@@ -18,6 +18,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Toaster } from "sonner";
 
 const NAV = [
   { to: "/plan", label: "Plan", short: "Plan", icon: Target },
@@ -184,6 +185,7 @@ export function AppShell() {
         </main>
         <BottomNav />
       </div>
+      <Toaster theme="dark" position="top-right" toastOptions={{ style: { background: "#102033", border: "1px solid rgba(164,191,223,0.34)", color: "#fff" } }} />
     </div>
   );
 }
