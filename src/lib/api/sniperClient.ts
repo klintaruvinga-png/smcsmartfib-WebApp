@@ -115,7 +115,7 @@ export const apiClient = {
   },
   async postEngineBatch(payload: unknown, mock = MOCK_MODE): Promise<{ ok: true }> {
     if (mock) return { ok: true };
-    return call("/engine-batch", { method: "POST", body: payload, secret: true });
+    return call("/engine-batch", { method: "POST", body: payload, privileged: true });
   },
 
   // Authenticated user
