@@ -44,20 +44,34 @@ export function getBackendUrl() {
 interface RequestOpts {
   method?: "GET" | "POST";
   body?: unknown;
-  secret?: boolean;
+  /**
+   * Privileged route — must NEVER be called directly from the browser with a
+   * shared secret. The backend MUST proxy these via an authenticated
+   * server-side handler (e.g. WP AJAX action verifying user capability + nonce,
+   * or an edge function holding the secret server-side). The frontend posts to
+   * a same-origin proxy path; the secret never touches `window`.
+   */
+  privileged?: boolean;
 }
 
 async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  // Placeholder auth headers — wired to wp_localize_script in production
-  const win = typeof window !== "undefined" ? (window as unknown as { SNIPER?: { nonce?: string; secret?: string } }) : undefined;
+  // Per-session WP nonce only. We intentionally do NOT read any shared secret
+  // from `window.*` — exposing a privileged credential to page JS would make
+  // it trivially stealable via XSS or DevTools.
+  const win = typeof window !== "undefined" ? (window as unknown as { SNIPER?: { nonce?: string } }) : undefined;
   if (win?.SNIPER?.nonce) headers["X-WP-Nonce"] = win.SNIPER.nonce;
-  if (opts.secret && win?.SNIPER?.secret) headers["X-Sniper-Secret"] = win.SNIPER.secret;
 
-  const base = backendUrl.replace(/\/$/, "");
-  const res = await fetch(`${base}/sniper/v1${path}`, {
+  // Privileged routes are sent to a same-origin proxy that injects the secret
+  // server-side after validating the user's capability + nonce.
+  const url = opts.privileged
+    ? `/wp-json/sniper/v1/proxy${path}`
+    : `${backendUrl.replace(/\/$/, "")}/sniper/v1${path}`;
+
+  const res = await fetch(url, {
     method: opts.method ?? "GET",
     headers,
+    credentials: opts.privileged ? "same-origin" : "omit",
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
   if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
@@ -101,7 +115,7 @@ export const apiClient = {
   },
   async postEngineBatch(payload: unknown, mock = MOCK_MODE): Promise<{ ok: true }> {
     if (mock) return { ok: true };
-    return call("/engine-batch", { method: "POST", body: payload, secret: true });
+    return call("/engine-batch", { method: "POST", body: payload, privileged: true });
   },
 
   // Authenticated user
