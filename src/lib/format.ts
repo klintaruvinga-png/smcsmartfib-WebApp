@@ -3,6 +3,9 @@ import type { Symbol } from "@/types/sniper";
 export function fmtPrice(value: number, symbol?: Symbol): string {
   if (symbol === "XAUUSD") return value.toFixed(2);
   if (symbol && symbol.endsWith("JPY")) return value.toFixed(3);
+  if (symbol === "US30" || symbol === "NAS100") return value.toFixed(1);
+  if (symbol === "BTCUSD") return value.toFixed(2);
+  if (symbol === "ETHUSD") return value.toFixed(2);
   return value.toFixed(5);
 }
 
@@ -12,13 +15,34 @@ export function fmtPct(value: number, signed = true): string {
   return `${s}%`;
 }
 
-export function fmtUSC(value: number, signed = false): string {
-  const sign = signed && value > 0 ? "+" : "";
-  return `${sign}$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: "$",
+  GBP: "£",
+  EUR: "€",
+  ZAR: "R",
+  AUD: "A$",
+  CAD: "C$",
+  CHF: "Fr",
+  JPY: "¥",
+  NZD: "NZ$",
+};
 
-export function fmtZAR(value: number): string {
-  return `R${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+/**
+ * Format a monetary value in any ISO 4217 currency.
+ * Falls back to the 3-letter code prefix for unknown currencies.
+ */
+export function fmtCurrency(
+  value: number,
+  currencyCode = "USD",
+  opts: { signed?: boolean; decimals?: number } = {},
+): string {
+  const { signed = false, decimals = 2 } = opts;
+  const sign = signed && value > 0 ? "+" : "";
+  const sym = CURRENCY_SYMBOLS[currencyCode.toUpperCase()] ?? `${currencyCode} `;
+  return `${sign}${sym}${Math.abs(value).toLocaleString(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })}`;
 }
 
 export function relTime(iso: string): string {

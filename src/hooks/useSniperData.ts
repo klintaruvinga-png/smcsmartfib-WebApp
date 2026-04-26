@@ -3,6 +3,15 @@ import { apiClient } from "@/lib/api/sniperClient";
 
 const POLL_MS = 15_000;
 
+/** Instrument spec registry — static data, cached indefinitely. */
+export function useInstrumentSpecs() {
+  return useQuery({
+    queryKey: ["instrument-specs"],
+    queryFn: () => apiClient.getInstrumentSpecs(),
+    staleTime: Infinity,
+  });
+}
+
 export function useSnapshot() {
   return useQuery({
     queryKey: ["snapshot"],

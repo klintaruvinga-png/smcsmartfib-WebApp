@@ -7,15 +7,35 @@ export type FreshnessState =
   | "pending-sync"
   | "mock";
 
+// All instruments in the spec registry. Extend here as new instruments are added.
 export type Symbol =
-  | "GBPUSD"
-  | "AUDUSD"
-  | "EURUSD"
-  | "NZDUSD"
-  | "USDJPY"
-  | "AUDJPY"
-  | "EURJPY"
-  | "XAUUSD";
+  // FOREX — USD quoted
+  | "GBPUSD" | "AUDUSD" | "EURUSD" | "NZDUSD"
+  // FOREX — JPY quoted
+  | "USDJPY" | "AUDJPY" | "EURJPY" | "GBPJPY" | "NZDJPY" | "CADJPY" | "CHFJPY"
+  // FOREX — USD-base, non-USD quote
+  | "USDCAD" | "USDCHF"
+  // FOREX — cross pairs
+  | "EURGBP" | "EURAUD" | "EURNZD" | "EURCHF" | "EURCAD"
+  | "GBPAUD" | "GBPNZD" | "GBPCAD" | "GBPCHF"
+  | "AUDNZD" | "AUDCAD" | "AUDCHF" | "NZDCAD" | "NZDCHF" | "CADCHF"
+  // METALS
+  | "XAUUSD" | "XAGUSD"
+  // INDICES
+  | "US30" | "NAS100"
+  // CRYPTO
+  | "BTCUSD" | "ETHUSD";
+
+export type InstrumentType = "forex" | "metal" | "index" | "crypto";
+
+export interface InstrumentSpec {
+  type: InstrumentType;
+  pip_size: number;          // price units per 1 pip
+  contract_size: number;     // units per 1.0 standard lot
+  quote: string;             // ISO 4217 quote currency (e.g. "USD", "JPY")
+  min_stop_pips: number;     // minimum stop-loss distance in pips
+  user_overrideable: boolean;// user can adjust contract_size/pip_size for their broker
+}
 
 export interface PairPrice {
   symbol: Symbol;
@@ -58,6 +78,14 @@ export interface SignalCandidate {
   createdAt: string;
 }
 
+export interface TradePlanStage {
+  entry: number | null;
+  lot: number;
+  riskAmount: number;  // in account_currency
+  currency: string;    // ISO 4217
+  slPips: number;
+}
+
 export interface TradePlan {
   signalId: string;
   entries: { e1: number; e2: number; e3: number };
@@ -65,8 +93,8 @@ export interface TradePlan {
   tps: { tp1: number; tp2: number; tp3: number };
   rr: { tp1: number; tp2: number; tp3: number };
   lotSize: { e1: number; e2: number; e3: number };
-  riskUSC: number;
-  riskZAR: number;
+  riskAmount: number;     // total risk in account_currency
+  currency: string;       // ISO 4217 (e.g. "USD", "ZAR")
   drawdownImpactPct: number;
   source: "frontend-preview" | "backend-blueprint";
 }
@@ -78,7 +106,8 @@ export interface Position {
   entry: number;
   current: number;
   lots: number;
-  pnlUSC: number;
+  pnlAmount: number;  // in account_currency
+  currency: string;
   pnlPct: number;
   openedAt: string;
   state: FreshnessState;
@@ -105,6 +134,11 @@ export interface EngineHealth {
   lastEngineRunAt: string | null;
 }
 
+export interface InstrumentOverride {
+  contract_size?: number;
+  pip_size?: number;
+}
+
 export interface DashboardSettings {
   backendUrl: string;
   apiKeyStatus: "ok" | "missing" | "invalid";
@@ -115,6 +149,11 @@ export interface DashboardSettings {
 }
 
 export interface RiskProfile {
+  // Account currency configuration
+  accountCurrency: string;        // ISO 4217: "USD" | "GBP" | "EUR" | "ZAR" | …
+  usdToAccountRate: number;       // how many account-currency units equal 1 USD (1.0 for USD)
+  instrumentOverrides: Record<string, InstrumentOverride>; // per-user broker adjustments
+  // Risk parameters
   tier: "conservative" | "balanced" | "aggressive";
   maxConcurrentTrades: number;
   perTradePct: number;
@@ -125,13 +164,14 @@ export interface RiskProfile {
 }
 
 export interface AccountState {
-  balanceUSC: number;
-  equityUSC: number;
+  balance: number;      // in accountCurrency
+  equity: number;       // in accountCurrency
+  currency: string;     // ISO 4217
   marginUsedPct: number;
   drawdownPct: number;
   openPositions: number;
   pendingOrders: number;
-  todayPnlUSC: number;
-  todayPnlPct: number;
+  pnlToday: number;     // in accountCurrency
+  pnlTodayPct: number;
   state: FreshnessState;
 }

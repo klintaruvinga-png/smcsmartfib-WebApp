@@ -8,6 +8,7 @@ import type {
   AccountState,
   DashboardSettings,
   GateState,
+  InstrumentSpec,
   PairPrice,
   PendingOrder,
   Position,
@@ -21,6 +22,7 @@ import type {
 import {
   mockAccount,
   mockGates,
+  mockInstrumentSpecs,
   mockOrders,
   mockPlan,
   mockPositions,
@@ -80,6 +82,11 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
 
 // ──────────────── Public / shared ────────────────
 export const apiClient = {
+  // Public — instrument spec registry (no auth required)
+  async getInstrumentSpecs(mock = MOCK_MODE): Promise<Record<string, InstrumentSpec>> {
+    if (mock) return mockInstrumentSpecs;
+    return call<Record<string, InstrumentSpec>>("/instrument-specs");
+  },
   // Public
   async getRegimes(mock = MOCK_MODE): Promise<RegimeState[]> {
     if (mock) return mockRegimes;

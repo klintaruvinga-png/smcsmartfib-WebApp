@@ -3,6 +3,7 @@ import type {
   DashboardSettings,
   EngineHealth,
   GateState,
+  InstrumentSpec,
   PairPrice,
   PendingOrder,
   Position,
@@ -26,6 +27,45 @@ export const WATCHLIST: Symbol[] = [
   "EURJPY",
   "XAUUSD",
 ];
+
+// ── Instrument spec registry ────────────────────────────────────────────────
+// Mirrors sniper_instrument_specs() in sniper-webhook.php exactly.
+export const mockInstrumentSpecs: Record<string, InstrumentSpec> = {
+  GBPUSD: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "USD", min_stop_pips: 20, user_overrideable: false },
+  AUDUSD: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "USD", min_stop_pips: 20, user_overrideable: false },
+  EURUSD: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "USD", min_stop_pips: 20, user_overrideable: false },
+  NZDUSD: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "USD", min_stop_pips: 20, user_overrideable: false },
+  USDJPY: { type: "forex", pip_size: 0.01,   contract_size: 100000, quote: "JPY", min_stop_pips: 20, user_overrideable: false },
+  AUDJPY: { type: "forex", pip_size: 0.01,   contract_size: 100000, quote: "JPY", min_stop_pips: 20, user_overrideable: false },
+  EURJPY: { type: "forex", pip_size: 0.01,   contract_size: 100000, quote: "JPY", min_stop_pips: 20, user_overrideable: false },
+  GBPJPY: { type: "forex", pip_size: 0.01,   contract_size: 100000, quote: "JPY", min_stop_pips: 20, user_overrideable: false },
+  NZDJPY: { type: "forex", pip_size: 0.01,   contract_size: 100000, quote: "JPY", min_stop_pips: 20, user_overrideable: false },
+  CADJPY: { type: "forex", pip_size: 0.01,   contract_size: 100000, quote: "JPY", min_stop_pips: 20, user_overrideable: false },
+  CHFJPY: { type: "forex", pip_size: 0.01,   contract_size: 100000, quote: "JPY", min_stop_pips: 20, user_overrideable: false },
+  USDCAD: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "CAD", min_stop_pips: 20, user_overrideable: false },
+  USDCHF: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "CHF", min_stop_pips: 20, user_overrideable: false },
+  EURGBP: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "GBP", min_stop_pips: 20, user_overrideable: false },
+  EURAUD: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "AUD", min_stop_pips: 20, user_overrideable: false },
+  EURNZD: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "NZD", min_stop_pips: 20, user_overrideable: false },
+  EURCHF: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "CHF", min_stop_pips: 20, user_overrideable: false },
+  EURCAD: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "CAD", min_stop_pips: 20, user_overrideable: false },
+  GBPAUD: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "AUD", min_stop_pips: 20, user_overrideable: false },
+  GBPNZD: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "NZD", min_stop_pips: 20, user_overrideable: false },
+  GBPCAD: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "CAD", min_stop_pips: 20, user_overrideable: false },
+  GBPCHF: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "CHF", min_stop_pips: 20, user_overrideable: false },
+  AUDNZD: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "NZD", min_stop_pips: 20, user_overrideable: false },
+  AUDCAD: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "CAD", min_stop_pips: 20, user_overrideable: false },
+  AUDCHF: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "CHF", min_stop_pips: 20, user_overrideable: false },
+  NZDCAD: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "CAD", min_stop_pips: 20, user_overrideable: false },
+  NZDCHF: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "CHF", min_stop_pips: 20, user_overrideable: false },
+  CADCHF: { type: "forex", pip_size: 0.0001, contract_size: 100000, quote: "CHF", min_stop_pips: 20, user_overrideable: false },
+  XAUUSD: { type: "metal",  pip_size: 0.01,  contract_size: 100,    quote: "USD", min_stop_pips: 50, user_overrideable: false },
+  XAGUSD: { type: "metal",  pip_size: 0.001, contract_size: 5000,   quote: "USD", min_stop_pips: 50, user_overrideable: false },
+  US30:   { type: "index",  pip_size: 1.0,   contract_size: 1,      quote: "USD", min_stop_pips: 30, user_overrideable: true  },
+  NAS100: { type: "index",  pip_size: 1.0,   contract_size: 1,      quote: "USD", min_stop_pips: 30, user_overrideable: true  },
+  BTCUSD: { type: "crypto", pip_size: 1.0,   contract_size: 1,      quote: "USD", min_stop_pips: 50, user_overrideable: true  },
+  ETHUSD: { type: "crypto", pip_size: 1.0,   contract_size: 1,      quote: "USD", min_stop_pips: 50, user_overrideable: true  },
+};
 
 export const mockPrices: PairPrice[] = [
   { symbol: "GBPUSD", bid: 1.2674, ask: 1.2676, mid: 1.2675, changePct1d: 0.42, updatedAt: now(), state: "mock" },
@@ -125,16 +165,16 @@ export const mockPlan: TradePlan = {
   tps: { tp1: 1.2705, tp2: 1.2738, tp3: 1.2782 },
   rr: { tp1: 1.2, tp2: 2.1, tp3: 3.6 },
   lotSize: { e1: 0.12, e2: 0.16, e3: 0.22 },
-  riskUSC: 124.0,
-  riskZAR: 2280,
+  riskAmount: 124.0,   // in account currency
+  currency: "USD",
   drawdownImpactPct: 0.62,
   source: "backend-blueprint",
 };
 
 export const mockPositions: Position[] = [
-  { id: "pos-1", symbol: "GBPUSD", direction: "LONG", entry: 1.2662, current: 1.2675, lots: 0.16, pnlUSC: 20.8, pnlPct: 0.1, openedAt: minutesAgo(45), state: "mock" },
-  { id: "pos-2", symbol: "USDJPY", direction: "LONG", entry: 156.1, current: 156.42, lots: 0.1, pnlUSC: 21.4, pnlPct: 0.2, openedAt: minutesAgo(120), state: "mock" },
-  { id: "pos-3", symbol: "AUDJPY", direction: "LONG", entry: 102.7, current: 102.95, lots: 0.08, pnlUSC: 14.2, pnlPct: 0.24, openedAt: minutesAgo(35), state: "stale" },
+  { id: "pos-1", symbol: "GBPUSD", direction: "LONG", entry: 1.2662, current: 1.2675, lots: 0.16, pnlAmount: 20.8, currency: "USD", pnlPct: 0.1, openedAt: minutesAgo(45), state: "mock" },
+  { id: "pos-2", symbol: "USDJPY", direction: "LONG", entry: 156.1, current: 156.42, lots: 0.1, pnlAmount: 21.4, currency: "USD", pnlPct: 0.2, openedAt: minutesAgo(120), state: "mock" },
+  { id: "pos-3", symbol: "AUDJPY", direction: "LONG", entry: 102.7, current: 102.95, lots: 0.08, pnlAmount: 14.2, currency: "USD", pnlPct: 0.24, openedAt: minutesAgo(35), state: "stale" },
 ];
 
 export const mockOrders: PendingOrder[] = [
@@ -162,6 +202,9 @@ export const mockSettings: DashboardSettings = {
 };
 
 export const mockRiskProfile: RiskProfile = {
+  accountCurrency: "USD",
+  usdToAccountRate: 1.0,
+  instrumentOverrides: {},
   tier: "balanced",
   maxConcurrentTrades: 3,
   perTradePct: 0.5,
@@ -172,14 +215,15 @@ export const mockRiskProfile: RiskProfile = {
 };
 
 export const mockAccount: AccountState = {
-  balanceUSC: 24820,
-  equityUSC: 24876,
+  balance: 24820,
+  equity: 24876,
+  currency: "USD",
   marginUsedPct: 4.2,
   drawdownPct: 1.1,
   openPositions: 3,
   pendingOrders: 4,
-  todayPnlUSC: 56.4,
-  todayPnlPct: 0.23,
+  pnlToday: 56.4,
+  pnlTodayPct: 0.23,
   state: "mock",
 };
 
@@ -191,7 +235,12 @@ export function mockPriceSeries(symbol: Symbol, points = 80) {
   const out: { t: number; p: number }[] = [];
   for (let i = points - 1; i >= 0; i--) {
     v += (Math.random() - 0.5) * vol;
-    out.push({ t: Date.now() - i * 60_000, p: Number(v.toFixed(symbol === "XAUUSD" ? 2 : symbol.endsWith("JPY") ? 3 : 5)) });
+    const dp =
+      symbol === "XAUUSD" ? 2
+      : symbol.endsWith("JPY") ? 3
+      : symbol === "BTCUSD" || symbol === "ETHUSD" ? 2
+      : 5;
+    out.push({ t: Date.now() - i * 60_000, p: Number(v.toFixed(dp)) });
   }
   return out;
 }
