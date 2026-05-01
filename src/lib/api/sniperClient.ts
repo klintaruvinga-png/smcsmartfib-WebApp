@@ -65,6 +65,7 @@ export function getBackendUrl() {
 interface RequestOpts {
   method?: "GET" | "POST" | "DELETE";
   body?: unknown;
+  skipAuthHeaders?: boolean;
   /**
    * Privileged route — must NEVER be called directly from the browser with a
    * shared secret. The backend MUST proxy these via an authenticated
@@ -76,18 +77,21 @@ interface RequestOpts {
 }
 
 async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = {};
+  if (opts.body) headers["Content-Type"] = "application/json";
 
-  const authHeader = getAuthHeader();
-  if (authHeader) {
-    headers["Authorization"] = authHeader;
-  } else {
-    // Fall back to nonce when served directly from WordPress (window.SNIPER injected)
-    const win =
-      typeof window !== "undefined"
-        ? (window as unknown as { SNIPER?: { nonce?: string } })
-        : undefined;
-    if (win?.SNIPER?.nonce) headers["X-WP-Nonce"] = win.SNIPER.nonce;
+  if (!opts.skipAuthHeaders) {
+    const authHeader = getAuthHeader();
+    if (authHeader) {
+      headers["Authorization"] = authHeader;
+    } else {
+      // Fall back to nonce when served directly from WordPress (window.SNIPER injected)
+      const win =
+        typeof window !== "undefined"
+          ? (window as unknown as { SNIPER?: { nonce?: string } })
+          : undefined;
+      if (win?.SNIPER?.nonce) headers["X-WP-Nonce"] = win.SNIPER.nonce;
+    }
   }
 
   const url = `${backendUrl.replace(/\/$/, "")}/sniper/v1${path}`;
@@ -190,7 +194,7 @@ export const apiClient = {
   async getSession(mock = MOCK_MODE) {
     if (mock)
       return { name: "London-AM", openUtc: "07:00", closeUtc: "11:00", state: "mock" as const };
-    return call<{ name: string; openUtc: string; closeUtc: string; state: string }>("/session");
+    return call<{ name: string; openUtc: string; closeUtc: string; state: string }>("/session", { skipAuthHeaders: true, authenticated: false });
   },
   async postEngineBatch(payload: unknown, mock = MOCK_MODE): Promise<{ ok: true }> {
     if (mock) return { ok: true };
