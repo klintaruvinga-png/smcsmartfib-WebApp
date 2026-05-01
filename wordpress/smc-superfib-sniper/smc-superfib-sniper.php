@@ -946,13 +946,14 @@ final class SMC_SuperFib_Sniper_REST {
             $this->set_twelve_key_status($user_id, 'rate-limited');
             return null;
         }
-        if (($code >= 400 && $code < 500) || (isset($body['status']) && $body['status'] === 'error')) {
-            $this->set_twelve_key_status($user_id, 'invalid');
+        // Check 5xx BEFORE checking body['status']: Twelve Data outage responses carry
+        // status:"error" in the body at the same time as a 5xx HTTP code, so if the body
+        // check ran first the 5xx escape hatch would never be reached.
+        if ($code >= 500) {
             return null;
         }
-        if ($code >= 500) {
-            // Transient upstream error — preserve the existing key status rather than
-            // permanently marking a valid key as invalid.
+        if ($code >= 400 || (isset($body['status']) && $body['status'] === 'error')) {
+            $this->set_twelve_key_status($user_id, 'invalid');
             return null;
         }
 
@@ -1083,11 +1084,12 @@ final class SMC_SuperFib_Sniper_REST {
         if ($code === 429 || (isset($body['code']) && (int) $body['code'] === 429)) {
             return array('ok' => false, 'status' => 'rate-limited', 'message' => 'Twelve Data rate limit reached.');
         }
-        if (($code >= 400 && $code < 500) || (isset($body['status']) && $body['status'] === 'error')) {
-            return array('ok' => false, 'status' => 'invalid', 'message' => isset($body['message']) ? $body['message'] : 'Invalid Twelve Data key.');
-        }
+        // Check 5xx BEFORE checking body['status'] — same ordering fix as fetch_quote.
         if ($code >= 500) {
             return array('ok' => false, 'status' => 'blocked', 'message' => 'Twelve Data service unavailable. Try again shortly.');
+        }
+        if ($code >= 400 || (isset($body['status']) && $body['status'] === 'error')) {
+            return array('ok' => false, 'status' => 'invalid', 'message' => isset($body['message']) ? $body['message'] : 'Invalid Twelve Data key.');
         }
 
         return array('ok' => true, 'status' => 'ok');
