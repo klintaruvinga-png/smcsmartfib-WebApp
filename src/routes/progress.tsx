@@ -45,7 +45,12 @@ function ProgressPage() {
             <FreshnessBadge state={account.state} />
           </div>
           <div className="font-mono text-2xl font-semibold mt-2">{fmtUSC(account.equityUSC)}</div>
-          <div className={cn("text-xs font-mono mt-0.5", account.todayPnlUSC >= 0 ? "text-buy" : "text-sell")}>
+          <div
+            className={cn(
+              "text-xs font-mono mt-0.5",
+              account.todayPnlUSC >= 0 ? "text-buy" : "text-sell",
+            )}
+          >
             {fmtUSC(account.todayPnlUSC, true)} today
           </div>
         </div>
@@ -59,7 +64,9 @@ function ProgressPage() {
           <div className="text-[10px] font-mono text-mute mt-0.5">Longest: 14 days</div>
         </div>
         <div className="rounded-lg border border-bd bg-bg1/60 p-4">
-          <div className="text-[11px] font-mono uppercase tracking-wider text-mute">DD remaining</div>
+          <div className="text-[11px] font-mono uppercase tracking-wider text-mute">
+            DD remaining
+          </div>
           <div className="font-mono text-2xl font-semibold mt-2 text-buy">
             {fmtPct(6 - account.drawdownPct, false)}
           </div>
@@ -81,9 +88,13 @@ function ProgressPage() {
                 ) : (
                   <Circle className="h-4 w-4 text-mute shrink-0" />
                 )}
-                <span className={cn("text-sm flex-1", m.done ? "text-tx" : "text-dim")}>{m.label}</span>
+                <span className={cn("text-sm flex-1", m.done ? "text-tx" : "text-dim")}>
+                  {m.label}
+                </span>
                 {!m.done && m.progress != null && (
-                  <span className="font-mono text-[10px] text-mute">{Math.round(m.progress * 100)}%</span>
+                  <span className="font-mono text-[10px] text-mute">
+                    {Math.round(m.progress * 100)}%
+                  </span>
                 )}
               </div>
               {!m.done && m.progress != null && (

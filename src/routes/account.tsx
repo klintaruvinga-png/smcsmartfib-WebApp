@@ -11,7 +11,10 @@ export const Route = createFileRoute("/account")({
   head: () => ({
     meta: [
       { title: "Account & Settings — SMC SuperFIB" },
-      { name: "description", content: "Backend URL, API key status, refresh interval, watchlist and risk profile." },
+      {
+        name: "description",
+        content: "Backend URL, API key status, refresh interval, watchlist and risk profile.",
+      },
       { property: "og:title", content: "Account & Settings — SMC SuperFIB" },
       { property: "og:description", content: "Configure your dashboard and risk profile." },
     ],
@@ -42,10 +45,18 @@ function AccountPage() {
       )}
 
       <div className="flex gap-1 border-b border-bd">
-        <TabButton active={tab === "settings"} onClick={() => setTab("settings")} icon={<SettingsIcon className="h-3.5 w-3.5" />}>
+        <TabButton
+          active={tab === "settings"}
+          onClick={() => setTab("settings")}
+          icon={<SettingsIcon className="h-3.5 w-3.5" />}
+        >
           Settings
         </TabButton>
-        <TabButton active={tab === "risk"} onClick={() => setTab("risk")} icon={<Shield className="h-3.5 w-3.5" />}>
+        <TabButton
+          active={tab === "risk"}
+          onClick={() => setTab("risk")}
+          icon={<Shield className="h-3.5 w-3.5" />}
+        >
           Risk Profile
         </TabButton>
       </div>
@@ -143,7 +154,10 @@ function SettingsTab({ settings }: { settings: import("@/types/sniper").Dashboar
       <Card title="Watchlist" className="lg:col-span-2">
         <div className="flex flex-wrap gap-1.5 mb-3">
           {s.watchlist.map((p) => (
-            <span key={p} className="inline-flex items-center gap-1.5 rounded border border-bd bg-bg2/60 px-2 py-1 font-mono text-xs text-dim">
+            <span
+              key={p}
+              className="inline-flex items-center gap-1.5 rounded border border-bd bg-bg2/60 px-2 py-1 font-mono text-xs text-dim"
+            >
               {p}
               <button onClick={() => removePair(p)} className="text-mute hover:text-sell">
                 <X className="h-3 w-3" />
@@ -174,9 +188,25 @@ function SettingsTab({ settings }: { settings: import("@/types/sniper").Dashboar
 
       <Card title="Risk allocation" className="lg:col-span-2">
         <div className="grid gap-3 sm:grid-cols-3">
-          <NumberInput label="Per-trade %" value={s.riskAllocation.perTradePct} onChange={(v) => setS({ ...s, riskAllocation: { ...s.riskAllocation, perTradePct: v } })} />
-          <NumberInput label="Daily max %" value={s.riskAllocation.dailyMaxPct} onChange={(v) => setS({ ...s, riskAllocation: { ...s.riskAllocation, dailyMaxPct: v } })} />
-          <NumberInput label="DD cap %" value={s.riskAllocation.ddCapPct} onChange={(v) => setS({ ...s, riskAllocation: { ...s.riskAllocation, ddCapPct: v } })} />
+          <NumberInput
+            label="Per-trade %"
+            value={s.riskAllocation.perTradePct}
+            onChange={(v) =>
+              setS({ ...s, riskAllocation: { ...s.riskAllocation, perTradePct: v } })
+            }
+          />
+          <NumberInput
+            label="Daily max %"
+            value={s.riskAllocation.dailyMaxPct}
+            onChange={(v) =>
+              setS({ ...s, riskAllocation: { ...s.riskAllocation, dailyMaxPct: v } })
+            }
+          />
+          <NumberInput
+            label="DD cap %"
+            value={s.riskAllocation.ddCapPct}
+            onChange={(v) => setS({ ...s, riskAllocation: { ...s.riskAllocation, ddCapPct: v } })}
+          />
         </div>
       </Card>
     </div>
@@ -196,7 +226,9 @@ function RiskTab({ risk }: { risk: import("@/types/sniper").RiskProfile }) {
                 onClick={() => setR({ ...r, tier: t })}
                 className={cn(
                   "flex-1 rounded border px-2.5 py-1.5 text-xs capitalize transition-colors",
-                  r.tier === t ? "border-accent/60 bg-accent/15 text-accent" : "border-bd bg-bg2/40 text-mute hover:text-dim",
+                  r.tier === t
+                    ? "border-accent/60 bg-accent/15 text-accent"
+                    : "border-bd bg-bg2/40 text-mute hover:text-dim",
                 )}
               >
                 {t}
@@ -204,13 +236,35 @@ function RiskTab({ risk }: { risk: import("@/types/sniper").RiskProfile }) {
             ))}
           </div>
         </Field>
-        <NumberInput label="Max concurrent trades" value={r.maxConcurrentTrades} onChange={(v) => setR({ ...r, maxConcurrentTrades: v })} step={1} />
-        <NumberInput label="Cooldown (min)" value={r.cooldownMin} onChange={(v) => setR({ ...r, cooldownMin: v })} step={1} />
+        <NumberInput
+          label="Max concurrent trades"
+          value={r.maxConcurrentTrades}
+          onChange={(v) => setR({ ...r, maxConcurrentTrades: v })}
+          step={1}
+        />
+        <NumberInput
+          label="Cooldown (min)"
+          value={r.cooldownMin}
+          onChange={(v) => setR({ ...r, cooldownMin: v })}
+          step={1}
+        />
       </Card>
       <Card title="Risk caps">
-        <NumberInput label="Per-trade %" value={r.perTradePct} onChange={(v) => setR({ ...r, perTradePct: v })} />
-        <NumberInput label="Daily max %" value={r.dailyMaxPct} onChange={(v) => setR({ ...r, dailyMaxPct: v })} />
-        <NumberInput label="DD cap %" value={r.ddCapPct} onChange={(v) => setR({ ...r, ddCapPct: v })} />
+        <NumberInput
+          label="Per-trade %"
+          value={r.perTradePct}
+          onChange={(v) => setR({ ...r, perTradePct: v })}
+        />
+        <NumberInput
+          label="Daily max %"
+          value={r.dailyMaxPct}
+          onChange={(v) => setR({ ...r, dailyMaxPct: v })}
+        />
+        <NumberInput
+          label="DD cap %"
+          value={r.ddCapPct}
+          onChange={(v) => setR({ ...r, ddCapPct: v })}
+        />
       </Card>
       <div className="lg:col-span-2 flex items-center justify-end gap-3">
         <FreshnessBadge state="mock" />
@@ -222,7 +276,15 @@ function RiskTab({ risk }: { risk: import("@/types/sniper").RiskProfile }) {
   );
 }
 
-function Card({ title, className, children }: { title: string; className?: string; children: React.ReactNode }) {
+function Card({
+  title,
+  className,
+  children,
+}: {
+  title: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className={cn("rounded-lg border border-bd bg-bg1/60 p-4 space-y-3", className)}>
       <div className="text-[11px] font-mono uppercase tracking-wider text-mute">{title}</div>
@@ -234,7 +296,9 @@ function Card({ title, className, children }: { title: string; className?: strin
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="block text-[10px] font-mono uppercase tracking-wider text-mute">{label}</label>
+      <label className="block text-[10px] font-mono uppercase tracking-wider text-mute">
+        {label}
+      </label>
       {children}
     </div>
   );

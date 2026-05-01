@@ -59,7 +59,10 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
   // Per-session WP nonce only. We intentionally do NOT read any shared secret
   // from `window.*` — exposing a privileged credential to page JS would make
   // it trivially stealable via XSS or DevTools.
-  const win = typeof window !== "undefined" ? (window as unknown as { SNIPER?: { nonce?: string } }) : undefined;
+  const win =
+    typeof window !== "undefined"
+      ? (window as unknown as { SNIPER?: { nonce?: string } })
+      : undefined;
   if (win?.SNIPER?.nonce) headers["X-WP-Nonce"] = win.SNIPER.nonce;
 
   // Privileged routes are sent to a same-origin proxy that injects the secret
@@ -110,7 +113,8 @@ export const apiClient = {
     return call<TradePlan[]>(`/ladders${symbol ? `?symbol=${symbol}` : ""}`);
   },
   async getSession(mock = MOCK_MODE) {
-    if (mock) return { name: "London-AM", openUtc: "07:00", closeUtc: "11:00", state: "mock" as const };
+    if (mock)
+      return { name: "London-AM", openUtc: "07:00", closeUtc: "11:00", state: "mock" as const };
     return call<{ name: string; openUtc: string; closeUtc: string; state: string }>("/session");
   },
   async postEngineBatch(payload: unknown, mock = MOCK_MODE): Promise<{ ok: true }> {
@@ -127,7 +131,9 @@ export const apiClient = {
     if (mock) return mockPrices.filter((p) => payload.symbols.includes(p.symbol));
     return call("/user/market-data", { method: "POST", body: payload });
   },
-  async getUserTrades(mock = MOCK_MODE): Promise<{ positions: Position[]; orders: PendingOrder[] }> {
+  async getUserTrades(
+    mock = MOCK_MODE,
+  ): Promise<{ positions: Position[]; orders: PendingOrder[] }> {
     if (mock) return { positions: mockPositions, orders: mockOrders };
     return call("/user/trades");
   },
@@ -147,7 +153,10 @@ export const apiClient = {
     if (mock) return mockSettings;
     return call("/user/settings");
   },
-  async postUserSettings(payload: Partial<DashboardSettings>, mock = MOCK_MODE): Promise<{ ok: true }> {
+  async postUserSettings(
+    payload: Partial<DashboardSettings>,
+    mock = MOCK_MODE,
+  ): Promise<{ ok: true }> {
     if (mock) return { ok: true };
     return call("/user/settings", { method: "POST", body: payload });
   },
@@ -155,7 +164,10 @@ export const apiClient = {
     if (mock) return mockRiskProfile;
     return call("/user/risk-profile");
   },
-  async postUserRiskProfile(payload: Partial<RiskProfile>, mock = MOCK_MODE): Promise<{ ok: true }> {
+  async postUserRiskProfile(
+    payload: Partial<RiskProfile>,
+    mock = MOCK_MODE,
+  ): Promise<{ ok: true }> {
     if (mock) return { ok: true };
     return call("/user/risk-profile", { method: "POST", body: payload });
   },
@@ -167,7 +179,10 @@ export const apiClient = {
     if (mock) return { ok: true };
     return call("/user/trade-queue", { method: "POST", body: payload });
   },
-  async postExecuteSignals(payload: { signalIds: string[] }, mock = MOCK_MODE): Promise<{ ok: true; queued: number }> {
+  async postExecuteSignals(
+    payload: { signalIds: string[] },
+    mock = MOCK_MODE,
+  ): Promise<{ ok: true; queued: number }> {
     if (mock) return { ok: true, queued: payload.signalIds.length };
     return call("/user/execute-signals", { method: "POST", body: payload });
   },

@@ -13,7 +13,10 @@ export const Route = createFileRoute("/signals")({
   head: () => ({
     meta: [
       { title: "Signal Engine — SMC SuperFIB" },
-      { name: "description", content: "Engine readiness checklist and live signal candidates with backend confirmation." },
+      {
+        name: "description",
+        content: "Engine readiness checklist and live signal candidates with backend confirmation.",
+      },
       { property: "og:title", content: "Signal Engine — SMC SuperFIB" },
       { property: "og:description", content: "Engine health and live candidate signals." },
     ],
@@ -23,45 +26,64 @@ export const Route = createFileRoute("/signals")({
 
 function HealthIcon({ state }: { state: FreshnessState | "ok" | "missing" }) {
   if (state === "live" || state === "ok") return <CheckCircle2 className="h-4 w-4 text-buy" />;
-  if (state === "stale" || state === "pending-sync" || state === "mock") return <AlertTriangle className="h-4 w-4 text-warn" />;
+  if (state === "stale" || state === "pending-sync" || state === "mock")
+    return <AlertTriangle className="h-4 w-4 text-warn" />;
   return <XCircle className="h-4 w-4 text-sell" />;
 }
 
 function SignalsPage() {
   const { data: signals } = useLiveSignals();
   const h = mockEngineHealth;
-  const divergent = (signals ?? []).filter((s) => s.computedBy === "frontend" && !s.backendConfirmed);
+  const divergent = (signals ?? []).filter(
+    (s) => s.computedBy === "frontend" && !s.backendConfirmed,
+  );
 
   const checks: { label: string; state: FreshnessState | "ok" | "missing"; detail?: string }[] = [
-    { label: "Backend sync", state: h.backendSync, detail: h.lastBatchAt ? relTime(h.lastBatchAt) : "never" },
+    {
+      label: "Backend sync",
+      state: h.backendSync,
+      detail: h.lastBatchAt ? relTime(h.lastBatchAt) : "never",
+    },
     { label: "Price feed", state: h.priceFeed },
     { label: "Twelve Data key", state: h.twelveDataKey === "present" ? "ok" : "missing" },
     { label: "Regime computer", state: "live" },
     { label: "Gate logic", state: "live" },
     { label: "Chop filter", state: "live" },
     { label: "Fib levels", state: "live" },
-    { label: "Engine run", state: h.lastEngineRunAt ? "live" : "offline", detail: h.lastEngineRunAt ? relTime(h.lastEngineRunAt) : "never" },
+    {
+      label: "Engine run",
+      state: h.lastEngineRunAt ? "live" : "offline",
+      detail: h.lastEngineRunAt ? relTime(h.lastEngineRunAt) : "never",
+    },
   ];
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Signal Engine</h1>
-        <p className="text-xs text-mute mt-0.5">Readiness · candidate flow · backend confirmation</p>
+        <p className="text-xs text-mute mt-0.5">
+          Readiness · candidate flow · backend confirmation
+        </p>
       </div>
 
       {divergent.length > 0 && (
         <DivergenceBanner>
-          {divergent.length} frontend-only candidate{divergent.length > 1 ? "s" : ""} without backend confirmation.
+          {divergent.length} frontend-only candidate{divergent.length > 1 ? "s" : ""} without
+          backend confirmation.
         </DivergenceBanner>
       )}
 
       {/* Readiness grid */}
       <div className="rounded-lg border border-bd bg-bg1/60 p-4">
-        <div className="text-[11px] font-mono uppercase tracking-wider text-mute mb-3">Engine readiness</div>
+        <div className="text-[11px] font-mono uppercase tracking-wider text-mute mb-3">
+          Engine readiness
+        </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {checks.map((c) => (
-            <div key={c.label} className="flex items-center justify-between gap-2 rounded border border-bd bg-bg2/40 px-3 py-2">
+            <div
+              key={c.label}
+              className="flex items-center justify-between gap-2 rounded border border-bd bg-bg2/40 px-3 py-2"
+            >
               <div className="flex items-center gap-2">
                 <HealthIcon state={c.state} />
                 <span className="text-xs text-dim">{c.label}</span>
@@ -75,7 +97,9 @@ function SignalsPage() {
       {/* Candidate list */}
       <div className="rounded-lg border border-bd bg-bg1/60">
         <div className="flex items-center justify-between border-b border-bd px-4 py-2.5">
-          <div className="text-[11px] font-mono uppercase tracking-wider text-mute">Live candidates</div>
+          <div className="text-[11px] font-mono uppercase tracking-wider text-mute">
+            Live candidates
+          </div>
           <span className="text-[10px] font-mono text-mute">{signals?.length ?? 0} total</span>
         </div>
         <div className="divide-y divide-bd">
@@ -88,7 +112,12 @@ function SignalsPage() {
                 </div>
                 <div className="col-span-4 sm:col-span-2">
                   <div className="font-mono text-sm font-semibold">{s.symbol}</div>
-                  <div className={cn("text-[10px] font-mono", s.direction === "LONG" ? "text-buy" : "text-sell")}>
+                  <div
+                    className={cn(
+                      "text-[10px] font-mono",
+                      s.direction === "LONG" ? "text-buy" : "text-sell",
+                    )}
+                  >
                     {s.direction}
                   </div>
                 </div>
@@ -110,7 +139,10 @@ function SignalsPage() {
                 </div>
                 <div className="hidden sm:flex col-span-4 flex-wrap gap-1">
                   {s.confluence.slice(0, 3).map((c) => (
-                    <span key={c} className="rounded bg-bg2 px-1.5 py-0.5 text-[9px] font-mono text-mute border border-bd">
+                    <span
+                      key={c}
+                      className="rounded bg-bg2 px-1.5 py-0.5 text-[9px] font-mono text-mute border border-bd"
+                    >
                       {c}
                     </span>
                   ))}
@@ -127,7 +159,10 @@ function SignalsPage() {
                     {s.computedBy}
                   </span>
                   {divergent ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-mono text-sell" title="Backend has not confirmed">
+                    <span
+                      className="inline-flex items-center gap-1 text-[10px] font-mono text-sell"
+                      title="Backend has not confirmed"
+                    >
                       ⚠️
                     </span>
                   ) : (
