@@ -266,4 +266,25 @@ export const apiClient = {
     if (mock) return { ok: true, queued: payload.signalIds.length };
     return call("/user/execute-signals", { method: "POST", body: payload });
   },
+
+  // Dedicated watchlist endpoints — changes persist immediately without a full settings save.
+  async getWatchlist(mock = MOCK_MODE): Promise<{ watchlist: Symbol[]; supported: string[] }> {
+    if (mock) return { watchlist: mockSettings.watchlist, supported: [] };
+    return call("/user/watchlist");
+  },
+  async postWatchlistAdd(
+    symbol: string,
+    mock = MOCK_MODE,
+  ): Promise<{ ok: boolean; watchlist: Symbol[] }> {
+    if (mock) return { ok: true, watchlist: [...mockSettings.watchlist, symbol as Symbol] };
+    return call("/user/watchlist/add", { method: "POST", body: { symbol } });
+  },
+  async postWatchlistRemove(
+    symbol: string,
+    mock = MOCK_MODE,
+  ): Promise<{ ok: boolean; watchlist: Symbol[] }> {
+    if (mock)
+      return { ok: true, watchlist: mockSettings.watchlist.filter((s) => s !== symbol) };
+    return call("/user/watchlist/remove", { method: "POST", body: { symbol } });
+  },
 };

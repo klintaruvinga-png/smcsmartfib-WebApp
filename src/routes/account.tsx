@@ -105,6 +105,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
   const [busy, setBusy] = useState<"settings" | "test-key" | "save-key" | "delete-key" | null>(
     null,
   );
+  const [watchlistBusy, setWatchlistBusy] = useState<string | null>(null);
 
   useEffect(() => {
     if (!settingsDirty) {
@@ -122,8 +123,46 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
     setS(next);
   }
 
-  const removePair = (p: string) =>
-    updateSettingsDraft({ ...s, watchlist: s.watchlist.filter((w) => w !== p) });
+  async function removePair(p: string) {
+    if (watchlistBusy) return;
+    setWatchlistBusy(p);
+    try {
+      const result = await apiClient.postWatchlistRemove(p);
+      setS((prev) => ({ ...prev, watchlist: result.watchlist }));
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["user-settings"] }),
+        qc.invalidateQueries({ queryKey: ["snapshot"] }),
+        qc.invalidateQueries({ queryKey: ["live-signals"] }),
+      ]);
+      toast.success(`${p} removed`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to remove symbol");
+    } finally {
+      setWatchlistBusy(null);
+    }
+  }
+
+  async function addPair() {
+    const sym = newPair.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (!sym || s.watchlist.includes(sym as never)) return;
+    setWatchlistBusy("add");
+    try {
+      const result = await apiClient.postWatchlistAdd(sym);
+      setS((prev) => ({ ...prev, watchlist: result.watchlist }));
+      setNewPair("");
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["user-settings"] }),
+        qc.invalidateQueries({ queryKey: ["snapshot"] }),
+        qc.invalidateQueries({ queryKey: ["live-signals"] }),
+      ]);
+      toast.success(`${sym} added to watchlist`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to add symbol");
+    } finally {
+      setWatchlistBusy(null);
+    }
+  }
+
   const keyReady = apiKey.trim().length > 0;
 
   async function saveSettings() {
@@ -318,7 +357,11 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
               className="inline-flex items-center gap-1.5 rounded border border-bd bg-bg2/60 px-2 py-1 font-mono text-xs text-dim"
             >
               {p}
-              <button onClick={() => removePair(p)} className="text-mute hover:text-sell">
+              <button
+                onClick={() => removePair(p)}
+                disabled={watchlistBusy !== null}
+                className="text-mute hover:text-sell disabled:opacity-40"
+              >
                 <X className="h-3 w-3" />
               </button>
             </span>
@@ -327,20 +370,17 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
         <div className="flex gap-2">
           <input
             value={newPair}
-            onChange={(e) => setNewPair(e.target.value.toUpperCase())}
+            onChange={(e) => setNewPair(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+            onKeyDown={(e) => e.key === "Enter" && addPair()}
             placeholder="EURGBP"
             className="flex-1 rounded border border-bd bg-bg2/60 px-2.5 py-1.5 font-mono text-xs text-tx focus:outline-none focus:border-accent"
           />
           <button
-            onClick={() => {
-              if (newPair && !s.watchlist.includes(newPair as never)) {
-                updateSettingsDraft({ ...s, watchlist: [...s.watchlist, newPair as never] });
-                setNewPair("");
-              }
-            }}
-            className="rounded border border-bd bg-bg2 px-3 py-1.5 text-xs text-dim hover:text-tx hover:border-bd2"
+            onClick={addPair}
+            disabled={watchlistBusy !== null || !newPair.trim()}
+            className="rounded border border-bd bg-bg2 px-3 py-1.5 text-xs text-dim hover:text-tx hover:border-bd2 disabled:opacity-50"
           >
-            Add
+            {watchlistBusy === "add" ? "Adding..." : "Add"}
           </button>
         </div>
       </Card>
