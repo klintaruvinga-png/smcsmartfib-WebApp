@@ -113,7 +113,7 @@ export interface SignalCandidate {
     mss: SequenceState;
     displacement: DisplacementQuality;
     htaOverride: boolean;
-    f3Chop: "clear" | "caution" | "blocked";
+    f3Chop: "clear" | "caution";
     ltfLevel: FibLevel | null;
     firstReactionFamily: FibFamily | null;
     chartState: string;
