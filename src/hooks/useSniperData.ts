@@ -63,3 +63,19 @@ export function useLadders() {
     queryFn: () => apiClient.getLadders(),
   });
 }
+
+export function useSession() {
+  return useQuery({
+    queryKey: ["session"],
+    queryFn: () => apiClient.getSession(),
+    refetchInterval: 60_000,
+  });
+}
+
+export function useRegimes() {
+  return useQuery({
+    queryKey: ["regimes"],
+    queryFn: () => apiClient.getRegimes(),
+    refetchInterval: POLL_MS,
+  });
+}
