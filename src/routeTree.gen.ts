@@ -9,11 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LoginRouteImport } from './routes/login'
 import { Route as SignalsRouteImport } from './routes/signals'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as PlanRouteImport } from './routes/plan'
 import { Route as OrdersRouteImport } from './routes/orders'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as LiveRouteImport } from './routes/live'
 import { Route as ChartsRouteImport } from './routes/charts'
 import { Route as BookRouteImport } from './routes/book'
@@ -21,11 +21,6 @@ import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SignalsRoute = SignalsRouteImport.update({
   id: '/signals',
   path: '/signals',
@@ -44,6 +39,11 @@ const PlanRoute = PlanRouteImport.update({
 const OrdersRoute = OrdersRouteImport.update({
   id: '/orders',
   path: '/orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LiveRoute = LiveRouteImport.update({
@@ -80,11 +80,11 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
-  '/login': typeof LoginRoute
   '/analytics': typeof AnalyticsRoute
   '/book': typeof BookRoute
   '/charts': typeof ChartsRoute
   '/live': typeof LiveRoute
+  '/login': typeof LoginRoute
   '/orders': typeof OrdersRoute
   '/plan': typeof PlanRoute
   '/progress': typeof ProgressRoute
@@ -93,11 +93,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
-  '/login': typeof LoginRoute
   '/analytics': typeof AnalyticsRoute
   '/book': typeof BookRoute
   '/charts': typeof ChartsRoute
   '/live': typeof LiveRoute
+  '/login': typeof LoginRoute
   '/orders': typeof OrdersRoute
   '/plan': typeof PlanRoute
   '/progress': typeof ProgressRoute
@@ -107,11 +107,11 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
-  '/login': typeof LoginRoute
   '/analytics': typeof AnalyticsRoute
   '/book': typeof BookRoute
   '/charts': typeof ChartsRoute
   '/live': typeof LiveRoute
+  '/login': typeof LoginRoute
   '/orders': typeof OrdersRoute
   '/plan': typeof PlanRoute
   '/progress': typeof ProgressRoute
@@ -162,11 +162,11 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
-  LoginRoute: typeof LoginRoute
   AnalyticsRoute: typeof AnalyticsRoute
   BookRoute: typeof BookRoute
   ChartsRoute: typeof ChartsRoute
   LiveRoute: typeof LiveRoute
+  LoginRoute: typeof LoginRoute
   OrdersRoute: typeof OrdersRoute
   PlanRoute: typeof PlanRoute
   ProgressRoute: typeof ProgressRoute
@@ -175,13 +175,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/signals': {
       id: '/signals'
       path: '/signals'
@@ -208,6 +201,13 @@ declare module '@tanstack/react-router' {
       path: '/orders'
       fullPath: '/orders'
       preLoaderRoute: typeof OrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/live': {
@@ -258,11 +258,11 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
-  LoginRoute: LoginRoute,
   AnalyticsRoute: AnalyticsRoute,
   BookRoute: BookRoute,
   ChartsRoute: ChartsRoute,
   LiveRoute: LiveRoute,
+  LoginRoute: LoginRoute,
   OrdersRoute: OrdersRoute,
   PlanRoute: PlanRoute,
   ProgressRoute: ProgressRoute,

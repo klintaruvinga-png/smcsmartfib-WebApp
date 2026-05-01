@@ -171,13 +171,18 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
 
   const keyReady = apiKey.trim().length > 0;
 
-  async function saveSettings() {
+  async function saveSettings(nextSettings: DashboardSettings = s) {
     const submittedVersion = settingsEditVersion.current;
     setBusy("settings");
     try {
-      setBackendUrl(s.backendUrl);
-      await apiClient.postUserSettings(s);
+      setBackendUrl(nextSettings.backendUrl);
+      await apiClient.postUserSettings(nextSettings);
       await qc.invalidateQueries({ queryKey: ["user-settings"] });
+      await Promise.all([
+        qc.refetchQueries({ queryKey: ["engine-health"], type: "active" }),
+        qc.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
+        qc.refetchQueries({ queryKey: ["live-signals"], type: "active" }),
+      ]);
       if (settingsEditVersion.current === submittedVersion) {
         setSettingsDirty(false);
       }
@@ -223,10 +228,12 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
       setS({ ...s, apiKeyStatus: result.status });
       setApiKey("");
       await qc.invalidateQueries({ queryKey: ["user-settings"] });
-      await qc.invalidateQueries({ queryKey: ["engine-health"] });
-      await qc.invalidateQueries({ queryKey: ["snapshot"] });
-      await qc.invalidateQueries({ queryKey: ["live-signals"] });
-      await qc.invalidateQueries({ queryKey: ["regimes"] });
+      await Promise.all([
+        qc.refetchQueries({ queryKey: ["engine-health"], type: "active" }),
+        qc.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
+        qc.refetchQueries({ queryKey: ["live-signals"], type: "active" }),
+      ]);
+      await qc.refetchQueries({ queryKey: ["regimes"], type: "active" });
       toast.success("Twelve Data key saved");
     } catch (error) {
       setKeyStatus(previousStatus);
@@ -244,10 +251,12 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
       setS({ ...s, apiKeyStatus: result.status });
       setApiKey("");
       await qc.invalidateQueries({ queryKey: ["user-settings"] });
-      await qc.invalidateQueries({ queryKey: ["engine-health"] });
-      await qc.invalidateQueries({ queryKey: ["snapshot"] });
-      await qc.invalidateQueries({ queryKey: ["live-signals"] });
-      await qc.invalidateQueries({ queryKey: ["regimes"] });
+      await Promise.all([
+        qc.refetchQueries({ queryKey: ["engine-health"], type: "active" }),
+        qc.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
+        qc.refetchQueries({ queryKey: ["live-signals"], type: "active" }),
+      ]);
+      await qc.refetchQueries({ queryKey: ["regimes"], type: "active" });
       toast.success("Twelve Data key deleted");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Twelve Data key delete failed");
@@ -255,6 +264,20 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
       setBusy(null);
     }
   }
+
+  useEffect(() => {
+    if (!settingsDirty || busy !== null) return;
+    const changedRefresh =
+      s.refreshIntervalSec !== settings.refreshIntervalSec ||
+      s.staleThresholdSec !== settings.staleThresholdSec;
+    if (!changedRefresh) return;
+
+    const id = window.setTimeout(() => {
+      void saveSettings(s);
+    }, 450);
+
+    return () => window.clearTimeout(id);
+  }, [s, settings, settingsDirty, busy]);
 
   return (
     <div className="grid gap-3 lg:grid-cols-2">
@@ -437,6 +460,20 @@ function RiskTab({ risk }: { risk: RiskProfile }) {
       setSaving(false);
     }
   }
+
+  useEffect(() => {
+    if (!settingsDirty || busy !== null) return;
+    const changedRefresh =
+      s.refreshIntervalSec !== settings.refreshIntervalSec ||
+      s.staleThresholdSec !== settings.staleThresholdSec;
+    if (!changedRefresh) return;
+
+    const id = window.setTimeout(() => {
+      void saveSettings(s);
+    }, 450);
+
+    return () => window.clearTimeout(id);
+  }, [s, settings, settingsDirty, busy]);
 
   return (
     <div className="grid gap-3 lg:grid-cols-2">

@@ -43,8 +43,16 @@ function SignalsPage() {
       state: h?.backendSync ?? "offline",
       detail: h?.lastBatchAt ? relTime(h.lastBatchAt) : "never",
     },
-    { label: "Price feed", state: h?.priceFeed ?? "offline" },
-    { label: "Twelve Data key", state: h?.twelveDataKey === "present" ? "ok" : "missing" },
+    {
+      label: "Price feed",
+      state: h?.priceFeed ?? "offline",
+      detail: h?.priceFeed === "live" ? "connected" : undefined,
+    },
+    {
+      label: "Twelve Data key",
+      state: h?.twelveDataKeyStatus === "ok" || h?.twelveDataKey === "present" ? "ok" : "missing",
+      detail: h?.twelveDataKeyStatus ? h.twelveDataKeyStatus.replace("-", " ") : undefined,
+    },
     { label: "Regime computer", state: h?.backendSync ?? "offline" },
     { label: "Gate logic", state: h?.backendSync ?? "offline" },
     { label: "Chop filter", state: h?.backendSync ?? "offline" },
