@@ -123,7 +123,14 @@ export const apiClient = {
     return call("/regime", { method: "POST", body: payload });
   },
   async getSnapshot(mock = MOCK_MODE) {
-    if (mock) return { prices: mockPrices, regimes: mockRegimes, gates: mockGates };
+    if (mock) {
+      const wl = new Set(mockSettings.watchlist);
+      return {
+        prices: mockPrices.filter((p) => wl.has(p.symbol)),
+        regimes: mockRegimes.filter((r) => wl.has(r.symbol)),
+        gates: mockGates.filter((g) => wl.has(g.symbol)),
+      };
+    }
     return call<{ prices: PairPrice[]; regimes: RegimeState[]; gates: GateState[] }>("/snapshot");
   },
   async getChartSnapshot(
@@ -166,7 +173,10 @@ export const apiClient = {
     return call("/snapshot", { method: "POST", body: payload });
   },
   async getLiveSignals(mock = MOCK_MODE): Promise<SignalCandidate[]> {
-    if (mock) return mockSignals;
+    if (mock) {
+      const wl = new Set(mockSettings.watchlist);
+      return mockSignals.filter((s) => wl.has(s.symbol));
+    }
     return call<SignalCandidate[]>("/live-signals");
   },
   async postSignal(payload: Partial<SignalCandidate>, mock = MOCK_MODE): Promise<{ ok: true }> {
@@ -276,15 +286,23 @@ export const apiClient = {
     symbol: string,
     mock = MOCK_MODE,
   ): Promise<{ ok: boolean; watchlist: Symbol[] }> {
-    if (mock) return { ok: true, watchlist: [...mockSettings.watchlist, symbol as Symbol] };
+    if (mock) {
+      const sym = symbol as Symbol;
+      if (!mockSettings.watchlist.includes(sym)) {
+        mockSettings.watchlist = [...mockSettings.watchlist, sym];
+      }
+      return { ok: true, watchlist: mockSettings.watchlist };
+    }
     return call("/user/watchlist/add", { method: "POST", body: { symbol } });
   },
   async postWatchlistRemove(
     symbol: string,
     mock = MOCK_MODE,
   ): Promise<{ ok: boolean; watchlist: Symbol[] }> {
-    if (mock)
-      return { ok: true, watchlist: mockSettings.watchlist.filter((s) => s !== symbol) };
+    if (mock) {
+      mockSettings.watchlist = mockSettings.watchlist.filter((s) => s !== symbol);
+      return { ok: true, watchlist: mockSettings.watchlist };
+    }
     return call("/user/watchlist/remove", { method: "POST", body: { symbol } });
   },
 };

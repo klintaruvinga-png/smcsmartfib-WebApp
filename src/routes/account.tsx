@@ -128,9 +128,12 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
     setWatchlistBusy(p);
     try {
       const result = await apiClient.postWatchlistRemove(p);
+      // Update cache directly so useEffect never re-reads stale backend data
+      qc.setQueryData<DashboardSettings>(["user-settings"], (old) =>
+        old ? { ...old, watchlist: result.watchlist } : old,
+      );
       setS((prev) => ({ ...prev, watchlist: result.watchlist }));
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ["user-settings"] }),
         qc.invalidateQueries({ queryKey: ["snapshot"] }),
         qc.invalidateQueries({ queryKey: ["live-signals"] }),
       ]);
@@ -148,10 +151,13 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
     setWatchlistBusy("add");
     try {
       const result = await apiClient.postWatchlistAdd(sym);
+      // Update cache directly so useEffect never re-reads stale backend data
+      qc.setQueryData<DashboardSettings>(["user-settings"], (old) =>
+        old ? { ...old, watchlist: result.watchlist } : old,
+      );
       setS((prev) => ({ ...prev, watchlist: result.watchlist }));
       setNewPair("");
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ["user-settings"] }),
         qc.invalidateQueries({ queryKey: ["snapshot"] }),
         qc.invalidateQueries({ queryKey: ["live-signals"] }),
       ]);

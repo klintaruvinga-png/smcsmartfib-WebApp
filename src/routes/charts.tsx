@@ -24,14 +24,24 @@ export const Route = createFileRoute("/charts")({
 function ChartsPage() {
   const { data } = useSnapshot();
   const [selected, setSelected] = useState<Symbol>("GBPUSD");
+
+  // Clamp selection to current watchlist snapshot — if the selected symbol was
+  // removed from the watchlist it will no longer appear in data.prices, so fall
+  // back to the first available symbol instead of dereferencing undefined.
+  const prices = data?.prices ?? [];
+  const price = prices.find((p) => p.symbol === selected) ?? prices[0];
+  const activeSymbol = price?.symbol ?? selected;
+
   const { data: chart } = useQuery({
-    queryKey: ["chart", selected],
-    queryFn: () => apiClient.getChartSnapshot(selected),
+    queryKey: ["chart", activeSymbol],
+    queryFn: () => apiClient.getChartSnapshot(activeSymbol),
   });
 
   if (!data) return null;
+  if (!price) {
+    return <div className="text-mute text-sm">Add symbols to your watchlist to view charts.</div>;
+  }
 
-  const price = data.prices.find((p) => p.symbol === selected)!;
   const series = (chart?.candles ?? []).map((c) => ({ t: new Date(c.time).getTime(), p: c.close }));
   const fibs = chart?.fibLevels ?? [];
 
@@ -51,7 +61,7 @@ function ChartsPage() {
             onClick={() => setSelected(p.symbol)}
             className={cn(
               "rounded border px-2.5 py-1 text-xs font-mono transition-colors",
-              p.symbol === selected
+              p.symbol === activeSymbol
                 ? "border-accent/60 bg-accent/15 text-accent"
                 : "border-bd bg-bg2/40 text-mute hover:text-dim hover:border-bd2",
             )}
@@ -87,7 +97,7 @@ function ChartsPage() {
             <LineChart data={series} margin={{ top: 5, right: 60, bottom: 5, left: 5 }}>
               <YAxis
                 domain={["dataMin", "dataMax"]}
-                tickFormatter={(v: number) => fmtPrice(v, selected)}
+                tickFormatter={(v: number) => fmtPrice(v, activeSymbol)}
                 width={70}
                 tick={{ fill: "#9cb0c9", fontSize: 10, fontFamily: "JetBrains Mono" }}
                 axisLine={{ stroke: "rgba(164,191,223,0.24)" }}
@@ -103,7 +113,7 @@ function ChartsPage() {
                   fontSize: 11,
                 }}
                 labelFormatter={() => ""}
-                formatter={(v: number) => [fmtPrice(v, selected), "PRICE"]}
+                formatter={(v: number) => [fmtPrice(v, activeSymbol), "PRICE"]}
               />
               {fibs.map((f) => (
                 <ReferenceLine
@@ -113,7 +123,7 @@ function ChartsPage() {
                   strokeDasharray="3 3"
                   strokeOpacity={0.55}
                   label={{
-                    value: `${f.label} / ${fmtPrice(f.price, selected)}`,
+                    value: `${f.label} / ${fmtPrice(f.price, activeSymbol)}`,
                     position: "right",
                     fill: "#d8a35d",
                     fontSize: 9,
@@ -142,7 +152,7 @@ function ChartsPage() {
               <div className="text-[10px] font-mono uppercase tracking-wider text-accent">
                 FIB {f.label}
               </div>
-              <div className="font-mono text-sm text-tx mt-0.5">{fmtPrice(f.price, selected)}</div>
+              <div className="font-mono text-sm text-tx mt-0.5">{fmtPrice(f.price, activeSymbol)}</div>
             </div>
           ))}
         </div>
