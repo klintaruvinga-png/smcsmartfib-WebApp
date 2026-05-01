@@ -120,7 +120,7 @@ export const apiClient = {
   // Public
   async getRegimes(mock = MOCK_MODE): Promise<RegimeState[]> {
     if (mock) return mockRegimes;
-    return call<RegimeState[]>("/regimes", { skipAuthHeaders: true, authenticated: false });
+    return call<RegimeState[]>("/regimes");
   },
   async postRegime(payload: Partial<RegimeState>, mock = MOCK_MODE): Promise<{ ok: true }> {
     if (mock) return { ok: true };
@@ -135,7 +135,7 @@ export const apiClient = {
         gates: mockGates.filter((g) => wl.has(g.symbol)),
       };
     }
-    return call<{ prices: PairPrice[]; regimes: RegimeState[]; gates: GateState[] }>("/snapshot", { skipAuthHeaders: true, authenticated: false });
+    return call<{ prices: PairPrice[]; regimes: RegimeState[]; gates: GateState[] }>("/snapshot");
   },
   async getChartSnapshot(
     symbol: Symbol,
@@ -181,7 +181,7 @@ export const apiClient = {
       const wl = new Set(mockSettings.watchlist);
       return mockSignals.filter((s) => wl.has(s.symbol));
     }
-    return call<SignalCandidate[]>("/live-signals", { skipAuthHeaders: true, authenticated: false });
+    return call<SignalCandidate[]>("/live-signals");
   },
   async postSignal(payload: Partial<SignalCandidate>, mock = MOCK_MODE): Promise<{ ok: true }> {
     if (mock) return { ok: true };
