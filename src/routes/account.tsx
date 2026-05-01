@@ -130,7 +130,6 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
       if (!result.ok) throw new Error(result.message ?? `Twelve Data key ${result.status}`);
       toast.success("Twelve Data key validated");
     } catch (error) {
-      setKeyStatus("invalid");
       toast.error(error instanceof Error ? error.message : "Twelve Data key test failed");
     } finally {
       setBusy(null);
@@ -150,7 +149,6 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
       await qc.invalidateQueries({ queryKey: ["engine-health"] });
       toast.success("Twelve Data key saved");
     } catch (error) {
-      setKeyStatus("invalid");
       toast.error(error instanceof Error ? error.message : "Twelve Data key save failed");
     } finally {
       setBusy(null);
