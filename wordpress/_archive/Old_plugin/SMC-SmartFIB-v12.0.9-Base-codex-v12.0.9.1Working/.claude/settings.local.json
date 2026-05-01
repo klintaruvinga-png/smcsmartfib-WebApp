@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(grep -E \"__test__|getPipValue[^UA]|getPipValue$\")",
+      "Bash(php -l \"sniper-webhook.php\")"
+    ]
+  }
+}

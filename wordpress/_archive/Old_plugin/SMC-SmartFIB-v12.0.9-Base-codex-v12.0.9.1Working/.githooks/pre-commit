@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Pre-commit hook: reject staged files containing common mojibake signatures.
+#
+# Install:
+#   git config core.hooksPath .githooks
+#
+# Mojibake patterns checked (UTF-8 double-encoding artifacts):
+#   â€  — first two bytes of many double-encoded sequences (U+00E2 U+20AC)
+#   Ã   — double-encoded Latin-1 high byte leader (U+00C3)
+#   �    — Unicode replacement character (U+FFFD)
+#   ï¿½   — mojibake form of U+FFFD (double-encoded)
+#
+# Files in the mojibake-cleaning utility functions intentionally contain
+# these patterns for input sanitisation. To bypass this check for such
+# cases, use:  git commit --no-verify
+
+set -euo pipefail
+
+MOJIBAKE_PATTERN='â€|Ã[^A-Za-z0-9 ]|\xef\xbf\xbd|ï¿½'
+
+# Only check text files staged for commit (ignore deleted files).
+staged_files=$(git diff --cached --name-only --diff-filter=d -- '*.php' '*.js' '*.html' '*.css' '*.json' '*.md' 2>/dev/null || true)
+
+if [ -z "$staged_files" ]; then
+    exit 0
+fi
+
+bad_files=""
+while IFS= read -r file; do
+    # Check the staged (index) version, not the working-tree version.
+    if git show ":$file" 2>/dev/null | grep -Pqn "$MOJIBAKE_PATTERN"; then
+        bad_files="$bad_files  $file\n"
+    fi
+done <<< "$staged_files"
+
+if [ -n "$bad_files" ]; then
+    echo "ERROR: Mojibake encoding artifacts detected in staged files:"
+    echo ""
+    printf "$bad_files"
+    echo ""
+    echo "These files contain double-encoded UTF-8 sequences (â€, Ã+, U+FFFD, or ï¿½)."
+    echo "Please fix the encoding before committing."
+    echo ""
+    echo "To bypass (only for intentional mojibake-matching code):"
+    echo "  git commit --no-verify"
+    exit 1
+fi
+
+exit 0
