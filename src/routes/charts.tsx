@@ -61,15 +61,8 @@ function ChartsPage() {
           <div>
             <div className="font-mono text-xl font-semibold">{price.symbol}</div>
             <div className="flex items-center gap-3 mt-1">
-              <span className="font-mono text-2xl text-tx">
-                {fmtPrice(price.mid, price.symbol)}
-              </span>
-              <span
-                className={cn(
-                  "font-mono text-sm",
-                  price.changePct1d >= 0 ? "text-buy" : "text-sell",
-                )}
-              >
+              <span className="font-mono text-2xl text-tx">{fmtPrice(price.mid, price.symbol)}</span>
+              <span className={cn("font-mono text-sm", price.changePct1d >= 0 ? "text-buy" : "text-sell")}>
                 {fmtPct(price.changePct1d)}
               </span>
             </div>
@@ -116,27 +109,15 @@ function ChartsPage() {
                   }}
                 />
               ))}
-              <Line
-                type="monotone"
-                dataKey="p"
-                stroke="#59a8ff"
-                strokeWidth={1.5}
-                dot={false}
-                isAnimationActive={false}
-              />
+              <Line type="monotone" dataKey="p" stroke="#59a8ff" strokeWidth={1.5} dot={false} isAnimationActive={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-5">
           {fibs.map((f) => (
-            <div
-              key={f.label}
-              className="rounded border border-bd bg-bg2/40 px-2.5 py-2 text-center"
-            >
-              <div className="text-[10px] font-mono uppercase tracking-wider text-accent">
-                FIB {f.label}
-              </div>
+            <div key={f.label} className="rounded border border-bd bg-bg2/40 px-2.5 py-2 text-center">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-accent">FIB {f.label}</div>
               <div className="font-mono text-sm text-tx mt-0.5">{fmtPrice(f.value, selected)}</div>
             </div>
           ))}

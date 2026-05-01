@@ -1,10 +1,4 @@
-import {
-  Outlet,
-  Link,
-  createRootRouteWithContext,
-  HeadContent,
-  Scripts,
-} from "@tanstack/react-router";
+import { Outlet, Link, createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import appCss from "../styles.css?url";
 import { AppShell } from "@/components/sniper/AppShell";
@@ -39,30 +33,12 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "SMC SuperFIB — Trading Dashboard" },
-      { name: "description", content: "SMC SuperFIB  Signal + Risk Engine & Account Manager" },
+      { name: "description", content: "Mobile-first SMC SuperFIB dashboard mirroring the WordPress signal engine." },
       { name: "theme-color", content: "#07111b" },
-      { property: "og:title", content: "SMC SuperFIB — Trading Dashboard" },
-      {
-        property: "og:description",
-        content: "SMC SuperFIB  Signal + Risk Engine & Account Manager",
-      },
+      { property: "og:title", content: "SMC SuperFIB" },
+      { property: "og:description", content: "Institutional SMC + Fibonacci trading dashboard." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "SMC SuperFIB — Trading Dashboard" },
-      {
-        name: "twitter:description",
-        content: "SMC SuperFIB  Signal + Risk Engine & Account Manager",
-      },
-      {
-        property: "og:image",
-        content:
-          "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/9eea452b-8272-48ac-acb2-0a56855859cd",
-      },
-      {
-        name: "twitter:image",
-        content:
-          "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/9eea452b-8272-48ac-acb2-0a56855859cd",
-      },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
   }),

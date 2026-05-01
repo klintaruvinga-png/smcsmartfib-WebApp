@@ -41,10 +41,7 @@ function HeaderTicker() {
     <div className="relative flex-1 overflow-hidden border-y border-bd bg-bg2/40">
       <div className="ticker-track flex w-max items-center gap-6 py-2 px-4">
         {loop.map((p, i) => (
-          <div
-            key={`${p.symbol}-${i}`}
-            className="flex items-center gap-2 whitespace-nowrap font-mono text-xs"
-          >
+          <div key={`${p.symbol}-${i}`} className="flex items-center gap-2 whitespace-nowrap font-mono text-xs">
             <span className="text-mute">{p.symbol}</span>
             <span className="text-tx">{fmtPrice(p.mid, p.symbol)}</span>
             <span className={cn(p.changePct1d >= 0 ? "text-buy" : "text-sell")}>
@@ -188,17 +185,7 @@ export function AppShell() {
         </main>
         <BottomNav />
       </div>
-      <Toaster
-        theme="dark"
-        position="top-right"
-        toastOptions={{
-          style: {
-            background: "#102033",
-            border: "1px solid rgba(164,191,223,0.34)",
-            color: "#fff",
-          },
-        }}
-      />
+      <Toaster theme="dark" position="top-right" toastOptions={{ style: { background: "#102033", border: "1px solid rgba(164,191,223,0.34)", color: "#fff" } }} />
     </div>
   );
 }

@@ -10,10 +10,7 @@ export const Route = createFileRoute("/book")({
   head: () => ({
     meta: [
       { title: "Active Book — SMC SuperFIB" },
-      {
-        name: "description",
-        content: "Open positions grouped by symbol with pair-level freshness warnings.",
-      },
+      { name: "description", content: "Open positions grouped by symbol with pair-level freshness warnings." },
       { property: "og:title", content: "Active Book — SMC SuperFIB" },
       { property: "og:description", content: "All open positions in one consolidated book." },
     ],
@@ -38,15 +35,11 @@ function BookPage() {
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Active Book</h1>
-          <p className="text-xs text-mute mt-0.5">
-            {positions.length} open · {fmtUSC(totalPnl, true)}
-          </p>
+          <p className="text-xs text-mute mt-0.5">{positions.length} open · {fmtUSC(totalPnl, true)}</p>
         </div>
       </div>
 
-      {Object.keys(grouped).length === 0 && (
-        <div className="text-mute text-sm">No open positions.</div>
-      )}
+      {Object.keys(grouped).length === 0 && <div className="text-mute text-sm">No open positions.</div>}
 
       <div className="space-y-4">
         {Object.entries(grouped).map(([symbol, posList]) => {
@@ -61,9 +54,7 @@ function BookPage() {
                   <span className="text-[10px] font-mono text-mute">{posList.length} pos</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span
-                    className={cn("font-mono text-sm", groupPnl >= 0 ? "text-buy" : "text-sell")}
-                  >
+                  <span className={cn("font-mono text-sm", groupPnl >= 0 ? "text-buy" : "text-sell")}>
                     {fmtUSC(groupPnl, true)}
                   </span>
                   {snapPair && <FreshnessBadge state={snapPair.state} />}
@@ -71,23 +62,16 @@ function BookPage() {
               </div>
               {stale && (
                 <div className="px-4 py-2 border-b border-bd">
-                  <WarningLine level="warn">
-                    {symbol} backend snapshot is {relTime(snapPair?.updatedAt ?? "")}.
-                  </WarningLine>
+                  <WarningLine level="warn">{symbol} backend snapshot is {relTime(snapPair?.updatedAt ?? "")}.</WarningLine>
                 </div>
               )}
               <div className="divide-y divide-bd">
                 {posList.map((p) => (
-                  <div
-                    key={p.id}
-                    className="grid grid-cols-12 items-center gap-2 px-4 py-3 text-xs"
-                  >
+                  <div key={p.id} className="grid grid-cols-12 items-center gap-2 px-4 py-3 text-xs">
                     <span
                       className={cn(
                         "col-span-2 sm:col-span-1 inline-flex items-center justify-center rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider font-mono w-fit",
-                        p.direction === "LONG"
-                          ? "border-buy/40 text-buy bg-buy/10"
-                          : "border-sell/40 text-sell bg-sell/10",
+                        p.direction === "LONG" ? "border-buy/40 text-buy bg-buy/10" : "border-sell/40 text-sell bg-sell/10",
                       )}
                     >
                       {p.direction}
@@ -105,15 +89,8 @@ function BookPage() {
                       <div className="text-dim">{p.lots.toFixed(2)}</div>
                     </div>
                     <div className="col-span-2 sm:col-span-3 text-right font-mono">
-                      <div className={cn(p.pnlUSC >= 0 ? "text-buy" : "text-sell")}>
-                        {fmtUSC(p.pnlUSC, true)}
-                      </div>
-                      <div
-                        className={cn(
-                          "text-[10px]",
-                          p.pnlPct >= 0 ? "text-buy/70" : "text-sell/70",
-                        )}
-                      >
+                      <div className={cn(p.pnlUSC >= 0 ? "text-buy" : "text-sell")}>{fmtUSC(p.pnlUSC, true)}</div>
+                      <div className={cn("text-[10px]", p.pnlPct >= 0 ? "text-buy/70" : "text-sell/70")}>
                         {fmtPct(p.pnlPct)}
                       </div>
                     </div>

@@ -16,9 +16,7 @@ export function SyncChip({ state, label = "BACKEND" }: { state: FreshnessState; 
     <div className="inline-flex items-center gap-2 rounded-md border border-bd bg-bg2/60 px-2.5 py-1.5">
       <span className={s.dot} />
       <span className="text-[10px] font-semibold tracking-wider text-mute">{label}</span>
-      <span className={cn("text-[11px] font-semibold tracking-wider font-mono", s.text)}>
-        {s.word}
-      </span>
+      <span className={cn("text-[11px] font-semibold tracking-wider font-mono", s.text)}>{s.word}</span>
     </div>
   );
 }

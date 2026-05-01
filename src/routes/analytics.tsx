@@ -10,10 +10,7 @@ export const Route = createFileRoute("/analytics")({
   head: () => ({
     meta: [
       { title: "Analytics — SMC SuperFIB" },
-      {
-        name: "description",
-        content: "Equity curve, exposure, drawdown vs cap and win/loss split.",
-      },
+      { name: "description", content: "Equity curve, exposure, drawdown vs cap and win/loss split." },
       { property: "og:title", content: "Analytics — SMC SuperFIB" },
       { property: "og:description", content: "Account performance analytics." },
     ],
@@ -44,12 +41,8 @@ function AnalyticsPage() {
         <div className="rounded-lg border border-bd bg-bg1/60 p-4 lg:col-span-2">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <div className="text-[11px] font-mono uppercase tracking-wider text-mute">
-                Equity (30d)
-              </div>
-              <div className="font-mono text-2xl font-semibold mt-1">
-                {fmtUSC(account.equityUSC)}
-              </div>
+              <div className="text-[11px] font-mono uppercase tracking-wider text-mute">Equity (30d)</div>
+              <div className="font-mono text-2xl font-semibold mt-1">{fmtUSC(account.equityUSC)}</div>
             </div>
             <FreshnessBadge state={account.state} />
           </div>
@@ -81,13 +74,7 @@ function AnalyticsPage() {
                   labelFormatter={(l) => `Day ${l}`}
                   formatter={(v: number) => [`$${v.toFixed(2)}`, "EQUITY"]}
                 />
-                <Area
-                  type="monotone"
-                  dataKey="equity"
-                  stroke="#46d19a"
-                  strokeWidth={1.5}
-                  fill="url(#eq)"
-                />
+                <Area type="monotone" dataKey="equity" stroke="#46d19a" strokeWidth={1.5} fill="url(#eq)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -118,15 +105,11 @@ function AnalyticsPage() {
         {/* Drawdown card */}
         <div className="rounded-lg border border-bd bg-bg1/60 p-4">
           <div className="flex items-center justify-between mb-3">
-            <div className="text-[11px] font-mono uppercase tracking-wider text-mute">
-              Drawdown vs cap
-            </div>
+            <div className="text-[11px] font-mono uppercase tracking-wider text-mute">Drawdown vs cap</div>
             <FreshnessBadge state={account.state} />
           </div>
           <div className="font-mono text-xl">
-            <span
-              className={cn(ddRatio > 0.7 ? "text-sell" : ddRatio > 0.4 ? "text-warn" : "text-buy")}
-            >
+            <span className={cn(ddRatio > 0.7 ? "text-sell" : ddRatio > 0.4 ? "text-warn" : "text-buy")}>
               {fmtPct(account.drawdownPct, false)}
             </span>
             <span className="text-mute text-sm"> / {fmtPct(risk.ddCapPct, false)}</span>
@@ -144,9 +127,7 @@ function AnalyticsPage() {
 
         {/* Win/loss split */}
         <div className="rounded-lg border border-bd bg-bg1/60 p-4 lg:col-span-2">
-          <div className="text-[11px] font-mono uppercase tracking-wider text-mute mb-3">
-            Win / loss split (30d)
-          </div>
+          <div className="text-[11px] font-mono uppercase tracking-wider text-mute mb-3">Win / loss split (30d)</div>
           <div className="flex h-3 overflow-hidden rounded-full">
             <div className="bg-buy" style={{ width: "62%" }} />
             <div className="bg-sell" style={{ width: "38%" }} />

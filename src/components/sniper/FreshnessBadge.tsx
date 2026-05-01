@@ -11,13 +11,7 @@ const STYLES: Record<FreshnessState, { label: string; cls: string }> = {
   mock: { label: "MOCK", cls: "bg-violet/15 text-violet border-violet/40" },
 };
 
-export function FreshnessBadge({
-  state,
-  className,
-}: {
-  state: FreshnessState;
-  className?: string;
-}) {
+export function FreshnessBadge({ state, className }: { state: FreshnessState; className?: string }) {
   const s = STYLES[state];
   return (
     <span

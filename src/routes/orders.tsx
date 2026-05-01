@@ -36,9 +36,7 @@ function OrdersPage() {
         </div>
       </div>
 
-      {Object.keys(grouped).length === 0 && (
-        <div className="text-mute text-sm">No pending orders.</div>
-      )}
+      {Object.keys(grouped).length === 0 && <div className="text-mute text-sm">No pending orders.</div>}
 
       <div className="space-y-4">
         {Object.entries(grouped).map(([symbol, list]) => {
@@ -48,31 +46,22 @@ function OrdersPage() {
               <div className="flex items-center justify-between px-4 py-2.5 border-b border-bd bg-bg2/30">
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-sm font-semibold">{symbol}</span>
-                  <span className="text-[10px] font-mono text-mute">
-                    {list.length} order{list.length > 1 ? "s" : ""}
-                  </span>
+                  <span className="text-[10px] font-mono text-mute">{list.length} order{list.length > 1 ? "s" : ""}</span>
                 </div>
                 <FreshnessBadge state={pending ? "pending-sync" : list[0].state} />
               </div>
               {pending && (
                 <div className="px-4 py-2 border-b border-bd">
-                  <WarningLine level="warn">
-                    {symbol} has orders not yet acknowledged by backend.
-                  </WarningLine>
+                  <WarningLine level="warn">{symbol} has orders not yet acknowledged by backend.</WarningLine>
                 </div>
               )}
               <div className="divide-y divide-bd">
                 {list.map((o) => (
-                  <div
-                    key={o.id}
-                    className="grid grid-cols-12 items-center gap-2 px-4 py-3 text-xs"
-                  >
+                  <div key={o.id} className="grid grid-cols-12 items-center gap-2 px-4 py-3 text-xs">
                     <span
                       className={cn(
                         "col-span-2 sm:col-span-1 inline-flex items-center justify-center rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider font-mono w-fit",
-                        o.direction === "LONG"
-                          ? "border-buy/40 text-buy bg-buy/10"
-                          : "border-sell/40 text-sell bg-sell/10",
+                        o.direction === "LONG" ? "border-buy/40 text-buy bg-buy/10" : "border-sell/40 text-sell bg-sell/10",
                       )}
                     >
                       {o.direction}
