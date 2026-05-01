@@ -18,3 +18,9 @@ export function hasCredentials(): boolean {
   if (typeof window === "undefined") return false;
   return Boolean(sessionStorage.getItem(KEY));
 }
+
+export function hasWordPressNonce(): boolean {
+  if (typeof window === "undefined") return false;
+  const wpWindow = window as Window & { SNIPER?: { nonce?: string } };
+  return Boolean(wpWindow.SNIPER?.nonce);
+}

@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import appCss from "../styles.css?url";
 import { AppShell } from "@/components/sniper/AppShell";
 import { Toaster } from "sonner";
-import { hasCredentials, clearCredentials } from "@/lib/auth";
+import { hasCredentials, clearCredentials, hasWordPressNonce } from "@/lib/auth";
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -71,19 +71,20 @@ function RootComponent() {
   const isLogin = location.pathname === "/login";
 
   useEffect(() => {
-    if (!isLogin && !hasCredentials()) {
+    if (!isLogin && !hasCredentials() && !hasWordPressNonce()) {
       router.navigate({ to: "/login" });
     }
 
     const handleAuthRequired = () => {
       clearCredentials();
+      queryClient.clear();
       if (location.pathname !== "/login") {
         router.navigate({ to: "/login" });
       }
     };
     window.addEventListener("smc:auth-required", handleAuthRequired);
     return () => window.removeEventListener("smc:auth-required", handleAuthRequired);
-  }, [isLogin, location.pathname, router]);
+  }, [isLogin, location.pathname, queryClient, router]);
 
   return (
     <QueryClientProvider client={queryClient}>
