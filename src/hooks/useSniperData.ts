@@ -42,6 +42,14 @@ export function useUserSettings() {
   });
 }
 
+export function useEngineHealth() {
+  return useQuery({
+    queryKey: ["engine-health"],
+    queryFn: () => apiClient.getEngineHealth(),
+    refetchInterval: POLL_MS,
+  });
+}
+
 export function useUserRiskProfile() {
   return useQuery({
     queryKey: ["user-risk"],

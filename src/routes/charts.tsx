@@ -1,19 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useSnapshot } from "@/hooks/useSniperData";
-import { mockPriceSeries, mockFibLevels } from "@/mocks/sniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { fmtPrice, fmtPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { LineChart, Line, ResponsiveContainer, ReferenceLine, YAxis, Tooltip } from "recharts";
 import type { Symbol } from "@/types/sniper";
+import { apiClient } from "@/lib/api/sniperClient";
 
 export const Route = createFileRoute("/charts")({
   head: () => ({
     meta: [
-      { title: "Charts — SMC SuperFIB" },
+      { title: "Charts - SMC SuperFIB" },
       { name: "description", content: "Per-pair price and Fibonacci visualisation." },
-      { property: "og:title", content: "Charts — SMC SuperFIB" },
+      { property: "og:title", content: "Charts - SMC SuperFIB" },
       { property: "og:description", content: "Price action with key Fibonacci levels." },
     ],
   }),
@@ -23,11 +24,16 @@ export const Route = createFileRoute("/charts")({
 function ChartsPage() {
   const { data } = useSnapshot();
   const [selected, setSelected] = useState<Symbol>("GBPUSD");
+  const { data: chart } = useQuery({
+    queryKey: ["chart", selected],
+    queryFn: () => apiClient.getChartSnapshot(selected),
+  });
+
   if (!data) return null;
 
   const price = data.prices.find((p) => p.symbol === selected)!;
-  const series = mockPriceSeries(selected);
-  const fibs = mockFibLevels(selected);
+  const series = (chart?.candles ?? []).map((c) => ({ t: new Date(c.time).getTime(), p: c.close }));
+  const fibs = chart?.fibLevels ?? [];
 
   return (
     <div className="space-y-4">
@@ -38,7 +44,6 @@ function ChartsPage() {
         </div>
       </div>
 
-      {/* Pair switcher */}
       <div className="flex flex-wrap gap-1.5">
         {data.prices.map((p) => (
           <button
@@ -61,13 +66,20 @@ function ChartsPage() {
           <div>
             <div className="font-mono text-xl font-semibold">{price.symbol}</div>
             <div className="flex items-center gap-3 mt-1">
-              <span className="font-mono text-2xl text-tx">{fmtPrice(price.mid, price.symbol)}</span>
-              <span className={cn("font-mono text-sm", price.changePct1d >= 0 ? "text-buy" : "text-sell")}>
+              <span className="font-mono text-2xl text-tx">
+                {fmtPrice(price.mid, price.symbol)}
+              </span>
+              <span
+                className={cn(
+                  "font-mono text-sm",
+                  price.changePct1d >= 0 ? "text-buy" : "text-sell",
+                )}
+              >
                 {fmtPct(price.changePct1d)}
               </span>
             </div>
           </div>
-          <FreshnessBadge state={price.state} />
+          <FreshnessBadge state={chart?.state ?? price.state} />
         </div>
 
         <div className="h-[320px] -mx-2">
@@ -95,13 +107,13 @@ function ChartsPage() {
               />
               {fibs.map((f) => (
                 <ReferenceLine
-                  key={f.label}
-                  y={f.value}
+                  key={`${f.family}-${f.label}`}
+                  y={f.price}
                   stroke="#d8a35d"
                   strokeDasharray="3 3"
                   strokeOpacity={0.55}
                   label={{
-                    value: `${f.label} · ${fmtPrice(f.value, selected)}`,
+                    value: `${f.label} / ${fmtPrice(f.price, selected)}`,
                     position: "right",
                     fill: "#d8a35d",
                     fontSize: 9,
@@ -109,16 +121,28 @@ function ChartsPage() {
                   }}
                 />
               ))}
-              <Line type="monotone" dataKey="p" stroke="#59a8ff" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+              <Line
+                type="monotone"
+                dataKey="p"
+                stroke="#59a8ff"
+                strokeWidth={1.5}
+                dot={false}
+                isAnimationActive={false}
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-5">
           {fibs.map((f) => (
-            <div key={f.label} className="rounded border border-bd bg-bg2/40 px-2.5 py-2 text-center">
-              <div className="text-[10px] font-mono uppercase tracking-wider text-accent">FIB {f.label}</div>
-              <div className="font-mono text-sm text-tx mt-0.5">{fmtPrice(f.value, selected)}</div>
+            <div
+              key={`${f.family}-${f.label}`}
+              className="rounded border border-bd bg-bg2/40 px-2.5 py-2 text-center"
+            >
+              <div className="text-[10px] font-mono uppercase tracking-wider text-accent">
+                FIB {f.label}
+              </div>
+              <div className="font-mono text-sm text-tx mt-0.5">{fmtPrice(f.price, selected)}</div>
             </div>
           ))}
         </div>
