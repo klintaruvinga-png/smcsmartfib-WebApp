@@ -171,12 +171,13 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
 
   const keyReady = apiKey.trim().length > 0;
 
-  async function saveSettings(nextSettings: DashboardSettings = s) {
+  async function saveSettings(nextSettings?: DashboardSettings) {
     const submittedVersion = settingsEditVersion.current;
+    const settingsToSave = nextSettings ?? s;
     setBusy("settings");
     try {
-      setBackendUrl(nextSettings.backendUrl);
-      await apiClient.postUserSettings(nextSettings);
+      setBackendUrl(settingsToSave.backendUrl);
+      await apiClient.postUserSettings(settingsToSave);
       await qc.invalidateQueries({ queryKey: ["user-settings"] });
       await Promise.all([
         qc.refetchQueries({ queryKey: ["engine-health"], type: "active" }),
@@ -265,19 +266,6 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
     }
   }
 
-  useEffect(() => {
-    if (!settingsDirty || busy !== null) return;
-    const changedRefresh =
-      s.refreshIntervalSec !== settings.refreshIntervalSec ||
-      s.staleThresholdSec !== settings.staleThresholdSec;
-    if (!changedRefresh) return;
-
-    const id = window.setTimeout(() => {
-      void saveSettings(s);
-    }, 450);
-
-    return () => window.clearTimeout(id);
-  }, [s, settings, settingsDirty, busy]);
 
   return (
     <div className="grid gap-3 lg:grid-cols-2">
@@ -298,7 +286,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
         </Field>
         <div className="flex justify-end">
           <button
-            onClick={saveSettings}
+            onClick={() => void saveSettings()}
             disabled={busy === "settings" || watchlistBusy !== null}
             className="rounded-md border border-buy/50 bg-buy/15 px-3 py-1.5 text-xs font-semibold text-buy hover:bg-buy/25 disabled:opacity-60"
           >
@@ -461,19 +449,6 @@ function RiskTab({ risk }: { risk: RiskProfile }) {
     }
   }
 
-  useEffect(() => {
-    if (!settingsDirty || busy !== null) return;
-    const changedRefresh =
-      s.refreshIntervalSec !== settings.refreshIntervalSec ||
-      s.staleThresholdSec !== settings.staleThresholdSec;
-    if (!changedRefresh) return;
-
-    const id = window.setTimeout(() => {
-      void saveSettings(s);
-    }, 450);
-
-    return () => window.clearTimeout(id);
-  }, [s, settings, settingsDirty, busy]);
 
   return (
     <div className="grid gap-3 lg:grid-cols-2">
