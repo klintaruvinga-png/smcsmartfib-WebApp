@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUserSettings, useUserRiskProfile } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
@@ -97,27 +97,45 @@ function TabButton({
 function SettingsTab({ settings }: { settings: DashboardSettings }) {
   const qc = useQueryClient();
   const [s, setS] = useState(settings);
+  const [settingsDirty, setSettingsDirty] = useState(false);
   const [newPair, setNewPair] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [keyStatus, setKeyStatus] = useState<TwelveDataKeyStatus>(settings.apiKeyStatus);
+  const settingsEditVersion = useRef(0);
   const [busy, setBusy] = useState<"settings" | "test-key" | "save-key" | "delete-key" | null>(
     null,
   );
 
   useEffect(() => {
-    setS(settings);
-    setKeyStatus(settings.apiKeyStatus);
-  }, [settings]);
+    if (!settingsDirty) {
+      setS(settings);
+    }
+  }, [settings, settingsDirty]);
 
-  const removePair = (p: string) => setS({ ...s, watchlist: s.watchlist.filter((w) => w !== p) });
+  useEffect(() => {
+    setKeyStatus(settings.apiKeyStatus);
+  }, [settings.apiKeyStatus]);
+
+  function updateSettingsDraft(next: DashboardSettings) {
+    settingsEditVersion.current += 1;
+    setSettingsDirty(true);
+    setS(next);
+  }
+
+  const removePair = (p: string) =>
+    updateSettingsDraft({ ...s, watchlist: s.watchlist.filter((w) => w !== p) });
   const keyReady = apiKey.trim().length > 0;
 
   async function saveSettings() {
+    const submittedVersion = settingsEditVersion.current;
     setBusy("settings");
     try {
       setBackendUrl(s.backendUrl);
       await apiClient.postUserSettings(s);
       await qc.invalidateQueries({ queryKey: ["user-settings"] });
+      if (settingsEditVersion.current === submittedVersion) {
+        setSettingsDirty(false);
+      }
       toast.success("Settings saved");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Settings save failed");
@@ -200,7 +218,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
           <input
             type="url"
             value={s.backendUrl}
-            onChange={(e) => setS({ ...s, backendUrl: e.target.value })}
+            onChange={(e) => updateSettingsDraft({ ...s, backendUrl: e.target.value })}
             className="w-full rounded border border-bd bg-bg2/60 px-2.5 py-1.5 font-mono text-xs text-tx focus:outline-none focus:border-accent"
           />
         </Field>
@@ -275,7 +293,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
             min={5}
             max={60}
             value={s.refreshIntervalSec}
-            onChange={(e) => setS({ ...s, refreshIntervalSec: +e.target.value })}
+            onChange={(e) => updateSettingsDraft({ ...s, refreshIntervalSec: +e.target.value })}
             className="w-full accent-[var(--accent)]"
           />
         </Field>
@@ -286,7 +304,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
             max={600}
             step={10}
             value={s.staleThresholdSec}
-            onChange={(e) => setS({ ...s, staleThresholdSec: +e.target.value })}
+            onChange={(e) => updateSettingsDraft({ ...s, staleThresholdSec: +e.target.value })}
             className="w-full accent-[var(--accent)]"
           />
         </Field>
@@ -316,7 +334,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
           <button
             onClick={() => {
               if (newPair && !s.watchlist.includes(newPair as never)) {
-                setS({ ...s, watchlist: [...s.watchlist, newPair as never] });
+                updateSettingsDraft({ ...s, watchlist: [...s.watchlist, newPair as never] });
                 setNewPair("");
               }
             }}
@@ -333,20 +351,22 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
             label="Per-trade %"
             value={s.riskAllocation.perTradePct}
             onChange={(v) =>
-              setS({ ...s, riskAllocation: { ...s.riskAllocation, perTradePct: v } })
+              updateSettingsDraft({ ...s, riskAllocation: { ...s.riskAllocation, perTradePct: v } })
             }
           />
           <NumberInput
             label="Daily max %"
             value={s.riskAllocation.dailyMaxPct}
             onChange={(v) =>
-              setS({ ...s, riskAllocation: { ...s.riskAllocation, dailyMaxPct: v } })
+              updateSettingsDraft({ ...s, riskAllocation: { ...s.riskAllocation, dailyMaxPct: v } })
             }
           />
           <NumberInput
             label="DD cap %"
             value={s.riskAllocation.ddCapPct}
-            onChange={(v) => setS({ ...s, riskAllocation: { ...s.riskAllocation, ddCapPct: v } })}
+            onChange={(v) =>
+              updateSettingsDraft({ ...s, riskAllocation: { ...s.riskAllocation, ddCapPct: v } })
+            }
           />
         </div>
       </Card>

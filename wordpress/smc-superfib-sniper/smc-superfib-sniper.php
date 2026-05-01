@@ -724,15 +724,12 @@ final class SMC_SuperFib_Sniper_REST {
         $levels = $this->fib_levels($high, $low, 'LTF_SF');
         $nearest = $this->nearest_level($levels, $close);
         $sequence = $this->sequence_state($candles);
-        $direction = $position_ratio >= 62.5 ? 'LONG' : ($position_ratio <= 25 ? 'SHORT' : null);
-        $f3_chop = $position_ratio >= 37.5 && $position_ratio <= 62.5 ? 'blocked' : ($chop >= 0.7 ? 'caution' : 'clear');
+        $direction = $position_ratio >= 62.5 ? 'LONG' : ($position_ratio <= 25 ? 'SHORT' : ($bias === 'BEAR' ? 'SHORT' : 'LONG'));
+        $f3_chop = ($position_ratio >= 37.5 && $position_ratio <= 62.5) || $chop >= 0.7 ? 'caution' : 'clear';
         $hta_override = $position_ratio < 0 || $position_ratio > 100;
-        $blocked = $f3_chop === 'blocked' || !$direction;
         $status = 'WATCH';
 
-        if ($blocked) {
-            $status = 'BLOCKED';
-        } elseif (!$sequence[$direction]['sweep']) {
+        if (!$sequence[$direction]['sweep']) {
             $status = 'WATCH';
         } elseif (!$sequence[$direction]['mss']) {
             $status = 'ARMED';
@@ -756,12 +753,9 @@ final class SMC_SuperFib_Sniper_REST {
 
         $gate = array(
             'symbol' => $symbol,
-            'allow' => $status === 'BLOCKED' ? 'BLOCKED' : ($direction === 'LONG' ? 'BUY' : 'SELL'),
-            'state' => $status === 'BLOCKED' ? 'blocked' : 'live',
+            'allow' => $direction === 'LONG' ? 'BUY' : 'SELL',
+            'state' => 'live',
         );
-        if ($status === 'BLOCKED') {
-            $gate['reason'] = !$direction ? 'equilibrium / F3 chop territory' : 'F3 yearly chop zone';
-        }
 
         $regime = array(
             'symbol' => $symbol,
@@ -771,10 +765,6 @@ final class SMC_SuperFib_Sniper_REST {
             'updatedAt' => gmdate('c'),
             'state' => 'live',
         );
-
-        if (!$direction) {
-            return array('regime' => $regime, 'gate' => $gate, 'signal' => null, 'plan' => null);
-        }
 
         $ltf_level = $this->execution_level($levels, $direction);
 
@@ -817,7 +807,7 @@ final class SMC_SuperFib_Sniper_REST {
             'regime' => $regime,
             'gate' => $gate,
             'signal' => $signal,
-            'plan' => $status === 'BLOCKED' ? null : $this->build_trade_plan($user_id, $signal, $high, $low),
+            'plan' => $this->build_trade_plan($user_id, $signal, $high, $low),
         );
     }
 
