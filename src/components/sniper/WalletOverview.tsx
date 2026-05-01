@@ -12,13 +12,6 @@ export function WalletOverview() {
   const marginLevel = account.marginUsedPct > 0 ? (100 / account.marginUsedPct) * 100 : 0;
   const marginStrength = marginLevel > 1000 ? "Strong" : marginLevel > 200 ? "Healthy" : "Tight";
 
-  // Mock comparison deltas (vs last / vs base)
-  const equityVsLast = -4.9;
-  const equityVsBase = -18.0;
-  const balanceVsBase = -13.3;
-  const floatingVsLast = -597.37;
-  const marginVsLast = 13.8;
-
   return (
     <section className="space-y-2">
       <div className="flex items-center justify-between gap-3">
@@ -37,46 +30,25 @@ export function WalletOverview() {
             label="EQUITY"
             value={fmtUSC(account.equityUSC).replace("USC ", "")}
             valueClass="text-buy"
-            sub={
-              <>
-                <span className="text-mute">USC R2030 Day 17</span>{" "}
-                <Delta v={equityVsLast} suffix="vs last" />{" "}
-                <Delta v={equityVsBase} suffix="from base" />
-              </>
-            }
+            sub={<span className="text-mute">1% = {onePct.toFixed(2)} USC</span>}
           />
           <Cell
             label="BALANCE"
             value={fmtUSC(account.balanceUSC).replace("USC ", "")}
             valueClass="text-info"
-            sub={
-              <>
-                <span className="text-mute">1%={onePct.toFixed(2)} USC</span>{" "}
-                <Delta v={balanceVsBase} suffix="from base" />
-              </>
-            }
+            sub={<span className="text-mute">1% = {onePct.toFixed(2)} USC</span>}
           />
           <Cell
             label="FLOATING P/L"
             value={`${floating >= 0 ? "+" : ""}${floating.toFixed(2)}`}
             valueClass={floating >= 0 ? "text-buy" : "text-sell"}
-            sub={
-              <>
-                <span className="text-mute">USC</span>{" "}
-                <Delta v={floatingVsLast} suffix="vs last" raw />
-              </>
-            }
+            sub={<span className="text-mute">USC open exposure</span>}
           />
           <Cell
             label="MARGIN LEVEL"
             value={`${Math.round(marginLevel)}%`}
             valueClass="text-buy"
-            sub={
-              <>
-                <span className="text-dim">{marginStrength}</span>{" "}
-                <Delta v={marginVsLast} suffix="vs last" />
-              </>
-            }
+            sub={<span className="text-dim">{marginStrength}</span>}
           />
         </div>
       </div>
@@ -108,12 +80,3 @@ function Cell({
   );
 }
 
-function Delta({ v, suffix, raw }: { v: number; suffix: string; raw?: boolean }) {
-  const positive = v >= 0;
-  return (
-    <span className={positive ? "text-buy" : "text-sell"}>
-      {positive ? "+" : ""}
-      {raw ? v.toFixed(2) : `${v.toFixed(1)}%`} <span className="text-mute">{suffix}</span>
-    </span>
-  );
-}

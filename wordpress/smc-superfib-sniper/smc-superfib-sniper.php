@@ -585,7 +585,11 @@ final class SMC_SuperFib_Sniper_REST {
 
             $plan = json_decode($plan_row['plan'], true);
             foreach (array('e1', 'e2', 'e3') as $stage) {
-                $order_id = 'ord-' . substr(md5($signal_id . '|' . $stage . '|' . microtime(true)), 0, 16);
+                // Deterministic ID: same signal+stage always maps to the same row so that
+                // wpdb::replace deduplicates repeated execute calls instead of inserting extras.
+                $order_id = 'ord-' . substr(md5($signal_id . '|' . $stage), 0, 16);
+                // Map each entry stage to its corresponding TP: e1→tp1, e2→tp2, e3→tp3.
+                $tp_key = 'tp' . substr($stage, 1);
                 $order = array(
                     'id' => $order_id,
                     'symbol' => $signal['symbol'],
@@ -594,7 +598,7 @@ final class SMC_SuperFib_Sniper_REST {
                     'price' => $plan['entries'][$stage],
                     'lots' => $plan['lotSize'][$stage],
                     'sl' => isset($plan['stops'][$stage]) ? $plan['stops'][$stage] : $plan['sl'],
-                    'tp' => $plan['tps']['tp1'],
+                    'tp' => isset($plan['tps'][$tp_key]) ? $plan['tps'][$tp_key] : $plan['tps']['tp1'],
                     'placedAt' => gmdate('c'),
                     'state' => 'pending-sync',
                 );
@@ -823,7 +827,7 @@ final class SMC_SuperFib_Sniper_REST {
         $entries = array();
         $stops = array();
         $tps = array();
-        $lots = array('e1' => 0.01, 'e2' => 0.02, 'e3' => 0.03);
+        $lots = array();
         $ladder = array();
 
         foreach (array('e1', 'e2', 'e3') as $idx => $stage) {
@@ -834,6 +838,22 @@ final class SMC_SuperFib_Sniper_REST {
 
         foreach (array('tp1', 'tp2', 'tp3') as $idx => $tp) {
             $tps[$tp] = $this->price_for_ratio($high, $low, $target_ratios[$idx]);
+        }
+
+        // Compute lot sizes from risk budget. Weights match 1:2:3 so each stage carries a
+        // proportional share; rounding to the nearest micro-lot (0.01) keeps broker precision.
+        $sym = $signal['symbol'];
+        $pip = (substr($sym, -3) === 'JPY') ? 0.01 : 0.0001;
+        // Approximate pip value per standard lot in the account's base currency (USD).
+        // XAUUSD: 1 lot = 100 oz; 1 pip ($0.01) ≈ $1. For standard forex pairs, $10/pip/lot.
+        $pip_val = ($sym === 'XAUUSD') ? 1.0 : 10.0;
+        $risk_weights = array('e1' => 1, 'e2' => 2, 'e3' => 3);
+        foreach (array('e1', 'e2', 'e3') as $stage) {
+            $stop_dist = max(abs($entries[$stage] - $stops[$stage]), $pip);
+            $stop_pips = $stop_dist / $pip;
+            $stage_risk = $risk_usc * ($risk_weights[$stage] / 6.0);
+            $raw_lots = $stage_risk / max($stop_pips * $pip_val, 0.01);
+            $lots[$stage] = max(0.01, round($raw_lots / 0.01) * 0.01);
         }
 
         $risk_per_unit = max(abs($entries['e1'] - $stops['e1']), 0.00000001);
@@ -854,7 +874,7 @@ final class SMC_SuperFib_Sniper_REST {
             'ladder' => $ladder,
             'riskUSC' => $risk_usc,
             'riskZAR' => round($risk_usc * 18.5, 2),
-            'drawdownImpactPct' => round(((float) $risk['perTradePct']), 2),
+            'drawdownImpactPct' => round(($risk_usc / $equity) * 100, 4),
             'source' => 'backend-blueprint',
             'executionSource' => 'LTF_SF',
         );
@@ -942,8 +962,14 @@ final class SMC_SuperFib_Sniper_REST {
         if ($code >= 500) {
             return null;
         }
-        if ($code >= 400 || (isset($body['status']) && $body['status'] === 'error')) {
+        // Only revoke key status for authentication failures. A 400/404 means the symbol
+        // is unsupported or malformed, not that the key is invalid; branding one bad watchlist
+        // entry as an invalid key would block the entire feed.
+        if ($code === 401 || $code === 403 || (isset($body['code']) && in_array((int) $body['code'], array(401, 403), true))) {
             $this->set_twelve_key_status($user_id, 'invalid');
+            return null;
+        }
+        if ($code >= 400 || (isset($body['status']) && $body['status'] === 'error')) {
             return null;
         }
 
@@ -1003,7 +1029,8 @@ final class SMC_SuperFib_Sniper_REST {
 
                 if ($td_code === 429 || (isset($body['code']) && (int) $body['code'] === 429)) {
                     $this->set_twelve_key_status($user_id, 'rate-limited');
-                } elseif ($td_code >= 400 && $td_code < 500) {
+                } elseif ($td_code === 401 || $td_code === 403 || (isset($body['code']) && in_array((int) $body['code'], array(401, 403), true))) {
+                    // Only auth failures invalidate the key; a 400/404 for an unsupported symbol must not.
                     $this->set_twelve_key_status($user_id, 'invalid');
                 } elseif ($td_code < 400) {
                     if (!empty($body['values']) && is_array($body['values'])) {

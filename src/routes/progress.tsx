@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useUserAccount } from "@/hooks/useSniperData";
+import { useUserAccount, useUserRiskProfile } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { fmtUSC, fmtPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -28,7 +28,9 @@ const MILESTONES = [
 
 function ProgressPage() {
   const { data: account } = useUserAccount();
+  const { data: risk } = useUserRiskProfile();
   if (!account) return null;
+  const ddCap = risk?.ddCapPct ?? 6.0;
 
   return (
     <div className="space-y-4">
@@ -61,9 +63,9 @@ function ProgressPage() {
         <div className="rounded-lg border border-bd bg-bg1/60 p-4">
           <div className="text-[11px] font-mono uppercase tracking-wider text-mute">DD remaining</div>
           <div className="font-mono text-2xl font-semibold mt-2 text-buy">
-            {fmtPct(6 - account.drawdownPct, false)}
+            {fmtPct(ddCap - account.drawdownPct, false)}
           </div>
-          <div className="text-[10px] font-mono text-mute mt-0.5">before cap of 6.0%</div>
+          <div className="text-[10px] font-mono text-mute mt-0.5">before cap of {fmtPct(ddCap, false)}</div>
         </div>
       </div>
 
