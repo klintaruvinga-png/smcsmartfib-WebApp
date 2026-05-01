@@ -208,6 +208,11 @@ final class SMC_SuperFib_Sniper_REST {
         $this->route('/user/execute-signals', WP_REST_Server::CREATABLE, 'post_execute_signals', true);
         $this->route('/user/twelve-data-key', WP_REST_Server::CREATABLE, 'post_twelve_data_key', true);
         $this->route('/user/twelve-data-key', WP_REST_Server::DELETABLE, 'delete_twelve_data_key', true);
+        $this->route('/user/watchlist', WP_REST_Server::READABLE, 'get_user_watchlist', true);
+        $this->route('/user/watchlist', WP_REST_Server::CREATABLE, 'post_user_watchlist', true);
+        $this->route('/user/watchlist/add', WP_REST_Server::CREATABLE, 'post_watchlist_add', true);
+        $this->route('/user/watchlist/remove', WP_REST_Server::CREATABLE, 'post_watchlist_remove', true);
+        $this->route('/instruments', WP_REST_Server::READABLE, 'get_instruments', true);
     }
 
     private function route($path, $methods, $callback, $auth_required) {
@@ -378,6 +383,69 @@ final class SMC_SuperFib_Sniper_REST {
         $wpdb->delete($this->table('integrations'), array('user_id' => $user_id, 'provider' => self::TWELVE_PROVIDER), array('%d', '%s'));
         $this->audit($user_id, 'twelve_data_key.deleted', array());
         return rest_ensure_response(array('ok' => true, 'status' => 'missing'));
+    }
+
+    public function get_instruments() {
+        return rest_ensure_response($this->instrument_specs());
+    }
+
+    public function get_user_watchlist() {
+        $user_id = get_current_user_id();
+        $settings = $this->get_settings($user_id);
+        return rest_ensure_response(array(
+            'watchlist' => $settings['watchlist'],
+            'supported' => array_keys($this->instrument_specs()),
+        ));
+    }
+
+    public function post_user_watchlist(WP_REST_Request $request) {
+        $user_id = get_current_user_id();
+        $payload = $request->get_json_params();
+        $symbols = isset($payload['watchlist']) && is_array($payload['watchlist']) ? $payload['watchlist'] : array();
+        $validated = $this->validate_watchlist_symbols($symbols);
+        $this->save_watchlist($user_id, $validated);
+        $this->audit($user_id, 'watchlist.saved', array('watchlist' => $validated));
+        return rest_ensure_response(array('ok' => true, 'watchlist' => $validated));
+    }
+
+    public function post_watchlist_add(WP_REST_Request $request) {
+        $user_id = get_current_user_id();
+        $payload = $request->get_json_params();
+        $symbol = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) ($payload['symbol'] ?? '')));
+        if ($symbol === '') {
+            return new WP_Error('smc_sf_watchlist_symbol_missing', 'Symbol is required.', array('status' => 400));
+        }
+        if (!$this->is_supported_symbol($symbol)) {
+            return new WP_Error('smc_sf_watchlist_unsupported', 'Symbol not supported: ' . $symbol, array('status' => 400));
+        }
+        $settings = $this->get_settings($user_id);
+        $watchlist = $settings['watchlist'];
+        if (!in_array($symbol, $watchlist, true)) {
+            $watchlist[] = $symbol;
+            $watchlist = array_slice($watchlist, 0, 24);
+            $this->save_watchlist($user_id, $watchlist);
+            $this->audit($user_id, 'watchlist.add', array('symbol' => $symbol));
+        }
+        return rest_ensure_response(array('ok' => true, 'watchlist' => $watchlist));
+    }
+
+    public function post_watchlist_remove(WP_REST_Request $request) {
+        global $wpdb;
+        $user_id = get_current_user_id();
+        $payload = $request->get_json_params();
+        $symbol = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) ($payload['symbol'] ?? '')));
+        if ($symbol === '') {
+            return new WP_Error('smc_sf_watchlist_symbol_missing', 'Symbol is required.', array('status' => 400));
+        }
+        $settings = $this->get_settings($user_id);
+        $watchlist = array_values(array_filter($settings['watchlist'], function ($w) use ($symbol) {
+            return $w !== $symbol;
+        }));
+        $this->save_watchlist($user_id, $watchlist);
+        // Remove stale snapshot so the symbol does not reappear as a ghost price tile.
+        $wpdb->delete($this->table('snapshots'), array('user_id' => $user_id, 'symbol' => $symbol), array('%d', '%s'));
+        $this->audit($user_id, 'watchlist.remove', array('symbol' => $symbol));
+        return rest_ensure_response(array('ok' => true, 'watchlist' => $watchlist));
     }
 
     public function get_user_risk_profile() {
@@ -843,10 +911,9 @@ final class SMC_SuperFib_Sniper_REST {
         // Compute lot sizes from risk budget. Weights match 1:2:3 so each stage carries a
         // proportional share; rounding to the nearest micro-lot (0.01) keeps broker precision.
         $sym = $signal['symbol'];
-        $pip = (substr($sym, -3) === 'JPY' || $sym === 'XAUUSD') ? 0.01 : 0.0001;
-        // Approximate pip value per standard lot in the account's base currency (USD).
-        // XAUUSD: 1 lot = 100 oz; 1 pip ($0.01) ≈ $1. For standard forex pairs, $10/pip/lot.
-        $pip_val = ($sym === 'XAUUSD') ? 1.0 : 10.0;
+        $spec = $this->get_instrument_spec($sym);
+        $pip = $spec ? (float) $spec['pip_size'] : 0.0001;
+        $pip_val = $spec ? (float) $spec['pip_val'] : 10.0;
         $risk_weights = array('e1' => 1, 'e2' => 2, 'e3' => 3);
         foreach (array('e1', 'e2', 'e3') as $stage) {
             $stop_dist = max(abs($entries[$stage] - $stops[$stage]), $pip);
@@ -1057,10 +1124,11 @@ final class SMC_SuperFib_Sniper_REST {
                             );
                         }
                         $this->set_twelve_key_status($user_id, 'ok');
-                    } elseif (isset($body['status']) && $body['status'] === 'error') {
-                        $this->set_twelve_key_status($user_id, 'invalid');
                     }
-                    // $td_code >= 500: transient upstream error, preserve key status.
+                    // status:error within a 2xx HTTP response means unsupported/unrecognised
+                    // symbol — not an auth failure. Preserve key status so one bad watchlist
+                    // entry cannot block the entire feed.
+                    // $td_code >= 500: transient upstream error, also preserve key status.
                 }
             }
         }
@@ -1474,6 +1542,89 @@ final class SMC_SuperFib_Sniper_REST {
         );
     }
 
+    private function instrument_specs() {
+        static $specs = null;
+        if ($specs !== null) {
+            return $specs;
+        }
+        $specs = array(
+            // FOREX — USD quoted
+            'GBPUSD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'AUDUSD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'EURUSD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'NZDUSD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            // FOREX — JPY quoted
+            'USDJPY' => array('type' => 'forex', 'pip_size' => 0.01,   'contract_size' => 100000, 'pip_val' => 10.0),
+            'AUDJPY' => array('type' => 'forex', 'pip_size' => 0.01,   'contract_size' => 100000, 'pip_val' => 10.0),
+            'EURJPY' => array('type' => 'forex', 'pip_size' => 0.01,   'contract_size' => 100000, 'pip_val' => 10.0),
+            'GBPJPY' => array('type' => 'forex', 'pip_size' => 0.01,   'contract_size' => 100000, 'pip_val' => 10.0),
+            'NZDJPY' => array('type' => 'forex', 'pip_size' => 0.01,   'contract_size' => 100000, 'pip_val' => 10.0),
+            'CADJPY' => array('type' => 'forex', 'pip_size' => 0.01,   'contract_size' => 100000, 'pip_val' => 10.0),
+            'CHFJPY' => array('type' => 'forex', 'pip_size' => 0.01,   'contract_size' => 100000, 'pip_val' => 10.0),
+            // FOREX — non-JPY crosses
+            'USDCAD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'USDCHF' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'EURGBP' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'EURAUD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'EURNZD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'EURCHF' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'EURCAD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'GBPAUD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'GBPNZD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'GBPCAD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'GBPCHF' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'AUDNZD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'AUDCAD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'AUDCHF' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'NZDCAD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'NZDCHF' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'CADCHF' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            // METALS — XAU: 100 oz/lot; 1 pip ($0.01) = $1/pip/lot
+            'XAUUSD' => array('type' => 'metal',  'pip_size' => 0.01,   'contract_size' => 100,  'pip_val' => 1.0),
+            // XAG: 5000 oz/lot; 1 pip ($0.001) = $5/pip/lot
+            'XAGUSD' => array('type' => 'metal',  'pip_size' => 0.001,  'contract_size' => 5000, 'pip_val' => 5.0),
+            // INDICES — contract sizes vary by broker; defaults use $1/point/lot
+            'US30'   => array('type' => 'index',  'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
+            'NAS100' => array('type' => 'index',  'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
+            // CRYPTO — contract sizes vary by broker; defaults use $1/point/lot
+            'BTCUSD' => array('type' => 'crypto', 'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
+            'ETHUSD' => array('type' => 'crypto', 'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
+        );
+        return $specs;
+    }
+
+    private function get_instrument_spec($symbol) {
+        $key = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $symbol));
+        $specs = $this->instrument_specs();
+        return isset($specs[$key]) ? $specs[$key] : null;
+    }
+
+    private function is_supported_symbol($symbol) {
+        $key = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $symbol));
+        $specs = $this->instrument_specs();
+        return isset($specs[$key]);
+    }
+
+    private function validate_watchlist_symbols($symbols) {
+        $out = array();
+        foreach ($this->sanitize_symbols($symbols) as $sym) {
+            if ($this->is_supported_symbol($sym)) {
+                $out[] = $sym;
+            }
+        }
+        return $out;
+    }
+
+    private function save_watchlist($user_id, $watchlist) {
+        $current = $this->get_settings($user_id);
+        $current['watchlist'] = $watchlist;
+        $this->replace_json('user_settings', array('user_id' => $user_id), array(
+            'user_id' => $user_id,
+            'settings' => $current,
+            'updated_at' => $this->now_mysql(),
+        ));
+    }
+
     private function sanitize_symbols($symbols) {
         if (!is_array($symbols)) {
             return array();
@@ -1518,14 +1669,14 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function twelve_symbol($symbol) {
-        $symbol = strtoupper($symbol);
-        if ($symbol === 'XAUUSD') {
-            return 'XAU/USD';
+        $key = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $symbol));
+        // All-alpha 6-letter tokens (forex pairs, metals, crypto like BTC/USD) are
+        // slash-formatted by Twelve Data. Symbols with digits (US30, NAS100) pass through.
+        // This covers both registry-known pairs and any legacy user-watchlist entries.
+        if (preg_match('/^[A-Z]{6}$/', $key)) {
+            return substr($key, 0, 3) . '/' . substr($key, 3, 3);
         }
-        if (strlen($symbol) === 6) {
-            return substr($symbol, 0, 3) . '/' . substr($symbol, 3, 3);
-        }
-        return $symbol;
+        return $key;
     }
 
     private function latest_timestamp($table, $user_id, $column) {
