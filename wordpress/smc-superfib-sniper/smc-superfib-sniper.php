@@ -1670,10 +1670,10 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function twelve_symbol($symbol) {
         $key = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $symbol));
-        $spec = $this->get_instrument_spec($key);
-        // Only slash-format for forex/metal pairs that are purely alphabetic (6 letters).
-        // Indices (US30, NAS100) and crypto with digits must NOT receive a slash.
-        if ($spec && in_array($spec['type'], array('forex', 'metal'), true) && preg_match('/^[A-Z]{6}$/', $key)) {
+        // All-alpha 6-letter tokens (forex pairs, metals, crypto like BTC/USD) are
+        // slash-formatted by Twelve Data. Symbols with digits (US30, NAS100) pass through.
+        // This covers both registry-known pairs and any legacy user-watchlist entries.
+        if (preg_match('/^[A-Z]{6}$/', $key)) {
             return substr($key, 0, 3) . '/' . substr($key, 3, 3);
         }
         return $key;

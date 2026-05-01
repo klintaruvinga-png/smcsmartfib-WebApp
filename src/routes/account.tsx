@@ -270,7 +270,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
         <div className="flex justify-end">
           <button
             onClick={saveSettings}
-            disabled={busy === "settings"}
+            disabled={busy === "settings" || watchlistBusy !== null}
             className="rounded-md border border-buy/50 bg-buy/15 px-3 py-1.5 text-xs font-semibold text-buy hover:bg-buy/25 disabled:opacity-60"
           >
             {busy === "settings" ? "Saving..." : "Save settings"}
