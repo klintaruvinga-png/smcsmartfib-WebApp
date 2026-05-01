@@ -226,14 +226,14 @@ final class SMC_SuperFib_Sniper_REST {
             $name = 'London';
             $open = '07:00';
             $close = '11:00';
-        } elseif ($hour >= 12 && $hour < 16) {
-            $name = 'New York';
-            $open = '12:00';
-            $close = '16:00';
         } elseif ($hour >= 15 && $hour < 17) {
             $name = 'London Close';
             $open = '15:00';
             $close = '17:00';
+        } elseif ($hour >= 12 && $hour < 16) {
+            $name = 'New York';
+            $open = '12:00';
+            $close = '16:00';
         } else {
             $name = 'Off killzone';
             $open = null;
