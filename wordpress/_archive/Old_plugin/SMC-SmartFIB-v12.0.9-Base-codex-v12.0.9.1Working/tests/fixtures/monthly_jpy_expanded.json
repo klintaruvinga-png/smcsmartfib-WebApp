@@ -1,0 +1,36 @@
+{
+  "name": "monthly_jpy_expanded",
+  "kind": "anchor",
+  "pair": "USD/JPY",
+  "options": {
+    "tfSeconds": 86400,
+    "pipType": "JPY",
+    "sessionTf": "Monthly"
+  },
+  "candles": [
+    { "time": "2024-01-05T00:00:00Z", "open": 150.0, "high": 150.1, "low": 150.0, "close": 150.05 },
+    { "time": "2024-01-25T00:00:00Z", "open": 150.05, "high": 150.2, "low": 150.02, "close": 150.2 },
+    { "time": "2024-02-05T00:00:00Z", "open": 150.2, "high": 150.8, "low": 150.15, "close": 150.6 },
+    { "time": "2024-02-25T00:00:00Z", "open": 150.6, "high": 151.5, "low": 150.4, "close": 151.2 }
+  ],
+  "expected": {
+    "sessionTf": "Monthly",
+    "sessions": {
+      "s1": { "key": "2024-02" },
+      "s2": { "key": "2024-01" }
+    },
+    "f1": { "high": 150.2, "low": 150.0, "bull": true },
+    "f2": { "high": 151.5, "low": 150.0, "bull": true },
+    "f2Name": "SWAP EXP",
+    "f3": { "high": 151.5, "low": 150.15, "bull": true },
+    "f2Meta": {
+      "sameDir": true,
+      "swapRange": 0.04999999999998295,
+      "fullRange": 1.5,
+      "threshold": 0.35,
+      "expanded": true,
+      "branch": "EXPANDED"
+    },
+    "ef": null
+  }
+}

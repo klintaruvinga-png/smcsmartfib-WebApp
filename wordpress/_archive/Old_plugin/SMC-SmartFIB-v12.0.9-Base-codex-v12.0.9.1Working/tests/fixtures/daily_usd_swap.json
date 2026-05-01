@@ -1,0 +1,36 @@
+{
+  "name": "daily_usd_swap",
+  "kind": "anchor",
+  "pair": "GBP/USD",
+  "options": {
+    "tfSeconds": 3600,
+    "pipType": "USD",
+    "sessionTf": "Daily"
+  },
+  "candles": [
+    { "time": "2024-02-01T00:00:00Z", "open": 104.0, "high": 104.5, "low": 103.5, "close": 104.2 },
+    { "time": "2024-02-01T12:00:00Z", "open": 104.2, "high": 105.0, "low": 103.0, "close": 105.0 },
+    { "time": "2024-02-02T00:00:00Z", "open": 101.0, "high": 102.0, "low": 100.5, "close": 100.8 },
+    { "time": "2024-02-02T12:00:00Z", "open": 100.8, "high": 101.5, "low": 100.0, "close": 100.0 }
+  ],
+  "expected": {
+    "sessionTf": "Daily",
+    "sessions": {
+      "s1": { "key": "2024-02-02" },
+      "s2": { "key": "2024-02-01" }
+    },
+    "f1": { "high": 105.0, "low": 103.0, "bull": true },
+    "f2": { "high": 103.0, "low": 102.0, "bull": true },
+    "f2Name": "SWAP",
+    "f3": { "high": 102.0, "low": 100.0, "bull": false },
+    "f2Meta": {
+      "sameDir": false,
+      "swapRange": 1.0,
+      "fullRange": 5.0,
+      "threshold": 0.25,
+      "expanded": false,
+      "branch": "SWAP"
+    },
+    "ef": null
+  }
+}

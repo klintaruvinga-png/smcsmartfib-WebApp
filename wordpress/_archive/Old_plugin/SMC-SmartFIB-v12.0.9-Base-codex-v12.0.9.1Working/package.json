@@ -1,0 +1,14 @@
+{
+  "name": "smc-superfib-dashboard-ui-mod-v2-tests",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "npm run test:full",
+    "test:pine": "node --test --test-isolation=none tests/pine/*.test.js",
+    "test:js": "node --test --test-isolation=none tests/js/*.test.js",
+    "test:browser": "node --test --test-isolation=none tests/browser/*.test.js",
+    "test:php": "node tests/helpers/run-php-tests.js",
+    "test:node": "node --test --test-isolation=none tests/pine/*.test.js tests/js/*.test.js tests/browser/*.test.js",
+    "test:full": "npm run test:node && npm run test:php"
+  }
+}

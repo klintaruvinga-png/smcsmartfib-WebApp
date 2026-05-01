@@ -1,0 +1,55 @@
+{
+  "name": "execution_buy_weekly",
+  "kind": "execution",
+  "pair": "GBP/USD",
+  "options": {
+    "tfSeconds": 14400,
+    "pipType": "USD",
+    "sessionTf": "Weekly"
+  },
+  "candles": [],
+  "executionSignal": {
+    "pair": "GBP/USD",
+    "direction": "BUY",
+    "entry_zone_label": "EF 62.5%",
+    "entry_zone_price": 1.2,
+    "signal_state": "ACTIVE",
+    "sequence_status": "READY",
+    "final_bias": "BULL_EXP",
+    "gate": "BUY",
+    "gate_reason": "BIAS_ALIGNED",
+    "regime": "TREND UP",
+    "fib_timeframe": "Weekly",
+    "session_tf": "Weekly",
+    "matrix": { "matrix_state": "DISCOUNT" },
+    "pd_array": { "pd_array_dir": 1 },
+    "chop_band": { "low": 1.18, "high": 1.185 },
+    "setup_class": "A",
+    "confluence_score": 82,
+    "ede_stars": 4,
+    "market_price": 1.1995,
+    "sl": 1.198,
+    "tp1": 1.208,
+    "tp2": 1.212,
+    "ef_tp_narrative_valid": true,
+    "signal_valid_bars": 10,
+    "bar_duration_seconds": 14400,
+    "signal_bar_time": 1717507800000
+  },
+  "expected": {
+    "sessionTf": "Weekly",
+    "ef": {
+      "fibHigh": 1.205,
+      "fibLow": 1.195,
+      "dir": 1
+    },
+    "entries": [1.2003, 1.20015, 1.2],
+    "sl": 1.196,
+    "rr1": 1.79,
+    "rrActual": 2.0,
+    "risk": {
+      "stageLots": [0.01, 0.02, 0.04],
+      "totalRiskUsc": 28.6
+    }
+  }
+}
