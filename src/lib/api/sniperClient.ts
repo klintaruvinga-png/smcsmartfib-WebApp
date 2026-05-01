@@ -4,6 +4,15 @@
  * In MOCK_MODE every function returns the typed mock model with state: 'mock'.
  */
 
+import { getAuthHeader, clearCredentials } from "@/lib/auth";
+
+export class AuthError extends Error {
+  constructor() {
+    super("Authentication required");
+    this.name = "AuthError";
+  }
+}
+
 import type {
   AccountState,
   ChartSnapshot,
@@ -68,24 +77,36 @@ interface RequestOpts {
 
 async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  // Per-session WP nonce only. We intentionally do NOT read any shared secret
-  // from `window.*` — exposing a privileged credential to page JS would make
-  // it trivially stealable via XSS or DevTools.
-  const win =
-    typeof window !== "undefined"
-      ? (window as unknown as { SNIPER?: { nonce?: string } })
-      : undefined;
-  if (win?.SNIPER?.nonce) headers["X-WP-Nonce"] = win.SNIPER.nonce;
 
-  const authenticated = opts.authenticated ?? true;
+  const authHeader = getAuthHeader();
+  if (authHeader) {
+    headers["Authorization"] = authHeader;
+  } else {
+    // Fall back to nonce when served directly from WordPress (window.SNIPER injected)
+    const win =
+      typeof window !== "undefined"
+        ? (window as unknown as { SNIPER?: { nonce?: string } })
+        : undefined;
+    if (win?.SNIPER?.nonce) headers["X-WP-Nonce"] = win.SNIPER.nonce;
+  }
+
   const url = `${backendUrl.replace(/\/$/, "")}/sniper/v1${path}`;
 
   const res = await fetch(url, {
     method: opts.method ?? "GET",
     headers,
-    credentials: authenticated ? "include" : "omit",
+    credentials: opts.authenticated === false ? "omit" : "include",
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
+
+  if (res.status === 401) {
+    clearCredentials();
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("smc:auth-required"));
+    }
+    throw new AuthError();
+  }
+
   if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
   return (await res.json()) as T;
 }
