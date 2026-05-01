@@ -22,6 +22,29 @@ final class SMC_SuperFib_Sniper_REST {
         add_action('rest_api_init', array($instance, 'register_routes'));
         add_filter('rest_pre_serve_request', array($instance, 'send_cors_headers'), 10, 4);
         register_activation_hook(__FILE__, array(__CLASS__, 'activate'));
+
+        // Respond to CORS preflight (OPTIONS) requests before WordPress processes them.
+        // Without this, the browser's preflight check silently fails and blocks POST/DELETE.
+        add_action('init', function () use ($instance) {
+            if (!isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'OPTIONS') {
+                return;
+            }
+            $origin = isset($_SERVER['HTTP_ORIGIN']) ? esc_url_raw(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
+            if (!$origin) {
+                return;
+            }
+            $allowed = apply_filters('smc_sf_allowed_origins', array(home_url(), 'https://trader.stokvelsociety.co.za'));
+            if (!in_array(untrailingslashit($origin), array_map('untrailingslashit', $allowed), true)) {
+                return;
+            }
+            header('Access-Control-Allow-Origin: ' . $origin);
+            header('Access-Control-Allow-Credentials: true');
+            header('Access-Control-Allow-Headers: Content-Type, X-WP-Nonce, Authorization');
+            header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
+            header('Access-Control-Max-Age: 86400');
+            status_header(204);
+            exit;
+        });
     }
 
     public static function activate() {
@@ -213,8 +236,15 @@ final class SMC_SuperFib_Sniper_REST {
         if (in_array(untrailingslashit($origin), array_map('untrailingslashit', $allowed), true)) {
             header('Access-Control-Allow-Origin: ' . $origin);
             header('Access-Control-Allow-Credentials: true');
-            header('Access-Control-Allow-Headers: Content-Type, X-WP-Nonce');
+            header('Access-Control-Allow-Headers: Content-Type, X-WP-Nonce, Authorization');
             header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
+        }
+
+        // Prevent proxies and browsers from caching authenticated user-specific REST responses.
+        $route = $request->get_route();
+        if (strpos($route, '/sniper/v1/user/') === 0 || strpos($route, '/sniper/v1/health') === 0) {
+            header('Cache-Control: no-store, no-cache, must-revalidate');
+            header('Pragma: no-cache');
         }
 
         return $served;
@@ -309,6 +339,11 @@ final class SMC_SuperFib_Sniper_REST {
             return rest_ensure_response(array('ok' => false, 'status' => 'missing', 'message' => 'Twelve Data API key is required.'));
         }
 
+        // Reject keys that are clearly malformed before making any outbound request.
+        if (strlen($api_key) < 8 || strlen($api_key) > 64 || !preg_match('/^[A-Za-z0-9_\-]+$/', $api_key)) {
+            return rest_ensure_response(array('ok' => false, 'status' => 'invalid', 'message' => 'Invalid API key format.'));
+        }
+
         $validation = $this->validate_twelve_key($api_key);
         if (!$validation['ok']) {
             return rest_ensure_response($validation);
@@ -367,9 +402,12 @@ final class SMC_SuperFib_Sniper_REST {
             'updatedAt' => gmdate('c'),
         );
 
+        // Merge only the riskProfile key; preserve existing account data untouched.
+        $existing = $this->get_account_blob($user_id);
+        $existing['riskProfile'] = $profile;
         $this->replace_json('account_snapshots', array('user_id' => $user_id), array(
             'user_id' => $user_id,
-            'data' => array('riskProfile' => $profile, 'account' => $this->get_account_state($user_id)),
+            'data' => $existing,
             'updated_at' => $this->now_mysql(),
         ));
         $this->audit($user_id, 'risk_profile.updated', $profile);
@@ -478,15 +516,31 @@ final class SMC_SuperFib_Sniper_REST {
     public function post_user_account(WP_REST_Request $request) {
         $user_id = get_current_user_id();
         $payload = $request->get_json_params();
-        $account = array_merge($this->get_account_state($user_id), is_array($payload) ? $payload : array());
+        if (!is_array($payload)) {
+            $payload = array();
+        }
+
+        // Only allow updating user-supplied numeric fields; computed fields (openPositions,
+        // pendingOrders) are always derived from live DB state and cannot be overwritten.
+        $writable = array('balanceUSC', 'equityUSC', 'marginUsedPct', 'drawdownPct', 'todayPnlUSC', 'todayPnlPct');
+        $update = array();
+        foreach ($writable as $key) {
+            if (array_key_exists($key, $payload)) {
+                $update[$key] = (float) $payload[$key];
+            }
+        }
+
         $existing = $this->get_account_blob($user_id);
-        $existing['account'] = $account;
+        $existing['account'] = array_merge(
+            isset($existing['account']) && is_array($existing['account']) ? $existing['account'] : array(),
+            $update
+        );
         $this->replace_json('account_snapshots', array('user_id' => $user_id), array(
             'user_id' => $user_id,
             'data' => $existing,
             'updated_at' => $this->now_mysql(),
         ));
-        $this->audit($user_id, 'account.updated', $account);
+        $this->audit($user_id, 'account.updated', $update);
         return rest_ensure_response(array('ok' => true));
     }
 
@@ -723,6 +777,15 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         $ltf_level = $this->execution_level($levels, $direction);
+
+        // A signal may only be backend-confirmed when the price feed is live AND candles are
+        // fresh (last candle no older than 2 hours — two 15-min bars worth of normal delay plus
+        // buffer). Stale data can never produce a READY backend-confirmed signal.
+        $price_is_live  = isset($price['state']) && $price['state'] === 'live';
+        $last_candle    = !empty($candles) ? end($candles) : null;
+        $candles_fresh  = $last_candle && (time() - strtotime($last_candle['time'])) <= 7200;
+        $data_live      = $price_is_live && $candles_fresh;
+
         $signal_id = 'sig-' . substr(md5($user_id . '|' . $symbol . '|' . $direction . '|' . gmdate('YmdH')), 0, 16);
         $signal = array(
             'id' => $signal_id,
@@ -732,7 +795,7 @@ final class SMC_SuperFib_Sniper_REST {
             'confluence' => $confluence,
             'verdict' => $this->verdict($status, $confluence, $chop),
             'computedBy' => 'backend',
-            'backendConfirmed' => $status === 'READY',
+            'backendConfirmed' => $status === 'READY' && $data_live,
             'createdAt' => gmdate('c'),
             'engine' => array(
                 'htfBias' => $bias === 'RANGING' ? 'TRANSITIONAL' : $bias,
@@ -883,8 +946,13 @@ final class SMC_SuperFib_Sniper_REST {
             $this->set_twelve_key_status($user_id, 'rate-limited');
             return null;
         }
-        if ($code >= 400 || isset($body['status']) && $body['status'] === 'error') {
+        if (($code >= 400 && $code < 500) || (isset($body['status']) && $body['status'] === 'error')) {
             $this->set_twelve_key_status($user_id, 'invalid');
+            return null;
+        }
+        if ($code >= 500) {
+            // Transient upstream error — preserve the existing key status rather than
+            // permanently marking a valid key as invalid.
             return null;
         }
 
@@ -938,34 +1006,43 @@ final class SMC_SuperFib_Sniper_REST {
                 'apikey' => $key,
             ), 'https://api.twelvedata.com/time_series');
             $response = wp_remote_get($url, array('timeout' => 15));
-            if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) < 400) {
-                $body = json_decode(wp_remote_retrieve_body($response), true);
-                if (!empty($body['values']) && is_array($body['values'])) {
-                    foreach ($body['values'] as $item) {
-                        if (empty($item['datetime'])) {
-                            continue;
-                        }
-                        $time = gmdate('Y-m-d H:i:s', strtotime($item['datetime']));
-                        $wpdb->replace(
-                            $this->table('candles'),
-                            array(
-                                'user_id' => $user_id,
-                                'symbol' => $symbol,
-                                'timeframe' => $timeframe,
-                                'candle_time' => $time,
-                                'open' => (float) $item['open'],
-                                'high' => (float) $item['high'],
-                                'low' => (float) $item['low'],
-                                'close' => (float) $item['close'],
-                                'volume' => isset($item['volume']) ? (float) $item['volume'] : null,
-                                'created_at' => $this->now_mysql(),
-                            ),
-                            array('%d', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%f', '%s')
-                        );
-                    }
-                    $this->set_twelve_key_status($user_id, 'ok');
-                } elseif (isset($body['code']) && (int) $body['code'] === 429) {
+            if (!is_wp_error($response)) {
+                $td_code = wp_remote_retrieve_response_code($response);
+                $body    = json_decode(wp_remote_retrieve_body($response), true);
+
+                if ($td_code === 429 || (isset($body['code']) && (int) $body['code'] === 429)) {
                     $this->set_twelve_key_status($user_id, 'rate-limited');
+                } elseif ($td_code >= 400 && $td_code < 500) {
+                    $this->set_twelve_key_status($user_id, 'invalid');
+                } elseif ($td_code < 400) {
+                    if (!empty($body['values']) && is_array($body['values'])) {
+                        foreach ($body['values'] as $item) {
+                            if (empty($item['datetime'])) {
+                                continue;
+                            }
+                            $time = gmdate('Y-m-d H:i:s', strtotime($item['datetime']));
+                            $wpdb->replace(
+                                $this->table('candles'),
+                                array(
+                                    'user_id' => $user_id,
+                                    'symbol' => $symbol,
+                                    'timeframe' => $timeframe,
+                                    'candle_time' => $time,
+                                    'open' => (float) $item['open'],
+                                    'high' => (float) $item['high'],
+                                    'low' => (float) $item['low'],
+                                    'close' => (float) $item['close'],
+                                    'volume' => isset($item['volume']) ? (float) $item['volume'] : null,
+                                    'created_at' => $this->now_mysql(),
+                                ),
+                                array('%d', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%f', '%s')
+                            );
+                        }
+                        $this->set_twelve_key_status($user_id, 'ok');
+                    } elseif (isset($body['status']) && $body['status'] === 'error') {
+                        $this->set_twelve_key_status($user_id, 'invalid');
+                    }
+                    // $td_code >= 500: transient upstream error, preserve key status.
                 }
             }
         }
@@ -1006,8 +1083,11 @@ final class SMC_SuperFib_Sniper_REST {
         if ($code === 429 || (isset($body['code']) && (int) $body['code'] === 429)) {
             return array('ok' => false, 'status' => 'rate-limited', 'message' => 'Twelve Data rate limit reached.');
         }
-        if ($code >= 400 || (isset($body['status']) && $body['status'] === 'error')) {
+        if (($code >= 400 && $code < 500) || (isset($body['status']) && $body['status'] === 'error')) {
             return array('ok' => false, 'status' => 'invalid', 'message' => isset($body['message']) ? $body['message'] : 'Invalid Twelve Data key.');
+        }
+        if ($code >= 500) {
+            return array('ok' => false, 'status' => 'blocked', 'message' => 'Twelve Data service unavailable. Try again shortly.');
         }
 
         return array('ok' => true, 'status' => 'ok');
@@ -1382,7 +1462,11 @@ final class SMC_SuperFib_Sniper_REST {
         $out = array();
         foreach ($symbols as $symbol) {
             $clean = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $symbol));
-            if ($clean !== '' && !in_array($clean, $out, true)) {
+            // Reject empty strings and suspiciously long tokens (longest real symbol is ~10 chars).
+            if ($clean === '' || strlen($clean) > 12) {
+                continue;
+            }
+            if (!in_array($clean, $out, true)) {
                 $out[] = $clean;
             }
         }
@@ -1427,12 +1511,14 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function latest_timestamp($table, $user_id, $column) {
         global $wpdb;
-        $allowed = array('snapshots', 'engine_runs');
-        if (!in_array($table, $allowed, true)) {
+        $allowed_tables  = array('snapshots', 'engine_runs');
+        $allowed_columns = array('updated_at', 'created_at');
+        if (!in_array($table, $allowed_tables, true) || !in_array($column, $allowed_columns, true)) {
             return null;
         }
+        $col = $column === 'updated_at' ? 'updated_at' : 'created_at';
         return $wpdb->get_var($wpdb->prepare(
-            "SELECT MAX($column) FROM {$this->table($table)} WHERE user_id = %d",
+            "SELECT MAX({$col}) FROM {$this->table($table)} WHERE user_id = %d",
             $user_id
         ));
     }
