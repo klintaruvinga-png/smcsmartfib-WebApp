@@ -42,6 +42,12 @@ export function useUserSettings() {
   });
 }
 
+/** Canonical watchlist derived from the user-settings cache — single source of truth. */
+export function useWatchlist() {
+  const { data } = useUserSettings();
+  return data?.watchlist ?? [];
+}
+
 export function useEngineHealth() {
   return useQuery({
     queryKey: ["engine-health"],
