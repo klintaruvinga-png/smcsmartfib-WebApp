@@ -6,7 +6,9 @@
 
 import type {
   AccountState,
+  ChartSnapshot,
   DashboardSettings,
+  EngineHealth,
   GateState,
   PairPrice,
   PendingOrder,
@@ -15,11 +17,13 @@ import type {
   RiskProfile,
   SignalCandidate,
   Symbol,
+  TwelveDataKeyStatus,
   TradePlan,
 } from "@/types/sniper";
 
 import {
   mockAccount,
+  mockEngineHealth,
   mockGates,
   mockOrders,
   mockPlan,
@@ -28,21 +32,29 @@ import {
   mockRegimes,
   mockRiskProfile,
   mockSettings,
+  mockFibLevels,
+  mockPriceSeries,
   mockSignals,
 } from "@/mocks/sniperData";
 
-export const MOCK_MODE = true;
+const DEFAULT_BACKEND_URL =
+  import.meta.env.VITE_SNIPER_BACKEND_URL ?? "https://trader.stokvelsociety.co.za/wp-json";
 
-let backendUrl = mockSettings.backendUrl;
+export const MOCK_MODE =
+  String(
+    import.meta.env.VITE_SNIPER_MOCK_MODE ?? (import.meta.env.DEV ? "true" : "false"),
+  ).toLowerCase() === "true";
+
+let backendUrl = DEFAULT_BACKEND_URL;
 export function setBackendUrl(url: string) {
-  backendUrl = url;
+  backendUrl = url || DEFAULT_BACKEND_URL;
 }
 export function getBackendUrl() {
   return backendUrl;
 }
 
 interface RequestOpts {
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "DELETE";
   body?: unknown;
   /**
    * Privileged route — must NEVER be called directly from the browser with a
@@ -51,7 +63,7 @@ interface RequestOpts {
    * or an edge function holding the secret server-side). The frontend posts to
    * a same-origin proxy path; the secret never touches `window`.
    */
-  privileged?: boolean;
+  authenticated?: boolean;
 }
 
 async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
@@ -59,19 +71,19 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
   // Per-session WP nonce only. We intentionally do NOT read any shared secret
   // from `window.*` — exposing a privileged credential to page JS would make
   // it trivially stealable via XSS or DevTools.
-  const win = typeof window !== "undefined" ? (window as unknown as { SNIPER?: { nonce?: string } }) : undefined;
+  const win =
+    typeof window !== "undefined"
+      ? (window as unknown as { SNIPER?: { nonce?: string } })
+      : undefined;
   if (win?.SNIPER?.nonce) headers["X-WP-Nonce"] = win.SNIPER.nonce;
 
-  // Privileged routes are sent to a same-origin proxy that injects the secret
-  // server-side after validating the user's capability + nonce.
-  const url = opts.privileged
-    ? `/wp-json/sniper/v1/proxy${path}`
-    : `${backendUrl.replace(/\/$/, "")}/sniper/v1${path}`;
+  const authenticated = opts.authenticated ?? true;
+  const url = `${backendUrl.replace(/\/$/, "")}/sniper/v1${path}`;
 
   const res = await fetch(url, {
     method: opts.method ?? "GET",
     headers,
-    credentials: opts.privileged ? "same-origin" : "omit",
+    credentials: authenticated ? "include" : "omit",
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
   if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
@@ -93,6 +105,41 @@ export const apiClient = {
     if (mock) return { prices: mockPrices, regimes: mockRegimes, gates: mockGates };
     return call<{ prices: PairPrice[]; regimes: RegimeState[]; gates: GateState[] }>("/snapshot");
   },
+  async getChartSnapshot(
+    symbol: Symbol,
+    timeframe = "15min",
+    mock = MOCK_MODE,
+  ): Promise<ChartSnapshot> {
+    if (mock) {
+      const candles = mockPriceSeries(symbol).map((p) => ({
+        time: new Date(p.t).toISOString(),
+        open: p.p,
+        high: p.p,
+        low: p.p,
+        close: p.p,
+      }));
+      return {
+        symbol,
+        timeframe,
+        candles,
+        fibLevels: mockFibLevels(symbol).map((f) => {
+          const ratio = Number(f.label);
+          return {
+            family: "LTF_SF",
+            ratio,
+            label: `${f.label}%`,
+            price: f.value,
+            role: ratio < 50 ? "premium" : ratio === 50 ? "equilibrium" : "discount",
+          };
+        }),
+        updatedAt: new Date().toISOString(),
+        state: "mock",
+      };
+    }
+    return call<ChartSnapshot>(
+      `/charts?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`,
+    );
+  },
   async postSnapshot(payload: unknown, mock = MOCK_MODE): Promise<{ ok: true }> {
     if (mock) return { ok: true };
     return call("/snapshot", { method: "POST", body: payload });
@@ -110,12 +157,17 @@ export const apiClient = {
     return call<TradePlan[]>(`/ladders${symbol ? `?symbol=${symbol}` : ""}`);
   },
   async getSession(mock = MOCK_MODE) {
-    if (mock) return { name: "London-AM", openUtc: "07:00", closeUtc: "11:00", state: "mock" as const };
+    if (mock)
+      return { name: "London-AM", openUtc: "07:00", closeUtc: "11:00", state: "mock" as const };
     return call<{ name: string; openUtc: string; closeUtc: string; state: string }>("/session");
   },
   async postEngineBatch(payload: unknown, mock = MOCK_MODE): Promise<{ ok: true }> {
     if (mock) return { ok: true };
-    return call("/engine-batch", { method: "POST", body: payload, privileged: true });
+    return call("/engine-batch", { method: "POST", body: payload, authenticated: true });
+  },
+  async getEngineHealth(mock = MOCK_MODE): Promise<EngineHealth> {
+    if (mock) return mockEngineHealth;
+    return call<EngineHealth>("/health", { authenticated: true });
   },
 
   // Authenticated user
@@ -127,7 +179,9 @@ export const apiClient = {
     if (mock) return mockPrices.filter((p) => payload.symbols.includes(p.symbol));
     return call("/user/market-data", { method: "POST", body: payload });
   },
-  async getUserTrades(mock = MOCK_MODE): Promise<{ positions: Position[]; orders: PendingOrder[] }> {
+  async getUserTrades(
+    mock = MOCK_MODE,
+  ): Promise<{ positions: Position[]; orders: PendingOrder[] }> {
     if (mock) return { positions: mockPositions, orders: mockOrders };
     return call("/user/trades");
   },
@@ -147,15 +201,32 @@ export const apiClient = {
     if (mock) return mockSettings;
     return call("/user/settings");
   },
-  async postUserSettings(payload: Partial<DashboardSettings>, mock = MOCK_MODE): Promise<{ ok: true }> {
+  async postUserSettings(
+    payload: Partial<DashboardSettings>,
+    mock = MOCK_MODE,
+  ): Promise<{ ok: true }> {
     if (mock) return { ok: true };
     return call("/user/settings", { method: "POST", body: payload });
+  },
+  async postTwelveDataKey(
+    payload: { apiKey: string; testOnly?: boolean },
+    mock = MOCK_MODE,
+  ): Promise<{ ok: boolean; status: TwelveDataKeyStatus; message?: string }> {
+    if (mock) return { ok: Boolean(payload.apiKey), status: payload.apiKey ? "ok" : "missing" };
+    return call("/user/twelve-data-key", { method: "POST", body: payload });
+  },
+  async deleteTwelveDataKey(mock = MOCK_MODE): Promise<{ ok: true; status: TwelveDataKeyStatus }> {
+    if (mock) return { ok: true, status: "missing" };
+    return call("/user/twelve-data-key", { method: "DELETE" });
   },
   async getUserRiskProfile(mock = MOCK_MODE): Promise<RiskProfile> {
     if (mock) return mockRiskProfile;
     return call("/user/risk-profile");
   },
-  async postUserRiskProfile(payload: Partial<RiskProfile>, mock = MOCK_MODE): Promise<{ ok: true }> {
+  async postUserRiskProfile(
+    payload: Partial<RiskProfile>,
+    mock = MOCK_MODE,
+  ): Promise<{ ok: true }> {
     if (mock) return { ok: true };
     return call("/user/risk-profile", { method: "POST", body: payload });
   },
@@ -167,7 +238,10 @@ export const apiClient = {
     if (mock) return { ok: true };
     return call("/user/trade-queue", { method: "POST", body: payload });
   },
-  async postExecuteSignals(payload: { signalIds: string[] }, mock = MOCK_MODE): Promise<{ ok: true; queued: number }> {
+  async postExecuteSignals(
+    payload: { signalIds: string[] },
+    mock = MOCK_MODE,
+  ): Promise<{ ok: true; queued: number }> {
     if (mock) return { ok: true, queued: payload.signalIds.length };
     return call("/user/execute-signals", { method: "POST", body: payload });
   },

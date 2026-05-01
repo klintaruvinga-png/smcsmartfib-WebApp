@@ -42,6 +42,14 @@ export function useUserSettings() {
   });
 }
 
+export function useEngineHealth() {
+  return useQuery({
+    queryKey: ["engine-health"],
+    queryFn: () => apiClient.getEngineHealth(),
+    refetchInterval: POLL_MS,
+  });
+}
+
 export function useUserRiskProfile() {
   return useQuery({
     queryKey: ["user-risk"],
@@ -53,5 +61,21 @@ export function useLadders() {
   return useQuery({
     queryKey: ["ladders"],
     queryFn: () => apiClient.getLadders(),
+  });
+}
+
+export function useSession() {
+  return useQuery({
+    queryKey: ["session"],
+    queryFn: () => apiClient.getSession(),
+    refetchInterval: 60_000,
+  });
+}
+
+export function useRegimes() {
+  return useQuery({
+    queryKey: ["regimes"],
+    queryFn: () => apiClient.getRegimes(),
+    refetchInterval: POLL_MS,
   });
 }

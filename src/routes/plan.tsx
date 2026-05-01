@@ -14,9 +14,15 @@ export const Route = createFileRoute("/plan")({
   head: () => ({
     meta: [
       { title: "Signal Plan — SMC SuperFIB" },
-      { name: "description", content: "Top-rated signal with full ladder blueprint, risk and drawdown impact." },
+      {
+        name: "description",
+        content: "Top-rated signal with full ladder blueprint, risk and drawdown impact.",
+      },
       { property: "og:title", content: "Signal Plan — SMC SuperFIB" },
-      { property: "og:description", content: "Backend-confirmed entry ladder, SL, TP and risk allocation." },
+      {
+        property: "og:description",
+        content: "Backend-confirmed entry ladder, SL, TP and risk allocation.",
+      },
     ],
   }),
   component: PlanPage,
@@ -31,7 +37,12 @@ function PlanPage() {
   if (!top || !plan) return <div className="text-mute text-sm">⚠️ No active signal blueprint.</div>;
 
   const divergence = top.computedBy === "frontend" && !top.backendConfirmed;
-  const dirIcon = top.direction === "LONG" ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownRight className="h-5 w-5" />;
+  const dirIcon =
+    top.direction === "LONG" ? (
+      <ArrowUpRight className="h-5 w-5" />
+    ) : (
+      <ArrowDownRight className="h-5 w-5" />
+    );
 
   return (
     <div className="space-y-5">
@@ -47,7 +58,8 @@ function PlanPage() {
 
       {divergence && (
         <DivergenceBanner>
-          Frontend computed this signal but the backend has not confirmed it. Do not execute until backend confirmation.
+          Frontend computed this signal but the backend has not confirmed it. Do not execute until
+          backend confirmation.
         </DivergenceBanner>
       )}
 
@@ -83,7 +95,9 @@ function PlanPage() {
                   {top.status}
                 </span>
               </div>
-              <div className="text-xs text-mute mt-1 font-mono">{top.id} · {relTime(top.createdAt)}</div>
+              <div className="text-xs text-mute mt-1 font-mono">
+                {top.id} · {relTime(top.createdAt)}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -112,7 +126,10 @@ function PlanPage() {
 
         <div className="mt-4 flex flex-wrap gap-1.5">
           {top.confluence.map((c) => (
-            <span key={c} className="rounded bg-bg2 px-2 py-0.5 text-[10px] font-mono text-dim border border-bd">
+            <span
+              key={c}
+              className="rounded bg-bg2 px-2 py-0.5 text-[10px] font-mono text-dim border border-bd"
+            >
               {c}
             </span>
           ))}
@@ -122,33 +139,68 @@ function PlanPage() {
       {/* Ladder + risk */}
       <div className="grid gap-3 lg:grid-cols-3">
         <PlanCard title="Entries" tone="info">
-          <Row label="E1" value={fmtPrice(plan.entries.e1, top.symbol)} sub={`${plan.lotSize.e1.toFixed(2)} lot`} />
-          <Row label="E2" value={fmtPrice(plan.entries.e2, top.symbol)} sub={`${plan.lotSize.e2.toFixed(2)} lot`} />
-          <Row label="E3" value={fmtPrice(plan.entries.e3, top.symbol)} sub={`${plan.lotSize.e3.toFixed(2)} lot`} />
+          <Row
+            label="E1"
+            value={fmtPrice(plan.entries.e1, top.symbol)}
+            sub={`${plan.lotSize.e1.toFixed(2)} lot / SL ${fmtPrice(plan.stops?.e1 ?? plan.sl, top.symbol)}`}
+          />
+          <Row
+            label="E2"
+            value={fmtPrice(plan.entries.e2, top.symbol)}
+            sub={`${plan.lotSize.e2.toFixed(2)} lot / SL ${fmtPrice(plan.stops?.e2 ?? plan.sl, top.symbol)}`}
+          />
+          <Row
+            label="E3"
+            value={fmtPrice(plan.entries.e3, top.symbol)}
+            sub={`${plan.lotSize.e3.toFixed(2)} lot / SL ${fmtPrice(plan.stops?.e3 ?? plan.sl, top.symbol)}`}
+          />
         </PlanCard>
 
         <PlanCard title="Targets" tone="buy">
-          <Row label="TP1" value={fmtPrice(plan.tps.tp1, top.symbol)} sub={`R ${plan.rr.tp1.toFixed(2)}`} valueClass="text-buy" />
-          <Row label="TP2" value={fmtPrice(plan.tps.tp2, top.symbol)} sub={`R ${plan.rr.tp2.toFixed(2)}`} valueClass="text-buy" />
-          <Row label="TP3" value={fmtPrice(plan.tps.tp3, top.symbol)} sub={`R ${plan.rr.tp3.toFixed(2)}`} valueClass="text-buy" />
+          <Row
+            label="TP1"
+            value={fmtPrice(plan.tps.tp1, top.symbol)}
+            sub={`R ${plan.rr.tp1.toFixed(2)}`}
+            valueClass="text-buy"
+          />
+          <Row
+            label="TP2"
+            value={fmtPrice(plan.tps.tp2, top.symbol)}
+            sub={`R ${plan.rr.tp2.toFixed(2)}`}
+            valueClass="text-buy"
+          />
+          <Row
+            label="TP3"
+            value={fmtPrice(plan.tps.tp3, top.symbol)}
+            sub={`R ${plan.rr.tp3.toFixed(2)}`}
+            valueClass="text-buy"
+          />
         </PlanCard>
 
         <PlanCard title="Stop & risk" tone="sell">
           <Row label="SL" value={fmtPrice(plan.sl, top.symbol)} valueClass="text-sell" />
           <Row label="Risk" value={fmtUSC(plan.riskUSC)} sub={fmtZAR(plan.riskZAR)} />
-          <Row label="DD impact" value={fmtPct(plan.drawdownImpactPct)} sub="of equity" valueClass="text-warn" />
+          <Row
+            label="DD impact"
+            value={fmtPct(plan.drawdownImpactPct)}
+            sub="of equity"
+            valueClass="text-warn"
+          />
         </PlanCard>
       </div>
 
       {/* CTA */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-bd bg-bg1/40 p-4">
         <div className="text-xs text-mute">
-          Sending will queue all 3 ladder entries to <span className="font-mono text-dim">/user/execute-signals</span>.
+          Sending will queue all 3 ladder entries to{" "}
+          <span className="font-mono text-dim">/user/execute-signals</span>.
         </div>
         <button
           onClick={async () => {
             const r = await apiClient.postExecuteSignals({ signalIds: [top.id] });
-            toast.success(`Queued ${r.queued} signal${r.queued > 1 ? "s" : ""} for execution (mock)`);
+            toast.success(
+              `Queued ${r.queued} signal${r.queued > 1 ? "s" : ""} for execution (mock)`,
+            );
           }}
           disabled={!top.backendConfirmed}
           className={cn(
@@ -172,8 +224,17 @@ function PlanPage() {
   );
 }
 
-function PlanCard({ title, tone, children }: { title: string; tone: "buy" | "sell" | "info"; children: React.ReactNode }) {
-  const accent = tone === "buy" ? "border-buy/30" : tone === "sell" ? "border-sell/30" : "border-info/30";
+function PlanCard({
+  title,
+  tone,
+  children,
+}: {
+  title: string;
+  tone: "buy" | "sell" | "info";
+  children: React.ReactNode;
+}) {
+  const accent =
+    tone === "buy" ? "border-buy/30" : tone === "sell" ? "border-sell/30" : "border-info/30";
   return (
     <div className={cn("rounded-lg border bg-bg1/50 p-4", accent)}>
       <div className="text-[11px] font-mono uppercase tracking-wider text-mute mb-3">{title}</div>
@@ -182,12 +243,24 @@ function PlanCard({ title, tone, children }: { title: string; tone: "buy" | "sel
   );
 }
 
-function Row({ label, value, sub, valueClass }: { label: string; value: string; sub?: string; valueClass?: string }) {
+function Row({
+  label,
+  value,
+  sub,
+  valueClass,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  valueClass?: string;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-3">
       <span className="text-[11px] font-mono uppercase tracking-wider text-mute">{label}</span>
       <div className="text-right">
-        <div className={cn("font-mono text-sm font-semibold", valueClass ?? "text-tx")}>{value}</div>
+        <div className={cn("font-mono text-sm font-semibold", valueClass ?? "text-tx")}>
+          {value}
+        </div>
         {sub && <div className="text-[10px] font-mono text-mute">{sub}</div>}
       </div>
     </div>
