@@ -1,6 +1,7 @@
 import { createRouter } from "@tanstack/react-router";
 import { QueryClient } from "@tanstack/react-query";
 import { routeTree } from "./routeTree.gen";
+import { AuthError } from "@/lib/api/sniperClient";
 
 export const getRouter = () => {
   const queryClient = new QueryClient({
@@ -8,6 +9,10 @@ export const getRouter = () => {
       queries: {
         staleTime: 10_000,
         refetchOnWindowFocus: false,
+        retry: (failureCount, error) => {
+          if (error instanceof AuthError) return false;
+          return failureCount < 3;
+        },
       },
     },
   });

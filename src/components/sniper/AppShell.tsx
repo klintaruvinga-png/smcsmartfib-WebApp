@@ -1,4 +1,4 @@
-import { Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { Link, Outlet, useRouterState, useRouter } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useSnapshot, useLiveSignals } from "@/hooks/useSniperData";
 import { fmtPrice, fmtPct } from "@/lib/format";
@@ -11,6 +11,7 @@ import {
   Crosshair,
   LineChart,
   ListChecks,
+  LogOut,
   Radar,
   Settings,
   Target,
@@ -19,6 +20,7 @@ import {
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "sonner";
+import { clearCredentials } from "@/lib/auth";
 
 const NAV = [
   { to: "/plan", label: "Plan", short: "Plan", icon: Target },
@@ -101,6 +103,15 @@ function BrandMark() {
 }
 
 function LeftRail() {
+  const router = useRouter();
+  const qc = useQueryClient();
+
+  function handleLogout() {
+    clearCredentials();
+    qc.clear();
+    router.navigate({ to: "/login" });
+  }
+
   return (
     <aside className="hidden lg:flex w-52 shrink-0 flex-col border-r border-bd bg-bg1/40 sticky top-0 h-screen">
       <div className="px-4 pt-4 pb-3 border-b border-bd">
@@ -122,10 +133,19 @@ function LeftRail() {
           </Link>
         ))}
       </nav>
-      <div className="mt-auto p-3 border-t border-bd text-[10px] font-mono text-mute leading-relaxed">
-        Sniper Webhook v9.0.1
-        <br />
-        Backend = source of truth
+      <div className="mt-auto p-3 border-t border-bd space-y-2">
+        <div className="text-[10px] font-mono text-mute leading-relaxed">
+          Sniper Webhook v9.0.1
+          <br />
+          Backend = source of truth
+        </div>
+        <button
+          onClick={handleLogout}
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-mute hover:text-sell hover:bg-sell/10 transition-colors"
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          Sign out
+        </button>
       </div>
     </aside>
   );
