@@ -843,7 +843,7 @@ final class SMC_SuperFib_Sniper_REST {
         // Compute lot sizes from risk budget. Weights match 1:2:3 so each stage carries a
         // proportional share; rounding to the nearest micro-lot (0.01) keeps broker precision.
         $sym = $signal['symbol'];
-        $pip = (substr($sym, -3) === 'JPY') ? 0.01 : 0.0001;
+        $pip = (substr($sym, -3) === 'JPY' || $sym === 'XAUUSD') ? 0.01 : 0.0001;
         // Approximate pip value per standard lot in the account's base currency (USD).
         // XAUUSD: 1 lot = 100 oz; 1 pip ($0.01) ≈ $1. For standard forex pairs, $10/pip/lot.
         $pip_val = ($sym === 'XAUUSD') ? 1.0 : 10.0;
