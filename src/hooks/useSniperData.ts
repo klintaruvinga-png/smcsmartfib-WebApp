@@ -1,13 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/sniperClient";
 
-const POLL_MS = 15_000;
+const DEFAULT_POLL_MS = 15_000;
+
+function usePollMs() {
+  const { data } = useUserSettings();
+  const sec = data?.refreshIntervalSec;
+  return Number.isFinite(sec) && (sec ?? 0) > 0 ? (sec as number) * 1000 : DEFAULT_POLL_MS;
+}
 
 export function useSnapshot() {
   return useQuery({
     queryKey: ["snapshot"],
     queryFn: () => apiClient.getSnapshot(),
-    refetchInterval: POLL_MS,
+    refetchInterval: usePollMs(),
   });
 }
 
@@ -15,7 +21,7 @@ export function useLiveSignals() {
   return useQuery({
     queryKey: ["live-signals"],
     queryFn: () => apiClient.getLiveSignals(),
-    refetchInterval: POLL_MS,
+    refetchInterval: usePollMs(),
   });
 }
 
@@ -23,7 +29,7 @@ export function useUserTrades() {
   return useQuery({
     queryKey: ["user-trades"],
     queryFn: () => apiClient.getUserTrades(),
-    refetchInterval: POLL_MS,
+    refetchInterval: usePollMs(),
   });
 }
 
@@ -31,7 +37,7 @@ export function useUserAccount() {
   return useQuery({
     queryKey: ["user-account"],
     queryFn: () => apiClient.getUserAccount(),
-    refetchInterval: POLL_MS,
+    refetchInterval: usePollMs(),
   });
 }
 
@@ -52,7 +58,7 @@ export function useEngineHealth() {
   return useQuery({
     queryKey: ["engine-health"],
     queryFn: () => apiClient.getEngineHealth(),
-    refetchInterval: POLL_MS,
+    refetchInterval: usePollMs(),
   });
 }
 
@@ -74,7 +80,7 @@ export function useSession() {
   return useQuery({
     queryKey: ["session"],
     queryFn: () => apiClient.getSession(),
-    refetchInterval: 60_000,
+    refetchInterval: Math.max(usePollMs(), 60_000),
   });
 }
 
@@ -82,6 +88,6 @@ export function useRegimes() {
   return useQuery({
     queryKey: ["regimes"],
     queryFn: () => apiClient.getRegimes(),
-    refetchInterval: POLL_MS,
+    refetchInterval: usePollMs(),
   });
 }

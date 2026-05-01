@@ -171,13 +171,19 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
 
   const keyReady = apiKey.trim().length > 0;
 
-  async function saveSettings() {
+  async function saveSettings(nextSettings?: DashboardSettings) {
     const submittedVersion = settingsEditVersion.current;
+    const settingsToSave = nextSettings ?? s;
     setBusy("settings");
     try {
-      setBackendUrl(s.backendUrl);
-      await apiClient.postUserSettings(s);
+      setBackendUrl(settingsToSave.backendUrl);
+      await apiClient.postUserSettings(settingsToSave);
       await qc.invalidateQueries({ queryKey: ["user-settings"] });
+      await Promise.all([
+        qc.refetchQueries({ queryKey: ["engine-health"], type: "active" }),
+        qc.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
+        qc.refetchQueries({ queryKey: ["live-signals"], type: "active" }),
+      ]);
       if (settingsEditVersion.current === submittedVersion) {
         setSettingsDirty(false);
       }
@@ -223,10 +229,12 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
       setS({ ...s, apiKeyStatus: result.status });
       setApiKey("");
       await qc.invalidateQueries({ queryKey: ["user-settings"] });
-      await qc.invalidateQueries({ queryKey: ["engine-health"] });
-      await qc.invalidateQueries({ queryKey: ["snapshot"] });
-      await qc.invalidateQueries({ queryKey: ["live-signals"] });
-      await qc.invalidateQueries({ queryKey: ["regimes"] });
+      await Promise.all([
+        qc.refetchQueries({ queryKey: ["engine-health"], type: "active" }),
+        qc.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
+        qc.refetchQueries({ queryKey: ["live-signals"], type: "active" }),
+      ]);
+      await qc.refetchQueries({ queryKey: ["regimes"], type: "active" });
       toast.success("Twelve Data key saved");
     } catch (error) {
       setKeyStatus(previousStatus);
@@ -244,10 +252,12 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
       setS({ ...s, apiKeyStatus: result.status });
       setApiKey("");
       await qc.invalidateQueries({ queryKey: ["user-settings"] });
-      await qc.invalidateQueries({ queryKey: ["engine-health"] });
-      await qc.invalidateQueries({ queryKey: ["snapshot"] });
-      await qc.invalidateQueries({ queryKey: ["live-signals"] });
-      await qc.invalidateQueries({ queryKey: ["regimes"] });
+      await Promise.all([
+        qc.refetchQueries({ queryKey: ["engine-health"], type: "active" }),
+        qc.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
+        qc.refetchQueries({ queryKey: ["live-signals"], type: "active" }),
+      ]);
+      await qc.refetchQueries({ queryKey: ["regimes"], type: "active" });
       toast.success("Twelve Data key deleted");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Twelve Data key delete failed");
@@ -255,6 +265,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
       setBusy(null);
     }
   }
+
 
   return (
     <div className="grid gap-3 lg:grid-cols-2">
@@ -275,7 +286,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
         </Field>
         <div className="flex justify-end">
           <button
-            onClick={saveSettings}
+            onClick={() => void saveSettings()}
             disabled={busy === "settings" || watchlistBusy !== null}
             className="rounded-md border border-buy/50 bg-buy/15 px-3 py-1.5 text-xs font-semibold text-buy hover:bg-buy/25 disabled:opacity-60"
           >
@@ -437,6 +448,7 @@ function RiskTab({ risk }: { risk: RiskProfile }) {
       setSaving(false);
     }
   }
+
 
   return (
     <div className="grid gap-3 lg:grid-cols-2">
