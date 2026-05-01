@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUserSettings, useUserRiskProfile } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
@@ -104,6 +104,11 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
     null,
   );
 
+  useEffect(() => {
+    setS(settings);
+    setKeyStatus(settings.apiKeyStatus);
+  }, [settings]);
+
   const removePair = (p: string) => setS({ ...s, watchlist: s.watchlist.filter((w) => w !== p) });
   const keyReady = apiKey.trim().length > 0;
 
@@ -156,6 +161,9 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
       setApiKey("");
       await qc.invalidateQueries({ queryKey: ["user-settings"] });
       await qc.invalidateQueries({ queryKey: ["engine-health"] });
+      await qc.invalidateQueries({ queryKey: ["snapshot"] });
+      await qc.invalidateQueries({ queryKey: ["live-signals"] });
+      await qc.invalidateQueries({ queryKey: ["regimes"] });
       toast.success("Twelve Data key saved");
     } catch (error) {
       setKeyStatus(previousStatus);
@@ -174,6 +182,9 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
       setApiKey("");
       await qc.invalidateQueries({ queryKey: ["user-settings"] });
       await qc.invalidateQueries({ queryKey: ["engine-health"] });
+      await qc.invalidateQueries({ queryKey: ["snapshot"] });
+      await qc.invalidateQueries({ queryKey: ["live-signals"] });
+      await qc.invalidateQueries({ queryKey: ["regimes"] });
       toast.success("Twelve Data key deleted");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Twelve Data key delete failed");
