@@ -128,7 +128,10 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
     try {
       const result = await apiClient.postTwelveDataKey({ apiKey: apiKey.trim(), testOnly: true });
       setKeyStatus(result.status);
-      if (!result.ok) throw new Error(result.message ?? `Twelve Data key ${result.status}`);
+      if (!result.ok) {
+        toast.error(result.message ?? `Twelve Data key ${result.status}`);
+        return;
+      }
       toast.success("Twelve Data key validated");
     } catch (error) {
       setKeyStatus(previousStatus);
@@ -145,7 +148,10 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
     try {
       const result = await apiClient.postTwelveDataKey({ apiKey: apiKey.trim() });
       setKeyStatus(result.status);
-      if (!result.ok) throw new Error(result.message ?? `Twelve Data key ${result.status}`);
+      if (!result.ok) {
+        toast.error(result.message ?? `Twelve Data key ${result.status}`);
+        return;
+      }
       setS({ ...s, apiKeyStatus: result.status });
       setApiKey("");
       await qc.invalidateQueries({ queryKey: ["user-settings"] });
