@@ -1,7 +1,10 @@
-import { Outlet, Link, createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
+import { Outlet, Link, createRootRouteWithContext, HeadContent, Scripts, useRouter, useRouterState } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useEffect } from "react";
 import appCss from "../styles.css?url";
 import { AppShell } from "@/components/sniper/AppShell";
+import { Toaster } from "sonner";
+import { hasCredentials, clearCredentials } from "@/lib/auth";
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -63,9 +66,41 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
+  const { location } = useRouterState();
+  const isLogin = location.pathname === "/login";
+
+  useEffect(() => {
+    if (!isLogin && !hasCredentials()) {
+      router.navigate({ to: "/login" });
+    }
+
+    const handleAuthRequired = () => {
+      clearCredentials();
+      if (location.pathname !== "/login") {
+        router.navigate({ to: "/login" });
+      }
+    };
+    window.addEventListener("smc:auth-required", handleAuthRequired);
+    return () => window.removeEventListener("smc:auth-required", handleAuthRequired);
+  }, [isLogin, location.pathname, router]);
+
   return (
     <QueryClientProvider client={queryClient}>
-      <AppShell />
+      {isLogin ? (
+        <>
+          <Outlet />
+          <Toaster
+            theme="dark"
+            position="top-right"
+            toastOptions={{
+              style: { background: "#102033", border: "1px solid rgba(164,191,223,0.34)", color: "#fff" },
+            }}
+          />
+        </>
+      ) : (
+        <AppShell />
+      )}
     </QueryClientProvider>
   );
 }

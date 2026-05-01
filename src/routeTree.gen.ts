@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as SignalsRouteImport } from './routes/signals'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as PlanRouteImport } from './routes/plan'
@@ -20,6 +21,11 @@ import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignalsRoute = SignalsRouteImport.update({
   id: '/signals',
   path: '/signals',
@@ -74,6 +80,7 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/login': typeof LoginRoute
   '/analytics': typeof AnalyticsRoute
   '/book': typeof BookRoute
   '/charts': typeof ChartsRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/login': typeof LoginRoute
   '/analytics': typeof AnalyticsRoute
   '/book': typeof BookRoute
   '/charts': typeof ChartsRoute
@@ -99,6 +107,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/login': typeof LoginRoute
   '/analytics': typeof AnalyticsRoute
   '/book': typeof BookRoute
   '/charts': typeof ChartsRoute
@@ -117,6 +126,7 @@ export interface FileRouteTypes {
     | '/book'
     | '/charts'
     | '/live'
+    | '/login'
     | '/orders'
     | '/plan'
     | '/progress'
@@ -129,6 +139,7 @@ export interface FileRouteTypes {
     | '/book'
     | '/charts'
     | '/live'
+    | '/login'
     | '/orders'
     | '/plan'
     | '/progress'
@@ -141,6 +152,7 @@ export interface FileRouteTypes {
     | '/book'
     | '/charts'
     | '/live'
+    | '/login'
     | '/orders'
     | '/plan'
     | '/progress'
@@ -150,6 +162,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
+  LoginRoute: typeof LoginRoute
   AnalyticsRoute: typeof AnalyticsRoute
   BookRoute: typeof BookRoute
   ChartsRoute: typeof ChartsRoute
@@ -162,6 +175,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/signals': {
       id: '/signals'
       path: '/signals'
@@ -238,6 +258,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
+  LoginRoute: LoginRoute,
   AnalyticsRoute: AnalyticsRoute,
   BookRoute: BookRoute,
   ChartsRoute: ChartsRoute,
