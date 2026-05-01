@@ -8,6 +8,7 @@ import { ArrowUpRight, ArrowDownRight, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api/sniperClient";
 import { toast } from "sonner";
+import { WalletOverview } from "@/components/sniper/WalletOverview";
 
 export const Route = createFileRoute("/plan")({
   head: () => ({
@@ -33,7 +34,9 @@ function PlanPage() {
   const dirIcon = top.direction === "LONG" ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownRight className="h-5 w-5" />;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <WalletOverview />
+
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Signal Plan</h1>
