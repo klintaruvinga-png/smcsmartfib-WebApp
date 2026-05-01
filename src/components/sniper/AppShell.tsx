@@ -135,7 +135,7 @@ function LeftRail() {
       </nav>
       <div className="mt-auto p-3 border-t border-bd space-y-2">
         <div className="text-[10px] font-mono text-mute leading-relaxed">
-          Sniper Webhook v9.0.1
+          SMC SuperFIB v1.0.0
           <br />
           Backend = source of truth
         </div>

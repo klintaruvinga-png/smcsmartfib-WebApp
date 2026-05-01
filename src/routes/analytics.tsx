@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useUserAccount, useUserTrades, useUserRiskProfile } from "@/hooks/useSniperData";
 import { mockEquityCurve } from "@/mocks/sniperData";
+import { MOCK_MODE } from "@/lib/api/sniperClient";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { fmtPct, fmtUSC } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ function AnalyticsPage() {
   const positions = trades?.positions ?? [];
   const openRisk = positions.reduce((s, p) => s + Math.abs(p.pnlUSC), 0);
   const ddRatio = account.drawdownPct / risk.ddCapPct;
+  const equityCurveData = MOCK_MODE ? mockEquityCurve : null;
 
   return (
     <div className="space-y-4">
@@ -47,36 +49,42 @@ function AnalyticsPage() {
             <FreshnessBadge state={account.state} />
           </div>
           <div className="h-[200px] -mx-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={mockEquityCurve} margin={{ top: 5, right: 10, bottom: 5, left: 5 }}>
-                <defs>
-                  <linearGradient id="eq" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#46d19a" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="#46d19a" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <YAxis
-                  domain={["dataMin", "dataMax"]}
-                  width={60}
-                  tick={{ fill: "#9cb0c9", fontSize: 10, fontFamily: "JetBrains Mono" }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v: number) => `$${(v / 1000).toFixed(1)}k`}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: "#102033",
-                    border: "1px solid rgba(164,191,223,0.34)",
-                    borderRadius: 6,
-                    fontSize: 11,
-                    fontFamily: "JetBrains Mono",
-                  }}
-                  labelFormatter={(l) => `Day ${l}`}
-                  formatter={(v: number) => [`$${v.toFixed(2)}`, "EQUITY"]}
-                />
-                <Area type="monotone" dataKey="equity" stroke="#46d19a" strokeWidth={1.5} fill="url(#eq)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            {equityCurveData ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={equityCurveData} margin={{ top: 5, right: 10, bottom: 5, left: 5 }}>
+                  <defs>
+                    <linearGradient id="eq" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#46d19a" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="#46d19a" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <YAxis
+                    domain={["dataMin", "dataMax"]}
+                    width={60}
+                    tick={{ fill: "#9cb0c9", fontSize: 10, fontFamily: "JetBrains Mono" }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v: number) => `$${(v / 1000).toFixed(1)}k`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#102033",
+                      border: "1px solid rgba(164,191,223,0.34)",
+                      borderRadius: 6,
+                      fontSize: 11,
+                      fontFamily: "JetBrains Mono",
+                    }}
+                    labelFormatter={(l) => `Day ${l}`}
+                    formatter={(v: number) => [`$${v.toFixed(2)}`, "EQUITY"]}
+                  />
+                  <Area type="monotone" dataKey="equity" stroke="#46d19a" strokeWidth={1.5} fill="url(#eq)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-xs font-mono text-mute">
+                No historical equity data — connect backend to populate
+              </div>
+            )}
           </div>
         </div>
 
@@ -125,17 +133,25 @@ function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Win/loss split */}
+        {/* Win/loss split — requires closed trade history from backend */}
         <div className="rounded-lg border border-bd bg-bg1/60 p-4 lg:col-span-2">
           <div className="text-[11px] font-mono uppercase tracking-wider text-mute mb-3">Win / loss split (30d)</div>
-          <div className="flex h-3 overflow-hidden rounded-full">
-            <div className="bg-buy" style={{ width: "62%" }} />
-            <div className="bg-sell" style={{ width: "38%" }} />
-          </div>
-          <div className="mt-3 flex items-center justify-between text-xs font-mono">
-            <span className="text-buy">62% wins · 31</span>
-            <span className="text-sell">38% loss · 19</span>
-          </div>
+          {MOCK_MODE ? (
+            <>
+              <div className="flex h-3 overflow-hidden rounded-full">
+                <div className="bg-buy" style={{ width: "62%" }} />
+                <div className="bg-sell" style={{ width: "38%" }} />
+              </div>
+              <div className="mt-3 flex items-center justify-between text-xs font-mono">
+                <span className="text-buy">62% wins · 31</span>
+                <span className="text-sell">38% loss · 19</span>
+              </div>
+            </>
+          ) : (
+            <div className="text-xs font-mono text-mute py-2">
+              — historical trade data not yet available
+            </div>
+          )}
         </div>
       </div>
     </div>

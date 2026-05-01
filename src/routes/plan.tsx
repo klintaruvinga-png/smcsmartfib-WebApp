@@ -32,9 +32,14 @@ function PlanPage() {
   const { data: signals } = useLiveSignals();
   const { data: ladders } = useLadders();
   const top = signals?.find((s) => s.status === "READY") ?? signals?.[0];
-  const plan = ladders?.[0];
+  const plan = top ? (ladders?.find((l) => l.signalId === top.id) ?? null) : null;
 
-  if (!top || !plan) return <div className="text-mute text-sm">⚠️ No active signal blueprint.</div>;
+  if (!top || !plan)
+    return (
+      <div className="text-mute text-sm">
+        ⚠️ {top ? "No matching blueprint for this signal." : "No active signal blueprint."}
+      </div>
+    );
 
   const divergence = top.computedBy === "frontend" && !top.backendConfirmed;
   const dirIcon =
