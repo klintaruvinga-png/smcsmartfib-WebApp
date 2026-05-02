@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useSnapshot } from "@/hooks/useSniperData";
+import { useSnapshot, useUserSettings } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { BiasBadge, ChopMeter, GateBadge } from "@/components/sniper/Indicators";
 import { WarningLine } from "@/components/sniper/Warnings";
@@ -20,6 +20,8 @@ export const Route = createFileRoute("/live")({
 
 function LivePage() {
   const { data, isLoading } = useSnapshot();
+  const { data: settings } = useUserSettings();
+  const staleThresholdMs = (settings?.staleThresholdSec ?? 120) * 1000;
   if (isLoading || !data) return <div className="text-mute text-sm">Loading radar…</div>;
 
   return (
@@ -35,7 +37,14 @@ function LivePage() {
         {data.prices.map((price) => {
           const regime = data.regimes.find((r) => r.symbol === price.symbol);
           const gate = data.gates.find((g) => g.symbol === price.symbol);
-          const stale = price.state === "stale" || regime?.state === "stale";
+          const clientStale =
+            price.updatedAt
+              ? Date.now() - new Date(price.updatedAt).getTime() > staleThresholdMs
+              : false;
+          const stale = price.state === "stale" || regime?.state === "stale" || clientStale;
+          const priceUnavailable =
+            price.mid === 0 &&
+            (price.state === "unavailable" || gate?.allow === "BLOCKED");
           return (
             <div
               key={price.symbol}
@@ -55,16 +64,16 @@ function LivePage() {
 
               <div className="flex items-baseline justify-between">
                 <div className="font-mono text-2xl font-semibold tabular-nums">
-                  {fmtPrice(price.mid, price.symbol)}
+                  {priceUnavailable ? "—" : fmtPrice(price.mid, price.symbol)}
                 </div>
                 <div className={cn("font-mono text-sm", price.changePct1d >= 0 ? "text-buy" : "text-sell")}>
-                  {fmtPct(price.changePct1d)}
+                  {priceUnavailable ? "—" : fmtPct(price.changePct1d)}
                 </div>
               </div>
 
               <div className="flex items-center justify-between text-[10px] font-mono text-mute">
-                <span>BID {fmtPrice(price.bid, price.symbol)}</span>
-                <span>ASK {fmtPrice(price.ask, price.symbol)}</span>
+                <span>BID {priceUnavailable ? "—" : fmtPrice(price.bid, price.symbol)}</span>
+                <span>ASK {priceUnavailable ? "—" : fmtPrice(price.ask, price.symbol)}</span>
               </div>
 
               <div className="border-t border-bd pt-3 space-y-2">
@@ -91,7 +100,7 @@ function LivePage() {
 
               {gate?.reason && <WarningLine level="block">Gate blocked: {gate.reason}</WarningLine>}
               {stale && !gate?.reason && (
-                <WarningLine level="warn">Snapshot {relTime(price.updatedAt)} — refresh to revalidate.</WarningLine>
+                <WarningLine level="warn">Price data stale — last update {relTime(price.updatedAt)}.</WarningLine>
               )}
             </div>
           );
