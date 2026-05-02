@@ -182,7 +182,7 @@ export const mockSignals: SignalCandidate[] = [
     confluence: ["sweep", "MSS", "fib-OB", "London-AM"],
     verdict: "A+",
     computedBy: "backend",
-    backendConfirmed: true,
+    backendConfirmed: false,
     createdAt: minutesAgo(3),
   },
   {
@@ -222,11 +222,11 @@ export const mockSignals: SignalCandidate[] = [
     id: "sig-005",
     symbol: "EURUSD",
     direction: "SHORT",
-    status: "BLOCKED",
+    status: "WATCH",
     confluence: ["fib-0.382"],
     verdict: "C",
     computedBy: "backend",
-    backendConfirmed: true,
+    backendConfirmed: false,
     createdAt: minutesAgo(20),
   },
 ];
@@ -400,13 +400,14 @@ export function mockPriceSeries(symbol: Symbol, points = 80) {
 export function mockFibLevels(symbol: Symbol) {
   const base = mockPrices.find((p) => p.symbol === symbol)?.mid ?? 1;
   const range = base * 0.005;
-  return [
-    { label: "0.0", value: base - range },
-    { label: "0.382", value: base - range * 0.382 },
-    { label: "0.5", value: base },
-    { label: "0.618", value: base + range * 0.382 },
-    { label: "1.0", value: base + range },
-  ];
+  const ratios = [0, 25, 50, 62.5, 75, 100] as const;
+
+  return ratios.map((ratio) => ({
+    ratio,
+    label: `${ratio}%`,
+    price: base + range - (ratio / 100) * range * 2,
+    role: ratio < 50 ? "premium" : ratio === 50 ? "equilibrium" : "discount",
+  }));
 }
 
 // Equity curve for analytics

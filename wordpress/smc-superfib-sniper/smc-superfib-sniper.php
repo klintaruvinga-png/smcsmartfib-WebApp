@@ -247,7 +247,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         // Prevent proxies and browsers from caching authenticated user-specific REST responses.
         $route = $request->get_route();
-        if (strpos($route, '/sniper/v1/user/') === 0 || strpos($route, '/sniper/v1/health') === 0) {
+        if (strpos($route, '/sniper/v1/user/') === 0 || strpos($route, '/sniper/v1/health') === 0 || $route === '/sniper/v1/snapshot') {
             header('Cache-Control: no-store, no-cache, must-revalidate');
             header('Pragma: no-cache');
         }
@@ -261,14 +261,14 @@ final class SMC_SuperFib_Sniper_REST {
             $name = 'London';
             $open = '07:00';
             $close = '11:00';
-        } elseif ($hour >= 15 && $hour < 17) {
-            $name = 'London Close';
-            $open = '15:00';
-            $close = '17:00';
         } elseif ($hour >= 12 && $hour < 16) {
             $name = 'New York';
             $open = '12:00';
             $close = '16:00';
+        } elseif ($hour >= 16 && $hour < 17) {
+            $name = 'London Close';
+            $open = '16:00';
+            $close = '17:00';
         } else {
             $name = 'Off killzone';
             $open = null;
@@ -289,8 +289,13 @@ final class SMC_SuperFib_Sniper_REST {
         $last_batch = $this->latest_timestamp('snapshots', $user_id, 'updated_at');
         $last_run = $this->latest_timestamp('engine_runs', $user_id, 'created_at');
 
+        // Age out backendSync: treat as stale if last engine run is older than 5 minutes.
+        // At the 15s default poll rate a gap > 300s means the client is not actively polling.
+        $run_age = $last_run ? (time() - strtotime($last_run)) : PHP_INT_MAX;
+        $backend_sync = $run_age <= 300 ? 'live' : ($last_run ? 'stale' : 'offline');
+
         return rest_ensure_response(array(
-            'backendSync' => $last_run ? 'live' : 'offline',
+            'backendSync' => $backend_sync,
             'priceFeed' => $key_status === 'ok' ? ($last_batch ? 'live' : 'stale') : 'blocked',
             'twelveDataKey' => $key_status === 'ok' ? 'present' : 'missing',
             'twelveDataKeyStatus' => $key_status,
@@ -322,11 +327,27 @@ final class SMC_SuperFib_Sniper_REST {
         ));
         $settings['apiKeyStatus'] = $this->get_twelve_key_status($user_id);
 
-        $this->replace_json('user_settings', array('user_id' => $user_id), array(
+        $this->replace_json('user_settings', array(
             'user_id' => $user_id,
             'settings' => $settings,
             'updated_at' => $this->now_mysql(),
         ));
+        if (isset($settings['riskAllocation']) && is_array($settings['riskAllocation'])) {
+            $existing = $this->get_account_blob($user_id);
+            $current_risk = $this->get_risk_profile($user_id);
+            $existing['riskProfile'] = array_merge($current_risk, array(
+                'perTradePct' => (float) $settings['riskAllocation']['perTradePct'],
+                'dailyMaxPct' => (float) $settings['riskAllocation']['dailyMaxPct'],
+                'ddCapPct' => (float) $settings['riskAllocation']['ddCapPct'],
+                'updatedAt' => gmdate('c'),
+            ));
+            $this->replace_json('account_snapshots', array(
+                'user_id' => $user_id,
+                'data' => $existing,
+                'updated_at' => $this->now_mysql(),
+            ));
+        }
+
         $this->audit($user_id, 'settings.updated', array('watchlist' => $settings['watchlist']));
 
         return rest_ensure_response(array('ok' => true));
@@ -473,7 +494,7 @@ final class SMC_SuperFib_Sniper_REST {
         // Merge only the riskProfile key; preserve existing account data untouched.
         $existing = $this->get_account_blob($user_id);
         $existing['riskProfile'] = $profile;
-        $this->replace_json('account_snapshots', array('user_id' => $user_id), array(
+        $this->replace_json('account_snapshots', array(
             'user_id' => $user_id,
             'data' => $existing,
             'updated_at' => $this->now_mysql(),
@@ -544,7 +565,13 @@ final class SMC_SuperFib_Sniper_REST {
         $symbol = strtoupper(sanitize_text_field($request->get_param('symbol') ?: 'GBPUSD'));
         $timeframe = sanitize_text_field($request->get_param('timeframe') ?: '15min');
         $candles = $this->fetch_candles($user_id, $symbol, $timeframe, 120);
-        $state = empty($candles) ? ($this->get_twelve_key_status($user_id) === 'ok' ? 'stale' : 'blocked') : 'live';
+        $state = 'offline';
+        if (!empty($candles)) {
+            $last_candle = end($candles);
+            $state = $this->is_chart_candle_fresh($last_candle['time'] ?? null, $timeframe) ? 'live' : 'stale';
+        } else {
+            $state = $this->get_twelve_key_status($user_id) === 'ok' ? 'stale' : 'blocked';
+        }
         $levels = $this->fib_levels_from_candles($candles);
 
         return rest_ensure_response(array(
@@ -603,7 +630,7 @@ final class SMC_SuperFib_Sniper_REST {
             isset($existing['account']) && is_array($existing['account']) ? $existing['account'] : array(),
             $update
         );
-        $this->replace_json('account_snapshots', array('user_id' => $user_id), array(
+        $this->replace_json('account_snapshots', array(
             'user_id' => $user_id,
             'data' => $existing,
             'updated_at' => $this->now_mysql(),
@@ -703,6 +730,17 @@ final class SMC_SuperFib_Sniper_REST {
     private function run_engine_for_symbols($user_id, $symbols, $prices) {
         global $wpdb;
 
+        // Deduplicate concurrent calls within the same poll cycle (e.g. /snapshot + /live-signals
+        // both firing at ~15s). Sort symbols so key is order-independent. 5s TTL is shorter than
+        // the minimum meaningful poll interval but long enough to absorb same-cycle duplicates.
+        $sorted = $symbols;
+        sort($sorted);
+        $cache_key = 'smc_sf_eng_' . $user_id . '_' . md5(implode(',', $sorted));
+        $cached = get_transient($cache_key);
+        if ($cached !== false) {
+            return $cached;
+        }
+
         $regimes = array();
         $gates = array();
         $signals = array();
@@ -761,7 +799,9 @@ final class SMC_SuperFib_Sniper_REST {
             array('%d', '%s', '%s', '%s')
         );
 
-        return array('regimes' => $regimes, 'gates' => $gates, 'signals' => $signals, 'plans' => $plans);
+        $result = array('regimes' => $regimes, 'gates' => $gates, 'signals' => $signals, 'plans' => $plans);
+        set_transient($cache_key, $result, 5);
+        return $result;
     }
 
     private function build_symbol_state($user_id, $symbol, $price) {
@@ -848,7 +888,10 @@ final class SMC_SuperFib_Sniper_REST {
         $candles_fresh  = $last_candle && (time() - strtotime($last_candle['time'])) <= 7200;
         $data_live      = $price_is_live && $candles_fresh;
 
-        $signal_id = 'sig-' . substr(md5($user_id . '|' . $symbol . '|' . $direction . '|' . gmdate('YmdH')), 0, 16);
+        // Anchor the signal identity to the latest analysed candle so the same setup stays stable
+        // within one 15m bar, while later intraday setups get a distinct execution queue identity.
+        $signal_anchor = $last_candle && !empty($last_candle['time']) ? $last_candle['time'] : gmdate('c');
+        $signal_id = 'sig-' . substr(md5($user_id . '|' . $symbol . '|' . $direction . '|' . $signal_anchor), 0, 16);
         $signal = array(
             'id' => $signal_id,
             'symbol' => $symbol,
@@ -979,12 +1022,13 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function refresh_prices($user_id, $symbols) {
         $prices = array();
+        $stale_threshold_sec = $this->get_settings($user_id)['staleThresholdSec'];
         foreach ($symbols as $symbol) {
             $quote = $this->fetch_quote($user_id, $symbol);
             if ($quote) {
                 $prices[] = $quote;
             } else {
-                $cached = $this->get_cached_price($user_id, $symbol);
+                $cached = $this->get_cached_price($user_id, $symbol, $stale_threshold_sec);
                 $prices[] = $cached ? $cached : array(
                     'symbol' => $symbol,
                     'bid' => 0,
@@ -1117,10 +1161,10 @@ final class SMC_SuperFib_Sniper_REST {
                                     'high' => (float) $item['high'],
                                     'low' => (float) $item['low'],
                                     'close' => (float) $item['close'],
-                                    'volume' => isset($item['volume']) ? (float) $item['volume'] : null,
+                                    'volume' => isset($item['volume']) ? (string) $item['volume'] : null,
                                     'created_at' => $this->now_mysql(),
                                 ),
-                                array('%d', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%f', '%s')
+                                array('%d', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%s', '%s')
                             );
                         }
                         $this->set_twelve_key_status($user_id, 'ok');
@@ -1274,7 +1318,7 @@ final class SMC_SuperFib_Sniper_REST {
     private function read_pending_orders($user_id) {
         global $wpdb;
         $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT payload FROM {$this->table('trade_queue')} WHERE user_id = %d ORDER BY created_at DESC",
+            "SELECT payload FROM {$this->table('trade_queue')} WHERE user_id = %d AND state = 'pending-sync' ORDER BY created_at DESC",
             $user_id
         ), ARRAY_A);
         return array_values(array_filter(array_map(function ($row) {
@@ -1285,8 +1329,9 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function get_cached_prices($user_id, $symbols) {
         $prices = array();
+        $stale_threshold_sec = $this->get_settings($user_id)['staleThresholdSec'];
         foreach ($symbols as $symbol) {
-            $cached = $this->get_cached_price($user_id, $symbol);
+            $cached = $this->get_cached_price($user_id, $symbol, $stale_threshold_sec);
             if ($cached) {
                 $prices[] = $cached;
             }
@@ -1294,7 +1339,7 @@ final class SMC_SuperFib_Sniper_REST {
         return $prices;
     }
 
-    private function get_cached_price($user_id, $symbol) {
+    private function get_cached_price($user_id, $symbol, $stale_threshold_sec = null) {
         global $wpdb;
         $row = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM {$this->table('snapshots')} WHERE user_id = %d AND symbol = %s",
@@ -1312,7 +1357,7 @@ final class SMC_SuperFib_Sniper_REST {
             'mid' => (float) $row['mid'],
             'changePct1d' => (float) $row['change_pct_1d'],
             'updatedAt' => $this->to_iso($row['updated_at']),
-            'state' => $this->is_stale($row['updated_at'], $this->get_settings($user_id)['staleThresholdSec']) ? 'stale' : $row['state'],
+            'state' => $this->is_stale($row['updated_at'], $stale_threshold_sec !== null ? $stale_threshold_sec : $this->get_settings($user_id)['staleThresholdSec']) ? 'stale' : $row['state'],
         );
     }
 
@@ -1413,17 +1458,17 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function verdict($status, $confluence, $chop) {
-        if ($status === 'BLOCKED') {
-            return 'C';
-        }
-        $score = count($confluence) - ($chop > 0.7 ? 2 : 0);
-        if ($status === 'READY' && $score >= 5) {
+        // HTA_SF and LTF_SF are framework labels kept for display; only earned structural
+        // conditions (sweep, MSS, F3-clear, HTA-override) count toward the score.
+        $earned = array_diff($confluence, array('HTA_SF', 'LTF_SF'));
+        $score = count($earned) - ($chop > 0.7 ? 2 : 0);
+        if ($status === 'READY' && $score >= 3) {
             return 'A+';
         }
         if ($status === 'READY') {
             return 'A';
         }
-        return $score >= 4 ? 'B' : 'C';
+        return $score >= 2 ? 'B' : 'C';
     }
 
     private function get_twelve_key_status($user_id) {
@@ -1518,7 +1563,7 @@ final class SMC_SuperFib_Sniper_REST {
         return hash('sha256', $salt . '|smc-superfib-sniper|' . (defined('SECURE_AUTH_SALT') ? SECURE_AUTH_SALT : ''), true);
     }
 
-    private function replace_json($table, $key, $data) {
+    private function replace_json($table, $data) {
         global $wpdb;
         foreach ($data as $field => $value) {
             if (is_array($value)) {
@@ -1618,7 +1663,7 @@ final class SMC_SuperFib_Sniper_REST {
     private function save_watchlist($user_id, $watchlist) {
         $current = $this->get_settings($user_id);
         $current['watchlist'] = $watchlist;
-        $this->replace_json('user_settings', array('user_id' => $user_id), array(
+        $this->replace_json('user_settings', array(
             'user_id' => $user_id,
             'settings' => $current,
             'updated_at' => $this->now_mysql(),
@@ -1695,6 +1740,32 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function is_stale($mysql_time, $threshold_sec) {
         return (time() - strtotime($mysql_time . ' UTC')) > $threshold_sec;
+    }
+
+    private function timeframe_seconds($timeframe) {
+        $key = strtolower(trim((string) $timeframe));
+        if (!preg_match('/^(\d+)(min|h|day|week|month)$/', $key, $matches)) {
+            return 3600;
+        }
+        $units = array(
+            'min' => 60,
+            'h' => 3600,
+            'day' => 86400,
+            'week' => 604800,
+            'month' => 2592000,
+        );
+        return ((int) $matches[1]) * $units[$matches[2]];
+    }
+
+    private function is_chart_candle_fresh($candle_time, $timeframe) {
+        $candle_ts = $candle_time ? strtotime((string) $candle_time) : false;
+        if (!$candle_ts) {
+            return false;
+        }
+        // Preserve the existing 2h floor for intraday charts, but extend the stale window for
+        // slower frames so valid 1h/4h/1day candles are not misreported as stale.
+        $threshold_sec = max(7200, $this->timeframe_seconds($timeframe) * 2);
+        return (time() - $candle_ts) <= $threshold_sec;
     }
 
     private function table($name) {

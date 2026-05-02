@@ -15,7 +15,33 @@ export type KnownSymbol =
   | "USDJPY"
   | "AUDJPY"
   | "EURJPY"
-  | "XAUUSD";
+  | "GBPJPY"
+  | "NZDJPY"
+  | "CADJPY"
+  | "CHFJPY"
+  | "USDCAD"
+  | "USDCHF"
+  | "EURGBP"
+  | "EURAUD"
+  | "EURNZD"
+  | "EURCHF"
+  | "EURCAD"
+  | "GBPAUD"
+  | "GBPNZD"
+  | "GBPCAD"
+  | "GBPCHF"
+  | "AUDNZD"
+  | "AUDCAD"
+  | "AUDCHF"
+  | "NZDCAD"
+  | "NZDCHF"
+  | "CADCHF"
+  | "XAUUSD"
+  | "XAGUSD"
+  | "US30"
+  | "NAS100"
+  | "BTCUSD"
+  | "ETHUSD";
 
 export type Symbol = KnownSymbol | (string & {});
 export type TwelveDataKeyStatus =
@@ -92,7 +118,7 @@ export interface GateState {
   state: FreshnessState;
 }
 
-export type SignalStatus = "WATCH" | "ARMED" | "READY" | "EXPIRED" | "BLOCKED";
+export type SignalStatus = "WATCH" | "ARMED" | "READY";
 export type Verdict = "A+" | "A" | "B" | "C";
 
 export interface SignalCandidate {
