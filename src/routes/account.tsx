@@ -133,14 +133,14 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
     setWatchlistBusy(p);
     try {
       const result = await apiClient.postWatchlistRemove(p);
-      // Update cache directly so useEffect never re-reads stale backend data
       qc.setQueryData<DashboardSettings>(["user-settings"], (old) =>
         old ? { ...old, watchlist: result.watchlist } : old,
       );
       setS((prev) => ({ ...prev, watchlist: result.watchlist }));
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ["snapshot"] }),
+        qc.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
         qc.invalidateQueries({ queryKey: ["live-signals"] }),
+        qc.invalidateQueries({ queryKey: ["user-settings"] }),
       ]);
       toast.success(`${p} removed`);
     } catch (error) {
@@ -159,15 +159,15 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
     setWatchlistBusy("add");
     try {
       const result = await apiClient.postWatchlistAdd(sym);
-      // Update cache directly so useEffect never re-reads stale backend data
       qc.setQueryData<DashboardSettings>(["user-settings"], (old) =>
         old ? { ...old, watchlist: result.watchlist } : old,
       );
       setS((prev) => ({ ...prev, watchlist: result.watchlist }));
       setNewPair("");
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ["snapshot"] }),
+        qc.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
         qc.invalidateQueries({ queryKey: ["live-signals"] }),
+        qc.invalidateQueries({ queryKey: ["user-settings"] }),
       ]);
       toast.success(`${sym} added to watchlist`);
     } catch (error) {
@@ -371,6 +371,15 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
             className="w-full accent-[var(--accent)]"
           />
         </Field>
+        <div className="flex justify-end">
+          <button
+            onClick={() => void saveSettings()}
+            disabled={busy === "settings" || !settingsDirty}
+            className="rounded-md border border-buy/50 bg-buy/15 px-3 py-1.5 text-xs font-semibold text-buy hover:bg-buy/25 disabled:opacity-60"
+          >
+            {busy === "settings" ? "Saving..." : "Save"}
+          </button>
+        </div>
       </Card>
 
       <Card title="Watchlist" className="lg:col-span-2">
@@ -432,6 +441,15 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
               updateSettingsDraft({ ...s, riskAllocation: { ...s.riskAllocation, ddCapPct: v } })
             }
           />
+        </div>
+        <div className="flex justify-end">
+          <button
+            onClick={() => void saveSettings()}
+            disabled={busy === "settings" || !settingsDirty}
+            className="rounded-md border border-buy/50 bg-buy/15 px-3 py-1.5 text-xs font-semibold text-buy hover:bg-buy/25 disabled:opacity-60"
+          >
+            {busy === "settings" ? "Saving..." : "Save"}
+          </button>
         </div>
       </Card>
     </div>

@@ -1,5 +1,5 @@
 import { Link, Outlet, useRouterState, useRouter } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useSnapshot, useLiveSignals, useEngineHealth } from "@/hooks/useSniperData";
 import { fmtPrice, fmtPct } from "@/lib/format";
 import { SyncChip, SignalStatusChip } from "@/components/sniper/Chips";
@@ -66,6 +66,7 @@ function HeaderChips() {
   const { data: snap } = useSnapshot();
   const { data: signals } = useLiveSignals();
   const { data: health } = useEngineHealth();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const syncState = health?.backendSync ?? snap?.prices?.[0]?.state ?? "offline";
   const counts = useMemo(() => {
@@ -77,16 +78,31 @@ function HeaderChips() {
     };
   }, [signals]);
 
+  async function handleRefresh() {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        qc.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
+        qc.refetchQueries({ queryKey: ["live-signals"], type: "active" }),
+        qc.refetchQueries({ queryKey: ["engine-health"], type: "active" }),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
+
   return (
     <div className="flex items-center gap-2">
       <SyncChip state={syncState} />
       <SignalStatusChip {...counts} />
       <button
-        onClick={() => qc.invalidateQueries()}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-bd bg-bg2/60 text-mute hover:text-tx hover:border-bd2 transition-colors"
+        onClick={() => void handleRefresh()}
+        disabled={isRefreshing}
+        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-bd bg-bg2/60 text-mute hover:text-tx hover:border-bd2 transition-colors disabled:opacity-50"
         aria-label="Refresh"
       >
-        <RefreshCw className="h-4 w-4" />
+        <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
       </button>
     </div>
   );
