@@ -345,11 +345,16 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
           </div>
         </div>
         {settings.apiKeyStatus === "ok" &&
-          health?.twelveDataKeyStatus &&
-          health.twelveDataKeyStatus !== "ok" && (
+          health &&
+          ((health.twelveDataKeyStatus && health.twelveDataKeyStatus !== "ok") ||
+            (!health.twelveDataKeyStatus && health.twelveDataKey === "missing")) && (
             <WarningLine level="warn">
               Settings reports key OK but engine health shows:{" "}
-              <span className="font-semibold">{health.twelveDataKeyStatus.replace("-", " ")}</span>
+              <span className="font-semibold">
+                {health.twelveDataKeyStatus
+                  ? health.twelveDataKeyStatus.replace("-", " ")
+                  : "key missing"}
+              </span>
               . Backend sync may be pending.
             </WarningLine>
           )}
