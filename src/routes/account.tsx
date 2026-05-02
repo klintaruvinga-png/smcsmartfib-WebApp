@@ -374,7 +374,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
         <div className="flex justify-end">
           <button
             onClick={() => void saveSettings()}
-            disabled={busy === "settings" || !settingsDirty}
+            disabled={busy === "settings" || watchlistBusy !== null || !settingsDirty}
             className="rounded-md border border-buy/50 bg-buy/15 px-3 py-1.5 text-xs font-semibold text-buy hover:bg-buy/25 disabled:opacity-60"
           >
             {busy === "settings" ? "Saving..." : "Save"}
@@ -445,7 +445,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
         <div className="flex justify-end">
           <button
             onClick={() => void saveSettings()}
-            disabled={busy === "settings" || !settingsDirty}
+            disabled={busy === "settings" || watchlistBusy !== null || !settingsDirty}
             className="rounded-md border border-buy/50 bg-buy/15 px-3 py-1.5 text-xs font-semibold text-buy hover:bg-buy/25 disabled:opacity-60"
           >
             {busy === "settings" ? "Saving..." : "Save"}

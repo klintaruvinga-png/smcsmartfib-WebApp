@@ -82,11 +82,7 @@ function HeaderChips() {
     if (isRefreshing) return;
     setIsRefreshing(true);
     try {
-      await Promise.all([
-        qc.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
-        qc.refetchQueries({ queryKey: ["live-signals"], type: "active" }),
-        qc.refetchQueries({ queryKey: ["engine-health"], type: "active" }),
-      ]);
+      await qc.refetchQueries({ type: "active" });
     } finally {
       setIsRefreshing(false);
     }
