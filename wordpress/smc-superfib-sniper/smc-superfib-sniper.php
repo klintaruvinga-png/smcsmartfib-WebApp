@@ -563,8 +563,7 @@ final class SMC_SuperFib_Sniper_REST {
         $state = 'offline';
         if (!empty($candles)) {
             $last_candle = end($candles);
-            $last_candle_ts = isset($last_candle['time']) ? strtotime($last_candle['time']) : false;
-            $state = ($last_candle_ts && (time() - $last_candle_ts) <= 7200) ? 'live' : 'stale';
+            $state = $this->is_chart_candle_fresh($last_candle['time'] ?? null, $timeframe) ? 'live' : 'stale';
         } else {
             $state = $this->get_twelve_key_status($user_id) === 'ok' ? 'stale' : 'blocked';
         }
@@ -871,7 +870,10 @@ final class SMC_SuperFib_Sniper_REST {
         $candles_fresh  = $last_candle && (time() - strtotime($last_candle['time'])) <= 7200;
         $data_live      = $price_is_live && $candles_fresh;
 
-        $signal_id = 'sig-' . substr(md5($user_id . '|' . $symbol . '|' . $direction . '|' . gmdate('Ymd')), 0, 16);
+        // Anchor the signal identity to the latest analysed candle so the same setup stays stable
+        // within one 15m bar, while later intraday setups get a distinct execution queue identity.
+        $signal_anchor = $last_candle && !empty($last_candle['time']) ? $last_candle['time'] : gmdate('c');
+        $signal_id = 'sig-' . substr(md5($user_id . '|' . $symbol . '|' . $direction . '|' . $signal_anchor), 0, 16);
         $signal = array(
             'id' => $signal_id,
             'symbol' => $symbol,
@@ -1719,6 +1721,32 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function is_stale($mysql_time, $threshold_sec) {
         return (time() - strtotime($mysql_time . ' UTC')) > $threshold_sec;
+    }
+
+    private function timeframe_seconds($timeframe) {
+        $key = strtolower(trim((string) $timeframe));
+        if (!preg_match('/^(\d+)(min|h|day|week|month)$/', $key, $matches)) {
+            return 3600;
+        }
+        $units = array(
+            'min' => 60,
+            'h' => 3600,
+            'day' => 86400,
+            'week' => 604800,
+            'month' => 2592000,
+        );
+        return ((int) $matches[1]) * $units[$matches[2]];
+    }
+
+    private function is_chart_candle_fresh($candle_time, $timeframe) {
+        $candle_ts = $candle_time ? strtotime((string) $candle_time) : false;
+        if (!$candle_ts) {
+            return false;
+        }
+        // Preserve the existing 2h floor for intraday charts, but extend the stale window for
+        // slower frames so valid 1h/4h/1day candles are not misreported as stale.
+        $threshold_sec = max(7200, $this->timeframe_seconds($timeframe) * 2);
+        return (time() - $candle_ts) <= $threshold_sec;
     }
 
     private function table($name) {
