@@ -36,7 +36,9 @@ const NAV = [
 
 function HeaderTicker() {
   const { data } = useSnapshot();
-  const items = data?.prices ?? [];
+  const items = (data?.prices ?? []).filter(
+    (p) => p.mid > 0 && p.state !== "unavailable" && p.state !== "blocked",
+  );
   // Duplicate for seamless loop
   const loop = [...items, ...items];
   return (

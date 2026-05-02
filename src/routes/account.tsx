@@ -243,7 +243,6 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
         qc.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
         qc.refetchQueries({ queryKey: ["live-signals"], type: "active" }),
       ]);
-      await qc.refetchQueries({ queryKey: ["regimes"], type: "active" });
       toast.success("Twelve Data key saved");
     } catch (error) {
       setKeyStatus(previousStatus);
@@ -266,7 +265,6 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
         qc.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
         qc.refetchQueries({ queryKey: ["live-signals"], type: "active" }),
       ]);
-      await qc.refetchQueries({ queryKey: ["regimes"], type: "active" });
       toast.success("Twelve Data key deleted");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Twelve Data key delete failed");
@@ -475,7 +473,7 @@ function RiskTab({ risk }: { risk: RiskProfile }) {
   const qc = useQueryClient();
   const [r, setR] = useState(risk);
   const [saving, setSaving] = useState(false);
-  const [saveState, setSaveState] = useState<FreshnessState>(MOCK_MODE ? "mock" : "offline");
+  const [saveState, setSaveState] = useState<FreshnessState | null>(null);
 
   async function saveRiskProfile() {
     setSaving(true);
@@ -485,7 +483,7 @@ function RiskTab({ risk }: { risk: RiskProfile }) {
       setSaveState(MOCK_MODE ? "mock" : "live");
       toast.success("Risk profile saved");
     } catch (error) {
-      setSaveState(MOCK_MODE ? "mock" : "stale");
+      setSaveState("stale");
       toast.error(error instanceof Error ? error.message : "Risk profile save failed");
     } finally {
       setSaving(false);
@@ -544,7 +542,7 @@ function RiskTab({ risk }: { risk: RiskProfile }) {
         />
       </Card>
       <div className="lg:col-span-2 flex items-center justify-end gap-3">
-        <FreshnessBadge state={saveState} />
+        {saveState && <FreshnessBadge state={saveState} />}
         <button
           onClick={saveRiskProfile}
           disabled={saving}

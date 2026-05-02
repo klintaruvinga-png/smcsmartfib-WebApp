@@ -66,13 +66,7 @@ interface RequestOpts {
   method?: "GET" | "POST" | "DELETE";
   body?: unknown;
   skipAuthHeaders?: boolean;
-  /**
-   * Privileged route — must NEVER be called directly from the browser with a
-   * shared secret. The backend MUST proxy these via an authenticated
-   * server-side handler (e.g. WP AJAX action verifying user capability + nonce,
-   * or an edge function holding the secret server-side). The frontend posts to
-   * a same-origin proxy path; the secret never touches `window`.
-   */
+  /** When false, omit cookies/credentials from the fetch (e.g. public endpoints). Defaults to include. */
   authenticated?: boolean;
 }
 

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSnapshot } from "@/hooks/useSniperData";
+import { useSnapshot, usePollMs } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { fmtPrice, fmtPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,7 @@ export const Route = createFileRoute("/charts")({
 
 function ChartsPage() {
   const { data } = useSnapshot();
+  const pollMs = usePollMs();
   const [selected, setSelected] = useState<Symbol>("GBPUSD");
 
   // Clamp selection to current watchlist snapshot — if the selected symbol was
@@ -35,6 +36,7 @@ function ChartsPage() {
   const { data: chart } = useQuery({
     queryKey: ["chart", activeSymbol],
     queryFn: () => apiClient.getChartSnapshot(activeSymbol),
+    refetchInterval: pollMs,
   });
 
   if (!data) return null;

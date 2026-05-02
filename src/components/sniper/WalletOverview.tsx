@@ -29,13 +29,13 @@ export function WalletOverview() {
         <div className="grid grid-cols-2 lg:grid-cols-4 divide-bd divide-y lg:divide-y-0 lg:divide-x [&>*]:border-bd">
           <Cell
             label="EQUITY"
-            value={fmtUSC(account.equityUSC).replace("USC ", "")}
+            value={fmtUSC(account.equityUSC)}
             valueClass="text-buy"
             sub={<span className="text-mute">1% = {onePctEquity.toFixed(2)} USC</span>}
           />
           <Cell
             label="BALANCE"
-            value={fmtUSC(account.balanceUSC).replace("USC ", "")}
+            value={fmtUSC(account.balanceUSC)}
             valueClass="text-info"
             sub={<span className="text-mute">1% = {onePctBalance.toFixed(2)} USC</span>}
           />
