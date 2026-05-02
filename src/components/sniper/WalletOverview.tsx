@@ -8,7 +8,8 @@ export function WalletOverview() {
   if (!account) return null;
 
   const floating = account.equityUSC - account.balanceUSC;
-  const onePct = account.balanceUSC * 0.01;
+  const onePctBalance = account.balanceUSC * 0.01;
+  const onePctEquity = account.equityUSC * 0.01;
   const marginLevel = account.marginUsedPct > 0 ? (100 / account.marginUsedPct) * 100 : 0;
   const marginStrength = marginLevel > 1000 ? "Strong" : marginLevel > 200 ? "Healthy" : "Tight";
 
@@ -30,13 +31,13 @@ export function WalletOverview() {
             label="EQUITY"
             value={fmtUSC(account.equityUSC).replace("USC ", "")}
             valueClass="text-buy"
-            sub={<span className="text-mute">1% = {onePct.toFixed(2)} USC</span>}
+            sub={<span className="text-mute">1% = {onePctEquity.toFixed(2)} USC</span>}
           />
           <Cell
             label="BALANCE"
             value={fmtUSC(account.balanceUSC).replace("USC ", "")}
             valueClass="text-info"
-            sub={<span className="text-mute">1% = {onePct.toFixed(2)} USC</span>}
+            sub={<span className="text-mute">1% = {onePctBalance.toFixed(2)} USC</span>}
           />
           <Cell
             label="FLOATING P/L"
@@ -72,11 +73,15 @@ function Cell({
       <div className="text-[10px] font-mono uppercase tracking-[0.16em] text-mute font-semibold">
         {label}
       </div>
-      <div className={cn("font-mono text-2xl lg:text-3xl font-bold mt-1 tabular-nums truncate", valueClass)}>
+      <div
+        className={cn(
+          "font-mono text-2xl lg:text-3xl font-bold mt-1 tabular-nums truncate",
+          valueClass,
+        )}
+      >
         {value}
       </div>
       <div className="mt-1 text-[10px] font-mono leading-relaxed">{sub}</div>
     </div>
   );
 }
-

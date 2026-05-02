@@ -53,10 +53,11 @@ function SignalsPage() {
       state: h?.twelveDataKeyStatus === "ok" || h?.twelveDataKey === "present" ? "ok" : "missing",
       detail: h?.twelveDataKeyStatus ? h.twelveDataKeyStatus.replace("-", " ") : undefined,
     },
-    { label: "Regime computer", state: h?.backendSync ?? "offline" },
-    { label: "Gate logic", state: h?.backendSync ?? "offline" },
-    { label: "Chop filter", state: h?.backendSync ?? "offline" },
-    { label: "Fib levels", state: h?.backendSync ?? "offline" },
+    {
+      label: "Engine compute",
+      state: h?.lastEngineRunAt ? "live" : "offline",
+      detail: h?.lastEngineRunAt ? relTime(h.lastEngineRunAt) : "never",
+    },
     {
       label: "Engine run",
       state: h?.lastEngineRunAt ? "live" : "offline",
@@ -136,9 +137,7 @@ function SignalsPage() {
                         ? "border-buy/40 text-buy bg-buy/10"
                         : s.status === "ARMED"
                           ? "border-warn/40 text-warn bg-warn/10"
-                          : s.status === "BLOCKED"
-                            ? "border-sell/40 text-sell bg-sell/10"
-                            : "border-info/40 text-info bg-info/10",
+                          : "border-info/40 text-info bg-info/10",
                     )}
                   >
                     {s.status}

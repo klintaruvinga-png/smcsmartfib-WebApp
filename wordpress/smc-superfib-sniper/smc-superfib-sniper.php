@@ -1004,12 +1004,13 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function refresh_prices($user_id, $symbols) {
         $prices = array();
+        $stale_threshold_sec = $this->get_settings($user_id)['staleThresholdSec'];
         foreach ($symbols as $symbol) {
             $quote = $this->fetch_quote($user_id, $symbol);
             if ($quote) {
                 $prices[] = $quote;
             } else {
-                $cached = $this->get_cached_price($user_id, $symbol);
+                $cached = $this->get_cached_price($user_id, $symbol, $stale_threshold_sec);
                 $prices[] = $cached ? $cached : array(
                     'symbol' => $symbol,
                     'bid' => 0,
@@ -1439,9 +1440,6 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function verdict($status, $confluence, $chop) {
-        if ($status === 'BLOCKED') {
-            return 'C';
-        }
         $score = count($confluence) - ($chop > 0.7 ? 2 : 0);
         if ($status === 'READY' && $score >= 5) {
             return 'A+';
