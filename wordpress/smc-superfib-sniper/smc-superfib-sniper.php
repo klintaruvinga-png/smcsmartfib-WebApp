@@ -1771,11 +1771,20 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function set_feed_rate_limited($user_id, $symbol = null, $ttl_sec = 60) {
-        set_transient($this->rl_transient_key($user_id, $symbol), time(), $ttl_sec);
+        set_transient($this->rl_transient_key($user_id), time(), $ttl_sec);
+        if ($symbol !== null) {
+            set_transient($this->rl_transient_key($user_id, $symbol), time(), $ttl_sec);
+        }
     }
 
     private function is_feed_rate_limited($user_id, $symbol = null) {
-        return get_transient($this->rl_transient_key($user_id, $symbol)) !== false;
+        if (get_transient($this->rl_transient_key($user_id)) !== false) {
+            return true;
+        }
+        if ($symbol !== null) {
+            return get_transient($this->rl_transient_key($user_id, $symbol)) !== false;
+        }
+        return false;
     }
 
     private function get_twelve_key_status($user_id) {
