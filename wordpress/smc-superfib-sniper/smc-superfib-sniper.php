@@ -289,8 +289,13 @@ final class SMC_SuperFib_Sniper_REST {
         $last_batch = $this->latest_timestamp('snapshots', $user_id, 'updated_at');
         $last_run = $this->latest_timestamp('engine_runs', $user_id, 'created_at');
 
+        // Age out backendSync: treat as stale if last engine run is older than 5 minutes.
+        // At the 15s default poll rate a gap > 300s means the client is not actively polling.
+        $run_age = $last_run ? (time() - strtotime($last_run)) : PHP_INT_MAX;
+        $backend_sync = $run_age <= 300 ? 'live' : ($last_run ? 'stale' : 'offline');
+
         return rest_ensure_response(array(
-            'backendSync' => $last_run ? 'live' : 'offline',
+            'backendSync' => $backend_sync,
             'priceFeed' => $key_status === 'ok' ? ($last_batch ? 'live' : 'stale') : 'blocked',
             'twelveDataKey' => $key_status === 'ok' ? 'present' : 'missing',
             'twelveDataKeyStatus' => $key_status,
