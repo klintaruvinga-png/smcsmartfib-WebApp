@@ -10,34 +10,38 @@ function usePollMs() {
 }
 
 export function useSnapshot() {
+  const pollMs = usePollMs();
   return useQuery({
     queryKey: ["snapshot"],
     queryFn: () => apiClient.getSnapshot(),
-    refetchInterval: usePollMs(),
+    refetchInterval: pollMs,
   });
 }
 
 export function useLiveSignals() {
+  const pollMs = usePollMs();
   return useQuery({
     queryKey: ["live-signals"],
     queryFn: () => apiClient.getLiveSignals(),
-    refetchInterval: usePollMs(),
+    refetchInterval: pollMs,
   });
 }
 
 export function useUserTrades() {
+  const pollMs = usePollMs();
   return useQuery({
     queryKey: ["user-trades"],
     queryFn: () => apiClient.getUserTrades(),
-    refetchInterval: usePollMs(),
+    refetchInterval: pollMs,
   });
 }
 
 export function useUserAccount() {
+  const pollMs = usePollMs();
   return useQuery({
     queryKey: ["user-account"],
     queryFn: () => apiClient.getUserAccount(),
-    refetchInterval: usePollMs(),
+    refetchInterval: pollMs,
   });
 }
 
@@ -55,10 +59,11 @@ export function useWatchlist() {
 }
 
 export function useEngineHealth() {
+  const pollMs = usePollMs();
   return useQuery({
     queryKey: ["engine-health"],
     queryFn: () => apiClient.getEngineHealth(),
-    refetchInterval: usePollMs(),
+    refetchInterval: pollMs,
   });
 }
 
@@ -70,24 +75,19 @@ export function useUserRiskProfile() {
 }
 
 export function useLadders() {
+  const pollMs = usePollMs();
   return useQuery({
     queryKey: ["ladders"],
     queryFn: () => apiClient.getLadders(),
+    refetchInterval: pollMs,
   });
 }
 
 export function useSession() {
+  const pollMs = usePollMs();
   return useQuery({
     queryKey: ["session"],
     queryFn: () => apiClient.getSession(),
-    refetchInterval: Math.max(usePollMs(), 60_000),
-  });
-}
-
-export function useRegimes() {
-  return useQuery({
-    queryKey: ["regimes"],
-    queryFn: () => apiClient.getRegimes(),
-    refetchInterval: usePollMs(),
+    refetchInterval: Math.max(pollMs, 60_000),
   });
 }
