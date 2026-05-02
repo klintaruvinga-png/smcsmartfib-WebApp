@@ -294,6 +294,11 @@ final class SMC_SuperFib_Sniper_REST {
             $backend_sync = $age_sec <= 300 ? 'live' : 'stale';
         }
 
+        // Age out backendSync: treat as stale if last engine run is older than 5 minutes.
+        // At the 15s default poll rate a gap > 300s means the client is not actively polling.
+        $run_age = $last_run ? (time() - strtotime($last_run)) : PHP_INT_MAX;
+        $backend_sync = $run_age <= 300 ? 'live' : ($last_run ? 'stale' : 'offline');
+
         return rest_ensure_response(array(
             'backendSync' => $backend_sync,
             'priceFeed' => $key_status === 'ok' ? ($last_batch ? 'live' : 'stale') : 'blocked',
@@ -748,6 +753,17 @@ final class SMC_SuperFib_Sniper_REST {
         )));
         $cached = get_transient($transient_key);
         if (is_array($cached)) {
+            return $cached;
+        }
+
+        // Deduplicate concurrent calls within the same poll cycle (e.g. /snapshot + /live-signals
+        // both firing at ~15s). Sort symbols so key is order-independent. 5s TTL is shorter than
+        // the minimum meaningful poll interval but long enough to absorb same-cycle duplicates.
+        $sorted = $symbols;
+        sort($sorted);
+        $cache_key = 'smc_sf_eng_' . $user_id . '_' . md5(implode(',', $sorted));
+        $cached = get_transient($cache_key);
+        if ($cached !== false) {
             return $cached;
         }
 
