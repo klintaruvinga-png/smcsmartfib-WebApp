@@ -288,6 +288,11 @@ final class SMC_SuperFib_Sniper_REST {
         $key_status = $this->get_twelve_key_status($user_id);
         $last_batch = $this->latest_timestamp('snapshots', $user_id, 'updated_at');
         $last_run = $this->latest_timestamp('engine_runs', $user_id, 'created_at');
+        $backend_sync = 'offline';
+        if ($last_run) {
+            $age_sec = time() - strtotime($last_run . ' UTC');
+            $backend_sync = $age_sec <= 300 ? 'live' : 'stale';
+        }
 
         // Age out backendSync: treat as stale if last engine run is older than 5 minutes.
         // At the 15s default poll rate a gap > 300s means the client is not actively polling.
@@ -729,6 +734,27 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function run_engine_for_symbols($user_id, $symbols, $prices) {
         global $wpdb;
+        $symbols_sorted = $symbols;
+        sort($symbols_sorted);
+
+        $price_fingerprint = array();
+        foreach ($symbols_sorted as $symbol) {
+            $price = $this->find_price($prices, $symbol);
+            $price_fingerprint[$symbol] = array(
+                'mid' => isset($price['mid']) ? (float) $price['mid'] : null,
+                'updatedAt' => isset($price['updatedAt']) ? $price['updatedAt'] : null,
+                'state' => isset($price['state']) ? $price['state'] : null,
+            );
+        }
+
+        $transient_key = 'smc_engine_run_' . $user_id . '_' . md5(wp_json_encode(array(
+            'symbols' => $symbols_sorted,
+            'prices' => $price_fingerprint,
+        )));
+        $cached = get_transient($transient_key);
+        if (is_array($cached)) {
+            return $cached;
+        }
 
         // Deduplicate concurrent calls within the same poll cycle (e.g. /snapshot + /live-signals
         // both firing at ~15s). Sort symbols so key is order-independent. 5s TTL is shorter than
@@ -800,7 +826,9 @@ final class SMC_SuperFib_Sniper_REST {
         );
 
         $result = array('regimes' => $regimes, 'gates' => $gates, 'signals' => $signals, 'plans' => $plans);
+        set_transient($transient_key, $result, 5);
         set_transient($cache_key, $result, 5);
+
         return $result;
     }
 
@@ -1458,10 +1486,8 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function verdict($status, $confluence, $chop) {
-        // HTA_SF and LTF_SF are framework labels kept for display; only earned structural
-        // conditions (sweep, MSS, F3-clear, HTA-override) count toward the score.
-        $earned = array_diff($confluence, array('HTA_SF', 'LTF_SF'));
-        $score = count($earned) - ($chop > 0.7 ? 2 : 0);
+        $structural = array_values(array_diff($confluence, array('HTA_SF', 'LTF_SF')));
+        $score = count($structural) - ($chop > 0.7 ? 2 : 0);
         if ($status === 'READY' && $score >= 3) {
             return 'A+';
         }
