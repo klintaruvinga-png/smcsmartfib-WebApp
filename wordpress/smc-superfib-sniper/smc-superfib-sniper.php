@@ -340,6 +340,29 @@ final class SMC_SuperFib_Sniper_REST {
             'settings' => $settings,
             'updated_at' => $this->now_mysql(),
         ));
+
+        // Keep riskProfile in sync when the Settings tab edits the three overlapping risk-cap
+        // fields so execution sizing always sees the latest user intent regardless of which tab
+        // was used to change the values.
+        if (isset($settings['riskAllocation']) && is_array($settings['riskAllocation'])) {
+            $ra = $settings['riskAllocation'];
+            $existing_blob = $this->get_account_blob($user_id);
+            $existing_blob['riskProfile'] = array_merge(
+                $this->get_risk_profile($user_id),
+                array(
+                    'perTradePct' => (float) ($ra['perTradePct'] ?? 0.5),
+                    'dailyMaxPct' => (float) ($ra['dailyMaxPct'] ?? 2.0),
+                    'ddCapPct'    => (float) ($ra['ddCapPct'] ?? 6.0),
+                    'updatedAt'   => gmdate('c'),
+                )
+            );
+            $this->replace_json('account_snapshots', array(
+                'user_id'    => $user_id,
+                'data'       => $existing_blob,
+                'updated_at' => $this->now_mysql(),
+            ));
+        }
+
         $this->audit($user_id, 'settings.updated', array('watchlist' => $settings['watchlist']));
 
         return rest_ensure_response(array('ok' => true));
@@ -638,7 +661,8 @@ final class SMC_SuperFib_Sniper_REST {
         $existing = $this->get_account_blob($user_id);
         $existing['account'] = array_merge(
             isset($existing['account']) && is_array($existing['account']) ? $existing['account'] : array(),
-            $update
+            $update,
+            array('updatedAt' => gmdate('c'))
         );
         $this->replace_json('account_snapshots', array(
             'user_id' => $user_id,
@@ -1303,17 +1327,15 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function get_account_state($user_id) {
-        global $wpdb;
         $blob = $this->get_account_blob($user_id);
         $positions = $this->read_trade_payloads($user_id, 'position');
         $orders = $this->read_pending_orders($user_id);
 
-        $snapshot_updated = $wpdb->get_var($wpdb->prepare(
-            "SELECT updated_at FROM {$this->table('account_snapshots')} WHERE user_id = %d",
-            $user_id
-        ));
-        $snap_age = $snapshot_updated ? (time() - strtotime($snapshot_updated . ' UTC')) : PHP_INT_MAX;
-        $account_state = $snap_age <= 300 ? 'live' : ($snapshot_updated ? 'stale' : 'stale');
+        // Use the account-specific timestamp written only by post_user_account() so that
+        // risk-profile saves (which share the same blob row) cannot falsely mark account live.
+        $account_updated = !empty($blob['account']['updatedAt']) ? $blob['account']['updatedAt'] : null;
+        $snap_age = $account_updated ? (time() - strtotime($account_updated)) : PHP_INT_MAX;
+        $account_state = $snap_age <= 300 ? 'live' : 'stale';
 
         $default = array(
             'balanceUSC' => 0,
