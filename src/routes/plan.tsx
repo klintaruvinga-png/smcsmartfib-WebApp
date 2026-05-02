@@ -29,17 +29,60 @@ export const Route = createFileRoute("/plan")({
 });
 
 function PlanPage() {
-  const { data: signals } = useLiveSignals();
-  const { data: ladders } = useLadders();
-  const top = signals?.find((s) => s.status === "READY") ?? signals?.[0];
+  const { data: signals, isLoading: signalsLoading } = useLiveSignals();
+  const { data: ladders, isLoading: laddersLoading } = useLadders();
+  
+  // Deduplicate signals by ID to handle backend duplicates
+  const uniqueSignals = signals ? (() => {
+    const seen = new Set<string>();
+    return signals.filter((s) => {
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    });
+  })() : undefined;
+  
+  const top = uniqueSignals?.find((s) => s.status === "READY") ?? uniqueSignals?.[0];
   const plan = top ? (ladders?.find((l) => l.signalId === top.id) ?? null) : null;
 
-  if (!top || !plan)
+  if (signalsLoading || laddersLoading) {
     return (
       <div className="text-mute text-sm">
-        ⚠️ {top ? "No matching blueprint for this signal." : "No active signal blueprint."}
+        ⏳ Loading signal data and blueprints...
       </div>
     );
+  }
+
+  if (!top || !plan) {
+    const diagnostics = {
+      signalCount: uniqueSignals?.length ?? 0,
+      readyCount: uniqueSignals?.filter((s) => s.status === "READY").length ?? 0,
+      topSignal: top?.id,
+      topSymbol: top?.symbol,
+      blueprintCount: ladders?.length ?? 0,
+      blueprintIds: ladders?.map((l) => l.signalId) ?? [],
+    };
+    
+    return (
+      <div className="space-y-3 text-sm">
+        <div className="text-mute">
+          ⚠️ {top ? "No matching blueprint for this signal." : "No active signals found."}
+        </div>
+        {top && (
+          <div className="text-xs text-dim bg-bg1/40 rounded px-3 py-2 max-w-lg space-y-1">
+            <div>Signal: <span className="text-info font-mono">{top.id}</span> ({top.symbol} {top.direction})</div>
+            <div>Found {diagnostics.blueprintCount} total blueprints</div>
+            {diagnostics.blueprintCount === 0 && (
+              <div className="text-warn">🔍 Ladders endpoint returned no data — check backend connectivity</div>
+            )}
+            {diagnostics.blueprintCount > 0 && (
+              <div>Ladder IDs available: {diagnostics.blueprintIds.join(", ") || "none"}</div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const divergence = top.computedBy === "frontend" && !top.backendConfirmed;
   const dirIcon =

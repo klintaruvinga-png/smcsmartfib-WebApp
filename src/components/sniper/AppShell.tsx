@@ -73,10 +73,17 @@ function HeaderChips() {
   const syncState = health?.backendSync ?? snap?.prices?.[0]?.state ?? "offline";
   const counts = useMemo(() => {
     const r = signals ?? [];
+    // Deduplicate signals by ID to handle backend duplicates
+    const seen = new Set<string>();
+    const unique = r.filter((s) => {
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    });
     return {
-      ready: r.filter((s) => s.status === "READY").length,
-      armed: r.filter((s) => s.status === "ARMED").length,
-      watch: r.filter((s) => s.status === "WATCH").length,
+      ready: unique.filter((s) => s.status === "READY").length,
+      armed: unique.filter((s) => s.status === "ARMED").length,
+      watch: unique.filter((s) => s.status === "WATCH").length,
     };
   }, [signals]);
 

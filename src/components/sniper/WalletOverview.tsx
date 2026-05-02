@@ -4,8 +4,41 @@ import { fmtUSC } from "@/lib/format";
 import { FreshnessBadge } from "./FreshnessBadge";
 
 export function WalletOverview() {
-  const { data: account } = useUserAccount();
-  if (!account) return null;
+  const { data: account, isLoading, error } = useUserAccount();
+  
+  if (isLoading) {
+    return (
+      <section className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-3 w-1 rounded-sm bg-accent" />
+            <h2 className="text-[11px] font-mono uppercase tracking-[0.18em] text-dim font-semibold">
+              Account
+            </h2>
+          </div>
+          <div className="text-[10px] text-mute">Loading...</div>
+        </div>
+      </section>
+    );
+  }
+  
+  if (error || !account) {
+    return (
+      <section className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-3 w-1 rounded-sm bg-accent" />
+            <h2 className="text-[11px] font-mono uppercase tracking-[0.18em] text-dim font-semibold">
+              Account
+            </h2>
+          </div>
+        </div>
+        <div className="text-xs text-warn/80 px-4 py-3">
+          ⚠️ Account data unavailable — check backend connection or authentication
+        </div>
+      </section>
+    );
+  }
 
   const floating = account.equityUSC - account.balanceUSC;
   const onePctBalance = account.balanceUSC * 0.01;

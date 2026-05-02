@@ -44,7 +44,18 @@ function SignalsPage() {
   const { data: signals } = useLiveSignals();
   const { data: h } = useEngineHealth();
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
-  const divergent = (signals ?? []).filter(
+  
+  // Deduplicate signals by ID to handle backend duplicates
+  const uniqueSignals = signals ? (() => {
+    const seen = new Set<string>();
+    return signals.filter((s) => {
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    });
+  })() : [];
+  
+  const divergent = uniqueSignals.filter(
     (s) => s.computedBy === "frontend" && !s.backendConfirmed,
   );
 
@@ -133,10 +144,10 @@ function SignalsPage() {
           <div className="text-[11px] font-mono uppercase tracking-wider text-mute">
             Live candidates
           </div>
-          <span className="text-[10px] font-mono text-mute">{signals?.length ?? 0} total</span>
+          <span className="text-[10px] font-mono text-mute">{uniqueSignals?.length ?? 0} total</span>
         </div>
         <div className="divide-y divide-bd">
-          {(signals ?? []).map((s) => {
+          {(uniqueSignals ?? []).map((s) => {
             const divergent = s.computedBy === "frontend" && !s.backendConfirmed;
             return (
               <div key={s.id} className="grid grid-cols-12 items-center gap-3 px-4 py-3">
