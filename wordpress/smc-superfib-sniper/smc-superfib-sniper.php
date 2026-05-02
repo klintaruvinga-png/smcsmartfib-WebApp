@@ -332,6 +332,8 @@ final class SMC_SuperFib_Sniper_REST {
             $engine_run_state = 'stale';
         }
 
+        $snapshot = $this->get_engine_snapshot($user_id);
+
         return rest_ensure_response(array(
             'backendSync' => $backend_sync,
             'priceFeed' => $price_feed,
@@ -341,6 +343,7 @@ final class SMC_SuperFib_Sniper_REST {
             'twelveDataKeyStatus' => $key_status,
             'lastBatchAt' => $this->to_iso($last_batch),
             'lastEngineRunAt' => $this->to_iso($last_run),
+            'perSymbolDiagnostics' => is_array($snapshot) ? ($snapshot['diagnostics'] ?? array()) : array(),
         ));
     }
 
@@ -570,16 +573,24 @@ final class SMC_SuperFib_Sniper_REST {
 
     public function get_snapshot() {
         $user_id = get_current_user_id();
+        $snapshot = $this->get_engine_snapshot($user_id);
+        if (is_array($snapshot) && !empty($snapshot['prices'])) {
+            return rest_ensure_response($snapshot);
+        }
+
         $settings = $this->get_settings($user_id);
         $prices = $this->refresh_prices($user_id, $settings['watchlist']);
         $engine = $this->run_engine_for_symbols($user_id, $settings['watchlist'], $prices);
-
-        return rest_ensure_response(array(
+        $snapshot = array(
             'prices' => $prices,
             'regimes' => $engine['regimes'],
             'gates' => $engine['gates'],
+            'plans' => $engine['plans'],
             'diagnostics' => $engine['diagnostics'] ?? array(),
-        ));
+        );
+        $this->save_engine_snapshot($user_id, $snapshot);
+
+        return rest_ensure_response($snapshot);
     }
 
     // Pine webhook stub — intentionally audit-only until Pine alert integration is implemented.
@@ -592,11 +603,22 @@ final class SMC_SuperFib_Sniper_REST {
 
     public function get_regimes() {
         $user_id = get_current_user_id();
+        $snapshot = $this->get_engine_snapshot($user_id);
+        if (is_array($snapshot) && !empty($snapshot['regimes'])) {
+            return rest_ensure_response($snapshot['regimes']);
+        }
+
         $settings = $this->get_settings($user_id);
-        // Use TTL-safe refresh_prices() so regimes always see the freshest available data.
-        // The 45-second quote TTL prevents this from generating extra Twelve Data calls.
         $prices = $this->refresh_prices($user_id, $settings['watchlist']);
         $engine = $this->run_engine_for_symbols($user_id, $settings['watchlist'], $prices);
+        $snapshot = array(
+            'prices' => $prices,
+            'regimes' => $engine['regimes'],
+            'gates' => $engine['gates'],
+            'plans' => $engine['plans'],
+            'diagnostics' => $engine['diagnostics'] ?? array(),
+        );
+        $this->save_engine_snapshot($user_id, $snapshot);
         return rest_ensure_response($engine['regimes']);
     }
 
@@ -607,12 +629,38 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     public function get_live_signals() {
+        global $wpdb;
         $user_id = get_current_user_id();
         $settings = $this->get_settings($user_id);
-        // TTL-safe: fetch_quote() skips Twelve Data when the quote TTL transient is active.
-        $prices = $this->refresh_prices($user_id, $settings['watchlist']);
-        $engine = $this->run_engine_for_symbols($user_id, $settings['watchlist'], $prices);
-        return rest_ensure_response($engine['signals']);
+        $watchlist = $settings['watchlist'];
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table('signals')} WHERE user_id = %d ORDER BY updated_at DESC",
+            $user_id
+        ), ARRAY_A);
+
+        $signals = array();
+        foreach ($rows as $row) {
+            if (!in_array($row['symbol'], $watchlist, true)) {
+                continue;
+            }
+            $engine = json_decode($row['engine'], true) ?: array();
+            $signals[] = array(
+                'id' => $row['id'],
+                'symbol' => $row['symbol'],
+                'direction' => $row['direction'],
+                'status' => $row['status'],
+                'confluence' => json_decode($row['confluence'], true) ?: array(),
+                'verdict' => $row['verdict'],
+                'computedBy' => 'backend',
+                'backendConfirmed' => (bool) $row['backend_confirmed'],
+                'engineBlocker' => isset($engine['engineBlocker']) ? $engine['engineBlocker'] : null,
+                'createdAt' => $this->to_iso($row['created_at']),
+                'engine' => $engine,
+            );
+        }
+
+        return rest_ensure_response($signals);
     }
 
     // Pine webhook stub — intentionally audit-only until Pine alert integration is implemented.
@@ -626,9 +674,27 @@ final class SMC_SuperFib_Sniper_REST {
         $symbol = strtoupper(sanitize_text_field($request->get_param('symbol')));
         $settings = $this->get_settings($user_id);
         $symbols = $symbol ? array($symbol) : $settings['watchlist'];
-        // TTL-safe refresh ensures plans use the same market data as /snapshot and /live-signals.
+        $snapshot = $this->get_engine_snapshot($user_id);
+        if (is_array($snapshot) && !empty($snapshot['plans'])) {
+            $plans = $snapshot['plans'];
+            if ($symbol) {
+                $plans = array_values(array_filter($plans, function ($plan) use ($symbol) {
+                    return isset($plan['symbol']) && $plan['symbol'] === $symbol;
+                }));
+            }
+            return rest_ensure_response($plans);
+        }
+
         $prices = $this->refresh_prices($user_id, $symbols);
         $engine = $this->run_engine_for_symbols($user_id, $symbols, $prices);
+        $snapshot = array(
+            'prices' => $prices,
+            'regimes' => $engine['regimes'],
+            'gates' => $engine['gates'],
+            'plans' => $engine['plans'],
+            'diagnostics' => $engine['diagnostics'] ?? array(),
+        );
+        $this->save_engine_snapshot($user_id, $snapshot);
         return rest_ensure_response($engine['plans']);
     }
 
@@ -801,6 +867,13 @@ final class SMC_SuperFib_Sniper_REST {
         }
         $prices = $this->refresh_prices($user_id, $symbols);
         $engine = $this->run_engine_for_symbols($user_id, $symbols, $prices);
+        $snapshot = array(
+            'prices' => $prices,
+            'regimes' => $engine['regimes'],
+            'gates' => $engine['gates'],
+            'diagnostics' => isset($engine['diagnostics']) ? $engine['diagnostics'] : array(),
+        );
+        $this->save_engine_snapshot($user_id, $snapshot);
         return rest_ensure_response(array(
             'ok' => true,
             'diagnostics' => isset($engine['diagnostics']) ? $engine['diagnostics'] : array(),
@@ -1036,6 +1109,7 @@ final class SMC_SuperFib_Sniper_REST {
                 'firstReactionFamily' => $hta_override ? 'HTA_SF' : 'LTF_SF',
                 'chartState' => 'chart-derived',
                 'panelState' => null,
+                'engineBlocker' => $engine_blocker,
             ),
         );
 
@@ -1107,6 +1181,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         return array(
             'signalId' => $signal['id'],
+            'symbol' => $signal['symbol'],
             'entries' => $entries,
             'sl' => $stops['e3'],
             'stops' => $stops,
@@ -1185,9 +1260,9 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         // Quote TTL: skip upstream call if we fetched this symbol recently.
-        // Also skip while the feed is rate-limited; return the DB-cached price instead.
+        // Also skip while this symbol is rate-limited; return the DB-cached price instead.
         $quote_ttl_key = 'smc_sf_qt_' . $user_id . '_' . md5($symbol);
-        if (get_transient($quote_ttl_key) !== false || $this->is_feed_rate_limited($user_id)) {
+        if (get_transient($quote_ttl_key) !== false || $this->is_feed_rate_limited($user_id, $symbol)) {
             return $this->get_cached_price($user_id, $symbol);
         }
 
@@ -1281,7 +1356,7 @@ final class SMC_SuperFib_Sniper_REST {
         // Candle TTL: skip upstream call when candles were fetched recently or feed is rate-limited.
         // The stored DB candles remain available regardless.
         $candle_ttl_key = 'smc_sf_ct_' . $user_id . '_' . md5($symbol . '|' . $timeframe);
-        $candle_ttl_active = get_transient($candle_ttl_key) !== false || $this->is_feed_rate_limited($user_id);
+        $candle_ttl_active = get_transient($candle_ttl_key) !== false || $this->is_feed_rate_limited($user_id, $symbol);
 
         $key = $this->get_twelve_key($user_id);
         if (!$candle_ttl_active && !is_wp_error($key) && $key) {
@@ -1506,6 +1581,19 @@ final class SMC_SuperFib_Sniper_REST {
             }
         }
         return $prices;
+    }
+
+    private function get_engine_snapshot($user_id) {
+        $snapshot = get_user_meta($user_id, 'smc_sf_engine_snapshot', true);
+        return is_array($snapshot) ? $snapshot : null;
+    }
+
+    private function save_engine_snapshot($user_id, $snapshot) {
+        if (!is_array($snapshot)) {
+            return false;
+        }
+        update_user_meta($user_id, 'smc_sf_engine_snapshot', $snapshot);
+        return true;
     }
 
     private function get_cached_price($user_id, $symbol, $stale_threshold_sec = null) {
