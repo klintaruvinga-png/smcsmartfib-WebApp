@@ -282,6 +282,11 @@ export const apiClient = {
   },
 
   // Dedicated watchlist endpoints — changes persist immediately without a full settings save.
+
+  async postSnapshot(mock = MOCK_MODE): Promise<{ ok: true }> {
+    if (mock) return { ok: true };
+    return call("/snapshot", { method: "POST", body: {} });
+  },
   async getWatchlist(mock = MOCK_MODE): Promise<{ watchlist: Symbol[]; supported: string[] }> {
     if (mock) return { watchlist: mockSettings.watchlist, supported: [] };
     return call("/user/watchlist");

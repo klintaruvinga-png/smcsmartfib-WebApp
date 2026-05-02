@@ -138,6 +138,8 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
         old ? { ...old, watchlist: result.watchlist } : old,
       );
       setS((prev) => ({ ...prev, watchlist: result.watchlist }));
+      await apiClient.postUserSettings({ watchlist: result.watchlist });
+      await qc.invalidateQueries({ queryKey: ["user-settings"] });
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["snapshot"] }),
         qc.invalidateQueries({ queryKey: ["live-signals"] }),
@@ -164,6 +166,8 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
         old ? { ...old, watchlist: result.watchlist } : old,
       );
       setS((prev) => ({ ...prev, watchlist: result.watchlist }));
+      await apiClient.postUserSettings({ watchlist: result.watchlist });
+      await qc.invalidateQueries({ queryKey: ["user-settings"] });
       setNewPair("");
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["snapshot"] }),
