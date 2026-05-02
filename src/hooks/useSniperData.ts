@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api/sniperClient";
+import { apiClient, setBackendUrl } from "@/lib/api/sniperClient";
 
 const DEFAULT_POLL_MS = 15_000;
 
@@ -48,7 +48,11 @@ export function useUserAccount() {
 export function useUserSettings() {
   return useQuery({
     queryKey: ["user-settings"],
-    queryFn: () => apiClient.getUserSettings(),
+    queryFn: async () => {
+      const s = await apiClient.getUserSettings();
+      if (s.backendUrl) setBackendUrl(s.backendUrl);
+      return s;
+    },
   });
 }
 
@@ -83,11 +87,3 @@ export function useLadders() {
   });
 }
 
-export function useSession() {
-  const pollMs = usePollMs();
-  return useQuery({
-    queryKey: ["session"],
-    queryFn: () => apiClient.getSession(),
-    refetchInterval: Math.max(pollMs, 60_000),
-  });
-}

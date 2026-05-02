@@ -117,15 +117,6 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
 
 // ──────────────── Public / shared ────────────────
 export const apiClient = {
-  // Public
-  async getRegimes(mock = MOCK_MODE): Promise<RegimeState[]> {
-    if (mock) return mockRegimes;
-    return call<RegimeState[]>("/regimes");
-  },
-  async postRegime(payload: Partial<RegimeState>, mock = MOCK_MODE): Promise<{ ok: true }> {
-    if (mock) return { ok: true };
-    return call("/regime", { method: "POST", body: payload });
-  },
   async getSnapshot(mock = MOCK_MODE) {
     if (mock) {
       const wl = new Set(mockSettings.watchlist);
@@ -169,20 +160,12 @@ export const apiClient = {
       `/charts?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`,
     );
   },
-  async postSnapshot(payload: unknown, mock = MOCK_MODE): Promise<{ ok: true }> {
-    if (mock) return { ok: true };
-    return call("/snapshot", { method: "POST", body: payload });
-  },
   async getLiveSignals(mock = MOCK_MODE): Promise<SignalCandidate[]> {
     if (mock) {
       const wl = new Set(mockSettings.watchlist);
       return mockSignals.filter((s) => wl.has(s.symbol));
     }
     return call<SignalCandidate[]>("/live-signals");
-  },
-  async postSignal(payload: Partial<SignalCandidate>, mock = MOCK_MODE): Promise<{ ok: true }> {
-    if (mock) return { ok: true };
-    return call("/signal", { method: "POST", body: payload });
   },
   async getLadders(symbol?: Symbol, mock = MOCK_MODE): Promise<TradePlan[]> {
     if (mock) return [mockPlan];
@@ -196,33 +179,17 @@ export const apiClient = {
       authenticated: false,
     });
   },
-  async postEngineBatch(payload: unknown, mock = MOCK_MODE): Promise<{ ok: true }> {
-    if (mock) return { ok: true };
-    return call("/engine-batch", { method: "POST", body: payload, authenticated: true });
-  },
   async getEngineHealth(mock = MOCK_MODE): Promise<EngineHealth> {
     if (mock) return mockEngineHealth;
     return call<EngineHealth>("/health", { authenticated: true });
   },
 
   // Authenticated user
-  async postUserEngineBatch(payload: unknown, mock = MOCK_MODE): Promise<{ ok: true }> {
-    if (mock) return { ok: true };
-    return call("/user/engine-batch", { method: "POST", body: payload });
-  },
-  async postUserMarketData(payload: { symbols: Symbol[] }, mock = MOCK_MODE): Promise<PairPrice[]> {
-    if (mock) return mockPrices.filter((p) => payload.symbols.includes(p.symbol));
-    return call("/user/market-data", { method: "POST", body: payload });
-  },
   async getUserTrades(
     mock = MOCK_MODE,
   ): Promise<{ positions: Position[]; orders: PendingOrder[] }> {
     if (mock) return { positions: mockPositions, orders: mockOrders };
     return call("/user/trades");
-  },
-  async postUserTrades(payload: unknown, mock = MOCK_MODE): Promise<{ ok: true }> {
-    if (mock) return { ok: true };
-    return call("/user/trades", { method: "POST", body: payload });
   },
   async getUserAccount(mock = MOCK_MODE): Promise<AccountState> {
     if (mock) return mockAccount;
@@ -265,14 +232,6 @@ export const apiClient = {
     if (mock) return { ok: true };
     return call("/user/risk-profile", { method: "POST", body: payload });
   },
-  async getUserTradeQueue(mock = MOCK_MODE): Promise<PendingOrder[]> {
-    if (mock) return mockOrders;
-    return call("/user/trade-queue");
-  },
-  async postUserTradeQueue(payload: unknown, mock = MOCK_MODE): Promise<{ ok: true }> {
-    if (mock) return { ok: true };
-    return call("/user/trade-queue", { method: "POST", body: payload });
-  },
   async postExecuteSignals(
     payload: { signalIds: string[] },
     mock = MOCK_MODE,
@@ -282,10 +241,6 @@ export const apiClient = {
   },
 
   // Dedicated watchlist endpoints — changes persist immediately without a full settings save.
-  async getWatchlist(mock = MOCK_MODE): Promise<{ watchlist: Symbol[]; supported: string[] }> {
-    if (mock) return { watchlist: mockSettings.watchlist, supported: [] };
-    return call("/user/watchlist");
-  },
   async postWatchlistAdd(
     symbol: string,
     mock = MOCK_MODE,

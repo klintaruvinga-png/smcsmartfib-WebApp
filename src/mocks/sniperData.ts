@@ -2,6 +2,7 @@ import type {
   AccountState,
   DashboardSettings,
   EngineHealth,
+  FibRole,
   GateState,
   PairPrice,
   PendingOrder,
@@ -406,7 +407,7 @@ export function mockFibLevels(symbol: Symbol) {
     ratio,
     label: `${ratio}%`,
     price: base + range - (ratio / 100) * range * 2,
-    role: ratio < 50 ? "premium" : ratio === 50 ? "equilibrium" : "discount",
+    role: (ratio < 50 ? "premium" : ratio === 50 ? "equilibrium" : "discount") as FibRole,
   }));
 }
 
