@@ -26,6 +26,7 @@ import type {
   RiskProfile,
   SignalCandidate,
   Symbol,
+  SymbolDiagnostic,
   TwelveDataKeyStatus,
   TradePlan,
 } from "@/types/sniper";
@@ -118,9 +119,10 @@ export const apiClient = {
         prices: mockPrices.filter((p) => wl.has(p.symbol)),
         regimes: mockRegimes.filter((r) => wl.has(r.symbol)),
         gates: mockGates.filter((g) => wl.has(g.symbol)),
+        diagnostics: [] as SymbolDiagnostic[],
       };
     }
-    return call<{ prices: PairPrice[]; regimes: RegimeState[]; gates: GateState[] }>("/snapshot");
+    return call<{ prices: PairPrice[]; regimes: RegimeState[]; gates: GateState[]; diagnostics: SymbolDiagnostic[] }>("/snapshot");
   },
   async getChartSnapshot(
     symbol: Symbol,
@@ -232,6 +234,15 @@ export const apiClient = {
   ): Promise<{ ok: true; queued: number }> {
     if (mock) return { ok: true, queued: payload.signalIds.length };
     return call("/user/execute-signals", { method: "POST", body: payload });
+  },
+
+  /** Force a backend market-data refresh + engine run for the given symbols (or full watchlist). */
+  async postEngineBatch(
+    symbols?: Symbol[],
+    mock = MOCK_MODE,
+  ): Promise<{ ok: boolean; diagnostics: SymbolDiagnostic[] }> {
+    if (mock) return { ok: true, diagnostics: [] };
+    return call("/user/engine-batch", { method: "POST", body: symbols ? { symbols } : {} });
   },
 
   // Dedicated watchlist endpoints — changes persist immediately without a full settings save.

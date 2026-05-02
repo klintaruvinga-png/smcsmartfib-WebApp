@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient, setBackendUrl } from "@/lib/api/sniperClient";
+import type { Symbol } from "@/types/sniper";
 
 const DEFAULT_POLL_MS = 15_000;
 
@@ -84,6 +85,20 @@ export function useLadders() {
     queryKey: ["ladders"],
     queryFn: () => apiClient.getLadders(),
     refetchInterval: pollMs,
+  });
+}
+
+/** Trigger a forced backend market-data refresh + engine run, then invalidate all dependent queries. */
+export function useEngineBatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (symbols?: Symbol[]) => apiClient.postEngineBatch(symbols),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["snapshot"] });
+      queryClient.invalidateQueries({ queryKey: ["live-signals"] });
+      queryClient.invalidateQueries({ queryKey: ["engine-health"] });
+      queryClient.invalidateQueries({ queryKey: ["ladders"] });
+    },
   });
 }
 

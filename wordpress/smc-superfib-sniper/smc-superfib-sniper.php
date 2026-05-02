@@ -304,12 +304,39 @@ final class SMC_SuperFib_Sniper_REST {
         $run_age      = $last_run ? (time() - strtotime($last_run . ' UTC')) : PHP_INT_MAX;
         $backend_sync = $run_age <= 300 ? 'live' : ($last_run ? 'stale' : 'offline');
 
-        $batch_age  = $last_batch ? (time() - strtotime($last_batch . ' UTC')) : PHP_INT_MAX;
-        $price_feed = $key_status === 'ok' ? ($batch_age <= 300 ? 'live' : 'stale') : 'blocked';
+        $batch_age = $last_batch ? (time() - strtotime($last_batch . ' UTC')) : PHP_INT_MAX;
+
+        // feedStatus separates runtime feed health from credential validity.
+        // rate-limited = temporary 429 cooldown (key remains ok).
+        // blocked = key missing or invalid — feed cannot recover without user action.
+        if ($this->is_feed_rate_limited($user_id)) {
+            $feed_status = 'rate-limited';
+        } elseif ($key_status !== 'ok') {
+            $feed_status = 'blocked';
+        } elseif ($batch_age <= 300) {
+            $feed_status = 'live';
+        } else {
+            $feed_status = 'stale';
+        }
+        // priceFeed kept for backwards compatibility.
+        $price_feed = ($feed_status === 'live') ? 'live' : (($feed_status === 'blocked') ? 'blocked' : 'stale');
+
+        // engineRunState: whether the last engine run used fresh data or a cached result.
+        if (!$last_run) {
+            $engine_run_state = 'failed';
+        } elseif ($run_age <= 10) {
+            $engine_run_state = 'live';
+        } elseif ($run_age <= 300) {
+            $engine_run_state = 'cached';
+        } else {
+            $engine_run_state = 'stale';
+        }
 
         return rest_ensure_response(array(
             'backendSync' => $backend_sync,
             'priceFeed' => $price_feed,
+            'feedStatus' => $feed_status,
+            'engineRunState' => $engine_run_state,
             'twelveDataKey' => $key_status === 'ok' ? 'present' : 'missing',
             'twelveDataKeyStatus' => $key_status,
             'lastBatchAt' => $this->to_iso($last_batch),
@@ -551,6 +578,7 @@ final class SMC_SuperFib_Sniper_REST {
             'prices' => $prices,
             'regimes' => $engine['regimes'],
             'gates' => $engine['gates'],
+            'diagnostics' => $engine['diagnostics'] ?? array(),
         ));
     }
 
@@ -565,7 +593,9 @@ final class SMC_SuperFib_Sniper_REST {
     public function get_regimes() {
         $user_id = get_current_user_id();
         $settings = $this->get_settings($user_id);
-        $prices = $this->get_cached_prices($user_id, $settings['watchlist']);
+        // Use TTL-safe refresh_prices() so regimes always see the freshest available data.
+        // The 45-second quote TTL prevents this from generating extra Twelve Data calls.
+        $prices = $this->refresh_prices($user_id, $settings['watchlist']);
         $engine = $this->run_engine_for_symbols($user_id, $settings['watchlist'], $prices);
         return rest_ensure_response($engine['regimes']);
     }
@@ -579,7 +609,8 @@ final class SMC_SuperFib_Sniper_REST {
     public function get_live_signals() {
         $user_id = get_current_user_id();
         $settings = $this->get_settings($user_id);
-        $prices = $this->get_cached_prices($user_id, $settings['watchlist']);
+        // TTL-safe: fetch_quote() skips Twelve Data when the quote TTL transient is active.
+        $prices = $this->refresh_prices($user_id, $settings['watchlist']);
         $engine = $this->run_engine_for_symbols($user_id, $settings['watchlist'], $prices);
         return rest_ensure_response($engine['signals']);
     }
@@ -595,7 +626,8 @@ final class SMC_SuperFib_Sniper_REST {
         $symbol = strtoupper(sanitize_text_field($request->get_param('symbol')));
         $settings = $this->get_settings($user_id);
         $symbols = $symbol ? array($symbol) : $settings['watchlist'];
-        $prices = $this->get_cached_prices($user_id, $symbols);
+        // TTL-safe refresh ensures plans use the same market data as /snapshot and /live-signals.
+        $prices = $this->refresh_prices($user_id, $symbols);
         $engine = $this->run_engine_for_symbols($user_id, $symbols, $prices);
         return rest_ensure_response($engine['plans']);
     }
@@ -763,9 +795,16 @@ final class SMC_SuperFib_Sniper_REST {
         $user_id = get_current_user_id();
         $payload = $request->get_json_params();
         $symbols = isset($payload['symbols']) ? $this->sanitize_symbols($payload['symbols']) : $this->get_settings($user_id)['watchlist'];
+        // Force fresh quotes by clearing quote TTL transients for each symbol before refresh.
+        foreach ($symbols as $sym) {
+            delete_transient('smc_sf_qt_' . $user_id . '_' . md5($sym));
+        }
         $prices = $this->refresh_prices($user_id, $symbols);
-        $this->run_engine_for_symbols($user_id, $symbols, $prices);
-        return rest_ensure_response(array('ok' => true));
+        $engine = $this->run_engine_for_symbols($user_id, $symbols, $prices);
+        return rest_ensure_response(array(
+            'ok' => true,
+            'diagnostics' => isset($engine['diagnostics']) ? $engine['diagnostics'] : array(),
+        ));
     }
 
     private function run_engine_for_symbols($user_id, $symbols, $prices) {
@@ -796,12 +835,16 @@ final class SMC_SuperFib_Sniper_REST {
         $gates = array();
         $signals = array();
         $plans = array();
+        $diagnostics = array();
 
         foreach ($symbols as $symbol) {
             $price = $this->find_price($prices, $symbol);
             $state = $this->build_symbol_state($user_id, $symbol, $price);
             $regimes[] = $state['regime'];
             $gates[] = $state['gate'];
+            if (!empty($state['diagnostic'])) {
+                $diagnostics[] = $state['diagnostic'];
+            }
 
             if ($state['signal']) {
                 $signals[] = $state['signal'];
@@ -849,7 +892,7 @@ final class SMC_SuperFib_Sniper_REST {
             array('%d', '%s', '%s', '%s')
         );
 
-        $result = array('regimes' => $regimes, 'gates' => $gates, 'signals' => $signals, 'plans' => $plans);
+        $result = array('regimes' => $regimes, 'gates' => $gates, 'signals' => $signals, 'plans' => $plans, 'diagnostics' => $diagnostics);
         set_transient($transient_key, $result, 5);
 
         return $result;
@@ -865,11 +908,31 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         if (count($candles) < 30 || (float) $price['mid'] <= 0) {
+            $early_blocker = $this->determine_engine_blocker($user_id, $price, $candles, false, 'WATCH');
+            $early_gate_reason = $has_key ? 'insufficient candle history' : 'Twelve Data key missing';
+            if ($early_blocker === 'KEY_MISSING' || $early_blocker === 'KEY_INVALID') {
+                $early_gate_reason = 'Twelve Data key ' . ($early_blocker === 'KEY_MISSING' ? 'missing' : 'invalid');
+            } elseif ($early_blocker === 'RATE_LIMITED') {
+                $early_gate_reason = 'Twelve Data rate limited — cooling down';
+            } elseif ($early_blocker === 'CANDLES_MISSING') {
+                $early_gate_reason = 'no candle history available';
+            } elseif ($early_blocker === 'QUOTE_UNAVAILABLE') {
+                $early_gate_reason = 'price unavailable';
+            }
             return array(
                 'regime' => array('symbol' => $symbol, 'bias' => 'RANGING', 'chop' => 1, 'nearestFib' => null, 'updatedAt' => gmdate('c'), 'state' => $state),
-                'gate' => array('symbol' => $symbol, 'allow' => 'BLOCKED', 'reason' => $has_key ? 'insufficient candle history' : 'Twelve Data key missing', 'state' => $state),
+                'gate' => array('symbol' => $symbol, 'allow' => 'BLOCKED', 'reason' => $early_gate_reason, 'state' => $state),
                 'signal' => null,
                 'plan' => null,
+                'diagnostic' => array(
+                    'symbol' => $symbol,
+                    'priceState' => $price['state'] ?? $state,
+                    'candleState' => empty($candles) ? 'missing' : 'stale',
+                    'lastPriceAt' => $price['updatedAt'] ?? null,
+                    'lastCandleAt' => null,
+                    'candleCount' => count($candles),
+                    'engineBlocker' => $early_blocker,
+                ),
             );
         }
 
@@ -916,9 +979,11 @@ final class SMC_SuperFib_Sniper_REST {
 
         $last_candle    = !empty($candles) ? end($candles) : null;
         $price_is_live  = isset($price['state']) && $price['state'] === 'live';
-        $candles_fresh  = $last_candle && (time() - strtotime($last_candle['time'])) <= 7200;
+        $candle_age_sec = $last_candle ? (time() - strtotime($last_candle['time'])) : PHP_INT_MAX;
+        $candles_fresh  = $last_candle && $candle_age_sec <= 7200;
         $data_live      = $price_is_live && $candles_fresh;
         $symbol_state   = $data_live ? 'live' : 'stale';
+        $candle_state   = empty($candles) ? 'missing' : ($candles_fresh ? 'live' : 'stale');
 
         $gate = array(
             'symbol' => $symbol,
@@ -943,6 +1008,8 @@ final class SMC_SuperFib_Sniper_REST {
 
         // Anchor the signal identity to the latest analysed candle so the same setup stays stable
         // within one 15m bar, while later intraday setups get a distinct execution queue identity.
+        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status);
+
         $signal_anchor = $last_candle && !empty($last_candle['time']) ? $last_candle['time'] : gmdate('c');
         $signal_id = 'sig-' . substr(md5($user_id . '|' . $symbol . '|' . $direction . '|' . $signal_anchor), 0, 16);
         $signal = array(
@@ -954,6 +1021,7 @@ final class SMC_SuperFib_Sniper_REST {
             'verdict' => $this->verdict($status, $confluence, $chop),
             'computedBy' => 'backend',
             'backendConfirmed' => $status === 'READY' && $data_live,
+            'engineBlocker' => $engine_blocker,
             'createdAt' => $signal_anchor,
             'engine' => array(
                 'htfBias' => $bias === 'RANGING' ? 'TRANSITIONAL' : $bias,
@@ -971,11 +1039,22 @@ final class SMC_SuperFib_Sniper_REST {
             ),
         );
 
+        $diagnostic = array(
+            'symbol' => $symbol,
+            'priceState' => $price['state'] ?? $symbol_state,
+            'candleState' => $candle_state,
+            'lastPriceAt' => $price['updatedAt'] ?? null,
+            'lastCandleAt' => $last_candle ? $last_candle['time'] : null,
+            'candleCount' => count($candles),
+            'engineBlocker' => $engine_blocker,
+        );
+
         return array(
             'regime' => $regime,
             'gate' => $gate,
             'signal' => $signal,
             'plan' => $this->build_trade_plan($user_id, $signal, $high, $low),
+            'diagnostic' => $diagnostic,
         );
     }
 
@@ -1105,6 +1184,13 @@ final class SMC_SuperFib_Sniper_REST {
             return null;
         }
 
+        // Quote TTL: skip upstream call if we fetched this symbol recently.
+        // Also skip while the feed is rate-limited; return the DB-cached price instead.
+        $quote_ttl_key = 'smc_sf_qt_' . $user_id . '_' . md5($symbol);
+        if (get_transient($quote_ttl_key) !== false || $this->is_feed_rate_limited($user_id)) {
+            return $this->get_cached_price($user_id, $symbol);
+        }
+
         $url = add_query_arg(array(
             'symbol' => $this->twelve_symbol($symbol),
             'apikey' => $key,
@@ -1117,7 +1203,10 @@ final class SMC_SuperFib_Sniper_REST {
         $code = wp_remote_retrieve_response_code($response);
         $body = json_decode(wp_remote_retrieve_body($response), true);
         if ($code === 429 || (isset($body['code']) && (int) $body['code'] === 429)) {
-            $this->set_twelve_key_status($user_id, 'rate-limited');
+            // Track rate-limit in a transient — do NOT change key_status.
+            // A 429 is a temporary feed condition; invalidating key_status would prevent
+            // get_twelve_key() from returning the stored key after the cooldown expires.
+            $this->set_feed_rate_limited($user_id);
             return null;
         }
         // Check 5xx BEFORE checking body['status']: Twelve Data outage responses carry
@@ -1144,8 +1233,17 @@ final class SMC_SuperFib_Sniper_REST {
 
         $bid = isset($body['bid']) ? (float) $body['bid'] : $mid;
         $ask = isset($body['ask']) ? (float) $body['ask'] : $mid;
-        $previous = isset($body['previous_close']) ? (float) $body['previous_close'] : $mid;
-        $change = $previous > 0 ? (($mid - $previous) / $previous) * 100 : 0;
+        // Prefer current day's open for intraday percent change; fall back to previous_close
+        // only when the day-open field is absent from the /quote response.
+        $day_open = isset($body['open']) ? (float) $body['open'] : 0;
+        $prev_close = isset($body['previous_close']) ? (float) $body['previous_close'] : 0;
+        if ($day_open > 0) {
+            $change = (($mid - $day_open) / $day_open) * 100;
+        } elseif ($prev_close > 0) {
+            $change = (($mid - $prev_close) / $prev_close) * 100;
+        } else {
+            $change = 0;
+        }
         $row = array(
             'symbol' => $symbol,
             'bid' => $bid,
@@ -1171,6 +1269,8 @@ final class SMC_SuperFib_Sniper_REST {
             array('%d', '%s', '%f', '%f', '%f', '%f', '%s', '%s')
         );
 
+        // Mark this symbol's quote as freshly fetched for 45 seconds to prevent API spam.
+        set_transient($quote_ttl_key, 1, 45);
         $this->set_twelve_key_status($user_id, 'ok');
         return $row;
     }
@@ -1178,8 +1278,13 @@ final class SMC_SuperFib_Sniper_REST {
     private function fetch_candles($user_id, $symbol, $timeframe, $outputsize) {
         global $wpdb;
 
+        // Candle TTL: skip upstream call when candles were fetched recently or feed is rate-limited.
+        // The stored DB candles remain available regardless.
+        $candle_ttl_key = 'smc_sf_ct_' . $user_id . '_' . md5($symbol . '|' . $timeframe);
+        $candle_ttl_active = get_transient($candle_ttl_key) !== false || $this->is_feed_rate_limited($user_id);
+
         $key = $this->get_twelve_key($user_id);
-        if (!is_wp_error($key) && $key) {
+        if (!$candle_ttl_active && !is_wp_error($key) && $key) {
             $url = add_query_arg(array(
                 'symbol' => $this->twelve_symbol($symbol),
                 'interval' => $timeframe,
@@ -1192,7 +1297,8 @@ final class SMC_SuperFib_Sniper_REST {
                 $body    = json_decode(wp_remote_retrieve_body($response), true);
 
                 if ($td_code === 429 || (isset($body['code']) && (int) $body['code'] === 429)) {
-                    $this->set_twelve_key_status($user_id, 'rate-limited');
+                    // Transient-based rate-limit — do NOT change key_status so get_twelve_key() keeps working after cooldown.
+                    $this->set_feed_rate_limited($user_id);
                 } elseif ($td_code === 401 || $td_code === 403 || (isset($body['code']) && in_array((int) $body['code'], array(401, 403), true))) {
                     // Only auth failures invalidate the key; a 400/404 for an unsupported symbol must not.
                     $this->set_twelve_key_status($user_id, 'invalid');
@@ -1220,6 +1326,8 @@ final class SMC_SuperFib_Sniper_REST {
                                 array('%d', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%s', '%s')
                             );
                         }
+                        // Mark candles as freshly fetched for 90 seconds to prevent API spam.
+                        set_transient($candle_ttl_key, 1, 90);
                         $this->set_twelve_key_status($user_id, 'ok');
                     }
                     // status:error within a 2xx HTTP response means unsupported/unrecognised
@@ -1528,6 +1636,54 @@ final class SMC_SuperFib_Sniper_REST {
             return 'A';
         }
         return $score >= 2 ? 'B' : 'C';
+    }
+
+    // ── Per-symbol engine blocker ─────────────────────────────────────────────
+    // Returns a single string reason explaining why a READY signal cannot be
+    // backend-confirmed, or 'OK' when everything is healthy.
+
+    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status) {
+        $key_status = $this->get_twelve_key_status($user_id);
+        if ($key_status === 'missing') return 'KEY_MISSING';
+        if ($key_status === 'invalid') return 'KEY_INVALID';
+        if ($this->is_feed_rate_limited($user_id)) return 'RATE_LIMITED';
+
+        if (empty($price) || !isset($price['mid']) || (float) $price['mid'] <= 0) {
+            return 'QUOTE_UNAVAILABLE';
+        }
+        $price_state = $price['state'] ?? 'offline';
+        if (in_array($price_state, array('unavailable', 'blocked', 'offline'), true)) {
+            return 'QUOTE_UNAVAILABLE';
+        }
+
+        if (empty($candles)) return 'CANDLES_MISSING';
+        if (count($candles) < 30) return 'INSUFFICIENT_CANDLE_HISTORY';
+
+        $last_candle = end($candles);
+        $candle_age_sec = $last_candle ? (time() - strtotime($last_candle['time'])) : PHP_INT_MAX;
+
+        if ($price_state === 'stale') return 'PRICE_STALE';
+        if ($candle_age_sec > 7200) return 'CANDLES_STALE';
+
+        if ($status === 'READY' && !$data_live) return 'READY_NOT_CONFIRMED_STALE_DATA';
+        return 'OK';
+    }
+
+    // ── Rate-limit transient helpers ─────────────────────────────────────────
+    // A 429 from Twelve Data is a temporary feed condition. We track it in a
+    // short-lived WP transient so the stored key credential (key_status = 'ok')
+    // is never corrupted.  After the TTL expires the feed recovers automatically.
+
+    private function rl_transient_key($user_id) {
+        return 'smc_sf_rl_' . (int) $user_id;
+    }
+
+    private function set_feed_rate_limited($user_id, $ttl_sec = 60) {
+        set_transient($this->rl_transient_key($user_id), time(), $ttl_sec);
+    }
+
+    private function is_feed_rate_limited($user_id) {
+        return get_transient($this->rl_transient_key($user_id)) !== false;
     }
 
     private function get_twelve_key_status($user_id) {
