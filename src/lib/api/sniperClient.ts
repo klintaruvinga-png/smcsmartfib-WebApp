@@ -154,16 +154,13 @@ export const apiClient = {
         symbol,
         timeframe,
         candles,
-        fibLevels: mockFibLevels(symbol).map((f) => {
-          const ratio = Number(f.label);
-          return {
-            family: "LTF_SF",
-            ratio,
-            label: `${f.label}%`,
-            price: f.value,
-            role: ratio < 50 ? "premium" : ratio === 50 ? "equilibrium" : "discount",
-          };
-        }),
+        fibLevels: mockFibLevels(symbol).map((f) => ({
+          family: "LTF_SF" as const,
+          ratio: f.ratio,
+          label: f.label,
+          price: f.price,
+          role: f.role,
+        })),
         updatedAt: new Date().toISOString(),
         state: "mock",
       };
@@ -194,7 +191,10 @@ export const apiClient = {
   async getSession(mock = MOCK_MODE) {
     if (mock)
       return { name: "London-AM", openUtc: "07:00", closeUtc: "11:00", state: "mock" as const };
-    return call<{ name: string; openUtc: string; closeUtc: string; state: string }>("/session", { skipAuthHeaders: true, authenticated: false });
+    return call<{ name: string; openUtc: string; closeUtc: string; state: string }>("/session", {
+      skipAuthHeaders: true,
+      authenticated: false,
+    });
   },
   async postEngineBatch(payload: unknown, mock = MOCK_MODE): Promise<{ ok: true }> {
     if (mock) return { ok: true };
