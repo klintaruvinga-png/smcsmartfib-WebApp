@@ -302,7 +302,7 @@ final class SMC_SuperFib_Sniper_REST {
         $last_batch = $this->latest_timestamp('snapshots', $user_id, 'updated_at');
         $last_run = $this->latest_timestamp('engine_runs', $user_id, 'created_at');
         $run_age      = $last_run ? (time() - strtotime($last_run . ' UTC')) : PHP_INT_MAX;
-        $backend_sync = $run_age <= 300 ? 'live' : ($last_run ? 'stale' : 'offline');
+        $backend_sync = $run_age <= 120 ? 'live' : ($last_run ? 'stale' : 'offline');
 
         $batch_age = $last_batch ? (time() - strtotime($last_batch . ' UTC')) : PHP_INT_MAX;
 
@@ -313,7 +313,7 @@ final class SMC_SuperFib_Sniper_REST {
             $feed_status = 'rate-limited';
         } elseif ($key_status !== 'ok') {
             $feed_status = 'blocked';
-        } elseif ($batch_age <= 300) {
+        } elseif ($batch_age <= 120) {
             $feed_status = 'live';
         } else {
             $feed_status = 'stale';
@@ -326,7 +326,7 @@ final class SMC_SuperFib_Sniper_REST {
             $engine_run_state = 'failed';
         } elseif ($run_age <= 10) {
             $engine_run_state = 'live';
-        } elseif ($run_age <= 300) {
+        } elseif ($run_age <= 120) {
             $engine_run_state = 'cached';
         } else {
             $engine_run_state = 'stale';
@@ -908,7 +908,7 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         if (count($candles) < 30 || (float) $price['mid'] <= 0) {
-            $early_blocker = $this->determine_engine_blocker($user_id, $price, $candles, false, 'WATCH');
+            $early_blocker = $this->determine_engine_blocker($user_id, $price, $candles, false, 'WATCH', $symbol);
             $early_gate_reason = $has_key ? 'insufficient candle history' : 'Twelve Data key missing';
             if ($early_blocker === 'KEY_MISSING' || $early_blocker === 'KEY_INVALID') {
                 $early_gate_reason = 'Twelve Data key ' . ($early_blocker === 'KEY_MISSING' ? 'missing' : 'invalid');
@@ -1008,7 +1008,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         // Anchor the signal identity to the latest analysed candle so the same setup stays stable
         // within one 15m bar, while later intraday setups get a distinct execution queue identity.
-        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status);
+        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol);
 
         $signal_anchor = $last_candle && !empty($last_candle['time']) ? $last_candle['time'] : gmdate('c');
         $signal_id = 'sig-' . substr(md5($user_id . '|' . $symbol . '|' . $direction . '|' . $signal_anchor), 0, 16);
@@ -1206,7 +1206,7 @@ final class SMC_SuperFib_Sniper_REST {
             // Track rate-limit in a transient — do NOT change key_status.
             // A 429 is a temporary feed condition; invalidating key_status would prevent
             // get_twelve_key() from returning the stored key after the cooldown expires.
-            $this->set_feed_rate_limited($user_id);
+            $this->set_feed_rate_limited($user_id, $symbol);
             return null;
         }
         // Check 5xx BEFORE checking body['status']: Twelve Data outage responses carry
@@ -1298,7 +1298,7 @@ final class SMC_SuperFib_Sniper_REST {
 
                 if ($td_code === 429 || (isset($body['code']) && (int) $body['code'] === 429)) {
                     // Transient-based rate-limit — do NOT change key_status so get_twelve_key() keeps working after cooldown.
-                    $this->set_feed_rate_limited($user_id);
+                    $this->set_feed_rate_limited($user_id, $symbol);
                 } elseif ($td_code === 401 || $td_code === 403 || (isset($body['code']) && in_array((int) $body['code'], array(401, 403), true))) {
                     // Only auth failures invalidate the key; a 400/404 for an unsupported symbol must not.
                     $this->set_twelve_key_status($user_id, 'invalid');
@@ -1642,11 +1642,11 @@ final class SMC_SuperFib_Sniper_REST {
     // Returns a single string reason explaining why a READY signal cannot be
     // backend-confirmed, or 'OK' when everything is healthy.
 
-    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status) {
+    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol = null) {
         $key_status = $this->get_twelve_key_status($user_id);
         if ($key_status === 'missing') return 'KEY_MISSING';
         if ($key_status === 'invalid') return 'KEY_INVALID';
-        if ($this->is_feed_rate_limited($user_id)) return 'RATE_LIMITED';
+        if ($this->is_feed_rate_limited($user_id, $symbol)) return 'RATE_LIMITED';
 
         if (empty($price) || !isset($price['mid']) || (float) $price['mid'] <= 0) {
             return 'QUOTE_UNAVAILABLE';
@@ -1674,16 +1674,20 @@ final class SMC_SuperFib_Sniper_REST {
     // short-lived WP transient so the stored key credential (key_status = 'ok')
     // is never corrupted.  After the TTL expires the feed recovers automatically.
 
-    private function rl_transient_key($user_id) {
-        return 'smc_sf_rl_' . (int) $user_id;
+    private function rl_transient_key($user_id, $symbol = null) {
+        $key = 'smc_sf_rl_' . (int) $user_id;
+        if ($symbol) {
+            $key .= '_' . sanitize_key($symbol);
+        }
+        return $key;
     }
 
-    private function set_feed_rate_limited($user_id, $ttl_sec = 60) {
-        set_transient($this->rl_transient_key($user_id), time(), $ttl_sec);
+    private function set_feed_rate_limited($user_id, $symbol = null, $ttl_sec = 60) {
+        set_transient($this->rl_transient_key($user_id, $symbol), time(), $ttl_sec);
     }
 
-    private function is_feed_rate_limited($user_id) {
-        return get_transient($this->rl_transient_key($user_id)) !== false;
+    private function is_feed_rate_limited($user_id, $symbol = null) {
+        return get_transient($this->rl_transient_key($user_id, $symbol)) !== false;
     }
 
     private function get_twelve_key_status($user_id) {
