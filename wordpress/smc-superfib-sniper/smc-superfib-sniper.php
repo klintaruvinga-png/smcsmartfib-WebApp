@@ -827,6 +827,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         $result = array('regimes' => $regimes, 'gates' => $gates, 'signals' => $signals, 'plans' => $plans);
         set_transient($transient_key, $result, 5);
+        set_transient($cache_key, $result, 5);
 
         return $result;
     }
