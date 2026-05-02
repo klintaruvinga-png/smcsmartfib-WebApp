@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEngineHealth, useLiveSignals } from "@/hooks/useSniperData";
+import { useEngineHealth, useEngineBatch, useLiveSignals } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { VerdictBadge } from "@/components/sniper/VerdictBadge";
 import { DivergenceBanner } from "@/components/sniper/Warnings";
 import { relTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
-import type { FreshnessState } from "@/types/sniper";
+import { CheckCircle2, AlertTriangle, XCircle, RefreshCw } from "lucide-react";
+import type { EngineBlocker, FreshnessState } from "@/types/sniper";
 
 export const Route = createFileRoute("/signals")({
   head: () => ({
@@ -30,13 +30,26 @@ function HealthIcon({ state }: { state: FreshnessState | "ok" | "missing" }) {
   return <XCircle className="h-4 w-4 text-sell" />;
 }
 
+function blockerLabel(b: EngineBlocker | undefined): string {
+  if (!b || b === "OK") return "";
+  return b.replace(/_/g, " ").toLowerCase();
+}
+
+function blockerSeverity(b: EngineBlocker | undefined): "warn" | "sell" {
+  if (!b || b === "OK") return "warn";
+  return b === "KEY_MISSING" || b === "KEY_INVALID" || b === "RATE_LIMITED" ? "sell" : "warn";
+}
+
 function SignalsPage() {
   const { data: signals } = useLiveSignals();
   const { data: h } = useEngineHealth();
+  const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
   const divergent = (signals ?? []).filter(
     (s) => s.computedBy === "frontend" && !s.backendConfirmed,
   );
 
+  // feedStatus supersedes priceFeed when present (it is the richer field).
+  const feedState = (h?.feedStatus ?? h?.priceFeed ?? "offline") as FreshnessState;
   const checks: { label: string; state: FreshnessState | "ok" | "missing"; detail?: string }[] = [
     {
       label: "Backend sync",
@@ -44,9 +57,9 @@ function SignalsPage() {
       detail: h?.lastBatchAt ? relTime(h.lastBatchAt) : "never",
     },
     {
-      label: "Price feed",
-      state: h?.priceFeed ?? "offline",
-      detail: h?.priceFeed === "live" ? "connected" : undefined,
+      label: "Feed status",
+      state: feedState === "rate-limited" ? "stale" : feedState,
+      detail: h?.feedStatus ?? h?.priceFeed,
     },
     {
       label: "Twelve Data key",
@@ -58,22 +71,32 @@ function SignalsPage() {
     },
     {
       label: "Engine run",
-      state: h?.lastEngineRunAt
-        ? Date.now() - new Date(h.lastEngineRunAt).getTime() <= 300_000
-          ? "live"
-          : "stale"
+      state: h?.engineRunState === "live" || h?.engineRunState === "cached"
+        ? "live"
+        : h?.engineRunState === "stale"
+        ? "stale"
         : "offline",
-      detail: h?.lastEngineRunAt ? relTime(h.lastEngineRunAt) : "never",
+      detail: h?.engineRunState ?? (h?.lastEngineRunAt ? relTime(h.lastEngineRunAt) : "never"),
     },
   ];
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Signal Engine</h1>
-        <p className="text-xs text-mute mt-0.5">
-          Readiness · candidate flow · backend confirmation
-        </p>
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Signal Engine</h1>
+          <p className="text-xs text-mute mt-0.5">
+            Readiness · candidate flow · backend confirmation
+          </p>
+        </div>
+        <button
+          onClick={() => runBatch()}
+          disabled={batchRunning}
+          className="flex items-center gap-1.5 rounded border border-bd bg-bg2/60 px-3 py-1.5 text-[11px] font-mono text-dim hover:text-fg hover:border-info/40 disabled:opacity-50 transition-colors"
+        >
+          <RefreshCw className={cn("h-3 w-3", batchRunning && "animate-spin")} />
+          {batchRunning ? "Refreshing…" : "Force refresh"}
+        </button>
       </div>
 
       {divergent.length > 0 && (
@@ -155,27 +178,40 @@ function SignalsPage() {
                     </span>
                   ))}
                 </div>
-                <div className="col-span-3 flex items-center justify-end gap-2">
-                  <span
-                    className={cn(
-                      "inline-flex items-center rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider font-mono",
-                      s.computedBy === "backend"
-                        ? "border-buy/40 text-buy bg-buy/10"
-                        : "border-violet/40 text-violet bg-violet/10",
-                    )}
-                  >
-                    {s.computedBy}
-                  </span>
-                  {divergent ? (
+                <div className="col-span-3 flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-2">
                     <span
-                      className="inline-flex items-center gap-1 text-[10px] font-mono text-sell"
-                      title="Backend has not confirmed"
+                      className={cn(
+                        "inline-flex items-center rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider font-mono",
+                        s.computedBy === "backend"
+                          ? "border-buy/40 text-buy bg-buy/10"
+                          : "border-violet/40 text-violet bg-violet/10",
+                      )}
                     >
-                      ⚠️
+                      {s.computedBy}
                     </span>
-                  ) : (
-                    <span className="text-[10px] font-mono text-buy" title="Backend confirmed">
-                      ✓
+                    {divergent ? (
+                      <span
+                        className="inline-flex items-center gap-1 text-[10px] font-mono text-sell"
+                        title="Backend has not confirmed"
+                      >
+                        ⚠️
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-mono text-buy" title="Backend confirmed">
+                        ✓
+                      </span>
+                    )}
+                  </div>
+                  {s.engineBlocker && s.engineBlocker !== "OK" && (
+                    <span
+                      className={cn(
+                        "text-[9px] font-mono",
+                        blockerSeverity(s.engineBlocker) === "sell" ? "text-sell" : "text-warn",
+                      )}
+                      title={`Engine blocker: ${s.engineBlocker}`}
+                    >
+                      {blockerLabel(s.engineBlocker)}
                     </span>
                   )}
                 </div>

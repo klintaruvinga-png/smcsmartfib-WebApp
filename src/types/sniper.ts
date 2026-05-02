@@ -7,6 +7,28 @@ export type FreshnessState =
   | "pending-sync"
   | "mock";
 
+export type EngineBlocker =
+  | "KEY_MISSING"
+  | "KEY_INVALID"
+  | "RATE_LIMITED"
+  | "QUOTE_UNAVAILABLE"
+  | "PRICE_STALE"
+  | "CANDLES_MISSING"
+  | "CANDLES_STALE"
+  | "INSUFFICIENT_CANDLE_HISTORY"
+  | "READY_NOT_CONFIRMED_STALE_DATA"
+  | "OK";
+
+export interface SymbolDiagnostic {
+  symbol: Symbol;
+  priceState: FreshnessState;
+  candleState: "live" | "stale" | "missing";
+  lastPriceAt: string | null;
+  lastCandleAt: string | null;
+  candleCount: number;
+  engineBlocker: EngineBlocker;
+}
+
 export type KnownSymbol =
   | "GBPUSD"
   | "AUDUSD"
@@ -130,6 +152,7 @@ export interface SignalCandidate {
   verdict: Verdict;
   computedBy: "frontend" | "backend";
   backendConfirmed: boolean;
+  engineBlocker?: EngineBlocker;
   createdAt: string;
   engine?: {
     htfBias: "BULL" | "BEAR" | "RANGING" | "TRANSITIONAL";
@@ -196,10 +219,14 @@ export interface PendingOrder {
 export interface EngineHealth {
   backendSync: FreshnessState;
   priceFeed: FreshnessState;
+  /** Separates runtime feed health from credential validity. */
+  feedStatus?: FreshnessState | "rate-limited";
+  engineRunState?: "live" | "cached" | "stale" | "failed";
   twelveDataKey: "present" | "missing";
   twelveDataKeyStatus?: TwelveDataKeyStatus;
   lastBatchAt: string | null;
   lastEngineRunAt: string | null;
+  perSymbolDiagnostics?: SymbolDiagnostic[];
 }
 
 export interface DashboardSettings {
