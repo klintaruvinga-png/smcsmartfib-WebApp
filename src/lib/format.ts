@@ -1,8 +1,12 @@
 import type { Symbol } from "@/types/sniper";
 
-export function fmtPrice(value: number, symbol?: Symbol): string {
+export function fmtPrice(value: number, symbol?: Symbol | string): string {
+  if (!symbol) return value.toFixed(5);
   if (symbol === "XAUUSD") return value.toFixed(2);
-  if (symbol && symbol.endsWith("JPY")) return value.toFixed(3);
+  if (symbol === "XAGUSD") return value.toFixed(3);
+  if (symbol.endsWith("JPY")) return value.toFixed(3);
+  if (symbol === "BTCUSD" || symbol === "ETHUSD") return value.toFixed(2);
+  if (symbol === "US30" || symbol === "NAS100") return value.toFixed(2);
   return value.toFixed(5);
 }
 

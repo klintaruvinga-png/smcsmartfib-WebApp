@@ -203,9 +203,7 @@ function PlanPage() {
         <button
           onClick={async () => {
             const r = await apiClient.postExecuteSignals({ signalIds: [top.id] });
-            toast.success(
-              `Queued ${r.queued} signal${r.queued > 1 ? "s" : ""} for execution (mock)`,
-            );
+            toast.success(`Queued ${r.queued} signal${r.queued > 1 ? "s" : ""} for execution`);
           }}
           disabled={!top.backendConfirmed}
           className={cn(

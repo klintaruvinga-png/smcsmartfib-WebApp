@@ -8,7 +8,12 @@ import { cn } from "@/lib/utils";
 import { Settings as SettingsIcon, Shield, KeyRound, Trash2, X } from "lucide-react";
 import { apiClient, MOCK_MODE, setBackendUrl } from "@/lib/api/sniperClient";
 import { toast } from "sonner";
-import type { DashboardSettings, RiskProfile, TwelveDataKeyStatus } from "@/types/sniper";
+import type {
+  DashboardSettings,
+  FreshnessState,
+  RiskProfile,
+  TwelveDataKeyStatus,
+} from "@/types/sniper";
 
 export const Route = createFileRoute("/account")({
   head: () => ({
@@ -146,7 +151,10 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
   }
 
   async function addPair() {
-    const sym = newPair.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const sym = newPair
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
     if (!sym || s.watchlist.includes(sym as never)) return;
     setWatchlistBusy("add");
     try {
@@ -265,7 +273,6 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
       setBusy(null);
     }
   }
-
 
   return (
     <div className="grid gap-3 lg:grid-cols-2">
@@ -435,20 +442,22 @@ function RiskTab({ risk }: { risk: RiskProfile }) {
   const qc = useQueryClient();
   const [r, setR] = useState(risk);
   const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<FreshnessState>(MOCK_MODE ? "mock" : "offline");
 
   async function saveRiskProfile() {
     setSaving(true);
     try {
       await apiClient.postUserRiskProfile(r);
       await qc.invalidateQueries({ queryKey: ["user-risk"] });
+      setSaveState(MOCK_MODE ? "mock" : "live");
       toast.success("Risk profile saved");
     } catch (error) {
+      setSaveState(MOCK_MODE ? "mock" : "stale");
       toast.error(error instanceof Error ? error.message : "Risk profile save failed");
     } finally {
       setSaving(false);
     }
   }
-
 
   return (
     <div className="grid gap-3 lg:grid-cols-2">
@@ -502,7 +511,7 @@ function RiskTab({ risk }: { risk: RiskProfile }) {
         />
       </Card>
       <div className="lg:col-span-2 flex items-center justify-end gap-3">
-        <FreshnessBadge state={MOCK_MODE ? "mock" : "pending-sync"} />
+        <FreshnessBadge state={saveState} />
         <button
           onClick={saveRiskProfile}
           disabled={saving}

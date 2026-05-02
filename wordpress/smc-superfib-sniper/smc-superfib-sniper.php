@@ -247,7 +247,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         // Prevent proxies and browsers from caching authenticated user-specific REST responses.
         $route = $request->get_route();
-        if (strpos($route, '/sniper/v1/user/') === 0 || strpos($route, '/sniper/v1/health') === 0) {
+        if (strpos($route, '/sniper/v1/user/') === 0 || strpos($route, '/sniper/v1/health') === 0 || $route === '/sniper/v1/snapshot') {
             header('Cache-Control: no-store, no-cache, must-revalidate');
             header('Pragma: no-cache');
         }
@@ -261,14 +261,14 @@ final class SMC_SuperFib_Sniper_REST {
             $name = 'London';
             $open = '07:00';
             $close = '11:00';
-        } elseif ($hour >= 15 && $hour < 17) {
-            $name = 'London Close';
-            $open = '15:00';
-            $close = '17:00';
         } elseif ($hour >= 12 && $hour < 16) {
             $name = 'New York';
             $open = '12:00';
             $close = '16:00';
+        } elseif ($hour >= 16 && $hour < 17) {
+            $name = 'London Close';
+            $open = '16:00';
+            $close = '17:00';
         } else {
             $name = 'Off killzone';
             $open = null;
@@ -322,11 +322,27 @@ final class SMC_SuperFib_Sniper_REST {
         ));
         $settings['apiKeyStatus'] = $this->get_twelve_key_status($user_id);
 
-        $this->replace_json('user_settings', array('user_id' => $user_id), array(
+        $this->replace_json('user_settings', array(
             'user_id' => $user_id,
             'settings' => $settings,
             'updated_at' => $this->now_mysql(),
         ));
+        if (isset($settings['riskAllocation']) && is_array($settings['riskAllocation'])) {
+            $existing = $this->get_account_blob($user_id);
+            $current_risk = $this->get_risk_profile($user_id);
+            $existing['riskProfile'] = array_merge($current_risk, array(
+                'perTradePct' => (float) $settings['riskAllocation']['perTradePct'],
+                'dailyMaxPct' => (float) $settings['riskAllocation']['dailyMaxPct'],
+                'ddCapPct' => (float) $settings['riskAllocation']['ddCapPct'],
+                'updatedAt' => gmdate('c'),
+            ));
+            $this->replace_json('account_snapshots', array(
+                'user_id' => $user_id,
+                'data' => $existing,
+                'updated_at' => $this->now_mysql(),
+            ));
+        }
+
         $this->audit($user_id, 'settings.updated', array('watchlist' => $settings['watchlist']));
 
         return rest_ensure_response(array('ok' => true));
@@ -473,7 +489,7 @@ final class SMC_SuperFib_Sniper_REST {
         // Merge only the riskProfile key; preserve existing account data untouched.
         $existing = $this->get_account_blob($user_id);
         $existing['riskProfile'] = $profile;
-        $this->replace_json('account_snapshots', array('user_id' => $user_id), array(
+        $this->replace_json('account_snapshots', array(
             'user_id' => $user_id,
             'data' => $existing,
             'updated_at' => $this->now_mysql(),
@@ -544,7 +560,14 @@ final class SMC_SuperFib_Sniper_REST {
         $symbol = strtoupper(sanitize_text_field($request->get_param('symbol') ?: 'GBPUSD'));
         $timeframe = sanitize_text_field($request->get_param('timeframe') ?: '15min');
         $candles = $this->fetch_candles($user_id, $symbol, $timeframe, 120);
-        $state = empty($candles) ? ($this->get_twelve_key_status($user_id) === 'ok' ? 'stale' : 'blocked') : 'live';
+        $state = 'offline';
+        if (!empty($candles)) {
+            $last_candle = end($candles);
+            $last_candle_ts = isset($last_candle['time']) ? strtotime($last_candle['time']) : false;
+            $state = ($last_candle_ts && (time() - $last_candle_ts) <= 7200) ? 'live' : 'stale';
+        } else {
+            $state = $this->get_twelve_key_status($user_id) === 'ok' ? 'stale' : 'blocked';
+        }
         $levels = $this->fib_levels_from_candles($candles);
 
         return rest_ensure_response(array(
@@ -603,7 +626,7 @@ final class SMC_SuperFib_Sniper_REST {
             isset($existing['account']) && is_array($existing['account']) ? $existing['account'] : array(),
             $update
         );
-        $this->replace_json('account_snapshots', array('user_id' => $user_id), array(
+        $this->replace_json('account_snapshots', array(
             'user_id' => $user_id,
             'data' => $existing,
             'updated_at' => $this->now_mysql(),
@@ -848,7 +871,7 @@ final class SMC_SuperFib_Sniper_REST {
         $candles_fresh  = $last_candle && (time() - strtotime($last_candle['time'])) <= 7200;
         $data_live      = $price_is_live && $candles_fresh;
 
-        $signal_id = 'sig-' . substr(md5($user_id . '|' . $symbol . '|' . $direction . '|' . gmdate('YmdH')), 0, 16);
+        $signal_id = 'sig-' . substr(md5($user_id . '|' . $symbol . '|' . $direction . '|' . gmdate('Ymd')), 0, 16);
         $signal = array(
             'id' => $signal_id,
             'symbol' => $symbol,
@@ -1117,10 +1140,10 @@ final class SMC_SuperFib_Sniper_REST {
                                     'high' => (float) $item['high'],
                                     'low' => (float) $item['low'],
                                     'close' => (float) $item['close'],
-                                    'volume' => isset($item['volume']) ? (float) $item['volume'] : null,
+                                    'volume' => isset($item['volume']) ? (string) $item['volume'] : null,
                                     'created_at' => $this->now_mysql(),
                                 ),
-                                array('%d', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%f', '%s')
+                                array('%d', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%s', '%s')
                             );
                         }
                         $this->set_twelve_key_status($user_id, 'ok');
@@ -1274,7 +1297,7 @@ final class SMC_SuperFib_Sniper_REST {
     private function read_pending_orders($user_id) {
         global $wpdb;
         $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT payload FROM {$this->table('trade_queue')} WHERE user_id = %d ORDER BY created_at DESC",
+            "SELECT payload FROM {$this->table('trade_queue')} WHERE user_id = %d AND state = 'pending-sync' ORDER BY created_at DESC",
             $user_id
         ), ARRAY_A);
         return array_values(array_filter(array_map(function ($row) {
@@ -1285,8 +1308,9 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function get_cached_prices($user_id, $symbols) {
         $prices = array();
+        $stale_threshold_sec = $this->get_settings($user_id)['staleThresholdSec'];
         foreach ($symbols as $symbol) {
-            $cached = $this->get_cached_price($user_id, $symbol);
+            $cached = $this->get_cached_price($user_id, $symbol, $stale_threshold_sec);
             if ($cached) {
                 $prices[] = $cached;
             }
@@ -1294,7 +1318,7 @@ final class SMC_SuperFib_Sniper_REST {
         return $prices;
     }
 
-    private function get_cached_price($user_id, $symbol) {
+    private function get_cached_price($user_id, $symbol, $stale_threshold_sec = null) {
         global $wpdb;
         $row = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM {$this->table('snapshots')} WHERE user_id = %d AND symbol = %s",
@@ -1312,7 +1336,7 @@ final class SMC_SuperFib_Sniper_REST {
             'mid' => (float) $row['mid'],
             'changePct1d' => (float) $row['change_pct_1d'],
             'updatedAt' => $this->to_iso($row['updated_at']),
-            'state' => $this->is_stale($row['updated_at'], $this->get_settings($user_id)['staleThresholdSec']) ? 'stale' : $row['state'],
+            'state' => $this->is_stale($row['updated_at'], $stale_threshold_sec !== null ? $stale_threshold_sec : $this->get_settings($user_id)['staleThresholdSec']) ? 'stale' : $row['state'],
         );
     }
 
@@ -1518,7 +1542,7 @@ final class SMC_SuperFib_Sniper_REST {
         return hash('sha256', $salt . '|smc-superfib-sniper|' . (defined('SECURE_AUTH_SALT') ? SECURE_AUTH_SALT : ''), true);
     }
 
-    private function replace_json($table, $key, $data) {
+    private function replace_json($table, $data) {
         global $wpdb;
         foreach ($data as $field => $value) {
             if (is_array($value)) {
@@ -1618,7 +1642,7 @@ final class SMC_SuperFib_Sniper_REST {
     private function save_watchlist($user_id, $watchlist) {
         $current = $this->get_settings($user_id);
         $current['watchlist'] = $watchlist;
-        $this->replace_json('user_settings', array('user_id' => $user_id), array(
+        $this->replace_json('user_settings', array(
             'user_id' => $user_id,
             'settings' => $current,
             'updated_at' => $this->now_mysql(),
