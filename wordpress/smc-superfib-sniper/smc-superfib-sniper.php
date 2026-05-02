@@ -288,9 +288,14 @@ final class SMC_SuperFib_Sniper_REST {
         $key_status = $this->get_twelve_key_status($user_id);
         $last_batch = $this->latest_timestamp('snapshots', $user_id, 'updated_at');
         $last_run = $this->latest_timestamp('engine_runs', $user_id, 'created_at');
+        $backend_sync = 'offline';
+        if ($last_run) {
+            $age_sec = time() - strtotime($last_run . ' UTC');
+            $backend_sync = $age_sec <= 300 ? 'live' : 'stale';
+        }
 
         return rest_ensure_response(array(
-            'backendSync' => $last_run ? 'live' : 'offline',
+            'backendSync' => $backend_sync,
             'priceFeed' => $key_status === 'ok' ? ($last_batch ? 'live' : 'stale') : 'blocked',
             'twelveDataKey' => $key_status === 'ok' ? 'present' : 'missing',
             'twelveDataKeyStatus' => $key_status,
@@ -724,6 +729,27 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function run_engine_for_symbols($user_id, $symbols, $prices) {
         global $wpdb;
+        $symbols_sorted = $symbols;
+        sort($symbols_sorted);
+
+        $price_fingerprint = array();
+        foreach ($symbols_sorted as $symbol) {
+            $price = $this->find_price($prices, $symbol);
+            $price_fingerprint[$symbol] = array(
+                'mid' => isset($price['mid']) ? (float) $price['mid'] : null,
+                'updatedAt' => isset($price['updatedAt']) ? $price['updatedAt'] : null,
+                'state' => isset($price['state']) ? $price['state'] : null,
+            );
+        }
+
+        $transient_key = 'smc_engine_run_' . $user_id . '_' . md5(wp_json_encode(array(
+            'symbols' => $symbols_sorted,
+            'prices' => $price_fingerprint,
+        )));
+        $cached = get_transient($transient_key);
+        if (is_array($cached)) {
+            return $cached;
+        }
 
         $regimes = array();
         $gates = array();
@@ -783,7 +809,10 @@ final class SMC_SuperFib_Sniper_REST {
             array('%d', '%s', '%s', '%s')
         );
 
-        return array('regimes' => $regimes, 'gates' => $gates, 'signals' => $signals, 'plans' => $plans);
+        $result = array('regimes' => $regimes, 'gates' => $gates, 'signals' => $signals, 'plans' => $plans);
+        set_transient($transient_key, $result, 5);
+
+        return $result;
     }
 
     private function build_symbol_state($user_id, $symbol, $price) {
@@ -1440,14 +1469,15 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function verdict($status, $confluence, $chop) {
-        $score = count($confluence) - ($chop > 0.7 ? 2 : 0);
-        if ($status === 'READY' && $score >= 5) {
+        $structural = array_values(array_diff($confluence, array('HTA_SF', 'LTF_SF')));
+        $score = count($structural) - ($chop > 0.7 ? 2 : 0);
+        if ($status === 'READY' && $score >= 3) {
             return 'A+';
         }
         if ($status === 'READY') {
             return 'A';
         }
-        return $score >= 4 ? 'B' : 'C';
+        return $score >= 2 ? 'B' : 'C';
     }
 
     private function get_twelve_key_status($user_id) {
