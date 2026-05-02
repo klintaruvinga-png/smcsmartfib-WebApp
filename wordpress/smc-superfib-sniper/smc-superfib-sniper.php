@@ -731,7 +731,21 @@ final class SMC_SuperFib_Sniper_REST {
         global $wpdb;
         $symbols_sorted = $symbols;
         sort($symbols_sorted);
-        $transient_key = 'smc_engine_run_' . $user_id . '_' . md5(wp_json_encode($symbols_sorted));
+
+        $price_fingerprint = array();
+        foreach ($symbols_sorted as $symbol) {
+            $price = $this->find_price($prices, $symbol);
+            $price_fingerprint[$symbol] = array(
+                'mid' => isset($price['mid']) ? (float) $price['mid'] : null,
+                'updatedAt' => isset($price['updatedAt']) ? $price['updatedAt'] : null,
+                'state' => isset($price['state']) ? $price['state'] : null,
+            );
+        }
+
+        $transient_key = 'smc_engine_run_' . $user_id . '_' . md5(wp_json_encode(array(
+            'symbols' => $symbols_sorted,
+            'prices' => $price_fingerprint,
+        )));
         $cached = get_transient($transient_key);
         if (is_array($cached)) {
             return $cached;
