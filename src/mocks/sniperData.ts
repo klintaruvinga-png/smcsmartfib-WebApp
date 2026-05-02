@@ -183,7 +183,7 @@ export const mockSignals: SignalCandidate[] = [
     confluence: ["sweep", "MSS", "fib-OB", "London-AM"],
     verdict: "A+",
     computedBy: "backend",
-    backendConfirmed: false,
+    backendConfirmed: true,
     createdAt: minutesAgo(3),
   },
   {

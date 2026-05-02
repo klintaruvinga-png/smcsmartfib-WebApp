@@ -17,6 +17,7 @@ export const Route = createFileRoute("/progress")({
   component: ProgressPage,
 });
 
+// TODO: Replace with real milestone data from backend once the /user/progress endpoint is implemented.
 const MILESTONES = [
   { label: "First $1,000 profit", target: 1000, done: true },
   { label: "10 winning trades in a row", target: 10, done: true },
@@ -53,6 +54,7 @@ function ProgressPage() {
         </div>
         <div className="rounded-lg border border-bd bg-bg1/60 p-4">
           <div className="text-[11px] font-mono uppercase tracking-wider text-mute">Streak</div>
+          {/* TODO: streak + longest values are demo placeholders until /user/progress is live. */}
           <div className="flex items-center gap-2 mt-2">
             <Flame className="h-6 w-6 text-warn" />
             <span className="font-mono text-2xl font-semibold">7</span>

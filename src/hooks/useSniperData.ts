@@ -3,7 +3,7 @@ import { apiClient, setBackendUrl } from "@/lib/api/sniperClient";
 
 const DEFAULT_POLL_MS = 15_000;
 
-function usePollMs() {
+export function usePollMs() {
   const { data } = useUserSettings();
   const sec = data?.refreshIntervalSec;
   return Number.isFinite(sec) && (sec ?? 0) > 0 ? (sec as number) * 1000 : DEFAULT_POLL_MS;

@@ -191,7 +191,6 @@ final class SMC_SuperFib_Sniper_REST {
         $this->route('/live-signals', WP_REST_Server::READABLE, 'get_live_signals', true);
         $this->route('/signal', WP_REST_Server::CREATABLE, 'post_signal', true);
         $this->route('/ladders', WP_REST_Server::READABLE, 'get_ladders', true);
-        $this->route('/engine-batch', WP_REST_Server::CREATABLE, 'post_engine_batch', true);
 
         $this->route('/user/engine-batch', WP_REST_Server::CREATABLE, 'post_engine_batch', true);
         $this->route('/user/market-data', WP_REST_Server::CREATABLE, 'post_user_market_data', true);
@@ -288,15 +287,7 @@ final class SMC_SuperFib_Sniper_REST {
         $key_status = $this->get_twelve_key_status($user_id);
         $last_batch = $this->latest_timestamp('snapshots', $user_id, 'updated_at');
         $last_run = $this->latest_timestamp('engine_runs', $user_id, 'created_at');
-        $backend_sync = 'offline';
-        if ($last_run) {
-            $age_sec = time() - strtotime($last_run . ' UTC');
-            $backend_sync = $age_sec <= 300 ? 'live' : 'stale';
-        }
-
-        // Age out backendSync: treat as stale if last engine run is older than 5 minutes.
-        // At the 15s default poll rate a gap > 300s means the client is not actively polling.
-        $run_age = $last_run ? (time() - strtotime($last_run)) : PHP_INT_MAX;
+        $run_age      = $last_run ? (time() - strtotime($last_run . ' UTC')) : PHP_INT_MAX;
         $backend_sync = $run_age <= 300 ? 'live' : ($last_run ? 'stale' : 'offline');
 
         $batch_age  = $last_batch ? (time() - strtotime($last_batch . ' UTC')) : PHP_INT_MAX;
@@ -333,7 +324,6 @@ final class SMC_SuperFib_Sniper_REST {
             'watchlist' => $this->sanitize_symbols(isset($payload['watchlist']) ? $payload['watchlist'] : $current['watchlist']),
             'riskAllocation' => $this->sanitize_risk_allocation(isset($payload['riskAllocation']) ? $payload['riskAllocation'] : $current['riskAllocation'], $current['riskAllocation']),
         ));
-        $settings['apiKeyStatus'] = $this->get_twelve_key_status($user_id);
 
         $this->replace_json('user_settings', array(
             'user_id' => $user_id,
@@ -550,6 +540,7 @@ final class SMC_SuperFib_Sniper_REST {
         ));
     }
 
+    // Pine webhook stub — intentionally audit-only until Pine alert integration is implemented.
     public function post_snapshot(WP_REST_Request $request) {
         $user_id = get_current_user_id();
         $payload = $request->get_json_params();
@@ -565,6 +556,7 @@ final class SMC_SuperFib_Sniper_REST {
         return rest_ensure_response($engine['regimes']);
     }
 
+    // Pine webhook stub — intentionally audit-only until Pine alert integration is implemented.
     public function post_regime(WP_REST_Request $request) {
         $this->audit(get_current_user_id(), 'regime.posted', (array) $request->get_json_params());
         return rest_ensure_response(array('ok' => true));
@@ -578,6 +570,7 @@ final class SMC_SuperFib_Sniper_REST {
         return rest_ensure_response($engine['signals']);
     }
 
+    // Pine webhook stub — intentionally audit-only until Pine alert integration is implemented.
     public function post_signal(WP_REST_Request $request) {
         $this->audit(get_current_user_id(), 'signal.posted', (array) $request->get_json_params());
         return rest_ensure_response(array('ok' => true));
@@ -785,17 +778,6 @@ final class SMC_SuperFib_Sniper_REST {
             return $cached;
         }
 
-        // Deduplicate concurrent calls within the same poll cycle (e.g. /snapshot + /live-signals
-        // both firing at ~15s). Sort symbols so key is order-independent. 5s TTL is shorter than
-        // the minimum meaningful poll interval but long enough to absorb same-cycle duplicates.
-        $sorted = $symbols;
-        sort($sorted);
-        $cache_key = 'smc_sf_eng_' . $user_id . '_' . md5(implode(',', $sorted));
-        $cached = get_transient($cache_key);
-        if ($cached !== false) {
-            return $cached;
-        }
-
         $regimes = array();
         $gates = array();
         $signals = array();
@@ -855,7 +837,6 @@ final class SMC_SuperFib_Sniper_REST {
 
         $result = array('regimes' => $regimes, 'gates' => $gates, 'signals' => $signals, 'plans' => $plans);
         set_transient($transient_key, $result, 5);
-        set_transient($cache_key, $result, 5);
 
         return $result;
     }
@@ -1662,7 +1643,11 @@ final class SMC_SuperFib_Sniper_REST {
             'AUDUSD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
             'EURUSD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
             'NZDUSD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
-            // FOREX — JPY quoted
+            // FOREX — JPY quoted.
+            // pip_val = 1 pip (0.01 JPY) × 100,000 units ÷ USDJPY_rate.
+            // $10.0 is exact only at USDJPY ≈ 100; at current rates (~156) the true value is ~$6.40.
+            // For cross-JPY pairs the base-currency USD rate further affects pip_val.
+            // TODO: compute dynamically from the live USDJPY mid to keep lot sizing accurate.
             'USDJPY' => array('type' => 'forex', 'pip_size' => 0.01,   'contract_size' => 100000, 'pip_val' => 10.0),
             'AUDJPY' => array('type' => 'forex', 'pip_size' => 0.01,   'contract_size' => 100000, 'pip_val' => 10.0),
             'EURJPY' => array('type' => 'forex', 'pip_size' => 0.01,   'contract_size' => 100000, 'pip_val' => 10.0),

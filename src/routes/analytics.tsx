@@ -27,7 +27,7 @@ function AnalyticsPage() {
   if (!account || !risk) return null;
 
   const positions = trades?.positions ?? [];
-  const openRisk = positions.reduce((s, p) => s + Math.abs(p.pnlUSC), 0);
+  const floatingPnl = positions.reduce((s, p) => s + p.pnlUSC, 0);
   const ddRatio = account.drawdownPct / risk.ddCapPct;
   const equityCurveData = MOCK_MODE ? mockEquityCurve : null;
 
@@ -96,10 +96,10 @@ function AnalyticsPage() {
           state={account.state}
         />
         <Stat
-          label="Open exposure"
-          value={fmtUSC(openRisk)}
+          label="Floating P/L"
+          value={fmtUSC(floatingPnl, true)}
           sub={`${positions.length} positions`}
-          tone="info"
+          tone={floatingPnl >= 0 ? "buy" : "sell"}
           state={account.state}
         />
         <Stat
