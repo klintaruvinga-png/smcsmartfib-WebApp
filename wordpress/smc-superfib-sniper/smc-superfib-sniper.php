@@ -34,9 +34,10 @@ final class SMC_SuperFib_Sniper_REST {
                 return;
             }
             $allowed = apply_filters('smc_sf_allowed_origins', array(home_url(), 'https://trader.stokvelsociety.co.za', 'https://smcsuperfibwebapp.klintaruvinga.workers.dev', 'https://smcsmartfib.lovable.app'));
-            if (!in_array(untrailingslashit($origin), array_map('untrailingslashit', $allowed), true)) {
+            if (!self::is_allowed_origin($origin, $allowed)) {
                 return;
             }
+            header('Vary: Origin', false);
             header('Access-Control-Allow-Origin: ' . $origin);
             header('Access-Control-Allow-Credentials: true');
             header('Access-Control-Allow-Headers: Content-Type, X-WP-Nonce, Authorization');
@@ -230,14 +231,27 @@ final class SMC_SuperFib_Sniper_REST {
         return true;
     }
 
+    private static function is_allowed_origin($origin, $allowed) {
+        if (in_array(untrailingslashit($origin), array_map('untrailingslashit', $allowed), true)) {
+            return true;
+        }
+        // Allow any Lovable project-preview subdomain (UUID.lovableproject.com).
+        $host = wp_parse_url($origin, PHP_URL_HOST);
+        return $host && (bool) preg_match('/^[0-9a-f\-]+\.lovableproject\.com$/', $host);
+    }
+
     public function send_cors_headers($served, $result, $request, $server) {
         $origin = isset($_SERVER['HTTP_ORIGIN']) ? esc_url_raw(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
+
+        // Always send Vary: Origin so caches never serve one origin's CORS headers to another.
+        header('Vary: Origin', false);
+
         if (!$origin) {
             return $served;
         }
 
         $allowed = apply_filters('smc_sf_allowed_origins', array(home_url(), 'https://trader.stokvelsociety.co.za', 'https://smcsuperfibwebapp.klintaruvinga.workers.dev', 'https://smcsmartfib.lovable.app'));
-        if (in_array(untrailingslashit($origin), array_map('untrailingslashit', $allowed), true)) {
+        if (self::is_allowed_origin($origin, $allowed)) {
             header('Access-Control-Allow-Origin: ' . $origin);
             header('Access-Control-Allow-Credentials: true');
             header('Access-Control-Allow-Headers: Content-Type, X-WP-Nonce, Authorization');
