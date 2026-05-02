@@ -725,6 +725,17 @@ final class SMC_SuperFib_Sniper_REST {
     private function run_engine_for_symbols($user_id, $symbols, $prices) {
         global $wpdb;
 
+        // Deduplicate concurrent calls within the same poll cycle (e.g. /snapshot + /live-signals
+        // both firing at ~15s). Sort symbols so key is order-independent. 5s TTL is shorter than
+        // the minimum meaningful poll interval but long enough to absorb same-cycle duplicates.
+        $sorted = $symbols;
+        sort($sorted);
+        $cache_key = 'smc_sf_eng_' . $user_id . '_' . md5(implode(',', $sorted));
+        $cached = get_transient($cache_key);
+        if ($cached !== false) {
+            return $cached;
+        }
+
         $regimes = array();
         $gates = array();
         $signals = array();
@@ -783,7 +794,9 @@ final class SMC_SuperFib_Sniper_REST {
             array('%d', '%s', '%s', '%s')
         );
 
-        return array('regimes' => $regimes, 'gates' => $gates, 'signals' => $signals, 'plans' => $plans);
+        $result = array('regimes' => $regimes, 'gates' => $gates, 'signals' => $signals, 'plans' => $plans);
+        set_transient($cache_key, $result, 5);
+        return $result;
     }
 
     private function build_symbol_state($user_id, $symbol, $price) {
@@ -1440,14 +1453,17 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function verdict($status, $confluence, $chop) {
-        $score = count($confluence) - ($chop > 0.7 ? 2 : 0);
-        if ($status === 'READY' && $score >= 5) {
+        // HTA_SF and LTF_SF are framework labels kept for display; only earned structural
+        // conditions (sweep, MSS, F3-clear, HTA-override) count toward the score.
+        $earned = array_diff($confluence, array('HTA_SF', 'LTF_SF'));
+        $score = count($earned) - ($chop > 0.7 ? 2 : 0);
+        if ($status === 'READY' && $score >= 3) {
             return 'A+';
         }
         if ($status === 'READY') {
             return 'A';
         }
-        return $score >= 4 ? 'B' : 'C';
+        return $score >= 2 ? 'B' : 'C';
     }
 
     private function get_twelve_key_status($user_id) {
