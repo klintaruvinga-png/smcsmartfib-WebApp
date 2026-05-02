@@ -33,7 +33,7 @@ final class SMC_SuperFib_Sniper_REST {
             if (!$origin) {
                 return;
             }
-            $allowed = apply_filters('smc_sf_allowed_origins', array(home_url(), 'https://trader.stokvelsociety.co.za', 'https://smcsuperfibwebapp.klintaruvinga.workers.dev'));
+            $allowed = apply_filters('smc_sf_allowed_origins', array(home_url(), 'https://trader.stokvelsociety.co.za', 'https://smcsuperfibwebapp.klintaruvinga.workers.dev', 'https://smcsmartfib.lovable.app'));
             if (!in_array(untrailingslashit($origin), array_map('untrailingslashit', $allowed), true)) {
                 return;
             }
@@ -236,7 +236,7 @@ final class SMC_SuperFib_Sniper_REST {
             return $served;
         }
 
-        $allowed = apply_filters('smc_sf_allowed_origins', array(home_url(), 'https://trader.stokvelsociety.co.za', 'https://smcsuperfibwebapp.klintaruvinga.workers.dev'));
+        $allowed = apply_filters('smc_sf_allowed_origins', array(home_url(), 'https://trader.stokvelsociety.co.za', 'https://smcsuperfibwebapp.klintaruvinga.workers.dev', 'https://smcsmartfib.lovable.app'));
         if (in_array(untrailingslashit($origin), array_map('untrailingslashit', $allowed), true)) {
             header('Access-Control-Allow-Origin: ' . $origin);
             header('Access-Control-Allow-Credentials: true');
