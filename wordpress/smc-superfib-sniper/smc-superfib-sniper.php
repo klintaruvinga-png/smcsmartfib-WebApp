@@ -299,9 +299,12 @@ final class SMC_SuperFib_Sniper_REST {
         $run_age = $last_run ? (time() - strtotime($last_run)) : PHP_INT_MAX;
         $backend_sync = $run_age <= 300 ? 'live' : ($last_run ? 'stale' : 'offline');
 
+        $batch_age  = $last_batch ? (time() - strtotime($last_batch . ' UTC')) : PHP_INT_MAX;
+        $price_feed = $key_status === 'ok' ? ($batch_age <= 300 ? 'live' : 'stale') : 'blocked';
+
         return rest_ensure_response(array(
             'backendSync' => $backend_sync,
-            'priceFeed' => $key_status === 'ok' ? ($last_batch ? 'live' : 'stale') : 'blocked',
+            'priceFeed' => $price_feed,
             'twelveDataKey' => $key_status === 'ok' ? 'present' : 'missing',
             'twelveDataKeyStatus' => $key_status,
             'lastBatchAt' => $this->to_iso($last_batch),
@@ -337,22 +340,6 @@ final class SMC_SuperFib_Sniper_REST {
             'settings' => $settings,
             'updated_at' => $this->now_mysql(),
         ));
-        if (isset($settings['riskAllocation']) && is_array($settings['riskAllocation'])) {
-            $existing = $this->get_account_blob($user_id);
-            $current_risk = $this->get_risk_profile($user_id);
-            $existing['riskProfile'] = array_merge($current_risk, array(
-                'perTradePct' => (float) $settings['riskAllocation']['perTradePct'],
-                'dailyMaxPct' => (float) $settings['riskAllocation']['dailyMaxPct'],
-                'ddCapPct' => (float) $settings['riskAllocation']['ddCapPct'],
-                'updatedAt' => gmdate('c'),
-            ));
-            $this->replace_json('account_snapshots', array(
-                'user_id' => $user_id,
-                'data' => $existing,
-                'updated_at' => $this->now_mysql(),
-            ));
-        }
-
         $this->audit($user_id, 'settings.updated', array('watchlist' => $settings['watchlist']));
 
         return rest_ensure_response(array('ok' => true));
@@ -504,6 +491,24 @@ final class SMC_SuperFib_Sniper_REST {
             'data' => $existing,
             'updated_at' => $this->now_mysql(),
         ));
+
+        // Mirror the three overlapping risk-cap fields back to settings.riskAllocation so the
+        // Settings tab and Risk tab always display consistent values after a risk save.
+        $current_settings = $this->get_settings($user_id);
+        $current_settings['riskAllocation'] = array_merge(
+            is_array($current_settings['riskAllocation'] ?? null) ? $current_settings['riskAllocation'] : array(),
+            array(
+                'perTradePct' => $profile['perTradePct'],
+                'dailyMaxPct' => $profile['dailyMaxPct'],
+                'ddCapPct' => $profile['ddCapPct'],
+            )
+        );
+        $this->replace_json('user_settings', array(
+            'user_id' => $user_id,
+            'settings' => $current_settings,
+            'updated_at' => $this->now_mysql(),
+        ));
+
         $this->audit($user_id, 'risk_profile.updated', $profile);
 
         return rest_ensure_response(array('ok' => true));
@@ -780,23 +785,22 @@ final class SMC_SuperFib_Sniper_REST {
 
             if ($state['signal']) {
                 $signals[] = $state['signal'];
-                $wpdb->replace(
-                    $this->table('signals'),
-                    array(
-                        'id' => $state['signal']['id'],
-                        'user_id' => $user_id,
-                        'symbol' => $symbol,
-                        'direction' => $state['signal']['direction'],
-                        'status' => $state['signal']['status'],
-                        'verdict' => $state['signal']['verdict'],
-                        'confluence' => wp_json_encode($state['signal']['confluence']),
-                        'engine' => wp_json_encode($state['signal']['engine']),
-                        'backend_confirmed' => $state['signal']['backendConfirmed'] ? 1 : 0,
-                        'created_at' => $this->now_mysql(),
-                        'updated_at' => $this->now_mysql(),
-                    ),
-                    array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s')
-                );
+                $sig = $state['signal'];
+                $sig_created = gmdate('Y-m-d H:i:s', strtotime($sig['createdAt']));
+                $wpdb->query($wpdb->prepare(
+                    "INSERT INTO `{$this->table('signals')}` (id, user_id, symbol, direction, status, verdict, confluence, engine, backend_confirmed, created_at, updated_at) VALUES (%s, %d, %s, %s, %s, %s, %s, %s, %d, %s, %s) ON DUPLICATE KEY UPDATE symbol=VALUES(symbol), direction=VALUES(direction), status=VALUES(status), verdict=VALUES(verdict), confluence=VALUES(confluence), engine=VALUES(engine), backend_confirmed=VALUES(backend_confirmed), updated_at=VALUES(updated_at)",
+                    $sig['id'],
+                    $user_id,
+                    $symbol,
+                    $sig['direction'],
+                    $sig['status'],
+                    $sig['verdict'],
+                    wp_json_encode($sig['confluence']),
+                    wp_json_encode($sig['engine']),
+                    $sig['backendConfirmed'] ? 1 : 0,
+                    $sig_created,
+                    $this->now_mysql()
+                ));
             }
 
             if ($state['plan']) {
@@ -891,10 +895,16 @@ final class SMC_SuperFib_Sniper_REST {
             $confluence[] = 'HTA-override';
         }
 
+        $last_candle    = !empty($candles) ? end($candles) : null;
+        $price_is_live  = isset($price['state']) && $price['state'] === 'live';
+        $candles_fresh  = $last_candle && (time() - strtotime($last_candle['time'])) <= 7200;
+        $data_live      = $price_is_live && $candles_fresh;
+        $symbol_state   = $data_live ? 'live' : 'stale';
+
         $gate = array(
             'symbol' => $symbol,
             'allow' => $direction === 'LONG' ? 'BUY' : 'SELL',
-            'state' => 'live',
+            'state' => $symbol_state,
         );
 
         $regime = array(
@@ -903,7 +913,7 @@ final class SMC_SuperFib_Sniper_REST {
             'chop' => $chop,
             'nearestFib' => $nearest ? $nearest['price'] : null,
             'updatedAt' => gmdate('c'),
-            'state' => 'live',
+            'state' => $symbol_state,
         );
 
         $ltf_level = $this->execution_level($levels, $direction);
@@ -911,10 +921,6 @@ final class SMC_SuperFib_Sniper_REST {
         // A signal may only be backend-confirmed when the price feed is live AND candles are
         // fresh (last candle no older than 2 hours — two 15-min bars worth of normal delay plus
         // buffer). Stale data can never produce a READY backend-confirmed signal.
-        $price_is_live  = isset($price['state']) && $price['state'] === 'live';
-        $last_candle    = !empty($candles) ? end($candles) : null;
-        $candles_fresh  = $last_candle && (time() - strtotime($last_candle['time'])) <= 7200;
-        $data_live      = $price_is_live && $candles_fresh;
 
         // Anchor the signal identity to the latest analysed candle so the same setup stays stable
         // within one 15m bar, while later intraday setups get a distinct execution queue identity.
@@ -929,7 +935,7 @@ final class SMC_SuperFib_Sniper_REST {
             'verdict' => $this->verdict($status, $confluence, $chop),
             'computedBy' => 'backend',
             'backendConfirmed' => $status === 'READY' && $data_live,
-            'createdAt' => gmdate('c'),
+            'createdAt' => $signal_anchor,
             'engine' => array(
                 'htfBias' => $bias === 'RANGING' ? 'TRANSITIONAL' : $bias,
                 'pdState' => $pd_state,
@@ -1297,9 +1303,18 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function get_account_state($user_id) {
+        global $wpdb;
         $blob = $this->get_account_blob($user_id);
         $positions = $this->read_trade_payloads($user_id, 'position');
         $orders = $this->read_pending_orders($user_id);
+
+        $snapshot_updated = $wpdb->get_var($wpdb->prepare(
+            "SELECT updated_at FROM {$this->table('account_snapshots')} WHERE user_id = %d",
+            $user_id
+        ));
+        $snap_age = $snapshot_updated ? (time() - strtotime($snapshot_updated . ' UTC')) : PHP_INT_MAX;
+        $account_state = $snap_age <= 300 ? 'live' : ($snapshot_updated ? 'stale' : 'stale');
+
         $default = array(
             'balanceUSC' => 0,
             'equityUSC' => 0,
@@ -1309,13 +1324,14 @@ final class SMC_SuperFib_Sniper_REST {
             'pendingOrders' => count($orders),
             'todayPnlUSC' => 0,
             'todayPnlPct' => 0,
-            'state' => 'live',
+            'state' => $account_state,
         );
         if (!empty($blob['account']) && is_array($blob['account'])) {
             $default = array_merge($default, $blob['account']);
         }
         $default['openPositions'] = count($positions);
         $default['pendingOrders'] = count($orders);
+        $default['state'] = $account_state;
 
         return $default;
     }

@@ -56,7 +56,7 @@ function PlanPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Signal Plan</h1>
-          <p className="text-xs text-mute mt-0.5">Top-rated candidate · backend blueprint</p>
+          <p className="text-xs text-mute mt-0.5">First READY candidate · backend blueprint</p>
         </div>
         <FreshnessBadge state={plan.source === "backend-blueprint" ? "live" : "pending-sync"} />
       </div>
@@ -203,7 +203,7 @@ function PlanPage() {
         <button
           onClick={async () => {
             const r = await apiClient.postExecuteSignals({ signalIds: [top.id] });
-            toast.success(`Queued ${r.queued} signal${r.queued > 1 ? "s" : ""} for execution`);
+            toast.success(`Queued ${r.queued} order${r.queued > 1 ? "s" : ""} for execution`);
           }}
           disabled={!top.backendConfirmed}
           className={cn(

@@ -57,13 +57,12 @@ function SignalsPage() {
       detail: h?.twelveDataKeyStatus ? h.twelveDataKeyStatus.replace("-", " ") : undefined,
     },
     {
-      label: "Engine compute",
-      state: h?.lastEngineRunAt ? "live" : "offline",
-      detail: h?.lastEngineRunAt ? relTime(h.lastEngineRunAt) : "never",
-    },
-    {
       label: "Engine run",
-      state: h?.lastEngineRunAt ? "live" : "offline",
+      state: h?.lastEngineRunAt
+        ? Date.now() - new Date(h.lastEngineRunAt).getTime() <= 300_000
+          ? "live"
+          : "stale"
+        : "offline",
       detail: h?.lastEngineRunAt ? relTime(h.lastEngineRunAt) : "never",
     },
   ];
