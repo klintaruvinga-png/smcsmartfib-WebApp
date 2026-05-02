@@ -50,7 +50,10 @@ function SignalsPage() {
     },
     {
       label: "Twelve Data key",
-      state: h?.twelveDataKeyStatus === "ok" || h?.twelveDataKey === "present" ? "ok" : "missing",
+      state:
+        h?.twelveDataKeyStatus === "ok" || (!h?.twelveDataKeyStatus && h?.twelveDataKey === "present")
+          ? "ok"
+          : "missing",
       detail: h?.twelveDataKeyStatus ? h.twelveDataKeyStatus.replace("-", " ") : undefined,
     },
     {

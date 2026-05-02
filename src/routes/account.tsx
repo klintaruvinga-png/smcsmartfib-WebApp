@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useUserSettings, useUserRiskProfile } from "@/hooks/useSniperData";
+import { useUserSettings, useUserRiskProfile, useEngineHealth } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { WarningLine } from "@/components/sniper/Warnings";
 import { cn } from "@/lib/utils";
@@ -101,6 +101,7 @@ function TabButton({
 
 function SettingsTab({ settings }: { settings: DashboardSettings }) {
   const qc = useQueryClient();
+  const { data: health } = useEngineHealth();
   const [s, setS] = useState(settings);
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [newPair, setNewPair] = useState("");
@@ -186,7 +187,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
     try {
       setBackendUrl(settingsToSave.backendUrl);
       await apiClient.postUserSettings(settingsToSave);
-      await qc.invalidateQueries({ queryKey: ["user-settings"] });
+      await qc.refetchQueries({ queryKey: ["user-settings"], type: "active" });
       await Promise.all([
         qc.refetchQueries({ queryKey: ["engine-health"], type: "active" }),
         qc.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
@@ -236,7 +237,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
       }
       setS({ ...s, apiKeyStatus: result.status });
       setApiKey("");
-      await qc.invalidateQueries({ queryKey: ["user-settings"] });
+      await qc.refetchQueries({ queryKey: ["user-settings"], type: "active" });
       await Promise.all([
         qc.refetchQueries({ queryKey: ["engine-health"], type: "active" }),
         qc.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
@@ -259,7 +260,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
       setKeyStatus(result.status);
       setS({ ...s, apiKeyStatus: result.status });
       setApiKey("");
-      await qc.invalidateQueries({ queryKey: ["user-settings"] });
+      await qc.refetchQueries({ queryKey: ["user-settings"], type: "active" });
       await Promise.all([
         qc.refetchQueries({ queryKey: ["engine-health"], type: "active" }),
         qc.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
@@ -343,6 +344,20 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
             </button>
           </div>
         </div>
+        {settings.apiKeyStatus === "ok" &&
+          health &&
+          ((health.twelveDataKeyStatus && health.twelveDataKeyStatus !== "ok") ||
+            (!health.twelveDataKeyStatus && health.twelveDataKey === "missing")) && (
+            <WarningLine level="warn">
+              Settings reports key OK but engine health shows:{" "}
+              <span className="font-semibold">
+                {health.twelveDataKeyStatus
+                  ? health.twelveDataKeyStatus.replace("-", " ")
+                  : "key missing"}
+              </span>
+              . Backend sync may be pending.
+            </WarningLine>
+          )}
         <p className="text-[10px] font-mono text-mute">
           The key is submitted to WordPress for encrypted server-side use and is never returned to
           the browser.
