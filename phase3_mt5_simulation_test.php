@@ -7,8 +7,8 @@
  */
 
 // Configuration - Update these for your WordPress instance
-$wordpress_url = 'https://your-wordpress-site.com/wp-json/sniper/v1/snapshot';
-$auth_token = 'your-application-password'; // WP Application Password
+$wordpress_url = 'https://trader.stokvelsociety.co.za//wp-json/sniper/v1/snapshot';
+$auth_token = 'dD9c lGv5 GDw6 KlB4 T2vv PMmIyour-application-password'; // WP Application Password
 
 // Sample MT5 payload (matches the format from MarketDataEngine.mqh)
 $sample_payload = [
