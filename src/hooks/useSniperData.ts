@@ -4,6 +4,11 @@ import type { Symbol } from "@/types/sniper";
 
 const DEFAULT_POLL_MS = 15_000;
 
+function useBackendReady() {
+  const { data } = useUserSettings();
+  return Boolean(data?.backendUrl);
+}
+
 export function usePollMs() {
   const { data } = useUserSettings();
   const sec = data?.refreshIntervalSec;
@@ -11,37 +16,45 @@ export function usePollMs() {
 }
 
 export function useSnapshot() {
+  const backendReady = useBackendReady();
   const pollMs = usePollMs();
   return useQuery({
     queryKey: ["snapshot"],
     queryFn: () => apiClient.getSnapshot(),
+    enabled: backendReady,
     refetchInterval: pollMs,
   });
 }
 
 export function useLiveSignals() {
+  const backendReady = useBackendReady();
   const pollMs = usePollMs();
   return useQuery({
     queryKey: ["live-signals"],
     queryFn: () => apiClient.getLiveSignals(),
+    enabled: backendReady,
     refetchInterval: pollMs,
   });
 }
 
 export function useUserTrades() {
+  const backendReady = useBackendReady();
   const pollMs = usePollMs();
   return useQuery({
     queryKey: ["user-trades"],
     queryFn: () => apiClient.getUserTrades(),
+    enabled: backendReady,
     refetchInterval: pollMs,
   });
 }
 
 export function useUserAccount() {
+  const backendReady = useBackendReady();
   const pollMs = usePollMs();
   return useQuery({
     queryKey: ["user-account"],
     queryFn: () => apiClient.getUserAccount(),
+    enabled: backendReady,
     refetchInterval: pollMs,
   });
 }
@@ -72,26 +85,32 @@ export function useWatchlist() {
 }
 
 export function useEngineHealth() {
+  const backendReady = useBackendReady();
   const pollMs = usePollMs();
   return useQuery({
     queryKey: ["engine-health"],
     queryFn: () => apiClient.getEngineHealth(),
+    enabled: backendReady,
     refetchInterval: pollMs,
   });
 }
 
 export function useUserRiskProfile() {
+  const backendReady = useBackendReady();
   return useQuery({
     queryKey: ["user-risk"],
     queryFn: () => apiClient.getUserRiskProfile(),
+    enabled: backendReady,
   });
 }
 
 export function useLadders() {
+  const backendReady = useBackendReady();
   const pollMs = usePollMs();
   return useQuery({
     queryKey: ["ladders"],
     queryFn: () => apiClient.getLadders(),
+    enabled: backendReady,
     refetchInterval: pollMs,
   });
 }

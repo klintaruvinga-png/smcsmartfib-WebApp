@@ -1,6 +1,6 @@
 import { Link, Outlet, useRouterState, useRouter } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useSnapshot, useLiveSignals, useEngineHealth, useSession } from "@/hooks/useSniperData";
+import { useSnapshot, useLiveSignals, useEngineHealth, useSession, useUserSettings } from "@/hooks/useSniperData";
 import { fmtPrice, fmtPct } from "@/lib/format";
 import { SyncChip, SignalStatusChip } from "@/components/sniper/Chips";
 import { cn, deduplicateById } from "@/lib/utils";
@@ -219,6 +219,8 @@ function Header() {
 }
 
 export function AppShell() {
+  useUserSettings();
+
   return (
     <div className="flex min-h-screen">
       <LeftRail />
