@@ -73,9 +73,7 @@ function HeaderChips() {
 
   const syncState = health?.backendSync ?? snap?.prices?.[0]?.state ?? "offline";
   const counts = useMemo(() => {
-    const r = signals ?? [];
-    // Deduplicate signals by ID to handle backend duplicates
-    const unique = deduplicateById(r);
+    const unique = deduplicateById(signals ?? []);
     return {
       ready: unique.filter((s) => s.status === "READY").length,
       armed: unique.filter((s) => s.status === "ARMED").length,
@@ -95,15 +93,13 @@ function HeaderChips() {
 
   return (
     <div className="flex items-center gap-2">
+      {session?.name && (
+        <span className="hidden sm:inline-flex items-center rounded border border-bd bg-bg2/60 px-2 py-0.5 text-[10px] font-mono text-dim">
+          {session.name}
+        </span>
+      )}
       <SyncChip state={syncState} />
       <SignalStatusChip {...counts} />
-      {session?.name && (
-        <div className="inline-flex items-center rounded-md border border-bd bg-bg2/60 px-2.5 py-1.5">
-          <span className="text-[10px] font-semibold tracking-wider text-mute font-mono">
-            {session.name}
-          </span>
-        </div>
-      )}
       <button
         onClick={() => void handleRefresh()}
         disabled={isRefreshing}

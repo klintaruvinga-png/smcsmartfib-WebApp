@@ -155,7 +155,7 @@ export interface SignalCandidate {
   engineBlocker?: EngineBlocker;
   createdAt: string;
   engine?: {
-    htfBias: "BULL" | "BEAR" | "TRANSITIONAL"; // RANGING is mapped to TRANSITIONAL by the backend before emission
+    htfBias: "BULL" | "BEAR" | "TRANSITIONAL";
     pdState: PdState;
     drawOnLiquidity: string | null;
     sweep: SequenceState;

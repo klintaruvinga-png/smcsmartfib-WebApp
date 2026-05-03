@@ -45,17 +45,15 @@ function SignalsPage() {
   const { data: h } = useEngineHealth();
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
   
-  // Deduplicate signals by ID to handle backend duplicates
   const uniqueSignals = signals ? deduplicateById(signals) : [];
   
   const divergent = uniqueSignals.filter(
     (s) => s.computedBy === "frontend" && !s.backendConfirmed,
   );
 
-  // feedStatus supersedes priceFeed when present (it is the richer field).
+  // feedStatus supersedes priceFeed when present; "rate-limited" is not a FreshnessState value.
   const rawFeedState = h?.feedStatus ?? h?.priceFeed ?? "offline";
-  const feedState: FreshnessState =
-    rawFeedState === "rate-limited" ? "stale" : (rawFeedState as FreshnessState);
+  const feedState: FreshnessState = rawFeedState === "rate-limited" ? "stale" : (rawFeedState as FreshnessState);
   const checks: { label: string; state: FreshnessState | "ok" | "missing"; detail?: string }[] = [
     {
       label: "Backend sync",
