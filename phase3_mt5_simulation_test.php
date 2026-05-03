@@ -102,7 +102,7 @@ if (function_exists('curl_init')) {
     exec('curl.exe --version 2>NUL', $ver_out, $ver_ret);
     if ($ver_ret === 0) {
         // Write body to a temp file to avoid shell quoting issues with JSON on Windows
-        $tmp = tempnam(sys_get_temp_dir(), 'mt5_') . '.json';
+        $tmp = tempnam(sys_get_temp_dir(), 'mt5_');
         file_put_contents($tmp, $json_body);
         $escaped_tmp = escapeshellarg($tmp);
 
