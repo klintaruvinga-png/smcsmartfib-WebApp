@@ -8,6 +8,7 @@
 
 // Configuration - Update these for your WordPress instance
 $wordpress_url = 'https://trader.stokvelsociety.co.za//wp-json/sniper/v1/snapshot';
+$username   = 'your-wordpress-username';  // WP username that generated the application password below
 $auth_token = 'dD9c lGv5 GDw6 KlB4 T2vv PMmIyour-application-password'; // WP Application Password
 
 // Sample MT5 payload (matches the format from MarketDataEngine.mqh)
@@ -41,7 +42,7 @@ echo "Sending payload to: $wordpress_url\n";
 echo "Payload:\n" . json_encode($sample_payload, JSON_PRETTY_PRINT) . "\n\n";
 
 $json_body = json_encode($sample_payload);
-$auth_header = 'Basic ' . base64_encode('admin:' . $auth_token); // Replace 'username' with actual WP username
+$auth_header = 'Basic ' . base64_encode($username . ':' . $auth_token);
 
 if (function_exists('curl_init')) {
     $ch = curl_init();
