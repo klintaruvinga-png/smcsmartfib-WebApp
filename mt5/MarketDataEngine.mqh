@@ -202,13 +202,19 @@ public:
     }
 
 private:
-    // Convert a datetime to ISO 8601 string (YYYY-MM-DDTHH:MM:SSZ).
-    // MQL5's TimeToString produces "YYYY.MM.DD HH:MM:SS" which PHP strtotime()
-    // does not reliably parse; ISO 8601 is unambiguous and portable.
+    // Convert a datetime to ISO 8601 UTC string (YYYY-MM-DDTHH:MM:SSZ).
+    // TimeToStruct() decomposes into broker-server local time, not UTC. Appending Z
+    // without converting first produces a false UTC claim: a UTC+2 broker tick at
+    // server-time 12:00 would be stored as UTC 12:00 instead of UTC 10:00, shifting
+    // candle buckets by the server offset and breaking UNIQUE KEY alignment with
+    // Twelve Data's UTC-based candles.
+    // Fix: subtract the broker UTC offset (TimeCurrent() - TimeGMT()) before
+    // decomposing so the formatted components are genuine UTC.
     string TimeToIso8601(datetime t)
     {
+        datetime brokerUtcOffset = TimeCurrent() - TimeGMT();
         MqlDateTime dt;
-        TimeToStruct(t, dt);
+        TimeToStruct(t - brokerUtcOffset, dt);
         return StringFormat("%04d-%02d-%02dT%02d:%02d:%02dZ",
                             dt.year, dt.mon, dt.day,
                             dt.hour, dt.min, dt.sec);
