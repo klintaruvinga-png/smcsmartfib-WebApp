@@ -96,14 +96,6 @@ export function useLadders() {
   });
 }
 
-export function useSession() {
-  return useQuery({
-    queryKey: ["session"],
-    queryFn: () => apiClient.getSession(),
-    refetchInterval: 60_000,
-  });
-}
-
 /** Trigger a forced backend market-data refresh + engine run, then invalidate all dependent queries. */
 export function useEngineBatch() {
   const queryClient = useQueryClient();
