@@ -41,7 +41,7 @@ echo "Sending payload to: $wordpress_url\n";
 echo "Payload:\n" . json_encode($sample_payload, JSON_PRETTY_PRINT) . "\n\n";
 
 $json_body = json_encode($sample_payload);
-$auth_header = 'Basic ' . base64_encode('username:' . $auth_token); // Replace 'username' with actual WP username
+$auth_header = 'Basic ' . base64_encode('admin:' . $auth_token); // Replace 'username' with actual WP username
 
 if (function_exists('curl_init')) {
     $ch = curl_init();
