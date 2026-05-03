@@ -1140,6 +1140,10 @@ final class SMC_SuperFib_Sniper_REST {
             $status = 'WATCH';
         } elseif (!$sequence[$direction]['mss']) {
             $status = 'ARMED';
+        } elseif ($chop >= 0.7) {
+            // CRITICAL: Block READY status when chop >= 0.7 (F3 caution zone).
+            // SMC methodology requires no entries in high-chop equilibrium.
+            $status = 'ARMED';
         } else {
             $status = 'READY';
         }
@@ -1213,10 +1217,10 @@ final class SMC_SuperFib_Sniper_REST {
             'confluence' => $confluence,
             'verdict' => $this->verdict($status, $confluence, $chop),
             'computedBy' => 'backend',
-            // CRITICAL HARDENING: Never backend-confirm a signal when the chop gate is
-            // blocked (chop >= 0.7). Without this guard, post_execute_signals() would
-            // still accept and queue the signal for execution despite a BLOCKED gate.
-            'backendConfirmed' => $status === 'READY' && $data_live && $chop < 0.7,
+            // CRITICAL HARDENING: Never backend-confirm a signal unless status is READY
+            // (which already incorporates chop gate blocking). Without this guard, 
+            // post_execute_signals() would still accept and queue non-READY signals.
+            'backendConfirmed' => $status === 'READY' && $data_live,
             'engineBlocker' => $engine_blocker,
             'createdAt' => $signal_anchor,
             'engine' => array(
