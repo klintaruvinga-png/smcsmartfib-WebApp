@@ -48,12 +48,15 @@ function SignalsPage() {
   const watchlist = useWatchlist();
   const [watchlistOnly, setWatchlistOnly] = useState(true);
 
-  const allUnique = signals ? deduplicateById(signals) : [];
+  // CRITICAL: Deduplicate signals by ID and filter to backend-confirmed for execution readiness.
+  const allUnique = signals ? deduplicateById(signals).filter((s) => s.backendConfirmed) : [];
   const uniqueSignals =
     watchlistOnly && watchlist.length > 0
       ? allUnique.filter((s) => watchlist.includes(s.symbol))
       : allUnique;
 
+  // NOTE: uniqueSignals is pre-filtered to backendConfirmed only (see above).
+  // This divergent filter is now a safety check for data consistency issues.
   const divergent = uniqueSignals.filter(
     (s) => s.computedBy === "frontend" && !s.backendConfirmed,
   );

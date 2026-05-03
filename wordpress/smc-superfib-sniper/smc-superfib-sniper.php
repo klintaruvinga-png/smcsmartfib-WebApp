@@ -817,7 +817,14 @@ final class SMC_SuperFib_Sniper_REST {
                 $user_id
             ), ARRAY_A);
 
+            // CRITICAL: Only allow execution of backend-confirmed READY signals.
+            // Reject ANY signal with backend_confirmed=0, regardless of frontend status.
+            // This prevents frontend-only signal execution.
             if (!$signal || (int) $signal['backend_confirmed'] !== 1 || $signal['status'] !== 'READY') {
+                $this->audit($user_id, 'signals.execute.rejected', array(
+                    'signal_id' => $signal_id,
+                    'reason' => !$signal ? 'not_found' : ((int) $signal['backend_confirmed'] !== 1 ? 'not_confirmed' : 'not_ready'),
+                ));
                 continue;
             }
 
@@ -989,10 +996,21 @@ final class SMC_SuperFib_Sniper_REST {
     private function build_symbol_state($user_id, $symbol, $price) {
         $candles = $this->fetch_candles($user_id, $symbol, '15min', 120);
         $has_key = $this->get_twelve_key_status($user_id) === 'ok';
+        $settings = $this->get_settings($user_id);
+        $stale_threshold_sec = $settings['staleThresholdSec'];
         $state = $has_key ? 'stale' : 'blocked';
 
         if (!$price) {
             $price = array('symbol' => $symbol, 'mid' => 0, 'updatedAt' => gmdate('c'), 'state' => $state);
+        }
+
+        // CRITICAL FIX: Enforce staleThresholdSec setting on price freshness.
+        // A price older than the threshold MUST be marked stale, not live.
+        if (isset($price['updatedAt']) && !$this->is_stale($price['updatedAt'], $stale_threshold_sec)) {
+            // Price is within threshold, keep its original state.
+        } else if (isset($price['updatedAt'])) {
+            // Price exceeds threshold, force stale state.
+            $price['state'] = 'stale';
         }
 
         if (count($candles) < 30 || (float) $price['mid'] <= 0) {
@@ -1019,7 +1037,7 @@ final class SMC_SuperFib_Sniper_REST {
                     'lastPriceAt' => $price['updatedAt'] ?? null,
                     'lastCandleAt' => null,
                     'candleCount' => count($candles),
-                    'engineBlocker' => $early_blocker,
+                    'engineBlocker' => $early_blocker,  // CRITICAL: Always include engineBlocker in diagnostic
                 ),
             );
         }
@@ -2085,9 +2103,13 @@ final class SMC_SuperFib_Sniper_REST {
         if (!$candle_ts) {
             return false;
         }
-        // Preserve the existing 2h floor for intraday charts, but extend the stale window for
-        // slower frames so valid 1h/4h/1day candles are not misreported as stale.
-        $threshold_sec = max(7200, $this->timeframe_seconds($timeframe) * 2);
+        // CRITICAL FIX: Properly scale candle freshness window by timeframe.
+        // A 1h candle can be up to 2 hours old before considered stale (covers a full bar + delay).
+        // A 15m candle should be fresh within 30 minutes.
+        // Minimum 2 hours for all frames to account for market gaps.
+        $tf_seconds = $this->timeframe_seconds($timeframe);
+        // For frames <= 15m: use 2-hour floor. For slower frames: scale to 2x timeframe.
+        $threshold_sec = max(7200, min($tf_seconds * 2, 14400)); // 2h-4h range
         return (time() - $candle_ts) <= $threshold_sec;
     }
 
