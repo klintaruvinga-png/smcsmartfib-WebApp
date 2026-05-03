@@ -40,7 +40,7 @@ function LivePage() {
   const { data, isLoading } = useSnapshot();
   const { data: settings } = useUserSettings();
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
-  const staleThresholdMs = (settings?.staleThresholdSec ?? 120) * 1000;
+  const staleThresholdMs = (settings?.staleThresholdSec ?? 180) * 1000;
   if (isLoading || !data) return <div className="text-mute text-sm">Loading radar…</div>;
 
   return (

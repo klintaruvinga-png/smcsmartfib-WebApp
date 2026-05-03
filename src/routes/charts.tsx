@@ -145,7 +145,7 @@ function ChartsPage() {
           </ResponsiveContainer>
         </div>
 
-        <div className="mt-4 grid gap-2 sm:grid-cols-5">
+        <div className="mt-4 flex flex-wrap gap-2">
           {fibs.map((f) => (
             <div
               key={`${f.family}-${f.label}`}

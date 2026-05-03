@@ -737,6 +737,7 @@ final class SMC_SuperFib_Sniper_REST {
         ));
     }
 
+    // Audit-only stub — does not process payload; trade state is sourced from MT4/MT5 bridge.
     public function post_user_trades(WP_REST_Request $request) {
         $this->audit(get_current_user_id(), 'trades.posted', (array) $request->get_json_params());
         return rest_ensure_response(array('ok' => true));
@@ -782,6 +783,7 @@ final class SMC_SuperFib_Sniper_REST {
         return rest_ensure_response($this->read_pending_orders(get_current_user_id()));
     }
 
+    // Audit-only stub — does not process payload; trade state is sourced from MT4/MT5 bridge.
     public function post_user_trade_queue(WP_REST_Request $request) {
         $this->audit(get_current_user_id(), 'trade_queue.posted', (array) $request->get_json_params());
         return rest_ensure_response(array('ok' => true));
@@ -1571,18 +1573,6 @@ final class SMC_SuperFib_Sniper_REST {
         }, $rows)));
     }
 
-    private function get_cached_prices($user_id, $symbols) {
-        $prices = array();
-        $stale_threshold_sec = $this->get_settings($user_id)['staleThresholdSec'];
-        foreach ($symbols as $symbol) {
-            $cached = $this->get_cached_price($user_id, $symbol, $stale_threshold_sec);
-            if ($cached) {
-                $prices[] = $cached;
-            }
-        }
-        return $prices;
-    }
-
     private function get_engine_snapshot($user_id) {
         $snapshot = get_user_meta($user_id, 'smc_sf_engine_snapshot', true);
         return is_array($snapshot) ? $snapshot : null;
@@ -1916,7 +1906,7 @@ final class SMC_SuperFib_Sniper_REST {
             'NZDUSD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
             // FOREX — JPY quoted.
             // pip_val = 1 pip (0.01 JPY) × 100,000 units ÷ USDJPY_rate.
-            // $10.0 is exact only at USDJPY ≈ 100; at current rates (~156) the true value is ~$6.40.
+            // $10.0 is exact only at USDJPY ≈ 100; at USDJPY≈156 the true value is ~$6.40 (~36% lot-size underestimate).
             // For cross-JPY pairs the base-currency USD rate further affects pip_val.
             // TODO: compute dynamically from the live USDJPY mid to keep lot sizing accurate.
             'USDJPY' => array('type' => 'forex', 'pip_size' => 0.01,   'contract_size' => 100000, 'pip_val' => 10.0),

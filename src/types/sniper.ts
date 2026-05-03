@@ -155,7 +155,7 @@ export interface SignalCandidate {
   engineBlocker?: EngineBlocker;
   createdAt: string;
   engine?: {
-    htfBias: "BULL" | "BEAR" | "RANGING" | "TRANSITIONAL";
+    htfBias: "BULL" | "BEAR" | "TRANSITIONAL";
     pdState: PdState;
     drawOnLiquidity: string | null;
     sweep: SequenceState;
@@ -172,6 +172,7 @@ export interface SignalCandidate {
 
 export interface TradePlan {
   signalId: string;
+  symbol?: Symbol;
   entries: { e1: number; e2: number; e3: number };
   sl: number;
   stops?: { e1: number; e2: number; e3: number };

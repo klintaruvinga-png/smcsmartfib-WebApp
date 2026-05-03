@@ -37,7 +37,7 @@ function AccountPage() {
   const { data: settings } = useUserSettings();
   const { data: risk } = useUserRiskProfile();
 
-  if (!settings || !risk) return null;
+  if (!settings || !risk) return <div className="text-mute text-sm">Loading settings…</div>;
 
   return (
     <div className="space-y-4">
