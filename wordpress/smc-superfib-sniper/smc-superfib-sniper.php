@@ -873,6 +873,7 @@ final class SMC_SuperFib_Sniper_REST {
             'prices' => $prices,
             'regimes' => $engine['regimes'],
             'gates' => $engine['gates'],
+            'plans' => $engine['plans'],
             'diagnostics' => isset($engine['diagnostics']) ? $engine['diagnostics'] : array(),
         );
         $this->save_engine_snapshot($user_id, $snapshot);

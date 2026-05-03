@@ -57,6 +57,14 @@ export function useUserSettings() {
   });
 }
 
+export function useSession() {
+  return useQuery({
+    queryKey: ["session"],
+    queryFn: () => apiClient.getSession(),
+    refetchInterval: 60_000, // Session changes infrequently
+  });
+}
+
 /** Canonical watchlist derived from the user-settings cache — single source of truth. */
 export function useWatchlist() {
   const { data } = useUserSettings();
