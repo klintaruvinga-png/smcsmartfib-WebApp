@@ -2,7 +2,7 @@
 @source "../src";
 @import "tw-animate-css";
 
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+/* Google Fonts loaded via <link> in src/routes/__root.tsx head() to avoid @import-after-rules build errors. */
 
 @custom-variant dark (&:is(.dark *));
 
