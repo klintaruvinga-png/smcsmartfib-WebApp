@@ -196,7 +196,7 @@ final class SMC_SuperFib_Sniper_REST {
         $this->route('/health', WP_REST_Server::READABLE, 'get_health', true);
         $this->route('/session', WP_REST_Server::READABLE, 'get_session', false);
         $this->route('/snapshot', WP_REST_Server::READABLE, 'get_snapshot', true);
-        $this->route('/snapshot', WP_REST_Server::CREATABLE, 'post_snapshot', false);
+        $this->route('/snapshot', WP_REST_Server::CREATABLE, 'post_snapshot', true);
         $this->route('/charts', WP_REST_Server::READABLE, 'get_chart_snapshot', true);
         $this->route('/regimes', WP_REST_Server::READABLE, 'get_regimes', true);
         $this->route('/regime', WP_REST_Server::CREATABLE, 'post_regime', true);
@@ -613,6 +613,11 @@ final class SMC_SuperFib_Sniper_REST {
     public function post_snapshot(WP_REST_Request $request) {
         global $wpdb;
 
+        $permission = $this->permission_user();
+        if ($permission !== true) {
+            return $permission;
+        }
+
         $user_id = get_current_user_id();
         $payload = $request->get_json_params();
 
@@ -622,6 +627,8 @@ final class SMC_SuperFib_Sniper_REST {
 
         $symbol = strtoupper(sanitize_text_field($payload['symbol']));
         $normalized_symbol = isset($payload['normalized_symbol']) ? strtoupper(sanitize_text_field($payload['normalized_symbol'])) : $symbol;
+        $freshness_raw = isset($payload['freshness']) ? sanitize_text_field($payload['freshness']) : '';
+        $snapshot_state = $this->mt5_freshness_to_snapshot_state($freshness_raw);
 
         // Store tick data as price snapshot
         if (isset($payload['tick'])) {
@@ -629,7 +636,7 @@ final class SMC_SuperFib_Sniper_REST {
             $bid = isset($tick['bid']) ? (float) $tick['bid'] : 0;
             $ask = isset($tick['ask']) ? (float) $tick['ask'] : 0;
             $spread = isset($tick['spread']) ? (int) $tick['spread'] : 0;
-            $timestamp = isset($tick['timestamp']) ? sanitize_text_field($tick['timestamp']) : gmdate('c');
+            $timestamp_mysql = $this->normalize_market_timestamp(isset($tick['timestamp']) ? $tick['timestamp'] : null, $this->now_mysql());
 
             $mid = ($bid + $ask) / 2;
             $changePct1d = 0; // Placeholder, could be calculated from historical data
@@ -645,9 +652,26 @@ final class SMC_SuperFib_Sniper_REST {
                     'spread' => $spread,
                     'change_pct_1d' => $changePct1d,
                     'source' => 'mt5',
-                    'updated_at' => $this->now_mysql(),
+                    'state' => $snapshot_state,
+                    'updated_at' => $timestamp_mysql,
                 ),
-                array('%d', '%s', '%f', '%f', '%f', '%d', '%f', '%s', '%s')
+                array('%d', '%s', '%f', '%f', '%f', '%d', '%f', '%s', '%s', '%s')
+            );
+        } elseif ($freshness_raw !== '') {
+            // Preserve the last authoritative quote timestamp when MT5 is only reporting a
+            // freshness/session transition. Bumping updated_at here would fake a live quote.
+            $wpdb->update(
+                $this->table('snapshots'),
+                array(
+                    'state' => $snapshot_state,
+                    'source' => 'mt5',
+                ),
+                array(
+                    'user_id' => $user_id,
+                    'symbol' => $normalized_symbol,
+                ),
+                array('%s', '%s'),
+                array('%d', '%s')
             );
         }
 
@@ -655,6 +679,7 @@ final class SMC_SuperFib_Sniper_REST {
         if (isset($payload['candle_m1'])) {
             $candle = $payload['candle_m1'];
             $timeframe = '1min';
+            $candle_time = $this->normalize_market_timestamp(isset($candle['timestamp']) ? $candle['timestamp'] : null, $this->now_mysql());
 
             $wpdb->replace(
                 $this->table('candles'),
@@ -662,7 +687,7 @@ final class SMC_SuperFib_Sniper_REST {
                     'user_id' => $user_id,
                     'symbol' => $normalized_symbol,
                     'timeframe' => $timeframe,
-                    'candle_time' => isset($candle['timestamp']) ? gmdate('Y-m-d H:i:s', strtotime($candle['timestamp'])) : $this->now_mysql(),
+                    'candle_time' => $candle_time,
                     'open' => (float) $candle['open'],
                     'high' => (float) $candle['high'],
                     'low' => (float) $candle['low'],
@@ -678,7 +703,7 @@ final class SMC_SuperFib_Sniper_REST {
         // Store freshness state (could add to snapshots or new table)
         // For now, store in transients or extend snapshots table
         if (isset($payload['freshness'])) {
-            $freshness = sanitize_text_field($payload['freshness']);
+            $freshness = strtoupper($freshness_raw);
             set_transient('smc_sf_freshness_' . $user_id . '_' . $normalized_symbol, $freshness, 300); // 5 min
         }
 
@@ -711,9 +736,12 @@ final class SMC_SuperFib_Sniper_REST {
             return rest_ensure_response($svc->get_authority_state($user_id, $symbol));
         }
 
-        // No symbol supplied — return authority state for all watched symbols.
-        $snapshot = $this->ensure_engine_snapshot($user_id);
-        $watched  = array_column($snapshot['symbols'] ?? array(), 'symbol');
+        $watched = $this->get_settings($user_id)['watchlist'];
+        if (empty($watched)) {
+            $snapshot = $this->ensure_engine_snapshot($user_id);
+            $watched = $snapshot['meta']['watchlist'] ?? array_column($snapshot['prices'] ?? array(), 'symbol');
+        }
+        $watched = array_values(array_unique(array_filter(array_map('strval', is_array($watched) ? $watched : array()))));
         $result   = array();
         foreach ($watched as $sym) {
             $result[$sym] = $svc->get_authority_state($user_id, $sym);
@@ -2375,6 +2403,37 @@ final class SMC_SuperFib_Sniper_REST {
         // For frames <= 15m: use 2-hour floor. For slower frames: scale to 2x timeframe.
         $threshold_sec = max(7200, min($tf_seconds * 2, 14400)); // 2h-4h range
         return (time() - $candle_ts) <= $threshold_sec;
+    }
+
+    private function normalize_market_timestamp($raw_time, $fallback = null) {
+        $fallback = $fallback ?: $this->now_mysql();
+        if ($raw_time === null || $raw_time === '') {
+            return $fallback;
+        }
+
+        $value = trim((string) $raw_time);
+        $value = preg_replace('/^(\d{4})\.(\d{2})\.(\d{2})/', '$1-$2-$3', $value);
+        $ts = strtotime($value);
+        if ($ts === false) {
+            return $fallback;
+        }
+
+        return gmdate('Y-m-d H:i:s', $ts);
+    }
+
+    private function mt5_freshness_to_snapshot_state($freshness) {
+        switch (strtoupper(trim((string) $freshness))) {
+            case 'LIVE':
+                return 'live';
+            case 'DELAYED':
+            case 'STALE':
+                return 'stale';
+            case 'CLOSED':
+            case 'DISCONNECTED':
+                return 'offline';
+            default:
+                return 'offline';
+        }
     }
 
     private function table($name) {
