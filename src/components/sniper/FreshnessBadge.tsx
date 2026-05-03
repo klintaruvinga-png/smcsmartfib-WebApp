@@ -18,7 +18,10 @@ export function FreshnessBadge({
   state: FreshnessState;
   className?: string;
 }) {
-  const s = STYLES[state];
+  // HARDENING: guard against unknown state strings (e.g. 'delayed' from MT5,
+  // or a future backend value not yet in FreshnessState) so the component never
+  // crashes with "Cannot read properties of undefined".
+  const s = STYLES[state] ?? STYLES["stale"];
   return (
     <span
       className={cn(

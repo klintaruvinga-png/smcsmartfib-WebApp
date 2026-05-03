@@ -43,6 +43,13 @@ public:
         int index = GetSymbolIndex(symbol);
         if (index == -1)
             index = AddSymbol(symbol);
+        // HARDENING: AddSymbol() returns -1 when the 100-symbol capacity is full.
+        // Guard so callers never use index -1 for out-of-bounds array access.
+        if (index == -1)
+        {
+            Print("TickProcessor: capacity full, skipping symbol: ", symbol);
+            return;
+        }
 
         // Create tick data
         TickData tick;

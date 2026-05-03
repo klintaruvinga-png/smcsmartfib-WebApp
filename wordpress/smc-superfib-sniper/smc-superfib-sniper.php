@@ -975,7 +975,7 @@ final class SMC_SuperFib_Sniper_REST {
         ));
     }
 
-    private function run_engine_for_symbols($user_id, $symbols, $prices) {
+    private function run_engine_for_symbols($user_id, $symbols, $prices, $force = false) {
         global $wpdb;
         $symbols_sorted = $symbols;
         sort($symbols_sorted);
@@ -994,8 +994,12 @@ final class SMC_SuperFib_Sniper_REST {
             'symbols' => $symbols_sorted,
             'prices' => $price_fingerprint,
         )));
+        // HARDENING: Skip transient cache when a forced refresh is requested so that
+        // post_engine_batch() always produces a freshly computed engine result, not the
+        // 5-second-old cached snapshot that was present before quote/candle transients
+        // were cleared.
         $cached = get_transient($transient_key);
-        if (is_array($cached)) {
+        if (!$force && is_array($cached)) {
             return $cached;
         }
 
@@ -1135,6 +1139,10 @@ final class SMC_SuperFib_Sniper_REST {
             $status = 'WATCH';
         } elseif (!$sequence[$direction]['mss']) {
             $status = 'ARMED';
+        } elseif ($chop >= 0.7) {
+            // CRITICAL: Block READY status when chop >= 0.7 (F3 caution zone).
+            // SMC methodology requires no entries in high-chop equilibrium.
+            $status = 'ARMED';
         } else {
             $status = 'READY';
         }
@@ -1161,11 +1169,23 @@ final class SMC_SuperFib_Sniper_REST {
         $symbol_state   = $data_live ? 'live' : 'stale';
         $candle_state   = empty($candles) ? 'missing' : ($candles_fresh ? 'live' : 'stale');
 
-        $gate = array(
-            'symbol' => $symbol,
-            'allow' => $direction === 'LONG' ? 'BUY' : 'SELL',
-            'state' => $symbol_state,
-        );
+        // CRITICAL HARDENING: Block gate when chop >= 0.7 (F3 caution zone).
+        // SMC methodology requires no entries in high-chop equilibrium; this was
+        // missing from the live backend while the mock data showed BLOCKED correctly.
+        if ($chop >= 0.7) {
+            $gate = array(
+                'symbol' => $symbol,
+                'allow'  => 'BLOCKED',
+                'reason' => 'chop > 0.7 — F3 caution zone',
+                'state'  => $symbol_state,
+            );
+        } else {
+            $gate = array(
+                'symbol' => $symbol,
+                'allow'  => $direction === 'LONG' ? 'BUY' : 'SELL',
+                'state'  => $symbol_state,
+            );
+        }
 
         $regime = array(
             'symbol' => $symbol,
@@ -1184,7 +1204,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         // Anchor the signal identity to the latest analysed candle so the same setup stays stable
         // within one 15m bar, while later intraday setups get a distinct execution queue identity.
-        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol);
+        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol, $chop);
 
         $signal_anchor = $last_candle && !empty($last_candle['time']) ? $last_candle['time'] : gmdate('c');
         $signal_id = 'sig-' . substr(md5($user_id . '|' . $symbol . '|' . $direction . '|' . $signal_anchor), 0, 16);
@@ -1196,6 +1216,9 @@ final class SMC_SuperFib_Sniper_REST {
             'confluence' => $confluence,
             'verdict' => $this->verdict($status, $confluence, $chop),
             'computedBy' => 'backend',
+            // CRITICAL HARDENING: Never backend-confirm a signal unless status is READY
+            // (which already incorporates chop gate blocking). Without this guard, 
+            // post_execute_signals() would still accept and queue non-READY signals.
             'backendConfirmed' => $status === 'READY' && $data_live,
             'engineBlocker' => $engine_blocker,
             'createdAt' => $signal_anchor,
@@ -1870,7 +1893,7 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         $prices = $this->refresh_prices($user_id, $symbols);
-        $engine = $this->run_engine_for_symbols($user_id, $symbols, $prices);
+        $engine = $this->run_engine_for_symbols($user_id, $symbols, $prices, $force);
         $snapshot = array(
             'prices' => $prices,
             'regimes' => $engine['regimes'],
@@ -2054,7 +2077,7 @@ final class SMC_SuperFib_Sniper_REST {
     // Returns a single string reason explaining why a READY signal cannot be
     // backend-confirmed, or 'OK' when everything is healthy.
 
-    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol = null) {
+    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol = null, $chop = null) {
         $key_status = $this->get_twelve_key_status($user_id);
         if ($key_status === 'missing') return 'KEY_MISSING';
         if ($key_status === 'invalid') return 'KEY_INVALID';
@@ -2078,6 +2101,13 @@ final class SMC_SuperFib_Sniper_REST {
         if ($candle_age_sec > 7200) return 'CANDLES_STALE';
 
         if ($status === 'READY' && !$data_live) return 'READY_NOT_CONFIRMED_STALE_DATA';
+
+        // CRITICAL HARDENING: Gate is BLOCKED when chop >= 0.7; signal must never be
+        // backend-confirmed in this state. Without this check, post_execute_signals()
+        // can still queue a READY+confirmed signal even though the gate is BLOCKED,
+        // breaking the chop-gate contract introduced by the gate patch.
+        if ($chop !== null && (float) $chop >= 0.7) return 'CHOP_GATE_BLOCKED';
+
         return 'OK';
     }
 
