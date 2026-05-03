@@ -4,7 +4,7 @@ import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { VerdictBadge } from "@/components/sniper/VerdictBadge";
 import { DivergenceBanner } from "@/components/sniper/Warnings";
 import { relTime } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { cn, deduplicateById } from "@/lib/utils";
 import { CheckCircle2, AlertTriangle, XCircle, RefreshCw } from "lucide-react";
 import type { EngineBlocker, FreshnessState } from "@/types/sniper";
 
@@ -46,21 +46,16 @@ function SignalsPage() {
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
   
   // Deduplicate signals by ID to handle backend duplicates
-  const uniqueSignals = signals ? (() => {
-    const seen = new Set<string>();
-    return signals.filter((s) => {
-      if (seen.has(s.id)) return false;
-      seen.add(s.id);
-      return true;
-    });
-  })() : [];
+  const uniqueSignals = signals ? deduplicateById(signals) : [];
   
   const divergent = uniqueSignals.filter(
     (s) => s.computedBy === "frontend" && !s.backendConfirmed,
   );
 
   // feedStatus supersedes priceFeed when present (it is the richer field).
-  const feedState = (h?.feedStatus ?? h?.priceFeed ?? "offline") as FreshnessState;
+  const rawFeedState = h?.feedStatus ?? h?.priceFeed ?? "offline";
+  const feedState: FreshnessState =
+    rawFeedState === "rate-limited" ? "stale" : (rawFeedState as FreshnessState);
   const checks: { label: string; state: FreshnessState | "ok" | "missing"; detail?: string }[] = [
     {
       label: "Backend sync",
@@ -69,7 +64,7 @@ function SignalsPage() {
     },
     {
       label: "Feed status",
-      state: feedState === "rate-limited" ? "stale" : feedState,
+      state: feedState,
       detail: h?.feedStatus ?? h?.priceFeed,
     },
     {

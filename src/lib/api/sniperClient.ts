@@ -177,7 +177,7 @@ export const apiClient = {
   },
   async getEngineHealth(mock = MOCK_MODE): Promise<EngineHealth> {
     if (mock) return mockEngineHealth;
-    return call<EngineHealth>("/health", { authenticated: true });
+    return call<EngineHealth>("/health");
   },
 
   // Authenticated user

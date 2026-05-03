@@ -4,8 +4,8 @@ import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { VerdictBadge } from "@/components/sniper/VerdictBadge";
 import { WarningLine, DivergenceBanner } from "@/components/sniper/Warnings";
 import { fmtPrice, fmtPct, fmtUSC, fmtZAR, relTime } from "@/lib/format";
-import { ArrowUpRight, ArrowDownRight, Send } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ArrowUpRight, ArrowDownRight, Send, Loader, AlertTriangle, Search } from "lucide-react";
+import { cn, deduplicateById } from "@/lib/utils";
 import { apiClient } from "@/lib/api/sniperClient";
 import { toast } from "sonner";
 import { WalletOverview } from "@/components/sniper/WalletOverview";
@@ -33,14 +33,7 @@ function PlanPage() {
   const { data: ladders, isLoading: laddersLoading } = useLadders();
   
   // Deduplicate signals by ID to handle backend duplicates
-  const uniqueSignals = signals ? (() => {
-    const seen = new Set<string>();
-    return signals.filter((s) => {
-      if (seen.has(s.id)) return false;
-      seen.add(s.id);
-      return true;
-    });
-  })() : undefined;
+  const uniqueSignals = signals ? deduplicateById(signals) : undefined;
   
   const top = uniqueSignals?.find((s) => s.status === "READY") ?? uniqueSignals?.[0];
   const plan = top ? (ladders?.find((l) => l.signalId === top.id) ?? null) : null;
@@ -48,7 +41,7 @@ function PlanPage() {
   if (signalsLoading || laddersLoading) {
     return (
       <div className="text-mute text-sm">
-        ⏳ Loading signal data and blueprints...
+        <Loader className="h-4 w-4 animate-spin inline mr-2" /> Loading signal data and blueprints...
       </div>
     );
   }
@@ -66,14 +59,14 @@ function PlanPage() {
     return (
       <div className="space-y-3 text-sm">
         <div className="text-mute">
-          ⚠️ {top ? "No matching blueprint for this signal." : "No active signals found."}
+          <AlertTriangle className="h-4 w-4 inline mr-2" /> {top ? "No matching blueprint for this signal." : "No active signals found."}
         </div>
         {top && (
           <div className="text-xs text-dim bg-bg1/40 rounded px-3 py-2 max-w-lg space-y-1">
             <div>Signal: <span className="text-info font-mono">{top.id}</span> ({top.symbol} {top.direction})</div>
             <div>Found {diagnostics.blueprintCount} total blueprints</div>
             {diagnostics.blueprintCount === 0 && (
-              <div className="text-warn">🔍 Ladders endpoint returned no data — check backend connectivity</div>
+              <div className="text-warn"><Search className="h-4 w-4 inline mr-2" /> Ladders endpoint returned no data — check backend connectivity</div>
             )}
             {diagnostics.blueprintCount > 0 && (
               <div>Ladder IDs available: {diagnostics.blueprintIds.join(", ") || "none"}</div>
@@ -245,8 +238,12 @@ function PlanPage() {
         </div>
         <button
           onClick={async () => {
-            const r = await apiClient.postExecuteSignals({ signalIds: [top.id] });
-            toast.success(`Queued ${r.queued} order${r.queued > 1 ? "s" : ""} for execution`);
+            try {
+              const r = await apiClient.postExecuteSignals({ signalIds: [top.id] });
+              toast.success(`Queued ${r.queued} order${r.queued > 1 ? "s" : ""} for execution`);
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Execution failed");
+            }
           }}
           disabled={!top.backendConfirmed}
           className={cn(

@@ -1,9 +1,9 @@
 import { Link, Outlet, useRouterState, useRouter } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useSnapshot, useLiveSignals, useEngineHealth } from "@/hooks/useSniperData";
+import { useSnapshot, useLiveSignals, useEngineHealth, useSession } from "@/hooks/useSniperData";
 import { fmtPrice, fmtPct } from "@/lib/format";
 import { SyncChip, SignalStatusChip } from "@/components/sniper/Chips";
-import { cn } from "@/lib/utils";
+import { cn, deduplicateById } from "@/lib/utils";
 import {
   Activity,
   BarChart3,
@@ -68,18 +68,14 @@ function HeaderChips() {
   const { data: snap } = useSnapshot();
   const { data: signals } = useLiveSignals();
   const { data: health } = useEngineHealth();
+  const { data: session } = useSession();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const syncState = health?.backendSync ?? snap?.prices?.[0]?.state ?? "offline";
   const counts = useMemo(() => {
     const r = signals ?? [];
     // Deduplicate signals by ID to handle backend duplicates
-    const seen = new Set<string>();
-    const unique = r.filter((s) => {
-      if (seen.has(s.id)) return false;
-      seen.add(s.id);
-      return true;
-    });
+    const unique = deduplicateById(r);
     return {
       ready: unique.filter((s) => s.status === "READY").length,
       armed: unique.filter((s) => s.status === "ARMED").length,
@@ -101,6 +97,13 @@ function HeaderChips() {
     <div className="flex items-center gap-2">
       <SyncChip state={syncState} />
       <SignalStatusChip {...counts} />
+      {session?.name && (
+        <div className="inline-flex items-center rounded-md border border-bd bg-bg2/60 px-2.5 py-1.5">
+          <span className="text-[10px] font-semibold tracking-wider text-mute font-mono">
+            {session.name}
+          </span>
+        </div>
+      )}
       <button
         onClick={() => void handleRefresh()}
         disabled={isRefreshing}
