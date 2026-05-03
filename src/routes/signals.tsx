@@ -53,8 +53,9 @@ function SignalsPage() {
   const watchlist = useWatchlist();
   const [watchlistOnly, setWatchlistOnly] = useState(true);
 
-  // CRITICAL: Deduplicate signals by ID and filter to backend-confirmed for execution readiness.
-  const allUnique = signals ? deduplicateById(signals).filter((s) => s.backendConfirmed) : [];
+  // Deduplicate signals by ID and preserve backend unconfirmed candidates so the UI reflects
+  // actual engine output, even when some candidates are still waiting on backend confirmation.
+  const allUnique = signals ? deduplicateById(signals) : [];
   const uniqueSignals =
     watchlistOnly && watchlist.length > 0
       ? allUnique.filter((s) => watchlist.includes(s.symbol))

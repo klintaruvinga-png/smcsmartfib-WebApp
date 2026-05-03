@@ -463,6 +463,7 @@ final class SMC_SuperFib_Sniper_REST {
                 ),
                 array('%d', '%s', '%s', '%s', '%s')
             );
+            $this->clear_feed_rate_limit_state($user_id);
             $this->audit($user_id, 'twelve_data_key.saved', array('status' => 'ok'));
         }
 
@@ -1811,20 +1812,18 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function set_feed_rate_limited($user_id, $symbol = null, $ttl_sec = 60) {
-        set_transient($this->rl_transient_key($user_id), time(), $ttl_sec);
         if ($symbol !== null) {
             set_transient($this->rl_transient_key($user_id, $symbol), time(), $ttl_sec);
+        } else {
+            set_transient($this->rl_transient_key($user_id), time(), $ttl_sec);
         }
     }
 
     private function is_feed_rate_limited($user_id, $symbol = null) {
-        if (get_transient($this->rl_transient_key($user_id)) !== false) {
-            return true;
-        }
         if ($symbol !== null) {
             return get_transient($this->rl_transient_key($user_id, $symbol)) !== false;
         }
-        return false;
+        return get_transient($this->rl_transient_key($user_id)) !== false;
     }
 
     private function get_twelve_key_status($user_id) {
@@ -1835,6 +1834,14 @@ final class SMC_SuperFib_Sniper_REST {
             self::TWELVE_PROVIDER
         ));
         return $status ? $status : 'missing';
+    }
+
+    private function clear_feed_rate_limit_state($user_id) {
+        delete_transient($this->rl_transient_key($user_id));
+        $settings = $this->get_settings($user_id);
+        foreach ($settings['watchlist'] as $symbol) {
+            delete_transient($this->rl_transient_key($user_id, $symbol));
+        }
     }
 
     private function set_twelve_key_status($user_id, $status) {
