@@ -52,12 +52,31 @@ public:
         freshnessStates[index] = FRESHNESS_LIVE;  // Since we just got a tick
     }
 
-    // Update freshness periodically
-    void UpdatePeriodic()
+    // Update freshness periodically.
+    // Pass is_market_open=false during weekends/holidays so symbols transition
+    // to FRESHNESS_CLOSED rather than incorrectly aging into FRESHNESS_STALE.
+    void UpdatePeriodic(bool is_market_open = true)
     {
         datetime now = TimeCurrent();
         for (int i = 0; i < symbolCount; i++)
         {
+            // HARDENING: disconnected terminal always wins — no live data possible.
+            if (!IsTerminalConnected())
+            {
+                freshnessStates[i] = FRESHNESS_DISCONNECTED;
+                stagnationTimers[i] = (int)(now - lastTickTimes[i]);
+                continue;
+            }
+
+            // HARDENING: propagate CLOSED state from session manager so market-closed
+            // symbols are not misrepresented as STALE during weekends/holidays.
+            if (!is_market_open)
+            {
+                freshnessStates[i] = FRESHNESS_CLOSED;
+                stagnationTimers[i] = (int)(now - lastTickTimes[i]);
+                continue;
+            }
+
             int secondsSinceTick = (int)(now - lastTickTimes[i]);
             stagnationTimers[i] = secondsSinceTick;
 
@@ -67,11 +86,6 @@ public:
                 freshnessStates[i] = FRESHNESS_DELAYED;
             else
                 freshnessStates[i] = FRESHNESS_STALE;
-
-            // Check session and connection
-            if (!IsTerminalConnected())
-                freshnessStates[i] = FRESHNESS_DISCONNECTED;
-            // Session check would be integrated with SessionManager
         }
     }
 

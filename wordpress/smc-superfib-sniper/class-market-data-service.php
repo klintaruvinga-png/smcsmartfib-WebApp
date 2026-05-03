@@ -50,9 +50,12 @@ class SMC_MarketData_Service
                 'spread' => $spread,
                 'change_pct_1d' => 0,
                 'source' => 'mt5',
+                // HARDENING: explicitly mark MT5-sourced ticks as 'live' so get_cached_price()
+                // does not return state='offline' (the column DEFAULT) for fresh MT5 data.
+                'state' => 'live',
                 'updated_at' => gmdate('Y-m-d H:i:s'),
             ),
-            array('%d', '%s', '%f', '%f', '%f', '%d', '%f', '%s', '%s')
+            array('%d', '%s', '%f', '%f', '%f', '%d', '%f', '%s', '%s', '%s')
         ) !== false;
     }
 
