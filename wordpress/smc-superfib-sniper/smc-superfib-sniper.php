@@ -1085,17 +1085,34 @@ final class SMC_SuperFib_Sniper_REST {
             'regime' => $regime,
             'gate' => $gate,
             'signal' => $signal,
-            'plan' => $this->build_trade_plan($user_id, $signal, $high, $low),
+            'plan' => $this->build_trade_plan($user_id, $signal, $high, $low, $sequence),
             'diagnostic' => $diagnostic,
         );
     }
 
-    private function build_trade_plan($user_id, $signal, $high, $low) {
+    private function build_trade_plan($user_id, $signal, $high, $low, $sequence) {
         $risk = $this->get_risk_profile($user_id);
         $account = $this->get_account_state($user_id);
         $equity = max((float) $account['equityUSC'], 1);
         $risk_usc = round($equity * ((float) $risk['perTradePct'] / 100), 2);
         $is_long = $signal['direction'] === 'LONG';
+
+        // Compute swings for SL/TP
+        $candles = $this->get_candles($user_id, $signal['symbol'], 120);
+        if (count($candles) >= 35) {
+            $prior = array_slice($candles, -35, 25);
+            $swing_hi = max(array_map(function ($c) { return (float) $c['high']; }, $prior));
+            $swing_lo = min(array_map(function ($c) { return (float) $c['low']; }, $prior));
+        } else {
+            $swing_hi = $high;
+            $swing_lo = $low;
+        }
+        $sweep_up = $sequence['LONG']['sweep'];
+        $sweep_down = $sequence['SHORT']['sweep'];
+        $sl = $this->get_sl_from_sweep($signal['direction'], $sweep_up, $sweep_down, $swing_hi, $swing_lo);
+        $zone_price = $is_long ? $low : $high;
+        $tp = $this->get_tp_price_from_zone($zone_price, $signal['direction']);
+
         $ratios = $is_long ? array(62.5, 75, 100) : array(25, 0, -25);
         $stop_ratios = $is_long ? array(75, 100, 125) : array(0, -25, -62.5);
         $target_ratios = $is_long ? array(50, 25, 0) : array(50, 75, 100);
@@ -1111,9 +1128,15 @@ final class SMC_SuperFib_Sniper_REST {
             $ladder[$stage] = array('ratio' => $ratios[$idx], 'stopRatio' => $stop_ratios[$idx], 'family' => 'LTF_SF');
         }
 
-        foreach (array('tp1', 'tp2', 'tp3') as $idx => $tp) {
-            $tps[$tp] = $this->price_for_ratio($high, $low, $target_ratios[$idx]);
+        foreach (array('tp1', 'tp2', 'tp3') as $idx => $tp_key) {
+            $tps[$tp_key] = $this->price_for_ratio($high, $low, $target_ratios[$idx]);
         }
+
+        // Override SL and TP with imported logic
+        $sl = $this->get_sl_from_sweep($signal['direction'], $sweep_up, $sweep_down, $swing_hi, $swing_lo);
+        $tp = $this->get_tp_price_from_zone($zone_price, $signal['direction']);
+        $tps = array('tp1' => $tp, 'tp2' => $tp, 'tp3' => $tp); // Set all to same for now
+        $stops = array('e1' => $sl, 'e2' => $sl, 'e3' => $sl); // Per-stage stops to SL
 
         // Compute lot sizes from risk budget. Weights match 1:2:3 so each stage carries a
         // proportional share; rounding to the nearest micro-lot (0.01) keeps broker precision.
@@ -1141,7 +1164,7 @@ final class SMC_SuperFib_Sniper_REST {
             'signalId' => $signal['id'],
             'symbol' => $signal['symbol'],
             'entries' => $entries,
-            'sl' => $stops['e3'],
+            'sl' => $sl,
             'stops' => $stops,
             'tps' => $tps,
             'rr' => $rr,
@@ -1152,7 +1175,32 @@ final class SMC_SuperFib_Sniper_REST {
             'drawdownImpactPct' => round(($risk_usc / $equity) * 100, 4),
             'source' => 'backend-blueprint',
             'executionSource' => 'LTF_SF',
+            'ladderId' => md5($signal['id'] . time()),
+            'direction' => $signal['direction'],
+            'stageFills' => array('e1' => false, 'e2' => false, 'e3' => false),
+            'state' => 'ACTIVE',
         );
+    }
+
+    private function get_sl_from_sweep($direction, $sweep_up, $sweep_down, $swing_hi, $swing_lo) {
+        // Ported from Pine: basic implementation
+        $buffer = 0.001; // Placeholder: should depend on session and pair type
+        if ($direction === 'LONG') {
+            return $swing_lo - $buffer;
+        } else {
+            return $swing_hi + $buffer;
+        }
+    }
+
+    private function get_tp_price_from_zone($zone_price, $direction) {
+        // Ported from Pine: basic implementation using EF levels
+        // Assume zone_price is the high/low, and TP is offset
+        $offset = 0.002; // Placeholder
+        if ($direction === 'LONG') {
+            return $zone_price + $offset;
+        } else {
+            return $zone_price - $offset;
+        }
     }
 
     private function sequence_state($candles) {

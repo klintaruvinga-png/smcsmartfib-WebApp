@@ -263,6 +263,31 @@ function PlanPage() {
         </PlanCard>
       </div>
 
+      {/* Ladder Status */}
+      {plan.stageFills && (
+        <PlanCard title="Ladder Status" tone="neutral">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span>State:</span>
+              <span className={cn("font-mono text-sm", plan.state === 'ACTIVE' ? 'text-buy' : 'text-sell')}>
+                {plan.state}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className={cn("rounded px-2 py-1 text-center text-xs font-mono", plan.stageFills.e1 ? 'bg-buy/20 text-buy' : 'bg-bg2 text-dim')}>
+                E1 {plan.stageFills.e1 ? 'Filled' : 'Pending'}
+              </div>
+              <div className={cn("rounded px-2 py-1 text-center text-xs font-mono", plan.stageFills.e2 ? 'bg-buy/20 text-buy' : 'bg-bg2 text-dim')}>
+                E2 {plan.stageFills.e2 ? 'Filled' : 'Pending'}
+              </div>
+              <div className={cn("rounded px-2 py-1 text-center text-xs font-mono", plan.stageFills.e3 ? 'bg-buy/20 text-buy' : 'bg-bg2 text-dim')}>
+                E3 {plan.stageFills.e3 ? 'Filled' : 'Pending'}
+              </div>
+            </div>
+          </div>
+        </PlanCard>
+      )}
+
       {/* CTA */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-bd bg-bg1/40 p-4">
         <div className="text-xs text-mute">

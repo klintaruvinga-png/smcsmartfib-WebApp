@@ -189,6 +189,10 @@ export interface TradePlan {
   drawdownImpactPct: number;
   source: "frontend-preview" | "backend-blueprint";
   executionSource?: "LTF_SF";
+  ladderId?: string;
+  direction?: "LONG" | "SHORT";
+  stageFills?: { e1: boolean; e2: boolean; e3: boolean };
+  state?: "ACTIVE" | "INVALID";
 }
 
 export interface Position {
