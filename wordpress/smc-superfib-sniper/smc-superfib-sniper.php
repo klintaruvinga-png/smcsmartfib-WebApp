@@ -1578,30 +1578,46 @@ final class SMC_SuperFib_Sniper_REST {
         // MT5 is the authoritative real-time source. If the row was written by MT5 within
         // the last 60 seconds, skip the twelve-data overwrite so live EA prices persist.
         $existing = $wpdb->get_row( $wpdb->prepare(
-            "SELECT source, updated_at FROM {$this->table('snapshots')} WHERE user_id = %d AND symbol = %s",
+            "SELECT source, updated_at, bid, ask, mid, change_pct_1d FROM {$this->table('snapshots')} WHERE user_id = %d AND symbol = %s",
             $user_id, $symbol
         ) );
+        $age_seconds = $existing ? ( strtotime($this->now_mysql()) - strtotime($existing->updated_at) ) : -1;
         $mt5_is_fresh = $existing
             && $existing->source === 'mt5'
-            && (strtotime($this->now_mysql()) - strtotime($existing->updated_at)) < 60;
+            && $age_seconds >= 0
+            && $age_seconds < 60;
 
-        if ( ! $mt5_is_fresh ) {
-            $wpdb->replace(
-                $this->table('snapshots'),
-                array(
-                    'user_id'       => $user_id,
-                    'symbol'        => $symbol,
-                    'bid'           => $bid,
-                    'ask'           => $ask,
-                    'mid'           => $mid,
-                    'change_pct_1d' => $row['changePct1d'],
-                    'source'        => 'twelve-data',
-                    'state'         => 'live',
-                    'updated_at'    => $this->now_mysql(),
-                ),
-                array('%d', '%s', '%f', '%f', '%f', '%f', '%s', '%s', '%s')
+        if ( $mt5_is_fresh ) {
+            // Return the stored MT5 values so callers serve authoritative EA prices,
+            // not the just-fetched Twelve Data quote.
+            set_transient($quote_ttl_key, 1, 45);
+            $this->set_twelve_key_status($user_id, 'ok');
+            return array(
+                'symbol'      => $symbol,
+                'bid'         => (float) $existing->bid,
+                'ask'         => (float) $existing->ask,
+                'mid'         => (float) $existing->mid,
+                'changePct1d' => (float) $existing->change_pct_1d,
+                'updatedAt'   => $existing->updated_at,
+                'state'       => 'live',
             );
         }
+
+        $wpdb->replace(
+            $this->table('snapshots'),
+            array(
+                'user_id'       => $user_id,
+                'symbol'        => $symbol,
+                'bid'           => $bid,
+                'ask'           => $ask,
+                'mid'           => $mid,
+                'change_pct_1d' => $row['changePct1d'],
+                'source'        => 'twelve-data',
+                'state'         => 'live',
+                'updated_at'    => $this->now_mysql(),
+            ),
+            array('%d', '%s', '%f', '%f', '%f', '%f', '%s', '%s', '%s')
+        );
 
         // Mark this symbol's quote as freshly fetched for 45 seconds to prevent API spam.
         set_transient($quote_ttl_key, 1, 45);
