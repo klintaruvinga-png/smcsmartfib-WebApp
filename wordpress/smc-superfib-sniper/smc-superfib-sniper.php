@@ -1281,7 +1281,8 @@ final class SMC_SuperFib_Sniper_REST {
         $cached = $this->get_cached_price($user_id, $symbol);
         if (is_array($cached) && isset($cached['mid']) && (float) $cached['mid'] > 0) {
             $age_sec = $this->iso_age_sec(isset($cached['updatedAt']) ? $cached['updatedAt'] : null);
-            if ($age_sec <= 86400) {
+            $stale_threshold_sec = $this->get_settings($user_id)['staleThresholdSec'];
+            if ($age_sec <= $stale_threshold_sec && ($cached['state'] ?? 'stale') === 'live') {
                 return (float) $cached['mid'];
             }
         }

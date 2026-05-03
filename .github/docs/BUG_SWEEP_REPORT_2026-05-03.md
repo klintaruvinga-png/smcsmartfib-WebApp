@@ -110,6 +110,7 @@ For the issue above:
 
 - Updated [`/wordpress/smc-superfib-sniper/smc-superfib-sniper.php`](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/smc-superfib-sniper.php) so `build_trade_plan()` uses runtime FX conversion data when computing pip value per standard lot.
 - Added guarded helpers for symbol splitting, reference-mid resolution, quote-currency USD conversion, and fallback behavior when reference prices are unavailable or too old.
+- Hardened FX conversion to reject cached reference mids unless the cached quote is still marked `live` and remains within the user’s stale-threshold window.
 - Added focused regression coverage in [`/wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php`](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php).
 
 ---
@@ -125,7 +126,7 @@ For the issue above:
 
 ## Remaining Risks
 
-- Reference conversion prices for CAD/CHF crosses still depend on available market data snapshots. The runtime now falls back safely, but empirical staging verification is still required.
+- Reference conversion prices for CAD/CHF crosses still depend on available market data snapshots. The runtime now falls back safely and will reject stale cached reference mids, but empirical staging verification is still required.
 - End-to-end trade-plan parity against Pine/MT5 remains unproven in this run because only the mathematical sizing helper was exercised.
 - Phase 0 success criteria still require long-duration refresh validation.
 
