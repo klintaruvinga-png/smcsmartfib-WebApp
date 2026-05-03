@@ -816,9 +816,12 @@ final class SMC_SuperFib_Sniper_REST {
         $user_id = get_current_user_id();
         $payload = $request->get_json_params();
         $symbols = isset($payload['symbols']) ? $this->sanitize_symbols($payload['symbols']) : $this->get_settings($user_id)['watchlist'];
-        // Force fresh quotes by clearing quote TTL transients for each symbol before refresh.
+        // Force fresh data by clearing both quote and candle TTL transients for each symbol.
+        // Without clearing candle TTL, a force-refresh fetches new quotes but returns 90-second-old
+        // cached candles from the DB, producing a stale-candle / fresh-price mismatch.
         foreach ($symbols as $sym) {
             delete_transient('smc_sf_qt_' . $user_id . '_' . md5($sym));
+            delete_transient('smc_sf_ct_' . $user_id . '_' . md5($sym . '|15min'));
         }
         $snapshot = $this->ensure_engine_snapshot($user_id, true);
         return rest_ensure_response(array(
@@ -929,12 +932,9 @@ final class SMC_SuperFib_Sniper_REST {
             $price = array('symbol' => $symbol, 'mid' => 0, 'updatedAt' => gmdate('c'), 'state' => $state);
         }
 
-        // CRITICAL FIX: Enforce staleThresholdSec setting on price freshness.
-        // A price older than the threshold MUST be marked stale, not live.
-        if (isset($price['updatedAt']) && !$this->is_stale($price['updatedAt'], $stale_threshold_sec)) {
-            // Price is within threshold, keep its original state.
-        } else if (isset($price['updatedAt'])) {
-            // Price exceeds threshold, force stale state.
+        // Enforce staleThresholdSec on price freshness using iso_age_sec() — is_stale() appends
+        // ' UTC' which breaks strtotime() when the timestamp is already ISO 8601 with timezone.
+        if (isset($price['updatedAt']) && $this->iso_age_sec($price['updatedAt']) > $stale_threshold_sec) {
             $price['state'] = 'stale';
         }
 
@@ -1067,7 +1067,6 @@ final class SMC_SuperFib_Sniper_REST {
                 'firstReactionFamily' => $hta_override ? 'HTA_SF' : 'LTF_SF',
                 'chartState' => 'chart-derived',
                 'panelState' => null,
-                'engineBlocker' => $engine_blocker,
             ),
         );
 
@@ -1085,20 +1084,19 @@ final class SMC_SuperFib_Sniper_REST {
             'regime' => $regime,
             'gate' => $gate,
             'signal' => $signal,
-            'plan' => $this->build_trade_plan($user_id, $signal, $high, $low, $sequence),
+            'plan' => $this->build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles),
             'diagnostic' => $diagnostic,
         );
     }
 
-    private function build_trade_plan($user_id, $signal, $high, $low, $sequence) {
+    private function build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles) {
         $risk = $this->get_risk_profile($user_id);
         $account = $this->get_account_state($user_id);
         $equity = max((float) $account['equityUSC'], 1);
         $risk_usc = round($equity * ((float) $risk['perTradePct'] / 100), 2);
         $is_long = $signal['direction'] === 'LONG';
 
-        // Compute swings for SL/TP
-        $candles = $this->get_candles($user_id, $signal['symbol'], 120);
+        // Compute swings for SL using the candles already fetched by build_symbol_state().
         if (count($candles) >= 35) {
             $prior = array_slice($candles, -35, 25);
             $swing_hi = max(array_map(function ($c) { return (float) $c['high']; }, $prior));
@@ -1109,34 +1107,28 @@ final class SMC_SuperFib_Sniper_REST {
         }
         $sweep_up = $sequence['LONG']['sweep'];
         $sweep_down = $sequence['SHORT']['sweep'];
-        $sl = $this->get_sl_from_sweep($signal['direction'], $sweep_up, $sweep_down, $swing_hi, $swing_lo);
-        $zone_price = $is_long ? $low : $high;
-        $tp = $this->get_tp_price_from_zone($zone_price, $signal['direction']);
+        // Swing-based SL with instrument-aware buffer (plan-level SL field).
+        $sl = $this->get_sl_from_sweep($signal['direction'], $sweep_up, $sweep_down, $swing_hi, $swing_lo, $signal['symbol']);
 
-        $ratios = $is_long ? array(62.5, 75, 100) : array(25, 0, -25);
-        $stop_ratios = $is_long ? array(75, 100, 125) : array(0, -25, -62.5);
-        $target_ratios = $is_long ? array(50, 25, 0) : array(50, 75, 100);
+        // Fib-ratio-based entries, per-stage stops, and differentiated TPs.
+        $ratios        = $is_long ? array(62.5, 75, 100)   : array(25, 0, -25);
+        $stop_ratios   = $is_long ? array(75, 100, 125)    : array(0, -25, -62.5);
+        $target_ratios = $is_long ? array(50, 25, 0)       : array(50, 75, 100);
         $entries = array();
-        $stops = array();
-        $tps = array();
-        $lots = array();
-        $ladder = array();
+        $stops   = array();
+        $tps     = array();
+        $lots    = array();
+        $ladder  = array();
 
         foreach (array('e1', 'e2', 'e3') as $idx => $stage) {
             $entries[$stage] = $this->price_for_ratio($high, $low, $ratios[$idx]);
-            $stops[$stage] = $this->price_for_ratio($high, $low, $stop_ratios[$idx]);
-            $ladder[$stage] = array('ratio' => $ratios[$idx], 'stopRatio' => $stop_ratios[$idx], 'family' => 'LTF_SF');
+            $stops[$stage]   = $this->price_for_ratio($high, $low, $stop_ratios[$idx]);
+            $ladder[$stage]  = array('ratio' => $ratios[$idx], 'stopRatio' => $stop_ratios[$idx], 'family' => 'LTF_SF');
         }
 
         foreach (array('tp1', 'tp2', 'tp3') as $idx => $tp_key) {
             $tps[$tp_key] = $this->price_for_ratio($high, $low, $target_ratios[$idx]);
         }
-
-        // Override SL and TP with imported logic
-        $sl = $this->get_sl_from_sweep($signal['direction'], $sweep_up, $sweep_down, $swing_hi, $swing_lo);
-        $tp = $this->get_tp_price_from_zone($zone_price, $signal['direction']);
-        $tps = array('tp1' => $tp, 'tp2' => $tp, 'tp3' => $tp); // Set all to same for now
-        $stops = array('e1' => $sl, 'e2' => $sl, 'e3' => $sl); // Per-stage stops to SL
 
         // Compute lot sizes from risk budget. Weights match 1:2:3 so each stage carries a
         // proportional share; rounding to the nearest micro-lot (0.01) keeps broker precision.
@@ -1175,20 +1167,22 @@ final class SMC_SuperFib_Sniper_REST {
             'drawdownImpactPct' => round(($risk_usc / $equity) * 100, 4),
             'source' => 'backend-blueprint',
             'executionSource' => 'LTF_SF',
-            'ladderId' => md5($signal['id'] . time()),
+            'ladderId' => md5($signal['id']),
             'direction' => $signal['direction'],
             'stageFills' => array('e1' => false, 'e2' => false, 'e3' => false),
             'state' => 'ACTIVE',
         );
     }
 
-    private function get_sl_from_sweep($direction, $sweep_up, $sweep_down, $swing_hi, $swing_lo) {
-        // Ported from Pine: basic implementation
-        $buffer = 0.001; // Placeholder: should depend on session and pair type
+    private function get_sl_from_sweep($direction, $sweep_up, $sweep_down, $swing_hi, $swing_lo, $symbol = null) {
+        // 5-pip buffer beyond swing extreme; scale by instrument pip_size so JPY/metal/index
+        // pairs don't get a USD-pair-sized buffer that is effectively 0 pips.
+        $spec   = $symbol ? $this->get_instrument_spec($symbol) : null;
+        $buffer = $spec ? ((float) $spec['pip_size'] * 5) : 0.0005;
         if ($direction === 'LONG') {
-            return $swing_lo - $buffer;
+            return round($swing_lo - $buffer, 8);
         } else {
-            return $swing_hi + $buffer;
+            return round($swing_hi + $buffer, 8);
         }
     }
 
@@ -2106,6 +2100,19 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function is_stale($mysql_time, $threshold_sec) {
         return (time() - strtotime($mysql_time . ' UTC')) > $threshold_sec;
+    }
+
+    /**
+     * Returns age in seconds for an ISO 8601 timestamp (e.g. from gmdate('c')).
+     * Unlike is_stale(), this does NOT append ' UTC' — ISO strings already carry
+     * timezone info, and appending ' UTC' causes strtotime() to return false in PHP 8.
+     */
+    private function iso_age_sec($iso_time) {
+        if (!$iso_time) {
+            return PHP_INT_MAX;
+        }
+        $ts = strtotime((string) $iso_time);
+        return $ts !== false ? (time() - $ts) : PHP_INT_MAX;
     }
 
     private function timeframe_seconds($timeframe) {

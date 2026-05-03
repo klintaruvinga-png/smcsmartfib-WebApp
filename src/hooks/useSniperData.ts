@@ -127,7 +127,7 @@ export function useLadders() {
     queryKey: ["ladders"],
     queryFn: () => apiClient.getLadders(),
     enabled,
-    refetchInterval: pollMs ?? false,
+    refetchInterval: pollMs ?? DEFAULT_POLL_MS,
   });
 }
 
