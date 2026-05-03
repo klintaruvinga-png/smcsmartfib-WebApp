@@ -53,7 +53,8 @@ function SignalsPage() {
   const watchlist = useWatchlist();
   const [watchlistOnly, setWatchlistOnly] = useState(true);
 
-  const allUnique = signals ? deduplicateById(signals) : [];
+  // CRITICAL: Deduplicate signals by ID and filter to backend-confirmed for execution readiness.
+  const allUnique = signals ? deduplicateById(signals).filter((s) => s.backendConfirmed) : [];
   const uniqueSignals =
     watchlistOnly && watchlist.length > 0
       ? allUnique.filter((s) => watchlist.includes(s.symbol))

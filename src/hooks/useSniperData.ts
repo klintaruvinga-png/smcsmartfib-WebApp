@@ -12,50 +12,63 @@ function useBackendReady() {
 export function usePollMs() {
   const { data } = useUserSettings();
   const sec = data?.refreshIntervalSec;
+  // CRITICAL FIX: Only use loaded user settings, never fall back to DEFAULT.
+  // If settings haven't loaded yet, return null to disable polling until ready.
+  // This prevents orphaned queries firing with stale refresh intervals.
+  if (!data) return null;
   return Number.isFinite(sec) && (sec ?? 0) > 0 ? (sec as number) * 1000 : DEFAULT_POLL_MS;
 }
 
 export function useSnapshot() {
   const backendReady = useBackendReady();
   const pollMs = usePollMs();
+  // CRITICAL: Only enable query when backend is ready AND pollMs is valid (not null).
+  // Prevents orphaned queries and race conditions during initialization.
+  const enabled = backendReady && pollMs !== null;
   return useQuery({
     queryKey: ["snapshot"],
     queryFn: () => apiClient.getSnapshot(),
-    enabled: backendReady,
-    refetchInterval: pollMs,
+    enabled,
+    refetchInterval: pollMs ?? DEFAULT_POLL_MS, // Use DEFAULT_POLL_MS when pollMs is null
   });
 }
 
 export function useLiveSignals() {
   const backendReady = useBackendReady();
   const pollMs = usePollMs();
+  // CRITICAL: Only enable query when backend is ready AND pollMs is valid (not null).
+  const enabled = backendReady && pollMs !== null;
   return useQuery({
     queryKey: ["live-signals"],
     queryFn: () => apiClient.getLiveSignals(),
-    enabled: backendReady,
-    refetchInterval: pollMs,
+    enabled,
+    refetchInterval: pollMs ?? DEFAULT_POLL_MS,
   });
 }
 
 export function useUserTrades() {
   const backendReady = useBackendReady();
   const pollMs = usePollMs();
+  // CRITICAL: Only enable query when backend is ready AND pollMs is valid (not null).
+  const enabled = backendReady && pollMs !== null;
   return useQuery({
     queryKey: ["user-trades"],
     queryFn: () => apiClient.getUserTrades(),
-    enabled: backendReady,
-    refetchInterval: pollMs,
+    enabled,
+    refetchInterval: pollMs ?? DEFAULT_POLL_MS,
   });
 }
 
 export function useUserAccount() {
   const backendReady = useBackendReady();
   const pollMs = usePollMs();
+  // CRITICAL: Only enable query when backend is ready AND pollMs is valid (not null).
+  const enabled = backendReady && pollMs !== null;
   return useQuery({
     queryKey: ["user-account"],
     queryFn: () => apiClient.getUserAccount(),
-    enabled: backendReady,
-    refetchInterval: pollMs,
+    enabled,
+    refetchInterval: pollMs ?? DEFAULT_POLL_MS,
   });
 }
 
@@ -87,11 +100,13 @@ export function useWatchlist() {
 export function useEngineHealth() {
   const backendReady = useBackendReady();
   const pollMs = usePollMs();
+  // CRITICAL: Only enable query when backend is ready AND pollMs is valid (not null).
+  const enabled = backendReady && pollMs !== null;
   return useQuery({
     queryKey: ["engine-health"],
     queryFn: () => apiClient.getEngineHealth(),
-    enabled: backendReady,
-    refetchInterval: pollMs,
+    enabled,
+    refetchInterval: pollMs ?? DEFAULT_POLL_MS,
   });
 }
 
