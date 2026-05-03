@@ -63,8 +63,8 @@ if (function_exists('curl_init')) {
         echo "cURL Error: $curl_err\n";
         exit(1);
     }
-} else {
-    // Fallback: use file_get_contents (no extension required)
+} elseif (in_array('https', stream_get_wrappers())) {
+    // Fallback: file_get_contents with stream context (requires openssl wrapper)
     $context = stream_context_create([
         'http' => [
             'method'        => 'POST',
@@ -91,6 +91,53 @@ if (function_exists('curl_init')) {
     if ($response === false) {
         echo "Request failed (file_get_contents). Check URL and network.\n";
         exit(1);
+    }
+} else {
+    // Last resort: shell out to curl.exe (bundled with Windows 10+) or PowerShell
+    $escaped_url  = escapeshellarg($wordpress_url);
+    $escaped_body = escapeshellarg($json_body);
+    $escaped_auth = escapeshellarg('Authorization: ' . $auth_header);
+
+    // Try curl.exe first (Windows 10 1803+ ships it in System32)
+    exec('curl.exe --version 2>NUL', $ver_out, $ver_ret);
+    if ($ver_ret === 0) {
+        $cmd = "curl.exe -s -o - -w \"\n__HTTP_CODE__:%{http_code}\" "
+             . "-X POST $escaped_url "
+             . "-H \"Content-Type: application/json\" "
+             . "-H $escaped_auth "
+             . "--data $escaped_body "
+             . "--insecure";
+        exec($cmd, $out, $ret);
+        $raw       = implode("\n", $out);
+        $http_code = 0;
+        if (preg_match('#__HTTP_CODE__:(\d+)$#', $raw, $m)) {
+            $http_code = (int) $m[1];
+            $response  = preg_replace('#\n__HTTP_CODE__:\d+$#', '', $raw);
+        } else {
+            $response = $raw;
+        }
+        if ($ret !== 0 && $http_code === 0) {
+            echo "curl.exe failed (exit $ret). Check URL and network.\n";
+            exit(1);
+        }
+    } else {
+        // Final fallback: PowerShell Invoke-WebRequest
+        $ps_body = str_replace("'", "''", $json_body); // escape single quotes for PS
+        $ps_cmd  = "powershell -NoProfile -Command \""
+                 . "\$r = Invoke-WebRequest -Uri '$wordpress_url' "
+                 . "-Method POST "
+                 . "-Headers @{'Content-Type'='application/json';'Authorization'='" . addslashes('Basic ' . base64_encode('username:' . $auth_token)) . "'} "
+                 . "-Body '" . $ps_body . "' -UseBasicParsing; "
+                 . "Write-Output (\$r.StatusCode.ToString() + '|' + \$r.Content)"
+                 . "\"";
+        exec($ps_cmd, $out, $ret);
+        $raw = implode('', $out);
+        if ($ret !== 0 || strpos($raw, '|') === false) {
+            echo "PowerShell request failed. Check URL and network.\n";
+            exit(1);
+        }
+        [$http_code, $response] = explode('|', $raw, 2);
+        $http_code = (int) $http_code;
     }
 }
 
