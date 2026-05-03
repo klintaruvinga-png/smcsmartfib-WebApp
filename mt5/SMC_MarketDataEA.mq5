@@ -22,29 +22,43 @@ input string Symbols     = "EURUSD,GBPUSD,XAUUSD,USDJPY,GBPJPY,AUDUSD";
 
 MarketDataEngine engine;
 
+// CRITICAL FIX: Promote parsed symbol list to module-level so OnTimer() can iterate
+// all registered symbols and call SymbolInfoTick() for each.  Without this, OnTick()
+// only fires for the chart symbol; all other watched symbols remain at
+// FRESHNESS_DISCONNECTED permanently (lastTickTime = 0) because they never receive a
+// tick-driven update from OnTick().
+string g_symArray[];
+int    g_symCount = 0;
+
 int OnInit()
 {
-    // Parse comma-separated symbol list
-    string symArray[];
-    int count = StringSplit(Symbols, ',', symArray);
-    if (count <= 0)
+    // Parse comma-separated symbol list into module-level arrays.
+    g_symCount = StringSplit(Symbols, ',', g_symArray);
+    if (g_symCount <= 0)
     {
         Print("SMC_MarketDataEA: no symbols configured");
         return INIT_FAILED;
+    }
+
+    // Trim whitespace from each symbol token.
+    for (int i = 0; i < g_symCount; i++)
+    {
+        StringTrimLeft(g_symArray[i]);
+        StringTrimRight(g_symArray[i]);
     }
 
     string auth = (StringLen(AuthToken) > 0)
                   ? "Authorization: Basic " + AuthToken + "\r\n"
                   : "";
 
-    if (!engine.Initialize(symArray, count, WebhookURL, auth))
+    if (!engine.Initialize(g_symArray, g_symCount, WebhookURL, auth))
     {
         Print("SMC_MarketDataEA: engine init failed");
         return INIT_FAILED;
     }
 
     EventSetTimer(TimerSec);
-    Print("SMC_MarketDataEA: started, monitoring ", count, " symbols");
+    Print("SMC_MarketDataEA: started, monitoring ", g_symCount, " symbols");
     return INIT_SUCCEEDED;
 }
 
@@ -55,7 +69,7 @@ void OnDeinit(const int reason)
 
 void OnTick()
 {
-    // In MQL5, Bid/Ask/Volume are not global variables — use MqlTick struct
+    // Real-time tick for the chart symbol only — forward to engine.
     MqlTick tick;
     if (!SymbolInfoTick(Symbol(), tick))
         return;
@@ -65,5 +79,21 @@ void OnTick()
 
 void OnTimer()
 {
+    // CRITICAL FIX: Refresh tick state for all non-chart symbols via SymbolInfoTick().
+    // In MQL5, OnTick() only fires when the chart symbol ticks.  Without this loop,
+    // every symbol other than the attached chart shows FRESHNESS_DISCONNECTED because
+    // FreshnessEngine.lastTickTimes[] remains 0 for them, making secondsSinceTick
+    // enormous and driving all non-chart symbols to FRESHNESS_STALE / DISCONNECTED.
+    string chartSym = Symbol();
+    for (int i = 0; i < g_symCount; i++)
+    {
+        if (g_symArray[i] == chartSym)
+            continue; // already handled in OnTick()
+
+        MqlTick tick;
+        if (SymbolInfoTick(g_symArray[i], tick))
+            engine.OnTick(g_symArray[i], tick.bid, tick.ask, tick.time, tick.volume);
+    }
+
     engine.OnPeriodic();
 }

@@ -976,7 +976,7 @@ final class SMC_SuperFib_Sniper_REST {
         ));
     }
 
-    private function run_engine_for_symbols($user_id, $symbols, $prices) {
+    private function run_engine_for_symbols($user_id, $symbols, $prices, $force = false) {
         global $wpdb;
         $symbols_sorted = $symbols;
         sort($symbols_sorted);
@@ -995,8 +995,12 @@ final class SMC_SuperFib_Sniper_REST {
             'symbols' => $symbols_sorted,
             'prices' => $price_fingerprint,
         )));
+        // HARDENING: Skip transient cache when a forced refresh is requested so that
+        // post_engine_batch() always produces a freshly computed engine result, not the
+        // 5-second-old cached snapshot that was present before quote/candle transients
+        // were cleared.
         $cached = get_transient($transient_key);
-        if (is_array($cached)) {
+        if (!$force && is_array($cached)) {
             return $cached;
         }
 
@@ -1162,11 +1166,23 @@ final class SMC_SuperFib_Sniper_REST {
         $symbol_state   = $data_live ? 'live' : 'stale';
         $candle_state   = empty($candles) ? 'missing' : ($candles_fresh ? 'live' : 'stale');
 
-        $gate = array(
-            'symbol' => $symbol,
-            'allow' => $direction === 'LONG' ? 'BUY' : 'SELL',
-            'state' => $symbol_state,
-        );
+        // CRITICAL HARDENING: Block gate when chop >= 0.7 (F3 caution zone).
+        // SMC methodology requires no entries in high-chop equilibrium; this was
+        // missing from the live backend while the mock data showed BLOCKED correctly.
+        if ($chop >= 0.7) {
+            $gate = array(
+                'symbol' => $symbol,
+                'allow'  => 'BLOCKED',
+                'reason' => 'chop > 0.7 — F3 caution zone',
+                'state'  => $symbol_state,
+            );
+        } else {
+            $gate = array(
+                'symbol' => $symbol,
+                'allow'  => $direction === 'LONG' ? 'BUY' : 'SELL',
+                'state'  => $symbol_state,
+            );
+        }
 
         $regime = array(
             'symbol' => $symbol,
@@ -1871,7 +1887,7 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         $prices = $this->refresh_prices($user_id, $symbols);
-        $engine = $this->run_engine_for_symbols($user_id, $symbols, $prices);
+        $engine = $this->run_engine_for_symbols($user_id, $symbols, $prices, $force);
         $snapshot = array(
             'prices' => $prices,
             'regimes' => $engine['regimes'],
