@@ -323,15 +323,18 @@ final class SMC_SuperFib_Sniper_REST {
         // blocked = key missing or invalid — feed cannot recover without user action.
         $settings = $this->get_settings($user_id);
         $feed_has_stale_symbols = false;
+        $feed_any_rate_limited = false;
         foreach ($settings['watchlist'] as $symbol) {
             $cached_price = $this->get_cached_price($user_id, $symbol, $settings['staleThresholdSec']);
             if (!$cached_price || ($cached_price['state'] ?? 'offline') !== 'live') {
                 $feed_has_stale_symbols = true;
-                break;
+            }
+            if ($this->is_feed_rate_limited($user_id, $symbol)) {
+                $feed_any_rate_limited = true;
             }
         }
 
-        if ($this->is_feed_rate_limited($user_id)) {
+        if ($feed_any_rate_limited) {
             $feed_status = 'rate-limited';
         } elseif ($key_status !== 'ok') {
             $feed_status = 'blocked';
@@ -817,12 +820,15 @@ final class SMC_SuperFib_Sniper_REST {
         $user_id = get_current_user_id();
         $payload = $request->get_json_params();
         $symbols = isset($payload['symbols']) ? $this->sanitize_symbols($payload['symbols']) : $this->get_settings($user_id)['watchlist'];
-        // Force fresh data by clearing both quote and candle TTL transients for each symbol.
+        // Force fresh data by clearing quote TTL, candle TTL, and rate-limit transients per symbol.
         // Without clearing candle TTL, a force-refresh fetches new quotes but returns 90-second-old
         // cached candles from the DB, producing a stale-candle / fresh-price mismatch.
+        // Without clearing rate-limit transients, a previous 429 keeps all pairs stuck on
+        // "Feed rate-limited — cooling down" even after the user explicitly requests a refresh.
         foreach ($symbols as $sym) {
             delete_transient('smc_sf_qt_' . $user_id . '_' . md5($sym));
             delete_transient('smc_sf_ct_' . $user_id . '_' . md5($sym . '|15min'));
+            delete_transient($this->rl_transient_key($user_id, $sym));
         }
         $snapshot = $this->ensure_engine_snapshot($user_id, true);
         return rest_ensure_response(array(
