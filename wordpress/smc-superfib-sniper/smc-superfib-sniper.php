@@ -603,11 +603,93 @@ final class SMC_SuperFib_Sniper_REST {
         return rest_ensure_response($snapshot);
     }
 
-    // Pine webhook stub — intentionally audit-only until Pine alert integration is implemented.
+    // MT5 webhook — process and store market data from MT5 EA
     public function post_snapshot(WP_REST_Request $request) {
+        global $wpdb;
+
         $user_id = get_current_user_id();
         $payload = $request->get_json_params();
-        $this->audit($user_id, 'snapshot.posted', is_array($payload) ? $payload : array());
+
+        if (!is_array($payload) || !isset($payload['symbol'])) {
+            return rest_ensure_response(array('error' => 'Invalid payload'), 400);
+        }
+
+        $symbol = strtoupper(sanitize_text_field($payload['symbol']));
+        $normalized_symbol = isset($payload['normalized_symbol']) ? strtoupper(sanitize_text_field($payload['normalized_symbol'])) : $symbol;
+
+        // Store tick data as price snapshot
+        if (isset($payload['tick'])) {
+            $tick = $payload['tick'];
+            $bid = isset($tick['bid']) ? (float) $tick['bid'] : 0;
+            $ask = isset($tick['ask']) ? (float) $tick['ask'] : 0;
+            $spread = isset($tick['spread']) ? (int) $tick['spread'] : 0;
+            $timestamp = isset($tick['timestamp']) ? sanitize_text_field($tick['timestamp']) : gmdate('c');
+
+            $mid = ($bid + $ask) / 2;
+            $changePct1d = 0; // Placeholder, could be calculated from historical data
+
+            $wpdb->replace(
+                $this->table('snapshots'),
+                array(
+                    'user_id' => $user_id,
+                    'symbol' => $normalized_symbol,
+                    'bid' => $bid,
+                    'ask' => $ask,
+                    'mid' => $mid,
+                    'spread' => $spread,
+                    'change_pct_1d' => $changePct1d,
+                    'updated_at' => $this->now_mysql(),
+                ),
+                array('%d', '%s', '%f', '%f', '%f', '%d', '%f', '%s')
+            );
+        }
+
+        // Store M1 candle
+        if (isset($payload['candle_m1'])) {
+            $candle = $payload['candle_m1'];
+            $timeframe = '1min';
+
+            $wpdb->replace(
+                $this->table('candles'),
+                array(
+                    'user_id' => $user_id,
+                    'symbol' => $normalized_symbol,
+                    'timeframe' => $timeframe,
+                    'candle_time' => isset($candle['timestamp']) ? gmdate('Y-m-d H:i:s', strtotime($candle['timestamp'])) : $this->now_mysql(),
+                    'open' => (float) $candle['open'],
+                    'high' => (float) $candle['high'],
+                    'low' => (float) $candle['low'],
+                    'close' => (float) $candle['close'],
+                    'volume' => isset($candle['volume']) ? (string) $candle['volume'] : null,
+                    'created_at' => $this->now_mysql(),
+                ),
+                array('%d', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%s', '%s')
+            );
+        }
+
+        // Store freshness state (could add to snapshots or new table)
+        // For now, store in transients or extend snapshots table
+        if (isset($payload['freshness'])) {
+            $freshness = sanitize_text_field($payload['freshness']);
+            set_transient('smc_sf_freshness_' . $user_id . '_' . $normalized_symbol, $freshness, 300); // 5 min
+        }
+
+        // Store session state
+        if (isset($payload['session'])) {
+            $session = sanitize_text_field($payload['session']);
+            set_transient('smc_sf_session_' . $user_id . '_' . $normalized_symbol, $session, 300);
+        }
+
+        $this->audit($user_id, 'mt5_snapshot.processed', array(
+            'symbol' => $symbol,
+            'normalized_symbol' => $normalized_symbol,
+            'has_tick' => isset($payload['tick']),
+            'has_candle' => isset($payload['candle_m1']),
+            'freshness' => $payload['freshness'] ?? null,
+            'session' => $payload['session'] ?? null,
+            'is_synthetic' => $payload['is_synthetic'] ?? false,
+        ));
+
         return rest_ensure_response(array('ok' => true));
     }
 
