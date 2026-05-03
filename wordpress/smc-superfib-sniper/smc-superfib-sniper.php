@@ -24,6 +24,11 @@ final class SMC_SuperFib_Sniper_REST {
         add_action('rest_api_init', array($instance, 'register_routes'));
         add_filter('rest_pre_serve_request', array($instance, 'send_cors_headers'), 10, 4);
 
+        // Regression guard: Validate CORS configuration consistency
+        if (!self::validate_cors_origins_consistency()) {
+            error_log('CORS configuration validation failed. Check allowed origins consistency.');
+        }
+
         // Respond to CORS preflight (OPTIONS) requests before WordPress processes them.
         // Without this, the browser's preflight check silently fails and blocks POST/DELETE.
         add_action('init', function () use ($instance) {
@@ -36,10 +41,10 @@ final class SMC_SuperFib_Sniper_REST {
             }
             $allowed = apply_filters('smc_sf_allowed_origins', array(
                 home_url(),
-                'trader.stokvelsociety.co.za',
-                'smcsuperfibwebapp.klintaruvinga.workers.dev',
-                'smcsmartfib.lovable.app',
-                'id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
+                'https://trader.stokvelsociety.co.za',
+                'https://smcsuperfibwebapp.klintaruvinga.workers.dev',
+                'https://smcsmartfib.lovable.app',
+                'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
             ));
             if (!self::is_allowed_origin($origin, $allowed)) {
                 return;
@@ -249,6 +254,44 @@ final class SMC_SuperFib_Sniper_REST {
         // Allow any Lovable preview host used by the dashboard.
         $host = wp_parse_url($origin, PHP_URL_HOST);
         return $host && (bool) preg_match('/^(?:[0-9a-f\-]+\.lovableproject\.com|id-preview--[0-9a-z\-]+\.lovable\.app)$/', $host);
+    }
+
+    /**
+     * Regression guard: Ensure CORS allowed origins are consistently defined.
+     * This prevents future CORS issues from protocol prefix mismatches.
+     */
+    private static function validate_cors_origins_consistency() {
+        $options_origins = array(
+            home_url(),
+            'https://trader.stokvelsociety.co.za',
+            'https://smcsuperfibwebapp.klintaruvinga.workers.dev',
+            'https://smcsmartfib.lovable.app',
+            'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
+        );
+
+        $headers_origins = array(
+            home_url(),
+            'https://trader.stokvelsociety.co.za',
+            'https://smcsuperfibwebapp.klintaruvinga.workers.dev',
+            'https://smcsmartfib.lovable.app',
+            'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
+        );
+
+        // Check that both arrays are identical
+        if ($options_origins !== $headers_origins) {
+            error_log('CORS REGRESSION GUARD: Allowed origins mismatch between OPTIONS handler and headers method. This could cause CORS failures.');
+            return false;
+        }
+
+        // Validate that all origins include protocol (no bare hostnames)
+        foreach ($options_origins as $origin) {
+            if (!wp_parse_url($origin, PHP_URL_SCHEME)) {
+                error_log('CORS REGRESSION GUARD: Origin missing protocol: ' . $origin . '. All origins must include https:// prefix.');
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function send_cors_headers($served, $result, $request, $server) {
