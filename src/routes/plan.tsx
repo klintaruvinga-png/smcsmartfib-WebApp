@@ -32,8 +32,13 @@ function PlanPage() {
   const { data: signals, isLoading: signalsLoading } = useLiveSignals();
   const { data: ladders, isLoading: laddersLoading } = useLadders();
   
-  const uniqueSignals = signals ? deduplicateById(signals) : undefined;
-  
+  const VERDICT_RANK: Record<string, number> = { "A+": 4, A: 3, B: 2, C: 1 };
+  const uniqueSignals = signals
+    ? deduplicateById(signals).sort(
+        (a, b) => (VERDICT_RANK[b.verdict] ?? 0) - (VERDICT_RANK[a.verdict] ?? 0),
+      )
+    : undefined;
+
   const top =
     uniqueSignals?.find(
       (s) => s.status === "READY" && ladders?.some((l) => l.signalId === s.id),
@@ -105,7 +110,7 @@ function PlanPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Signal Plan</h1>
-          <p className="text-xs text-mute mt-0.5">First READY candidate · backend blueprint</p>
+          <p className="text-xs text-mute mt-0.5">Best-rated READY candidate · backend blueprint</p>
         </div>
         <FreshnessBadge state={plan.source === "backend-blueprint" ? "live" : "pending-sync"} />
       </div>
