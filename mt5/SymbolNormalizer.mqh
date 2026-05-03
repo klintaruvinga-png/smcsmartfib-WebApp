@@ -3,38 +3,80 @@
 
 //+------------------------------------------------------------------+
 //| SymbolNormalizer Class                                           |
+//|                                                                  |
+//| Strips broker-specific suffixes and validates against the 28+   |
+//| known symbols used by SMC SuperFib.                             |
 //+------------------------------------------------------------------+
 class SymbolNormalizer
 {
 private:
-    string knownSymbols[50];  // List of known valid symbols
+    string knownSymbols[50];
     int knownCount;
 
+    // Multi-char suffix list: tried longest-first to avoid partial matches.
+    // Single chars like "m" are intentionally excluded to prevent mangling
+    // symbols such as XAUUSD or BTCUSD that don't end with those letters.
+    string multiSuffixes[8];
+    int multiSuffixCount;
+
 public:
-    // Constructor
     SymbolNormalizer()
     {
-        knownCount = 0;
-        // Initialize known symbols
+        knownCount       = 0;
+        multiSuffixCount = 0;
+
+        // Known broker suffixes (longest first to avoid partial stripping)
+        multiSuffixes[multiSuffixCount++] = ".MICRO";
+        multiSuffixes[multiSuffixCount++] = ".PRO";
+        multiSuffixes[multiSuffixCount++] = ".ECN";
+        multiSuffixes[multiSuffixCount++] = ".STP";
+        multiSuffixes[multiSuffixCount++] = ".RAW";
+        multiSuffixes[multiSuffixCount++] = ".A";
+        multiSuffixes[multiSuffixCount++] = ".B";
+        multiSuffixes[multiSuffixCount++] = ".C";
+
+        // FX majors / crosses
         AddKnownSymbol("EURUSD");
         AddKnownSymbol("GBPUSD");
         AddKnownSymbol("AUDUSD");
         AddKnownSymbol("NZDUSD");
+        AddKnownSymbol("USDCAD");
+        AddKnownSymbol("USDCHF");
         AddKnownSymbol("USDJPY");
+        AddKnownSymbol("EURJPY");
+        AddKnownSymbol("GBPJPY");
         AddKnownSymbol("AUDJPY");
+        AddKnownSymbol("EURAUD");
+        AddKnownSymbol("EURGBP");
+        AddKnownSymbol("GBPAUD");
+        AddKnownSymbol("GBPCAD");
+        AddKnownSymbol("GBPCHF");
+        AddKnownSymbol("AUDCAD");
+        AddKnownSymbol("AUDCHF");
+        AddKnownSymbol("AUDNZD");
+        AddKnownSymbol("NZDJPY");
+        AddKnownSymbol("CADCHF");
+        AddKnownSymbol("CADJPY");
+        AddKnownSymbol("CHFJPY");
+        // Metals
         AddKnownSymbol("XAUUSD");
         AddKnownSymbol("XAGUSD");
+        // Indices
         AddKnownSymbol("US30");
         AddKnownSymbol("NAS100");
+        AddKnownSymbol("SPX500");
+        AddKnownSymbol("UK100");
+        AddKnownSymbol("GER40");
+        // Crypto
         AddKnownSymbol("BTCUSD");
         AddKnownSymbol("ETHUSD");
-        // Add more as needed
+        // Oil
+        AddKnownSymbol("USOIL");
+        AddKnownSymbol("UKOIL");
     }
 
-    // Destructor
     ~SymbolNormalizer() {}
 
-    // Normalize symbol
     string NormalizeSymbol(string symbol)
     {
         string normalized = ToUpperCase(symbol);
@@ -44,31 +86,28 @@ public:
         return normalized;
     }
 
-    // Validate symbol
     bool IsValidSymbol(string symbol)
     {
-        string normalized = NormalizeSymbol(symbol);
-        return IsKnownSymbol(normalized);
+        return IsKnownSymbol(NormalizeSymbol(symbol));
     }
 
-    // Strip suffixes/prefixes
     string StripSuffixes(string symbol)
     {
-        // Remove common suffixes
-        string suffixes[] = {".A", ".PRO", "M", ".MICRO"};
-        for (int i = 0; i < ArraySize(suffixes); i++)
+        // Strip known multi-char suffixes (dot-prefixed, e.g. ".PRO", ".MICRO")
+        for (int i = 0; i < multiSuffixCount; i++)
         {
-            int pos = StringFind(symbol, suffixes[i]);
-            if (pos != -1)
+            int suffixLen = StringLen(multiSuffixes[i]);
+            int pos       = StringLen(symbol) - suffixLen;
+            if (pos > 0 && StringSubstr(symbol, pos) == multiSuffixes[i])
+            {
                 symbol = StringSubstr(symbol, 0, pos);
+                break;  // One suffix at most
+            }
         }
-        // Remove prefixes
-        if (StringGetChar(symbol, 0) == 'A' || StringGetChar(symbol, 0) == 'a')
-            symbol = StringSubstr(symbol, 1);
         return symbol;
     }
 
-    // Convert to uppercase
+private:
     string ToUpperCase(string symbol)
     {
         string upper = "";
@@ -82,7 +121,6 @@ public:
         return upper;
     }
 
-    // Check against known list
     bool IsKnownSymbol(string symbol)
     {
         for (int i = 0; i < knownCount; i++)
@@ -93,14 +131,10 @@ public:
         return false;
     }
 
-private:
     void AddKnownSymbol(string symbol)
     {
         if (knownCount < 50)
-        {
-            knownSymbols[knownCount] = symbol;
-            knownCount++;
-        }
+            knownSymbols[knownCount++] = symbol;
     }
 };
 

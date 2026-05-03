@@ -261,7 +261,7 @@ class SMC_MarketData_Service
 
         // Check if Twelve Data has data
         $count = $this->wpdb->get_var($this->wpdb->prepare(
-            "SELECT COUNT(*) FROM {$this->table_prefix}candles WHERE user_id = %d AND symbol = %s AND source IS NULL OR source = ''",
+            "SELECT COUNT(*) FROM {$this->table_prefix}candles WHERE user_id = %d AND symbol = %s AND (source IS NULL OR source = '')",
             $user_id,
             strtoupper(sanitize_text_field($symbol))
         ));

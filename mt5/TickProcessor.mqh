@@ -97,6 +97,36 @@ public:
             lastTickTime[index] = TimeCurrent();
     }
 
+    // Average spread over last N ticks (in points)
+    double GetAverageSpread(string symbol, int lookback = 100)
+    {
+        int index = GetSymbolIndex(symbol);
+        if (index == -1)
+            return 0.0;
+
+        int count = MathMin(lookback, 1000);
+        double total = 0.0;
+        int valid = 0;
+        for (int i = 0; i < count; i++)
+        {
+            int idx = (tickIndices[index] - 1 - i + 1000) % 1000;
+            if (lastTicks[index][idx].timestamp == 0)
+                break;
+            total += lastTicks[index][idx].spread;
+            valid++;
+        }
+        return (valid > 0) ? (total / valid) : 0.0;
+    }
+
+    // Seconds since the last tick was received for a symbol
+    int GetStagnationTime(string symbol)
+    {
+        int index = GetSymbolIndex(symbol);
+        if (index == -1 || lastTickTime[index] == 0)
+            return INT_MAX;
+        return (int)(TimeCurrent() - lastTickTime[index]);
+    }
+
 private:
     int GetSymbolIndex(string symbol)
     {

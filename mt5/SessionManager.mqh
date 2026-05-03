@@ -17,48 +17,31 @@ enum ENUM_SESSION_STATE
 
 //+------------------------------------------------------------------+
 //| SessionManager Class                                             |
+//| All session boundaries are UTC hours.                            |
+//|                                                                  |
+//| Sydney   : Sun 22:00 – Mon 06:00  (wraps midnight)              |
+//| Tokyo    : 00:00 – 08:00                                         |
+//| London   : 07:00 – 15:00                                         |
+//| New York : 12:00 – 20:00                                         |
+//| Overlap  : London+Tokyo 07-08, London+NY 12-15                  |
 //+------------------------------------------------------------------+
 class SessionManager
 {
 private:
     ENUM_SESSION_STATE currentSession;
-    datetime sessionStartTimes[7];  // Start times for each session (UTC)
-    datetime sessionEndTimes[7];
     bool isHoliday;
     MqlDateTime dt;
 
 public:
-    // Constructor
     SessionManager()
     {
         currentSession = SESSION_CLOSED;
         isHoliday = false;
-
-        // Initialize session times (UTC, example for Monday)
-        // Sydney: 22:00 Sun - 06:00 Mon
-        sessionStartTimes[0] = StringToTime("22:00");  // Sunday
-        sessionEndTimes[0] = StringToTime("06:00") + 86400;  // Monday
-
-        // Tokyo: 00:00 - 08:00 Mon
-        sessionStartTimes[1] = StringToTime("00:00") + 86400;
-        sessionEndTimes[1] = StringToTime("08:00") + 86400;
-
-        // London: 07:00 - 15:00 Mon
-        sessionStartTimes[2] = StringToTime("07:00") + 86400;
-        sessionEndTimes[2] = StringToTime("15:00") + 86400;
-
-        // New York: 12:00 - 20:00 Mon
-        sessionStartTimes[3] = StringToTime("12:00") + 86400;
-        sessionEndTimes[3] = StringToTime("20:00") + 86400;
-
-        // Add more sessions as needed
     }
 
-    // Destructor
     ~SessionManager() {}
 
-    // Update session state
-    void UpdateSession(datetime currentTime)
+    void UpdateSession(datetime utcTime)
     {
         if (isHoliday)
         {
@@ -66,58 +49,109 @@ public:
             return;
         }
 
-        TimeToStruct(currentTime, dt);
-        int dow = dt.day_of_week;  // 0=Sunday
+        TimeToStruct(utcTime, dt);
+        int dow  = dt.day_of_week;  // 0=Sunday, 6=Saturday
+        int hour = dt.hour;
 
-        if (dow == 0 || dow == 6)  // Weekend
+        // Saturday is always closed market
+        if (dow == 6)
         {
             currentSession = SESSION_WEEKEND;
             return;
         }
 
-        // Adjust for day of week
-        datetime dayStart = currentTime - (dt.hour * 3600 + dt.min * 60 + dt.sec);
-        datetime timeOfDay = currentTime - dayStart;
+        // Sunday: market opens at 22:00 UTC (Sydney open)
+        if (dow == 0)
+        {
+            currentSession = (hour >= 22) ? SESSION_SYDNEY : SESSION_WEEKEND;
+            return;
+        }
 
-        // Check each session
-        if (timeOfDay >= sessionStartTimes[0] && timeOfDay < sessionEndTimes[0])
-            currentSession = SESSION_SYDNEY;
-        else if (timeOfDay >= sessionStartTimes[1] && timeOfDay < sessionEndTimes[1])
-            currentSession = SESSION_TOKYO;
-        else if (timeOfDay >= sessionStartTimes[2] && timeOfDay < sessionEndTimes[2])
+        // Friday: market closes at 22:00 UTC (New York close +2 h buffer)
+        if (dow == 5 && hour >= 22)
+        {
+            currentSession = SESSION_WEEKEND;
+            return;
+        }
+
+        // Intraday: determine session by UTC hour
+        bool sydney   = (hour >= 22) || (hour < 6);
+        bool tokyo    = (hour >= 0)  && (hour < 8);
+        bool london   = (hour >= 7)  && (hour < 15);
+        bool newYork  = (hour >= 12) && (hour < 20);
+
+        // Overlaps take precedence (highest liquidity)
+        if (london && newYork)
+        {
+            currentSession = SESSION_OVERLAP;
+        }
+        else if (london && tokyo)
+        {
+            currentSession = SESSION_OVERLAP;
+        }
+        else if (london)
+        {
             currentSession = SESSION_LONDON;
-        else if (timeOfDay >= sessionStartTimes[3] && timeOfDay < sessionEndTimes[3])
+        }
+        else if (newYork)
+        {
             currentSession = SESSION_NEWYORK;
+        }
+        else if (tokyo)
+        {
+            currentSession = SESSION_TOKYO;
+        }
+        else if (sydney)
+        {
+            currentSession = SESSION_SYDNEY;
+        }
         else
+        {
             currentSession = SESSION_CLOSED;
-
-        // Check for overlaps (simplified)
-        // If in multiple, set to OVERLAP
+        }
     }
 
-    // Check if market is open
     bool IsMarketOpen()
     {
         return currentSession != SESSION_CLOSED && currentSession != SESSION_WEEKEND;
     }
 
-    // Get current session
+    bool IsHighLiquidity()
+    {
+        return currentSession == SESSION_OVERLAP
+            || currentSession == SESSION_LONDON
+            || currentSession == SESSION_NEWYORK;
+    }
+
     ENUM_SESSION_STATE GetCurrentSession()
     {
         return currentSession;
     }
 
-    // Handle holidays
+    string GetSessionName()
+    {
+        switch (currentSession)
+        {
+            case SESSION_SYDNEY:   return "Sydney";
+            case SESSION_TOKYO:    return "Tokyo";
+            case SESSION_LONDON:   return "London";
+            case SESSION_NEWYORK:  return "New York";
+            case SESSION_OVERLAP:  return "Overlap";
+            case SESSION_WEEKEND:  return "Weekend";
+            default:               return "Closed";
+        }
+    }
+
     void SetHoliday(bool holiday)
     {
         isHoliday = holiday;
     }
 
-    // Detect session transitions
-    bool IsSessionTransition()
+    bool IsSessionTransition(datetime utcTime)
     {
-        // Implement transition detection logic
-        return false;  // Placeholder
+        ENUM_SESSION_STATE before = currentSession;
+        UpdateSession(utcTime);
+        return currentSession != before;
     }
 };
 
