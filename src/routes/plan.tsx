@@ -34,7 +34,13 @@ function PlanPage() {
   
   const uniqueSignals = signals ? deduplicateById(signals) : undefined;
   
-  const top = uniqueSignals?.find((s) => s.status === "READY") ?? uniqueSignals?.[0];
+  const top =
+    uniqueSignals?.find(
+      (s) => s.status === "READY" && ladders?.some((l) => l.signalId === s.id),
+    ) ??
+    uniqueSignals?.find((s) => ladders?.some((l) => l.signalId === s.id)) ??
+    uniqueSignals?.find((s) => s.status === "READY") ??
+    uniqueSignals?.[0];
   const plan = top ? (ladders?.find((l) => l.signalId === top.id) ?? null) : null;
 
   if (signalsLoading || laddersLoading) {
