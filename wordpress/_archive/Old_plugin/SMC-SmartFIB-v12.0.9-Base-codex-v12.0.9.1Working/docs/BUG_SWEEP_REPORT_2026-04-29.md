@@ -3,6 +3,7 @@
 ## 1. Problem Areas
 
 ### [RSE-01] Full test suite is not portable due to hardcoded local PHP CLI path
+
 - File(s): `tests/php/php-cli-path.txt`, `tests/helpers/run-php-tests.js`
 - Layer: Supporting config / test
 - Severity: High
@@ -12,6 +13,7 @@
 - Why this matters: This blocks reliable stale-data/signal-engine regression testing in shared environments.
 
 ### [RSE-02] Refresh throttling/state guard has split responsibilities across manual + auto paths
+
 - File(s): `assets/js/sniper-dashboard-core.js`
 - Layer: Dashboard JS
 - Severity: Medium
@@ -21,6 +23,7 @@
 - Why this matters: Refresh reliability is core to live signal truth and stale prevention.
 
 ### [WH-01] Silent catch blocks in template-local storage/theme helpers can hide runtime faults
+
 - File(s): `templates/dashboard-ui.html`
 - Layer: Template / UI bootstrap JS
 - Severity: Medium
@@ -30,6 +33,7 @@
 - Why this matters: Hidden failures impede operational triage during stale-state incidents.
 
 ### [DC-01] Version contract drift risk between Pine source filename and platform runtime versioning
+
 - File(s): `SMC_SuperFib_v10.16.1.pine`, `sniper-webhook.php`, `assets/js/sniper-dashboard-core.js`
 - Layer: Pine / Backend / Dashboard JS / Data contract
 - Severity: Medium
@@ -39,6 +43,7 @@
 - Why this matters: Cross-layer parity depends on unambiguous version alignment.
 
 ### [DUP-01] Competing planner/rendering logic paths increase wiring fragility
+
 - File(s): `assets/js/sniper-dashboard-core.js`, `assets/js/sniper-dashboard-planner.js`
 - Layer: Dashboard JS
 - Severity: Medium
@@ -48,6 +53,7 @@
 - Why this matters: Duplicate logic is a common source of stale UI truth.
 
 ### [PAR-01] F1/F2/F3 Pine audit status is test-backed but tightly coupled to string-level source guards
+
 - File(s): `tests/pine/pine-fib-parity.test.js`, `SMC_SuperFib_v10.16.1.pine`
 - Layer: Pine / test
 - Severity: Low
@@ -57,6 +63,7 @@
 - Why this matters: Raises noise floor and can discourage safe cleanup around F1/F2/F3 plumbing.
 
 ### [UI-01] Debug/state instrumentation is production-adjacent and mixed into core runtime flow
+
 - File(s): `assets/js/sniper-dashboard-core.js`, `sniper-webhook.php`
 - Layer: Dashboard JS / Backend
 - Severity: Low
@@ -68,6 +75,7 @@
 ## 2. Proposed Minimal Fixes
 
 ### [FIX-RSE-01] Make PHP test runner path-resilient
+
 - Fixes problem(s): RSE-01
 - Files to touch: `tests/helpers/run-php-tests.js`, optional `tests/php/php-cli-path.txt`
 - Minimal change: Resolve PHP binary via env var (`PHP_BIN`), fallback to `php` on PATH, then optional local path file.
@@ -77,6 +85,7 @@
 - Acceptance criteria: PHP tests execute instead of ENOENT in this environment.
 
 ### [FIX-RSE-02] Consolidate refresh guard semantics into one helper
+
 - Fixes problem(s): RSE-02
 - Files to touch: `assets/js/sniper-dashboard-core.js`
 - Minimal change: Extract `_lastCall` and interval reset policy into a named helper used by both manual and auto refresh paths.
@@ -86,6 +95,7 @@
 - Acceptance criteria: No blocked manual refresh after background refresh; no duplicate burst calls.
 
 ### [FIX-WH-01] Replace silent catches with bounded warnings
+
 - Fixes problem(s): WH-01
 - Files to touch: `templates/dashboard-ui.html`
 - Minimal change: Add non-fatal `console.warn` (or shared toast-safe logger) in currently empty catches.
@@ -95,6 +105,7 @@
 - Acceptance criteria: Failures are observable without breaking page boot.
 
 ### [FIX-DC-01] Add explicit cross-layer version mapping note
+
 - Fixes problem(s): DC-01
 - Files to touch: `README.md` and/or `Indicator Update Log.md`
 - Minimal change: Document Pine artifact lineage vs platform runtime version equivalence.
@@ -104,6 +115,7 @@
 - Acceptance criteria: Operators can reconcile Pine/backend/dashboard versions unambiguously.
 
 ### [FIX-DUP-01] Designate one planner render authority, keep thin bridge in the other file
+
 - Fixes problem(s): DUP-01
 - Files to touch: `assets/js/sniper-dashboard-core.js`, `assets/js/sniper-dashboard-planner.js`
 - Minimal change: Keep existing public API names, route duplicate rendering calls through one module, deprecate duplicate path with comments.
@@ -113,6 +125,7 @@
 - Acceptance criteria: Same UI output with a single maintained render path.
 
 ### [FIX-PAR-01] Relax brittle Pine wiring assertions to intent-based checks
+
 - Fixes problem(s): PAR-01
 - Files to touch: `tests/pine/pine-fib-parity.test.js`
 - Minimal change: Prefer functional/parity checks over exact string-shape guards where possible.

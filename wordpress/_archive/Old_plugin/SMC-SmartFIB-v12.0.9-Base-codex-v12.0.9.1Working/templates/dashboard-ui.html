@@ -1,1051 +1,2445 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" data-theme="dark" data-density="normal">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SMC SuperFIB __SNIPER_VERSION__ &mdash; Signal + Risk Engine</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-/* ── Final UI Parity Patch ──────────────────────────────────────────── */
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>SMC SuperFIB __SNIPER_VERSION__ &mdash; Signal + Risk Engine</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            /* ── Final UI Parity Patch ──────────────────────────────────────────── */
 
-/* Regime gate: clean institutional table (v12.0.9.1 parity).
+            /* Regime gate: clean institutional table (v12.0.9.1 parity).
    The previous grid-row transform forced 5 columns onto a 10-column table,
    which made badges collide and rows wrap. Restored to a proper table with
    horizontal scroll on narrow viewports. */
-.sfx-regime-gate-card { padding: 0; overflow: hidden; }
-.sfx-regime-gate-card > .sfx-regime-tw {
-  width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-.sfx-regime-table {
-  width: 100%;
-  min-width: 880px;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-}
-.sfx-regime-table thead th {
-  text-align: left;
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--fg-mute);
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--line);
-  background: var(--bg-2);
-  white-space: nowrap;
-}
-.sfx-regime-table thead th:first-child {
-  border-top-left-radius: var(--radius-md);
-}
-.sfx-regime-table thead th:last-child {
-  border-top-right-radius: var(--radius-md);
-}
-.sfx-regime-table tbody tr {
-  transition: background 0.15s;
-}
-.sfx-regime-table tbody tr + tr td {
-  border-top: 1px solid var(--line);
-}
-.sfx-regime-table tbody tr:hover td {
-  background: var(--surface);
-}
-.sfx-regime-table td {
-  padding: 12px 14px;
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  color: var(--fg-dim);
-  vertical-align: middle;
-  white-space: nowrap;
-}
-.sfx-regime-table td:first-child {
-  font-weight: 700;
-  font-size: 0.82rem;
-  color: var(--fg);
-  letter-spacing: 0.02em;
-  position: relative;
-}
-.sfx-regime-table td:first-child::before {
-  content: "";
-  position: absolute;
-  left: 0; top: 8px; bottom: 8px;
-  width: 2px;
-  background: var(--accent-line);
-  border-radius: 2px;
-}
-.sfx-regime-table tbody tr.is-blocked td:first-child::before { background: var(--sell); }
-.sfx-regime-table tbody tr.is-ready   td:first-child::before { background: var(--buy); }
-.sfx-regime-table tbody tr.is-stale   td:first-child::before { background: var(--warn); }
+            .sfx-regime-gate-card {
+                padding: 0;
+                overflow: hidden;
+            }
+            .sfx-regime-gate-card > .sfx-regime-tw {
+                width: 100%;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .sfx-regime-table {
+                width: 100%;
+                min-width: 880px;
+                border-collapse: separate;
+                border-spacing: 0;
+                font-family: var(--font-mono);
+                font-size: 0.74rem;
+            }
+            .sfx-regime-table thead th {
+                text-align: left;
+                font-family: var(--font-mono);
+                font-size: 0.6rem;
+                font-weight: 700;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                color: var(--fg-mute);
+                padding: 12px 14px;
+                border-bottom: 1px solid var(--line);
+                background: var(--bg-2);
+                white-space: nowrap;
+            }
+            .sfx-regime-table thead th:first-child {
+                border-top-left-radius: var(--radius-md);
+            }
+            .sfx-regime-table thead th:last-child {
+                border-top-right-radius: var(--radius-md);
+            }
+            .sfx-regime-table tbody tr {
+                transition: background 0.15s;
+            }
+            .sfx-regime-table tbody tr + tr td {
+                border-top: 1px solid var(--line);
+            }
+            .sfx-regime-table tbody tr:hover td {
+                background: var(--surface);
+            }
+            .sfx-regime-table td {
+                padding: 12px 14px;
+                font-family: var(--font-mono);
+                font-size: 0.74rem;
+                color: var(--fg-dim);
+                vertical-align: middle;
+                white-space: nowrap;
+            }
+            .sfx-regime-table td:first-child {
+                font-weight: 700;
+                font-size: 0.82rem;
+                color: var(--fg);
+                letter-spacing: 0.02em;
+                position: relative;
+            }
+            .sfx-regime-table td:first-child::before {
+                content: "";
+                position: absolute;
+                left: 0;
+                top: 8px;
+                bottom: 8px;
+                width: 2px;
+                background: var(--accent-line);
+                border-radius: 2px;
+            }
+            .sfx-regime-table tbody tr.is-blocked td:first-child::before {
+                background: var(--sell);
+            }
+            .sfx-regime-table tbody tr.is-ready td:first-child::before {
+                background: var(--buy);
+            }
+            .sfx-regime-table tbody tr.is-stale td:first-child::before {
+                background: var(--warn);
+            }
 
-/* Signal section container — no outer card, signals render directly */
-#computed-signal-cards > .sfx-signal { margin-bottom: 0; }
-#computed-signal-cards > .sfx-signal + .sfx-signal { margin-top: 8px; }
+            /* Signal section container — no outer card, signals render directly */
+            #computed-signal-cards > .sfx-signal {
+                margin-bottom: 0;
+            }
+            #computed-signal-cards > .sfx-signal + .sfx-signal {
+                margin-top: 8px;
+            }
 
-/* Plan action bar — secondary actions promoted from topbar */
-.sfx-plan-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
-}
+            /* Plan action bar — secondary actions promoted from topbar */
+            .sfx-plan-actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                align-items: center;
+                margin-top: 14px;
+                padding-top: 14px;
+                border-top: 1px solid var(--line);
+            }
 
-/* Phase chips row using sfx-chips */
-.sfx-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+            /* Phase chips row using sfx-chips */
+            .sfx-chips {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                margin-bottom: 18px;
+            }
 
-/* Section head consistent style */
-.sfx-section-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 26px 0 12px;
-}
-.sfx-section-head:first-child { margin-top: 0; }
-.sfx-section-head h2 {
-  font-size: 0.82rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-weight: 600;
-  color: var(--fg);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0;
-}
-.sfx-section-head h2::before {
-  content: "";
-  width: 3px; height: 14px;
-  background: var(--accent);
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-.sfx-section-head__meta {
-  font-family: var(--font-mono);
-  font-size: 0.64rem;
-  color: var(--fg-mute);
-  letter-spacing: 0.06em;
-}
+            /* Section head consistent style */
+            .sfx-section-head {
+                display: flex;
+                align-items: flex-end;
+                justify-content: space-between;
+                gap: 12px;
+                margin: 26px 0 12px;
+            }
+            .sfx-section-head:first-child {
+                margin-top: 0;
+            }
+            .sfx-section-head h2 {
+                font-size: 0.82rem;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                font-weight: 600;
+                color: var(--fg);
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin: 0;
+            }
+            .sfx-section-head h2::before {
+                content: "";
+                width: 3px;
+                height: 14px;
+                background: var(--accent);
+                border-radius: 2px;
+                flex-shrink: 0;
+            }
+            .sfx-section-head__meta {
+                font-family: var(--font-mono);
+                font-size: 0.64rem;
+                color: var(--fg-mute);
+                letter-spacing: 0.06em;
+            }
 
-/* Suppress legacy .slbl inside plan since we use sfx-section-head now */
-.slbl.ac { display: none; }
+            /* Suppress legacy .slbl inside plan since we use sfx-section-head now */
+            .slbl.ac {
+                display: none;
+            }
 
-/* Account KPI cards — fix legacy card/clbl/cval alignment */
-#acctcards .card.sfx-kpi .clbl,
-#live-summary .card.sfx-kpi .clbl { font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--fg-mute); font-weight: 600; }
-#acctcards .card.sfx-kpi .cval,
-#live-summary .card.sfx-kpi .cval { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-#acctcards .card.sfx-kpi .csub,
-#live-summary .card.sfx-kpi .csub { font-size: 0.72rem; color: var(--fg-mute); }
+            /* Account KPI cards — fix legacy card/clbl/cval alignment */
+            #acctcards .card.sfx-kpi .clbl,
+            #live-summary .card.sfx-kpi .clbl {
+                font-family: var(--font-mono);
+                font-size: 0.62rem;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                color: var(--fg-mute);
+                font-weight: 600;
+            }
+            #acctcards .card.sfx-kpi .cval,
+            #live-summary .card.sfx-kpi .cval {
+                font-family: var(--font-mono);
+                font-size: 1.5rem;
+                font-weight: 700;
+                letter-spacing: -0.02em;
+                font-variant-numeric: tabular-nums;
+            }
+            #acctcards .card.sfx-kpi .csub,
+            #live-summary .card.sfx-kpi .csub {
+                font-size: 0.72rem;
+                color: var(--fg-mute);
+            }
 
-/* Hide the account tabs row — KPI cards are the identity strip */
-.smc-account-tabs { display: none; }
-#tab-risk-profile { display: none !important; }
+            /* Hide the account tabs row — KPI cards are the identity strip */
+            .smc-account-tabs {
+                display: none;
+            }
+            #tab-risk-profile {
+                display: none !important;
+            }
 
-/* Show account overview always */
-#tab-account-overview { display: block !important; }
+            /* Show account overview always */
+            #tab-account-overview {
+                display: block !important;
+            }
 
-/* Remove Book Delta section from primary view */
-#delpan { display: none !important; }
+            /* Remove Book Delta section from primary view */
+            #delpan {
+                display: none !important;
+            }
 
-/* Topbar — auth elements hidden (JS hooks preserved) */
-#smc-nav-login, #smc-nav-logout { display: none !important; }
+            /* Topbar — auth elements hidden (JS hooks preserved) */
+            #smc-nav-login,
+            #smc-nav-logout {
+                display: none !important;
+            }
 
-/* Sidebar auth links hidden */
-.sfx-sb-auth { display: none !important; }
+            /* Sidebar auth links hidden */
+            .sfx-sb-auth {
+                display: none !important;
+            }
 
-/* Plan inputs card — slimmer */
-.card.ab { border: 1px solid var(--line); background: var(--surface-raised); border-radius: var(--radius-md, 10px); padding: var(--density-card, 16px); }
+            /* Plan inputs card — slimmer */
+            .card.ab {
+                border: 1px solid var(--line);
+                background: var(--surface-raised);
+                border-radius: var(--radius-md, 10px);
+                padding: var(--density-card, 16px);
+            }
 
-/* Upload dropzone aliasing */
-.upz {
-  border: 1.5px dashed var(--line-hi);
-  border-radius: var(--radius-md, 10px);
-  padding: 24px;
-  text-align: center;
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  background: var(--bg-1);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.upz:hover { border-color: var(--accent); background: var(--accent-soft); }
-.smc-upload-icon {
-  width: 40px; height: 40px; border-radius: 8px; border: 1px solid var(--line);
-  background: var(--surface-raised); display: grid; place-items: center;
-  font-family: var(--font-mono); font-size: 0.7rem; font-weight: 700;
-  color: var(--fg-mute); letter-spacing: 0.04em;
-}
+            /* Upload dropzone aliasing */
+            .upz {
+                border: 1.5px dashed var(--line-hi);
+                border-radius: var(--radius-md, 10px);
+                padding: 24px;
+                text-align: center;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 8px;
+                background: var(--bg-1);
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .upz:hover {
+                border-color: var(--accent);
+                background: var(--accent-soft);
+            }
+            .smc-upload-icon {
+                width: 40px;
+                height: 40px;
+                border-radius: 8px;
+                border: 1px solid var(--line);
+                background: var(--surface-raised);
+                display: grid;
+                place-items: center;
+                font-family: var(--font-mono);
+                font-size: 0.7rem;
+                font-weight: 700;
+                color: var(--fg-mute);
+                letter-spacing: 0.04em;
+            }
 
-/* Legacy muted text */
-.smc-muted { color: var(--fg-mute); font-size: 0.82rem; }
+            /* Legacy muted text */
+            .smc-muted {
+                color: var(--fg-mute);
+                font-size: 0.82rem;
+            }
 
-/* Tab panels — same as .sfx-view */
-.tp { display: none; }
-.tp.active { display: block; }
+            /* Tab panels — same as .sfx-view */
+            .tp {
+                display: none;
+            }
+            .tp.active {
+                display: block;
+            }
 
-/* g2/g4 grid aliases */
-.g4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
-.g3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
-.g2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
-@media (max-width: 1100px) { .g4 { grid-template-columns: repeat(2,1fr); } .g3 { grid-template-columns: repeat(2,1fr); } }
-@media (max-width: 640px) { .g4,.g3,.g2 { grid-template-columns: 1fr; gap: 10px; } }
+            /* g2/g4 grid aliases */
+            .g4 {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 14px;
+            }
+            .g3 {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 14px;
+            }
+            .g2 {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 14px;
+            }
+            @media (max-width: 1100px) {
+                .g4 {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+                .g3 {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+            }
+            @media (max-width: 640px) {
+                .g4,
+                .g3,
+                .g2 {
+                    grid-template-columns: 1fr;
+                    gap: 10px;
+                }
+            }
 
-/* Plan section header for plan tab */
-#tab-plan .sfx-section-head { margin-top: 22px; }
-#tab-plan .sfx-section-head:first-child { margin-top: 0; }
+            /* Plan section header for plan tab */
+            #tab-plan .sfx-section-head {
+                margin-top: 22px;
+            }
+            #tab-plan .sfx-section-head:first-child {
+                margin-top: 0;
+            }
 
-/* Trade queue section heading restore */
-#trade-queue-wrapper .sfx-section-head { display: flex; }
+            /* Trade queue section heading restore */
+            #trade-queue-wrapper .sfx-section-head {
+                display: flex;
+            }
 
-/* Operations brief note items */
-.smc-note-stack { display: flex; flex-direction: column; gap: 10px; font-size: 0.82rem; color: var(--fg-dim); line-height: 1.55; }
-.smc-note-item .clbl { font-family: var(--font-mono); font-size: 0.64rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-mute); font-weight: 600; margin-bottom: 4px; }
+            /* Operations brief note items */
+            .smc-note-stack {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                font-size: 0.82rem;
+                color: var(--fg-dim);
+                line-height: 1.55;
+            }
+            .smc-note-item .clbl {
+                font-family: var(--font-mono);
+                font-size: 0.64rem;
+                letter-spacing: 0.14em;
+                text-transform: uppercase;
+                color: var(--fg-mute);
+                font-weight: 600;
+                margin-bottom: 4px;
+            }
 
-/* Card title */
-.clbl { font-family: var(--font-mono); font-size: 0.64rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-mute); font-weight: 600; margin-bottom: 8px; }
-.card-title { font-size: 0.84rem; font-weight: 600; }
+            /* Card title */
+            .clbl {
+                font-family: var(--font-mono);
+                font-size: 0.64rem;
+                letter-spacing: 0.14em;
+                text-transform: uppercase;
+                color: var(--fg-mute);
+                font-weight: 600;
+                margin-bottom: 8px;
+            }
+            .card-title {
+                font-size: 0.84rem;
+                font-weight: 600;
+            }
 
-/* Analytics slbl override — keep those visible */
-#tab-analytics .slbl,
-#tab-progress .slbl,
-#tab-live .slbl,
-#tab-book .slbl,
-#tab-orders .slbl,
-#tab-signals .slbl { display: flex; font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-mute); font-weight: 600; margin: 22px 0 10px; align-items: center; gap: 8px; }
-#tab-analytics .slbl::before,
-#tab-progress .slbl::before,
-#tab-live .slbl::before { content: ""; width: 3px; height: 14px; background: var(--accent); border-radius: 2px; }
+            /* Analytics slbl override — keep those visible */
+            #tab-analytics .slbl,
+            #tab-progress .slbl,
+            #tab-live .slbl,
+            #tab-book .slbl,
+            #tab-orders .slbl,
+            #tab-signals .slbl {
+                display: flex;
+                font-family: var(--font-mono);
+                font-size: 0.62rem;
+                letter-spacing: 0.14em;
+                text-transform: uppercase;
+                color: var(--fg-mute);
+                font-weight: 600;
+                margin: 22px 0 10px;
+                align-items: center;
+                gap: 8px;
+            }
+            #tab-analytics .slbl::before,
+            #tab-progress .slbl::before,
+            #tab-live .slbl::before {
+                content: "";
+                width: 3px;
+                height: 14px;
+                background: var(--accent);
+                border-radius: 2px;
+            }
 
-/* Plan tab action bar responsive */
-@media (max-width: 640px) {
-  .sfx-plan-actions { gap: 6px; }
-  .sfx-plan-actions .sfx-btn { font-size: 0.62rem; padding: 6px 10px; }
-}
-</style>
-</head>
-<body class="sfx-app smc-dashboard">
+            /* Plan tab action bar responsive */
+            @media (max-width: 640px) {
+                .sfx-plan-actions {
+                    gap: 6px;
+                }
+                .sfx-plan-actions .sfx-btn {
+                    font-size: 0.62rem;
+                    padding: 6px 10px;
+                }
+            }
+        </style>
+    </head>
+    <body class="sfx-app smc-dashboard">
+        <!-- ═══ APP SHELL ═══════════════════════════════════════════════════════ -->
+        <div class="sfx-shell">
+            <!-- Sidebar overlay -->
+            <div class="sfx-sidebar-overlay" id="smc-sidebar-overlay"></div>
 
-<!-- ═══ APP SHELL ═══════════════════════════════════════════════════════ -->
-<div class="sfx-shell">
-
-  <!-- Sidebar overlay -->
-  <div class="sfx-sidebar-overlay" id="smc-sidebar-overlay"></div>
-
-  <!-- ═══ SIDEBAR ════════════════════════════════════════════════════ -->
-  <aside class="sfx-sidebar" id="smc-sidebar" aria-label="Dashboard navigation">
-
-    <!-- Brand -->
-    <div class="sfx-brand">
-      <div class="sfx-brand__mark">SF</div>
-      <div class="sfx-brand__title">
-        <div class="sfx-brand__name">SMC <span>SuperFIB</span></div>
-        <div class="sfx-brand__ver">__SNIPER_VERSION__</div>
-      </div>
-      <button class="sfx-btn icon ghost sfx-sidebar-close" id="smc-sidebar-close" type="button" aria-label="Close navigation" data-nav-action="close-menu">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="width:16px;height:16px"><path d="M4 4l8 8M12 4l-8 8"/></svg>
-      </button>
-    </div>
-
-    <!-- Workspace Nav Group -->
-    <div class="sfx-sb-group">
-      <div class="sfx-sb-label">Workspace</div>
-      <button class="sfx-nav-item active" type="button" data-section="plan" id="plan-tab-trigger">
-        <svg class="sfx-nav-item__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5h12M2 8h8M2 12.5h10"/><circle cx="13.5" cy="8" r="1.2" fill="currentColor" stroke="none"/></svg>
-        <span>Signal Plan</span>
-        <span class="sfx-nav-item__count" id="tab-plan-badge" style="display:none"></span>
-      </button>
-      <button class="sfx-nav-item" type="button" data-section="live">
-        <svg class="sfx-nav-item__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="3"/><path d="M8 8 L12.5 4.5"/><circle cx="12" cy="5" r="0.9" fill="currentColor" stroke="none"/></svg>
-        <span>Live Radar</span>
-      </button>
-      <button class="sfx-nav-item" type="button" data-section="charts">
-        <svg class="sfx-nav-item__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13.5V3M2 13.5h12"/><path d="M4.5 11l2.5-3 2 2 3.5-5"/></svg>
-        <span>Charts</span>
-      </button>
-      <button class="sfx-nav-item" type="button" data-section="analytics">
-        <svg class="sfx-nav-item__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="8" width="3" height="6" rx="0.5"/><rect x="6.5" y="4" width="3" height="10" rx="0.5"/><rect x="11" y="10" width="3" height="4" rx="0.5"/></svg>
-        <span>Analytics</span>
-      </button>
-      <button class="sfx-nav-item" type="button" data-section="signals">
-        <svg class="sfx-nav-item__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="1.2" fill="currentColor"/><path d="M5 5a4 4 0 0 0 0 6M11 5a4 4 0 0 1 0 6M3 3a7 7 0 0 0 0 10M13 3a7 7 0 0 1 0 10"/></svg>
-        <span>Level Log</span>
-      </button>
-    </div>
-
-    <!-- Books Nav Group -->
-    <div class="sfx-sb-group">
-      <div class="sfx-sb-label">Books</div>
-      <button class="sfx-nav-item" type="button" data-section="book">
-        <svg class="sfx-nav-item__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7a2 2 0 0 1 2 2v8H5a2 2 0 0 0-2 2V3z"/><path d="M3 13a2 2 0 0 1 2-2h7"/></svg>
-        <span>Open Book</span>
-      </button>
-      <button class="sfx-nav-item" type="button" data-section="orders">
-        <svg class="sfx-nav-item__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h10l-1 9a2 2 0 0 1-2 1.8H6a2 2 0 0 1-2-1.8L3 3z"/><path d="M6 6v3M10 6v3"/></svg>
-        <span>Orders</span>
-        <span class="sfx-nav-item__count warn" id="tab-orders-badge" style="display:none"></span>
-      </button>
-      <button class="sfx-nav-item" type="button" data-section="progress">
-        <svg class="sfx-nav-item__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8a6 6 0 1 1-6-6"/><path d="M8 4v4l2.5 1.5"/></svg>
-        <span>4a Progress</span>
-      </button>
-    </div>
-
-    <!-- Engine Status -->
-    <div class="sfx-sb-group">
-      <div class="sfx-sb-label">Engine Status</div>
-      <div class="sfx-engine-card">
-        <div class="sfx-engine-row">
-          <span class="sfx-eng-name">Signal Engine</span>
-          <div class="sfx-eng-val"><span class="sfx-dot" id="eng-dot-engine"></span><span id="eng-status-label">OFFLINE</span></div>
-        </div>
-        <div class="sfx-engine-row">
-          <span class="sfx-eng-name">Price Feed</span>
-          <div class="sfx-eng-val"><span class="sfx-dot" id="eng-dot-price"></span><span id="price-status">--</span></div>
-        </div>
-        <div class="sfx-engine-row">
-          <span class="sfx-eng-name">Backend Sync</span>
-          <div class="sfx-eng-val"><span class="sfx-dot" id="eng-dot-sync"></span><span id="sync-status">--</span></div>
-        </div>
-        <div class="sfx-engine-row">
-          <span class="sfx-eng-name">Last Update</span>
-          <div class="sfx-eng-val" style="color:var(--fg-mute)"><span id="eng-live-sync-sb">--</span></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Identity footer — v12.0.9.1 parity: stacked text + stylized auth button -->
-    <div class="sfx-sb-user">
-      <div class="sfx-sb-user__name" id="smc-nav-user">Session</div>
-      <div class="sfx-sb-user__meta" id="hdr-account">Upload report to begin</div>
-      <div class="sfx-sb-user__meta sfx-sb-user__meta--name" id="hdr-name"></div>
-      <div class="sfx-sb-auth">
-        <a id="smc-sidebar-login"  class="sfx-sb-auth__btn" href="#" onclick="smcLogin();return false">Login</a>
-        <a id="smc-sidebar-logout" class="sfx-sb-auth__btn sfx-sb-auth__btn--logout" href="#" style="display:none" onclick="smcLogout();return false">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 11.5V13a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 2 13V3a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 10 3v1.5"/><path d="M14 8H6m0 0 2.5-2.5M6 8l2.5 2.5"/></svg>
-          <span>Logout</span>
-        </a>
-      </div>
-    </div>
-
-  </aside><!-- /sfx-sidebar -->
-
-  <!-- ═══ MAIN ════════════════════════════════════════════════════════ -->
-  <main class="sfx-main">
-
-    <!-- ═══ TOPBAR ═══════════════════════════════════════════════════ -->
-    <header class="sfx-topbar">
-      <button class="sfx-menu-btn" id="smc-menu-toggle" type="button" aria-label="Open navigation" aria-controls="smc-sidebar" aria-expanded="false" data-nav-action="menu">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg>
-      </button>
-
-      <div class="sfx-topbar__title">
-        <div class="sfx-topbar__eyebrow" id="sfx-topbar-eyebrow">Workspace</div>
-        <div class="sfx-topbar__h smc-topbar__label"><span style="color:var(--fg-mute)">Signal</span> Plan</div>
-      </div>
-
-      <div class="sfx-topbar__spacer"></div>
-
-      <div class="sfx-topbar__actions">
-        <!-- Upload button -->
-        <button class="sfx-btn" id="topbar-upload-btn" type="button" title="Upload Report" onclick="document.getElementById('fi').click()" style="font-size:0.72rem;padding:6px 12px;height:32px;">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><path d="M8 11V3M5 6l3-3 3 3"/><path d="M2.5 11v2a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-2"/></svg>
-          UPLOAD
-        </button>
-        
-        <!-- Refresh button -->
-        <button class="sfx-btn" id="refresh-live-btn" type="button" title="Refresh" onclick="fetchLiveSignals(true)" style="font-size:0.72rem;padding:6px 12px;height:32px;">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><path d="M2.5 8a5.5 5.5 0 0 1 9.5-3.8L14 6"/><path d="M14 2v4h-4"/><path d="M13.5 8a5.5 5.5 0 0 1-9.5 3.8L2 10"/><path d="M2 14v-4h4"/></svg>
-          REFRESH
-        </button>
-
-        <!-- Engine indicator / LIVE pill -->
-        <button class="sfx-engine-indicator" id="nav-engine-indicator" type="button" title="Signal Engine status">
-          <span class="sfx-engine-indicator__dot" id="nav-engine-dot"></span>
-          <span class="sfx-engine-indicator__label" id="signal-engine-status">OFFLINE</span>
-        </button>
-
-        <!-- Theme toggle -->
-        <button class="sfx-btn icon ghost" id="sfx-theme-toggle" type="button" title="Toggle theme">
-          <svg id="sfx-icon-sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8h1.5M13 8h1.5M3.2 3.2l1 1M11.8 11.8l1 1M3.2 12.8l1-1M11.8 4.2l1-1"/></svg>
-          <svg id="sfx-icon-moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;display:none"><path d="M13.5 9.5A5.5 5.5 0 1 1 6.5 2.5a4.5 4.5 0 0 0 7 7z"/></svg>
-        </button>
-
-        <!-- Tweaks panel toggle -->
-        <button class="sfx-btn icon ghost" id="sfx-tweaks-toggle" type="button" title="Tweaks &amp; Appearance">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M11.2 2.2a3.2 3.2 0 0 0-3.9 4.1l-5 5a1.4 1.4 0 0 0 2 2l5-5a3.2 3.2 0 0 0 4.1-3.9L11.5 6.2 9.8 4.5l1.4-2.3z"/></svg>
-        </button>
-
-        <!-- Reset button -->
-        <button id="reset-btn" class="sfx-btn danger" type="button" title="Reset all settings" onclick="resetAll()">Reset</button>
-
-        <!-- Auth hooks — hidden, preserved for JS -->
-        <a id="smc-nav-login"  class="sfx-btn btn bta bts" href="#" style="display:none" onclick="smcLogin();return false">Login</a>
-        <a id="smc-nav-logout" class="sfx-btn btn btg bts" href="#" style="display:none" onclick="smcLogout();return false">Logout</a>
-      </div>
-    </header>
-
-    <!-- Hidden file inputs -->
-    <input type="file" id="fi"      accept=".xlsx,.xls" style="display:none" onchange="handleFile(this.files[0]);this.value=''">
-    <input type="file" id="hist-fi" accept=".xlsx,.xls" style="display:none" onchange="handleHistoryFile(this.files[0]);this.value=''">
-    <input type="hidden" id="wp-base-input">
-
-    <!-- ═══ TICKER ════════════════════════════════════════════════════ -->
-    <div class="sfx-ticker">
-      <div class="sfx-ticker__track">
-        <div id="smc-ticker-items" class="sfx-ticker__inner smc-ticker__scroll-inner"></div>
-      </div>
-      <div class="sfx-ticker__right">
-        <span id="kz-status-chip" class="smc-ticker__kz-chip" style="font-size:0.65rem;padding:2px 8px;border-radius:12px;background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-line);font-weight:600;letter-spacing:0.05em;"></span>
-        <span class="sfx-clock smc-ticker__clock" id="clk" style="font-size:0.68rem;min-width:80px;text-align:right;">--:--:--</span>
-      </div>
-    </div>
-
-    <!-- ═══ CONTENT ═══════════════════════════════════════════════════ -->
-    <div class="sfx-content smc-content">
-
-      <!-- ── Status strip / Phase chips ──────────────────────────── -->
-      <div class="sfx-chips">
-        <span class="sfx-chip accent"><span class="sfx-chip__dot"></span>Phase 1 Recovery</span>
-        <span class="sfx-chip">4a Level Testing</span>
-        <span class="sfx-chip">20p / 50p Tolerance</span>
-        <span class="sfx-chip buy" id="dbadge">Day 0</span>
-      </div>
-
-      <!-- ── Account strip ───────────────────────────────────────── -->
-      <div class="sfx-section-head">
-        <h2>Account</h2>
-        <div class="sfx-section-head__meta" id="account-strip-meta"></div>
-      </div>
-
-      <!-- Legacy tab structure preserved for JS; tabs UI hidden via CSS -->
-      <div class="smc-account-tabs" style="display:none">
-        <button class="tab-btn active" type="button" data-tab="account-overview">Overview</button>
-        <button class="tab-btn" type="button" data-tab="risk-profile">Risk Profile</button>
-      </div>
-
-      <div id="tab-account-overview" class="tab-panel">
-        <div class="slbl ac">Account Pulse</div>
-        <div class="g4" id="acctcards">
-          <div class="card sfx-kpi">
-            <div class="clbl">Equity</div>
-            <div class="cval sfx-num" style="font-size:1.5rem;font-weight:700;color:var(--fg-mute)">-</div>
-            <div class="csub">Upload report to begin</div>
-          </div>
-          <div class="card sfx-kpi">
-            <div class="clbl">Balance</div>
-            <div class="cval sfx-num" style="font-size:1.5rem;font-weight:700;color:var(--fg-mute)">-</div>
-            <div class="csub">-</div>
-          </div>
-          <div class="card sfx-kpi">
-            <div class="clbl">Floating P/L</div>
-            <div class="cval sfx-num" style="font-size:1.5rem;font-weight:700;color:var(--fg-mute)">-</div>
-            <div class="csub">-</div>
-          </div>
-          <div class="card sfx-kpi">
-            <div class="clbl">Margin Level</div>
-            <div class="cval sfx-num" style="font-size:1.5rem;font-weight:700;color:var(--fg-mute)">-</div>
-            <div class="csub">-</div>
-          </div>
-        </div>
-        <!-- Delta panel — hidden by default, JS shows when data available -->
-        <div id="delpan" style="display:none">
-          <div class="slbl ac">Book Delta</div>
-          <div class="g3" id="delcards"></div>
-          <div id="delnew"></div>
-          <div id="delclosed"></div>
-        </div>
-      </div>
-
-      <!-- Risk profile — hidden, preserved for JS -->
-      <div id="tab-risk-profile" class="tab-panel" style="display:none;">
-        <div class="card" style="padding:1.25rem;">
-          <h3 class="card-title" style="margin-bottom:1rem;">Risk Profile</h3>
-          <div class="kv-row"><span class="kv-label">Phase</span><span class="kv-value pill pac">Recovery</span></div>
-          <div class="kv-row"><span class="kv-label">Phase Tolerance</span><span class="kv-value pill pgy">20p USD / 50p JPY</span></div>
-          <div class="kv-row"><span class="kv-label">Minimum Confluence</span><span class="kv-value pill pg2">2-star for entries</span></div>
-          <hr style="margin:1.25rem 0;border-color:var(--line);">
-          <h4 style="margin-bottom:0.75rem;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--fg-mute);">Baseline</h4>
-          <div class="kv-row"><span class="kv-label">Baseline Date</span><span class="kv-value" id="rp-baseline-date">—</span></div>
-          <div class="kv-row"><span class="kv-label">Baseline Positions</span><span class="kv-value" id="rp-baseline-positions">—</span></div>
-          <div class="kv-row"><span class="kv-label">Report File</span><span class="kv-value" id="rp-baseline-file">No baseline loaded</span></div>
-        </div>
-      </div>
-
-      <!-- ── Regime Gate ────────────────────────────────────────── -->
-      <div class="sfx-section-head">
-        <h2>Regime Gate</h2>
-        <div class="sfx-section-head__meta" id="regime-brief-meta">Awaiting Price Engine sync&hellip;</div>
-      </div>
-      <div class="sfx-card sfx-regime-gate-card">
-        <div class="sfx-regime-tw">
-          <table class="sfx-regime-table">
-            <thead>
-              <tr><th>Pair</th><th>Regime</th><th>Gate</th><th>Chop Block</th><th>Status</th></tr>
-            </thead>
-            <tbody id="regime-brief-table"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- ═══ TAB: SIGNAL PLAN ═══════════════════════════════════════ -->
-      <div class="tp active" id="tab-plan">
-        <div id="plan-section" data-tab-focus>
-
-          <!-- Plan Parameters -->
-          <div class="sfx-section-head">
-            <h2>Plan Parameters</h2>
-            <div class="sfx-section-head__meta" id="price-status-plan">Loading&hellip;</div>
-          </div>
-          <div class="sfx-card">
-            <!-- Top Control Row: Fib TF, Risk Allocation, Live Status, Refresh Prices -->
-            <div class="plan-params-top-grid">
-              <div class="sfx-eyebrow plan-params-label">Fib Timeframe</div>
-              <div class="sfx-eyebrow plan-params-label">Risk Allocation</div>
-              <div class="sfx-eyebrow plan-params-label">Live Price Status</div>
-              <div class="plan-params-label">&nbsp;</div>
-
-              <div class="plan-params-control plan-params-control--wide">
-                <div class="sfx-seg">
-                  <button type="button" class="active" onclick="onTimeframeChange('Yearly')">Yearly</button>
-                  <button type="button" onclick="onTimeframeChange('Monthly')">Monthly</button>
-                  <button type="button" onclick="onTimeframeChange('Weekly')">Weekly</button>
-                  <button type="button" onclick="onTimeframeChange('Daily')">Daily</button>
+            <!-- ═══ SIDEBAR ════════════════════════════════════════════════════ -->
+            <aside class="sfx-sidebar" id="smc-sidebar" aria-label="Dashboard navigation">
+                <!-- Brand -->
+                <div class="sfx-brand">
+                    <div class="sfx-brand__mark">SF</div>
+                    <div class="sfx-brand__title">
+                        <div class="sfx-brand__name">SMC <span>SuperFIB</span></div>
+                        <div class="sfx-brand__ver">__SNIPER_VERSION__</div>
+                    </div>
+                    <button
+                        class="sfx-btn icon ghost sfx-sidebar-close"
+                        id="smc-sidebar-close"
+                        type="button"
+                        aria-label="Close navigation"
+                        data-nav-action="close-menu"
+                    >
+                        <svg
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                            style="width: 16px; height: 16px"
+                        >
+                            <path d="M4 4l8 8M12 4l-8 8" />
+                        </svg>
+                    </button>
                 </div>
-                <select id="fib-timeframe" onchange="onTimeframeChange(this.value)" style="display:none">
-                  <option value="Yearly" selected>Yearly</option>
-                  <option value="Monthly">Monthly</option>
-                  <option value="Weekly">Weekly</option>
-                  <option value="Daily">Daily / H4</option>
-                </select>
-              </div>
 
-              <div class="plan-params-control plan-params-control--medium">
-                <div class="sfx-seg">
-                  <button type="button" class="active" onclick="document.getElementById('adv-risk').value='staggered';generatePlan()">Staggered 20/30/50</button>
-                  <button type="button" onclick="document.getElementById('adv-risk').value='equal';generatePlan()">Equal</button>
+                <!-- Workspace Nav Group -->
+                <div class="sfx-sb-group">
+                    <div class="sfx-sb-label">Workspace</div>
+                    <button
+                        class="sfx-nav-item active"
+                        type="button"
+                        data-section="plan"
+                        id="plan-tab-trigger"
+                    >
+                        <svg
+                            class="sfx-nav-item__icon"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M2 3.5h12M2 8h8M2 12.5h10" />
+                            <circle cx="13.5" cy="8" r="1.2" fill="currentColor" stroke="none" />
+                        </svg>
+                        <span>Signal Plan</span>
+                        <span
+                            class="sfx-nav-item__count"
+                            id="tab-plan-badge"
+                            style="display: none"
+                        ></span>
+                    </button>
+                    <button class="sfx-nav-item" type="button" data-section="live">
+                        <svg
+                            class="sfx-nav-item__icon"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.3"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <circle cx="8" cy="8" r="6" />
+                            <circle cx="8" cy="8" r="3" />
+                            <path d="M8 8 L12.5 4.5" />
+                            <circle cx="12" cy="5" r="0.9" fill="currentColor" stroke="none" />
+                        </svg>
+                        <span>Live Radar</span>
+                    </button>
+                    <button class="sfx-nav-item" type="button" data-section="charts">
+                        <svg
+                            class="sfx-nav-item__icon"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M2 13.5V3M2 13.5h12" />
+                            <path d="M4.5 11l2.5-3 2 2 3.5-5" />
+                        </svg>
+                        <span>Charts</span>
+                    </button>
+                    <button class="sfx-nav-item" type="button" data-section="analytics">
+                        <svg
+                            class="sfx-nav-item__icon"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <rect x="2" y="8" width="3" height="6" rx="0.5" />
+                            <rect x="6.5" y="4" width="3" height="10" rx="0.5" />
+                            <rect x="11" y="10" width="3" height="4" rx="0.5" />
+                        </svg>
+                        <span>Analytics</span>
+                    </button>
+                    <button class="sfx-nav-item" type="button" data-section="signals">
+                        <svg
+                            class="sfx-nav-item__icon"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <circle cx="8" cy="8" r="1.2" fill="currentColor" />
+                            <path
+                                d="M5 5a4 4 0 0 0 0 6M11 5a4 4 0 0 1 0 6M3 3a7 7 0 0 0 0 10M13 3a7 7 0 0 1 0 10"
+                            />
+                        </svg>
+                        <span>Level Log</span>
+                    </button>
                 </div>
-                <select id="adv-risk" onchange="generatePlan()" style="display:none">
-                  <option value="staggered" selected>Staggered 20/30/50</option>
-                  <option value="equal">Equal (legacy)</option>
-                </select>
-              </div>
 
-              <div class="plan-params-control plan-params-control--medium">
-                <div class="plan-params-status-box">
-                  <span id="live-price-status-inline">0/5 Live</span>
+                <!-- Books Nav Group -->
+                <div class="sfx-sb-group">
+                    <div class="sfx-sb-label">Books</div>
+                    <button class="sfx-nav-item" type="button" data-section="book">
+                        <svg
+                            class="sfx-nav-item__icon"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M3 3h7a2 2 0 0 1 2 2v8H5a2 2 0 0 0-2 2V3z" />
+                            <path d="M3 13a2 2 0 0 1 2-2h7" />
+                        </svg>
+                        <span>Open Book</span>
+                    </button>
+                    <button class="sfx-nav-item" type="button" data-section="orders">
+                        <svg
+                            class="sfx-nav-item__icon"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M3 3h10l-1 9a2 2 0 0 1-2 1.8H6a2 2 0 0 1-2-1.8L3 3z" />
+                            <path d="M6 6v3M10 6v3" />
+                        </svg>
+                        <span>Orders</span>
+                        <span
+                            class="sfx-nav-item__count warn"
+                            id="tab-orders-badge"
+                            style="display: none"
+                        ></span>
+                    </button>
+                    <button class="sfx-nav-item" type="button" data-section="progress">
+                        <svg
+                            class="sfx-nav-item__icon"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M14 8a6 6 0 1 1-6-6" />
+                            <path d="M8 4v4l2.5 1.5" />
+                        </svg>
+                        <span>4a Progress</span>
+                    </button>
                 </div>
-              </div>
 
-              <div class="plan-params-control plan-params-control--compact">
-                <button class="sfx-btn ghost" id="fetch-btn" type="button" onclick="fetchPrices(true)">
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><path d="M2.5 8a5.5 5.5 0 0 1 9.5-3.8L14 6"/><path d="M14 2v4h-4"/><path d="M13.5 8a5.5 5.5 0 0 1-9.5 3.8L2 10"/><path d="M2 14v-4h4"/></svg>
-                  Refresh Prices
+                <!-- Engine Status -->
+                <div class="sfx-sb-group">
+                    <div class="sfx-sb-label">Engine Status</div>
+                    <div class="sfx-engine-card">
+                        <div class="sfx-engine-row">
+                            <span class="sfx-eng-name">Signal Engine</span>
+                            <div class="sfx-eng-val">
+                                <span class="sfx-dot" id="eng-dot-engine"></span
+                                ><span id="eng-status-label">OFFLINE</span>
+                            </div>
+                        </div>
+                        <div class="sfx-engine-row">
+                            <span class="sfx-eng-name">Price Feed</span>
+                            <div class="sfx-eng-val">
+                                <span class="sfx-dot" id="eng-dot-price"></span
+                                ><span id="price-status">--</span>
+                            </div>
+                        </div>
+                        <div class="sfx-engine-row">
+                            <span class="sfx-eng-name">Backend Sync</span>
+                            <div class="sfx-eng-val">
+                                <span class="sfx-dot" id="eng-dot-sync"></span
+                                ><span id="sync-status">--</span>
+                            </div>
+                        </div>
+                        <div class="sfx-engine-row">
+                            <span class="sfx-eng-name">Last Update</span>
+                            <div class="sfx-eng-val" style="color: var(--fg-mute)">
+                                <span id="eng-live-sync-sb">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Identity footer — v12.0.9.1 parity: stacked text + stylized auth button -->
+                <div class="sfx-sb-user">
+                    <div class="sfx-sb-user__name" id="smc-nav-user">Session</div>
+                    <div class="sfx-sb-user__meta" id="hdr-account">Upload report to begin</div>
+                    <div class="sfx-sb-user__meta sfx-sb-user__meta--name" id="hdr-name"></div>
+                    <div class="sfx-sb-auth">
+                        <a
+                            id="smc-sidebar-login"
+                            class="sfx-sb-auth__btn"
+                            href="#"
+                            onclick="
+                                smcLogin();
+                                return false;
+                            "
+                            >Login</a
+                        >
+                        <a
+                            id="smc-sidebar-logout"
+                            class="sfx-sb-auth__btn sfx-sb-auth__btn--logout"
+                            href="#"
+                            style="display: none"
+                            onclick="
+                                smcLogout();
+                                return false;
+                            "
+                        >
+                            <svg
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                aria-hidden="true"
+                            >
+                                <path
+                                    d="M10 11.5V13a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 2 13V3a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 10 3v1.5"
+                                />
+                                <path d="M14 8H6m0 0 2.5-2.5M6 8l2.5 2.5" />
+                            </svg>
+                            <span>Logout</span>
+                        </a>
+                    </div>
+                </div>
+            </aside>
+            <!-- /sfx-sidebar -->
+
+            <!-- ═══ MAIN ════════════════════════════════════════════════════════ -->
+            <main class="sfx-main">
+                <!-- ═══ TOPBAR ═══════════════════════════════════════════════════ -->
+                <header class="sfx-topbar">
+                    <button
+                        class="sfx-menu-btn"
+                        id="smc-menu-toggle"
+                        type="button"
+                        aria-label="Open navigation"
+                        aria-controls="smc-sidebar"
+                        aria-expanded="false"
+                        data-nav-action="menu"
+                    >
+                        <svg
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                        >
+                            <path d="M2.5 4h11M2.5 8h11M2.5 12h11" />
+                        </svg>
+                    </button>
+
+                    <div class="sfx-topbar__title">
+                        <div class="sfx-topbar__eyebrow" id="sfx-topbar-eyebrow">Workspace</div>
+                        <div class="sfx-topbar__h smc-topbar__label">
+                            <span style="color: var(--fg-mute)">Signal</span> Plan
+                        </div>
+                    </div>
+
+                    <div class="sfx-topbar__spacer"></div>
+
+                    <div class="sfx-topbar__actions">
+                        <!-- Upload button -->
+                        <button
+                            class="sfx-btn"
+                            id="topbar-upload-btn"
+                            type="button"
+                            title="Upload Report"
+                            onclick="document.getElementById('fi').click()"
+                            style="font-size: 0.72rem; padding: 6px 12px; height: 32px"
+                        >
+                            <svg
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.4"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                style="width: 12px; height: 12px"
+                            >
+                                <path d="M8 11V3M5 6l3-3 3 3" />
+                                <path
+                                    d="M2.5 11v2a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-2"
+                                />
+                            </svg>
+                            UPLOAD
+                        </button>
+
+                        <!-- Refresh button -->
+                        <button
+                            class="sfx-btn"
+                            id="refresh-live-btn"
+                            type="button"
+                            title="Refresh"
+                            onclick="fetchLiveSignals(true)"
+                            style="font-size: 0.72rem; padding: 6px 12px; height: 32px"
+                        >
+                            <svg
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.4"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                style="width: 12px; height: 12px"
+                            >
+                                <path d="M2.5 8a5.5 5.5 0 0 1 9.5-3.8L14 6" />
+                                <path d="M14 2v4h-4" />
+                                <path d="M13.5 8a5.5 5.5 0 0 1-9.5 3.8L2 10" />
+                                <path d="M2 14v-4h4" />
+                            </svg>
+                            REFRESH
+                        </button>
+
+                        <!-- Engine indicator / LIVE pill -->
+                        <button
+                            class="sfx-engine-indicator"
+                            id="nav-engine-indicator"
+                            type="button"
+                            title="Signal Engine status"
+                        >
+                            <span class="sfx-engine-indicator__dot" id="nav-engine-dot"></span>
+                            <span class="sfx-engine-indicator__label" id="signal-engine-status"
+                                >OFFLINE</span
+                            >
+                        </button>
+
+                        <!-- Theme toggle -->
+                        <button
+                            class="sfx-btn icon ghost"
+                            id="sfx-theme-toggle"
+                            type="button"
+                            title="Toggle theme"
+                        >
+                            <svg
+                                id="sfx-icon-sun"
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.4"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                style="width: 18px; height: 18px"
+                            >
+                                <circle cx="8" cy="8" r="3" />
+                                <path
+                                    d="M8 1.5v1.5M8 13v1.5M1.5 8h1.5M13 8h1.5M3.2 3.2l1 1M11.8 11.8l1 1M3.2 12.8l1-1M11.8 4.2l1-1"
+                                />
+                            </svg>
+                            <svg
+                                id="sfx-icon-moon"
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.4"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                style="width: 18px; height: 18px; display: none"
+                            >
+                                <path d="M13.5 9.5A5.5 5.5 0 1 1 6.5 2.5a4.5 4.5 0 0 0 7 7z" />
+                            </svg>
+                        </button>
+
+                        <!-- Tweaks panel toggle -->
+                        <button
+                            class="sfx-btn icon ghost"
+                            id="sfx-tweaks-toggle"
+                            type="button"
+                            title="Tweaks &amp; Appearance"
+                        >
+                            <svg
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.3"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                style="width: 18px; height: 18px"
+                            >
+                                <path
+                                    d="M11.2 2.2a3.2 3.2 0 0 0-3.9 4.1l-5 5a1.4 1.4 0 0 0 2 2l5-5a3.2 3.2 0 0 0 4.1-3.9L11.5 6.2 9.8 4.5l1.4-2.3z"
+                                />
+                            </svg>
+                        </button>
+
+                        <!-- Reset button -->
+                        <button
+                            id="reset-btn"
+                            class="sfx-btn danger"
+                            type="button"
+                            title="Reset all settings"
+                            onclick="resetAll()"
+                        >
+                            Reset
+                        </button>
+
+                        <!-- Auth hooks — hidden, preserved for JS -->
+                        <a
+                            id="smc-nav-login"
+                            class="sfx-btn btn bta bts"
+                            href="#"
+                            style="display: none"
+                            onclick="
+                                smcLogin();
+                                return false;
+                            "
+                            >Login</a
+                        >
+                        <a
+                            id="smc-nav-logout"
+                            class="sfx-btn btn btg bts"
+                            href="#"
+                            style="display: none"
+                            onclick="
+                                smcLogout();
+                                return false;
+                            "
+                            >Logout</a
+                        >
+                    </div>
+                </header>
+
+                <!-- Hidden file inputs -->
+                <input
+                    type="file"
+                    id="fi"
+                    accept=".xlsx,.xls"
+                    style="display: none"
+                    onchange="
+                        handleFile(this.files[0]);
+                        this.value = '';
+                    "
+                />
+                <input
+                    type="file"
+                    id="hist-fi"
+                    accept=".xlsx,.xls"
+                    style="display: none"
+                    onchange="
+                        handleHistoryFile(this.files[0]);
+                        this.value = '';
+                    "
+                />
+                <input type="hidden" id="wp-base-input" />
+
+                <!-- ═══ TICKER ════════════════════════════════════════════════════ -->
+                <div class="sfx-ticker">
+                    <div class="sfx-ticker__track">
+                        <div
+                            id="smc-ticker-items"
+                            class="sfx-ticker__inner smc-ticker__scroll-inner"
+                        ></div>
+                    </div>
+                    <div class="sfx-ticker__right">
+                        <span
+                            id="kz-status-chip"
+                            class="smc-ticker__kz-chip"
+                            style="
+                                font-size: 0.65rem;
+                                padding: 2px 8px;
+                                border-radius: 12px;
+                                background: var(--accent-soft);
+                                color: var(--accent);
+                                border: 1px solid var(--accent-line);
+                                font-weight: 600;
+                                letter-spacing: 0.05em;
+                            "
+                        ></span>
+                        <span
+                            class="sfx-clock smc-ticker__clock"
+                            id="clk"
+                            style="font-size: 0.68rem; min-width: 80px; text-align: right"
+                            >--:--:--</span
+                        >
+                    </div>
+                </div>
+
+                <!-- ═══ CONTENT ═══════════════════════════════════════════════════ -->
+                <div class="sfx-content smc-content">
+                    <!-- ── Status strip / Phase chips ──────────────────────────── -->
+                    <div class="sfx-chips">
+                        <span class="sfx-chip accent"
+                            ><span class="sfx-chip__dot"></span>Phase 1 Recovery</span
+                        >
+                        <span class="sfx-chip">4a Level Testing</span>
+                        <span class="sfx-chip">20p / 50p Tolerance</span>
+                        <span class="sfx-chip buy" id="dbadge">Day 0</span>
+                    </div>
+
+                    <!-- ── Account strip ───────────────────────────────────────── -->
+                    <div class="sfx-section-head">
+                        <h2>Account</h2>
+                        <div class="sfx-section-head__meta" id="account-strip-meta"></div>
+                    </div>
+
+                    <!-- Legacy tab structure preserved for JS; tabs UI hidden via CSS -->
+                    <div class="smc-account-tabs" style="display: none">
+                        <button class="tab-btn active" type="button" data-tab="account-overview">
+                            Overview
+                        </button>
+                        <button class="tab-btn" type="button" data-tab="risk-profile">
+                            Risk Profile
+                        </button>
+                    </div>
+
+                    <div id="tab-account-overview" class="tab-panel">
+                        <div class="slbl ac">Account Pulse</div>
+                        <div class="g4" id="acctcards">
+                            <div class="card sfx-kpi">
+                                <div class="clbl">Equity</div>
+                                <div
+                                    class="cval sfx-num"
+                                    style="
+                                        font-size: 1.5rem;
+                                        font-weight: 700;
+                                        color: var(--fg-mute);
+                                    "
+                                >
+                                    -
+                                </div>
+                                <div class="csub">Upload report to begin</div>
+                            </div>
+                            <div class="card sfx-kpi">
+                                <div class="clbl">Balance</div>
+                                <div
+                                    class="cval sfx-num"
+                                    style="
+                                        font-size: 1.5rem;
+                                        font-weight: 700;
+                                        color: var(--fg-mute);
+                                    "
+                                >
+                                    -
+                                </div>
+                                <div class="csub">-</div>
+                            </div>
+                            <div class="card sfx-kpi">
+                                <div class="clbl">Floating P/L</div>
+                                <div
+                                    class="cval sfx-num"
+                                    style="
+                                        font-size: 1.5rem;
+                                        font-weight: 700;
+                                        color: var(--fg-mute);
+                                    "
+                                >
+                                    -
+                                </div>
+                                <div class="csub">-</div>
+                            </div>
+                            <div class="card sfx-kpi">
+                                <div class="clbl">Margin Level</div>
+                                <div
+                                    class="cval sfx-num"
+                                    style="
+                                        font-size: 1.5rem;
+                                        font-weight: 700;
+                                        color: var(--fg-mute);
+                                    "
+                                >
+                                    -
+                                </div>
+                                <div class="csub">-</div>
+                            </div>
+                        </div>
+                        <!-- Delta panel — hidden by default, JS shows when data available -->
+                        <div id="delpan" style="display: none">
+                            <div class="slbl ac">Book Delta</div>
+                            <div class="g3" id="delcards"></div>
+                            <div id="delnew"></div>
+                            <div id="delclosed"></div>
+                        </div>
+                    </div>
+
+                    <!-- Risk profile — hidden, preserved for JS -->
+                    <div id="tab-risk-profile" class="tab-panel" style="display: none">
+                        <div class="card" style="padding: 1.25rem">
+                            <h3 class="card-title" style="margin-bottom: 1rem">Risk Profile</h3>
+                            <div class="kv-row">
+                                <span class="kv-label">Phase</span
+                                ><span class="kv-value pill pac">Recovery</span>
+                            </div>
+                            <div class="kv-row">
+                                <span class="kv-label">Phase Tolerance</span
+                                ><span class="kv-value pill pgy">20p USD / 50p JPY</span>
+                            </div>
+                            <div class="kv-row">
+                                <span class="kv-label">Minimum Confluence</span
+                                ><span class="kv-value pill pg2">2-star for entries</span>
+                            </div>
+                            <hr style="margin: 1.25rem 0; border-color: var(--line)" />
+                            <h4
+                                style="
+                                    margin-bottom: 0.75rem;
+                                    font-size: 0.75rem;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.08em;
+                                    color: var(--fg-mute);
+                                "
+                            >
+                                Baseline
+                            </h4>
+                            <div class="kv-row">
+                                <span class="kv-label">Baseline Date</span
+                                ><span class="kv-value" id="rp-baseline-date">—</span>
+                            </div>
+                            <div class="kv-row">
+                                <span class="kv-label">Baseline Positions</span
+                                ><span class="kv-value" id="rp-baseline-positions">—</span>
+                            </div>
+                            <div class="kv-row">
+                                <span class="kv-label">Report File</span
+                                ><span class="kv-value" id="rp-baseline-file"
+                                    >No baseline loaded</span
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── Regime Gate ────────────────────────────────────────── -->
+                    <div class="sfx-section-head">
+                        <h2>Regime Gate</h2>
+                        <div class="sfx-section-head__meta" id="regime-brief-meta">
+                            Awaiting Price Engine sync&hellip;
+                        </div>
+                    </div>
+                    <div class="sfx-card sfx-regime-gate-card">
+                        <div class="sfx-regime-tw">
+                            <table class="sfx-regime-table">
+                                <thead>
+                                    <tr>
+                                        <th>Pair</th>
+                                        <th>Regime</th>
+                                        <th>Gate</th>
+                                        <th>Chop Block</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="regime-brief-table"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- ═══ TAB: SIGNAL PLAN ═══════════════════════════════════════ -->
+                    <div class="tp active" id="tab-plan">
+                        <div id="plan-section" data-tab-focus>
+                            <!-- Plan Parameters -->
+                            <div class="sfx-section-head">
+                                <h2>Plan Parameters</h2>
+                                <div class="sfx-section-head__meta" id="price-status-plan">
+                                    Loading&hellip;
+                                </div>
+                            </div>
+                            <div class="sfx-card">
+                                <!-- Top Control Row: Fib TF, Risk Allocation, Live Status, Refresh Prices -->
+                                <div class="plan-params-top-grid">
+                                    <div class="sfx-eyebrow plan-params-label">Fib Timeframe</div>
+                                    <div class="sfx-eyebrow plan-params-label">Risk Allocation</div>
+                                    <div class="sfx-eyebrow plan-params-label">
+                                        Live Price Status
+                                    </div>
+                                    <div class="plan-params-label">&nbsp;</div>
+
+                                    <div class="plan-params-control plan-params-control--wide">
+                                        <div class="sfx-seg">
+                                            <button
+                                                type="button"
+                                                class="active"
+                                                onclick="onTimeframeChange('Yearly')"
+                                            >
+                                                Yearly
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onclick="onTimeframeChange('Monthly')"
+                                            >
+                                                Monthly
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onclick="onTimeframeChange('Weekly')"
+                                            >
+                                                Weekly
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onclick="onTimeframeChange('Daily')"
+                                            >
+                                                Daily
+                                            </button>
+                                        </div>
+                                        <select
+                                            id="fib-timeframe"
+                                            onchange="onTimeframeChange(this.value)"
+                                            style="display: none"
+                                        >
+                                            <option value="Yearly" selected>Yearly</option>
+                                            <option value="Monthly">Monthly</option>
+                                            <option value="Weekly">Weekly</option>
+                                            <option value="Daily">Daily / H4</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="plan-params-control plan-params-control--medium">
+                                        <div class="sfx-seg">
+                                            <button
+                                                type="button"
+                                                class="active"
+                                                onclick="
+                                                    document.getElementById('adv-risk').value =
+                                                        'staggered';
+                                                    generatePlan();
+                                                "
+                                            >
+                                                Staggered 20/30/50
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onclick="
+                                                    document.getElementById('adv-risk').value =
+                                                        'equal';
+                                                    generatePlan();
+                                                "
+                                            >
+                                                Equal
+                                            </button>
+                                        </div>
+                                        <select
+                                            id="adv-risk"
+                                            onchange="generatePlan()"
+                                            style="display: none"
+                                        >
+                                            <option value="staggered" selected>
+                                                Staggered 20/30/50
+                                            </option>
+                                            <option value="equal">Equal (legacy)</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="plan-params-control plan-params-control--medium">
+                                        <div class="plan-params-status-box">
+                                            <span id="live-price-status-inline">0/5 Live</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="plan-params-control plan-params-control--compact">
+                                        <button
+                                            class="sfx-btn ghost"
+                                            id="fetch-btn"
+                                            type="button"
+                                            onclick="fetchPrices(true)"
+                                        >
+                                            <svg
+                                                viewBox="0 0 16 16"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="1.4"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                style="width: 12px; height: 12px"
+                                            >
+                                                <path d="M2.5 8a5.5 5.5 0 0 1 9.5-3.8L14 6" />
+                                                <path d="M14 2v4h-4" />
+                                                <path d="M13.5 8a5.5 5.5 0 0 1-9.5 3.8L2 10" />
+                                                <path d="M2 14v-4h4" />
+                                            </svg>
+                                            Refresh Prices
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="plan-params-equity-note">
+                                    <span id="plan-equity-note">Upload report to set equity</span>
+                                </div>
+
+                                <!-- Live price inputs (instrument grid) - Middle section -->
+                                <div
+                                    style="
+                                        margin-bottom: 8px;
+                                        padding-bottom: 8px;
+                                        border-bottom: 1px solid var(--line);
+                                    "
+                                >
+                                    <div
+                                        style="
+                                            display: flex;
+                                            justify-content: space-between;
+                                            align-items: center;
+                                            margin-bottom: 6px;
+                                            flex-wrap: wrap;
+                                            gap: 8px;
+                                        "
+                                    >
+                                        <span
+                                            style="
+                                                font-family: var(--font-mono);
+                                                font-size: 0.62rem;
+                                                letter-spacing: 0.12em;
+                                                text-transform: uppercase;
+                                                color: var(--fg-mute);
+                                            "
+                                            >Live Prices &middot; Twelve Data - If Price Engine is
+                                            offline Enter Price and Trend Manually below</span
+                                        >
+                                    </div>
+                                    <div class="plan-input-grid" id="priceinputs"></div>
+                                </div>
+
+                                <!-- Bottom Action Footer: Add Pair + Action Buttons -->
+                                <div class="plan-params-footer">
+                                    <div
+                                        class="plan-params-footer__group plan-params-footer__group--left"
+                                    >
+                                        <span class="plan-params-footer__label">Add Pair</span>
+                                        <div class="plan-params-footer__add-group">
+                                            <input
+                                                id="add-pair-input"
+                                                type="text"
+                                                placeholder="e.g. ETH/USD"
+                                                maxlength="14"
+                                            />
+                                            <button
+                                                class="sfx-btn"
+                                                type="button"
+                                                onclick="addInstrument()"
+                                            >
+                                                Add Pair
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div
+                                        class="plan-params-footer__group plan-params-footer__group--right"
+                                    >
+                                        <button
+                                            class="sfx-btn primary"
+                                            id="topbar-plan-btn"
+                                            type="button"
+                                            onclick="generatePlan()"
+                                        >
+                                            <svg
+                                                viewBox="0 0 16 16"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="1.4"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                style="width: 14px; height: 14px"
+                                            >
+                                                <path d="M3 8l3.5 3.5L13 4" />
+                                            </svg>
+                                            Generate Plan
+                                        </button>
+                                        <button
+                                            class="sfx-btn"
+                                            type="button"
+                                            onclick="exportPlanHTML()"
+                                        >
+                                            <svg
+                                                viewBox="0 0 16 16"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="1.4"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                style="width: 14px; height: 14px"
+                                            >
+                                                <path d="M8 11V3M5 8l3 3 3-3" />
+                                                <path
+                                                    d="M2.5 11v2a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-2"
+                                                />
+                                            </svg>
+                                            Export Plan
+                                        </button>
+                                        <button
+                                            class="sfx-btn"
+                                            id="plan-upload-btn"
+                                            type="button"
+                                            onclick="document.getElementById('fi').click()"
+                                        >
+                                            <svg
+                                                viewBox="0 0 16 16"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="1.4"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                style="width: 14px; height: 14px"
+                                            >
+                                                <path d="M8 11V3M5 6l3-3 3 3" />
+                                                <path
+                                                    d="M2.5 11v2a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-2"
+                                                />
+                                            </svg>
+                                            Upload Report
+                                        </button>
+                                        <button
+                                            class="sfx-btn"
+                                            id="topbar-hist-btn"
+                                            type="button"
+                                            onclick="document.getElementById('hist-fi').click()"
+                                        >
+                                            <svg
+                                                viewBox="0 0 16 16"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="1.4"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                style="width: 14px; height: 14px"
+                                            >
+                                                <path d="M8 3v8M5 8l3 3 3-3" />
+                                                <path
+                                                    d="M2.5 12.5v1a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1"
+                                                />
+                                            </svg>
+                                            Upload History
+                                        </button>
+                                    </div>
+
+                                    <!-- Export Report dropdown (hidden by default) -->
+                                    <div
+                                        class="export-chooser-wrap"
+                                        style="position: relative; display: none"
+                                    >
+                                        <button
+                                            class="sfx-btn"
+                                            type="button"
+                                            onclick="exportReport()"
+                                        >
+                                            <svg
+                                                viewBox="0 0 16 16"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="1.4"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                style="width: 14px; height: 14px"
+                                            >
+                                                <path
+                                                    d="M3 3h10l-1 9a2 2 0 0 1-2 1.8H6A2 2 0 0 1 4 12L3 3z"
+                                                />
+                                                <path d="M1.5 3h13" />
+                                            </svg>
+                                            Export Report
+                                        </button>
+                                        <div
+                                            id="export-chooser"
+                                            class="export-chooser"
+                                            style="
+                                                display: none;
+                                                position: absolute;
+                                                right: 0;
+                                                top: calc(100% + 4px);
+                                                z-index: 50;
+                                                background: var(--surface-raised);
+                                                border: 1px solid var(--line);
+                                                border-radius: var(--radius-sm, 6px);
+                                                overflow: hidden;
+                                                min-width: 120px;
+                                            "
+                                            role="dialog"
+                                            aria-label="Choose export format"
+                                        >
+                                            <button
+                                                class="sfx-btn"
+                                                style="
+                                                    width: 100%;
+                                                    border-radius: 0;
+                                                    border: none;
+                                                    border-bottom: 1px solid var(--line);
+                                                "
+                                                type="button"
+                                                onclick="
+                                                    exportReportHtml();
+                                                    hideExportChooser();
+                                                "
+                                            >
+                                                HTML
+                                            </button>
+                                            <button
+                                                class="sfx-btn"
+                                                style="width: 100%; border-radius: 0; border: none"
+                                                type="button"
+                                                onclick="
+                                                    exportCSV();
+                                                    hideExportChooser();
+                                                "
+                                            >
+                                                CSV
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Hidden buttons for JS -->
+                                    <button
+                                        class="sfx-btn"
+                                        id="refresh-regimes-btn"
+                                        type="button"
+                                        onclick="fetchRegimes(true)"
+                                        style="display: none"
+                                    >
+                                        Refresh Regimes
+                                    </button>
+                                    <button
+                                        class="sfx-btn"
+                                        type="button"
+                                        onclick="fetchPendingLimits()"
+                                        style="display: none"
+                                        id="pending-limits-btn"
+                                    >
+                                        Pending Limits
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Plan Output -->
+                            <div id="plan-output" style="display: none">
+                                <div id="plan-verdict"></div>
+                                <div class="sfx-section-head"><h2>Action Checklist</h2></div>
+                                <div class="sfx-card" style="margin-bottom: var(--sp-4)">
+                                    <div id="plan-checklist"></div>
+                                </div>
+                                <div class="sfx-section-head"><h2>Signal Ladders</h2></div>
+                                <div id="plan-ladders"></div>
+                                <div class="sfx-section-head"><h2>Risk Summary</h2></div>
+                                <div class="g4" id="plan-risk"></div>
+                                <div class="sfx-section-head"><h2>Regime Gate Check</h2></div>
+                                <div
+                                    class="sfx-card sfx-regime-gate-card"
+                                    style="margin-bottom: var(--sp-4)"
+                                >
+                                    <div class="sfx-regime-tw">
+                                        <table class="sfx-regime-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Pair</th>
+                                                    <th>Regime</th>
+                                                    <th>Price</th>
+                                                    <th>Direction</th>
+                                                    <th>Nearest Zone</th>
+                                                    <th>Dist to Zone</th>
+                                                    <th>Chop Block</th>
+                                                    <th>Gate Result</th>
+                                                    <th>Stars</th>
+                                                    <th>EDE Dist</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="plan-gates"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Computed Signals -->
+                            <div id="computed-signals-section">
+                                <div class="sfx-section-head">
+                                    <h2>Computed Signals</h2>
+                                    <div
+                                        class="sfx-section-head__meta"
+                                        id="computed-signals-meta"
+                                    ></div>
+                                </div>
+                                <div id="computed-signal-cards">
+                                    <div class="sfx-mute" style="padding: 16px 0">
+                                        Signal engine loading dynamic market state&hellip;
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Trade Queue -->
+                            <div id="trade-queue-wrapper">
+                                <div class="sfx-section-head">
+                                    <h2>Trade Queue</h2>
+                                </div>
+                                <div id="trade-queue-section">
+                                    <div class="sfx-mute" style="padding: 16px 0">
+                                        Signal engine will populate this when READY signals are
+                                        detected.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Data Ingest + Operations Brief -->
+                            <div class="sfx-section-head">
+                                <h2>Data Ingest</h2>
+                            </div>
+                            <div class="g2">
+                                <div
+                                    class="upz sfx-drop"
+                                    id="upz"
+                                    ondragover="
+                                        event.preventDefault();
+                                        this.classList.add('drag');
+                                    "
+                                    ondragleave="this.classList.remove('drag')"
+                                    ondrop="handleDrop(event)"
+                                    onclick="document.getElementById('fi').click()"
+                                >
+                                    <div class="smc-upload-icon sfx-drop__icon">XLS</div>
+                                    <div style="font-weight: 600">Report Intake</div>
+                                    <p
+                                        class="smc-muted"
+                                        style="font-size: 0.78rem; max-width: 320px; margin: 0"
+                                    >
+                                        Drop the ReportTrade workbook to update equity, book state,
+                                        and Phase 4a baseline.
+                                    </p>
+                                    <div
+                                        id="upstat"
+                                        style="
+                                            font-family: var(--font-mono);
+                                            font-size: 0.66rem;
+                                            color: var(--fg-mute);
+                                            margin-top: 4px;
+                                        "
+                                    >
+                                        No report loaded &middot; Upload to establish baseline.
+                                    </div>
+                                </div>
+                                <div class="sfx-card">
+                                    <div class="sfx-card__hd">
+                                        <div class="sfx-card__title">Operations Brief</div>
+                                        <div class="sfx-card__meta">Auto</div>
+                                    </div>
+                                    <div class="smc-note-stack">
+                                        <div class="smc-note-item">
+                                            <div class="clbl">History Import</div>
+                                            <div
+                                                id="hist-stat"
+                                                style="
+                                                    font-family: var(--font-mono);
+                                                    font-size: 0.7rem;
+                                                    color: var(--fg-mute);
+                                                "
+                                            >
+                                                No history file loaded yet &middot; exact close
+                                                analytics stay pending until history is imported.
+                                            </div>
+                                        </div>
+                                        <div class="smc-note-item">
+                                            <div class="clbl">Recommended Flow</div>
+                                            <p class="smc-muted" style="margin: 0">
+                                                Upload report &rarr; confirm regime gate &rarr;
+                                                generate plan &rarr; monitor live radar as backend
+                                                publishes READY states.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- /plan-section -->
+                    </div>
+                    <!-- /tab-plan -->
+
+                    <!-- ═══ TAB: LIVE RADAR ════════════════════════════════════════ -->
+                    <div class="tp" id="tab-live">
+                        <div class="g3" id="live-summary" data-tab-focus>
+                            <div class="card sfx-kpi">
+                                <div class="clbl">Tracked Instruments</div>
+                                <div
+                                    class="cval sfx-num"
+                                    style="font-size: 1.5rem; font-weight: 700; color: var(--info)"
+                                    id="live-count"
+                                >
+                                    0
+                                </div>
+                                <div class="csub">Authenticated live universe</div>
+                            </div>
+                            <div class="card sfx-kpi">
+                                <div class="clbl">Execution Ready</div>
+                                <div
+                                    class="cval sfx-num pos"
+                                    style="font-size: 1.5rem; font-weight: 700"
+                                    id="live-ready"
+                                >
+                                    0
+                                </div>
+                                <div class="csub">ACTIVE and sequence-ready</div>
+                            </div>
+                            <div class="card sfx-kpi">
+                                <div class="clbl">Last Update</div>
+                                <div
+                                    class="cval sfx-num"
+                                    style="
+                                        font-size: 1.2rem;
+                                        font-weight: 700;
+                                        color: var(--accent);
+                                    "
+                                    id="live-sync"
+                                >
+                                    -
+                                </div>
+                                <div class="csub" id="live-meta">
+                                    <span
+                                        class="sfx-dot live"
+                                        style="
+                                            width: 7px;
+                                            height: 7px;
+                                            border-radius: 50%;
+                                            background: var(--buy);
+                                            display: inline-block;
+                                            margin-right: 4px;
+                                        "
+                                    ></span
+                                    >Waiting for Price Engine
+                                </div>
+                            </div>
+                        </div>
+                        <div class="slbl">Top Ranked Candidates</div>
+                        <div id="live-top10">
+                            <div class="sfx-mute" style="padding: 16px 0">
+                                No dynamic signals yet &mdash; candles may still be loading or no
+                                valid setups present.
+                            </div>
+                        </div>
+                        <div class="slbl">Instrument Feed</div>
+                        <div class="sfx-table-wrap" style="overflow-x: auto">
+                            <table class="sfx-table">
+                                <thead>
+                                    <tr>
+                                        <th>Instrument</th>
+                                        <th>Direction</th>
+                                        <th>Regime</th>
+                                        <th>Sequence</th>
+                                        <th>State</th>
+                                        <th>Grade</th>
+                                        <th>Setup Q</th>
+                                        <th>R:R</th>
+                                        <th>Updated</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="live-table">
+                                    <tr>
+                                        <td
+                                            colspan="9"
+                                            style="
+                                                text-align: center;
+                                                color: var(--fg-mute);
+                                                padding: 20px;
+                                            "
+                                        >
+                                            No live feed yet
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- /tab-live -->
+
+                    <!-- ═══ TAB: CHARTS ════════════════════════════════════════════ -->
+                    <div class="tp" id="tab-charts">
+                        <div
+                            style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px"
+                            id="chart-pair-btns"
+                            data-tab-focus
+                        >
+                            <button
+                                class="sfx-btn primary"
+                                type="button"
+                                onclick="showChart('FX:GBPUSD', this)"
+                            >
+                                GBP/USD
+                            </button>
+                            <button
+                                class="sfx-btn"
+                                type="button"
+                                onclick="showChart('FX:AUDUSD', this)"
+                            >
+                                AUD/USD
+                            </button>
+                            <button
+                                class="sfx-btn"
+                                type="button"
+                                onclick="showChart('FX:USDJPY', this)"
+                            >
+                                USD/JPY
+                            </button>
+                            <button
+                                class="sfx-btn"
+                                type="button"
+                                onclick="showChart('FX:AUDJPY', this)"
+                            >
+                                AUD/JPY
+                            </button>
+                            <button
+                                class="sfx-btn"
+                                type="button"
+                                onclick="showChart('FX:EURUSD', this)"
+                            >
+                                EUR/USD
+                            </button>
+                            <button
+                                class="sfx-btn"
+                                type="button"
+                                onclick="showChart('OANDA:XAUUSD', this)"
+                            >
+                                XAU/USD
+                            </button>
+                            <button
+                                class="sfx-btn"
+                                type="button"
+                                onclick="showChart('OANDA:US30USD', this)"
+                            >
+                                US30
+                            </button>
+                            <button
+                                class="sfx-btn"
+                                type="button"
+                                onclick="showChart('CRYPTOCAP:BTC.D', this)"
+                            >
+                                BTC.D
+                            </button>
+                        </div>
+                        <div id="chart-context-panel" class="sfx-card sfx-chart-context">
+                            <div class="sfx-card__hd">
+                                <div>
+                                    <div class="sfx-card__title">Chart Context</div>
+                                    <div class="sfx-card__meta">
+                                        Waiting for tracked instrument data
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="sfx-chart-context__empty">
+                                Open a chart from Live Radar, Signal Plan, Trade Queue, or Level Log
+                                to sync the active setup.
+                            </div>
+                        </div>
+                        <div id="tv-chart-container">
+                            <div class="tradingview-widget-container">
+                                <div id="tv-chart-inner"></div>
+                                <div
+                                    style="
+                                        padding: 0.4rem 0.7rem 0.6rem;
+                                        border-top: 1px solid var(--line);
+                                        font-family: var(--font-mono);
+                                        font-size: 0.64rem;
+                                        color: var(--fg-mute);
+                                    "
+                                >
+                                    <a
+                                        href="https://www.tradingview.com/"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        style="color: var(--fg-mute)"
+                                        >Charts by TradingView</a
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- /tab-charts -->
+
+                    <!-- ═══ TAB: LEVEL LOG ═════════════════════════════════════════ -->
+                    <div class="tp" id="tab-signals">
+                        <div
+                            id="sig-summary"
+                            style="display: none; margin-bottom: var(--sp-4)"
+                        ></div>
+                        <div class="sfx-card" id="siglist" data-tab-focus>
+                            <div class="sfx-mute">
+                                No signals yet &mdash; upload a report and the dashboard will
+                                generate the level log from detected positions.
+                            </div>
+                        </div>
+                    </div>
+                    <!-- /tab-signals -->
+
+                    <!-- ═══ TAB: ANALYTICS ═════════════════════════════════════════ -->
+                    <div class="tp" id="tab-analytics">
+                        <div class="slbl" data-tab-focus>Sequence Gate Status</div>
+                        <div
+                            class="g4"
+                            id="seq-status-cards"
+                            style="margin-bottom: var(--sp-4)"
+                        ></div>
+                        <div class="slbl">Level Reliability</div>
+                        <div class="g4">
+                            <div class="card sfx-kpi">
+                                <div class="clbl">Hold Rate</div>
+                                <div
+                                    class="cval pos sfx-num"
+                                    style="font-size: 1.5rem; font-weight: 700"
+                                    id="an-hr"
+                                >
+                                    -
+                                </div>
+                                <div class="csub">Levels that reacted</div>
+                            </div>
+                            <div class="card sfx-kpi">
+                                <div class="clbl">Tests Total</div>
+                                <div
+                                    class="cval sfx-num"
+                                    style="font-size: 1.5rem; font-weight: 700; color: var(--info)"
+                                    id="an-tt"
+                                >
+                                    0
+                                </div>
+                                <div class="csub" id="an-ts">0 open, 0 closed</div>
+                            </div>
+                            <div class="card sfx-kpi">
+                                <div class="clbl">Avg Pips (Holds)</div>
+                                <div
+                                    class="cval pos sfx-num"
+                                    style="font-size: 1.5rem; font-weight: 700"
+                                    id="an-ap"
+                                >
+                                    -
+                                </div>
+                                <div class="csub">From zone to close</div>
+                            </div>
+                            <div class="card sfx-kpi">
+                                <div class="clbl">Net P/L</div>
+                                <div id="an-pl" style="font-size: 0"></div>
+                                <div class="csub">Closed trades only</div>
+                            </div>
+                        </div>
+                        <div class="g2" style="margin-top: var(--sp-4)">
+                            <div class="sfx-card">
+                                <div class="sfx-card__hd">
+                                    <div class="sfx-card__title">Hold Rate by Star Count</div>
+                                </div>
+                                <div id="an-star">
+                                    <div class="smc-muted">No closed tests yet</div>
+                                </div>
+                            </div>
+                            <div class="sfx-card">
+                                <div class="sfx-card__hd">
+                                    <div class="sfx-card__title">Hold Rate by Zone %</div>
+                                </div>
+                                <div id="an-zone">
+                                    <div class="smc-muted">No closed tests yet</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="g2" style="margin-top: var(--sp-4)">
+                            <div class="sfx-card">
+                                <div class="sfx-card__hd">
+                                    <div class="sfx-card__title">Hold Rate by Regime</div>
+                                </div>
+                                <div id="an-regime">
+                                    <div class="smc-muted">No closed tests yet</div>
+                                </div>
+                            </div>
+                            <div class="sfx-card">
+                                <div class="sfx-card__hd">
+                                    <div class="sfx-card__title">Profitability by Pair</div>
+                                </div>
+                                <div id="an-pair">
+                                    <div class="smc-muted">No closed tests yet</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            class="sfx-card"
+                            id="winloss-stats"
+                            style="margin-top: var(--sp-4); display: none"
+                        ></div>
+                    </div>
+                    <!-- /tab-analytics -->
+
+                    <!-- ═══ TAB: OPEN BOOK ═════════════════════════════════════════ -->
+                    <div class="tp" id="tab-book">
+                        <div class="sfx-table-wrap" style="overflow-x: auto" data-tab-focus>
+                            <table class="sfx-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Pos ID</th>
+                                        <th>Opened</th>
+                                        <th>Pair</th>
+                                        <th>Dir</th>
+                                        <th class="num">Lots</th>
+                                        <th class="num">Entry</th>
+                                        <th class="num">SL</th>
+                                        <th class="num">Mkt</th>
+                                        <th class="num">SL Pips</th>
+                                        <th class="num">To SL</th>
+                                        <th class="num">Swap</th>
+                                        <th class="num">P/L USC</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="btbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- /tab-book -->
+
+                    <!-- ═══ TAB: ORDERS ════════════════════════════════════════════ -->
+                    <div class="tp" id="tab-orders">
+                        <div id="orders-alert" style="display: none" class="alert alert-warning">
+                            <div class="alert-icon">⚠</div>
+                            <div class="alert-content">
+                                <div class="alert-label">WARNING</div>
+                                <div id="orders-alert-msg"></div>
+                            </div>
+                        </div>
+                        <div class="sfx-table-wrap" style="overflow-x: auto" data-tab-focus>
+                            <table class="sfx-table">
+                                <thead>
+                                    <tr>
+                                        <th>Order ID</th>
+                                        <th>Pair</th>
+                                        <th>Type</th>
+                                        <th class="num">Lots</th>
+                                        <th class="num">Entry</th>
+                                        <th class="num">SL</th>
+                                        <th class="num">TP</th>
+                                        <th class="num">Dist</th>
+                                        <th class="num">Risk USC</th>
+                                        <th class="num">R:R</th>
+                                        <th>Chop?</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="otbody">
+                                    <tr>
+                                        <td
+                                            colspan="11"
+                                            style="
+                                                text-align: center;
+                                                color: var(--fg-mute);
+                                                padding: 20px;
+                                            "
+                                        >
+                                            No orders &mdash; upload report to load pending orders.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- /tab-orders -->
+
+                    <!-- ═══ TAB: 4A PROGRESS ═══════════════════════════════════════ -->
+                    <div class="tp" id="tab-progress">
+                        <div class="g2" data-tab-focus>
+                            <div class="sfx-card">
+                                <div class="sfx-card__hd">
+                                    <div class="sfx-card__title">
+                                        Level Tests per Pair · Target 50
+                                    </div>
+                                </div>
+                                <div id="pprog"></div>
+                            </div>
+                            <div class="sfx-card">
+                                <div class="sfx-card__hd">
+                                    <div class="sfx-card__title">90-Day Collection Timeline</div>
+                                </div>
+                                <div id="tprog"></div>
+                                <div style="margin-top: var(--sp-4)">
+                                    <div class="kv">
+                                        <span class="kvl">Collection Start</span
+                                        ><span class="kvv" id="collection-start-kv">-</span>
+                                    </div>
+                                    <div class="kv">
+                                        <span class="kvl">Goal</span
+                                        ><span class="kvv"
+                                            >50 level tests per pair &middot; all instruments</span
+                                        >
+                                    </div>
+                                    <div class="kv">
+                                        <span class="kvl">What Is Measured</span
+                                        ><span class="kvv">Did the level hold? Stars? Regime?</span>
+                                    </div>
+                                    <div class="kv">
+                                        <span class="kvl">Output</span
+                                        ><span class="kvv"
+                                            >Signal model tuning data for Phase 4b</span
+                                        >
+                                    </div>
+                                    <div class="kv">
+                                        <span class="kvl">Unlock</span
+                                        ><span class="kvv wrn"
+                                            >50 per pair + 90 days = Phase 4b build</span
+                                        >
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- /tab-progress -->
+
+                    <!-- Footer -->
+                    <div
+                        class="fn"
+                        style="
+                            margin-top: var(--sp-8);
+                            padding-top: var(--sp-4);
+                            border-top: 1px solid var(--line);
+                            font-family: var(--font-mono);
+                            font-size: 0.64rem;
+                            color: var(--fg-mute);
+                            letter-spacing: 0.04em;
+                        "
+                    >
+                        SMC SUPERFIB __SNIPER_VERSION__ &middot; Signal + Risk Engine + Account
+                        Manager &middot; Developed by Kudzanai Taruvinga &middot; For Munhumukapa
+                        Holdings Group &middot; © 2026
+                    </div>
+                </div>
+                <!-- /sfx-content -->
+            </main>
+            <!-- /sfx-main -->
+        </div>
+        <!-- /sfx-shell -->
+
+        <!-- ═══ BOTTOM NAV ════════════════════════════════════════════════════ -->
+        <nav class="sfx-bottom-nav smc-bottom-nav" aria-label="Mobile section navigation">
+            <button class="sfx-bn-item active" type="button" data-section="plan">
+                <svg
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <path d="M2 3.5h12M2 8h8M2 12.5h10" />
+                    <circle cx="13.5" cy="8" r="1.2" fill="currentColor" stroke="none" />
+                </svg>
+                <span>Plan</span>
+            </button>
+            <button class="sfx-bn-item" type="button" data-section="live">
+                <svg
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <circle cx="8" cy="8" r="6" />
+                    <circle cx="8" cy="8" r="3" />
+                    <path d="M8 8 L12.5 4.5" />
+                    <circle cx="12" cy="5" r="0.9" fill="currentColor" stroke="none" />
+                </svg>
+                <span>Live</span>
+            </button>
+            <button class="sfx-bn-item" type="button" data-section="charts">
+                <svg
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <path d="M2 13.5V3M2 13.5h12" />
+                    <path d="M4.5 11l2.5-3 2 2 3.5-5" />
+                </svg>
+                <span>Charts</span>
+            </button>
+            <button class="sfx-bn-item" type="button" data-section="analytics">
+                <svg
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <rect x="2" y="8" width="3" height="6" rx="0.5" />
+                    <rect x="6.5" y="4" width="3" height="10" rx="0.5" />
+                    <rect x="11" y="10" width="3" height="4" rx="0.5" />
+                </svg>
+                <span>Stats</span>
+            </button>
+            <button
+                class="sfx-bn-item"
+                id="smc-bottom-nav-menu"
+                type="button"
+                data-nav-action="menu"
+            >
+                <svg
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                >
+                    <path d="M2.5 4h11M2.5 8h11M2.5 12h11" />
+                </svg>
+                <span>Menu</span>
+            </button>
+        </nav>
+
+        <!-- ═══ TWEAKS PANEL ════════════════════════════════════════════════ -->
+        <div class="sfx-tweaks" id="sfx-tweaks-panel" aria-label="Appearance tweaks">
+            <div class="sfx-tweaks__hd">
+                <div class="sfx-tweaks__title">Tweaks</div>
+                <button
+                    class="sfx-btn icon ghost"
+                    id="sfx-tweaks-close"
+                    type="button"
+                    aria-label="Close tweaks"
+                >
+                    <svg
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.6"
+                        stroke-linecap="round"
+                        style="width: 16px; height: 16px"
+                    >
+                        <path d="M4 4l8 8M12 4l-8 8" />
+                    </svg>
                 </button>
-              </div>
             </div>
-            <div class="plan-params-equity-note">
-              <span id="plan-equity-note">Upload report to set equity</span>
-            </div>
-
-
-            <!-- Live price inputs (instrument grid) - Middle section -->
-            <div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--line);">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:8px;">
-                <span style="font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--fg-mute)">Live Prices &middot; Twelve Data - If Price Engine is offline Enter Price and Trend Manually below</span>
-              </div>
-              <div class="plan-input-grid" id="priceinputs"></div>
-            </div>
-
-            <!-- Bottom Action Footer: Add Pair + Action Buttons -->
-            <div class="plan-params-footer">
-              <div class="plan-params-footer__group plan-params-footer__group--left">
-                <span class="plan-params-footer__label">Add Pair</span>
-                <div class="plan-params-footer__add-group">
-                  <input id="add-pair-input" type="text" placeholder="e.g. ETH/USD" maxlength="14">
-                  <button class="sfx-btn" type="button" onclick="addInstrument()">Add Pair</button>
+            <div class="sfx-tweaks__body">
+                <div class="sfx-tweak-row">
+                    <div class="sfx-tweak-row__label">Theme</div>
+                    <div class="sfx-seg">
+                        <button
+                            id="sfx-theme-dark"
+                            class="active"
+                            type="button"
+                            onclick="sfxSetTheme('dark')"
+                        >
+                            Dark
+                        </button>
+                        <button id="sfx-theme-light" type="button" onclick="sfxSetTheme('light')">
+                            Light
+                        </button>
+                    </div>
                 </div>
-              </div>
-              <div class="plan-params-footer__group plan-params-footer__group--right">
-                <button class="sfx-btn primary" id="topbar-plan-btn" type="button" onclick="generatePlan()">
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M3 8l3.5 3.5L13 4"/></svg>
-                  Generate Plan
-                </button>
-                <button class="sfx-btn" type="button" onclick="exportPlanHTML()">
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M8 11V3M5 8l3 3 3-3"/><path d="M2.5 11v2a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-2"/></svg>
-                  Export Plan
-                </button>
-                <button class="sfx-btn" id="plan-upload-btn" type="button" onclick="document.getElementById('fi').click()">
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M8 11V3M5 6l3-3 3 3"/><path d="M2.5 11v2a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-2"/></svg>
-                  Upload Report
-                </button>
-                <button class="sfx-btn" id="topbar-hist-btn" type="button" onclick="document.getElementById('hist-fi').click()">
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M8 3v8M5 8l3 3 3-3"/><path d="M2.5 12.5v1a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1"/></svg>
-                  Upload History
-                </button>
-              </div>
-
-              <!-- Export Report dropdown (hidden by default) -->
-              <div class="export-chooser-wrap" style="position:relative;display:none">
-                <button class="sfx-btn" type="button" onclick="exportReport()">
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M3 3h10l-1 9a2 2 0 0 1-2 1.8H6A2 2 0 0 1 4 12L3 3z"/><path d="M1.5 3h13"/></svg>
-                  Export Report
-                </button>
-                <div id="export-chooser" class="export-chooser" style="display:none;position:absolute;right:0;top:calc(100% + 4px);z-index:50;background:var(--surface-raised);border:1px solid var(--line);border-radius:var(--radius-sm,6px);overflow:hidden;min-width:120px" role="dialog" aria-label="Choose export format">
-                  <button class="sfx-btn" style="width:100%;border-radius:0;border:none;border-bottom:1px solid var(--line)" type="button" onclick="exportReportHtml(); hideExportChooser();">HTML</button>
-                  <button class="sfx-btn" style="width:100%;border-radius:0;border:none" type="button" onclick="exportCSV(); hideExportChooser();">CSV</button>
+                <div class="sfx-tweak-row">
+                    <div class="sfx-tweak-row__label">Density</div>
+                    <div class="sfx-seg">
+                        <button
+                            id="sfx-density-compact"
+                            type="button"
+                            onclick="sfxSetDensity('compact')"
+                        >
+                            Compact
+                        </button>
+                        <button
+                            id="sfx-density-normal"
+                            class="active"
+                            type="button"
+                            onclick="sfxSetDensity('normal')"
+                        >
+                            Normal
+                        </button>
+                        <button
+                            id="sfx-density-relaxed"
+                            type="button"
+                            onclick="sfxSetDensity('relaxed')"
+                        >
+                            Relaxed
+                        </button>
+                    </div>
                 </div>
-              </div>
-
-              <!-- Hidden buttons for JS -->
-              <button class="sfx-btn" id="refresh-regimes-btn" type="button" onclick="fetchRegimes(true)" style="display:none">Refresh Regimes</button>
-              <button class="sfx-btn" type="button" onclick="fetchPendingLimits()" style="display:none" id="pending-limits-btn">Pending Limits</button>
-            </div>
-          </div>
-
-          <!-- Plan Output -->
-          <div id="plan-output" style="display:none">
-            <div id="plan-verdict"></div>
-            <div class="sfx-section-head"><h2>Action Checklist</h2></div>
-            <div class="sfx-card" style="margin-bottom:var(--sp-4)">
-              <div id="plan-checklist"></div>
-            </div>
-            <div class="sfx-section-head"><h2>Signal Ladders</h2></div>
-            <div id="plan-ladders"></div>
-            <div class="sfx-section-head"><h2>Risk Summary</h2></div>
-            <div class="g4" id="plan-risk"></div>
-            <div class="sfx-section-head"><h2>Regime Gate Check</h2></div>
-            <div class="sfx-card sfx-regime-gate-card" style="margin-bottom:var(--sp-4)">
-              <div class="sfx-regime-tw">
-                <table class="sfx-regime-table">
-                  <thead>
-                    <tr>
-                      <th>Pair</th><th>Regime</th><th>Price</th><th>Direction</th>
-                      <th>Nearest Zone</th><th>Dist to Zone</th><th>Chop Block</th>
-                      <th>Gate Result</th><th>Stars</th><th>EDE Dist</th>
-                    </tr>
-                  </thead>
-                  <tbody id="plan-gates"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <!-- Computed Signals -->
-          <div id="computed-signals-section">
-            <div class="sfx-section-head">
-              <h2>Computed Signals</h2>
-              <div class="sfx-section-head__meta" id="computed-signals-meta"></div>
-            </div>
-            <div id="computed-signal-cards">
-              <div class="sfx-mute" style="padding:16px 0">Signal engine loading dynamic market state&hellip;</div>
-            </div>
-          </div>
-
-          <!-- Trade Queue -->
-          <div id="trade-queue-wrapper">
-            <div class="sfx-section-head">
-              <h2>Trade Queue</h2>
-            </div>
-            <div id="trade-queue-section">
-              <div class="sfx-mute" style="padding:16px 0">Signal engine will populate this when READY signals are detected.</div>
-            </div>
-          </div>
-
-          <!-- Data Ingest + Operations Brief -->
-          <div class="sfx-section-head">
-            <h2>Data Ingest</h2>
-          </div>
-          <div class="g2">
-            <div class="upz sfx-drop" id="upz"
-              ondragover="event.preventDefault();this.classList.add('drag')"
-              ondragleave="this.classList.remove('drag')"
-              ondrop="handleDrop(event)"
-              onclick="document.getElementById('fi').click()">
-              <div class="smc-upload-icon sfx-drop__icon">XLS</div>
-              <div style="font-weight:600">Report Intake</div>
-              <p class="smc-muted" style="font-size:0.78rem;max-width:320px;margin:0">Drop the ReportTrade workbook to update equity, book state, and Phase 4a baseline.</p>
-              <div id="upstat" style="font-family:var(--font-mono);font-size:0.66rem;color:var(--fg-mute);margin-top:4px">No report loaded &middot; Upload to establish baseline.</div>
-            </div>
-            <div class="sfx-card">
-              <div class="sfx-card__hd">
-                <div class="sfx-card__title">Operations Brief</div>
-                <div class="sfx-card__meta">Auto</div>
-              </div>
-              <div class="smc-note-stack">
-                <div class="smc-note-item">
-                  <div class="clbl">History Import</div>
-                  <div id="hist-stat" style="font-family:var(--font-mono);font-size:0.7rem;color:var(--fg-mute)">No history file loaded yet &middot; exact close analytics stay pending until history is imported.</div>
+                <div class="sfx-tweak-row">
+                    <div class="sfx-tweak-row__label">Accent</div>
+                    <div class="sfx-swatch-row">
+                        <div
+                            class="sfx-swatch active"
+                            data-accent="gold"
+                            style="background: linear-gradient(135deg, #d8a35d, #f3d7ab)"
+                            title="Gold"
+                            onclick="sfxSetAccent('gold')"
+                        ></div>
+                        <div
+                            class="sfx-swatch"
+                            data-accent="teal"
+                            style="background: linear-gradient(135deg, #46d19a, #78e8be)"
+                            title="Teal"
+                            onclick="sfxSetAccent('teal')"
+                        ></div>
+                        <div
+                            class="sfx-swatch"
+                            data-accent="azure"
+                            style="background: linear-gradient(135deg, #5aa9ff, #8bc2ff)"
+                            title="Azure"
+                            onclick="sfxSetAccent('azure')"
+                        ></div>
+                        <div
+                            class="sfx-swatch"
+                            data-accent="violet"
+                            style="background: linear-gradient(135deg, #9e8cff, #c4b7ff)"
+                            title="Violet"
+                            onclick="sfxSetAccent('violet')"
+                        ></div>
+                        <div
+                            class="sfx-swatch"
+                            data-accent="rose"
+                            style="background: linear-gradient(135deg, #ff8a80, #ffb0a8)"
+                            title="Rose"
+                            onclick="sfxSetAccent('rose')"
+                        ></div>
+                    </div>
                 </div>
-                <div class="smc-note-item">
-                  <div class="clbl">Recommended Flow</div>
-                  <p class="smc-muted" style="margin:0">Upload report &rarr; confirm regime gate &rarr; generate plan &rarr; monitor live radar as backend publishes READY states.</p>
+                <div
+                    class="sfx-tweak-row"
+                    style="
+                        flex-direction: row;
+                        align-items: center;
+                        gap: 8px;
+                        padding-top: 4px;
+                        border-top: 1px solid var(--line);
+                        margin-top: 8px;
+                    "
+                >
+                    <input
+                        type="checkbox"
+                        id="sfx-mobile-preview-check"
+                        onchange="sfxSetMobilePreview(this.checked)"
+                        style="cursor: pointer"
+                    />
+                    <label
+                        for="sfx-mobile-preview-check"
+                        style="
+                            font-family: var(--font-mono);
+                            font-size: 0.65rem;
+                            color: var(--fg);
+                            cursor: pointer;
+                            user-select: none;
+                        "
+                        >Mobile Preview</label
+                    >
                 </div>
-              </div>
             </div>
-          </div>
-
-        </div><!-- /plan-section -->
-      </div><!-- /tab-plan -->
-
-      <!-- ═══ TAB: LIVE RADAR ════════════════════════════════════════ -->
-      <div class="tp" id="tab-live">
-        <div class="g3" id="live-summary" data-tab-focus>
-          <div class="card sfx-kpi">
-            <div class="clbl">Tracked Instruments</div>
-            <div class="cval sfx-num" style="font-size:1.5rem;font-weight:700;color:var(--info)" id="live-count">0</div>
-            <div class="csub">Authenticated live universe</div>
-          </div>
-          <div class="card sfx-kpi">
-            <div class="clbl">Execution Ready</div>
-            <div class="cval sfx-num pos" style="font-size:1.5rem;font-weight:700" id="live-ready">0</div>
-            <div class="csub">ACTIVE and sequence-ready</div>
-          </div>
-          <div class="card sfx-kpi">
-            <div class="clbl">Last Update</div>
-            <div class="cval sfx-num" style="font-size:1.2rem;font-weight:700;color:var(--accent)" id="live-sync">-</div>
-            <div class="csub" id="live-meta"><span class="sfx-dot live" style="width:7px;height:7px;border-radius:50%;background:var(--buy);display:inline-block;margin-right:4px"></span>Waiting for Price Engine</div>
-          </div>
         </div>
-        <div class="slbl">Top Ranked Candidates</div>
-        <div id="live-top10">
-          <div class="sfx-mute" style="padding:16px 0">No dynamic signals yet &mdash; candles may still be loading or no valid setups present.</div>
-        </div>
-        <div class="slbl">Instrument Feed</div>
-        <div class="sfx-table-wrap" style="overflow-x:auto">
-          <table class="sfx-table">
-            <thead>
-              <tr><th>Instrument</th><th>Direction</th><th>Regime</th><th>Sequence</th><th>State</th><th>Grade</th><th>Setup Q</th><th>R:R</th><th>Updated</th></tr>
-            </thead>
-            <tbody id="live-table">
-              <tr><td colspan="9" style="text-align:center;color:var(--fg-mute);padding:20px">No live feed yet</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div><!-- /tab-live -->
 
-      <!-- ═══ TAB: CHARTS ════════════════════════════════════════════ -->
-      <div class="tp" id="tab-charts">
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px" id="chart-pair-btns" data-tab-focus>
-          <button class="sfx-btn primary" type="button" onclick="showChart('FX:GBPUSD',this)">GBP/USD</button>
-          <button class="sfx-btn" type="button" onclick="showChart('FX:AUDUSD',this)">AUD/USD</button>
-          <button class="sfx-btn" type="button" onclick="showChart('FX:USDJPY',this)">USD/JPY</button>
-          <button class="sfx-btn" type="button" onclick="showChart('FX:AUDJPY',this)">AUD/JPY</button>
-          <button class="sfx-btn" type="button" onclick="showChart('FX:EURUSD',this)">EUR/USD</button>
-          <button class="sfx-btn" type="button" onclick="showChart('OANDA:XAUUSD',this)">XAU/USD</button>
-          <button class="sfx-btn" type="button" onclick="showChart('OANDA:US30USD',this)">US30</button>
-          <button class="sfx-btn" type="button" onclick="showChart('CRYPTOCAP:BTC.D',this)">BTC.D</button>
-        </div>
-        <div id="chart-context-panel" class="sfx-card sfx-chart-context">
-          <div class="sfx-card__hd">
-            <div>
-              <div class="sfx-card__title">Chart Context</div>
-              <div class="sfx-card__meta">Waiting for tracked instrument data</div>
-            </div>
-          </div>
-          <div class="sfx-chart-context__empty">Open a chart from Live Radar, Signal Plan, Trade Queue, or Level Log to sync the active setup.</div>
-        </div>
-        <div id="tv-chart-container">
-          <div class="tradingview-widget-container">
-            <div id="tv-chart-inner"></div>
-            <div style="padding:0.4rem 0.7rem 0.6rem;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:0.64rem;color:var(--fg-mute)">
-              <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer" style="color:var(--fg-mute)">Charts by TradingView</a>
-            </div>
-          </div>
-        </div>
-      </div><!-- /tab-charts -->
+        <!-- ═══ TOAST ═══════════════════════════════════════════════════════ -->
+        <div id="toast" class="sfx-toast"></div>
 
-      <!-- ═══ TAB: LEVEL LOG ═════════════════════════════════════════ -->
-      <div class="tp" id="tab-signals">
-        <div id="sig-summary" style="display:none;margin-bottom:var(--sp-4)"></div>
-        <div class="sfx-card" id="siglist" data-tab-focus>
-          <div class="sfx-mute">No signals yet &mdash; upload a report and the dashboard will generate the level log from detected positions.</div>
-        </div>
-      </div><!-- /tab-signals -->
+        <!-- ═══ INLINE SCRIPTS ══════════════════════════════════════════════ -->
+        <script>
+            (function () {
+                function sfxStorageDebug(err) {
+                    if (window.SNIPER_DASHBOARD_DEBUG === true && window.console && console.warn)
+                        console.warn("[SFX_STORAGE]", err && err.message ? err.message : err);
+                }
+                function sfxLoad(k, d) {
+                    try {
+                        return JSON.parse(localStorage.getItem("sfx." + k)) ?? d;
+                    } catch (err) {
+                        sfxStorageDebug(err);
+                        return d;
+                    }
+                }
+                function sfxSave(k, v) {
+                    try {
+                        localStorage.setItem("sfx." + k, JSON.stringify(v));
+                    } catch (err) {
+                        sfxStorageDebug(err);
+                    }
+                }
 
-      <!-- ═══ TAB: ANALYTICS ═════════════════════════════════════════ -->
-      <div class="tp" id="tab-analytics">
-        <div class="slbl" data-tab-focus>Sequence Gate Status</div>
-        <div class="g4" id="seq-status-cards" style="margin-bottom:var(--sp-4)"></div>
-        <div class="slbl">Level Reliability</div>
-        <div class="g4">
-          <div class="card sfx-kpi"><div class="clbl">Hold Rate</div><div class="cval pos sfx-num" style="font-size:1.5rem;font-weight:700" id="an-hr">-</div><div class="csub">Levels that reacted</div></div>
-          <div class="card sfx-kpi"><div class="clbl">Tests Total</div><div class="cval sfx-num" style="font-size:1.5rem;font-weight:700;color:var(--info)" id="an-tt">0</div><div class="csub" id="an-ts">0 open, 0 closed</div></div>
-          <div class="card sfx-kpi"><div class="clbl">Avg Pips (Holds)</div><div class="cval pos sfx-num" style="font-size:1.5rem;font-weight:700" id="an-ap">-</div><div class="csub">From zone to close</div></div>
-          <div class="card sfx-kpi"><div class="clbl">Net P/L</div><div id="an-pl" style="font-size:0"></div><div class="csub">Closed trades only</div></div>
-        </div>
-        <div class="g2" style="margin-top:var(--sp-4)">
-          <div class="sfx-card"><div class="sfx-card__hd"><div class="sfx-card__title">Hold Rate by Star Count</div></div><div id="an-star"><div class="smc-muted">No closed tests yet</div></div></div>
-          <div class="sfx-card"><div class="sfx-card__hd"><div class="sfx-card__title">Hold Rate by Zone %</div></div><div id="an-zone"><div class="smc-muted">No closed tests yet</div></div></div>
-        </div>
-        <div class="g2" style="margin-top:var(--sp-4)">
-          <div class="sfx-card"><div class="sfx-card__hd"><div class="sfx-card__title">Hold Rate by Regime</div></div><div id="an-regime"><div class="smc-muted">No closed tests yet</div></div></div>
-          <div class="sfx-card"><div class="sfx-card__hd"><div class="sfx-card__title">Profitability by Pair</div></div><div id="an-pair"><div class="smc-muted">No closed tests yet</div></div></div>
-        </div>
-        <div class="sfx-card" id="winloss-stats" style="margin-top:var(--sp-4);display:none"></div>
-      </div><!-- /tab-analytics -->
+                var ACCENT_MAP = {
+                    gold: {
+                        accent: "#d8a35d",
+                        accent2: "#f3d7ab",
+                        soft: "rgba(216,163,93,0.12)",
+                        line: "rgba(216,163,93,0.35)",
+                    },
+                    teal: {
+                        accent: "#46d19a",
+                        accent2: "#78e8be",
+                        soft: "rgba(70,209,154,0.12)",
+                        line: "rgba(70,209,154,0.35)",
+                    },
+                    azure: {
+                        accent: "#5aa9ff",
+                        accent2: "#8bc2ff",
+                        soft: "rgba(90,169,255,0.12)",
+                        line: "rgba(90,169,255,0.35)",
+                    },
+                    violet: {
+                        accent: "#9e8cff",
+                        accent2: "#c4b7ff",
+                        soft: "rgba(158,140,255,0.12)",
+                        line: "rgba(158,140,255,0.35)",
+                    },
+                    rose: {
+                        accent: "#ff8a80",
+                        accent2: "#ffb0a8",
+                        soft: "rgba(255,138,128,0.12)",
+                        line: "rgba(255,138,128,0.35)",
+                    },
+                };
 
-      <!-- ═══ TAB: OPEN BOOK ═════════════════════════════════════════ -->
-      <div class="tp" id="tab-book">
-        <div class="sfx-table-wrap" style="overflow-x:auto" data-tab-focus>
-          <table class="sfx-table">
-            <thead>
-              <tr><th>#</th><th>Pos ID</th><th>Opened</th><th>Pair</th><th>Dir</th><th class="num">Lots</th><th class="num">Entry</th><th class="num">SL</th><th class="num">Mkt</th><th class="num">SL Pips</th><th class="num">To SL</th><th class="num">Swap</th><th class="num">P/L USC</th><th>Status</th></tr>
-            </thead>
-            <tbody id="btbody"></tbody>
-          </table>
-        </div>
-      </div><!-- /tab-book -->
+                function sfxApplyAccent(id) {
+                    var a = ACCENT_MAP[id] || ACCENT_MAP.gold;
+                    var r = document.documentElement;
+                    r.style.setProperty("--accent", a.accent);
+                    r.style.setProperty("--accent-2", a.accent2);
+                    r.style.setProperty("--accent-soft", a.soft);
+                    r.style.setProperty("--accent-line", a.line);
+                    document.querySelectorAll(".sfx-swatch").forEach(function (s) {
+                        s.classList.toggle("active", s.dataset.accent === id);
+                    });
+                    sfxSave("accent", id);
+                }
+                window.sfxSetAccent = sfxApplyAccent;
 
-      <!-- ═══ TAB: ORDERS ════════════════════════════════════════════ -->
-      <div class="tp" id="tab-orders">
-        <div id="orders-alert" style="display:none" class="alert alert-warning">
-          <div class="alert-icon">⚠</div>
-          <div class="alert-content">
-            <div class="alert-label">WARNING</div>
-            <div id="orders-alert-msg"></div>
-          </div>
-        </div>
-        <div class="sfx-table-wrap" style="overflow-x:auto" data-tab-focus>
-          <table class="sfx-table">
-            <thead>
-              <tr><th>Order ID</th><th>Pair</th><th>Type</th><th class="num">Lots</th><th class="num">Entry</th><th class="num">SL</th><th class="num">TP</th><th class="num">Dist</th><th class="num">Risk USC</th><th class="num">R:R</th><th>Chop?</th></tr>
-            </thead>
-            <tbody id="otbody">
-              <tr><td colspan="11" style="text-align:center;color:var(--fg-mute);padding:20px">No orders &mdash; upload report to load pending orders.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div><!-- /tab-orders -->
+                function sfxApplyTheme(t) {
+                    document.documentElement.setAttribute("data-theme", t);
+                    var sun = document.getElementById("sfx-icon-sun");
+                    var moon = document.getElementById("sfx-icon-moon");
+                    if (sun) sun.style.display = t === "dark" ? "block" : "none";
+                    if (moon) moon.style.display = t === "light" ? "block" : "none";
+                    var btnDark = document.getElementById("sfx-theme-dark");
+                    var btnLight = document.getElementById("sfx-theme-light");
+                    if (btnDark) btnDark.classList.toggle("active", t === "dark");
+                    if (btnLight) btnLight.classList.toggle("active", t === "light");
+                    sfxSave("theme", t);
+                }
+                window.sfxSetTheme = sfxApplyTheme;
 
-      <!-- ═══ TAB: 4A PROGRESS ═══════════════════════════════════════ -->
-      <div class="tp" id="tab-progress">
-        <div class="g2" data-tab-focus>
-          <div class="sfx-card">
-            <div class="sfx-card__hd"><div class="sfx-card__title">Level Tests per Pair · Target 50</div></div>
-            <div id="pprog"></div>
-          </div>
-          <div class="sfx-card">
-            <div class="sfx-card__hd"><div class="sfx-card__title">90-Day Collection Timeline</div></div>
-            <div id="tprog"></div>
-            <div style="margin-top:var(--sp-4)">
-              <div class="kv"><span class="kvl">Collection Start</span><span class="kvv" id="collection-start-kv">-</span></div>
-              <div class="kv"><span class="kvl">Goal</span><span class="kvv">50 level tests per pair &middot; all instruments</span></div>
-              <div class="kv"><span class="kvl">What Is Measured</span><span class="kvv">Did the level hold? Stars? Regime?</span></div>
-              <div class="kv"><span class="kvl">Output</span><span class="kvv">Signal model tuning data for Phase 4b</span></div>
-              <div class="kv"><span class="kvl">Unlock</span><span class="kvv wrn">50 per pair + 90 days = Phase 4b build</span></div>
-            </div>
-          </div>
-        </div>
-      </div><!-- /tab-progress -->
+                document.getElementById("sfx-theme-toggle").addEventListener("click", function () {
+                    var cur = document.documentElement.getAttribute("data-theme") || "dark";
+                    sfxApplyTheme(cur === "dark" ? "light" : "dark");
+                });
 
-      <!-- Footer -->
-      <div class="fn" style="margin-top:var(--sp-8);padding-top:var(--sp-4);border-top:1px solid var(--line);font-family:var(--font-mono);font-size:0.64rem;color:var(--fg-mute);letter-spacing:0.04em">
-        SMC SUPERFIB __SNIPER_VERSION__ &middot; Signal + Risk Engine + Account Manager  &middot; Developed by Kudzanai Taruvinga  &middot; For Munhumukapa Holdings Group  &middot; © 2026
-      </div>
+                function sfxApplyDensity(d) {
+                    document.documentElement.setAttribute("data-density", d);
+                    ["compact", "normal", "relaxed"].forEach(function (x) {
+                        var b = document.getElementById("sfx-density-" + x);
+                        if (b) b.classList.toggle("active", x === d);
+                    });
+                    sfxSave("density", d);
+                }
+                window.sfxSetDensity = sfxApplyDensity;
 
-    </div><!-- /sfx-content -->
-  </main><!-- /sfx-main -->
+                function sfxSetMobilePreview(enabled) {
+                    document.body.classList.toggle("mobile-preview", enabled);
+                    document.getElementById("sfx-mobile-preview-check").checked = enabled;
+                    sfxSave("view", enabled ? "mobile" : "desktop");
+                }
+                window.sfxSetMobilePreview = sfxSetMobilePreview;
 
-</div><!-- /sfx-shell -->
+                var tweaksPanel = document.getElementById("sfx-tweaks-panel");
+                document.getElementById("sfx-tweaks-toggle").addEventListener("click", function () {
+                    tweaksPanel.classList.toggle("open");
+                });
+                document.getElementById("sfx-tweaks-close").addEventListener("click", function () {
+                    tweaksPanel.classList.remove("open");
+                });
 
-<!-- ═══ BOTTOM NAV ════════════════════════════════════════════════════ -->
-<nav class="sfx-bottom-nav smc-bottom-nav" aria-label="Mobile section navigation">
-  <button class="sfx-bn-item active" type="button" data-section="plan">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5h12M2 8h8M2 12.5h10"/><circle cx="13.5" cy="8" r="1.2" fill="currentColor" stroke="none"/></svg>
-    <span>Plan</span>
-  </button>
-  <button class="sfx-bn-item" type="button" data-section="live">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="3"/><path d="M8 8 L12.5 4.5"/><circle cx="12" cy="5" r="0.9" fill="currentColor" stroke="none"/></svg>
-    <span>Live</span>
-  </button>
-  <button class="sfx-bn-item" type="button" data-section="charts">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13.5V3M2 13.5h12"/><path d="M4.5 11l2.5-3 2 2 3.5-5"/></svg>
-    <span>Charts</span>
-  </button>
-  <button class="sfx-bn-item" type="button" data-section="analytics">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="8" width="3" height="6" rx="0.5"/><rect x="6.5" y="4" width="3" height="10" rx="0.5"/><rect x="11" y="10" width="3" height="4" rx="0.5"/></svg>
-    <span>Stats</span>
-  </button>
-  <button class="sfx-bn-item" id="smc-bottom-nav-menu" type="button" data-nav-action="menu">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg>
-    <span>Menu</span>
-  </button>
-</nav>
+                // Eyebrow: watch .smc-topbar__label for text changes
+                var eyebrow = document.getElementById("sfx-topbar-eyebrow");
+                var EYEBROW_MAP = {
+                    plan: "Workspace",
+                    live: "Workspace",
+                    charts: "Workspace",
+                    analytics: "Workspace",
+                    signals: "Books",
+                    book: "Books",
+                    orders: "Books",
+                    progress: "Books",
+                    account: "Profile",
+                };
+                var label = document.querySelector(".smc-topbar__label");
+                if (label && eyebrow) {
+                    var _eyebrowObs = new MutationObserver(function () {
+                        var text = (label.textContent || "").trim().toLowerCase();
+                        eyebrow.textContent = EYEBROW_MAP[text] || "Workspace";
+                    });
+                    _eyebrowObs.observe(label, {
+                        childList: true,
+                        characterData: true,
+                        subtree: true,
+                    });
+                }
 
-<!-- ═══ TWEAKS PANEL ════════════════════════════════════════════════ -->
-<div class="sfx-tweaks" id="sfx-tweaks-panel" aria-label="Appearance tweaks">
-  <div class="sfx-tweaks__hd">
-    <div class="sfx-tweaks__title">Tweaks</div>
-    <button class="sfx-btn icon ghost" id="sfx-tweaks-close" type="button" aria-label="Close tweaks">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="width:16px;height:16px"><path d="M4 4l8 8M12 4l-8 8"/></svg>
-    </button>
-  </div>
-  <div class="sfx-tweaks__body">
-    <div class="sfx-tweak-row">
-      <div class="sfx-tweak-row__label">Theme</div>
-      <div class="sfx-seg">
-        <button id="sfx-theme-dark" class="active" type="button" onclick="sfxSetTheme('dark')">Dark</button>
-        <button id="sfx-theme-light" type="button" onclick="sfxSetTheme('light')">Light</button>
-      </div>
-    </div>
-    <div class="sfx-tweak-row">
-      <div class="sfx-tweak-row__label">Density</div>
-      <div class="sfx-seg">
-        <button id="sfx-density-compact" type="button" onclick="sfxSetDensity('compact')">Compact</button>
-        <button id="sfx-density-normal" class="active" type="button" onclick="sfxSetDensity('normal')">Normal</button>
-        <button id="sfx-density-relaxed" type="button" onclick="sfxSetDensity('relaxed')">Relaxed</button>
-      </div>
-    </div>
-    <div class="sfx-tweak-row">
-      <div class="sfx-tweak-row__label">Accent</div>
-      <div class="sfx-swatch-row">
-        <div class="sfx-swatch active" data-accent="gold"   style="background:linear-gradient(135deg,#d8a35d,#f3d7ab)" title="Gold"   onclick="sfxSetAccent('gold')"></div>
-        <div class="sfx-swatch"        data-accent="teal"   style="background:linear-gradient(135deg,#46d19a,#78e8be)" title="Teal"   onclick="sfxSetAccent('teal')"></div>
-        <div class="sfx-swatch"        data-accent="azure"  style="background:linear-gradient(135deg,#5aa9ff,#8bc2ff)" title="Azure"  onclick="sfxSetAccent('azure')"></div>
-        <div class="sfx-swatch"        data-accent="violet" style="background:linear-gradient(135deg,#9e8cff,#c4b7ff)" title="Violet" onclick="sfxSetAccent('violet')"></div>
-        <div class="sfx-swatch"        data-accent="rose"   style="background:linear-gradient(135deg,#ff8a80,#ffb0a8)" title="Rose"   onclick="sfxSetAccent('rose')"></div>
-      </div>
-    </div>
-    <div class="sfx-tweak-row" style="flex-direction:row;align-items:center;gap:8px;padding-top:4px;border-top:1px solid var(--line);margin-top:8px;">
-      <input type="checkbox" id="sfx-mobile-preview-check" onchange="sfxSetMobilePreview(this.checked)" style="cursor:pointer;">
-      <label for="sfx-mobile-preview-check" style="font-family:var(--font-mono);font-size:0.65rem;color:var(--fg);cursor:pointer;user-select:none;">Mobile Preview</label>
-    </div>
-  </div>
-</div>
+                // Engine indicator: watch #nav-engine-dot class
+                var engineDot = document.getElementById("nav-engine-dot");
+                var engineBtn = document.getElementById("nav-engine-indicator");
+                if (engineDot && engineBtn) {
+                    var _engineObs = new MutationObserver(function () {
+                        engineBtn.classList.remove(
+                            "live",
+                            "warn",
+                            "off",
+                            "stale",
+                            "offline",
+                            "error",
+                        );
+                        if (engineDot.classList.contains("live")) engineBtn.classList.add("live");
+                        else if (engineDot.classList.contains("warn"))
+                            engineBtn.classList.add("warn");
+                        else if (engineDot.classList.contains("off"))
+                            engineBtn.classList.add("off");
+                    });
+                    _engineObs.observe(engineDot, { attributes: true, attributeFilter: ["class"] });
+                }
 
-<!-- ═══ TOAST ═══════════════════════════════════════════════════════ -->
-<div id="toast" class="sfx-toast"></div>
+                // Sync plan parameters seg buttons with hidden selects
+                document.addEventListener("click", function (e) {
+                    var btn = e.target.closest && e.target.closest(".sfx-seg button");
+                    if (!btn) return;
+                    var seg = btn.closest(".sfx-seg");
+                    if (!seg) return;
+                    seg.querySelectorAll("button").forEach(function (b) {
+                        b.classList.remove("active");
+                    });
+                    btn.classList.add("active");
+                });
 
-<!-- ═══ INLINE SCRIPTS ══════════════════════════════════════════════ -->
-<script>
-(function () {
-  function sfxStorageDebug(err) {
-    if (window.SNIPER_DASHBOARD_DEBUG === true && window.console && console.warn) console.warn('[SFX_STORAGE]', err && err.message ? err.message : err);
-  }
-  function sfxLoad(k, d) { try { return JSON.parse(localStorage.getItem('sfx.' + k)) ?? d; } catch (err) { sfxStorageDebug(err); return d; } }
-  function sfxSave(k, v) { try { localStorage.setItem('sfx.' + k, JSON.stringify(v)); } catch (err) { sfxStorageDebug(err); } }
-
-  var ACCENT_MAP = {
-    gold:   { accent: '#d8a35d', accent2: '#f3d7ab', soft: 'rgba(216,163,93,0.12)',  line: 'rgba(216,163,93,0.35)'  },
-    teal:   { accent: '#46d19a', accent2: '#78e8be', soft: 'rgba(70,209,154,0.12)',  line: 'rgba(70,209,154,0.35)'  },
-    azure:  { accent: '#5aa9ff', accent2: '#8bc2ff', soft: 'rgba(90,169,255,0.12)',  line: 'rgba(90,169,255,0.35)'  },
-    violet: { accent: '#9e8cff', accent2: '#c4b7ff', soft: 'rgba(158,140,255,0.12)', line: 'rgba(158,140,255,0.35)' },
-    rose:   { accent: '#ff8a80', accent2: '#ffb0a8', soft: 'rgba(255,138,128,0.12)', line: 'rgba(255,138,128,0.35)' },
-  };
-
-  function sfxApplyAccent(id) {
-    var a = ACCENT_MAP[id] || ACCENT_MAP.gold;
-    var r = document.documentElement;
-    r.style.setProperty('--accent',      a.accent);
-    r.style.setProperty('--accent-2',    a.accent2);
-    r.style.setProperty('--accent-soft', a.soft);
-    r.style.setProperty('--accent-line', a.line);
-    document.querySelectorAll('.sfx-swatch').forEach(function(s) {
-      s.classList.toggle('active', s.dataset.accent === id);
-    });
-    sfxSave('accent', id);
-  }
-  window.sfxSetAccent = sfxApplyAccent;
-
-  function sfxApplyTheme(t) {
-    document.documentElement.setAttribute('data-theme', t);
-    var sun  = document.getElementById('sfx-icon-sun');
-    var moon = document.getElementById('sfx-icon-moon');
-    if (sun)  sun.style.display  = t === 'dark'  ? 'block' : 'none';
-    if (moon) moon.style.display = t === 'light' ? 'block' : 'none';
-    var btnDark  = document.getElementById('sfx-theme-dark');
-    var btnLight = document.getElementById('sfx-theme-light');
-    if (btnDark)  btnDark.classList.toggle('active',  t === 'dark');
-    if (btnLight) btnLight.classList.toggle('active', t === 'light');
-    sfxSave('theme', t);
-  }
-  window.sfxSetTheme = sfxApplyTheme;
-
-  document.getElementById('sfx-theme-toggle').addEventListener('click', function() {
-    var cur = document.documentElement.getAttribute('data-theme') || 'dark';
-    sfxApplyTheme(cur === 'dark' ? 'light' : 'dark');
-  });
-
-  function sfxApplyDensity(d) {
-    document.documentElement.setAttribute('data-density', d);
-    ['compact','normal','relaxed'].forEach(function(x) {
-      var b = document.getElementById('sfx-density-' + x);
-      if (b) b.classList.toggle('active', x === d);
-    });
-    sfxSave('density', d);
-  }
-  window.sfxSetDensity = sfxApplyDensity;
-
-  function sfxSetMobilePreview(enabled) {
-    document.body.classList.toggle('mobile-preview', enabled);
-    document.getElementById('sfx-mobile-preview-check').checked = enabled;
-    sfxSave('view', enabled ? 'mobile' : 'desktop');
-  }
-  window.sfxSetMobilePreview = sfxSetMobilePreview;
-
-  var tweaksPanel = document.getElementById('sfx-tweaks-panel');
-  document.getElementById('sfx-tweaks-toggle').addEventListener('click', function() {
-    tweaksPanel.classList.toggle('open');
-  });
-  document.getElementById('sfx-tweaks-close').addEventListener('click', function() {
-    tweaksPanel.classList.remove('open');
-  });
-
-  // Eyebrow: watch .smc-topbar__label for text changes
-  var eyebrow = document.getElementById('sfx-topbar-eyebrow');
-  var EYEBROW_MAP = {
-    plan: 'Workspace', live: 'Workspace', charts: 'Workspace',
-    analytics: 'Workspace', signals: 'Books',
-    book: 'Books', orders: 'Books', progress: 'Books',
-    account: 'Profile',
-  };
-  var label = document.querySelector('.smc-topbar__label');
-  if (label && eyebrow) {
-    var _eyebrowObs = new MutationObserver(function() {
-      var text = (label.textContent || '').trim().toLowerCase();
-      eyebrow.textContent = EYEBROW_MAP[text] || 'Workspace';
-    });
-    _eyebrowObs.observe(label, { childList: true, characterData: true, subtree: true });
-  }
-
-  // Engine indicator: watch #nav-engine-dot class
-  var engineDot = document.getElementById('nav-engine-dot');
-  var engineBtn = document.getElementById('nav-engine-indicator');
-  if (engineDot && engineBtn) {
-    var _engineObs = new MutationObserver(function() {
-      engineBtn.classList.remove('live', 'warn', 'off', 'stale', 'offline', 'error');
-      if (engineDot.classList.contains('live'))    engineBtn.classList.add('live');
-      else if (engineDot.classList.contains('warn'))   engineBtn.classList.add('warn');
-      else if (engineDot.classList.contains('off'))    engineBtn.classList.add('off');
-    });
-    _engineObs.observe(engineDot, { attributes: true, attributeFilter: ['class'] });
-  }
-
-  // Sync plan parameters seg buttons with hidden selects
-  document.addEventListener('click', function(e) {
-    var btn = e.target.closest && e.target.closest('.sfx-seg button');
-    if (!btn) return;
-    var seg = btn.closest('.sfx-seg');
-    if (!seg) return;
-    seg.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
-    btn.classList.add('active');
-  });
-
-  // Restore saved preferences
-  sfxApplyTheme(sfxLoad('theme', 'dark'));
-  sfxApplyDensity(sfxLoad('density', 'normal'));
-  sfxApplyAccent(sfxLoad('accent', 'gold'));
-  sfxSetMobilePreview(sfxLoad('view', 'desktop') === 'mobile');
-})();
-</script>
-
-</body>
+                // Restore saved preferences
+                sfxApplyTheme(sfxLoad("theme", "dark"));
+                sfxApplyDensity(sfxLoad("density", "normal"));
+                sfxApplyAccent(sfxLoad("accent", "gold"));
+                sfxSetMobilePreview(sfxLoad("view", "desktop") === "mobile");
+            })();
+        </script>
+    </body>
 </html>

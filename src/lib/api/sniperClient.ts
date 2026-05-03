@@ -133,7 +133,12 @@ export const apiClient = {
         diagnostics: [] as SymbolDiagnostic[],
       };
     }
-    return call<{ prices: PairPrice[]; regimes: RegimeState[]; gates: GateState[]; diagnostics: SymbolDiagnostic[] }>("/snapshot");
+    return call<{
+      prices: PairPrice[];
+      regimes: RegimeState[];
+      gates: GateState[];
+      diagnostics: SymbolDiagnostic[];
+    }>("/snapshot");
   },
   async getChartSnapshot(
     symbol: Symbol,

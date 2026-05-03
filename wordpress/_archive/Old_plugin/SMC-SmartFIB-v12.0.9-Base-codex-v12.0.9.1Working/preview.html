@@ -1,384 +1,882 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" data-theme="dark" data-density="normal">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SMC SuperFIB — UI Preview</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/style.css">
-</head>
-<body class="sfx-app smc-dashboard">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>SMC SuperFIB — UI Preview</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="assets/css/style.css" />
+    </head>
+    <body class="sfx-app smc-dashboard">
+        <div class="sfx-shell">
+            <div class="sfx-sidebar-overlay" id="smc-sidebar-overlay"></div>
 
-<div class="sfx-shell">
-  <div class="sfx-sidebar-overlay" id="smc-sidebar-overlay"></div>
+            <aside class="sfx-sidebar" id="smc-sidebar">
+                <div class="sfx-brand">
+                    <div class="sfx-brand__mark">SF</div>
+                    <div class="sfx-brand__title">
+                        <div class="sfx-brand__name">SMC <span>SuperFIB</span></div>
+                        <div class="sfx-brand__ver">v12.0.9.1</div>
+                    </div>
+                    <button
+                        class="sfx-btn icon ghost sfx-sidebar-close"
+                        id="smc-sidebar-close"
+                        type="button"
+                    >
+                        <svg
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                            style="width: 16px; height: 16px"
+                        >
+                            <path d="M4 4l8 8M12 4l-8 8" />
+                        </svg>
+                    </button>
+                </div>
 
-  <aside class="sfx-sidebar" id="smc-sidebar">
-    <div class="sfx-brand">
-      <div class="sfx-brand__mark">SF</div>
-      <div class="sfx-brand__title">
-        <div class="sfx-brand__name">SMC <span>SuperFIB</span></div>
-        <div class="sfx-brand__ver">v12.0.9.1</div>
-      </div>
-      <button class="sfx-btn icon ghost sfx-sidebar-close" id="smc-sidebar-close" type="button">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="width:16px;height:16px"><path d="M4 4l8 8M12 4l-8 8"/></svg>
-      </button>
-    </div>
+                <div class="sfx-sb-group">
+                    <div class="sfx-sb-label">Workspace</div>
+                    <button class="sfx-nav-item active" type="button">
+                        <svg
+                            class="sfx-nav-item__icon"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M2 3.5h12M2 8h8M2 12.5h10" />
+                            <circle cx="13.5" cy="8" r="1.2" fill="currentColor" stroke="none" />
+                        </svg>
+                        <span>Signal Plan</span>
+                        <span class="sfx-nav-item__count">2</span>
+                    </button>
+                    <button class="sfx-nav-item" type="button">
+                        <svg
+                            class="sfx-nav-item__icon"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.3"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <circle cx="8" cy="8" r="6" />
+                            <circle cx="8" cy="8" r="3" />
+                            <path d="M8 8 L12.5 4.5" />
+                            <circle cx="12" cy="5" r="0.9" fill="currentColor" stroke="none" />
+                        </svg>
+                        <span>Live Radar</span>
+                    </button>
+                    <button class="sfx-nav-item" type="button">
+                        <svg
+                            class="sfx-nav-item__icon"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M2 13.5V3M2 13.5h12" />
+                            <path d="M4.5 11l2.5-3 2 2 3.5-5" />
+                        </svg>
+                        <span>Charts</span>
+                    </button>
+                    <button class="sfx-nav-item" type="button">
+                        <svg
+                            class="sfx-nav-item__icon"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <rect x="2" y="8" width="3" height="6" rx="0.5" />
+                            <rect x="6.5" y="4" width="3" height="10" rx="0.5" />
+                            <rect x="11" y="10" width="3" height="4" rx="0.5" />
+                        </svg>
+                        <span>Analytics</span>
+                    </button>
+                    <button class="sfx-nav-item" type="button">
+                        <svg
+                            class="sfx-nav-item__icon"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <circle cx="8" cy="8" r="1.2" fill="currentColor" />
+                            <path
+                                d="M5 5a4 4 0 0 0 0 6M11 5a4 4 0 0 1 0 6M3 3a7 7 0 0 0 0 10M13 3a7 7 0 0 1 0 10"
+                            />
+                        </svg>
+                        <span>Level Log</span>
+                    </button>
+                </div>
 
-    <div class="sfx-sb-group">
-      <div class="sfx-sb-label">Workspace</div>
-      <button class="sfx-nav-item active" type="button">
-        <svg class="sfx-nav-item__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5h12M2 8h8M2 12.5h10"/><circle cx="13.5" cy="8" r="1.2" fill="currentColor" stroke="none"/></svg>
-        <span>Signal Plan</span>
-        <span class="sfx-nav-item__count">2</span>
-      </button>
-      <button class="sfx-nav-item" type="button">
-        <svg class="sfx-nav-item__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="3"/><path d="M8 8 L12.5 4.5"/><circle cx="12" cy="5" r="0.9" fill="currentColor" stroke="none"/></svg>
-        <span>Live Radar</span>
-      </button>
-      <button class="sfx-nav-item" type="button">
-        <svg class="sfx-nav-item__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13.5V3M2 13.5h12"/><path d="M4.5 11l2.5-3 2 2 3.5-5"/></svg>
-        <span>Charts</span>
-      </button>
-      <button class="sfx-nav-item" type="button">
-        <svg class="sfx-nav-item__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="8" width="3" height="6" rx="0.5"/><rect x="6.5" y="4" width="3" height="10" rx="0.5"/><rect x="11" y="10" width="3" height="4" rx="0.5"/></svg>
-        <span>Analytics</span>
-      </button>
-      <button class="sfx-nav-item" type="button">
-        <svg class="sfx-nav-item__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="1.2" fill="currentColor"/><path d="M5 5a4 4 0 0 0 0 6M11 5a4 4 0 0 1 0 6M3 3a7 7 0 0 0 0 10M13 3a7 7 0 0 1 0 10"/></svg>
-        <span>Level Log</span>
-      </button>
-    </div>
+                <div class="sfx-sb-group">
+                    <div class="sfx-sb-label">Books</div>
+                    <button class="sfx-nav-item" type="button">
+                        <svg
+                            class="sfx-nav-item__icon"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M3 3h7a2 2 0 0 1 2 2v8H5a2 2 0 0 0-2 2V3z" />
+                            <path d="M3 13a2 2 0 0 1 2-2h7" />
+                        </svg>
+                        <span>Open Book</span>
+                    </button>
+                    <button class="sfx-nav-item" type="button">
+                        <svg
+                            class="sfx-nav-item__icon"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M3 3h10l-1 9a2 2 0 0 1-2 1.8H6a2 2 0 0 1-2-1.8L3 3z" />
+                            <path d="M6 6v3M10 6v3" />
+                        </svg>
+                        <span>Orders</span>
+                        <span class="sfx-nav-item__count warn">3</span>
+                    </button>
+                    <button class="sfx-nav-item" type="button">
+                        <svg
+                            class="sfx-nav-item__icon"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M14 8a6 6 0 1 1-6-6" />
+                            <path d="M8 4v4l2.5 1.5" />
+                        </svg>
+                        <span>4a Progress</span>
+                    </button>
+                </div>
 
-    <div class="sfx-sb-group">
-      <div class="sfx-sb-label">Books</div>
-      <button class="sfx-nav-item" type="button">
-        <svg class="sfx-nav-item__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7a2 2 0 0 1 2 2v8H5a2 2 0 0 0-2 2V3z"/><path d="M3 13a2 2 0 0 1 2-2h7"/></svg>
-        <span>Open Book</span>
-      </button>
-      <button class="sfx-nav-item" type="button">
-        <svg class="sfx-nav-item__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h10l-1 9a2 2 0 0 1-2 1.8H6a2 2 0 0 1-2-1.8L3 3z"/><path d="M6 6v3M10 6v3"/></svg>
-        <span>Orders</span>
-        <span class="sfx-nav-item__count warn">3</span>
-      </button>
-      <button class="sfx-nav-item" type="button">
-        <svg class="sfx-nav-item__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8a6 6 0 1 1-6-6"/><path d="M8 4v4l2.5 1.5"/></svg>
-        <span>4a Progress</span>
-      </button>
-    </div>
+                <div class="sfx-sb-group">
+                    <div class="sfx-sb-label">Engine Status</div>
+                    <div class="sfx-engine-card">
+                        <div class="sfx-engine-row">
+                            <span>Signal Engine</span>
+                            <span><span class="sfx-dot live"></span> LIVE</span>
+                        </div>
+                        <div class="sfx-engine-row">
+                            <span>Price Feed</span>
+                            <span><span class="sfx-dot live"></span> 4s</span>
+                        </div>
+                        <div class="sfx-engine-row">
+                            <span>Backend Sync</span>
+                            <span><span class="sfx-dot info"></span> OK</span>
+                        </div>
+                        <div class="sfx-engine-row">
+                            <span>Last Update</span>
+                            <span style="color: var(--fg-mute)">12s ago</span>
+                        </div>
+                    </div>
+                </div>
 
-    <div class="sfx-sb-group">
-      <div class="sfx-sb-label">Engine Status</div>
-      <div class="sfx-engine-card">
-        <div class="sfx-engine-row">
-          <span>Signal Engine</span>
-          <span><span class="sfx-dot live"></span> LIVE</span>
+                <div class="sfx-sb-user">
+                    <div class="sfx-avatar">CV</div>
+                    <div class="sfx-sb-user__info">
+                        <div class="sfx-sb-user__name">Chris V.</div>
+                        <div class="sfx-sb-user__meta">FTMO · Phase 1</div>
+                    </div>
+                    <div class="sfx-sb-auth">
+                        <a href="#">Logout</a>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="sfx-main">
+                <header class="sfx-topbar">
+                    <button class="sfx-menu-btn" type="button">
+                        <svg
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                        >
+                            <path d="M2.5 4h11M2.5 8h11M2.5 12h11" />
+                        </svg>
+                    </button>
+                    <div class="sfx-topbar__title">
+                        <div class="sfx-topbar__eyebrow">Workspace</div>
+                        <div class="sfx-topbar__h smc-topbar__label">Signal Plan</div>
+                    </div>
+                    <div class="sfx-topbar__spacer"></div>
+                    <div class="sfx-topbar__actions">
+                        <button class="sfx-btn" type="button">
+                            <svg
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.4"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                style="width: 14px; height: 14px"
+                            >
+                                <path d="M8 11V3M5 6l3-3 3 3" />
+                                <path
+                                    d="M2.5 11v2a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-2"
+                                />
+                            </svg>
+                            Upload
+                        </button>
+                        <button class="sfx-btn" type="button">
+                            <svg
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.4"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                style="width: 14px; height: 14px"
+                            >
+                                <path d="M2.5 8a5.5 5.5 0 0 1 9.5-3.8L14 6" />
+                                <path d="M14 2v4h-4" />
+                                <path d="M13.5 8a5.5 5.5 0 0 1-9.5 3.8L2 10" />
+                                <path d="M2 14v-4h4" />
+                            </svg>
+                            Refresh
+                        </button>
+                        <button class="sfx-engine-indicator live" type="button">
+                            <span class="sfx-engine-indicator__dot live"></span>
+                            <span class="sfx-engine-indicator__label">LIVE</span>
+                        </button>
+                        <button class="sfx-btn icon ghost" type="button" id="sfx-theme-toggle">
+                            <svg
+                                id="sfx-icon-sun"
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.4"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                style="width: 18px; height: 18px"
+                            >
+                                <circle cx="8" cy="8" r="3" />
+                                <path
+                                    d="M8 1.5v1.5M8 13v1.5M1.5 8h1.5M13 8h1.5M3.2 3.2l1 1M11.8 11.8l1 1M3.2 12.8l1-1M11.8 4.2l1-1"
+                                />
+                            </svg>
+                            <svg
+                                id="sfx-icon-moon"
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.4"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                style="width: 18px; height: 18px; display: none"
+                            >
+                                <path d="M13.5 9.5A5.5 5.5 0 1 1 6.5 2.5a4.5 4.5 0 0 0 7 7z" />
+                            </svg>
+                        </button>
+                        <button class="sfx-btn icon ghost" type="button" id="sfx-tweaks-toggle">
+                            <svg
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.3"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                style="width: 18px; height: 18px"
+                            >
+                                <path
+                                    d="M11.2 2.2a3.2 3.2 0 0 0-3.9 4.1l-5 5a1.4 1.4 0 0 0 2 2l5-5a3.2 3.2 0 0 0 4.1-3.9L11.5 6.2 9.8 4.5l1.4-2.3z"
+                                />
+                            </svg>
+                        </button>
+                    </div>
+                </header>
+
+                <div class="sfx-ticker">
+                    <div class="sfx-ticker__track">
+                        <div class="sfx-ticker__inner" id="smc-ticker-items">
+                            <div class="sfx-ticker__item">
+                                <span class="sfx-ticker__pair">GBP/USD</span
+                                ><span class="sfx-ticker__price">1.2687</span
+                                ><span class="sfx-ticker__chg sfx-pos">+0.12%</span>
+                            </div>
+                            <div class="sfx-ticker__item">
+                                <span class="sfx-ticker__pair">AUD/USD</span
+                                ><span class="sfx-ticker__price">0.6521</span
+                                ><span class="sfx-ticker__chg sfx-neg">-0.08%</span>
+                            </div>
+                            <div class="sfx-ticker__item">
+                                <span class="sfx-ticker__pair">USD/JPY</span
+                                ><span class="sfx-ticker__price">154.82</span
+                                ><span class="sfx-ticker__chg sfx-pos">+0.31%</span>
+                            </div>
+                            <div class="sfx-ticker__item">
+                                <span class="sfx-ticker__pair">AUD/JPY</span
+                                ><span class="sfx-ticker__price">100.94</span
+                                ><span class="sfx-ticker__chg sfx-pos">+0.22%</span>
+                            </div>
+                            <div class="sfx-ticker__item">
+                                <span class="sfx-ticker__pair">EUR/USD</span
+                                ><span class="sfx-ticker__price">1.0814</span
+                                ><span class="sfx-ticker__chg sfx-neg">-0.04%</span>
+                            </div>
+                            <div class="sfx-ticker__item">
+                                <span class="sfx-ticker__pair">XAU/USD</span
+                                ><span class="sfx-ticker__price">2654.10</span
+                                ><span class="sfx-ticker__chg sfx-pos">+0.64%</span>
+                            </div>
+                            <div class="sfx-ticker__item">
+                                <span class="sfx-ticker__pair">US30</span
+                                ><span class="sfx-ticker__price">43128.4</span
+                                ><span class="sfx-ticker__chg sfx-pos">+0.45%</span>
+                            </div>
+                            <div class="sfx-ticker__item">
+                                <span class="sfx-ticker__pair">BTC.D</span
+                                ><span class="sfx-ticker__price">56.82</span
+                                ><span class="sfx-ticker__chg sfx-neg">-0.21%</span>
+                            </div>
+                            <div class="sfx-ticker__item">
+                                <span class="sfx-ticker__pair">GBP/USD</span
+                                ><span class="sfx-ticker__price">1.2687</span
+                                ><span class="sfx-ticker__chg sfx-pos">+0.12%</span>
+                            </div>
+                            <div class="sfx-ticker__item">
+                                <span class="sfx-ticker__pair">AUD/USD</span
+                                ><span class="sfx-ticker__price">0.6521</span
+                                ><span class="sfx-ticker__chg sfx-neg">-0.08%</span>
+                            </div>
+                            <div class="sfx-ticker__item">
+                                <span class="sfx-ticker__pair">USD/JPY</span
+                                ><span class="sfx-ticker__price">154.82</span
+                                ><span class="sfx-ticker__chg sfx-pos">+0.31%</span>
+                            </div>
+                            <div class="sfx-ticker__item">
+                                <span class="sfx-ticker__pair">XAU/USD</span
+                                ><span class="sfx-ticker__price">2654.10</span
+                                ><span class="sfx-ticker__chg sfx-pos">+0.64%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sfx-ticker__right">
+                        <span class="smc-ticker__kz-chip smc-ticker__kz-chip--active"
+                            >● NY KZ OPEN</span
+                        >
+                        <span class="sfx-clock">14:32:08 UTC</span>
+                    </div>
+                </div>
+
+                <div class="sfx-content smc-content">
+                    <div class="smc-chip-row">
+                        <span class="pill pac">Phase 1 Recovery</span>
+                        <span class="pill pp2">4a Level Testing</span>
+                        <span class="pill pgy">20p / 50p Tolerance</span>
+                        <span class="pill pg2">Day 23</span>
+                    </div>
+
+                    <div class="slbl ac">Account Pulse</div>
+                    <div class="g4">
+                        <div class="card sfx-kpi">
+                            <div class="clbl">Equity</div>
+                            <div class="cval pos">$4,872.14</div>
+                            <div class="csub">+$52.14 floating</div>
+                        </div>
+                        <div class="card sfx-kpi">
+                            <div class="clbl">Balance</div>
+                            <div class="cval" style="color: var(--fg)">$4,820.00</div>
+                            <div class="csub">Base balance</div>
+                        </div>
+                        <div class="card sfx-kpi">
+                            <div class="clbl">Floating P/L</div>
+                            <div class="cval pos">+$52.14</div>
+                            <div class="csub">+1.08% return</div>
+                        </div>
+                        <div class="card sfx-kpi">
+                            <div class="clbl">Margin Level</div>
+                            <div class="cval" style="color: var(--info)">842%</div>
+                            <div class="csub">Used: $578.22</div>
+                        </div>
+                    </div>
+
+                    <div class="slbl ac" style="margin-top: 1.5rem">Regime Gate</div>
+                    <div class="card">
+                        <div class="tw">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Pair</th>
+                                        <th>Regime</th>
+                                        <th>Gate</th>
+                                        <th>Chop Block</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>GBP/USD</strong></td>
+                                        <td><span class="pill pgy">RANGE</span></td>
+                                        <td><span class="pill pg2">PASS</span></td>
+                                        <td>—</td>
+                                        <td><span class="pill pac">ARMED</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>AUD/USD</strong></td>
+                                        <td><span class="pill re">TREND−</span></td>
+                                        <td><span class="pill re">BLOCKED</span></td>
+                                        <td>✓ Chop</td>
+                                        <td><span class="pill pgy">WAIT</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>USD/JPY</strong></td>
+                                        <td><span class="pill pg2">TREND+</span></td>
+                                        <td><span class="pill pg2">PASS</span></td>
+                                        <td>—</td>
+                                        <td><span class="pill pac">ARMED</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>XAU/USD</strong></td>
+                                        <td><span class="pill pg2">TREND+</span></td>
+                                        <td><span class="pill pg2">PASS</span></td>
+                                        <td>—</td>
+                                        <td><span class="pill pac">ARMED</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="slbl ac" style="margin-top: 1.5rem">Computed Signals</div>
+                    <div class="card">
+                        <div class="sfx-signal">
+                            <div class="sfx-signal__lead">
+                                <span class="sfx-signal__pair">AUD/JPY</span>
+                                <span class="sfx-dir buy">BUY</span>
+                            </div>
+                            <div class="sfx-signal__body">
+                                <div class="sfx-signal__price">
+                                    <span style="color: var(--buy)">E 100.780</span>
+                                    <span style="color: var(--sell)">SL 100.560</span>
+                                    <span style="color: var(--fg-mute)">+22p</span>
+                                </div>
+                                <div class="sfx-signal__row">
+                                    <strong>4a+ Sweep + MSS</strong>
+                                    <span>RANGE</span>
+                                    <span>R:R 1:3.2</span>
+                                </div>
+                            </div>
+                            <div class="sfx-signal__trail">
+                                <span
+                                    style="
+                                        font-family: var(--font-mono);
+                                        font-size: 0.62rem;
+                                        color: var(--fg-mute);
+                                    "
+                                    >12s ago</span
+                                >
+                                <span class="pill pac">READY</span>
+                                <span style="display: inline-flex; gap: 2px">
+                                    <svg
+                                        viewBox="0 0 16 16"
+                                        fill="var(--accent)"
+                                        width="10"
+                                        height="10"
+                                    >
+                                        <path
+                                            d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"
+                                        />
+                                    </svg>
+                                    <svg
+                                        viewBox="0 0 16 16"
+                                        fill="var(--accent)"
+                                        width="10"
+                                        height="10"
+                                    >
+                                        <path
+                                            d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"
+                                        />
+                                    </svg>
+                                    <svg
+                                        viewBox="0 0 16 16"
+                                        fill="var(--accent)"
+                                        width="10"
+                                        height="10"
+                                    >
+                                        <path
+                                            d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"
+                                        />
+                                    </svg>
+                                    <svg
+                                        viewBox="0 0 16 16"
+                                        fill="var(--accent)"
+                                        width="10"
+                                        height="10"
+                                    >
+                                        <path
+                                            d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"
+                                        />
+                                    </svg>
+                                    <svg
+                                        viewBox="0 0 16 16"
+                                        fill="var(--line)"
+                                        width="10"
+                                        height="10"
+                                    >
+                                        <path
+                                            d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"
+                                        />
+                                    </svg>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="sfx-signal" style="margin-top: 8px">
+                            <div class="sfx-signal__lead">
+                                <span class="sfx-signal__pair">USD/JPY</span>
+                                <span class="sfx-dir buy">BUY</span>
+                            </div>
+                            <div class="sfx-signal__body">
+                                <div class="sfx-signal__price">
+                                    <span style="color: var(--buy)">E 154.620</span>
+                                    <span style="color: var(--sell)">SL 154.380</span>
+                                    <span style="color: var(--fg-mute)">−14p</span>
+                                </div>
+                                <div class="sfx-signal__row">
+                                    <strong>Liq Sweep H4</strong>
+                                    <span>TREND+</span>
+                                    <span>R:R 1:2.4</span>
+                                </div>
+                            </div>
+                            <div class="sfx-signal__trail">
+                                <span
+                                    style="
+                                        font-family: var(--font-mono);
+                                        font-size: 0.62rem;
+                                        color: var(--fg-mute);
+                                    "
+                                    >48s ago</span
+                                >
+                                <span class="pill pg2">ARMED</span>
+                                <span style="display: inline-flex; gap: 2px">
+                                    <svg
+                                        viewBox="0 0 16 16"
+                                        fill="var(--accent)"
+                                        width="10"
+                                        height="10"
+                                    >
+                                        <path
+                                            d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"
+                                        />
+                                    </svg>
+                                    <svg
+                                        viewBox="0 0 16 16"
+                                        fill="var(--accent)"
+                                        width="10"
+                                        height="10"
+                                    >
+                                        <path
+                                            d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"
+                                        />
+                                    </svg>
+                                    <svg
+                                        viewBox="0 0 16 16"
+                                        fill="var(--accent)"
+                                        width="10"
+                                        height="10"
+                                    >
+                                        <path
+                                            d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"
+                                        />
+                                    </svg>
+                                    <svg
+                                        viewBox="0 0 16 16"
+                                        fill="var(--line)"
+                                        width="10"
+                                        height="10"
+                                    >
+                                        <path
+                                            d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"
+                                        />
+                                    </svg>
+                                    <svg
+                                        viewBox="0 0 16 16"
+                                        fill="var(--line)"
+                                        width="10"
+                                        height="10"
+                                    >
+                                        <path
+                                            d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"
+                                        />
+                                    </svg>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="fn" style="margin-top: 2rem">
+                        SMC SuperFIB v12.0.9.1 · Signal + Risk Engine · UI Preview
+                    </div>
+                </div>
+            </main>
         </div>
-        <div class="sfx-engine-row">
-          <span>Price Feed</span>
-          <span><span class="sfx-dot live"></span> 4s</span>
-        </div>
-        <div class="sfx-engine-row">
-          <span>Backend Sync</span>
-          <span><span class="sfx-dot info"></span> OK</span>
-        </div>
-        <div class="sfx-engine-row">
-          <span>Last Update</span>
-          <span style="color:var(--fg-mute)">12s ago</span>
-        </div>
-      </div>
-    </div>
 
-    <div class="sfx-sb-user">
-      <div class="sfx-avatar">CV</div>
-      <div class="sfx-sb-user__info">
-        <div class="sfx-sb-user__name">Chris V.</div>
-        <div class="sfx-sb-user__meta">FTMO · Phase 1</div>
-      </div>
-      <div class="sfx-sb-auth">
-        <a href="#">Logout</a>
-      </div>
-    </div>
-  </aside>
+        <nav class="sfx-bottom-nav">
+            <button class="sfx-bn-item active" type="button">
+                <svg
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <path d="M2 3.5h12M2 8h8M2 12.5h10" />
+                    <circle cx="13.5" cy="8" r="1.2" fill="currentColor" stroke="none" />
+                </svg>
+                <span>Plan</span>
+            </button>
+            <button class="sfx-bn-item" type="button">
+                <svg
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <circle cx="8" cy="8" r="6" />
+                    <circle cx="8" cy="8" r="3" />
+                    <path d="M8 8 L12.5 4.5" />
+                </svg>
+                <span>Live</span>
+            </button>
+            <button class="sfx-bn-item" type="button">
+                <svg
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <path d="M2 13.5V3M2 13.5h12" />
+                    <path d="M4.5 11l2.5-3 2 2 3.5-5" />
+                </svg>
+                <span>Charts</span>
+            </button>
+            <button class="sfx-bn-item" type="button">
+                <svg
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <rect x="2" y="8" width="3" height="6" rx="0.5" />
+                    <rect x="6.5" y="4" width="3" height="10" rx="0.5" />
+                    <rect x="11" y="10" width="3" height="4" rx="0.5" />
+                </svg>
+                <span>Stats</span>
+            </button>
+            <button class="sfx-bn-item" type="button">
+                <svg
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                >
+                    <path d="M2.5 4h11M2.5 8h11M2.5 12h11" />
+                </svg>
+                <span>Menu</span>
+            </button>
+        </nav>
 
-  <main class="sfx-main">
-    <header class="sfx-topbar">
-      <button class="sfx-menu-btn" type="button">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg>
-      </button>
-      <div class="sfx-topbar__title">
-        <div class="sfx-topbar__eyebrow">Workspace</div>
-        <div class="sfx-topbar__h smc-topbar__label">Signal Plan</div>
-      </div>
-      <div class="sfx-topbar__spacer"></div>
-      <div class="sfx-topbar__actions">
-        <button class="sfx-btn" type="button">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M8 11V3M5 6l3-3 3 3"/><path d="M2.5 11v2a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-2"/></svg>
-          Upload
-        </button>
-        <button class="sfx-btn" type="button">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M2.5 8a5.5 5.5 0 0 1 9.5-3.8L14 6"/><path d="M14 2v4h-4"/><path d="M13.5 8a5.5 5.5 0 0 1-9.5 3.8L2 10"/><path d="M2 14v-4h4"/></svg>
-          Refresh
-        </button>
-        <button class="sfx-engine-indicator live" type="button">
-          <span class="sfx-engine-indicator__dot live"></span>
-          <span class="sfx-engine-indicator__label">LIVE</span>
-        </button>
-        <button class="sfx-btn icon ghost" type="button" id="sfx-theme-toggle">
-          <svg id="sfx-icon-sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8h1.5M13 8h1.5M3.2 3.2l1 1M11.8 11.8l1 1M3.2 12.8l1-1M11.8 4.2l1-1"/></svg>
-          <svg id="sfx-icon-moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;display:none"><path d="M13.5 9.5A5.5 5.5 0 1 1 6.5 2.5a4.5 4.5 0 0 0 7 7z"/></svg>
-        </button>
-        <button class="sfx-btn icon ghost" type="button" id="sfx-tweaks-toggle">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M11.2 2.2a3.2 3.2 0 0 0-3.9 4.1l-5 5a1.4 1.4 0 0 0 2 2l5-5a3.2 3.2 0 0 0 4.1-3.9L11.5 6.2 9.8 4.5l1.4-2.3z"/></svg>
-        </button>
-      </div>
-    </header>
-
-    <div class="sfx-ticker">
-      <div class="sfx-ticker__track">
-        <div class="sfx-ticker__inner" id="smc-ticker-items">
-          <div class="sfx-ticker__item"><span class="sfx-ticker__pair">GBP/USD</span><span class="sfx-ticker__price">1.2687</span><span class="sfx-ticker__chg sfx-pos">+0.12%</span></div>
-          <div class="sfx-ticker__item"><span class="sfx-ticker__pair">AUD/USD</span><span class="sfx-ticker__price">0.6521</span><span class="sfx-ticker__chg sfx-neg">-0.08%</span></div>
-          <div class="sfx-ticker__item"><span class="sfx-ticker__pair">USD/JPY</span><span class="sfx-ticker__price">154.82</span><span class="sfx-ticker__chg sfx-pos">+0.31%</span></div>
-          <div class="sfx-ticker__item"><span class="sfx-ticker__pair">AUD/JPY</span><span class="sfx-ticker__price">100.94</span><span class="sfx-ticker__chg sfx-pos">+0.22%</span></div>
-          <div class="sfx-ticker__item"><span class="sfx-ticker__pair">EUR/USD</span><span class="sfx-ticker__price">1.0814</span><span class="sfx-ticker__chg sfx-neg">-0.04%</span></div>
-          <div class="sfx-ticker__item"><span class="sfx-ticker__pair">XAU/USD</span><span class="sfx-ticker__price">2654.10</span><span class="sfx-ticker__chg sfx-pos">+0.64%</span></div>
-          <div class="sfx-ticker__item"><span class="sfx-ticker__pair">US30</span><span class="sfx-ticker__price">43128.4</span><span class="sfx-ticker__chg sfx-pos">+0.45%</span></div>
-          <div class="sfx-ticker__item"><span class="sfx-ticker__pair">BTC.D</span><span class="sfx-ticker__price">56.82</span><span class="sfx-ticker__chg sfx-neg">-0.21%</span></div>
-          <div class="sfx-ticker__item"><span class="sfx-ticker__pair">GBP/USD</span><span class="sfx-ticker__price">1.2687</span><span class="sfx-ticker__chg sfx-pos">+0.12%</span></div>
-          <div class="sfx-ticker__item"><span class="sfx-ticker__pair">AUD/USD</span><span class="sfx-ticker__price">0.6521</span><span class="sfx-ticker__chg sfx-neg">-0.08%</span></div>
-          <div class="sfx-ticker__item"><span class="sfx-ticker__pair">USD/JPY</span><span class="sfx-ticker__price">154.82</span><span class="sfx-ticker__chg sfx-pos">+0.31%</span></div>
-          <div class="sfx-ticker__item"><span class="sfx-ticker__pair">XAU/USD</span><span class="sfx-ticker__price">2654.10</span><span class="sfx-ticker__chg sfx-pos">+0.64%</span></div>
-        </div>
-      </div>
-      <div class="sfx-ticker__right">
-        <span class="smc-ticker__kz-chip smc-ticker__kz-chip--active">● NY KZ OPEN</span>
-        <span class="sfx-clock">14:32:08 UTC</span>
-      </div>
-    </div>
-
-    <div class="sfx-content smc-content">
-      <div class="smc-chip-row">
-        <span class="pill pac">Phase 1 Recovery</span>
-        <span class="pill pp2">4a Level Testing</span>
-        <span class="pill pgy">20p / 50p Tolerance</span>
-        <span class="pill pg2">Day 23</span>
-      </div>
-
-      <div class="slbl ac">Account Pulse</div>
-      <div class="g4">
-        <div class="card sfx-kpi">
-          <div class="clbl">Equity</div>
-          <div class="cval pos">$4,872.14</div>
-          <div class="csub">+$52.14 floating</div>
-        </div>
-        <div class="card sfx-kpi">
-          <div class="clbl">Balance</div>
-          <div class="cval" style="color:var(--fg)">$4,820.00</div>
-          <div class="csub">Base balance</div>
-        </div>
-        <div class="card sfx-kpi">
-          <div class="clbl">Floating P/L</div>
-          <div class="cval pos">+$52.14</div>
-          <div class="csub">+1.08% return</div>
-        </div>
-        <div class="card sfx-kpi">
-          <div class="clbl">Margin Level</div>
-          <div class="cval" style="color:var(--info)">842%</div>
-          <div class="csub">Used: $578.22</div>
-        </div>
-      </div>
-
-      <div class="slbl ac" style="margin-top:1.5rem">Regime Gate</div>
-      <div class="card">
-        <div class="tw">
-          <table>
-            <thead><tr><th>Pair</th><th>Regime</th><th>Gate</th><th>Chop Block</th><th>Status</th></tr></thead>
-            <tbody>
-              <tr><td><strong>GBP/USD</strong></td><td><span class="pill pgy">RANGE</span></td><td><span class="pill pg2">PASS</span></td><td>—</td><td><span class="pill pac">ARMED</span></td></tr>
-              <tr><td><strong>AUD/USD</strong></td><td><span class="pill re">TREND−</span></td><td><span class="pill re">BLOCKED</span></td><td>✓ Chop</td><td><span class="pill pgy">WAIT</span></td></tr>
-              <tr><td><strong>USD/JPY</strong></td><td><span class="pill pg2">TREND+</span></td><td><span class="pill pg2">PASS</span></td><td>—</td><td><span class="pill pac">ARMED</span></td></tr>
-              <tr><td><strong>XAU/USD</strong></td><td><span class="pill pg2">TREND+</span></td><td><span class="pill pg2">PASS</span></td><td>—</td><td><span class="pill pac">ARMED</span></td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="slbl ac" style="margin-top:1.5rem">Computed Signals</div>
-      <div class="card">
-        <div class="sfx-signal">
-          <div class="sfx-signal__lead">
-            <span class="sfx-signal__pair">AUD/JPY</span>
-            <span class="sfx-dir buy">BUY</span>
-          </div>
-          <div class="sfx-signal__body">
-            <div class="sfx-signal__price">
-              <span style="color:var(--buy)">E 100.780</span>
-              <span style="color:var(--sell)">SL 100.560</span>
-              <span style="color:var(--fg-mute)">+22p</span>
+        <div class="sfx-tweaks" id="sfx-tweaks-panel">
+            <div class="sfx-tweaks__hd">
+                <div class="sfx-tweaks__title">Tweaks</div>
+                <button class="sfx-btn icon ghost" id="sfx-tweaks-close" type="button">
+                    <svg
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.6"
+                        stroke-linecap="round"
+                        style="width: 16px; height: 16px"
+                    >
+                        <path d="M4 4l8 8M12 4l-8 8" />
+                    </svg>
+                </button>
             </div>
-            <div class="sfx-signal__row">
-              <strong>4a+ Sweep + MSS</strong>
-              <span>RANGE</span>
-              <span>R:R 1:3.2</span>
+            <div class="sfx-tweaks__body">
+                <div class="sfx-tweak-row">
+                    <div class="sfx-tweak-row__label">Theme</div>
+                    <div class="sfx-seg">
+                        <button id="sfx-theme-dark" class="active" onclick="sfxSetTheme('dark')">
+                            Dark
+                        </button>
+                        <button id="sfx-theme-light" onclick="sfxSetTheme('light')">Light</button>
+                    </div>
+                </div>
+                <div class="sfx-tweak-row">
+                    <div class="sfx-tweak-row__label">Density</div>
+                    <div class="sfx-seg">
+                        <button onclick="sfxSetDensity('compact')">Compact</button>
+                        <button
+                            class="active"
+                            id="sfx-density-normal"
+                            onclick="sfxSetDensity('normal')"
+                        >
+                            Normal
+                        </button>
+                        <button onclick="sfxSetDensity('relaxed')">Relaxed</button>
+                    </div>
+                </div>
+                <div class="sfx-tweak-row">
+                    <div class="sfx-tweak-row__label">Accent</div>
+                    <div class="sfx-swatch-row">
+                        <div
+                            class="sfx-swatch active"
+                            data-accent="gold"
+                            style="background: linear-gradient(135deg, #d8a35d, #f3d7ab)"
+                            onclick="sfxSetAccent('gold')"
+                        ></div>
+                        <div
+                            class="sfx-swatch"
+                            data-accent="teal"
+                            style="background: linear-gradient(135deg, #46d19a, #78e8be)"
+                            onclick="sfxSetAccent('teal')"
+                        ></div>
+                        <div
+                            class="sfx-swatch"
+                            data-accent="azure"
+                            style="background: linear-gradient(135deg, #5aa9ff, #8bc2ff)"
+                            onclick="sfxSetAccent('azure')"
+                        ></div>
+                        <div
+                            class="sfx-swatch"
+                            data-accent="violet"
+                            style="background: linear-gradient(135deg, #9e8cff, #c4b7ff)"
+                            onclick="sfxSetAccent('violet')"
+                        ></div>
+                        <div
+                            class="sfx-swatch"
+                            data-accent="rose"
+                            style="background: linear-gradient(135deg, #ff8a80, #ffb0a8)"
+                            onclick="sfxSetAccent('rose')"
+                        ></div>
+                    </div>
+                </div>
             </div>
-          </div>
-          <div class="sfx-signal__trail">
-            <span style="font-family:var(--font-mono);font-size:0.62rem;color:var(--fg-mute)">12s ago</span>
-            <span class="pill pac">READY</span>
-            <span style="display:inline-flex;gap:2px">
-              <svg viewBox="0 0 16 16" fill="var(--accent)" width="10" height="10"><path d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"/></svg>
-              <svg viewBox="0 0 16 16" fill="var(--accent)" width="10" height="10"><path d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"/></svg>
-              <svg viewBox="0 0 16 16" fill="var(--accent)" width="10" height="10"><path d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"/></svg>
-              <svg viewBox="0 0 16 16" fill="var(--accent)" width="10" height="10"><path d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"/></svg>
-              <svg viewBox="0 0 16 16" fill="var(--line)" width="10" height="10"><path d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"/></svg>
-            </span>
-          </div>
         </div>
-        <div class="sfx-signal" style="margin-top:8px">
-          <div class="sfx-signal__lead">
-            <span class="sfx-signal__pair">USD/JPY</span>
-            <span class="sfx-dir buy">BUY</span>
-          </div>
-          <div class="sfx-signal__body">
-            <div class="sfx-signal__price">
-              <span style="color:var(--buy)">E 154.620</span>
-              <span style="color:var(--sell)">SL 154.380</span>
-              <span style="color:var(--fg-mute)">−14p</span>
-            </div>
-            <div class="sfx-signal__row">
-              <strong>Liq Sweep H4</strong>
-              <span>TREND+</span>
-              <span>R:R 1:2.4</span>
-            </div>
-          </div>
-          <div class="sfx-signal__trail">
-            <span style="font-family:var(--font-mono);font-size:0.62rem;color:var(--fg-mute)">48s ago</span>
-            <span class="pill pg2">ARMED</span>
-            <span style="display:inline-flex;gap:2px">
-              <svg viewBox="0 0 16 16" fill="var(--accent)" width="10" height="10"><path d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"/></svg>
-              <svg viewBox="0 0 16 16" fill="var(--accent)" width="10" height="10"><path d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"/></svg>
-              <svg viewBox="0 0 16 16" fill="var(--accent)" width="10" height="10"><path d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"/></svg>
-              <svg viewBox="0 0 16 16" fill="var(--line)" width="10" height="10"><path d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"/></svg>
-              <svg viewBox="0 0 16 16" fill="var(--line)" width="10" height="10"><path d="M8 1.5l1.98 4.02 4.43.64-3.2 3.12.75 4.4L8 11.6l-3.96 2.08.75-4.4-3.2-3.12 4.43-.64z"/></svg>
-            </span>
-          </div>
-        </div>
-      </div>
 
-      <div class="fn" style="margin-top:2rem">SMC SuperFIB v12.0.9.1 · Signal + Risk Engine · UI Preview</div>
-    </div>
-  </main>
-</div>
-
-<nav class="sfx-bottom-nav">
-  <button class="sfx-bn-item active" type="button">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5h12M2 8h8M2 12.5h10"/><circle cx="13.5" cy="8" r="1.2" fill="currentColor" stroke="none"/></svg>
-    <span>Plan</span>
-  </button>
-  <button class="sfx-bn-item" type="button">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="3"/><path d="M8 8 L12.5 4.5"/></svg>
-    <span>Live</span>
-  </button>
-  <button class="sfx-bn-item" type="button">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13.5V3M2 13.5h12"/><path d="M4.5 11l2.5-3 2 2 3.5-5"/></svg>
-    <span>Charts</span>
-  </button>
-  <button class="sfx-bn-item" type="button">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="8" width="3" height="6" rx="0.5"/><rect x="6.5" y="4" width="3" height="10" rx="0.5"/><rect x="11" y="10" width="3" height="4" rx="0.5"/></svg>
-    <span>Stats</span>
-  </button>
-  <button class="sfx-bn-item" type="button">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg>
-    <span>Menu</span>
-  </button>
-</nav>
-
-<div class="sfx-tweaks" id="sfx-tweaks-panel">
-  <div class="sfx-tweaks__hd">
-    <div class="sfx-tweaks__title">Tweaks</div>
-    <button class="sfx-btn icon ghost" id="sfx-tweaks-close" type="button">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="width:16px;height:16px"><path d="M4 4l8 8M12 4l-8 8"/></svg>
-    </button>
-  </div>
-  <div class="sfx-tweaks__body">
-    <div class="sfx-tweak-row">
-      <div class="sfx-tweak-row__label">Theme</div>
-      <div class="sfx-seg">
-        <button id="sfx-theme-dark" class="active" onclick="sfxSetTheme('dark')">Dark</button>
-        <button id="sfx-theme-light" onclick="sfxSetTheme('light')">Light</button>
-      </div>
-    </div>
-    <div class="sfx-tweak-row">
-      <div class="sfx-tweak-row__label">Density</div>
-      <div class="sfx-seg">
-        <button onclick="sfxSetDensity('compact')">Compact</button>
-        <button class="active" id="sfx-density-normal" onclick="sfxSetDensity('normal')">Normal</button>
-        <button onclick="sfxSetDensity('relaxed')">Relaxed</button>
-      </div>
-    </div>
-    <div class="sfx-tweak-row">
-      <div class="sfx-tweak-row__label">Accent</div>
-      <div class="sfx-swatch-row">
-        <div class="sfx-swatch active" data-accent="gold"   style="background:linear-gradient(135deg,#d8a35d,#f3d7ab)" onclick="sfxSetAccent('gold')"></div>
-        <div class="sfx-swatch"        data-accent="teal"   style="background:linear-gradient(135deg,#46d19a,#78e8be)" onclick="sfxSetAccent('teal')"></div>
-        <div class="sfx-swatch"        data-accent="azure"  style="background:linear-gradient(135deg,#5aa9ff,#8bc2ff)" onclick="sfxSetAccent('azure')"></div>
-        <div class="sfx-swatch"        data-accent="violet" style="background:linear-gradient(135deg,#9e8cff,#c4b7ff)" onclick="sfxSetAccent('violet')"></div>
-        <div class="sfx-swatch"        data-accent="rose"   style="background:linear-gradient(135deg,#ff8a80,#ffb0a8)" onclick="sfxSetAccent('rose')"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-var ACCENT_MAP = {
-  gold:   { accent:'#d8a35d', accent2:'#f3d7ab', soft:'rgba(216,163,93,0.12)',  line:'rgba(216,163,93,0.35)'  },
-  teal:   { accent:'#46d19a', accent2:'#78e8be', soft:'rgba(70,209,154,0.12)',  line:'rgba(70,209,154,0.35)'  },
-  azure:  { accent:'#5aa9ff', accent2:'#8bc2ff', soft:'rgba(90,169,255,0.12)',  line:'rgba(90,169,255,0.35)'  },
-  violet: { accent:'#9e8cff', accent2:'#c4b7ff', soft:'rgba(158,140,255,0.12)', line:'rgba(158,140,255,0.35)' },
-  rose:   { accent:'#ff8a80', accent2:'#ffb0a8', soft:'rgba(255,138,128,0.12)', line:'rgba(255,138,128,0.35)' },
-};
-function sfxSetAccent(id) {
-  var a = ACCENT_MAP[id]; if (!a) return;
-  var r = document.documentElement;
-  r.style.setProperty('--accent', a.accent);
-  r.style.setProperty('--accent-2', a.accent2);
-  r.style.setProperty('--accent-soft', a.soft);
-  r.style.setProperty('--accent-line', a.line);
-  document.querySelectorAll('.sfx-swatch').forEach(function(s){ s.classList.toggle('active', s.dataset.accent === id); });
-}
-function sfxSetTheme(t) {
-  document.documentElement.setAttribute('data-theme', t);
-  document.getElementById('sfx-icon-sun').style.display  = t === 'dark'  ? '' : 'none';
-  document.getElementById('sfx-icon-moon').style.display = t === 'light' ? '' : 'none';
-  document.getElementById('sfx-theme-dark').classList.toggle('active', t === 'dark');
-  document.getElementById('sfx-theme-light').classList.toggle('active', t === 'light');
-}
-function sfxSetDensity(d) {
-  document.documentElement.setAttribute('data-density', d);
-}
-document.getElementById('sfx-theme-toggle').addEventListener('click', function() {
-  sfxSetTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
-});
-document.getElementById('sfx-tweaks-toggle').addEventListener('click', function() {
-  document.getElementById('sfx-tweaks-panel').classList.toggle('open');
-});
-document.getElementById('sfx-tweaks-close').addEventListener('click', function() {
-  document.getElementById('sfx-tweaks-panel').classList.remove('open');
-});
-document.querySelectorAll('.sfx-nav-item').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    document.querySelectorAll('.sfx-nav-item').forEach(function(b){ b.classList.remove('active'); });
-    btn.classList.add('active');
-  });
-});
-document.querySelectorAll('.sfx-bn-item').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    document.querySelectorAll('.sfx-bn-item').forEach(function(b){ b.classList.remove('active'); });
-    btn.classList.add('active');
-  });
-});
-</script>
-</body>
+        <script>
+            var ACCENT_MAP = {
+                gold: {
+                    accent: "#d8a35d",
+                    accent2: "#f3d7ab",
+                    soft: "rgba(216,163,93,0.12)",
+                    line: "rgba(216,163,93,0.35)",
+                },
+                teal: {
+                    accent: "#46d19a",
+                    accent2: "#78e8be",
+                    soft: "rgba(70,209,154,0.12)",
+                    line: "rgba(70,209,154,0.35)",
+                },
+                azure: {
+                    accent: "#5aa9ff",
+                    accent2: "#8bc2ff",
+                    soft: "rgba(90,169,255,0.12)",
+                    line: "rgba(90,169,255,0.35)",
+                },
+                violet: {
+                    accent: "#9e8cff",
+                    accent2: "#c4b7ff",
+                    soft: "rgba(158,140,255,0.12)",
+                    line: "rgba(158,140,255,0.35)",
+                },
+                rose: {
+                    accent: "#ff8a80",
+                    accent2: "#ffb0a8",
+                    soft: "rgba(255,138,128,0.12)",
+                    line: "rgba(255,138,128,0.35)",
+                },
+            };
+            function sfxSetAccent(id) {
+                var a = ACCENT_MAP[id];
+                if (!a) return;
+                var r = document.documentElement;
+                r.style.setProperty("--accent", a.accent);
+                r.style.setProperty("--accent-2", a.accent2);
+                r.style.setProperty("--accent-soft", a.soft);
+                r.style.setProperty("--accent-line", a.line);
+                document.querySelectorAll(".sfx-swatch").forEach(function (s) {
+                    s.classList.toggle("active", s.dataset.accent === id);
+                });
+            }
+            function sfxSetTheme(t) {
+                document.documentElement.setAttribute("data-theme", t);
+                document.getElementById("sfx-icon-sun").style.display = t === "dark" ? "" : "none";
+                document.getElementById("sfx-icon-moon").style.display =
+                    t === "light" ? "" : "none";
+                document.getElementById("sfx-theme-dark").classList.toggle("active", t === "dark");
+                document
+                    .getElementById("sfx-theme-light")
+                    .classList.toggle("active", t === "light");
+            }
+            function sfxSetDensity(d) {
+                document.documentElement.setAttribute("data-density", d);
+            }
+            document.getElementById("sfx-theme-toggle").addEventListener("click", function () {
+                sfxSetTheme(
+                    document.documentElement.getAttribute("data-theme") === "dark"
+                        ? "light"
+                        : "dark",
+                );
+            });
+            document.getElementById("sfx-tweaks-toggle").addEventListener("click", function () {
+                document.getElementById("sfx-tweaks-panel").classList.toggle("open");
+            });
+            document.getElementById("sfx-tweaks-close").addEventListener("click", function () {
+                document.getElementById("sfx-tweaks-panel").classList.remove("open");
+            });
+            document.querySelectorAll(".sfx-nav-item").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    document.querySelectorAll(".sfx-nav-item").forEach(function (b) {
+                        b.classList.remove("active");
+                    });
+                    btn.classList.add("active");
+                });
+            });
+            document.querySelectorAll(".sfx-bn-item").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    document.querySelectorAll(".sfx-bn-item").forEach(function (b) {
+                        b.classList.remove("active");
+                    });
+                    btn.classList.add("active");
+                });
+            });
+        </script>
+    </body>
 </html>
