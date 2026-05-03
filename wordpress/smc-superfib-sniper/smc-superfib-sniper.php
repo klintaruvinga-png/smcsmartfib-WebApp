@@ -1142,7 +1142,7 @@ final class SMC_SuperFib_Sniper_REST {
         $sym = $signal['symbol'];
         $spec = $this->get_instrument_spec($sym);
         $pip = $spec ? (float) $spec['pip_size'] : 0.0001;
-        $pip_val = $spec ? (float) $spec['pip_val'] : 10.0;
+        $pip_val = $spec ? $this->pip_value_per_standard_lot($user_id, $sym, $spec) : 10.0;
         $risk_weights = array('e1' => 1, 'e2' => 2, 'e3' => 3);
         foreach (array('e1', 'e2', 'e3') as $stage) {
             $stop_dist = max(abs($entries[$stage] - $stops[$stage]), $pip);
@@ -1191,6 +1191,116 @@ final class SMC_SuperFib_Sniper_REST {
         } else {
             return round($swing_hi + $buffer, 8);
         }
+    }
+
+    private function pip_value_per_standard_lot($user_id, $symbol, $spec) {
+        $fallback = isset($spec['pip_val']) ? (float) $spec['pip_val'] : 10.0;
+        if (!is_array($spec) || ($spec['type'] ?? '') !== 'forex') {
+            return $fallback;
+        }
+
+        $market_mids = $this->market_mids_for_symbol($user_id, $symbol);
+        return $this->pip_value_from_market($symbol, $spec, $market_mids);
+    }
+
+    private function pip_value_from_market($symbol, $spec, $market_mids) {
+        $fallback = isset($spec['pip_val']) ? (float) $spec['pip_val'] : 10.0;
+        $contract_size = isset($spec['contract_size']) ? (float) $spec['contract_size'] : 0.0;
+        $pip_size = isset($spec['pip_size']) ? (float) $spec['pip_size'] : 0.0;
+        if (($spec['type'] ?? '') !== 'forex' || $contract_size <= 0 || $pip_size <= 0) {
+            return $fallback;
+        }
+
+        $pair = $this->split_symbol_pair($symbol);
+        if (!$pair) {
+            return $fallback;
+        }
+
+        list($base, $quote) = $pair;
+        $quote_to_usd = $this->quote_to_usd_rate_from_market($base, $quote, $market_mids);
+        if ($quote_to_usd <= 0) {
+            return $fallback;
+        }
+
+        return round($contract_size * $pip_size * $quote_to_usd, 6);
+    }
+
+    private function market_mids_for_symbol($user_id, $symbol) {
+        $pair = $this->split_symbol_pair($symbol);
+        if (!$pair) {
+            return array();
+        }
+
+        list($base, $quote) = $pair;
+        $refs = array($symbol);
+        if ($quote !== 'USD') {
+            $refs[] = $quote . 'USD';
+            $refs[] = 'USD' . $quote;
+        }
+
+        $out = array();
+        foreach (array_values(array_unique($refs)) as $ref) {
+            $mid = $this->reference_mid($user_id, $ref);
+            if ($mid > 0) {
+                $out[$ref] = $mid;
+            }
+        }
+
+        return $out;
+    }
+
+    private function quote_to_usd_rate_from_market($base, $quote, $market_mids) {
+        if ($quote === 'USD') {
+            return 1.0;
+        }
+
+        if ($base === 'USD') {
+            $pair_mid = $this->reference_mid_from_market($market_mids, $base . $quote);
+            return $pair_mid > 0 ? (1.0 / $pair_mid) : 0.0;
+        }
+
+        $direct_mid = $this->reference_mid_from_market($market_mids, $quote . 'USD');
+        if ($direct_mid > 0) {
+            return $direct_mid;
+        }
+
+        $inverse_mid = $this->reference_mid_from_market($market_mids, 'USD' . $quote);
+        if ($inverse_mid > 0) {
+            return 1.0 / $inverse_mid;
+        }
+
+        return 0.0;
+    }
+
+    private function reference_mid($user_id, $symbol) {
+        $quote = $this->fetch_quote($user_id, $symbol);
+        if (is_array($quote) && isset($quote['mid']) && (float) $quote['mid'] > 0) {
+            return (float) $quote['mid'];
+        }
+
+        $cached = $this->get_cached_price($user_id, $symbol);
+        if (is_array($cached) && isset($cached['mid']) && (float) $cached['mid'] > 0) {
+            $age_sec = $this->iso_age_sec(isset($cached['updatedAt']) ? $cached['updatedAt'] : null);
+            if ($age_sec <= 86400) {
+                return (float) $cached['mid'];
+            }
+        }
+
+        return 0.0;
+    }
+
+    private function reference_mid_from_market($market_mids, $symbol) {
+        $key = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $symbol));
+        return isset($market_mids[$key]) ? (float) $market_mids[$key] : 0.0;
+    }
+
+    private function split_symbol_pair($symbol) {
+        $key = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $symbol));
+        if (!preg_match('/^[A-Z]{6}$/', $key)) {
+            return null;
+        }
+
+        return array(substr($key, 0, 3), substr($key, 3, 3));
     }
 
     private function get_tp_price_from_zone($zone_price, $direction) {
@@ -1967,11 +2077,9 @@ final class SMC_SuperFib_Sniper_REST {
             'AUDUSD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
             'EURUSD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
             'NZDUSD' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
-            // FOREX — JPY quoted.
-            // pip_val = 1 pip (0.01 JPY) × 100,000 units ÷ USDJPY_rate.
-            // $10.0 is exact only at USDJPY ≈ 100; at USDJPY≈156 the true value is ~$6.40 (~36% lot-size underestimate).
-            // For cross-JPY pairs the base-currency USD rate further affects pip_val.
-            // TODO: compute dynamically from the live USDJPY mid to keep lot sizing accurate.
+            // FOREX — non-USD quoted pairs use pip_val as a fallback only.
+            // Runtime sizing resolves the quote currency into USD from live/cached reference mids
+            // so JPY/CAD/CHF/GBP/AUD/NZD quoted pairs do not inherit the flat $10 assumption.
             'USDJPY' => array('type' => 'forex', 'pip_size' => 0.01,   'contract_size' => 100000, 'pip_val' => 10.0),
             'AUDJPY' => array('type' => 'forex', 'pip_size' => 0.01,   'contract_size' => 100000, 'pip_val' => 10.0),
             'EURJPY' => array('type' => 'forex', 'pip_size' => 0.01,   'contract_size' => 100000, 'pip_val' => 10.0),
