@@ -196,7 +196,7 @@ final class SMC_SuperFib_Sniper_REST {
         $this->route('/health', WP_REST_Server::READABLE, 'get_health', true);
         $this->route('/session', WP_REST_Server::READABLE, 'get_session', false);
         $this->route('/snapshot', WP_REST_Server::READABLE, 'get_snapshot', true);
-        $this->route('/snapshot', WP_REST_Server::CREATABLE, 'post_snapshot', true);
+        $this->route('/snapshot', WP_REST_Server::CREATABLE, 'post_snapshot', false);
         $this->route('/charts', WP_REST_Server::READABLE, 'get_chart_snapshot', true);
         $this->route('/regimes', WP_REST_Server::READABLE, 'get_regimes', true);
         $this->route('/regime', WP_REST_Server::CREATABLE, 'post_regime', true);
