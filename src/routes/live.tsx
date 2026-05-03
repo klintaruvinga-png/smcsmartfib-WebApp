@@ -51,7 +51,7 @@ function LivePage() {
           <p className="text-xs text-mute mt-0.5">Prices · Regime · Gate · Chop</p>
         </div>
         <button
-          onClick={() => runBatch()}
+          onClick={() => runBatch(undefined)}
           disabled={batchRunning}
           className="flex items-center gap-1.5 rounded border border-bd bg-bg2/60 px-3 py-1.5 text-[11px] font-mono text-dim hover:text-fg hover:border-info/40 disabled:opacity-50 transition-colors"
         >

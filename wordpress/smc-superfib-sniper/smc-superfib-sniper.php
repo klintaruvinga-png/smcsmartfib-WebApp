@@ -321,11 +321,21 @@ final class SMC_SuperFib_Sniper_REST {
         // feedStatus separates runtime feed health from credential validity.
         // rate-limited = temporary 429 cooldown (key remains ok).
         // blocked = key missing or invalid — feed cannot recover without user action.
+        $settings = $this->get_settings($user_id);
+        $feed_has_stale_symbols = false;
+        foreach ($settings['watchlist'] as $symbol) {
+            $cached_price = $this->get_cached_price($user_id, $symbol, $settings['staleThresholdSec']);
+            if (!$cached_price || ($cached_price['state'] ?? 'offline') !== 'live') {
+                $feed_has_stale_symbols = true;
+                break;
+            }
+        }
+
         if ($this->is_feed_rate_limited($user_id)) {
             $feed_status = 'rate-limited';
         } elseif ($key_status !== 'ok') {
             $feed_status = 'blocked';
-        } elseif ($batch_age <= 120) {
+        } elseif (!$feed_has_stale_symbols && $batch_age <= 120) {
             $feed_status = 'live';
         } else {
             $feed_status = 'stale';
@@ -585,23 +595,7 @@ final class SMC_SuperFib_Sniper_REST {
 
     public function get_snapshot() {
         $user_id = get_current_user_id();
-        $snapshot = $this->get_engine_snapshot($user_id);
-        if (is_array($snapshot) && !empty($snapshot['prices'])) {
-            return rest_ensure_response($snapshot);
-        }
-
-        $settings = $this->get_settings($user_id);
-        $prices = $this->refresh_prices($user_id, $settings['watchlist']);
-        $engine = $this->run_engine_for_symbols($user_id, $settings['watchlist'], $prices);
-        $snapshot = array(
-            'prices' => $prices,
-            'regimes' => $engine['regimes'],
-            'gates' => $engine['gates'],
-            'plans' => $engine['plans'],
-            'diagnostics' => $engine['diagnostics'] ?? array(),
-        );
-        $this->save_engine_snapshot($user_id, $snapshot);
-
+        $snapshot = $this->ensure_engine_snapshot($user_id);
         return rest_ensure_response($snapshot);
     }
 
@@ -615,23 +609,8 @@ final class SMC_SuperFib_Sniper_REST {
 
     public function get_regimes() {
         $user_id = get_current_user_id();
-        $snapshot = $this->get_engine_snapshot($user_id);
-        if (is_array($snapshot) && !empty($snapshot['regimes'])) {
-            return rest_ensure_response($snapshot['regimes']);
-        }
-
-        $settings = $this->get_settings($user_id);
-        $prices = $this->refresh_prices($user_id, $settings['watchlist']);
-        $engine = $this->run_engine_for_symbols($user_id, $settings['watchlist'], $prices);
-        $snapshot = array(
-            'prices' => $prices,
-            'regimes' => $engine['regimes'],
-            'gates' => $engine['gates'],
-            'plans' => $engine['plans'],
-            'diagnostics' => $engine['diagnostics'] ?? array(),
-        );
-        $this->save_engine_snapshot($user_id, $snapshot);
-        return rest_ensure_response($engine['regimes']);
+        $snapshot = $this->ensure_engine_snapshot($user_id);
+        return rest_ensure_response($snapshot['regimes'] ?? array());
     }
 
     // Pine webhook stub — intentionally audit-only until Pine alert integration is implemented.
@@ -641,38 +620,9 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     public function get_live_signals() {
-        global $wpdb;
         $user_id = get_current_user_id();
-        $settings = $this->get_settings($user_id);
-        $watchlist = $settings['watchlist'];
-
-        $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$this->table('signals')} WHERE user_id = %d ORDER BY updated_at DESC",
-            $user_id
-        ), ARRAY_A);
-
-        $signals = array();
-        foreach ($rows as $row) {
-            if (!in_array($row['symbol'], $watchlist, true)) {
-                continue;
-            }
-            $engine = json_decode($row['engine'], true) ?: array();
-            $signals[] = array(
-                'id' => $row['id'],
-                'symbol' => $row['symbol'],
-                'direction' => $row['direction'],
-                'status' => $row['status'],
-                'confluence' => json_decode($row['confluence'], true) ?: array(),
-                'verdict' => $row['verdict'],
-                'computedBy' => 'backend',
-                'backendConfirmed' => (bool) $row['backend_confirmed'],
-                'engineBlocker' => isset($engine['engineBlocker']) ? $engine['engineBlocker'] : null,
-                'createdAt' => $this->to_iso($row['created_at']),
-                'engine' => $engine,
-            );
-        }
-
-        return rest_ensure_response($signals);
+        $snapshot = $this->ensure_engine_snapshot($user_id);
+        return rest_ensure_response($snapshot['signals'] ?? array());
     }
 
     // Pine webhook stub — intentionally audit-only until Pine alert integration is implemented.
@@ -684,30 +634,14 @@ final class SMC_SuperFib_Sniper_REST {
     public function get_ladders(WP_REST_Request $request) {
         $user_id = get_current_user_id();
         $symbol = strtoupper(sanitize_text_field($request->get_param('symbol')));
-        $settings = $this->get_settings($user_id);
-        $symbols = $symbol ? array($symbol) : $settings['watchlist'];
-        $snapshot = $this->get_engine_snapshot($user_id);
-        if (is_array($snapshot) && !empty($snapshot['plans'])) {
-            $plans = $snapshot['plans'];
-            if ($symbol) {
-                $plans = array_values(array_filter($plans, function ($plan) use ($symbol) {
-                    return isset($plan['symbol']) && $plan['symbol'] === $symbol;
-                }));
-            }
-            return rest_ensure_response($plans);
+        $snapshot = $this->ensure_engine_snapshot($user_id);
+        $plans = $snapshot['plans'] ?? array();
+        if ($symbol) {
+            $plans = array_values(array_filter($plans, function ($plan) use ($symbol) {
+                return isset($plan['symbol']) && $plan['symbol'] === $symbol;
+            }));
         }
-
-        $prices = $this->refresh_prices($user_id, $symbols);
-        $engine = $this->run_engine_for_symbols($user_id, $symbols, $prices);
-        $snapshot = array(
-            'prices' => $prices,
-            'regimes' => $engine['regimes'],
-            'gates' => $engine['gates'],
-            'plans' => $engine['plans'],
-            'diagnostics' => $engine['diagnostics'] ?? array(),
-        );
-        $this->save_engine_snapshot($user_id, $snapshot);
-        return rest_ensure_response($engine['plans']);
+        return rest_ensure_response($plans);
     }
 
     public function get_chart_snapshot(WP_REST_Request $request) {
@@ -886,19 +820,10 @@ final class SMC_SuperFib_Sniper_REST {
         foreach ($symbols as $sym) {
             delete_transient('smc_sf_qt_' . $user_id . '_' . md5($sym));
         }
-        $prices = $this->refresh_prices($user_id, $symbols);
-        $engine = $this->run_engine_for_symbols($user_id, $symbols, $prices);
-        $snapshot = array(
-            'prices' => $prices,
-            'regimes' => $engine['regimes'],
-            'gates' => $engine['gates'],
-            'plans' => $engine['plans'],
-            'diagnostics' => isset($engine['diagnostics']) ? $engine['diagnostics'] : array(),
-        );
-        $this->save_engine_snapshot($user_id, $snapshot);
+        $snapshot = $this->ensure_engine_snapshot($user_id, true);
         return rest_ensure_response(array(
             'ok' => true,
-            'diagnostics' => isset($engine['diagnostics']) ? $engine['diagnostics'] : array(),
+            'diagnostics' => isset($snapshot['diagnostics']) ? $snapshot['diagnostics'] : array(),
         ));
     }
 
@@ -1609,12 +1534,64 @@ final class SMC_SuperFib_Sniper_REST {
         return is_array($snapshot) ? $snapshot : null;
     }
 
+    private function ensure_engine_snapshot($user_id, $force = false) {
+        $settings = $this->get_settings($user_id);
+        $symbols = $settings['watchlist'];
+        $snapshot = $this->get_engine_snapshot($user_id);
+
+        if (!$force && $this->is_engine_snapshot_current($snapshot, $symbols, (int) $settings['refreshIntervalSec'])) {
+            return $snapshot;
+        }
+
+        $prices = $this->refresh_prices($user_id, $symbols);
+        $engine = $this->run_engine_for_symbols($user_id, $symbols, $prices);
+        $snapshot = array(
+            'prices' => $prices,
+            'regimes' => $engine['regimes'],
+            'gates' => $engine['gates'],
+            'signals' => $engine['signals'],
+            'plans' => $engine['plans'],
+            'diagnostics' => $engine['diagnostics'] ?? array(),
+            'meta' => array(
+                'computedAt' => gmdate('c'),
+                'watchlist' => $symbols,
+            ),
+        );
+        $this->save_engine_snapshot($user_id, $snapshot);
+
+        return $snapshot;
+    }
+
     private function save_engine_snapshot($user_id, $snapshot) {
         if (!is_array($snapshot)) {
             return false;
         }
         update_user_meta($user_id, 'smc_sf_engine_snapshot', $snapshot);
         return true;
+    }
+
+    private function is_engine_snapshot_current($snapshot, $expected_symbols, $refresh_interval_sec) {
+        if (!is_array($snapshot) || empty($snapshot['prices']) || empty($snapshot['meta']['computedAt'])) {
+            return false;
+        }
+
+        $computed_at = strtotime((string) $snapshot['meta']['computedAt']);
+        if (!$computed_at) {
+            return false;
+        }
+        if ((time() - $computed_at) > max(5, (int) $refresh_interval_sec)) {
+            return false;
+        }
+
+        $snapshot_symbols = array_values(array_unique(array_filter(array_map(function ($price) {
+            return isset($price['symbol']) ? (string) $price['symbol'] : null;
+        }, is_array($snapshot['prices']) ? $snapshot['prices'] : array()))));
+        sort($snapshot_symbols);
+
+        $expected_symbols = array_values(array_unique(array_filter(array_map('strval', is_array($expected_symbols) ? $expected_symbols : array()))));
+        sort($expected_symbols);
+
+        return $snapshot_symbols === $expected_symbols;
     }
 
     private function get_cached_price($user_id, $symbol, $stale_threshold_sec = null) {

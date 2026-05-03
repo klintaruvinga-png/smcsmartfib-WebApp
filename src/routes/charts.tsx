@@ -6,7 +6,7 @@ import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { fmtPrice, fmtPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { LineChart, Line, ResponsiveContainer, ReferenceLine, YAxis, Tooltip } from "recharts";
-import type { Symbol } from "@/types/sniper";
+import type { ChartSnapshot, Symbol } from "@/types/sniper";
 import { apiClient } from "@/lib/api/sniperClient";
 
 export const Route = createFileRoute("/charts")({
@@ -33,10 +33,11 @@ function ChartsPage() {
   const price = prices.find((p) => p.symbol === selected) ?? prices[0];
   const activeSymbol = price?.symbol ?? selected;
 
-  const { data: chart } = useQuery({
+  const { data: chart } = useQuery<ChartSnapshot>({
     queryKey: ["chart", activeSymbol],
     queryFn: () => apiClient.getChartSnapshot(activeSymbol),
-    refetchInterval: pollMs,
+    enabled: pollMs !== null,
+    refetchInterval: pollMs ?? false,
   });
 
   if (!data) return null;
