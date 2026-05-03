@@ -32,6 +32,7 @@ function blockerWarning(blocker: EngineBlocker | undefined): string | null {
     CANDLES_STALE: "Candles stale (>2 h old)",
     INSUFFICIENT_CANDLE_HISTORY: "Insufficient candle history (<30 bars)",
     READY_NOT_CONFIRMED_STALE_DATA: "READY but stale data — confirmation blocked",
+    CHOP_GATE_BLOCKED: "Gate blocked — chop > 0.7 (F3 caution zone)",
   };
   return map[blocker] ?? blocker.replace(/_/g, " ").toLowerCase();
 }

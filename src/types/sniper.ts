@@ -17,6 +17,7 @@ export type EngineBlocker =
   | "CANDLES_STALE"
   | "INSUFFICIENT_CANDLE_HISTORY"
   | "READY_NOT_CONFIRMED_STALE_DATA"
+  | "CHOP_GATE_BLOCKED"
   | "OK";
 
 export interface SymbolDiagnostic {
