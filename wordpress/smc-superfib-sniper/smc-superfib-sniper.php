@@ -229,6 +229,7 @@ final class SMC_SuperFib_Sniper_REST {
         $this->route('/user/watchlist/remove', WP_REST_Server::CREATABLE, 'post_watchlist_remove', true);
         $this->route('/instruments', WP_REST_Server::READABLE, 'get_instruments', true);
         $this->route('/market-data-authority', WP_REST_Server::READABLE, 'get_market_data_authority', true);
+        $this->route('/authority-diagnostics', WP_REST_Server::READABLE, 'get_authority_diagnostics', true);
     }
 
     private function route($path, $methods, $callback, $auth_required) {
@@ -790,6 +791,44 @@ final class SMC_SuperFib_Sniper_REST {
             $result[$sym] = $svc->get_authority_state($user_id, $sym);
         }
         return rest_ensure_response($result);
+    }
+
+    public function get_authority_diagnostics(WP_REST_Request $request) {
+        $user_id = get_current_user_id();
+        $symbol  = strtoupper(sanitize_text_field($request->get_param('symbol') ?: ''));
+
+        if (!$symbol) {
+            return new WP_REST_Response(array('error' => 'symbol required'), 400);
+        }
+
+        global $wpdb;
+        $row = $wpdb->get_row($wpdb->prepare(
+            "SELECT source, updated_at FROM {$this->table('snapshots')} WHERE user_id = %d AND symbol = %s",
+            $user_id,
+            $symbol
+        ));
+
+        if (!$row) {
+            return rest_ensure_response(array(
+                'symbol' => $symbol,
+                'authority' => 'unavailable',
+                'authorityAgeSec' => null,
+                'lastUpdateTime' => null,
+            ));
+        }
+
+        $now_ts = strtotime($this->now_mysql());
+        $update_ts = strtotime($row->updated_at);
+        $age_sec = max(0, $now_ts - $update_ts);
+
+        return rest_ensure_response(array(
+            'symbol' => $symbol,
+            'authority' => $row->source,  // 'mt5', 'twelve-data', or 'unavailable'
+            'authorityAgeSec' => $age_sec,
+            'lastUpdateTime' => $this->to_iso($row->updated_at),
+            'authorityStale' => ($row->source === 'mt5' && $age_sec >= 60),
+            'willFallbackToTD' => ($row->source === 'mt5' && $age_sec >= 60),
+        ));
     }
 
     public function get_regimes() {
@@ -1763,15 +1802,34 @@ final class SMC_SuperFib_Sniper_REST {
             }
         }
 
-        $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT candle_time, open, high, low, close FROM {$this->table('candles')} WHERE user_id = %d AND symbol = %s AND timeframe = %s ORDER BY candle_time DESC LIMIT %d",
+        // HARDENING: Fetch source alongside candle data for MT5 prioritization
+        $all_candles = $wpdb->get_results($wpdb->prepare(
+            "SELECT candle_time, open, high, low, close, source FROM {$this->table('candles')} WHERE user_id = %d AND symbol = %s AND timeframe = %s ORDER BY candle_time DESC",
             $user_id,
             $symbol,
-            $timeframe,
-            $outputsize
+            $timeframe
         ), ARRAY_A);
 
+        // Deduplicate by candle_time, preferring MT5 over TwelveData
+        $deduped = array();
+        foreach ($all_candles as $candle) {
+            $time_key = $candle['candle_time'];
+            if (!isset($deduped[$time_key])) {
+                // First occurrence: store it
+                $deduped[$time_key] = $candle;
+            } elseif ($candle['source'] === 'mt5' && $deduped[$time_key]['source'] !== 'mt5') {
+                // Replace with MT5 if current is higher-priority source
+                $deduped[$time_key] = $candle;
+            }
+            // Otherwise: keep existing (MT5 preferred, or existing is already MT5)
+        }
+
+        // Take top N candles (by most recent timestamps)
+        $rows = array_slice($deduped, 0, $outputsize);
+        
+        // Reverse to chronological order (oldest to newest)
         $rows = array_reverse($rows);
+        
         return array_map(function ($row) {
             return array(
                 'time' => $this->to_iso($row['candle_time']),
