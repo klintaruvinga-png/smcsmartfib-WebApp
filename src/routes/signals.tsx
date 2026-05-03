@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEngineHealth, useEngineBatch, useLiveSignals } from "@/hooks/useSniperData";
+import { useEngineHealth, useEngineBatch, useLiveSignals, useWatchlist } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { VerdictBadge } from "@/components/sniper/VerdictBadge";
 import { DivergenceBanner } from "@/components/sniper/Warnings";
 import { relTime } from "@/lib/format";
 import { cn, deduplicateById } from "@/lib/utils";
 import { CheckCircle2, AlertTriangle, XCircle, RefreshCw } from "lucide-react";
+import { useState } from "react";
 import type { EngineBlocker, FreshnessState } from "@/types/sniper";
 
 export const Route = createFileRoute("/signals")({
@@ -44,9 +45,15 @@ function SignalsPage() {
   const { data: signals } = useLiveSignals();
   const { data: h } = useEngineHealth();
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
-  
-  const uniqueSignals = signals ? deduplicateById(signals) : [];
-  
+  const watchlist = useWatchlist();
+  const [watchlistOnly, setWatchlistOnly] = useState(true);
+
+  const allUnique = signals ? deduplicateById(signals) : [];
+  const uniqueSignals =
+    watchlistOnly && watchlist.length > 0
+      ? allUnique.filter((s) => watchlist.includes(s.symbol))
+      : allUnique;
+
   const divergent = uniqueSignals.filter(
     (s) => s.computedBy === "frontend" && !s.backendConfirmed,
   );
@@ -137,7 +144,26 @@ function SignalsPage() {
           <div className="text-[11px] font-mono uppercase tracking-wider text-mute">
             Live candidates
           </div>
-          <span className="text-[10px] font-mono text-mute">{uniqueSignals?.length ?? 0} total</span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setWatchlistOnly((v) => !v)}
+              className={cn(
+                "text-[10px] font-mono px-2 py-0.5 rounded border transition-colors",
+                watchlistOnly
+                  ? "border-info/40 text-info bg-info/10"
+                  : "border-bd text-mute hover:border-info/30 hover:text-info",
+              )}
+            >
+              {watchlistOnly ? "watchlist" : "all symbols"}
+            </button>
+            <span className="text-[10px] font-mono text-mute">
+              {uniqueSignals.length}
+              {watchlistOnly && allUnique.length !== uniqueSignals.length && (
+                <span className="text-mute/50"> / {allUnique.length}</span>
+              )}{" "}
+              total
+            </span>
+          </div>
         </div>
         <div className="divide-y divide-bd">
           {(uniqueSignals ?? []).map((s) => {
