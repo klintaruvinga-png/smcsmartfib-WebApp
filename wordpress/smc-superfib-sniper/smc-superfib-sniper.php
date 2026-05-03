@@ -1443,17 +1443,6 @@ final class SMC_SuperFib_Sniper_REST {
         return array(substr($key, 0, 3), substr($key, 3, 3));
     }
 
-    private function get_tp_price_from_zone($zone_price, $direction) {
-        // Ported from Pine: basic implementation using EF levels
-        // Assume zone_price is the high/low, and TP is offset
-        $offset = 0.002; // Placeholder
-        if ($direction === 'LONG') {
-            return $zone_price + $offset;
-        } else {
-            return $zone_price - $offset;
-        }
-    }
-
     private function sequence_state($candles) {
         $prior = array_slice($candles, -35, 25);
         $recent = array_slice($candles, -10);
@@ -1641,22 +1630,32 @@ final class SMC_SuperFib_Sniper_REST {
                                 continue;
                             }
                             $time = gmdate('Y-m-d H:i:s', strtotime($item['datetime']));
-                            $wpdb->replace(
-                                $this->table('candles'),
-                                array(
-                                    'user_id' => $user_id,
-                                    'symbol' => $symbol,
-                                    'timeframe' => $timeframe,
-                                    'candle_time' => $time,
-                                    'open' => (float) $item['open'],
-                                    'high' => (float) $item['high'],
-                                    'low' => (float) $item['low'],
-                                    'close' => (float) $item['close'],
-                                    'volume' => isset($item['volume']) ? (string) $item['volume'] : null,
-                                    'created_at' => $this->now_mysql(),
-                                ),
-                                array('%d', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%s', '%s')
-                            );
+                            // HARDENING: INSERT … ON DUPLICATE KEY UPDATE instead of REPLACE so
+                            // that MT5-authoritative candles (source='mt5') are never silently
+                            // overwritten. REPLACE deletes then re-inserts, erasing the source flag.
+                            $wpdb->query($wpdb->prepare(
+                                "INSERT INTO `{$this->table('candles')}`
+                                     (user_id, symbol, timeframe, candle_time, open, high, low, close, volume, source, created_at)
+                                 VALUES (%d, %s, %s, %s, %f, %f, %f, %f, %s, 'twelve-data', %s)
+                                 ON DUPLICATE KEY UPDATE
+                                     open       = IF(source = 'mt5', open,       VALUES(open)),
+                                     high       = IF(source = 'mt5', high,       VALUES(high)),
+                                     low        = IF(source = 'mt5', low,        VALUES(low)),
+                                     close      = IF(source = 'mt5', close,      VALUES(close)),
+                                     volume     = IF(source = 'mt5', volume,     VALUES(volume)),
+                                     source     = IF(source = 'mt5', 'mt5',      'twelve-data'),
+                                     created_at = IF(source = 'mt5', created_at, VALUES(created_at))",
+                                $user_id,
+                                $symbol,
+                                $timeframe,
+                                $time,
+                                (float) $item['open'],
+                                (float) $item['high'],
+                                (float) $item['low'],
+                                (float) $item['close'],
+                                isset($item['volume']) ? (string) $item['volume'] : null,
+                                $this->now_mysql()
+                            ));
                         }
                         // Mark candles as freshly fetched for 90 seconds to prevent API spam.
                         set_transient($candle_ttl_key, 1, 90);
@@ -2374,6 +2373,24 @@ final class SMC_SuperFib_Sniper_REST {
         }
         $ts = strtotime((string) $iso_time);
         return $ts !== false ? (time() - $ts) : PHP_INT_MAX;
+    }
+
+    /**
+     * Parse an MT5 timestamp (YYYY.MM.DD HH:MM:SS) or ISO 8601 string into MySQL format.
+     * MQL5's TimeToString(TIME_DATE|TIME_SECONDS) produces "YYYY.MM.DD HH:MM:SS" which
+     * PHP strtotime() does not reliably handle — replace dots with dashes before parsing.
+     */
+    private function parse_mt5_timestamp($raw) {
+        if (!$raw) {
+            return $this->now_mysql();
+        }
+        $s = trim((string) $raw);
+        // Convert MT5 dot-date format: "2024.01.15 10:30:45" → "2024-01-15 10:30:45"
+        if (preg_match('/^\d{4}\.\d{2}\.\d{2}[ T]\d{2}:\d{2}:\d{2}/', $s)) {
+            $s = preg_replace('/^(\d{4})\.(\d{2})\.(\d{2})/', '$1-$2-$3', $s);
+        }
+        $ts = strtotime($s);
+        return $ts !== false ? gmdate('Y-m-d H:i:s', $ts) : $this->now_mysql();
     }
 
     private function timeframe_seconds($timeframe) {
