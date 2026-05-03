@@ -33,7 +33,13 @@ final class SMC_SuperFib_Sniper_REST {
             if (!$origin) {
                 return;
             }
-            $allowed = apply_filters('smc_sf_allowed_origins', array(home_url(), 'https://trader.stokvelsociety.co.za', 'https://smcsuperfibwebapp.klintaruvinga.workers.dev', 'https://smcsmartfib.lovable.app'));
+            $allowed = apply_filters('smc_sf_allowed_origins', array(
+                home_url(),
+                'https://trader.stokvelsociety.co.za',
+                'https://smcsuperfibwebapp.klintaruvinga.workers.dev',
+                'https://smcsmartfib.lovable.app',
+                'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
+            ));
             if (!self::is_allowed_origin($origin, $allowed)) {
                 return;
             }
@@ -235,9 +241,9 @@ final class SMC_SuperFib_Sniper_REST {
         if (in_array(untrailingslashit($origin), array_map('untrailingslashit', $allowed), true)) {
             return true;
         }
-        // Allow any Lovable project-preview subdomain (UUID.lovableproject.com).
+        // Allow any Lovable preview host used by the dashboard.
         $host = wp_parse_url($origin, PHP_URL_HOST);
-        return $host && (bool) preg_match('/^[0-9a-f\-]+\.lovableproject\.com$/', $host);
+        return $host && (bool) preg_match('/^(?:[0-9a-f\-]+\.lovableproject\.com|id-preview--[0-9a-z\-]+\.lovable\.app)$/', $host);
     }
 
     public function send_cors_headers($served, $result, $request, $server) {
@@ -250,7 +256,13 @@ final class SMC_SuperFib_Sniper_REST {
             return $served;
         }
 
-        $allowed = apply_filters('smc_sf_allowed_origins', array(home_url(), 'https://trader.stokvelsociety.co.za', 'https://smcsuperfibwebapp.klintaruvinga.workers.dev', 'https://smcsmartfib.lovable.app'));
+        $allowed = apply_filters('smc_sf_allowed_origins', array(
+            home_url(),
+            'https://trader.stokvelsociety.co.za',
+            'https://smcsuperfibwebapp.klintaruvinga.workers.dev',
+            'https://smcsmartfib.lovable.app',
+            'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
+        ));
         if (self::is_allowed_origin($origin, $allowed)) {
             header('Access-Control-Allow-Origin: ' . $origin);
             header('Access-Control-Allow-Credentials: true');
