@@ -91,23 +91,34 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
 
   const url = `${backendUrl.replace(/\/$/, "")}/sniper/v1${path}`;
 
-  const res = await fetch(url, {
-    method: opts.method ?? "GET",
-    headers,
-    credentials: opts.authenticated === false ? "omit" : "include",
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-  });
+  try {
+    const res = await fetch(url, {
+      method: opts.method ?? "GET",
+      headers,
+      credentials: opts.authenticated === false ? "omit" : "include",
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    });
 
-  if (res.status === 401) {
-    clearCredentials();
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("smc:auth-required"));
+    if (res.status === 401) {
+      clearCredentials();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("smc:auth-required"));
+      }
+      throw new AuthError();
     }
-    throw new AuthError();
-  }
 
-  if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
-  return (await res.json()) as T;
+    if (!res.ok) {
+      const errorBody = await res.text();
+      throw new Error(`API ${path} failed: ${res.status}${errorBody ? ` - ${errorBody}` : ""}`);
+    }
+    
+    return (await res.json()) as T;
+  } catch (error) {
+    // CRITICAL: Never swallow errors. Log and rethrow so consumers can handle properly.
+    if (error instanceof AuthError) throw error;
+    if (error instanceof Error) throw error;
+    throw new Error(`API ${path} failed: ${String(error)}`);
+  }
 }
 
 // ──────────────── Public / shared ────────────────

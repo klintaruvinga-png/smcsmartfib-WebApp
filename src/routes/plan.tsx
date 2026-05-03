@@ -33,10 +33,14 @@ function PlanPage() {
   const { data: ladders, isLoading: laddersLoading } = useLadders();
   
   const VERDICT_RANK: Record<string, number> = { "A+": 4, A: 3, B: 2, C: 1 };
+  // CRITICAL: Deduplicate signals by ID AND filter to backend-confirmed only.
+  // Frontend-only signals cannot be executed (backendConfirmed must be true).
   const uniqueSignals = signals
-    ? deduplicateById(signals).sort(
-        (a, b) => (VERDICT_RANK[b.verdict] ?? 0) - (VERDICT_RANK[a.verdict] ?? 0),
-      )
+    ? deduplicateById(signals)
+        .filter((s) => s.backendConfirmed) // Only backend-confirmed signals
+        .sort(
+          (a, b) => (VERDICT_RANK[b.verdict] ?? 0) - (VERDICT_RANK[a.verdict] ?? 0),
+        )
     : undefined;
 
   const top =
