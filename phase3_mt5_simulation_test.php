@@ -101,18 +101,25 @@ if (function_exists('curl_init')) {
     // Try curl.exe first (Windows 10 1803+ ships it in System32)
     exec('curl.exe --version 2>NUL', $ver_out, $ver_ret);
     if ($ver_ret === 0) {
-        $cmd = "curl.exe -s -o - -w \"\n__HTTP_CODE__:%{http_code}\" "
+        // Write body to a temp file to avoid shell quoting issues with JSON on Windows
+        $tmp = tempnam(sys_get_temp_dir(), 'mt5_') . '.json';
+        file_put_contents($tmp, $json_body);
+        $escaped_tmp = escapeshellarg($tmp);
+
+        // Use a safe sentinel with no newline so cmd.exe doesn't split the command
+        $cmd = "curl.exe -s -o - -w \"__HTTP_CODE__:%{http_code}\" "
              . "-X POST $escaped_url "
              . "-H \"Content-Type: application/json\" "
              . "-H $escaped_auth "
-             . "--data $escaped_body "
+             . "--data @$escaped_tmp "
              . "--insecure";
         exec($cmd, $out, $ret);
+        @unlink($tmp);
         $raw       = implode("\n", $out);
         $http_code = 0;
         if (preg_match('#__HTTP_CODE__:(\d+)$#', $raw, $m)) {
             $http_code = (int) $m[1];
-            $response  = preg_replace('#\n__HTTP_CODE__:\d+$#', '', $raw);
+            $response  = preg_replace('#__HTTP_CODE__:\d+$#', '', $raw);
         } else {
             $response = $raw;
         }
