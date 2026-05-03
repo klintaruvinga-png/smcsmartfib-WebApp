@@ -78,7 +78,12 @@ public:
     // Call from EA OnTimer() — typically every 5–30 seconds
     void OnPeriodic()
     {
-        freshnessEngine.UpdatePeriodic();
+        // HARDENING: Refresh session with wall-clock time on every periodic call so
+        // IsMarketOpen() stays accurate even when no ticks arrive (e.g. market closure).
+        sessionManager.UpdateSession(TimeCurrent());
+        // Pass session open state so FreshnessEngine can set CLOSED instead of
+        // aging into STALE during weekends/holidays.
+        freshnessEngine.UpdatePeriodic(sessionManager.IsMarketOpen());
 
         // Push a snapshot to the backend for every registered symbol
         if (StringLen(webhookUrl) == 0)
@@ -151,14 +156,16 @@ public:
             json += "\"ask\":"       + DoubleToString(tick.ask, 8) + ",";
             json += "\"spread\":"    + DoubleToString(tick.spread, 5) + ",";
             json += "\"volume\":"    + IntegerToString(tick.volume) + ",";
-            json += "\"timestamp\":\"" + TimeToString(tick.timestamp, TIME_DATE | TIME_SECONDS) + "\"";
+            // HARDENING: Use ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ) instead of MT5's
+            // dot-format (YYYY.MM.DD HH:MM:SS) which PHP strtotime() cannot reliably parse.
+            json += "\"timestamp\":\"" + TimeToIso8601(tick.timestamp) + "\"";
             json += "}";
         }
 
         if (hasCandle && candleBuilder.ValidateCandle(candle))
         {
             json += ",\"candle_m1\":{";
-            json += "\"timestamp\":\"" + TimeToString(candle.time, TIME_DATE | TIME_SECONDS) + "\",";
+            json += "\"timestamp\":\"" + TimeToIso8601(candle.time) + "\",";
             json += "\"open\":"   + DoubleToString(candle.open,  8) + ",";
             json += "\"high\":"   + DoubleToString(candle.high,  8) + ",";
             json += "\"low\":"    + DoubleToString(candle.low,   8) + ",";
@@ -195,6 +202,18 @@ public:
     }
 
 private:
+    // Convert a datetime to ISO 8601 string (YYYY-MM-DDTHH:MM:SSZ).
+    // MQL5's TimeToString produces "YYYY.MM.DD HH:MM:SS" which PHP strtotime()
+    // does not reliably parse; ISO 8601 is unambiguous and portable.
+    string TimeToIso8601(datetime t)
+    {
+        MqlDateTime dt;
+        TimeToStruct(t, dt);
+        return StringFormat("%04d-%02d-%02dT%02d:%02d:%02dZ",
+                            dt.year, dt.mon, dt.day,
+                            dt.hour, dt.min, dt.sec);
+    }
+
     string FreshnessStateName(ENUM_FRESHNESS_STATE state)
     {
         switch (state)

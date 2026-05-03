@@ -62,7 +62,11 @@ public:
             currentCandles[index].low = tick.bid;
             currentCandles[index].close = tick.bid;
             currentCandles[index].tick_volume = tick.volume;
-            currentCandles[index].spread = (int)((tick.ask - tick.bid) * 100000);  // Assuming 5-digit
+            // HARDENING: Use SymbolInfoInteger for the correct point multiplier instead of
+            // a hardcoded 100000 (5-digit assumption). JPY pairs and metals use different
+            // point values; the hardcoded multiplier produces meaningless spread figures.
+            double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+            currentCandles[index].spread = (point > 0) ? (int)MathRound((tick.ask - tick.bid) / point) : 0;
             currentCandles[index].real_volume = 0;
 
             lastCandleTime[index] = candleTime;
