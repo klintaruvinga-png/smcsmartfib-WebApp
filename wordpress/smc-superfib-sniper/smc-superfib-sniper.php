@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-require_once plugin_dir_path(__FILE__) . 'class-market-data-service.php';
+require_once __DIR__ . '/class-market-data-service.php';
 
 final class SMC_SuperFib_Sniper_REST {
     const VERSION = '1.0.0';
@@ -23,7 +23,6 @@ final class SMC_SuperFib_Sniper_REST {
         $instance = new self();
         add_action('rest_api_init', array($instance, 'register_routes'));
         add_filter('rest_pre_serve_request', array($instance, 'send_cors_headers'), 10, 4);
-        register_activation_hook(__FILE__, array(__CLASS__, 'activate'));
 
         // Respond to CORS preflight (OPTIONS) requests before WordPress processes them.
         // Without this, the browser's preflight check silently fails and blocks POST/DELETE.
@@ -37,10 +36,10 @@ final class SMC_SuperFib_Sniper_REST {
             }
             $allowed = apply_filters('smc_sf_allowed_origins', array(
                 home_url(),
-                'https://trader.stokvelsociety.co.za',
-                'https://smcsuperfibwebapp.klintaruvinga.workers.dev',
-                'https://smcsmartfib.lovable.app',
-                'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
+                'trader.stokvelsociety.co.za',
+                'smcsuperfibwebapp.klintaruvinga.workers.dev',
+                'smcsmartfib.lovable.app',
+                'id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
             ));
             if (!self::is_allowed_origin($origin, $allowed)) {
                 return;
@@ -2500,4 +2499,6 @@ final class SMC_SuperFib_Sniper_REST {
     }
 }
 
-SMC_SuperFib_Sniper_REST::boot();
+register_activation_hook(__FILE__, array('SMC_SuperFib_Sniper_REST', 'activate'));
+
+add_action('plugins_loaded', array('SMC_SuperFib_Sniper_REST', 'boot'));
