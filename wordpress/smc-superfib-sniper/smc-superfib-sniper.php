@@ -1575,20 +1575,33 @@ final class SMC_SuperFib_Sniper_REST {
             'state' => 'live',
         );
 
-        $wpdb->replace(
-            $this->table('snapshots'),
-            array(
-                'user_id' => $user_id,
-                'symbol' => $symbol,
-                'bid' => $bid,
-                'ask' => $ask,
-                'mid' => $mid,
-                'change_pct_1d' => $row['changePct1d'],
-                'state' => 'live',
-                'updated_at' => $this->now_mysql(),
-            ),
-            array('%d', '%s', '%f', '%f', '%f', '%f', '%s', '%s')
-        );
+        // MT5 is the authoritative real-time source. If the row was written by MT5 within
+        // the last 60 seconds, skip the twelve-data overwrite so live EA prices persist.
+        $existing = $wpdb->get_row( $wpdb->prepare(
+            "SELECT source, updated_at FROM {$this->table('snapshots')} WHERE user_id = %d AND symbol = %s",
+            $user_id, $symbol
+        ) );
+        $mt5_is_fresh = $existing
+            && $existing->source === 'mt5'
+            && (strtotime($this->now_mysql()) - strtotime($existing->updated_at)) < 60;
+
+        if ( ! $mt5_is_fresh ) {
+            $wpdb->replace(
+                $this->table('snapshots'),
+                array(
+                    'user_id'       => $user_id,
+                    'symbol'        => $symbol,
+                    'bid'           => $bid,
+                    'ask'           => $ask,
+                    'mid'           => $mid,
+                    'change_pct_1d' => $row['changePct1d'],
+                    'source'        => 'twelve-data',
+                    'state'         => 'live',
+                    'updated_at'    => $this->now_mysql(),
+                ),
+                array('%d', '%s', '%f', '%f', '%f', '%f', '%s', '%s', '%s')
+            );
+        }
 
         // Mark this symbol's quote as freshly fetched for 45 seconds to prevent API spam.
         set_transient($quote_ttl_key, 1, 45);
