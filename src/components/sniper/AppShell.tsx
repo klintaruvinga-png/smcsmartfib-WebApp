@@ -71,7 +71,7 @@ function HeaderChips() {
   const { data: session } = useSession();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const syncState = health?.backendSync ?? snap?.prices?.[0]?.state ?? "offline";Z
+  const syncState = health?.backendSync ?? snap?.prices?.[0]?.state ?? "offline";
   const counts = useMemo(() => {
     const unique = deduplicateById(signals ?? []);
     return {
@@ -100,13 +100,6 @@ function HeaderChips() {
       )}
       <SyncChip state={syncState} />
       <SignalStatusChip {...counts} />
-      {session?.name && (
-        <div className="inline-flex items-center rounded-md border border-bd bg-bg2/60 px-2.5 py-1.5">
-          <span className="text-[10px] font-semibold tracking-wider text-mute font-mono">
-            {session.name}
-          </span>
-        </div>
-      )}
       <button
         onClick={() => void handleRefresh()}
         disabled={isRefreshing}
