@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient, setBackendUrl } from "@/lib/api/sniperClient";
-import type { Symbol } from "@/types/sniper";
+import type { Symbol, SymbolDiagnostic, TradePlan } from "@/types/sniper";
 
 const DEFAULT_POLL_MS = 15_000;
 
@@ -122,24 +122,27 @@ export function useUserRiskProfile() {
 export function useLadders() {
   const backendReady = useBackendReady();
   const pollMs = usePollMs();
-  return useQuery({
+  const enabled = backendReady && pollMs !== null;
+  return useQuery<TradePlan[]>({
     queryKey: ["ladders"],
     queryFn: () => apiClient.getLadders(),
-    enabled: backendReady,
-    refetchInterval: pollMs,
+    enabled,
+    refetchInterval: pollMs ?? false,
   });
 }
 
 /** Trigger a forced backend market-data refresh + engine run, then invalidate all dependent queries. */
 export function useEngineBatch() {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (symbols?: Symbol[]) => apiClient.postEngineBatch(symbols),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["snapshot"] });
-      queryClient.invalidateQueries({ queryKey: ["live-signals"] });
-      queryClient.invalidateQueries({ queryKey: ["engine-health"] });
-      queryClient.invalidateQueries({ queryKey: ["ladders"] });
+  return useMutation<{ ok: boolean; diagnostics: SymbolDiagnostic[] }, Error, Symbol[] | undefined>(
+    {
+      mutationFn: (symbols) => apiClient.postEngineBatch(symbols),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["snapshot"] });
+        queryClient.invalidateQueries({ queryKey: ["live-signals"] });
+        queryClient.invalidateQueries({ queryKey: ["engine-health"] });
+        queryClient.invalidateQueries({ queryKey: ["ladders"] });
+      },
     },
-  });
+  );
 }

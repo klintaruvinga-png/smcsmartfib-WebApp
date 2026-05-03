@@ -116,6 +116,7 @@ Search for:
 - Dashboard render paths with no upstream source
 - Missing subscriptions
 - Unreachable code branches
+- Plan section layout/parity regression: hero candidate card, backend blueprint badge, entries/targets/stop-risk panels, and execution CTA should render consistently with mock control
 
 ### PASS 3 — Data Contract Verification
 
