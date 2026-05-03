@@ -10,6 +10,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+require_once plugin_dir_path(__FILE__) . 'class-market-data-service.php';
+
 final class SMC_SuperFib_Sniper_REST {
     const VERSION = '1.0.0';
     const NAMESPACE = 'sniper/v1';
@@ -89,6 +91,7 @@ final class SMC_SuperFib_Sniper_REST {
             low DECIMAL(20,8) NOT NULL,
             close DECIMAL(20,8) NOT NULL,
             volume DECIMAL(24,8) NULL,
+            source VARCHAR(20) NOT NULL DEFAULT 'twelve-data',
             created_at DATETIME NOT NULL,
             PRIMARY KEY  (id),
             UNIQUE KEY candle_lookup (user_id, symbol, timeframe, candle_time),
@@ -101,7 +104,9 @@ final class SMC_SuperFib_Sniper_REST {
             bid DECIMAL(20,8) NOT NULL DEFAULT 0,
             ask DECIMAL(20,8) NOT NULL DEFAULT 0,
             mid DECIMAL(20,8) NOT NULL DEFAULT 0,
+            spread INT NOT NULL DEFAULT 0,
             change_pct_1d DECIMAL(12,6) NOT NULL DEFAULT 0,
+            source VARCHAR(20) NOT NULL DEFAULT 'twelve-data',
             state VARCHAR(32) NOT NULL DEFAULT 'offline',
             updated_at DATETIME NOT NULL,
             PRIMARY KEY  (user_id, symbol)
@@ -219,6 +224,7 @@ final class SMC_SuperFib_Sniper_REST {
         $this->route('/user/watchlist/add', WP_REST_Server::CREATABLE, 'post_watchlist_add', true);
         $this->route('/user/watchlist/remove', WP_REST_Server::CREATABLE, 'post_watchlist_remove', true);
         $this->route('/instruments', WP_REST_Server::READABLE, 'get_instruments', true);
+        $this->route('/market-data-authority', WP_REST_Server::READABLE, 'get_market_data_authority', true);
     }
 
     private function route($path, $methods, $callback, $auth_required) {
@@ -611,7 +617,7 @@ final class SMC_SuperFib_Sniper_REST {
         $payload = $request->get_json_params();
 
         if (!is_array($payload) || !isset($payload['symbol'])) {
-            return rest_ensure_response(array('error' => 'Invalid payload'), 400);
+            return new WP_REST_Response(array('error' => 'Invalid payload'), 400);
         }
 
         $symbol = strtoupper(sanitize_text_field($payload['symbol']));
@@ -638,9 +644,10 @@ final class SMC_SuperFib_Sniper_REST {
                     'mid' => $mid,
                     'spread' => $spread,
                     'change_pct_1d' => $changePct1d,
+                    'source' => 'mt5',
                     'updated_at' => $this->now_mysql(),
                 ),
-                array('%d', '%s', '%f', '%f', '%f', '%d', '%f', '%s')
+                array('%d', '%s', '%f', '%f', '%f', '%d', '%f', '%s', '%s')
             );
         }
 
@@ -661,9 +668,10 @@ final class SMC_SuperFib_Sniper_REST {
                     'low' => (float) $candle['low'],
                     'close' => (float) $candle['close'],
                     'volume' => isset($candle['volume']) ? (string) $candle['volume'] : null,
+                    'source' => 'mt5',
                     'created_at' => $this->now_mysql(),
                 ),
-                array('%d', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%s', '%s')
+                array('%d', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%s', '%s', '%s')
             );
         }
 
@@ -691,6 +699,26 @@ final class SMC_SuperFib_Sniper_REST {
         ));
 
         return rest_ensure_response(array('ok' => true));
+    }
+
+    public function get_market_data_authority(WP_REST_Request $request) {
+        $user_id = get_current_user_id();
+        $symbol  = strtoupper(sanitize_text_field($request->get_param('symbol') ?: ''));
+
+        $svc = new SMC_MarketData_Service();
+
+        if ($symbol) {
+            return rest_ensure_response($svc->get_authority_state($user_id, $symbol));
+        }
+
+        // No symbol supplied — return authority state for all watched symbols.
+        $snapshot = $this->ensure_engine_snapshot($user_id);
+        $watched  = array_column($snapshot['symbols'] ?? array(), 'symbol');
+        $result   = array();
+        foreach ($watched as $sym) {
+            $result[$sym] = $svc->get_authority_state($user_id, $sym);
+        }
+        return rest_ensure_response($result);
     }
 
     public function get_regimes() {
