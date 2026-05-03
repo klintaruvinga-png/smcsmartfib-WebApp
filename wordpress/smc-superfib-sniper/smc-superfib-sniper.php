@@ -637,6 +637,7 @@ final class SMC_SuperFib_Sniper_REST {
             $ask = isset($tick['ask']) ? (float) $tick['ask'] : 0;
             $spread = isset($tick['spread']) ? (int) $tick['spread'] : 0;
             $timestamp_mysql = $this->normalize_market_timestamp(isset($tick['timestamp']) ? $tick['timestamp'] : null, $this->now_mysql());
+            $tick_snapshot_state = $freshness_raw !== '' ? $snapshot_state : 'live';
 
             $mid = ($bid + $ask) / 2;
             $changePct1d = 0; // Placeholder, could be calculated from historical data
@@ -652,7 +653,7 @@ final class SMC_SuperFib_Sniper_REST {
                     'spread' => $spread,
                     'change_pct_1d' => $changePct1d,
                     'source' => 'mt5',
-                    'state' => $snapshot_state,
+                    'state' => $tick_snapshot_state,
                     'updated_at' => $timestamp_mysql,
                 ),
                 array('%d', '%s', '%f', '%f', '%f', '%d', '%f', '%s', '%s', '%s')

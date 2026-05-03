@@ -449,6 +449,23 @@ $snapshotRow = $wpdb->tables[$snapshotTable]['7|EURUSD'] ?? null;
 assert_same('offline', $snapshotRow['state'], 'State-only MT5 update must degrade snapshot state');
 assert_same('2026-05-03 08:15:30', $snapshotRow['updated_at'], 'State-only MT5 update must not rewrite quote timestamp');
 
+$tickWithoutFreshness = $instance->post_snapshot(new WP_REST_Request(array(
+    'symbol' => 'EURUSD',
+    'normalized_symbol' => 'EURUSD',
+    'tick' => array(
+        'bid' => 1.1020,
+        'ask' => 1.1022,
+        'spread' => 2,
+        'timestamp' => '2026-05-03T08:16:30Z',
+    ),
+    'session' => 'London',
+)));
+
+assert_true(is_array($tickWithoutFreshness) && !empty($tickWithoutFreshness['ok']), 'Tick-only MT5 update should succeed');
+$snapshotRow = $wpdb->tables[$snapshotTable]['7|EURUSD'] ?? null;
+assert_same('live', $snapshotRow['state'], 'Tick-only MT5 update must default to live when freshness is omitted');
+assert_same('2026-05-03 08:16:30', $snapshotRow['updated_at'], 'Tick-only MT5 update must persist the new quote timestamp');
+
 $wpdb->replace($snapshotTable, array(
     'user_id' => 7,
     'symbol' => 'USDJPY',
