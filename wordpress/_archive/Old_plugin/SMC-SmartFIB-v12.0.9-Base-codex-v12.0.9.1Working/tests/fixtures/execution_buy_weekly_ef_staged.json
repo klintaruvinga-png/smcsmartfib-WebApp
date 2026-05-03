@@ -1,63 +1,87 @@
 {
-  "name": "execution_buy_weekly_ef_staged",
-  "kind": "execution",
-  "pair": "GBP/USD",
-  "options": {
-    "tfSeconds": 14400,
-    "pipType": "USD",
-    "sessionTf": "Weekly"
-  },
-  "candles": [],
-  "executionSignal": {
+    "name": "execution_buy_weekly_ef_staged",
+    "kind": "execution",
     "pair": "GBP/USD",
-    "direction": "BUY",
-    "entry_zone_label": "EF 62.5%",
-    "entry_zone_price": 1.215,
-    "entry_source": "EF",
-    "signal_state": "ACTIVE",
-    "sequence_status": "READY",
-    "final_bias": "BULL_EXP",
-    "gate": "BUY",
-    "gate_reason": "BIAS_ALIGNED",
-    "regime": "TREND UP",
-    "fib_timeframe": "Weekly",
-    "session_tf": "Weekly",
-    "matrix": { "matrix_state": "DISCOUNT" },
-    "pd_array": { "pd_array_dir": 1 },
-    "chop_band": { "low": 1.18, "high": 1.185 },
-    "setup_class": "A",
-    "confluence_score": 84,
-    "ede_stars": 4,
-    "market_price": 1.221,
-    "tp1": 1.228,
-    "tp2": 1.232,
-    "sl_rule": "STAGE_EF_NEXT_LEVEL",
-    "entry_levels": [
-      { "stage": "E1", "price": 1.215, "source": "EF", "label": "EF 62.5%", "fib": "EF Range" },
-      { "stage": "E2", "price": 1.21, "source": "EF", "label": "EF 75%", "fib": "EF Range" },
-      { "stage": "E3", "price": 1.2, "source": "EF", "label": "EF 100%", "fib": "EF Range" }
-    ],
-    "sl_levels": [
-      { "stage": "E1", "sl_price": 1.2098, "rule": "EF_NEXT_LEVEL", "level_label": "EF 75%", "level_price": 1.21 },
-      { "stage": "E2", "sl_price": 1.1998, "rule": "EF_NEXT_LEVEL", "level_label": "EF 100%", "level_price": 1.2 },
-      { "stage": "E3", "sl_price": 1.196, "rule": "LEGACY_BUFFER", "level_label": "", "level_price": null }
-    ],
-    "ef_tp_narrative_valid": true,
-    "signal_valid_bars": 10,
-    "bar_duration_seconds": 14400,
-    "signal_bar_time": 1717507800000
-  },
-  "expected": {
-    "entries": [1.215, 1.21, 1.2],
-    "stageSls": [1.2098, 1.1998, 1.196],
-    "sl": 1.2098,
-    "rr1": 2.5,
-    "rrActual": 2.5,
-    "entrySource": "EF",
-    "slRule": "STAGE_EF_NEXT_LEVEL",
-    "risk": {
-      "stageLots": [0.01, 0.01, 0.04],
-      "totalRiskUsc": 31.4
+    "options": {
+        "tfSeconds": 14400,
+        "pipType": "USD",
+        "sessionTf": "Weekly"
+    },
+    "candles": [],
+    "executionSignal": {
+        "pair": "GBP/USD",
+        "direction": "BUY",
+        "entry_zone_label": "EF 62.5%",
+        "entry_zone_price": 1.215,
+        "entry_source": "EF",
+        "signal_state": "ACTIVE",
+        "sequence_status": "READY",
+        "final_bias": "BULL_EXP",
+        "gate": "BUY",
+        "gate_reason": "BIAS_ALIGNED",
+        "regime": "TREND UP",
+        "fib_timeframe": "Weekly",
+        "session_tf": "Weekly",
+        "matrix": { "matrix_state": "DISCOUNT" },
+        "pd_array": { "pd_array_dir": 1 },
+        "chop_band": { "low": 1.18, "high": 1.185 },
+        "setup_class": "A",
+        "confluence_score": 84,
+        "ede_stars": 4,
+        "market_price": 1.221,
+        "tp1": 1.228,
+        "tp2": 1.232,
+        "sl_rule": "STAGE_EF_NEXT_LEVEL",
+        "entry_levels": [
+            {
+                "stage": "E1",
+                "price": 1.215,
+                "source": "EF",
+                "label": "EF 62.5%",
+                "fib": "EF Range"
+            },
+            { "stage": "E2", "price": 1.21, "source": "EF", "label": "EF 75%", "fib": "EF Range" },
+            { "stage": "E3", "price": 1.2, "source": "EF", "label": "EF 100%", "fib": "EF Range" }
+        ],
+        "sl_levels": [
+            {
+                "stage": "E1",
+                "sl_price": 1.2098,
+                "rule": "EF_NEXT_LEVEL",
+                "level_label": "EF 75%",
+                "level_price": 1.21
+            },
+            {
+                "stage": "E2",
+                "sl_price": 1.1998,
+                "rule": "EF_NEXT_LEVEL",
+                "level_label": "EF 100%",
+                "level_price": 1.2
+            },
+            {
+                "stage": "E3",
+                "sl_price": 1.196,
+                "rule": "LEGACY_BUFFER",
+                "level_label": "",
+                "level_price": null
+            }
+        ],
+        "ef_tp_narrative_valid": true,
+        "signal_valid_bars": 10,
+        "bar_duration_seconds": 14400,
+        "signal_bar_time": 1717507800000
+    },
+    "expected": {
+        "entries": [1.215, 1.21, 1.2],
+        "stageSls": [1.2098, 1.1998, 1.196],
+        "sl": 1.2098,
+        "rr1": 2.5,
+        "rrActual": 2.5,
+        "entrySource": "EF",
+        "slRule": "STAGE_EF_NEXT_LEVEL",
+        "risk": {
+            "stageLots": [0.01, 0.01, 0.04],
+            "totalRiskUsc": 31.4
+        }
     }
-  }
 }

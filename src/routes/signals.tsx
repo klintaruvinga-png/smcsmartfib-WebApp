@@ -1,5 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEngineHealth, useEngineBatch, useLiveSignals, useWatchlist } from "@/hooks/useSniperData";
+import {
+  useEngineHealth,
+  useEngineBatch,
+  useLiveSignals,
+  useWatchlist,
+} from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { VerdictBadge } from "@/components/sniper/VerdictBadge";
 import { DivergenceBanner } from "@/components/sniper/Warnings";
@@ -54,13 +59,12 @@ function SignalsPage() {
       ? allUnique.filter((s) => watchlist.includes(s.symbol))
       : allUnique;
 
-  const divergent = uniqueSignals.filter(
-    (s) => s.computedBy === "frontend" && !s.backendConfirmed,
-  );
+  const divergent = uniqueSignals.filter((s) => s.computedBy === "frontend" && !s.backendConfirmed);
 
   // feedStatus supersedes priceFeed when present; "rate-limited" is not a FreshnessState value.
   const rawFeedState = h?.feedStatus ?? h?.priceFeed ?? "offline";
-  const feedState: FreshnessState = rawFeedState === "rate-limited" ? "stale" : (rawFeedState as FreshnessState);
+  const feedState: FreshnessState =
+    rawFeedState === "rate-limited" ? "stale" : (rawFeedState as FreshnessState);
   const checks: { label: string; state: FreshnessState | "ok" | "missing"; detail?: string }[] = [
     {
       label: "Backend sync",
@@ -75,18 +79,20 @@ function SignalsPage() {
     {
       label: "Twelve Data key",
       state:
-        h?.twelveDataKeyStatus === "ok" || (!h?.twelveDataKeyStatus && h?.twelveDataKey === "present")
+        h?.twelveDataKeyStatus === "ok" ||
+        (!h?.twelveDataKeyStatus && h?.twelveDataKey === "present")
           ? "ok"
           : "missing",
       detail: h?.twelveDataKeyStatus ? h.twelveDataKeyStatus.replace("-", " ") : undefined,
     },
     {
       label: "Engine run",
-      state: h?.engineRunState === "live" || h?.engineRunState === "cached"
-        ? "live"
-        : h?.engineRunState === "stale"
-        ? "stale"
-        : "offline",
+      state:
+        h?.engineRunState === "live" || h?.engineRunState === "cached"
+          ? "live"
+          : h?.engineRunState === "stale"
+            ? "stale"
+            : "offline",
       detail: h?.engineRunState ?? (h?.lastEngineRunAt ? relTime(h.lastEngineRunAt) : "never"),
     },
   ];

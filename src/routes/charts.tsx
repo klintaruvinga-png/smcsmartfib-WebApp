@@ -154,7 +154,9 @@ function ChartsPage() {
               <div className="text-[10px] font-mono uppercase tracking-wider text-accent">
                 FIB {f.label}
               </div>
-              <div className="font-mono text-sm text-tx mt-0.5">{fmtPrice(f.price, activeSymbol)}</div>
+              <div className="font-mono text-sm text-tx mt-0.5">
+                {fmtPrice(f.price, activeSymbol)}
+              </div>
             </div>
           ))}
         </div>

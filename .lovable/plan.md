@@ -1,4 +1,3 @@
-
 # SMC SuperFIB Dashboard — Build Plan
 
 A standalone, mobile-first trading dashboard frontend that mirrors the SMC SuperFIB WordPress plugin. Ships with mock data and a typed REST client ready to point at `/wp-json/sniper/v1/...`.
@@ -25,17 +24,17 @@ Dark institutional fintech, mobile-first, dense but legible.
 
 Each is a TanStack route file, each declares its own `head()` meta.
 
-| Route       | Label              | Contents |
-|-------------|--------------------|----------|
-| `/plan`     | Signal Plan        | Selected `SignalCandidate` with verdict (A+/A/B/C), `TradePlan` panel: E1/E2/E3, SL, TP1/2/3 with R:R, lot sizing per stage, USC + ZAR risk, drawdown impact, confluence chips, `backend-blueprint` vs `frontend-preview` source badge, "Send to execution" button. |
-| `/live`     | Live Radar         | Per-pair card grid with `PairPrice`, `RegimeState`, `GateState`, chop bar, nearest fib, freshness badge, stale row warnings. |
-| `/signals`  | Signal Engine      | Engine readiness checklist (price feed, regime, gate, chop, fib, backend sync, Twelve Data key) + live `SignalCandidate` list with `computedBy`/`backendConfirmed` flags and divergence banner. |
-| `/charts`   | Charts             | Per-pair price + fib visualisation (Recharts line + horizontal fib levels). |
-| `/book`     | Active Book        | Open positions grouped by symbol, pair-level consolidated warnings at group header. |
-| `/orders`   | Pending Orders     | Working/queued orders, same grouping pattern. |
-| `/analytics`| Analytics          | Equity curve, current exposure, open risk, drawdown vs cap, win/loss split — each card shows its `FreshnessState`. |
-| `/progress` | Progress           | Account pulse, milestones, streaks. |
-| `/account`  | Account / Settings | Sub-tabs: Settings (backend URL, API key status, refresh interval, stale threshold, watchlist editor, risk allocation %) and Risk Profile (`/user/risk-profile`). |
+| Route        | Label              | Contents                                                                                                                                                                                                                                                            |
+| ------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/plan`      | Signal Plan        | Selected `SignalCandidate` with verdict (A+/A/B/C), `TradePlan` panel: E1/E2/E3, SL, TP1/2/3 with R:R, lot sizing per stage, USC + ZAR risk, drawdown impact, confluence chips, `backend-blueprint` vs `frontend-preview` source badge, "Send to execution" button. |
+| `/live`      | Live Radar         | Per-pair card grid with `PairPrice`, `RegimeState`, `GateState`, chop bar, nearest fib, freshness badge, stale row warnings.                                                                                                                                        |
+| `/signals`   | Signal Engine      | Engine readiness checklist (price feed, regime, gate, chop, fib, backend sync, Twelve Data key) + live `SignalCandidate` list with `computedBy`/`backendConfirmed` flags and divergence banner.                                                                     |
+| `/charts`    | Charts             | Per-pair price + fib visualisation (Recharts line + horizontal fib levels).                                                                                                                                                                                         |
+| `/book`      | Active Book        | Open positions grouped by symbol, pair-level consolidated warnings at group header.                                                                                                                                                                                 |
+| `/orders`    | Pending Orders     | Working/queued orders, same grouping pattern.                                                                                                                                                                                                                       |
+| `/analytics` | Analytics          | Equity curve, current exposure, open risk, drawdown vs cap, win/loss split — each card shows its `FreshnessState`.                                                                                                                                                  |
+| `/progress`  | Progress           | Account pulse, milestones, streaks.                                                                                                                                                                                                                                 |
+| `/account`   | Account / Settings | Sub-tabs: Settings (backend URL, API key status, refresh interval, stale threshold, watchlist editor, risk allocation %) and Risk Profile (`/user/risk-profile`).                                                                                                   |
 
 `/` redirects to `/plan`.
 

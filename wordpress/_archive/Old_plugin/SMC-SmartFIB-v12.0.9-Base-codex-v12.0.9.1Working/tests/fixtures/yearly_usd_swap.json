@@ -1,36 +1,60 @@
 {
-  "name": "yearly_usd_swap",
-  "kind": "anchor",
-  "pair": "EUR/USD",
-  "options": {
-    "tfSeconds": 604800,
-    "pipType": "USD",
-    "sessionTf": "Yearly"
-  },
-  "candles": [
-    { "time": "2022-03-01T00:00:00Z", "open": 1.22, "high": 1.225, "low": 1.22, "close": 1.223 },
-    { "time": "2022-10-01T00:00:00Z", "open": 1.223, "high": 1.23, "low": 1.221, "close": 1.229 },
-    { "time": "2023-03-01T00:00:00Z", "open": 1.218, "high": 1.219, "low": 1.212, "close": 1.216 },
-    { "time": "2023-10-01T00:00:00Z", "open": 1.216, "high": 1.217, "low": 1.205, "close": 1.206 }
-  ],
-  "expected": {
-    "sessionTf": "Yearly",
-    "sessions": {
-      "s1": { "key": "2023" },
-      "s2": { "key": "2022" }
+    "name": "yearly_usd_swap",
+    "kind": "anchor",
+    "pair": "EUR/USD",
+    "options": {
+        "tfSeconds": 604800,
+        "pipType": "USD",
+        "sessionTf": "Yearly"
     },
-    "f1": { "high": 1.23, "low": 1.22, "bull": true },
-    "f2": { "high": 1.22, "low": 1.219, "bull": true },
-    "f2Name": "SWAP",
-    "f3": { "high": 1.219, "low": 1.205, "bull": false },
-    "f2Meta": {
-      "sameDir": false,
-      "swapRange": 0.0009999999999998899,
-      "fullRange": 0.025000000000000133,
-      "threshold": 0.25,
-      "expanded": false,
-      "branch": "SWAP"
-    },
-    "ef": null
-  }
+    "candles": [
+        {
+            "time": "2022-03-01T00:00:00Z",
+            "open": 1.22,
+            "high": 1.225,
+            "low": 1.22,
+            "close": 1.223
+        },
+        {
+            "time": "2022-10-01T00:00:00Z",
+            "open": 1.223,
+            "high": 1.23,
+            "low": 1.221,
+            "close": 1.229
+        },
+        {
+            "time": "2023-03-01T00:00:00Z",
+            "open": 1.218,
+            "high": 1.219,
+            "low": 1.212,
+            "close": 1.216
+        },
+        {
+            "time": "2023-10-01T00:00:00Z",
+            "open": 1.216,
+            "high": 1.217,
+            "low": 1.205,
+            "close": 1.206
+        }
+    ],
+    "expected": {
+        "sessionTf": "Yearly",
+        "sessions": {
+            "s1": { "key": "2023" },
+            "s2": { "key": "2022" }
+        },
+        "f1": { "high": 1.23, "low": 1.22, "bull": true },
+        "f2": { "high": 1.22, "low": 1.219, "bull": true },
+        "f2Name": "SWAP",
+        "f3": { "high": 1.219, "low": 1.205, "bull": false },
+        "f2Meta": {
+            "sameDir": false,
+            "swapRange": 0.0009999999999998899,
+            "fullRange": 0.025000000000000133,
+            "threshold": 0.25,
+            "expanded": false,
+            "branch": "SWAP"
+        },
+        "ef": null
+    }
 }

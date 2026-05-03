@@ -143,9 +143,9 @@ Routes registered in the codebase include:
 - `GET /sniper/v1/live-signals`
 - `GET /sniper/v1/ladders`
 - `GET /sniper/v1/session`
-- `POST /sniper/v1/engine-batch`  ← public / Pine webhook
-- `POST /sniper/v1/user/engine-batch`  ← JS engine (authenticated)
-- `POST /sniper/v1/user/market-data`   ← JS price fetcher (authenticated)
+- `POST /sniper/v1/engine-batch` ← public / Pine webhook
+- `POST /sniper/v1/user/engine-batch` ← JS engine (authenticated)
+- `POST /sniper/v1/user/market-data` ← JS price fetcher (authenticated)
 
 ### Authenticated user endpoints
 

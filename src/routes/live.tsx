@@ -65,14 +65,12 @@ function LivePage() {
           const regime = data.regimes.find((r) => r.symbol === price.symbol);
           const gate = data.gates.find((g) => g.symbol === price.symbol);
           const diagnostic = (data.diagnostics ?? []).find((d) => d.symbol === price.symbol);
-          const clientStale =
-            price.updatedAt
-              ? Date.now() - new Date(price.updatedAt).getTime() > staleThresholdMs
-              : false;
+          const clientStale = price.updatedAt
+            ? Date.now() - new Date(price.updatedAt).getTime() > staleThresholdMs
+            : false;
           const stale = price.state === "stale" || regime?.state === "stale" || clientStale;
           const priceUnavailable =
-            price.mid === 0 &&
-            (price.state === "unavailable" || gate?.allow === "BLOCKED");
+            price.mid === 0 && (price.state === "unavailable" || gate?.allow === "BLOCKED");
           const diagWarning = blockerWarning(diagnostic?.engineBlocker);
           return (
             <div
@@ -95,7 +93,12 @@ function LivePage() {
                 <div className="font-mono text-2xl font-semibold tabular-nums">
                   {priceUnavailable ? "—" : fmtPrice(price.mid, price.symbol)}
                 </div>
-                <div className={cn("font-mono text-sm", price.changePct1d >= 0 ? "text-buy" : "text-sell")}>
+                <div
+                  className={cn(
+                    "font-mono text-sm",
+                    price.changePct1d >= 0 ? "text-buy" : "text-sell",
+                  )}
+                >
                   {priceUnavailable ? "—" : fmtPct(price.changePct1d)}
                 </div>
               </div>
@@ -107,17 +110,23 @@ function LivePage() {
 
               <div className="border-t border-bd pt-3 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-mute">Regime</span>
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-mute">
+                    Regime
+                  </span>
                   {regime && <BiasBadge bias={regime.bias} />}
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-mute">Gate</span>
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-mute">
+                    Gate
+                  </span>
                   {gate && <GateBadge allow={gate.allow} />}
                 </div>
                 {regime && (
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-mono uppercase tracking-wider text-mute">Chop</span>
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-mute">
+                        Chop
+                      </span>
                       <span className="text-[10px] font-mono text-dim">
                         Fib {regime.nearestFib ? fmtPrice(regime.nearestFib, price.symbol) : "—"}
                       </span>
@@ -142,7 +151,9 @@ function LivePage() {
                 </WarningLine>
               )}
               {stale && !gate?.reason && !diagWarning && (
-                <WarningLine level="warn">Price data stale — last update {relTime(price.updatedAt)}.</WarningLine>
+                <WarningLine level="warn">
+                  Price data stale — last update {relTime(price.updatedAt)}.
+                </WarningLine>
               )}
             </div>
           );

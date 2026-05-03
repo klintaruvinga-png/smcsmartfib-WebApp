@@ -1,4 +1,12 @@
-import { Outlet, Link, createRootRouteWithContext, HeadContent, Scripts, useRouter, useRouterState } from "@tanstack/react-router";
+import {
+  Outlet,
+  Link,
+  createRootRouteWithContext,
+  HeadContent,
+  Scripts,
+  useRouter,
+  useRouterState,
+} from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
 import appCss from "../styles.css?url";
@@ -36,7 +44,10 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "SMC SuperFIB — Trading Dashboard" },
-      { name: "description", content: "Mobile-first SMC SuperFIB dashboard mirroring the WordPress signal engine." },
+      {
+        name: "description",
+        content: "Mobile-first SMC SuperFIB dashboard mirroring the WordPress signal engine.",
+      },
       { name: "theme-color", content: "#07111b" },
       { property: "og:title", content: "SMC SuperFIB" },
       { property: "og:description", content: "Institutional SMC + Fibonacci trading dashboard." },
@@ -103,7 +114,11 @@ function RootComponent() {
             theme="dark"
             position="top-right"
             toastOptions={{
-              style: { background: "#102033", border: "1px solid rgba(164,191,223,0.34)", color: "#fff" },
+              style: {
+                background: "#102033",
+                border: "1px solid rgba(164,191,223,0.34)",
+                color: "#fff",
+              },
             }}
           />
         </>

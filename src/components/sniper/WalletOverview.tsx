@@ -5,7 +5,7 @@ import { FreshnessBadge } from "./FreshnessBadge";
 
 export function WalletOverview() {
   const { data: account, isLoading, error } = useUserAccount();
-  
+
   if (isLoading) {
     return (
       <section className="space-y-2">
@@ -21,7 +21,7 @@ export function WalletOverview() {
       </section>
     );
   }
-  
+
   if (error || !account) {
     return (
       <section className="space-y-2">

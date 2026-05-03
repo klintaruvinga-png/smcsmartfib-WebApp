@@ -1,36 +1,60 @@
 {
-  "name": "daily_usd_expanded",
-  "kind": "anchor",
-  "pair": "EUR/USD",
-  "options": {
-    "tfSeconds": 3600,
-    "pipType": "USD",
-    "sessionTf": "Daily"
-  },
-  "candles": [
-    { "time": "2024-01-01T00:00:00Z", "open": 100.0, "high": 100.5, "low": 100.0, "close": 100.4 },
-    { "time": "2024-01-01T12:00:00Z", "open": 100.4, "high": 101.0, "low": 100.3, "close": 101.0 },
-    { "time": "2024-01-02T00:00:00Z", "open": 101.0, "high": 103.0, "low": 100.8, "close": 102.0 },
-    { "time": "2024-01-02T12:00:00Z", "open": 102.0, "high": 105.0, "low": 101.5, "close": 104.0 }
-  ],
-  "expected": {
-    "sessionTf": "Daily",
-    "sessions": {
-      "s1": { "key": "2024-01-02" },
-      "s2": { "key": "2024-01-01" }
+    "name": "daily_usd_expanded",
+    "kind": "anchor",
+    "pair": "EUR/USD",
+    "options": {
+        "tfSeconds": 3600,
+        "pipType": "USD",
+        "sessionTf": "Daily"
     },
-    "f1": { "high": 101.0, "low": 100.0, "bull": true },
-    "f2": { "high": 105.0, "low": 100.0, "bull": true },
-    "f2Name": "SWAP EXP",
-    "f3": { "high": 105.0, "low": 100.8, "bull": true },
-    "f2Meta": {
-      "sameDir": true,
-      "swapRange": 0.20000000000000284,
-      "fullRange": 5.0,
-      "threshold": 0.25,
-      "expanded": true,
-      "branch": "EXPANDED"
-    },
-    "ef": null
-  }
+    "candles": [
+        {
+            "time": "2024-01-01T00:00:00Z",
+            "open": 100.0,
+            "high": 100.5,
+            "low": 100.0,
+            "close": 100.4
+        },
+        {
+            "time": "2024-01-01T12:00:00Z",
+            "open": 100.4,
+            "high": 101.0,
+            "low": 100.3,
+            "close": 101.0
+        },
+        {
+            "time": "2024-01-02T00:00:00Z",
+            "open": 101.0,
+            "high": 103.0,
+            "low": 100.8,
+            "close": 102.0
+        },
+        {
+            "time": "2024-01-02T12:00:00Z",
+            "open": 102.0,
+            "high": 105.0,
+            "low": 101.5,
+            "close": 104.0
+        }
+    ],
+    "expected": {
+        "sessionTf": "Daily",
+        "sessions": {
+            "s1": { "key": "2024-01-02" },
+            "s2": { "key": "2024-01-01" }
+        },
+        "f1": { "high": 101.0, "low": 100.0, "bull": true },
+        "f2": { "high": 105.0, "low": 100.0, "bull": true },
+        "f2Name": "SWAP EXP",
+        "f3": { "high": 105.0, "low": 100.8, "bull": true },
+        "f2Meta": {
+            "sameDir": true,
+            "swapRange": 0.20000000000000284,
+            "fullRange": 5.0,
+            "threshold": 0.25,
+            "expanded": true,
+            "branch": "EXPANDED"
+        },
+        "ef": null
+    }
 }

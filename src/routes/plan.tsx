@@ -31,7 +31,7 @@ export const Route = createFileRoute("/plan")({
 function PlanPage() {
   const { data: signals, isLoading: signalsLoading } = useLiveSignals();
   const { data: ladders, isLoading: laddersLoading } = useLadders();
-  
+
   const VERDICT_RANK: Record<string, number> = { "A+": 4, A: 3, B: 2, C: 1 };
   const uniqueSignals = signals
     ? deduplicateById(signals).sort(
@@ -40,9 +40,7 @@ function PlanPage() {
     : undefined;
 
   const top =
-    uniqueSignals?.find(
-      (s) => s.status === "READY" && ladders?.some((l) => l.signalId === s.id),
-    ) ??
+    uniqueSignals?.find((s) => s.status === "READY" && ladders?.some((l) => l.signalId === s.id)) ??
     uniqueSignals?.find((s) => ladders?.some((l) => l.signalId === s.id)) ??
     uniqueSignals?.find((s) => s.status === "READY") ??
     uniqueSignals?.[0];
@@ -77,7 +75,10 @@ function PlanPage() {
           </div>
           {top && (
             <div className="text-xs text-dim bg-bg1/40 rounded px-3 py-2 max-w-lg space-y-1">
-              <div>Signal: <span className="text-info font-mono">{top.id}</span> ({top.symbol} {top.direction})</div>
+              <div>
+                Signal: <span className="text-info font-mono">{top.id}</span> ({top.symbol}{" "}
+                {top.direction})
+              </div>
               <div>Found {diagnostics.blueprintCount} total blueprints</div>
               {diagnostics.blueprintCount === 0 && (
                 <div className="flex items-center gap-1.5 text-warn">

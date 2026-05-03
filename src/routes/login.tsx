@@ -104,9 +104,16 @@ function LoginPage() {
           </div>
           <ol className="space-y-1 text-xs text-dim leading-relaxed list-decimal list-inside">
             <li>Log in to your WordPress admin</li>
-            <li>Go to <span className="font-mono text-tx">Users → Profile</span></li>
-            <li>Scroll to <span className="font-mono text-tx">Application Passwords</span></li>
-            <li>Enter a name (e.g. "SuperFIB App") and click <span className="font-mono text-tx">Add New</span></li>
+            <li>
+              Go to <span className="font-mono text-tx">Users → Profile</span>
+            </li>
+            <li>
+              Scroll to <span className="font-mono text-tx">Application Passwords</span>
+            </li>
+            <li>
+              Enter a name (e.g. "SuperFIB App") and click{" "}
+              <span className="font-mono text-tx">Add New</span>
+            </li>
             <li>Copy the generated password and paste it above</li>
           </ol>
         </div>
