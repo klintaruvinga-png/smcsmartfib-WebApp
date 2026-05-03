@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name: SMC SuperFIB Sniper REST Backend
- * Description: WordPress REST backend for the Lovable SMC SuperFIB dashboard.
+ * Plugin Name: SMC SuperFIB Signal Engine & Account Manager
+ * Description: WordPress REST backend for the SMC SuperFIB Dashboard.
  * Version: 1.0.0
- * Author: SMC SuperFIB
+ * Author: Kudzanai Lloyd Taruvinga For Munhumukapa Holdings Group
  */
 
 if (!defined('ABSPATH')) {
