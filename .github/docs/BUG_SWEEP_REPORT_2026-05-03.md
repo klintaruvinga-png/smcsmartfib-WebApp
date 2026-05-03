@@ -1,26 +1,26 @@
 # Executive Summary
 
-- Overall health: Stable enough for targeted patching, but Phase 0 is not migration-ready yet.
-- Bugs found: 1 confirmed high-severity backend sizing defect, 2 medium verification gaps.
-- Fixes applied: Backend lot sizing now derives forex pip value from live/cached FX conversion mids instead of a flat `$10/pip` assumption.
-- Remaining risks: No empirical Pine/MT5 replay in the active workspace and no long-run refresh soak evidence from this run.
-- Migration readiness: Phase 0 remains blocked on verification evidence, not on the patched code path itself.
+- Overall health: Improved, with the MT5 ingress contract now protected against anonymous writes, stale timestamp spoofing, and empty authority audits.
+- Bugs found: 4 confirmed backend contract defects or gaps in the active migration path.
+- Fixes applied: Hardened MT5 snapshot auth, canonical state/timestamp persistence, authority watchlist enumeration, and PHP regression harness portability.
+- Remaining risks: No live MT5 terminal soak was executed in this run, and multi-symbol MT5 hydration still depends on terminal-side symbol/tick availability.
+- Migration readiness: Phase 0 backend ingress is patch-ready, but migration governance still needs live staging verification.
 
 **Report Date**: 2026-05-03  
-**Phase**: 0 (Stabilization)  
+**Phase**: 0 (Stabilization / MT5 ingress hardening)  
 **Scanner**: Code Bug Fix And Cleanup automation  
-**Scan Duration**: 2026-05-03T08:39:00+02:00 - 2026-05-03T09:05:37+02:00
+**Scan Duration**: 2026-05-03T13:08:00+02:00 - 2026-05-03T13:23:34+02:00
 
 ---
 
 ## Summary
 
-- **Total Issues Found**: 3
-- **Critical Issues**: 0
+- **Total Issues Found**: 4
+- **Critical Issues**: 1
 - **High Priority Issues**: 1
 - **Medium Priority Issues**: 2
 - **Low Priority Issues**: 0
-- **Test Coverage**: Targeted backend regression only (`php -l` + focused pip-value parity harness)
+- **Test Coverage**: Targeted backend ingress and sizing regressions (`php -l` plus two focused PHP harnesses)
 
 ---
 
@@ -28,7 +28,7 @@
 
 | Issue | Component | Root Cause | Impact | Blocker | Corrective Action |
 |-------|-----------|-----------|--------|---------|-----------------|
-| None confirmed in this scan | - | - | - | No | Continue Phase 0 verification work |
+| MT5 snapshot ingress accepted unauthenticated writes | WordPress REST MT5 snapshot route | `POST /snapshot` was registered public and the handler trusted `get_current_user_id()` without an in-method permission guard | EA posts could succeed while persisting under user `0`, breaking backend authority and making the dashboard silently miss live MT5 data | No after patch | Required authenticated route registration and added a defensive auth check inside `post_snapshot()` |
 
 ---
 
@@ -36,7 +36,7 @@
 
 | Issue | Component | Root Cause | Impact | Blocker | Corrective Action |
 |-------|-----------|-----------|--------|---------|-----------------|
-| Hardcoded forex pip valuation on non-USD quoted pairs | Backend trade-plan sizing | `build_trade_plan()` used static `pip_val` metadata instead of quote-to-USD conversion from market prices | JPY/CAD/CHF/GBP/AUD/NZD quoted pairs could size risk 20-40%+ off, breaking backend truth and MT5 parity expectations | No after patch | Patched runtime valuation helpers and added PHP regression coverage for USDJPY, EURJPY, EURGBP, AUDCHF, USDCAD, and EURCAD |
+| MT5 snapshot rows lost canonical freshness/state truth | Backend snapshot persistence | `post_snapshot()` never wrote the snapshot `state`, and it stored `updated_at` from receipt time instead of the MT5 quote timestamp | Fresh MT5 prices could surface as `offline`, and state-only MT5 updates risked faking quote recency | No after patch | Persisted normalized MT5 freshness into `state`, parsed MT5 timestamps into MySQL time, and preserved the last quote timestamp during state-only transitions |
 
 ---
 
@@ -44,10 +44,10 @@
 
 | Engine | Previous % | Current % | Trend | Status | Action |
 |--------|-----------|----------|-------|--------|--------|
-| Fib (Phase 4) | N/A | N/A | Stable | PENDING | No fib code delta; replay audit still required |
-| Regime (Phase 5) | N/A | N/A | Stable | PENDING | No regime code delta; replay audit still required |
-| Signal (Phase 6) | 0% on covered pip-value conversion cases | 100% on covered pip-value conversion cases | Improving | PASS | Expand from helper-level parity to end-to-end Pine/MT5 replay |
-| Freshness (Phase 0) | N/A | N/A | Stable | PENDING | Run 24h/72h soak; stale/live guards were inspected but not time-soaked |
+| Freshness / ingress (Phase 0) | N/A | 100% on covered MT5 auth/state/timestamp cases | Improving | PASS | Run live staging disconnect/reconnect drill |
+| Fib (Phase 4) | N/A | N/A | Stable | PENDING | No fib code delta in this run |
+| Regime (Phase 5) | N/A | N/A | Stable | PENDING | No regime code delta in this run |
+| Signal (Phase 6) | 100% on covered pip-value conversion cases | 100% on covered pip-value conversion cases | Stable | PASS | Keep existing sizing parity harness in CI rotation |
 
 ---
 
@@ -56,112 +56,124 @@
 | Test | Phase | Status | Error | Frequency |
 |------|-------|--------|-------|-----------|
 | PHP syntax check (`php -l`) | 0 | PASS | None | Once |
+| MT5 snapshot contract harness | 0 | PASS | None | Once |
 | Pip-value regression harness | 0 / 6 | PASS | None | Once |
-| 24h refresh stability | 0 | PENDING | Not executed in this automation run | Not run |
-| Pine/MT5 signal replay | 6 | PENDING | No active replay harness in current workspace | Not run |
+| Live MT5 staging reconnect drill | 0 | PENDING | Not executed in this automation run | Not run |
+| Long-run refresh soak (24h/72h) | 0 | PENDING | Not executed in this automation run | Not run |
 
 ---
 
 ## Blocker Assessment
 
-**Blocks Current Phase**: Yes  
+**Blocks Current Phase**: No after patch  
 **Blocks Phase N+1 Transition**: Yes  
 **Timeline Impact**: Verification dependent  
 **Risk Level**: HIGH
 
-Phase 0 is still blocked by missing long-run refresh evidence and missing empirical Pine/MT5 parity evidence, even though the confirmed backend sizing defect is patched.
+The confirmed backend ingress defects are patched, but migration progression still requires live MT5 staging evidence and longer freshness validation.
 
 ---
 
 ## Recommended Priority Order
 
-1. Validate the patched sizing path on staging for at least one JPY pair and one CAD/CHF quote pair.
-2. Run 24h and 72h refresh/stale soak checks against the active backend.
-3. Add or restore an empirical Pine/MT5 replay harness for fib/regime/signal parity before migration phase advancement.
+1. Deploy the backend plugin patch to staging with authenticated MT5 EA credentials.
+2. Force an MT5 disconnect/reconnect drill and confirm `offline -> live` transitions without timestamp spoofing.
+3. Run 24h refresh/stale soak checks against the active backend.
+4. Review MT5 multi-symbol hydration behavior on the terminal side before expanding the watchlist.
 
 ---
 
 ## Verification Criteria for Fix
 
-For the issue above:
 - [x] Code change deployed locally
-- [x] Targeted regression re-run passed
-- [x] No signal-gating or freshness logic changed
-- [x] Parity re-validated for covered forex pip-value conversion cases
-- [ ] Staging execution snapshot confirms corrected lot sizes on live data
-- [ ] Pine/MT5 replay confirms no downstream drift in entry/SL/TP orchestration
+- [x] `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+- [x] `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
+- [x] `php wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php`
+- [x] Regression artifact written to `.github/migration/test-logs/phase-0-mt5-ingress-2026-05-03.log`
+- [ ] Live staging MT5 snapshot confirms authenticated writes land under the intended user
+- [ ] Staging disconnect/reconnect confirms `updated_at` remains quote-time anchored
+- [ ] 24h/72h soak clears residual fake-live risk
 
 ---
 
 ## Confirmed Problems
 
+### Critical
+
+- Backend MT5 ingress in `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` allowed unauthenticated `POST /snapshot` requests even though the payload is user-scoped and persisted via `get_current_user_id()`.
+
 ### High
 
-- Backend risk sizing in [`/wordpress/smc-superfib-sniper/smc-superfib-sniper.php`](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/smc-superfib-sniper.php) treated `pip_val` as a static truth source for all forex symbols. That is mathematically wrong for any non-USD quoted pair and materially wrong for JPY quotes.
+- MT5 snapshot persistence in `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` never populated the `state` column and used backend receipt time instead of MT5 quote time for `updated_at`.
 
 ### Medium
 
-- The active workspace has no empirical MT5/Pine replay artifact for fib/regime/signal parity, so migration parity remains governance-pending even where code paths look aligned.
-- The refresh/stale system has hardening in place, but this automation run did not execute a 24h or 72h soak against a live backend, so fake-live regression risk is not cleared.
+- `get_market_data_authority()` enumerated `snapshot['symbols']`, but engine snapshots only expose `prices` and `meta.watchlist`, so the all-symbol authority audit path returned an empty result set.
+- `wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php` lacked a `plugin_dir_path()` stub, so the regression harness could not execute in the standalone PHP environment used by this automation.
 
 ---
 
 ## Surgical Fixes Applied
 
-- Updated [`/wordpress/smc-superfib-sniper/smc-superfib-sniper.php`](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/smc-superfib-sniper.php) so `build_trade_plan()` uses runtime FX conversion data when computing pip value per standard lot.
-- Added guarded helpers for symbol splitting, reference-mid resolution, quote-currency USD conversion, and fallback behavior when reference prices are unavailable or too old.
-- Hardened FX conversion to reject cached reference mids unless the cached quote is still marked `live` and remains within the user’s stale-threshold window.
-- Added focused regression coverage in [`/wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php`](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php).
+- Updated `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` so `POST /snapshot` now requires authenticated permission at both the route layer and inside `post_snapshot()`.
+- Added MT5 freshness-to-dashboard state normalization and timestamp parsing helpers in `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`.
+- Hardened `post_snapshot()` so tick-bearing MT5 payloads persist canonical `state` and MT5 quote time, while freshness-only payloads degrade state without rewriting `updated_at`.
+- Fixed the all-watchlist authority path in `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` to enumerate the configured watchlist instead of a nonexistent snapshot field.
+- Added `wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` to lock auth, timestamp, state-only refresh, and authority endpoint behavior.
+- Hardened `wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php` so it can run outside WordPress in the automation harness.
 
 ---
 
 ## Parity Verification Results
 
+- Freshness parity: Covered MT5 ingress contract cases passed 4/4. Auth, state mapping, quote-time persistence, and watchlist authority enumeration now match backend truth expectations.
 - Fib parity: Not re-run in this scan. No fib code delta detected.
 - Regime parity: Not re-run in this scan. No regime code delta detected.
-- Signal parity: Covered backend pip-value conversion cases now match expected market-derived values 7/7 (100%).
-- Freshness parity: No code delta. Static inspection confirms live/stale logic remains anchored to stored quote/candle timestamps rather than fetch-time spoofing.
+- Signal parity: Existing pip-value conversion coverage remains green at 7/7.
 
 ---
 
 ## Remaining Risks
 
-- Reference conversion prices for CAD/CHF crosses still depend on available market data snapshots. The runtime now falls back safely and will reject stale cached reference mids, but empirical staging verification is still required.
-- End-to-end trade-plan parity against Pine/MT5 remains unproven in this run because only the mathematical sizing helper was exercised.
-- Phase 0 success criteria still require long-duration refresh validation.
+- This run did not exercise a live MT5 terminal or a real WordPress auth chain, so staging verification is still required.
+- The MT5 EA still warrants a separate review for multi-symbol hydration behavior when attached to a single chart and relying on terminal-side symbol availability.
+- No 24h/72h refresh soak evidence was produced in this run.
 
 ---
 
 ## Regression Checklist
 
-- [x] `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
-- [x] `php wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php`
-- [ ] 24h refresh loop test against live backend
+- [x] Backend plugin PHP syntax check
+- [x] MT5 snapshot contract regression harness
+- [x] Pip-value parity regression harness
+- [ ] Live MT5 authenticated ingress check
+- [ ] Disconnect/reconnect stale-state verification
+- [ ] 24h refresh loop soak
 - [ ] 72h stale-state / reconnect soak
-- [ ] Pine vs backend trade-plan replay on JPY and CAD/CHF quote pairs
-- [ ] MT5 dual-run comparison once Phase 6 parity harness exists
 
 ---
 
 ## Safe Deployment Order
 
-1. Deploy the backend plugin patch to staging.
-2. Force an engine batch on a watchlist that includes at least one JPY pair and one non-USD cross.
-3. Compare pre/post lot sizes and confirm risk budgets now scale with actual FX conversion.
-4. Run refresh/stale soak checks.
-5. Promote only after staging sizing and freshness checks pass.
+1. Deploy the plugin patch to staging.
+2. Reconfigure or confirm MT5 EA authentication and post one controlled snapshot.
+3. Verify the snapshot lands under the correct user and surfaces as `live` only when the MT5 quote timestamp is fresh.
+4. Trigger a state-only `DISCONNECTED` update and confirm the last quote timestamp does not move.
+5. Run the extended freshness soak before production promotion.
 
 ---
 
 ## Do Not Touch List
 
 - `determine_engine_blocker()` freshness gating without a separate stale-truth review
-- `fetch_quote()` and `fetch_candles()` timestamp/state discipline
-- Execution authorization in `post_execute_signals()`
+- `fetch_quote()` and `fetch_candles()` upstream rate-limit/auth sequencing
+- Trade execution authorization in `post_execute_signals()`
+- MT5 symbol normalization / broker-symbol mapping without a dedicated terminal parity pass
 
 ---
 
 ## Attachments
 
-- Test log: `.github/migration/test-logs/phase-0-risk-sizing-2026-05-03.log`
-- Parity audit: `.github/migration/audits/phase-6-signal-parity-2026-05-03.md`
+- Test log: `.github/migration/test-logs/phase-0-mt5-ingress-2026-05-03.log`
+- Freshness audit: `.github/migration/audits/phase-0-freshness-parity-2026-05-03.md`
+- Existing signal parity artifact revalidated by harness: `.github/migration/audits/phase-6-signal-parity-2026-05-03.md`
