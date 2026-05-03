@@ -1598,7 +1598,7 @@ final class SMC_SuperFib_Sniper_REST {
                 'ask'         => (float) $existing->ask,
                 'mid'         => (float) $existing->mid,
                 'changePct1d' => (float) $existing->change_pct_1d,
-                'updatedAt'   => $existing->updated_at,
+                'updatedAt'   => $this->to_iso($existing->updated_at),
                 'state'       => 'live',
             );
         }
