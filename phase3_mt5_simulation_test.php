@@ -40,45 +40,77 @@ echo "==================================================\n\n";
 echo "Sending payload to: $wordpress_url\n";
 echo "Payload:\n" . json_encode($sample_payload, JSON_PRETTY_PRINT) . "\n\n";
 
-// Initialize cURL
-$ch = curl_init();
+$json_body = json_encode($sample_payload);
+$auth_header = 'Basic ' . base64_encode('username:' . $auth_token); // Replace 'username' with actual WP username
 
-curl_setopt($ch, CURLOPT_URL, $wordpress_url);
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($sample_payload));
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    'Content-Type: application/json',
-    'Authorization: Basic ' . base64_encode('username:' . $auth_token) // Replace 'username' with actual WP username
-]);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // For testing - remove in production
+if (function_exists('curl_init')) {
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $wordpress_url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $json_body);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'Authorization: ' . $auth_header,
+    ]);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curl_err  = curl_error($ch);
+    curl_close($ch);
 
-$response = curl_exec($ch);
-$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-if (curl_error($ch)) {
-    echo "cURL Error: " . curl_error($ch) . "\n";
+    if ($curl_err) {
+        echo "cURL Error: $curl_err\n";
+        exit(1);
+    }
 } else {
-    echo "HTTP Response Code: $http_code\n";
-    echo "Response:\n$response\n\n";
-
-    if ($http_code === 200) {
-        $response_data = json_decode($response, true);
-        if (isset($response_data['ok']) && $response_data['ok'] === true) {
-            echo "✅ SUCCESS: Backend accepted the MT5 payload\n";
-            echo "✅ Price data (tick) should be stored in snapshots table with source='mt5'\n";
-            echo "✅ Candlestick data (M1) should be stored in candles table with source='mt5'\n";
-            echo "✅ Freshness state should be stored as transient\n";
-            echo "✅ Session state should be stored as transient\n";
-        } else {
-            echo "❌ FAILURE: Backend rejected the payload\n";
+    // Fallback: use file_get_contents (no extension required)
+    $context = stream_context_create([
+        'http' => [
+            'method'        => 'POST',
+            'header'        => implode("\r\n", [
+                'Content-Type: application/json',
+                'Authorization: ' . $auth_header,
+            ]),
+            'content'       => $json_body,
+            'ignore_errors' => true,
+            'timeout'       => 15,
+        ],
+        'ssl' => [
+            'verify_peer'      => false,
+            'verify_peer_name' => false,
+        ],
+    ]);
+    $response  = file_get_contents($wordpress_url, false, $context);
+    $http_code = 0;
+    foreach ($http_response_header ?? [] as $h) {
+        if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $m)) {
+            $http_code = (int) $m[1];
         }
-    } else {
-        echo "❌ FAILURE: HTTP error $http_code\n";
+    }
+    if ($response === false) {
+        echo "Request failed (file_get_contents). Check URL and network.\n";
+        exit(1);
     }
 }
 
-curl_close($ch);
+echo "HTTP Response Code: $http_code\n";
+echo "Response:\n$response\n\n";
+
+if ($http_code === 200) {
+    $response_data = json_decode($response, true);
+    if (isset($response_data['ok']) && $response_data['ok'] === true) {
+        echo "SUCCESS: Backend accepted the MT5 payload\n";
+        echo "Price data (tick) should be stored in snapshots table with source='mt5'\n";
+        echo "Candlestick data (M1) should be stored in candles table with source='mt5'\n";
+        echo "Freshness state should be stored as transient\n";
+        echo "Session state should be stored as transient\n";
+    } else {
+        echo "FAILURE: Backend rejected the payload\n";
+    }
+} else {
+    echo "FAILURE: HTTP error $http_code\n";
+}
 
 echo "\nNext Steps:\n";
 echo "1. Configure the correct WordPress URL and auth token above\n";
