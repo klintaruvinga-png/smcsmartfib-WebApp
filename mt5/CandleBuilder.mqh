@@ -25,7 +25,7 @@ public:
         symbolCount = 0;
         ArrayInitialize(candleIndices, 0);
         ArrayInitialize(lastCandleTime, 0);
-        ArrayInitialize(currentCandles, 0);
+        ZeroMemory(currentCandles);   // ArrayInitialize doesn't support struct arrays
     }
 
     // Destructor

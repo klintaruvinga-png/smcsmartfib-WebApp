@@ -113,10 +113,10 @@ private:
         string upper = "";
         for (int i = 0; i < StringLen(symbol); i++)
         {
-            ushort ch = StringGetChar(symbol, i);
+            ushort ch = StringGetCharacter(symbol, i);  // StringGetChar removed in MQL5 build 2000+
             if (ch >= 'a' && ch <= 'z')
                 ch -= 32;
-            upper += CharToString(ch);
+            upper += CharToString((uchar)ch);           // CharToString takes uchar, not ushort
         }
         return upper;
     }

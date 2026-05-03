@@ -87,7 +87,7 @@ public:
     // Check if terminal is connected
     bool IsTerminalConnected()
     {
-        return TerminalInfoInteger(TERMINAL_CONNECTED);
+        return TerminalInfoInteger(TERMINAL_CONNECTED) != 0;
     }
 
     // Aggregate account freshness
