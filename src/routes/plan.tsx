@@ -331,11 +331,17 @@ function PlanCard({
   children,
 }: {
   title: string;
-  tone: "buy" | "sell" | "info";
+  tone: "buy" | "sell" | "info" | "neutral";
   children: React.ReactNode;
 }) {
   const accent =
-    tone === "buy" ? "border-buy/30" : tone === "sell" ? "border-sell/30" : "border-info/30";
+    tone === "buy"
+      ? "border-buy/30"
+      : tone === "sell"
+        ? "border-sell/30"
+        : tone === "info"
+          ? "border-info/30"
+          : "border-bd";
   return (
     <div className={cn("rounded-lg border bg-bg1/50 p-4", accent)}>
       <div className="text-[11px] font-mono uppercase tracking-wider text-mute mb-3">{title}</div>
