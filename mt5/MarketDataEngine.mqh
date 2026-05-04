@@ -10,8 +10,8 @@
 //+------------------------------------------------------------------+
 //| MarketDataEngine                                                  |
 //|                                                                   |
-//| Central orchestrator.  Call OnTick() on every tick and            |
-//| OnPeriodic() from a timer (e.g. every 5 s) to flush stale        |
+//| Central orchestrator. Call OnTick() on every tick and            |
+//| OnPeriodic() from a timer (e.g. every 10 s) to flush stale       |
 //| freshness states and push snapshots to the PHP backend.          |
 //+------------------------------------------------------------------+
 class MarketDataEngine
@@ -23,13 +23,17 @@ private:
     FreshnessEngine*  freshnessEngine;
     SymbolNormalizer* symbolNormalizer;
 
-    string symbols[100];
-    int    symbolCount;
+    string   symbols[100];
+    int      symbolCount;
 
-    string webhookUrl;   // e.g. "https://yoursite.com/wp-json/sniper/v1/ea/market-stream"
-    string authHeader;   // e.g. "X-API-KEY: <token>"
-    int    wpUserId;
+    string   webhookUrl;   // https://yoursite.com/wp-json/sniper/v1/ea/market-stream
+    string   authHeader;   // Full header line: "X-EA-API-Key: <token>"
+    int      wpUserId;     // WordPress user_id that owns this stream
+
     datetime lastSentCandleM1[100];
+
+    // Cached constant headers — built once in Initialize(), reused every send.
+    string   cachedHeaders;
 
 public:
     MarketDataEngine()
@@ -43,6 +47,7 @@ public:
         webhookUrl       = "";
         authHeader       = "";
         wpUserId         = 0;
+        cachedHeaders    = "";
         ArrayInitialize(lastSentCandleM1, 0);
     }
 
@@ -55,6 +60,10 @@ public:
         delete symbolNormalizer;
     }
 
+    // url  = full webhook endpoint URL
+    // auth = complete header line e.g. "X-EA-API-Key: mykey"
+    //        (caller is responsible for the header name prefix)
+    // userId = WordPress user_id that owns this data stream
     bool Initialize(string& activeSymbols[], int count,
                     string url = "", string auth = "", int userId = 0)
     {
@@ -65,32 +74,41 @@ public:
         webhookUrl = url;
         authHeader = auth;
         wpUserId   = userId;
+
+        // Build the HTTP headers string once — reused on every WebRequest call.
+        cachedHeaders  = "Content-Type: application/json\r\n";
+        cachedHeaders += "Accept: application/json\r\n";
+        cachedHeaders += "Connection: close\r\n";
+        if (StringLen(authHeader) > 0)
+            cachedHeaders += authHeader + "\r\n";
+
         return true;
     }
+
+    // ---- EA event handlers ----
 
     // Call from EA OnTick()
     void OnTick(string symbol, double bid, double ask,
                 datetime timestamp, long volume)
     {
         string normalized = symbolNormalizer.NormalizeSymbol(symbol);
-
         tickProcessor.ProcessTick(normalized, bid, ask, timestamp, volume);
         freshnessEngine.UpdateOnTick(normalized, timestamp);
         sessionManager.UpdateSession(timestamp);
         candleBuilder.BuildCandleM1(normalized, *tickProcessor);
     }
 
-    // Call from EA OnTimer() — typically every 5–30 seconds
+    // Call from EA OnTimer() — typically every 10–30 seconds
     void OnPeriodic()
     {
-        // HARDENING: Refresh session with wall-clock time on every periodic call so
-        // IsMarketOpen() stays accurate even when no ticks arrive (e.g. market closure).
+        // Refresh session with wall-clock time so IsMarketOpen() stays accurate
+        // even when no ticks arrive (e.g. during market close / weekend).
         sessionManager.UpdateSession(TimeCurrent());
-        // Pass session open state so FreshnessEngine can set CLOSED instead of
-        // aging into STALE during weekends/holidays.
+
+        // Let FreshnessEngine age states; pass market-open flag so it can
+        // set CLOSED instead of STALE during weekend/holiday gaps.
         freshnessEngine.UpdatePeriodic(sessionManager.IsMarketOpen());
 
-        // Push a snapshot to the backend for every registered symbol
         if (StringLen(webhookUrl) == 0)
             return;
 
@@ -135,51 +153,54 @@ public:
 
     // ---- Webhook ----
 
-    // Build JSON payload for one symbol snapshot
+    // Build the JSON payload for one symbol snapshot.
     string BuildWebhookPayload(string symbol)
     {
         string norm = symbolNormalizer.NormalizeSymbol(symbol);
 
-        TickData  tick;
-        MqlRates  candle;
+        TickData tick;
+        MqlRates candle;
         bool hasTick   = tickProcessor.GetLastTick(norm, tick);
         bool hasCandle = candleBuilder.GetCandle(norm, PERIOD_M1, 0, candle);
-
 
         if (!hasTick)
             return "";
 
         int digits = (int) SymbolInfoInteger(symbol, SYMBOL_DIGITS);
         if (digits < 0) digits = 5;
-        string tf = "M1";
+
         string json = "{";
+
+        // user_id — lets PHP resolve ownership without a WP session cookie.
         if (wpUserId > 0)
-            json += "\"user_id\":" + IntegerToString(wpUserId) + ",";
-        json += "\"symbol\":\"" + symbol + "\",";
-        json += "\"normalized_symbol\":\"" + norm + "\",";
-        json += "\"timeframe\":\"" + tf + "\",";
-        json += "\"timestamp\":\"" + TimeToIso8601(tick.timestamp) + "\",";
-        json += "\"bid\":" + DoubleToString(tick.bid, digits) + ",";
-        json += "\"ask\":" + DoubleToString(tick.ask, digits) + ",";
-        json += "\"freshness\":\"" + FreshnessStateName(GetFreshnessState(symbol)) + "\",";
-        json += "\"session\":\"" + GetSessionName() + "\"";
+            json += "\"user_id\":"        + IntegerToString(wpUserId) + ",";
+
+        json += "\"symbol\":\""           + symbol                                    + "\",";
+        json += "\"normalized_symbol\":\"" + norm                                     + "\",";
+        json += "\"timeframe\":\"M1\",";
+        json += "\"timestamp\":\""        + TimeToIso8601(tick.timestamp)             + "\",";
+        json += "\"bid\":"                + DoubleToString(tick.bid, digits)           + ",";
+        json += "\"ask\":"                + DoubleToString(tick.ask, digits)           + ",";
+        json += "\"freshness\":\""        + FreshnessStateName(GetFreshnessState(symbol)) + "\",";
+        json += "\"session\":\""          + GetSessionName()                          + "\"";
 
         if (hasCandle && candleBuilder.ValidateCandle(candle))
         {
             json += ",\"candle\":{";
-            json += "\"time\":\"" + TimeToIso8601(candle.time) + "\",";
-            json += "\"open\":" + DoubleToString(candle.open, digits) + ",";
-            json += "\"high\":" + DoubleToString(candle.high, digits) + ",";
-            json += "\"low\":" + DoubleToString(candle.low, digits) + ",";
-            json += "\"close\":" + DoubleToString(candle.close, digits) + ",";
-            json += "\"volume\":" + IntegerToString((long)candle.tick_volume);
+            json += "\"time\":\""  + TimeToIso8601(candle.time)               + "\",";
+            json += "\"open\":"    + DoubleToString(candle.open,  digits)      + ",";
+            json += "\"high\":"    + DoubleToString(candle.high,  digits)      + ",";
+            json += "\"low\":"     + DoubleToString(candle.low,   digits)      + ",";
+            json += "\"close\":"   + DoubleToString(candle.close, digits)      + ",";
+            json += "\"volume\":"  + IntegerToString((long)candle.tick_volume);
             json += "}";
         }
+
         json += "}";
         return json;
     }
 
-    // POST a snapshot to the PHP backend via WebRequest
+    // POST a snapshot for one symbol to the PHP backend.
     bool SendToBackend(string symbol)
     {
         if (StringLen(webhookUrl) == 0)
@@ -188,42 +209,44 @@ public:
         string payload = BuildWebhookPayload(symbol);
         if (StringLen(payload) == 0)
             return false;
-        string headers = "Content-Type: application/json\r\n";
-        headers += "Connection: close\r\n";
-        headers += "Accept: application/json\r\n";
-        if (StringLen(authHeader) > 0)
-            headers += authHeader + "\r\n";
 
         char   postData[];
         char   result[];
         string responseHeaders;
-
         StringToCharArray(payload, postData, 0, StringLen(payload));
 
-        int lastHttpStatus = -1;
+        int lastStatus = -1;
         for (int attempt = 0; attempt < 3; attempt++)
         {
-            int httpStatus = WebRequest("POST", webhookUrl, headers, 5000,
+            int httpStatus = WebRequest("POST", webhookUrl, cachedHeaders, 5000,
                                         postData, result, responseHeaders);
-            lastHttpStatus = httpStatus;
+            lastStatus = httpStatus;
             if (httpStatus == 200 || httpStatus == 201)
                 return true;
+
+            int    err  = GetLastError();
+            string body = CharArrayToString(result, 0, -1, CP_UTF8);
+            Print("SMC_MarketDataEA attempt ", attempt + 1, " failed"
+                  " | symbol=",      symbol,
+                  " | httpStatus=",  httpStatus,
+                  " | lastError=",   err,
+                  " | response=",    StringLen(body) > 0 ? body : "(empty)");
             Sleep(150);
         }
-        string responseBody = CharArrayToString(result, 0, -1, CP_UTF8);
-        Print("SMC_MarketDataEA send failed for ", symbol,
-              " status=", IntegerToString(lastHttpStatus),
-              " response=", responseBody);
+
+        Print("SMC_MarketDataEA send failed for ", symbol, " (all 3 attempts)"
+              " | lastStatus=", lastStatus);
         return false;
     }
 
 private:
-    // Convert a datetime to ISO 8601 UTC string (YYYY-MM-DDTHH:MM:SSZ).
-    // TimeToStruct() decomposes into broker-server local time, not UTC. Appending Z
+    // Convert datetime to ISO 8601 UTC string (YYYY-MM-DDTHH:MM:SSZ).
+    //
+    // TimeToStruct() decomposes broker server-local time, not UTC. Appending Z
     // without converting first produces a false UTC claim: a UTC+2 broker tick at
-    // server-time 12:00 would be stored as UTC 12:00 instead of UTC 10:00, shifting
-    // candle buckets by the server offset and breaking UNIQUE KEY alignment with
-    // Twelve Data's UTC-based candles.
+    // server-time 12:00 would be stored as "12:00Z" instead of "10:00Z", shifting
+    // candle buckets by the broker offset and breaking UNIQUE KEY alignment.
+    //
     // Fix: subtract the broker UTC offset (TimeCurrent() - TimeGMT()) before
     // decomposing so the formatted components are genuine UTC.
     string TimeToIso8601(datetime t)

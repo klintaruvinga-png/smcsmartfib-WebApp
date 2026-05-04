@@ -22,7 +22,17 @@ final class SMC_SuperFib_Sniper_REST {
     public static function boot() {
         $instance = new self();
         add_action('rest_api_init', array($instance, 'register_routes'));
-        add_filter('rest_pre_serve_request', array($instance, 'send_cors_headers'), 10, 4);
+        add_filter('rest_pre_serve_request', function($value) {
+            $allowed = 'https://smcsuperfibwebapp.klintaruvinga.workers.dev';
+            $origin  = $_SERVER['HTTP_ORIGIN'] ?? '';
+            if ($origin === $allowed) {
+                header('Access-Control-Allow-Origin: ' . $allowed);
+                header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
+                header('Access-Control-Allow-Headers: Authorization, Content-Type, X-WP-Nonce, X-EA-API-Key');
+                header('Access-Control-Allow-Credentials: true');
+            }
+            return $value;
+        }, 15);
 
         // Regression guard: Validate CORS configuration consistency
         if (!self::validate_cors_origins_consistency()) {
@@ -31,33 +41,22 @@ final class SMC_SuperFib_Sniper_REST {
 
         // Respond to CORS preflight (OPTIONS) requests before WordPress processes them.
         // Without this, the browser's preflight check silently fails and blocks POST/DELETE.
-        add_action('init', function () use ($instance) {
-            if (!isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'OPTIONS') {
-                return;
+        add_action('init', function() {
+            if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+                $allowed = 'https://smcsuperfibwebapp.klintaruvinga.workers.dev';
+                $origin  = $_SERVER['HTTP_ORIGIN'] ?? '';
+                if ($origin === $allowed) {
+                    header('Access-Control-Allow-Origin: ' . $allowed);
+                    header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
+                    header('Access-Control-Allow-Headers: Authorization, Content-Type, X-WP-Nonce, X-EA-API-Key');
+                    header('Access-Control-Allow-Credentials: true');
+                    header('Access-Control-Max-Age: 3600');
+                    header('Content-Length: 0');
+                    http_response_code(204);
+                    exit;
+                }
             }
-            $origin = isset($_SERVER['HTTP_ORIGIN']) ? esc_url_raw(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
-            if (!$origin) {
-                return;
-            }
-            $allowed = apply_filters('smc_sf_allowed_origins', array(
-                home_url(),
-                'https://trader.stokvelsociety.co.za',
-                'https://smcsuperfibwebapp.klintaruvinga.workers.dev',
-                'https://smcsmartfib.lovable.app',
-                'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
-            ));
-            if (!self::is_allowed_origin($origin, $allowed)) {
-                return;
-            }
-            header('Vary: Origin', false);
-            header('Access-Control-Allow-Origin: ' . $origin);
-            header('Access-Control-Allow-Credentials: true');
-            header('Access-Control-Allow-Headers: Content-Type, X-WP-Nonce, Authorization');
-            header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
-            header('Access-Control-Max-Age: 86400');
-            status_header(204);
-            exit;
-        });
+        }, 1); // Priority 1 — runs before anything else touches the response
     }
 
     public static function activate() {

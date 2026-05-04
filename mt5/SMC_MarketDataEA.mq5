@@ -4,8 +4,8 @@
 //|                                                                  |
 //| Setup:                                                           |
 //|  1. Set WebhookURL to your WP REST endpoint.                    |
-//|  2. Set ApiKey to match SMC_SF_EA_API_KEY on WordPress.          |
-//|  3. Set UserId to the WordPress user that owns the stream.       |
+//|  2. Set ApiKey to match SMC_SF_EA_API_KEY in wp-config.php.     |
+//|  3. Set UserId to the WordPress user_id that owns the stream.   |
 //|  4. Allow WebRequest for your domain in                         |
 //|     Tools → Options → Expert Advisors.                          |
 //+------------------------------------------------------------------+
@@ -20,50 +20,57 @@
 #include "SymbolNormalizer.mqh"
 #include "MarketDataEngine.mqh"
 
-input string WebhookURL  = "https://yoursite.com/wp-json/sniper/v1/ea/market-stream";
-input string ApiKey      = "";          // X-API-KEY value
-input int    UserId      = 1;           // WordPress user_id for EA ingest ownership
-input int    TimerSec    = 10;          // OnPeriodic interval in seconds
-input string Symbols     = "EURUSD,GBPUSD,XAUUSD,USDJPY,GBPJPY,AUDUSD";
+input string WebhookURL = "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream";
+input string ApiKey     = "";   // Must match SMC_SF_EA_API_KEY in wp-config.php
+input int    UserId     = 1;    // WordPress user_id that owns this data stream
+input int    TimerSec   = 10;   // OnPeriodic interval in seconds
+input string Symbols    = "EURUSD,GBPUSD,XAUUSD,USDJPY,GBPJPY,AUDUSD";
 
 MarketDataEngine engine;
 
-// CRITICAL FIX: Promote parsed symbol list to module-level so OnTimer() can iterate
-// all registered symbols and call SymbolInfoTick() for each.  Without this, OnTick()
-// only fires for the chart symbol; all other watched symbols remain at
-// FRESHNESS_DISCONNECTED permanently (lastTickTime = 0) because they never receive a
-// tick-driven update from OnTick().
+// Module-level symbol list — OnTimer() needs it to poll non-chart symbols.
+// OnTick() only fires for the chart symbol; without this loop every other
+// symbol stays at FRESHNESS_DISCONNECTED permanently.
 string g_symArray[];
 int    g_symCount = 0;
 
 int OnInit()
 {
-    // Parse comma-separated symbol list into module-level arrays.
+    // --- Validate inputs ---
+    if (StringLen(WebhookURL) == 0)
+    {
+        Print("SMC_MarketDataEA: WebhookURL is required");
+        return INIT_FAILED;
+    }
+    if (StringLen(ApiKey) == 0)
+    {
+        Print("SMC_MarketDataEA: ApiKey is required — set it to match SMC_SF_EA_API_KEY in wp-config.php");
+        return INIT_FAILED;
+    }
+    if (UserId <= 0)
+    {
+        Print("SMC_MarketDataEA: UserId must be a valid WordPress user_id (>= 1)");
+        return INIT_FAILED;
+    }
+
+    // --- Parse symbol list ---
     g_symCount = StringSplit(Symbols, ',', g_symArray);
     if (g_symCount <= 0)
     {
         Print("SMC_MarketDataEA: no symbols configured");
         return INIT_FAILED;
     }
-    if (UserId <= 0)
-    {
-        Print("SMC_MarketDataEA: UserId must be a valid WordPress user_id");
-        return INIT_FAILED;
-    }
-    if (StringLen(ApiKey) <= 0)
-    {
-        Print("SMC_MarketDataEA: ApiKey is required for /ea/market-stream");
-        return INIT_FAILED;
-    }
 
-    // Trim whitespace from each symbol token.
+    // Trim whitespace from each token
     for (int i = 0; i < g_symCount; i++)
     {
         StringTrimLeft(g_symArray[i]);
         StringTrimRight(g_symArray[i]);
     }
 
-    string auth = StringLen(ApiKey) > 0 ? "X-EA-API-Key: " + ApiKey : "";
+    // Build the full auth header line — engine stores and reuses it.
+    // Header name MUST match what PHP reads: get_header('x_ea_api_key')
+    string auth = "X-EA-API-Key: " + ApiKey;
 
     if (!engine.Initialize(g_symArray, g_symCount, WebhookURL, auth, UserId))
     {
@@ -83,7 +90,7 @@ void OnDeinit(const int reason)
 
 void OnTick()
 {
-    // Real-time tick for the chart symbol only — forward to engine.
+    // Real-time tick for the chart symbol — forward to engine immediately.
     MqlTick tick;
     if (!SymbolInfoTick(Symbol(), tick))
         return;
@@ -93,11 +100,9 @@ void OnTick()
 
 void OnTimer()
 {
-    // CRITICAL FIX: Refresh tick state for all non-chart symbols via SymbolInfoTick().
-    // In MQL5, OnTick() only fires when the chart symbol ticks.  Without this loop,
-    // every symbol other than the attached chart shows FRESHNESS_DISCONNECTED because
-    // FreshnessEngine.lastTickTimes[] remains 0 for them, making secondsSinceTick
-    // enormous and driving all non-chart symbols to FRESHNESS_STALE / DISCONNECTED.
+    // Poll all non-chart symbols so their freshness state stays accurate.
+    // In MQL5, OnTick() only fires for the chart symbol; without this loop
+    // every other watched symbol remains at FRESHNESS_DISCONNECTED.
     string chartSym = Symbol();
     for (int i = 0; i < g_symCount; i++)
     {
@@ -109,5 +114,6 @@ void OnTimer()
             engine.OnTick(g_symArray[i], tick.bid, tick.ask, tick.time, tick.volume);
     }
 
+    // Flush freshness, update session, and push all snapshots to PHP backend.
     engine.OnPeriodic();
 }
