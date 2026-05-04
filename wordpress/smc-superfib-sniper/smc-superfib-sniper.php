@@ -270,6 +270,22 @@ final class SMC_SuperFib_Sniper_REST {
         if (!hash_equals($configured, $provided)) {
             return new WP_Error('smc_sf_api_key_invalid', 'Invalid API key.', array('status' => 403));
         }
+
+        // Bind EA ingress to a concrete WordPress user context so downstream
+        // reads/writes use the same user_id (avoid storing under user_id=0).
+        $ea_user_id = absint(defined('SMC_SF_EA_USER_ID') ? SMC_SF_EA_USER_ID : getenv('SMC_SF_EA_USER_ID'));
+        if ($ea_user_id <= 0) {
+            error_log('SMC SuperFIB: SMC_SF_EA_USER_ID is not configured.');
+            return new WP_Error('smc_sf_ea_user_unconfigured', 'EA ingest user is not configured.', array('status' => 503));
+        }
+
+        $ea_user = get_user_by('id', $ea_user_id);
+        if (!$ea_user || !user_can($ea_user, 'read')) {
+            error_log('SMC SuperFIB: SMC_SF_EA_USER_ID is invalid or lacks read capability.');
+            return new WP_Error('smc_sf_ea_user_invalid', 'EA ingest user is invalid.', array('status' => 503));
+        }
+
+        wp_set_current_user($ea_user_id);
         return true;
     }
 
