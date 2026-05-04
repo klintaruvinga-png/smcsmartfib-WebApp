@@ -903,6 +903,9 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         $symbol = sanitize_text_field(strtoupper($payload['symbol']));
+        if (!empty($payload['normalized_symbol'])) {
+            $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper(sanitize_text_field($payload['normalized_symbol'])));
+        }
         $timeframe = $this->normalize_mt5_timeframe($payload['timeframe'] ?? 'M15');
         $snapshot_updated_at = $this->normalize_market_timestamp($payload['timestamp'] ?? null, $this->now_mysql());
 
