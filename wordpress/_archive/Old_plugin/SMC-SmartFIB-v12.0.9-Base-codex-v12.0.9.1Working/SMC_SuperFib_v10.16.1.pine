@@ -1,6 +1,6 @@
 //@version=6
 const string INDICATOR_NAME = "SMC SuperFib"
-const string INDICATOR_BUILD = "v10.16.1 (dashboard compat v12.0.9.1)"
+const string INDICATOR_BUILD = "v12.0.9.1 - AM Bug Run"
 indicator(INDICATOR_NAME + " " + INDICATOR_BUILD + " Smart Layout", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500, max_bars_back=5000)
 
 var GD = "Display"
