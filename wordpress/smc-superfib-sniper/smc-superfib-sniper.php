@@ -2160,15 +2160,40 @@ final class SMC_SuperFib_Sniper_REST {
             // Otherwise: keep existing (MT5 preferred, or existing is already MT5)
         }
 
+        // Take top N candles (by most recent timestamps)
+        $rows = array_slice($deduped, 0, $outputsize);
+
         if ($timeframe !== '1min') {
             $mt5_aggregated = $this->fetch_aggregated_mt5_m1_candles($user_id, $symbol, $timeframe, $outputsize);
             if (!empty($mt5_aggregated)) {
-                return $mt5_aggregated;
+                $canonical_latest = 0;
+                if (!empty($rows[0]['candle_time'])) {
+                    $canonical_latest = strtotime($rows[0]['candle_time'] . ' UTC');
+                    if ($canonical_latest === false) {
+                        $canonical_latest = 0;
+                    }
+                }
+
+                $mt5_latest = 0;
+                $mt5_last = end($mt5_aggregated);
+                if (!empty($mt5_last['time'])) {
+                    $mt5_latest = strtotime($mt5_last['time']);
+                    if ($mt5_latest === false) {
+                        $mt5_latest = 0;
+                    }
+                }
+
+                $tf_seconds = max(60, (int) $this->timeframe_seconds($timeframe));
+                $freshness_window = max($tf_seconds * 2, 300);
+                $mt5_is_recent = $mt5_latest > 0 && (time() - $mt5_latest) <= $freshness_window;
+                $mt5_has_coverage = count($mt5_aggregated) >= min(max(1, (int) $outputsize), 5);
+                $mt5_not_older_than_canonical = $canonical_latest <= 0 || $mt5_latest >= ($canonical_latest - $tf_seconds);
+
+                if ($mt5_is_recent && $mt5_has_coverage && $mt5_not_older_than_canonical) {
+                    return $mt5_aggregated;
+                }
             }
         }
-
-        // Take top N candles (by most recent timestamps)
-        $rows = array_slice($deduped, 0, $outputsize);
 
         // Reverse to chronological order (oldest to newest)
         $rows = array_reverse($rows);
