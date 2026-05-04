@@ -23,13 +23,10 @@ final class SMC_SuperFib_Sniper_REST {
         $instance = new self();
         add_action('rest_api_init', array($instance, 'register_routes'));
         add_filter('rest_pre_serve_request', function($value) {
-            $allowed = 'https://smcsuperfibwebapp.klintaruvinga.workers.dev';
+            $allowed = self::get_allowed_origins();
             $origin  = $_SERVER['HTTP_ORIGIN'] ?? '';
-            if ($origin === $allowed) {
-                header('Access-Control-Allow-Origin: ' . $allowed);
-                header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
-                header('Access-Control-Allow-Headers: Authorization, Content-Type, X-WP-Nonce, X-EA-API-Key');
-                header('Access-Control-Allow-Credentials: true');
+            if ($origin && self::is_allowed_origin($origin, $allowed)) {
+                self::send_cors_headers_for_origin($origin);
             }
             return $value;
         }, 15);
@@ -43,13 +40,10 @@ final class SMC_SuperFib_Sniper_REST {
         // Without this, the browser's preflight check silently fails and blocks POST/DELETE.
         add_action('init', function() {
             if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-                $allowed = 'https://smcsuperfibwebapp.klintaruvinga.workers.dev';
+                $allowed = self::get_allowed_origins();
                 $origin  = $_SERVER['HTTP_ORIGIN'] ?? '';
-                if ($origin === $allowed) {
-                    header('Access-Control-Allow-Origin: ' . $allowed);
-                    header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
-                    header('Access-Control-Allow-Headers: Authorization, Content-Type, X-WP-Nonce, X-EA-API-Key');
-                    header('Access-Control-Allow-Credentials: true');
+                if ($origin && self::is_allowed_origin($origin, $allowed)) {
+                    self::send_cors_headers_for_origin($origin);
                     header('Access-Control-Max-Age: 3600');
                     header('Content-Length: 0');
                     http_response_code(204);
@@ -234,7 +228,7 @@ final class SMC_SuperFib_Sniper_REST {
         register_rest_route(self::NAMESPACE, '/ea/market-stream', array(
             'methods' => WP_REST_Server::CREATABLE,
             'callback' => array($this, 'post_ea_market_stream'),
-            'permission_callback' => array($this, 'verify_ea_api_key'),
+            'permission_callback' => array($this, 'permission_ea_market_stream'),
         ));
     }
 
@@ -255,9 +249,9 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     public function permission_ea_market_stream(WP_REST_Request $request) {
-        $provided = trim((string) $request->get_header('X-API-KEY'));
+        $provided = trim((string) $this->get_ea_api_key($request));
         if ($provided === '') {
-            return new WP_Error('smc_sf_api_key_missing', 'X-API-KEY header required.', array('status' => 401));
+            return new WP_Error('smc_sf_api_key_missing', 'X-EA-API-Key or X-API-KEY header required.', array('status' => 401));
         }
 
         $configured = trim((string) (defined('SMC_SF_EA_API_KEY') ? SMC_SF_EA_API_KEY : getenv('SMC_SF_EA_API_KEY')));
@@ -292,11 +286,27 @@ final class SMC_SuperFib_Sniper_REST {
         $expected = defined('SMC_SF_EA_API_KEY') ? SMC_SF_EA_API_KEY : '';
         if (empty($expected)) return false;
 
-        // Accept either header name so EA and curl both work
-        $sent = $request->get_header('x_ea_api_key')
-             ?: $request->get_header('x_api_key');
+        $sent = trim((string) $this->get_ea_api_key($request));
+        return $sent !== '' && hash_equals($expected, $sent);
+    }
 
-        return hash_equals($expected, (string) $sent);
+    private function get_ea_api_key(WP_REST_Request $request): string
+    {
+        $header_names = array(
+            'x-ea-api-key',
+            'x_ea_api_key',
+            'x-api-key',
+            'x_api_key',
+        );
+
+        foreach ($header_names as $name) {
+            $value = trim((string) $request->get_header($name));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
     }
 
     private function resolve_ea_user_id(): int
@@ -322,35 +332,36 @@ final class SMC_SuperFib_Sniper_REST {
         return $host && (bool) preg_match('/^(?:[0-9a-f\-]+\.lovableproject\.com|id-preview--[0-9a-z\-]+\.lovable\.app)$/', $host);
     }
 
+    private static function get_allowed_origins() {
+        return array(
+            home_url(),
+            'https://trader.stokvelsociety.co.za',
+            'https://smcsuperfibwebapp.klintaruvinga.workers.dev',
+            'https://smcsmartfib.lovable.app',
+            'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
+        );
+    }
+
+    private static function get_cors_allowed_headers() {
+        return 'Authorization, Content-Type, X-WP-Nonce, X-EA-API-Key, X-API-KEY';
+    }
+
+    private static function send_cors_headers_for_origin($origin) {
+        header('Access-Control-Allow-Origin: ' . $origin);
+        header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
+        header('Access-Control-Allow-Headers: ' . self::get_cors_allowed_headers());
+        header('Access-Control-Allow-Credentials: true');
+    }
+
     /**
      * Regression guard: Ensure CORS allowed origins are consistently defined.
      * This prevents future CORS issues from protocol prefix mismatches.
      */
     private static function validate_cors_origins_consistency() {
-        $options_origins = array(
-            home_url(),
-            'https://trader.stokvelsociety.co.za',
-            'https://smcsuperfibwebapp.klintaruvinga.workers.dev',
-            'https://smcsmartfib.lovable.app',
-            'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
-        );
-
-        $headers_origins = array(
-            home_url(),
-            'https://trader.stokvelsociety.co.za',
-            'https://smcsuperfibwebapp.klintaruvinga.workers.dev',
-            'https://smcsmartfib.lovable.app',
-            'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
-        );
-
-        // Check that both arrays are identical
-        if ($options_origins !== $headers_origins) {
-            error_log('CORS REGRESSION GUARD: Allowed origins mismatch between OPTIONS handler and headers method. This could cause CORS failures.');
-            return false;
-        }
+        $allowed_origins = self::get_allowed_origins();
 
         // Validate that all origins include protocol (no bare hostnames)
-        foreach ($options_origins as $origin) {
+        foreach ($allowed_origins as $origin) {
             if (!wp_parse_url($origin, PHP_URL_SCHEME)) {
                 error_log('CORS REGRESSION GUARD: Origin missing protocol: ' . $origin . '. All origins must include https:// prefix.');
                 return false;
@@ -380,7 +391,7 @@ final class SMC_SuperFib_Sniper_REST {
         if (self::is_allowed_origin($origin, $allowed)) {
             header('Access-Control-Allow-Origin: ' . $origin);
             header('Access-Control-Allow-Credentials: true');
-            header('Access-Control-Allow-Headers: Content-Type, X-WP-Nonce, Authorization');
+            header('Access-Control-Allow-Headers: Content-Type, X-WP-Nonce, Authorization, X-EA-API-Key, X-API-KEY');
             header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
         }
 
@@ -918,9 +929,16 @@ final class SMC_SuperFib_Sniper_REST {
      * }
      */
     public function post_ea_market_stream(WP_REST_Request $request) {
-        // Resolve user_id from API key — EA has no WP session
-        $user_id = $this->resolve_ea_user_id();
         $payload = $request->get_json_params();
+        $user_id = isset($payload['user_id']) ? (int) $payload['user_id'] : 0;
+        if ($user_id <= 0) {
+            $user_id = $this->resolve_ea_user_id();
+        }
+
+        $user = get_userdata($user_id);
+        if (!$user || !user_can($user, 'read')) {
+            return new WP_Error('smc_sf_user_invalid', 'user_id must reference a valid readable user.', array('status' => 403));
+        }
 
         // Regression guard: Validate payload structure
         if (!$payload || !isset($payload['symbol'])) {
