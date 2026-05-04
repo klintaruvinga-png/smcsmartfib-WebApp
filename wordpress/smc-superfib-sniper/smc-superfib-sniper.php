@@ -26,7 +26,7 @@ final class SMC_SuperFib_Sniper_REST {
         // Send CORS headers on all REST responses (success, error, auth failure, etc)
         add_filter('rest_post_dispatch', function($response, $server, $request) {
             $allowed = self::get_allowed_origins();
-            $origin  = $_SERVER['HTTP_ORIGIN'] ?? '';
+            $origin  = isset($_SERVER['HTTP_ORIGIN']) ? esc_url_raw(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
             if ($origin && self::is_allowed_origin($origin, $allowed)) {
                 self::send_cors_headers_for_origin($origin);
             }
@@ -35,7 +35,7 @@ final class SMC_SuperFib_Sniper_REST {
         
         add_filter('rest_pre_serve_request', function($value) {
             $allowed = self::get_allowed_origins();
-            $origin  = $_SERVER['HTTP_ORIGIN'] ?? '';
+            $origin  = isset($_SERVER['HTTP_ORIGIN']) ? esc_url_raw(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
             if ($origin && self::is_allowed_origin($origin, $allowed)) {
                 self::send_cors_headers_for_origin($origin);
             }
@@ -339,22 +339,37 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private static function is_allowed_origin($origin, $allowed) {
-        if (in_array(untrailingslashit($origin), array_map('untrailingslashit', $allowed), true)) {
+        $normalized = untrailingslashit($origin);
+        $allowed_normalized = array_map('untrailingslashit', $allowed);
+
+        if (in_array($normalized, $allowed_normalized, true)) {
             return true;
         }
-        // Allow any Lovable preview host used by the dashboard.
+
         $host = wp_parse_url($origin, PHP_URL_HOST);
-        return $host && (bool) preg_match('/^(?:[0-9a-f\-]+\.lovableproject\.com|id-preview--[0-9a-z\-]+\.lovable\.app)$/', $host);
+        if (!$host) {
+            return false;
+        }
+
+        if (preg_match('/^(?:[0-9a-f\-]+\.lovableproject\.com|id-preview--[0-9a-z\-]+\.lovable\.app)$/', $host)) {
+            return true;
+        }
+
+        if (preg_match('/\.workers\.dev$/', $host)) {
+            return true;
+        }
+
+        return false;
     }
 
     private static function get_allowed_origins() {
-        return array(
+        return apply_filters('smc_sf_allowed_origins', array(
             home_url(),
             'https://trader.stokvelsociety.co.za',
             'https://smcsuperfibwebapp.klintaruvinga.workers.dev',
             'https://smcsmartfib.lovable.app',
             'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
-        );
+        ));
     }
 
     private static function get_cors_allowed_headers() {
@@ -362,6 +377,7 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private static function send_cors_headers_for_origin($origin) {
+        header('Vary: Origin', false);
         header('Access-Control-Allow-Origin: ' . $origin);
         header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
         header('Access-Control-Allow-Headers: ' . self::get_cors_allowed_headers());
@@ -374,6 +390,7 @@ final class SMC_SuperFib_Sniper_REST {
      */
     private static function validate_cors_origins_consistency() {
         $allowed_origins = self::get_allowed_origins();
+        $normalized_origins = array_map('untrailingslashit', $allowed_origins);
 
         // Validate that all origins include protocol (no bare hostnames)
         foreach ($allowed_origins as $origin) {
@@ -381,6 +398,12 @@ final class SMC_SuperFib_Sniper_REST {
                 error_log('CORS REGRESSION GUARD: Origin missing protocol: ' . $origin . '. All origins must include https:// prefix.');
                 return false;
             }
+        }
+
+        // Validate that there are no duplicate origins after normalization.
+        if (count($normalized_origins) !== count(array_unique($normalized_origins))) {
+            error_log('CORS REGRESSION GUARD: Duplicate origins found after normalization in allowed origins.');
+            return false;
         }
 
         return true;
@@ -396,13 +419,7 @@ final class SMC_SuperFib_Sniper_REST {
             return $served;
         }
 
-        $allowed = apply_filters('smc_sf_allowed_origins', array(
-            home_url(),
-            'https://trader.stokvelsociety.co.za',
-            'https://smcsuperfibwebapp.klintaruvinga.workers.dev',
-            'https://smcsmartfib.lovable.app',
-            'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
-        ));
+        $allowed = self::get_allowed_origins();
         if (self::is_allowed_origin($origin, $allowed)) {
             header('Access-Control-Allow-Origin: ' . $origin);
             header('Access-Control-Allow-Credentials: true');
