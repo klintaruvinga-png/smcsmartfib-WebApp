@@ -203,7 +203,7 @@ require_once __DIR__ . '/../../smc-superfib-sniper.php';
 
 function dispatch_ea_market_stream($plugin, $payload, $headers = array()) {
     if (empty($headers)) {
-        $headers = array('X-API-KEY' => 'test-key');
+        $headers = array('X-EA-API-Key' => 'test-key');
     }
     $request = new WP_REST_Request($payload, $headers);
     $permission = $plugin->permission_ea_market_stream($request);
@@ -304,7 +304,28 @@ function test_ea_market_stream() {
 
     echo "\n";
 
-    // Test 2: Permission requires user_id before callback runs.
+    // Test 2: Alternate header name X-API-KEY accepted
+    echo "Test 2: Alternate header name X-API-KEY accepted\n";
+    $alternate_header_payload = array(
+        'user_id' => 7,
+        'symbol' => 'USDJPY',
+        'timeframe' => 'M15',
+        'timestamp' => gmdate('c', time()),
+        'bid' => 148.321,
+        'ask' => 148.335
+    );
+    $alternate_header_response = dispatch_ea_market_stream($plugin, $alternate_header_payload, array('X-API-KEY' => 'test-key'));
+
+    if ($alternate_header_response instanceof WP_REST_Response && isset($alternate_header_response->data['ok']) && $alternate_header_response->data['ok']) {
+        echo "✓ SUCCESS: X-API-KEY header accepted\n";
+    } else {
+        echo "✗ FAILED: X-API-KEY header rejected\n";
+        var_dump($alternate_header_response);
+    }
+
+    echo "\n";
+
+    // Test 3: Permission requires user_id before callback runs.
     echo "Test 2: Missing user_id rejected by EA permission gate\n";
     $missing_user_payload = array(
         'symbol' => 'EURUSD',
