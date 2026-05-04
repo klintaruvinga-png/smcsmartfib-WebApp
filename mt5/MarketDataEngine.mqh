@@ -189,6 +189,8 @@ public:
         if (StringLen(payload) == 0)
             return false;
         string headers = "Content-Type: application/json\r\n";
+        headers += "Connection: close\r\n";
+        headers += "Accept: application/json\r\n";
         if (StringLen(authHeader) > 0)
             headers += authHeader + "\r\n";
 
