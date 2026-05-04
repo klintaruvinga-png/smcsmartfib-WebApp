@@ -6,32 +6,35 @@
  * to test if the backend correctly receives and stores price and candlestick data.
  */
 
-// Configuration - Update these for your WordPress instance
-$wordpress_url = 'https://trader.stokvelsociety.co.za//wp-json/sniper/v1/snapshot';
-$username   = 'admin';  // WP username that generated the application password below
-$auth_token = 'dD9c lGv5 GDw6 KlB4 T2vv PMmI'; // WP Application Password
+// Configuration - set these through environment variables for your WordPress instance.
+$wordpress_url = getenv('SMC_SF_EA_ENDPOINT') ?: 'https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream';
+$api_key       = getenv('SMC_SF_EA_API_KEY') ?: '';
+$user_id       = (int) (getenv('SMC_SF_EA_USER_ID') ?: 1);
+
+if ($api_key === '') {
+    echo "Missing SMC_SF_EA_API_KEY environment variable.\n";
+    exit(1);
+}
 
 // Sample MT5 payload (matches the format from MarketDataEngine.mqh)
 $sample_payload = [
+    'user_id' => $user_id,
     'symbol' => 'EURUSD',
     'normalized_symbol' => 'EURUSD',
-    'tick' => [
-        'bid' => 1.0845,
-        'ask' => 1.0847,
-        'spread' => 2,
-        'timestamp' => '2026-05-03T12:00:00.000Z',
-        'volume' => 100
-    ],
-    'candle_m1' => [
+    'timeframe' => 'M1',
+    'timestamp' => gmdate('c'),
+    'bid' => 1.0845,
+    'ask' => 1.0847,
+    'freshness' => 'LIVE',
+    'session' => 'London',
+    'candle' => [
+        'time' => gmdate('c', time() - 60),
         'open' => 1.0840,
         'high' => 1.0850,
         'low' => 1.0835,
         'close' => 1.0845,
-        'volume' => 5000,
-        'timestamp' => '2026-05-03T12:00:00Z'
+        'volume' => 5000
     ],
-    'freshness' => 'LIVE',
-    'session' => 'London',
     'is_synthetic' => false
 ];
 
@@ -42,7 +45,6 @@ echo "Sending payload to: $wordpress_url\n";
 echo "Payload:\n" . json_encode($sample_payload, JSON_PRETTY_PRINT) . "\n\n";
 
 $json_body = json_encode($sample_payload);
-$auth_header = 'Basic ' . base64_encode($username . ':' . $auth_token);
 
 if (function_exists('curl_init')) {
     $ch = curl_init();
@@ -51,7 +53,7 @@ if (function_exists('curl_init')) {
     curl_setopt($ch, CURLOPT_POSTFIELDS, $json_body);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/json',
-        'Authorization: ' . $auth_header,
+        'X-API-KEY: ' . $api_key,
     ]);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
@@ -71,7 +73,7 @@ if (function_exists('curl_init')) {
             'method'        => 'POST',
             'header'        => implode("\r\n", [
                 'Content-Type: application/json',
-                'Authorization: ' . $auth_header,
+                'X-API-KEY: ' . $api_key,
             ]),
             'content'       => $json_body,
             'ignore_errors' => true,
@@ -97,7 +99,7 @@ if (function_exists('curl_init')) {
     // Last resort: shell out to curl.exe (bundled with Windows 10+) or PowerShell
     $escaped_url  = escapeshellarg($wordpress_url);
     $escaped_body = escapeshellarg($json_body);
-    $escaped_auth = escapeshellarg('Authorization: ' . $auth_header);
+    $escaped_auth = escapeshellarg('X-API-KEY: ' . $api_key);
 
     // Try curl.exe first (Windows 10 1803+ ships it in System32)
     exec('curl.exe --version 2>NUL', $ver_out, $ver_ret);
@@ -134,7 +136,7 @@ if (function_exists('curl_init')) {
         $ps_cmd  = "powershell -NoProfile -Command \""
                  . "\$r = Invoke-WebRequest -Uri '$wordpress_url' "
                  . "-Method POST "
-                 . "-Headers @{'Content-Type'='application/json';'Authorization'='" . addslashes($auth_header) . "'} "
+                 . "-Headers @{'Content-Type'='application/json';'X-API-KEY'='" . addslashes($api_key) . "'} "
                  . "-Body '" . $ps_body . "' -UseBasicParsing; "
                  . "Write-Output (\$r.StatusCode.ToString() + '|' + \$r.Content)"
                  . "\"";

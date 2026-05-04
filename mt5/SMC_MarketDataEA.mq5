@@ -4,9 +4,9 @@
 //|                                                                  |
 //| Setup:                                                           |
 //|  1. Set WebhookURL to your WP REST endpoint.                    |
-//|  2. Set AuthToken to a WP Application Password                  |
-//|     (Settings → Users → Application Passwords).                 |
-//|  3. Allow WebRequest for your domain in                         |
+//|  2. Set ApiKey to match SMC_SF_EA_API_KEY on WordPress.          |
+//|  3. Set UserId to the WordPress user that owns the stream.       |
+//|  4. Allow WebRequest for your domain in                         |
 //|     Tools → Options → Expert Advisors.                          |
 //+------------------------------------------------------------------+
 #property copyright "SMC SuperFib"
@@ -22,6 +22,7 @@
 
 input string WebhookURL  = "https://yoursite.com/wp-json/sniper/v1/ea/market-stream";
 input string ApiKey      = "";          // X-API-KEY value
+input int    UserId      = 1;           // WordPress user_id for EA ingest ownership
 input int    TimerSec    = 10;          // OnPeriodic interval in seconds
 input string Symbols     = "EURUSD,GBPUSD,XAUUSD,USDJPY,GBPJPY,AUDUSD";
 
@@ -44,6 +45,16 @@ int OnInit()
         Print("SMC_MarketDataEA: no symbols configured");
         return INIT_FAILED;
     }
+    if (UserId <= 0)
+    {
+        Print("SMC_MarketDataEA: UserId must be a valid WordPress user_id");
+        return INIT_FAILED;
+    }
+    if (StringLen(ApiKey) <= 0)
+    {
+        Print("SMC_MarketDataEA: ApiKey is required for /ea/market-stream");
+        return INIT_FAILED;
+    }
 
     // Trim whitespace from each symbol token.
     for (int i = 0; i < g_symCount; i++)
@@ -52,11 +63,9 @@ int OnInit()
         StringTrimRight(g_symArray[i]);
     }
 
-    string auth = (StringLen(ApiKey) > 0)
-                  ? "X-API-KEY: " + ApiKey + "\r\n"
-                  : "";
+    string auth = "X-API-KEY: " + ApiKey;
 
-    if (!engine.Initialize(g_symArray, g_symCount, WebhookURL, auth))
+    if (!engine.Initialize(g_symArray, g_symCount, WebhookURL, auth, UserId))
     {
         Print("SMC_MarketDataEA: engine init failed");
         return INIT_FAILED;

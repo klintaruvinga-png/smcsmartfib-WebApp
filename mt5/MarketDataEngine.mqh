@@ -26,8 +26,9 @@ private:
     string symbols[100];
     int    symbolCount;
 
-    string webhookUrl;   // e.g. "https://yoursite.com/wp-json/sniper/v1/snapshot"
+    string webhookUrl;   // e.g. "https://yoursite.com/wp-json/sniper/v1/ea/market-stream"
     string authHeader;   // e.g. "X-API-KEY: <token>"
+    int    wpUserId;
     datetime lastSentCandleM1[100];
 
 public:
@@ -41,6 +42,7 @@ public:
         symbolCount      = 0;
         webhookUrl       = "";
         authHeader       = "";
+        wpUserId         = 0;
         ArrayInitialize(lastSentCandleM1, 0);
     }
 
@@ -54,7 +56,7 @@ public:
     }
 
     bool Initialize(string& activeSymbols[], int count,
-                    string url = "", string auth = "")
+                    string url = "", string auth = "", int userId = 0)
     {
         symbolCount = MathMin(count, 100);
         for (int i = 0; i < symbolCount; i++)
@@ -62,6 +64,7 @@ public:
 
         webhookUrl = url;
         authHeader = auth;
+        wpUserId   = userId;
         return true;
     }
 
@@ -150,11 +153,16 @@ public:
         if (digits < 0) digits = 5;
         string tf = "M1";
         string json = "{";
+        if (wpUserId > 0)
+            json += "\"user_id\":" + IntegerToString(wpUserId) + ",";
         json += "\"symbol\":\"" + symbol + "\",";
+        json += "\"normalized_symbol\":\"" + norm + "\",";
         json += "\"timeframe\":\"" + tf + "\",";
         json += "\"timestamp\":\"" + TimeToIso8601(tick.timestamp) + "\",";
         json += "\"bid\":" + DoubleToString(tick.bid, digits) + ",";
-        json += "\"ask\":" + DoubleToString(tick.ask, digits);
+        json += "\"ask\":" + DoubleToString(tick.ask, digits) + ",";
+        json += "\"freshness\":\"" + FreshnessStateName(GetFreshnessState(symbol)) + "\",";
+        json += "\"session\":\"" + GetSessionName() + "\"";
 
         if (hasCandle && candleBuilder.ValidateCandle(candle))
         {
@@ -190,15 +198,20 @@ public:
 
         StringToCharArray(payload, postData, 0, StringLen(payload));
 
+        int lastHttpStatus = -1;
         for (int attempt = 0; attempt < 3; attempt++)
         {
             int httpStatus = WebRequest("POST", webhookUrl, headers, 5000,
                                         postData, result, responseHeaders);
+            lastHttpStatus = httpStatus;
             if (httpStatus == 200 || httpStatus == 201)
                 return true;
             Sleep(150);
         }
-        Print("SMC_MarketDataEA send failed for ", symbol);
+        string responseBody = CharArrayToString(result, 0, -1, CP_UTF8);
+        Print("SMC_MarketDataEA send failed for ", symbol,
+              " status=", IntegerToString(lastHttpStatus),
+              " response=", responseBody);
         return false;
     }
 
