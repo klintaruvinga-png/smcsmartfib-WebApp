@@ -22,6 +22,17 @@ final class SMC_SuperFib_Sniper_REST {
     public static function boot() {
         $instance = new self();
         add_action('rest_api_init', array($instance, 'register_routes'));
+        
+        // Send CORS headers on all REST responses (success, error, auth failure, etc)
+        add_filter('rest_post_dispatch', function($response, $server, $request) {
+            $allowed = self::get_allowed_origins();
+            $origin  = $_SERVER['HTTP_ORIGIN'] ?? '';
+            if ($origin && self::is_allowed_origin($origin, $allowed)) {
+                self::send_cors_headers_for_origin($origin);
+            }
+            return $response;
+        }, 10, 3);
+        
         add_filter('rest_pre_serve_request', function($value) {
             $allowed = self::get_allowed_origins();
             $origin  = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -38,16 +49,20 @@ final class SMC_SuperFib_Sniper_REST {
 
         // Respond to CORS preflight (OPTIONS) requests before WordPress processes them.
         // Without this, the browser's preflight check silently fails and blocks POST/DELETE.
-        add_action('init', function() {
-            if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-                $allowed = self::get_allowed_origins();
-                $origin  = $_SERVER['HTTP_ORIGIN'] ?? '';
-                if ($origin && self::is_allowed_origin($origin, $allowed)) {
-                    self::send_cors_headers_for_origin($origin);
-                    header('Access-Control-Max-Age: 3600');
-                    header('Content-Length: 0');
-                    http_response_code(204);
-                    exit;
+        add_action('wp_loaded', function() {
+            if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+                // Check if this is a request to our REST API
+                $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+                if (strpos($request_uri, '/wp-json/sniper/v1/') !== false) {
+                    $allowed = self::get_allowed_origins();
+                    $origin  = $_SERVER['HTTP_ORIGIN'] ?? '';
+                    if ($origin && self::is_allowed_origin($origin, $allowed)) {
+                        self::send_cors_headers_for_origin($origin);
+                        header('Access-Control-Max-Age: 86400');
+                        header('Content-Length: 0');
+                        http_response_code(204);
+                        exit;
+                    }
                 }
             }
         }, 1); // Priority 1 — runs before anything else touches the response
