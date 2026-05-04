@@ -111,8 +111,14 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
       const errorBody = await res.text();
       throw new Error(`API ${path} failed: ${res.status}${errorBody ? ` - ${errorBody}` : ""}`);
     }
-    
-    return (await res.json()) as T;
+
+    // Handle empty-body success responses (e.g. 204 No Content from DELETE endpoints).
+    if (res.status === 204) return {} as T;
+
+    const text = await res.text();
+    if (!text.trim()) return {} as T;
+
+    return JSON.parse(text) as T;
   } catch (error) {
     // CRITICAL: Never swallow errors. Log and rethrow so consumers can handle properly.
     if (error instanceof AuthError) throw error;
