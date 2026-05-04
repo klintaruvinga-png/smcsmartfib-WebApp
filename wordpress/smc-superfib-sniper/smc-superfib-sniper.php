@@ -866,7 +866,8 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         $symbol = sanitize_text_field(strtoupper($payload['symbol']));
-        $timeframe = sanitize_text_field($payload['timeframe'] ?? 'M15');
+        $timeframe = $this->normalize_mt5_timeframe($payload['timeframe'] ?? 'M15');
+        $snapshot_updated_at = $this->normalize_market_timestamp($payload['timestamp'] ?? null, $this->now_mysql());
 
         // Regression guard: Freshness enforcement - reject stale data (>5 minutes old)
         if (!empty($payload['timestamp'])) {
@@ -893,7 +894,7 @@ final class SMC_SuperFib_Sniper_REST {
             $ask = (float) $payload['ask'];
             
             if ($bid > 0 && $ask > 0 && $bid <= $ask) {
-                $result = $this->upsert_mt5_snapshot($user_id, $symbol, $bid, $ask);
+                $result = $this->upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $snapshot_updated_at);
                 if ($result) {
                     $inserted_snapshots = 1;
                 }
@@ -944,11 +945,12 @@ final class SMC_SuperFib_Sniper_REST {
      * Insert or update MT5 price snapshot
      * Regression guard: Atomic operation with proper source tagging
      */
-    private function upsert_mt5_snapshot($user_id, $symbol, $bid, $ask) {
+    private function upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $updated_at = null) {
         global $wpdb;
 
         $mid = ($bid + $ask) / 2;
         $spread = ($ask - $bid) * 10000; // Convert to pips (assuming 4-decimal pairs)
+        $updated_at = $this->normalize_market_timestamp($updated_at, $this->now_mysql());
 
         $result = $wpdb->replace(
             $this->table('snapshots'),
@@ -962,7 +964,7 @@ final class SMC_SuperFib_Sniper_REST {
                 'change_pct_1d' => 0, // MT5 doesn't provide this, will be calculated separately
                 'source' => 'mt5',
                 'state' => 'live',
-                'updated_at' => $this->now_mysql()
+                'updated_at' => $updated_at
             ),
             array('%d', '%s', '%f', '%f', '%f', '%d', '%f', '%s', '%s', '%s')
         );
@@ -2766,6 +2768,27 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         return gmdate('Y-m-d H:i:s', $ts);
+    }
+
+    private function normalize_mt5_timeframe($timeframe) {
+        $value = strtoupper(trim((string) $timeframe));
+        $mt5_map = array(
+            'M1' => '1min',
+            'M5' => '5min',
+            'M15' => '15min',
+            'M30' => '30min',
+            'H1' => '1h',
+            'H4' => '4h',
+            'D1' => '1day',
+            'W1' => '1week',
+            'MN1' => '1month',
+        );
+
+        if (isset($mt5_map[$value])) {
+            return $mt5_map[$value];
+        }
+
+        return sanitize_text_field($timeframe ?: '15min');
     }
 
     private function mt5_freshness_to_snapshot_state($freshness) {

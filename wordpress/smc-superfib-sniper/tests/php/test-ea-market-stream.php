@@ -215,6 +215,21 @@ function test_ea_market_stream() {
             echo "  Symbol: " . $candle['symbol'] . "\n";
             echo "  Timeframe: " . $candle['timeframe'] . "\n";
             echo "  Source: " . $candle['source'] . "\n";
+            if ($candle['timeframe'] === '15min') {
+                echo "✓ SUCCESS: MT5 timeframe normalized to internal value\n";
+            } else {
+                echo "✗ FAILED: MT5 timeframe not normalized\n";
+            }
+        }
+
+        if (isset($wpdb->tables[$snapshots_table])) {
+            $snapshot = reset($wpdb->tables[$snapshots_table]);
+            $expected_snapshot_time = gmdate('Y-m-d H:i:s', strtotime($payload['timestamp']));
+            if ($snapshot['updated_at'] === $expected_snapshot_time) {
+                echo "✓ SUCCESS: Snapshot uses payload timestamp for updated_at\n";
+            } else {
+                echo "✗ FAILED: Snapshot updated_at does not match payload timestamp\n";
+            }
         }
     } else {
         echo "✗ FAILED: Invalid response\n";
