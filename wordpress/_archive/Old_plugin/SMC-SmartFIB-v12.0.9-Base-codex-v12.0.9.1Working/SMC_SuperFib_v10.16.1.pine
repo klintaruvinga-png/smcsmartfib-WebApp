@@ -1,6 +1,6 @@
 //@version=6
 const string INDICATOR_NAME = "SMC SuperFib"
-const string INDICATOR_BUILD = "v12.0.9.1 - AM Bug Run"
+const string INDICATOR_BUILD = "v10.16.1 (dashboard compat v12.0.9.1)"
 indicator(INDICATOR_NAME + " " + INDICATOR_BUILD + " Smart Layout", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500, max_bars_back=5000)
 
 var GD = "Display"
@@ -2498,7 +2498,7 @@ if barstate.islast and (not ict_enabled or not show_ict_table)
         _tbl_mini_init := false
 
 if ict_enabled and show_ict_table and barstate.islast
-    header_text = INDICATOR_NAME + " " + INDICATOR_BUILD + " TP Gate" + (context_stack_minimized ? " [+]" : " [−]")
+    header_text = INDICATOR_NAME + " " + " TP Gate" + (context_stack_minimized ? " [+]" : " [−]")
 
     if context_stack_minimized
         if _tbl_full_init
