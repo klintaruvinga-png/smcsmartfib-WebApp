@@ -27,7 +27,8 @@ private:
     int    symbolCount;
 
     string webhookUrl;   // e.g. "https://yoursite.com/wp-json/sniper/v1/snapshot"
-    string authHeader;   // e.g. "Authorization: Bearer <token>"
+    string authHeader;   // e.g. "X-API-KEY: <token>"
+    datetime lastSentCandleM1[100];
 
 public:
     MarketDataEngine()
@@ -40,6 +41,7 @@ public:
         symbolCount      = 0;
         webhookUrl       = "";
         authHeader       = "";
+        ArrayInitialize(lastSentCandleM1, 0);
     }
 
     ~MarketDataEngine()
@@ -140,40 +142,31 @@ public:
         bool hasTick   = tickProcessor.GetLastTick(norm, tick);
         bool hasCandle = candleBuilder.GetCandle(norm, PERIOD_M1, 0, candle);
 
-        string freshness = FreshnessStateName(freshnessEngine.GetFreshnessState(norm));
-        string session   = sessionManager.GetSessionName();
 
+        if (!hasTick)
+            return "";
+
+        int digits = (int) SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+        if (digits < 0) digits = 5;
+        string tf = "M1";
         string json = "{";
         json += "\"symbol\":\"" + symbol + "\",";
-        json += "\"normalized_symbol\":\"" + norm + "\",";
-        json += "\"freshness\":\"" + freshness + "\",";
-        json += "\"session\":\"" + session + "\"";
-
-        if (hasTick)
-        {
-            json += ",\"tick\":{";
-            json += "\"bid\":"       + DoubleToString(tick.bid, 8) + ",";
-            json += "\"ask\":"       + DoubleToString(tick.ask, 8) + ",";
-            json += "\"spread\":"    + DoubleToString(tick.spread, 5) + ",";
-            json += "\"volume\":"    + IntegerToString(tick.volume) + ",";
-            // HARDENING: Use ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ) instead of MT5's
-            // dot-format (YYYY.MM.DD HH:MM:SS) which PHP strtotime() cannot reliably parse.
-            json += "\"timestamp\":\"" + TimeToIso8601(tick.timestamp) + "\"";
-            json += "}";
-        }
+        json += "\"timeframe\":\"" + tf + "\",";
+        json += "\"timestamp\":\"" + TimeToIso8601(tick.timestamp) + "\",";
+        json += "\"bid\":" + DoubleToString(tick.bid, digits) + ",";
+        json += "\"ask\":" + DoubleToString(tick.ask, digits);
 
         if (hasCandle && candleBuilder.ValidateCandle(candle))
         {
-            json += ",\"candle_m1\":{";
-            json += "\"timestamp\":\"" + TimeToIso8601(candle.time) + "\",";
-            json += "\"open\":"   + DoubleToString(candle.open,  8) + ",";
-            json += "\"high\":"   + DoubleToString(candle.high,  8) + ",";
-            json += "\"low\":"    + DoubleToString(candle.low,   8) + ",";
-            json += "\"close\":"  + DoubleToString(candle.close, 8) + ",";
+            json += ",\"candle\":{";
+            json += "\"time\":\"" + TimeToIso8601(candle.time) + "\",";
+            json += "\"open\":" + DoubleToString(candle.open, digits) + ",";
+            json += "\"high\":" + DoubleToString(candle.high, digits) + ",";
+            json += "\"low\":" + DoubleToString(candle.low, digits) + ",";
+            json += "\"close\":" + DoubleToString(candle.close, digits) + ",";
             json += "\"volume\":" + IntegerToString((long)candle.tick_volume);
             json += "}";
         }
-
         json += "}";
         return json;
     }
@@ -185,6 +178,8 @@ public:
             return false;
 
         string payload = BuildWebhookPayload(symbol);
+        if (StringLen(payload) == 0)
+            return false;
         string headers = "Content-Type: application/json\r\n";
         if (StringLen(authHeader) > 0)
             headers += authHeader + "\r\n";
@@ -195,10 +190,16 @@ public:
 
         StringToCharArray(payload, postData, 0, StringLen(payload));
 
-        int httpStatus = WebRequest("POST", webhookUrl, headers, 5000,
-                                    postData, result, responseHeaders);
-
-        return (httpStatus == 200 || httpStatus == 201);
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            int httpStatus = WebRequest("POST", webhookUrl, headers, 5000,
+                                        postData, result, responseHeaders);
+            if (httpStatus == 200 || httpStatus == 201)
+                return true;
+            Sleep(150);
+        }
+        Print("SMC_MarketDataEA send failed for ", symbol);
+        return false;
     }
 
 private:

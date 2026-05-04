@@ -231,8 +231,12 @@ final class SMC_SuperFib_Sniper_REST {
         $this->route('/market-data-authority', WP_REST_Server::READABLE, 'get_market_data_authority', true);
         $this->route('/authority-diagnostics', WP_REST_Server::READABLE, 'get_authority_diagnostics', true);
 
-        // MT5 EA market data ingestion endpoint
-        $this->route('/ea/market-stream', WP_REST_Server::CREATABLE, 'post_ea_market_stream', true);
+        // MT5 EA market data ingestion endpoint (API key auth, no session/cookies).
+        register_rest_route(self::NAMESPACE, '/ea/market-stream', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($this, 'post_ea_market_stream'),
+            'permission_callback' => array($this, 'permission_ea_market_stream'),
+        ));
     }
 
     private function route($path, $methods, $callback, $auth_required) {
@@ -248,6 +252,24 @@ final class SMC_SuperFib_Sniper_REST {
             return new WP_Error('smc_sf_auth_required', 'Authentication required.', array('status' => 401));
         }
 
+        return true;
+    }
+
+    public function permission_ea_market_stream(WP_REST_Request $request) {
+        $provided = trim((string) $request->get_header('X-API-KEY'));
+        if ($provided === '') {
+            return new WP_Error('smc_sf_api_key_missing', 'X-API-KEY header required.', array('status' => 401));
+        }
+
+        $configured = trim((string) (defined('SMC_SF_EA_API_KEY') ? SMC_SF_EA_API_KEY : getenv('SMC_SF_EA_API_KEY')));
+        if ($configured === '') {
+            error_log('SMC SuperFIB: SMC_SF_EA_API_KEY is not configured.');
+            return new WP_Error('smc_sf_api_key_unconfigured', 'EA ingest key not configured.', array('status' => 503));
+        }
+
+        if (!hash_equals($configured, $provided)) {
+            return new WP_Error('smc_sf_api_key_invalid', 'Invalid API key.', array('status' => 403));
+        }
         return true;
     }
 
@@ -869,26 +891,30 @@ final class SMC_SuperFib_Sniper_REST {
         $timeframe = $this->normalize_mt5_timeframe($payload['timeframe'] ?? 'M15');
         $snapshot_updated_at = $this->normalize_market_timestamp($payload['timestamp'] ?? null, $this->now_mysql());
 
-        // Regression guard: Freshness enforcement - reject stale data (>5 minutes old)
+        // Freshness enforcement: reject stale data (>120 seconds drift).
         if (!empty($payload['timestamp'])) {
             $data_timestamp = strtotime($payload['timestamp']);
             $now_timestamp = time();
             $age_seconds = $now_timestamp - $data_timestamp;
             
-            if ($age_seconds > 300) { // 5 minutes
+            if ($age_seconds > 120) {
                 $this->audit($user_id, 'ea.market_stream.stale_data_rejected', array(
                     'symbol' => $symbol,
                     'timestamp' => $payload['timestamp'],
                     'age_seconds' => $age_seconds
                 ));
-                return new WP_Error('stale_data', 'Rejected market data older than 5 minutes', array('status' => 400));
+                return new WP_Error('stale_data', 'Rejected market data older than 120 seconds', array('status' => 400));
             }
         }
 
         $inserted_snapshots = 0;
         $inserted_candles = 0;
 
-        // Insert price snapshot if bid/ask provided
+        if (!isset($payload['bid'], $payload['ask'])) {
+            return new WP_Error('missing_prices', 'bid and ask are required.', array('status' => 400));
+        }
+
+        // Insert price snapshot (bid/ask required).
         if (isset($payload['bid'], $payload['ask'])) {
             $bid = (float) $payload['bid'];
             $ask = (float) $payload['ask'];
@@ -907,13 +933,13 @@ final class SMC_SuperFib_Sniper_REST {
             }
         }
 
-        // Insert candle if provided
+        // Insert candle if provided (closed candle only, dedupe via UNIQUE candle key).
         if (!empty($payload['candle']) && is_array($payload['candle'])) {
             $candle = $payload['candle'];
             
             // Validate required candle fields
             if (isset($candle['time'], $candle['open'], $candle['high'], $candle['low'], $candle['close'])) {
-                $result = $this->insert_mt5_candle($user_id, $symbol, $timeframe, $candle);
+                $result = $this->insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $payload['timestamp'] ?? null);
                 if ($result) {
                     $inserted_candles = 1;
                 }
@@ -976,11 +1002,20 @@ final class SMC_SuperFib_Sniper_REST {
      * Insert MT5 candle data
      * Regression guard: Atomic operation with proper source tagging
      */
-    private function insert_mt5_candle($user_id, $symbol, $timeframe, $candle) {
+    private function insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $stream_timestamp = null) {
         global $wpdb;
 
         // Parse timestamp to MySQL format
         $candle_time = gmdate('Y-m-d H:i:s', strtotime($candle['time']));
+        if ($stream_timestamp && strtotime($candle['time']) >= strtotime($stream_timestamp)) {
+            $this->audit($user_id, 'ea.market_stream.open_or_future_candle_rejected', array(
+                'symbol' => $symbol,
+                'timeframe' => $timeframe,
+                'candle_time' => $candle['time'],
+                'stream_timestamp' => $stream_timestamp,
+            ));
+            return false;
+        }
 
         $result = $wpdb->replace(
             $this->table('candles'),
