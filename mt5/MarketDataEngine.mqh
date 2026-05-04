@@ -101,6 +101,8 @@ public:
     // Call from EA OnTimer() — typically every 10–30 seconds
     void OnPeriodic()
     {
+        Print("SMC_MarketDataEA: OnPeriodic fired");
+
         // Refresh session with wall-clock time so IsMarketOpen() stays accurate
         // even when no ticks arrive (e.g. during market close / weekend).
         sessionManager.UpdateSession(TimeCurrent());
@@ -208,7 +210,10 @@ public:
 
         string payload = BuildWebhookPayload(symbol);
         if (StringLen(payload) == 0)
+        {
+            Print("SMC_MarketDataEA: empty payload for symbol=", symbol);
             return false;
+        }
 
         char   postData[];
         char   result[];
@@ -222,11 +227,18 @@ public:
                                         postData, result, responseHeaders);
             lastStatus = httpStatus;
             if (httpStatus == 200 || httpStatus == 201)
+            {
+                string body = CharArrayToString(result, 0, -1, CP_UTF8);
+                Print("SMC_MarketDataEA SUCCESS attempt ", attempt + 1,
+                      " | symbol=",      symbol,
+                      " | httpStatus=",  httpStatus,
+                      " | response=",    body);
                 return true;
+            }
 
             int    err  = GetLastError();
             string body = CharArrayToString(result, 0, -1, CP_UTF8);
-            Print("SMC_MarketDataEA attempt ", attempt + 1, " failed"
+            Print("SMC_MarketDataEA FAILED attempt ", attempt + 1,
                   " | symbol=",      symbol,
                   " | httpStatus=",  httpStatus,
                   " | lastError=",   err,
