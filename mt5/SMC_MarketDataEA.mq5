@@ -63,7 +63,7 @@ int OnInit()
         StringTrimRight(g_symArray[i]);
     }
 
-    string auth = "X-API-KEY: " + ApiKey;
+    string auth = StringLen(ApiKey) > 0 ? "X-EA-API-Key: " + ApiKey : "";
 
     if (!engine.Initialize(g_symArray, g_symCount, WebhookURL, auth, UserId))
     {
