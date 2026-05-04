@@ -27,12 +27,74 @@ input int    TimerSec   = 10;   // OnPeriodic interval in seconds
 input string Symbols    = "EURUSD,GBPUSD,XAUUSD,USDJPY,GBPJPY,AUDUSD";
 
 MarketDataEngine engine;
+SymbolNormalizer g_symbolNormalizer;
 
 // Module-level symbol list — OnTimer() needs it to poll non-chart symbols.
 // OnTick() only fires for the chart symbol; without this loop every other
 // symbol stays at FRESHNESS_DISCONNECTED permanently.
 string g_symArray[];
 int    g_symCount = 0;
+string g_rawSymArray[];
+int    g_rawSymCount = 0;
+
+bool TrySelectBrokerSymbol(string symbol)
+{
+    if (StringLen(symbol) == 0)
+        return false;
+
+    ResetLastError();
+    if (!SymbolInfoInteger(symbol, SYMBOL_EXIST))
+        return false;
+
+    if (!SymbolSelect(symbol, true))
+    {
+        Print("SMC_MarketDataEA: SymbolSelect failed for ", symbol, " | error=", GetLastError());
+        return false;
+    }
+
+    double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+    return point > 0;
+}
+
+bool ResolveBrokerSymbol(string configured, string& resolved)
+{
+    string token = configured;
+    StringTrimLeft(token);
+    StringTrimRight(token);
+    if (StringLen(token) == 0)
+        return false;
+
+    string canonical = g_symbolNormalizer.NormalizeSymbol(token);
+    if (TrySelectBrokerSymbol(token))
+    {
+        resolved = token;
+        return true;
+    }
+
+    int total = SymbolsTotal(false);
+    for (int i = 0; i < total; i++)
+    {
+        string candidate = SymbolName(i, false);
+        if (g_symbolNormalizer.NormalizeSymbol(candidate) == canonical && TrySelectBrokerSymbol(candidate))
+        {
+            resolved = candidate;
+            return true;
+        }
+    }
+
+    total = SymbolsTotal(true);
+    for (int j = 0; j < total; j++)
+    {
+        string selected = SymbolName(j, true);
+        if (g_symbolNormalizer.NormalizeSymbol(selected) == canonical && TrySelectBrokerSymbol(selected))
+        {
+            resolved = selected;
+            return true;
+        }
+    }
+
+    return false;
+}
 
 int OnInit()
 {
@@ -54,18 +116,41 @@ int OnInit()
     }
 
     // --- Parse symbol list ---
-    g_symCount = StringSplit(Symbols, ',', g_symArray);
-    if (g_symCount <= 0)
+    g_rawSymCount = StringSplit(Symbols, ',', g_rawSymArray);
+    if (g_rawSymCount <= 0)
     {
         Print("SMC_MarketDataEA: no symbols configured");
         return INIT_FAILED;
     }
 
-    // Trim whitespace from each token
-    for (int i = 0; i < g_symCount; i++)
+    ArrayResize(g_symArray, g_rawSymCount);
+    g_symCount = 0;
+
+    // Resolve configured canonical symbols to broker symbols and select them.
+    for (int i = 0; i < g_rawSymCount; i++)
     {
-        StringTrimLeft(g_symArray[i]);
-        StringTrimRight(g_symArray[i]);
+        StringTrimLeft(g_rawSymArray[i]);
+        StringTrimRight(g_rawSymArray[i]);
+        string resolved = "";
+        if (ResolveBrokerSymbol(g_rawSymArray[i], resolved))
+        {
+            g_symArray[g_symCount++] = resolved;
+            string canonical = g_symbolNormalizer.NormalizeSymbol(resolved);
+            Print("SMC_MarketDataEA: symbol resolved configured=", g_rawSymArray[i],
+                  " | broker=", resolved,
+                  " | normalized=", canonical);
+        }
+        else
+        {
+            Print("SMC_MarketDataEA: unresolved symbol configured=", g_rawSymArray[i],
+                  " | add/select the broker symbol in Market Watch or update Symbols input");
+        }
+    }
+
+    if (g_symCount <= 0)
+    {
+        Print("SMC_MarketDataEA: no configured symbols could be resolved");
+        return INIT_FAILED;
     }
 
     // Build the full auth header line — engine stores and reuses it.
@@ -79,7 +164,7 @@ int OnInit()
     }
 
     EventSetTimer(TimerSec);
-    Print("SMC_MarketDataEA: started, monitoring ", g_symCount, " symbols");
+    Print("SMC_MarketDataEA: started, monitoring ", g_symCount, " resolved symbols");
     return INIT_SUCCEEDED;
 }
 

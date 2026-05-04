@@ -67,6 +67,7 @@ function SignalsPage() {
   const rawFeedState = h?.feedStatus ?? h?.priceFeed ?? "offline";
   const feedState: FreshnessState =
     rawFeedState === "rate-limited" ? "stale" : (rawFeedState as FreshnessState);
+  const mt5AuthorityLive = h?.feedStatus === "live";
   const checks: { label: string; state: FreshnessState | "ok" | "missing"; detail?: string }[] = [
     {
       label: "Backend sync",
@@ -79,13 +80,18 @@ function SignalsPage() {
       detail: h?.feedStatus ?? h?.priceFeed,
     },
     {
-      label: "Twelve Data key",
-      state:
-        h?.twelveDataKeyStatus === "ok" ||
-        (!h?.twelveDataKeyStatus && h?.twelveDataKey === "present")
+      label: mt5AuthorityLive ? "MT5 authority" : "Twelve Data key",
+      state: mt5AuthorityLive
+        ? "ok"
+        : h?.twelveDataKeyStatus === "ok" ||
+            (!h?.twelveDataKeyStatus && h?.twelveDataKey === "present")
           ? "ok"
           : "missing",
-      detail: h?.twelveDataKeyStatus ? h.twelveDataKeyStatus.replace("-", " ") : undefined,
+      detail: mt5AuthorityLive
+        ? "live"
+        : h?.twelveDataKeyStatus
+          ? h.twelveDataKeyStatus.replace("-", " ")
+          : undefined,
     },
     {
       label: "Engine run",

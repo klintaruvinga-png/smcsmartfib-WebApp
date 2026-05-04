@@ -196,6 +196,29 @@ if (!class_exists('TestWpdb')) {
         }
 
         public function get_results($query, $output = ARRAY_A) {
+            if (preg_match("/SELECT candle_time, open, high, low, close(?:, volume)?(?:, source)? FROM ([^ ]+) WHERE user_id = (\\d+) AND symbol = '([^']+)' AND timeframe = '([^']+)'(?: AND source = '([^']+)')? ORDER BY candle_time (ASC|DESC)/", $query, $m)) {
+                $table = $m[1];
+                $user_id = (int) $m[2];
+                $symbol = $m[3];
+                $timeframe = $m[4];
+                $source = isset($m[5]) && $m[5] !== '' ? $m[5] : null;
+                $direction = isset($m[6]) ? $m[6] : 'ASC';
+                $rows = array();
+                foreach ($this->tables[$table] ?? array() as $row) {
+                    if ((int) $row['user_id'] !== $user_id || $row['symbol'] !== $symbol || $row['timeframe'] !== $timeframe) {
+                        continue;
+                    }
+                    if ($source !== null && ($row['source'] ?? '') !== $source) {
+                        continue;
+                    }
+                    $rows[] = $row;
+                }
+                usort($rows, function ($a, $b) use ($direction) {
+                    $cmp = strcmp($a['candle_time'], $b['candle_time']);
+                    return $direction === 'DESC' ? -1 * $cmp : $cmp;
+                });
+                return $rows;
+            }
             return array();
         }
 
@@ -294,6 +317,11 @@ if (!function_exists('rest_url')) {
 if (!function_exists('wp_json_encode')) {
     function wp_json_encode($value) {
         return json_encode($value);
+    }
+}
+if (!function_exists('sanitize_key')) {
+    function sanitize_key($key) {
+        return strtolower(preg_replace('/[^a-zA-Z0-9_\\-]/', '', (string) $key));
     }
 }
 if (!function_exists('set_transient')) {
@@ -494,5 +522,45 @@ $authority = $instance->get_market_data_authority(new WP_REST_Request());
 assert_true(is_array($authority), 'Authority endpoint should return an array');
 assert_true(isset($authority['EURUSD']), 'Authority endpoint must include EURUSD from watchlist');
 assert_true(isset($authority['USDJPY']), 'Authority endpoint must include USDJPY from watchlist');
+
+$candleTable = $wpdb->prefix . 'smc_sf_candles';
+$currentBucket = (int) (floor(time() / 900) * 900);
+$firstM1 = $currentBucket - (30 * 900);
+foreach (array('EURUSD' => 1.1000, 'USDJPY' => 156.0000) as $symbol => $base) {
+    $wpdb->replace($snapshotTable, array(
+        'user_id' => 7,
+        'symbol' => $symbol,
+        'bid' => $base,
+        'ask' => $base + 0.0002,
+        'mid' => $base + 0.0001,
+        'spread' => 2,
+        'change_pct_1d' => 0,
+        'source' => 'mt5',
+        'state' => 'live',
+        'updated_at' => gmdate('Y-m-d H:i:s', time() - 10),
+    ));
+
+    for ($i = 0; $i < 450; $i++) {
+        $price = $base + ($i * 0.00001);
+        $wpdb->replace($candleTable, array(
+            'user_id' => 7,
+            'symbol' => $symbol,
+            'timeframe' => '1min',
+            'candle_time' => gmdate('Y-m-d H:i:s', $firstM1 + ($i * 60)),
+            'open' => $price,
+            'high' => $price + 0.0002,
+            'low' => $price - 0.0002,
+            'close' => $price + 0.00005,
+            'volume' => '10',
+            'source' => 'mt5',
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ));
+    }
+}
+
+$health = $instance->get_health();
+assert_true(is_array($health), 'Health endpoint should return an array in the test harness');
+assert_same('missing', $health['twelveDataKeyStatus'], 'Test setup should have no Twelve Data key');
+assert_same('live', $health['feedStatus'], 'Fresh MT5 price plus aggregated M1 candles must make feedStatus live without a Twelve Data key');
 
 fwrite(STDOUT, 'mt5 snapshot contract checks passed' . PHP_EOL);
