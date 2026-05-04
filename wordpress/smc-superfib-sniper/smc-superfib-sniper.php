@@ -2370,6 +2370,7 @@ final class SMC_SuperFib_Sniper_REST {
             'ask' => (float) $row['ask'],
             'mid' => (float) $row['mid'],
             'changePct1d' => (float) $row['change_pct_1d'],
+            'source' => isset($row['source']) ? (string) $row['source'] : 'twelve-data',
             'updatedAt' => $this->to_iso($row['updated_at']),
             'state' => $this->is_stale($row['updated_at'], $stale_threshold_sec !== null ? $stale_threshold_sec : $this->get_settings($user_id)['staleThresholdSec']) ? 'stale' : $row['state'],
         );
