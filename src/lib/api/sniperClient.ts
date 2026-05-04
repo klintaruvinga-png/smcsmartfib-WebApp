@@ -69,6 +69,8 @@ interface RequestOpts {
   skipAuthHeaders?: boolean;
   /** When false, omit cookies/credentials from the fetch (e.g. public endpoints). Defaults to include. */
   authenticated?: boolean;
+  /** Allow successful responses with no payload body (e.g. known 204 endpoints). */
+  allowEmptyResponse?: boolean;
 }
 
 async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
@@ -112,11 +114,17 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
       throw new Error(`API ${path} failed: ${res.status}${errorBody ? ` - ${errorBody}` : ""}`);
     }
 
-    // Handle empty-body success responses (e.g. 204 No Content from DELETE endpoints).
-    if (res.status === 204) return {} as T;
+    // Only allow empty successful bodies for known no-content endpoints.
+    if (res.status === 204) {
+      if (opts.allowEmptyResponse) return {} as T;
+      throw new Error(`API ${path} failed: expected response body but got 204 No Content`);
+    }
 
     const text = await res.text();
-    if (!text.trim()) return {} as T;
+    if (!text.trim()) {
+      if (opts.allowEmptyResponse) return {} as T;
+      throw new Error(`API ${path} failed: expected response body but got empty 2xx response`);
+    }
 
     return JSON.parse(text) as T;
   } catch (error) {
@@ -237,7 +245,7 @@ export const apiClient = {
   },
   async deleteTwelveDataKey(mock = MOCK_MODE): Promise<{ ok: true; status: TwelveDataKeyStatus }> {
     if (mock) return { ok: true, status: "missing" };
-    return call("/user/twelve-data-key", { method: "DELETE" });
+    return call("/user/twelve-data-key", { method: "DELETE", allowEmptyResponse: true });
   },
   async getUserRiskProfile(mock = MOCK_MODE): Promise<RiskProfile> {
     if (mock) return mockRiskProfile;
