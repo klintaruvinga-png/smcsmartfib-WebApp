@@ -271,21 +271,20 @@ final class SMC_SuperFib_Sniper_REST {
             return new WP_Error('smc_sf_api_key_invalid', 'Invalid API key.', array('status' => 403));
         }
 
-        // Bind EA ingress to a concrete WordPress user context so downstream
-        // reads/writes use the same user_id (avoid storing under user_id=0).
-        $ea_user_id = absint(defined('SMC_SF_EA_USER_ID') ? SMC_SF_EA_USER_ID : getenv('SMC_SF_EA_USER_ID'));
+        $payload = (array) $request->get_json_params();
+        $ea_user_id = isset($payload['user_id']) ? (int) $payload['user_id'] : 0;
         if ($ea_user_id <= 0) {
-            error_log('SMC SuperFIB: SMC_SF_EA_USER_ID is not configured.');
-            return new WP_Error('smc_sf_ea_user_unconfigured', 'EA ingest user is not configured.', array('status' => 503));
+            return new WP_Error('smc_sf_user_required', 'user_id is required for EA ingest.', array('status' => 400));
         }
 
-        $ea_user = get_user_by('id', $ea_user_id);
-        if (!$ea_user || !user_can($ea_user, 'read')) {
-            error_log('SMC SuperFIB: SMC_SF_EA_USER_ID is invalid or lacks read capability.');
-            return new WP_Error('smc_sf_ea_user_invalid', 'EA ingest user is invalid.', array('status' => 503));
+        $user = get_userdata($ea_user_id);
+        if (!$user || !user_can($user, 'read')) {
+            return new WP_Error('smc_sf_user_invalid', 'user_id must reference a valid readable user.', array('status' => 403));
         }
 
+        // Bind ingest writes to a concrete WordPress user context.
         wp_set_current_user($ea_user_id);
+
         return true;
     }
 
@@ -1026,21 +1025,14 @@ final class SMC_SuperFib_Sniper_REST {
 
         // Parse timestamp to MySQL format
         $candle_time = gmdate('Y-m-d H:i:s', strtotime($candle['time']));
-        if ($stream_timestamp) {
-            $tf_seconds = max(60, (int) $this->timeframe_seconds($timeframe));
-            $stream_ts = strtotime($stream_timestamp);
-            $latest_closed_candle_ts = $stream_ts - $tf_seconds;
-            $candle_ts = strtotime($candle['time']);
-            if ($candle_ts > $latest_closed_candle_ts) {
-                $this->audit($user_id, 'ea.market_stream.open_or_future_candle_rejected', array(
-                    'symbol' => $symbol,
-                    'timeframe' => $timeframe,
-                    'candle_time' => $candle['time'],
-                    'stream_timestamp' => $stream_timestamp,
-                    'latest_closed_candle_time' => gmdate('c', $latest_closed_candle_ts),
-                ));
-                return false;
-            }
+        if ($stream_timestamp && strtotime($candle['time']) >= strtotime($stream_timestamp)) {
+            $this->audit($user_id, 'ea.market_stream.open_or_future_candle_rejected', array(
+                'symbol' => $symbol,
+                'timeframe' => $timeframe,
+                'candle_time' => $candle['time'],
+                'stream_timestamp' => $stream_timestamp,
+            ));
+            return false;
         }
 
         $result = $wpdb->replace(

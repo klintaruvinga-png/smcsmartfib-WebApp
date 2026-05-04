@@ -151,7 +151,6 @@ public:
         string tf = "M1";
         string json = "{";
         json += "\"symbol\":\"" + symbol + "\",";
-        json += "\"normalized_symbol\":\"" + norm + "\",";
         json += "\"timeframe\":\"" + tf + "\",";
         json += "\"timestamp\":\"" + TimeToIso8601(tick.timestamp) + "\",";
         json += "\"bid\":" + DoubleToString(tick.bid, digits) + ",";
