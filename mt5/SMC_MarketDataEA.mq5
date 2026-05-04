@@ -13,6 +13,11 @@
 #property version   "1.00"
 #property strict
 
+#include "TickProcessor.mqh"
+#include "CandleBuilder.mqh"
+#include "SessionManager.mqh"
+#include "FreshnessEngine.mqh"
+#include "SymbolNormalizer.mqh"
 #include "MarketDataEngine.mqh"
 
 input string WebhookURL  = "https://yoursite.com/wp-json/sniper/v1/ea/market-stream";
