@@ -1037,6 +1037,7 @@ final class SMC_SuperFib_Sniper_REST {
                 $result = $this->upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $snapshot_updated_at);
                 if ($result) {
                     $inserted_snapshots = 1;
+                    error_log("MT5 SNAPSHOT WRITE: {$symbol} | bid={$bid} ask={$ask} time={$snapshot_updated_at}");
                 }
             } else {
                 $this->audit($user_id, 'ea.market_stream.invalid_prices', array(
@@ -1056,13 +1057,19 @@ final class SMC_SuperFib_Sniper_REST {
                 $result = $this->insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $payload['timestamp'] ?? null);
                 if ($result) {
                     $inserted_candles = 1;
+                    error_log("MT5 CANDLE WRITE: {$symbol} | tf={$timeframe} | time={$candle['time']}");
+                } else {
+                    error_log("MT5 CANDLE INSERT FAILED: {$symbol} | tf={$timeframe} | time={$candle['time']} | stream_timestamp=" . ($payload['timestamp'] ?? 'null'));
                 }
             } else {
+                error_log("MT5 CANDLE PAYLOAD INVALID: " . print_r($candle, true));
                 $this->audit($user_id, 'ea.market_stream.invalid_candle', array(
                     'symbol' => $symbol,
                     'candle' => $candle
                 ));
             }
+        } else {
+            error_log("MT5 CANDLE PAYLOAD MISSING OR INVALID FOR SYMBOL: {$symbol}");
         }
 
         if (!empty($payload['freshness'])) {
@@ -1089,7 +1096,8 @@ final class SMC_SuperFib_Sniper_REST {
             'ok' => true,
             'symbol' => $symbol,
             'snapshots_inserted' => $inserted_snapshots,
-            'candles_inserted' => $inserted_candles
+            'candles_inserted' => $inserted_candles,
+            'server_time' => gmdate('c')
         ));
     }
 
@@ -1123,6 +1131,9 @@ final class SMC_SuperFib_Sniper_REST {
             array('%d', '%s', '%f', '%f', '%f', '%d', '%f', '%s', '%s', '%s')
         );
 
+        error_log("SNAPSHOT DB RESULT: " . print_r($result, true));
+        error_log("SNAPSHOT DB ERROR: " . $wpdb->last_error);
+
         return $result !== false;
     }
 
@@ -1136,6 +1147,8 @@ final class SMC_SuperFib_Sniper_REST {
         // Parse timestamp to MySQL format
         $candle_time = gmdate('Y-m-d H:i:s', strtotime($candle['time']));
         if ($stream_timestamp && strtotime($candle['time']) >= strtotime($stream_timestamp)) {
+            error_log("CANDLE CHECK: candle_time={$candle['time']} | stream={$stream_timestamp}");
+            error_log("CANDLE REJECTED: {$symbol} | candle_time={$candle['time']} >= stream={$stream_timestamp}");
             $this->audit($user_id, 'ea.market_stream.open_or_future_candle_rejected', array(
                 'symbol' => $symbol,
                 'timeframe' => $timeframe,
@@ -1143,6 +1156,18 @@ final class SMC_SuperFib_Sniper_REST {
                 'stream_timestamp' => $stream_timestamp,
             ));
             return false;
+        }
+
+        if ($stream_timestamp) {
+            $candle_ts = strtotime($candle['time']);
+            $stream_ts = strtotime($stream_timestamp);
+            if ($candle_ts !== false && $stream_ts !== false) {
+                $age_seconds = $stream_ts - $candle_ts;
+                if ($age_seconds > 120) {
+                    error_log("STALE REJECTED: {$symbol} | age={$age_seconds}");
+                    return false;
+                }
+            }
         }
 
         $result = $wpdb->replace(
