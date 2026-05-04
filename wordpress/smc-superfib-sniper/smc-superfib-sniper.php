@@ -230,6 +230,9 @@ final class SMC_SuperFib_Sniper_REST {
         $this->route('/instruments', WP_REST_Server::READABLE, 'get_instruments', true);
         $this->route('/market-data-authority', WP_REST_Server::READABLE, 'get_market_data_authority', true);
         $this->route('/authority-diagnostics', WP_REST_Server::READABLE, 'get_authority_diagnostics', true);
+
+        // MT5 EA market data ingestion endpoint
+        $this->route('/ea/market-stream', WP_REST_Server::CREATABLE, 'post_ea_market_stream', true);
     }
 
     private function route($path, $methods, $callback, $auth_required) {
@@ -829,6 +832,175 @@ final class SMC_SuperFib_Sniper_REST {
             'authorityStale' => ($row->source === 'mt5' && $age_sec >= 60),
             'willFallbackToTD' => ($row->source === 'mt5' && $age_sec >= 60),
         ));
+    }
+
+    /**
+     * MT5 EA market data ingestion endpoint
+     * Accepts live price snapshots and OHLC candles from MT5 Expert Advisor
+     * 
+     * Expected payload:
+     * {
+     *   "symbol": "EURUSD",
+     *   "timeframe": "M15",
+     *   "timestamp": "2026-05-04T12:30:00Z",
+     *   "bid": 1.08521,
+     *   "ask": 1.08534,
+     *   "candle": {
+     *     "time": "2026-05-04T12:30:00Z",
+     *     "open": 1.08450,
+     *     "high": 1.08550,
+     *     "low": 1.08420,
+     *     "close": 1.08510,
+     *     "volume": 1234
+     *   }
+     * }
+     */
+    public function post_ea_market_stream(WP_REST_Request $request) {
+        $user_id = get_current_user_id();
+        $payload = $request->get_json_params();
+
+        // Regression guard: Validate payload structure
+        if (!$payload || !isset($payload['symbol'])) {
+            $this->audit($user_id, 'ea.market_stream.invalid_payload', array('reason' => 'missing_symbol', 'payload' => $payload));
+            return new WP_Error('invalid_payload', 'Missing required symbol field', array('status' => 400));
+        }
+
+        $symbol = sanitize_text_field(strtoupper($payload['symbol']));
+        $timeframe = $this->normalize_mt5_timeframe($payload['timeframe'] ?? 'M15');
+        $snapshot_updated_at = $this->normalize_market_timestamp($payload['timestamp'] ?? null, $this->now_mysql());
+
+        // Regression guard: Freshness enforcement - reject stale data (>5 minutes old)
+        if (!empty($payload['timestamp'])) {
+            $data_timestamp = strtotime($payload['timestamp']);
+            $now_timestamp = time();
+            $age_seconds = $now_timestamp - $data_timestamp;
+            
+            if ($age_seconds > 300) { // 5 minutes
+                $this->audit($user_id, 'ea.market_stream.stale_data_rejected', array(
+                    'symbol' => $symbol,
+                    'timestamp' => $payload['timestamp'],
+                    'age_seconds' => $age_seconds
+                ));
+                return new WP_Error('stale_data', 'Rejected market data older than 5 minutes', array('status' => 400));
+            }
+        }
+
+        $inserted_snapshots = 0;
+        $inserted_candles = 0;
+
+        // Insert price snapshot if bid/ask provided
+        if (isset($payload['bid'], $payload['ask'])) {
+            $bid = (float) $payload['bid'];
+            $ask = (float) $payload['ask'];
+            
+            if ($bid > 0 && $ask > 0 && $bid <= $ask) {
+                $result = $this->upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $snapshot_updated_at);
+                if ($result) {
+                    $inserted_snapshots = 1;
+                }
+            } else {
+                $this->audit($user_id, 'ea.market_stream.invalid_prices', array(
+                    'symbol' => $symbol,
+                    'bid' => $bid,
+                    'ask' => $ask
+                ));
+            }
+        }
+
+        // Insert candle if provided
+        if (!empty($payload['candle']) && is_array($payload['candle'])) {
+            $candle = $payload['candle'];
+            
+            // Validate required candle fields
+            if (isset($candle['time'], $candle['open'], $candle['high'], $candle['low'], $candle['close'])) {
+                $result = $this->insert_mt5_candle($user_id, $symbol, $timeframe, $candle);
+                if ($result) {
+                    $inserted_candles = 1;
+                }
+            } else {
+                $this->audit($user_id, 'ea.market_stream.invalid_candle', array(
+                    'symbol' => $symbol,
+                    'candle' => $candle
+                ));
+            }
+        }
+
+        // Audit successful ingestion
+        $this->audit($user_id, 'ea.market_stream.ingested', array(
+            'symbol' => $symbol,
+            'snapshots_inserted' => $inserted_snapshots,
+            'candles_inserted' => $inserted_candles,
+            'timestamp' => $payload['timestamp'] ?? null
+        ));
+
+        return rest_ensure_response(array(
+            'ok' => true,
+            'symbol' => $symbol,
+            'snapshots_inserted' => $inserted_snapshots,
+            'candles_inserted' => $inserted_candles
+        ));
+    }
+
+    /**
+     * Insert or update MT5 price snapshot
+     * Regression guard: Atomic operation with proper source tagging
+     */
+    private function upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $updated_at = null) {
+        global $wpdb;
+
+        $mid = ($bid + $ask) / 2;
+        $spread = ($ask - $bid) * 10000; // Convert to pips (assuming 4-decimal pairs)
+        $updated_at = $this->normalize_market_timestamp($updated_at, $this->now_mysql());
+
+        $result = $wpdb->replace(
+            $this->table('snapshots'),
+            array(
+                'user_id' => $user_id,
+                'symbol' => $symbol,
+                'bid' => $bid,
+                'ask' => $ask,
+                'mid' => $mid,
+                'spread' => $spread,
+                'change_pct_1d' => 0, // MT5 doesn't provide this, will be calculated separately
+                'source' => 'mt5',
+                'state' => 'live',
+                'updated_at' => $updated_at
+            ),
+            array('%d', '%s', '%f', '%f', '%f', '%d', '%f', '%s', '%s', '%s')
+        );
+
+        return $result !== false;
+    }
+
+    /**
+     * Insert MT5 candle data
+     * Regression guard: Atomic operation with proper source tagging
+     */
+    private function insert_mt5_candle($user_id, $symbol, $timeframe, $candle) {
+        global $wpdb;
+
+        // Parse timestamp to MySQL format
+        $candle_time = gmdate('Y-m-d H:i:s', strtotime($candle['time']));
+
+        $result = $wpdb->replace(
+            $this->table('candles'),
+            array(
+                'user_id' => $user_id,
+                'symbol' => $symbol,
+                'timeframe' => $timeframe,
+                'candle_time' => $candle_time,
+                'open' => (float) $candle['open'],
+                'high' => (float) $candle['high'],
+                'low' => (float) $candle['low'],
+                'close' => (float) $candle['close'],
+                'volume' => isset($candle['volume']) ? (string) $candle['volume'] : '0',
+                'source' => 'mt5',
+                'created_at' => $this->now_mysql()
+            ),
+            array('%d', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%s', '%s', '%s')
+        );
+
+        return $result !== false;
     }
 
     public function get_regimes() {
@@ -2596,6 +2768,27 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         return gmdate('Y-m-d H:i:s', $ts);
+    }
+
+    private function normalize_mt5_timeframe($timeframe) {
+        $value = strtoupper(trim((string) $timeframe));
+        $mt5_map = array(
+            'M1' => '1min',
+            'M5' => '5min',
+            'M15' => '15min',
+            'M30' => '30min',
+            'H1' => '1h',
+            'H4' => '4h',
+            'D1' => '1day',
+            'W1' => '1week',
+            'MN1' => '1month',
+        );
+
+        if (isset($mt5_map[$value])) {
+            return $mt5_map[$value];
+        }
+
+        return sanitize_text_field($timeframe ?: '15min');
     }
 
     private function mt5_freshness_to_snapshot_state($freshness) {
