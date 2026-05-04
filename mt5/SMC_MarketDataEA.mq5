@@ -15,8 +15,8 @@
 
 #include "MarketDataEngine.mqh"
 
-input string WebhookURL  = "https://yoursite.com/wp-json/sniper/v1/snapshot";
-input string AuthToken   = "";          // WP Application Password (user:token)
+input string WebhookURL  = "https://yoursite.com/wp-json/sniper/v1/ea/market-stream";
+input string ApiKey      = "";          // X-API-KEY value
 input int    TimerSec    = 10;          // OnPeriodic interval in seconds
 input string Symbols     = "EURUSD,GBPUSD,XAUUSD,USDJPY,GBPJPY,AUDUSD";
 
@@ -47,8 +47,8 @@ int OnInit()
         StringTrimRight(g_symArray[i]);
     }
 
-    string auth = (StringLen(AuthToken) > 0)
-                  ? "Authorization: Basic " + AuthToken + "\r\n"
+    string auth = (StringLen(ApiKey) > 0)
+                  ? "X-API-KEY: " + ApiKey + "\r\n"
                   : "";
 
     if (!engine.Initialize(g_symArray, g_symCount, WebhookURL, auth))
