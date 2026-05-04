@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useSnapshot, useUserSettings, useEngineBatch } from "@/hooks/useSniperData";
+import { useSnapshot, useEngineBatch } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { BiasBadge, ChopMeter, GateBadge } from "@/components/sniper/Indicators";
 import { WarningLine } from "@/components/sniper/Warnings";
@@ -39,9 +39,7 @@ function blockerWarning(blocker: EngineBlocker | undefined): string | null {
 
 function LivePage() {
   const { data, isLoading } = useSnapshot();
-  const { data: settings } = useUserSettings();
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
-  const staleThresholdMs = (settings?.staleThresholdSec ?? 180) * 1000;
   if (isLoading || !data) return <div className="text-mute text-sm">Loading radar…</div>;
 
   return (
@@ -66,13 +64,17 @@ function LivePage() {
           const regime = data.regimes.find((r) => r.symbol === price.symbol);
           const gate = data.gates.find((g) => g.symbol === price.symbol);
           const diagnostic = (data.diagnostics ?? []).find((d) => d.symbol === price.symbol);
-          const clientStale = price.updatedAt
-            ? Date.now() - new Date(price.updatedAt).getTime() > staleThresholdMs
-            : false;
-          const stale = price.state === "stale" || regime?.state === "stale" || clientStale;
+          // Preserve backend freshness authority; the browser clock must not override
+          // backend-live data into a stale warning state.
+          const stale =
+            price.state === "stale" ||
+            regime?.state === "stale" ||
+            diagnostic?.priceState === "stale" ||
+            diagnostic?.candleState === "stale";
           const priceUnavailable =
             price.mid === 0 && (price.state === "unavailable" || gate?.allow === "BLOCKED");
           const diagWarning = blockerWarning(diagnostic?.engineBlocker);
+          const staleTimestamp = diagnostic?.lastPriceAt ?? price.updatedAt;
           return (
             <div
               key={price.symbol}
@@ -153,7 +155,7 @@ function LivePage() {
               )}
               {stale && !gate?.reason && !diagWarning && (
                 <WarningLine level="warn">
-                  Price data stale — last update {relTime(price.updatedAt)}.
+                  Price data stale — last update {relTime(staleTimestamp)}.
                 </WarningLine>
               )}
             </div>

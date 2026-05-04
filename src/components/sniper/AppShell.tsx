@@ -42,8 +42,9 @@ const NAV = [
 
 function HeaderTicker() {
   const { data } = useSnapshot();
+  // Treat the header strip as authoritative live market data, not a generic cache view.
   const items = (data?.prices ?? []).filter(
-    (p) => p.mid > 0 && p.state !== "unavailable" && p.state !== "blocked",
+    (p) => p.mid > 0 && (p.state === "live" || p.state === "mock"),
   );
   // Duplicate for seamless loop
   const loop = [...items, ...items];

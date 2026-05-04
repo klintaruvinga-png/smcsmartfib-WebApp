@@ -1,6 +1,6 @@
-import { readdir, readFile, stat } from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { readdir, readFile, stat } from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const MT5_DIR = ROOT;
@@ -15,15 +15,13 @@ async function scanDir(dir) {
       await scanDir(entryPath);
       continue;
     }
-    if (!entry.name.endsWith('.mq5') && !entry.name.endsWith('.mqh'))
-      continue;
+    if (!entry.name.endsWith(".mq5") && !entry.name.endsWith(".mqh")) continue;
 
-    const content = await readFile(entryPath, 'utf8');
+    const content = await readFile(entryPath, "utf8");
     const lines = content.split(/\r?\n/);
     for (let i = 0; i < lines.length; i++) {
       const match = INCLUDE_PATTERN.exec(lines[i]);
-      if (!match)
-        continue;
+      if (!match) continue;
 
       const includePath = match[2].trim();
       const resolved = path.resolve(path.dirname(entryPath), includePath);
@@ -45,9 +43,8 @@ async function exists(filePath) {
 
 await scanDir(MT5_DIR);
 if (errors.length > 0) {
-  console.error('MQL include verification failed:');
-  for (const error of errors)
-    console.error('  -', error);
+  console.error("MQL include verification failed:");
+  for (const error of errors) console.error("  -", error);
   process.exit(1);
 }
-console.log('MQL include verification passed.');
+console.log("MQL include verification passed.");
