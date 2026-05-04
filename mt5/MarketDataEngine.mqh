@@ -163,7 +163,7 @@ public:
         TickData tick;
         MqlRates candle;
         bool hasTick   = tickProcessor.GetLastTick(norm, tick);
-        bool hasCandle = candleBuilder.GetCandle(norm, PERIOD_M1, 1, candle);
+        bool hasCandle = candleBuilder.GetCandle(norm, PERIOD_M1, 0, candle);
 
         if (!hasTick)
         {

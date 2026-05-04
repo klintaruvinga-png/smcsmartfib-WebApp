@@ -481,9 +481,25 @@ final class SMC_SuperFib_Sniper_REST {
         $settings = $this->get_settings($user_id);
         $feed_has_stale_symbols = false;
         $feed_any_rate_limited = false;
+        $mt5_live_symbols = 0;
+        $watchlist_count = count($settings['watchlist']);
         foreach ($settings['watchlist'] as $symbol) {
             $cached_price = $this->get_cached_price($user_id, $symbol, $settings['staleThresholdSec']);
-            if (!$cached_price || ($cached_price['state'] ?? 'offline') !== 'live') {
+            $mt5_price_live = $cached_price
+                && ($cached_price['source'] ?? '') === 'mt5'
+                && ($cached_price['state'] ?? '') === 'live';
+            $mt5_candles_live = false;
+            if ($mt5_price_live) {
+                $candles = $this->fetch_candles($user_id, $symbol, '15min', 30);
+                $last_candle = !empty($candles) ? end($candles) : null;
+                $mt5_candles_live = count($candles) >= 30
+                    && $last_candle
+                    && $this->is_chart_candle_fresh($last_candle['time'] ?? null, '15min');
+            }
+
+            if ($mt5_price_live && $mt5_candles_live) {
+                $mt5_live_symbols++;
+            } elseif ($mt5_price_live || !$cached_price || ($cached_price['state'] ?? 'offline') !== 'live') {
                 $feed_has_stale_symbols = true;
             }
             if ($this->is_feed_rate_limited($user_id, $symbol)) {
@@ -491,19 +507,12 @@ final class SMC_SuperFib_Sniper_REST {
             }
         }
 
-        $has_fresh_mt5_snapshot = false;
-        foreach ($settings['watchlist'] as $symbol) {
-            $cached_price = $this->get_cached_price($user_id, $symbol, $settings['staleThresholdSec']);
-            if ($cached_price && ($cached_price['source'] ?? '') === 'mt5' && ($cached_price['state'] ?? '') === 'live') {
-                $has_fresh_mt5_snapshot = true;
-                break;
-            }
-        }
+        $all_symbols_mt5_live = $watchlist_count > 0 && $mt5_live_symbols === $watchlist_count;
 
-        if ($feed_any_rate_limited) {
-            $feed_status = 'rate-limited';
-        } elseif ($has_fresh_mt5_snapshot) {
+        if ($all_symbols_mt5_live) {
             $feed_status = 'live';
+        } elseif ($feed_any_rate_limited) {
+            $feed_status = 'rate-limited';
         } elseif ($key_status !== 'ok') {
             $feed_status = 'blocked';
         } elseif (!$feed_has_stale_symbols && $batch_age <= 120) {
@@ -1483,7 +1492,8 @@ final class SMC_SuperFib_Sniper_REST {
         $has_key = $this->get_twelve_key_status($user_id) === 'ok';
         $settings = $this->get_settings($user_id);
         $stale_threshold_sec = $settings['staleThresholdSec'];
-        $state = $has_key ? 'stale' : 'blocked';
+        $mt5_price_authority = $this->is_mt5_authoritative($user_id, $symbol);
+        $state = ($has_key || $mt5_price_authority) ? 'stale' : 'blocked';
 
         if (!$price) {
             $price = array('symbol' => $symbol, 'mid' => 0, 'updatedAt' => gmdate('c'), 'state' => $state);
@@ -1497,7 +1507,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         if (count($candles) < 30 || (float) $price['mid'] <= 0) {
             $early_blocker = $this->determine_engine_blocker($user_id, $price, $candles, false, 'WATCH', $symbol);
-            $early_gate_reason = $has_key ? 'insufficient candle history' : 'Twelve Data key missing';
+            $early_gate_reason = ($has_key || $mt5_price_authority) ? 'insufficient candle history' : 'Twelve Data key missing';
             if ($early_blocker === 'KEY_MISSING' || $early_blocker === 'KEY_INVALID') {
                 $early_gate_reason = 'Twelve Data key ' . ($early_blocker === 'KEY_MISSING' ? 'missing' : 'invalid');
             } elseif ($early_blocker === 'RATE_LIMITED') {
@@ -2152,10 +2162,42 @@ final class SMC_SuperFib_Sniper_REST {
 
         // Take top N candles (by most recent timestamps)
         $rows = array_slice($deduped, 0, $outputsize);
-        
+
+        if ($timeframe !== '1min') {
+            $mt5_aggregated = $this->fetch_aggregated_mt5_m1_candles($user_id, $symbol, $timeframe, $outputsize);
+            if (!empty($mt5_aggregated)) {
+                $canonical_latest = 0;
+                if (!empty($rows[0]['candle_time'])) {
+                    $canonical_latest = strtotime($rows[0]['candle_time'] . ' UTC');
+                    if ($canonical_latest === false) {
+                        $canonical_latest = 0;
+                    }
+                }
+
+                $mt5_latest = 0;
+                $mt5_last = end($mt5_aggregated);
+                if (!empty($mt5_last['time'])) {
+                    $mt5_latest = strtotime($mt5_last['time']);
+                    if ($mt5_latest === false) {
+                        $mt5_latest = 0;
+                    }
+                }
+
+                $tf_seconds = max(60, (int) $this->timeframe_seconds($timeframe));
+                $freshness_window = max($tf_seconds * 2, 300);
+                $mt5_is_recent = $mt5_latest > 0 && (time() - $mt5_latest) <= $freshness_window;
+                $mt5_has_coverage = count($mt5_aggregated) >= min(max(1, (int) $outputsize), 5);
+                $mt5_not_older_than_canonical = $canonical_latest <= 0 || $mt5_latest >= ($canonical_latest - $tf_seconds);
+
+                if ($mt5_is_recent && $mt5_has_coverage && $mt5_not_older_than_canonical) {
+                    return $mt5_aggregated;
+                }
+            }
+        }
+
         // Reverse to chronological order (oldest to newest)
         $rows = array_reverse($rows);
-        
+
         return array_map(function ($row) {
             return array(
                 'time' => $this->to_iso($row['candle_time']),
@@ -2165,6 +2207,65 @@ final class SMC_SuperFib_Sniper_REST {
                 'close' => (float) $row['close'],
             );
         }, $rows);
+    }
+
+    private function fetch_aggregated_mt5_m1_candles($user_id, $symbol, $timeframe, $outputsize) {
+        global $wpdb;
+
+        $tf_seconds = $this->timeframe_seconds($timeframe);
+        if ($tf_seconds <= 60) {
+            return array();
+        }
+
+        $m1_rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT candle_time, open, high, low, close, volume FROM {$this->table('candles')} WHERE user_id = %d AND symbol = %s AND timeframe = %s AND source = %s ORDER BY candle_time ASC",
+            $user_id,
+            $symbol,
+            '1min',
+            'mt5'
+        ), ARRAY_A);
+
+        if (empty($m1_rows)) {
+            return array();
+        }
+
+        $buckets = array();
+        $now = time();
+        foreach ($m1_rows as $row) {
+            $ts = strtotime($row['candle_time'] . ' UTC');
+            if ($ts === false) {
+                continue;
+            }
+
+            $bucket_start = (int) (floor($ts / $tf_seconds) * $tf_seconds);
+            if (($bucket_start + $tf_seconds) > $now) {
+                continue;
+            }
+
+            if (!isset($buckets[$bucket_start])) {
+                $buckets[$bucket_start] = array(
+                    'time' => gmdate('c', $bucket_start),
+                    'open' => (float) $row['open'],
+                    'high' => (float) $row['high'],
+                    'low' => (float) $row['low'],
+                    'close' => (float) $row['close'],
+                    'volume' => isset($row['volume']) ? (int) $row['volume'] : 0,
+                );
+                continue;
+            }
+
+            $buckets[$bucket_start]['high'] = max($buckets[$bucket_start]['high'], (float) $row['high']);
+            $buckets[$bucket_start]['low'] = min($buckets[$bucket_start]['low'], (float) $row['low']);
+            $buckets[$bucket_start]['close'] = (float) $row['close'];
+            $buckets[$bucket_start]['volume'] += isset($row['volume']) ? (int) $row['volume'] : 0;
+        }
+
+        if (empty($buckets)) {
+            return array();
+        }
+
+        ksort($buckets);
+        return array_slice(array_values($buckets), -1 * max(1, (int) $outputsize));
     }
 
     private function validate_twelve_key($api_key) {
