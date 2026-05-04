@@ -235,7 +235,7 @@ final class SMC_SuperFib_Sniper_REST {
         register_rest_route(self::NAMESPACE, '/ea/market-stream', array(
             'methods' => WP_REST_Server::CREATABLE,
             'callback' => array($this, 'post_ea_market_stream'),
-            'permission_callback' => array($this, 'permission_ea_market_stream'),
+            'permission_callback' => array($this, 'verify_ea_api_key'),
         ));
     }
 
@@ -286,6 +286,32 @@ final class SMC_SuperFib_Sniper_REST {
         wp_set_current_user($ea_user_id);
 
         return true;
+    }
+
+    public function verify_ea_api_key(WP_REST_Request $request): bool
+    {
+        $expected = defined('SMC_SF_EA_API_KEY') ? SMC_SF_EA_API_KEY : '';
+        if (empty($expected)) return false;
+
+        // Accept either header name so EA and curl both work
+        $sent = $request->get_header('x_ea_api_key')
+             ?: $request->get_header('x_api_key');
+
+        return hash_equals($expected, (string) $sent);
+    }
+
+    private function resolve_ea_user_id(): int
+    {
+        // EA key is global — resolve to the admin user
+        // who owns the plugin installation
+        $admin = get_users(array(
+            'role'    => 'administrator',
+            'number'  => 1,
+            'orderby' => 'ID',
+            'order'   => 'ASC',
+            'fields'  => array('ID'),
+        ));
+        return !empty($admin) ? (int) $admin[0]->ID : 1;
     }
 
     private static function is_allowed_origin($origin, $allowed) {
@@ -893,7 +919,8 @@ final class SMC_SuperFib_Sniper_REST {
      * }
      */
     public function post_ea_market_stream(WP_REST_Request $request) {
-        $user_id = get_current_user_id();
+        // Resolve user_id from API key — EA has no WP session
+        $user_id = $this->resolve_ea_user_id();
         $payload = $request->get_json_params();
 
         // Regression guard: Validate payload structure
