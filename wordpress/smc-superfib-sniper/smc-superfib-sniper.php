@@ -270,6 +270,21 @@ final class SMC_SuperFib_Sniper_REST {
         if (!hash_equals($configured, $provided)) {
             return new WP_Error('smc_sf_api_key_invalid', 'Invalid API key.', array('status' => 403));
         }
+
+        $payload = (array) $request->get_json_params();
+        $ea_user_id = isset($payload['user_id']) ? (int) $payload['user_id'] : 0;
+        if ($ea_user_id <= 0) {
+            return new WP_Error('smc_sf_user_required', 'user_id is required for EA ingest.', array('status' => 400));
+        }
+
+        $user = get_userdata($ea_user_id);
+        if (!$user || !user_can($user, 'read')) {
+            return new WP_Error('smc_sf_user_invalid', 'user_id must reference a valid readable user.', array('status' => 403));
+        }
+
+        // Bind ingest writes to a concrete WordPress user context.
+        wp_set_current_user($ea_user_id);
+
         return true;
     }
 
