@@ -163,10 +163,13 @@ public:
         TickData tick;
         MqlRates candle;
         bool hasTick   = tickProcessor.GetLastTick(norm, tick);
-        bool hasCandle = candleBuilder.GetCandle(norm, PERIOD_M1, 0, candle);
+        bool hasCandle = candleBuilder.GetCandle(norm, PERIOD_M1, 1, candle);
 
         if (!hasTick)
+        {
+            Print("SMC_MarketDataEA: no tick available for symbol=", symbol, " normalized=", norm);
             return "";
+        }
 
         int digits = (int) SymbolInfoInteger(symbol, SYMBOL_DIGITS);
         if (digits < 0) digits = 5;
