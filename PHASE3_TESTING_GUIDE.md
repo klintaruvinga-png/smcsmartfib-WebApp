@@ -6,7 +6,7 @@ Phase 3 testing verifies that the MT5 Expert Advisor (EA) successfully sends pri
 ## Prerequisites
 1. **MT5 Terminal** with the SMC_MarketDataEA.mq5 attached to a chart
 2. **WordPress Site** with SMC SuperFIB Sniper plugin activated
-3. **Application Password** configured in WordPress for API authentication
+3. **SMC_SF_EA_API_KEY** configured in WordPress and copied into the EA `ApiKey` input
 4. **Database Access** to verify stored data
 
 ## Test Setup
@@ -14,15 +14,16 @@ Phase 3 testing verifies that the MT5 Expert Advisor (EA) successfully sends pri
 ### 1. Configure MT5 EA
 In MT5, attach the EA to a chart with these inputs:
 ```
-WebhookURL = https://your-wordpress-site.com/wp-json/sniper/v1/snapshot
-AuthToken = your-application-password-here
+WebhookURL = https://your-wordpress-site.com/wp-json/sniper/v1/ea/market-stream
+ApiKey = value-that-matches-SMC_SF_EA_API_KEY
+UserId = WordPress user_id that owns the dashboard stream
 TimerSec = 10
 Symbols = EURUSD,GBPUSD,XAUUSD,USDJPY
 ```
 
 ### 2. Verify WordPress REST Endpoint
 The endpoint should be accessible at:
-`https://your-wordpress-site.com/wp-json/sniper/v1/snapshot`
+`https://your-wordpress-site.com/wp-json/sniper/v1/ea/market-stream`
 
 ### 3. Check Database Tables
 Ensure these tables exist with `source` columns:
@@ -41,13 +42,14 @@ Ensure these tables exist with `source` columns:
 
 ### ✅ Webhook Transmission
 - [ ] HTTP POST requests sent to WordPress endpoint
-- [ ] Basic authentication header included
+- [ ] `X-API-KEY` header included
+- [ ] JSON payload includes `user_id`
 - [ ] JSON payload properly formatted
 - [ ] No network/firewall blocking requests
 
 ### ✅ Backend Reception
-- [ ] WordPress REST API accepts POST to `/sniper/v1/snapshot`
-- [ ] Authentication passes (user logged in)
+- [ ] WordPress REST API accepts POST to `/sniper/v1/ea/market-stream`
+- [ ] API-key authentication passes and binds the request to `user_id`
 - [ ] JSON payload parsed correctly
 - [ ] No PHP errors in logs
 
@@ -69,25 +71,23 @@ Ensure these tables exist with `source` columns:
 ### Expected Webhook Payload from MT5 EA:
 ```json
 {
+  "user_id": 7,
   "symbol": "EURUSD",
   "normalized_symbol": "EURUSD",
-  "tick": {
-    "bid": 1.0845,
-    "ask": 1.0847,
-    "spread": 2,
-    "timestamp": "2026-05-03T12:00:00.000Z",
-    "volume": 100
-  },
-  "candle_m1": {
+  "timeframe": "M1",
+  "timestamp": "2026-05-03T12:00:00Z",
+  "bid": 1.0845,
+  "ask": 1.0847,
+  "freshness": "LIVE",
+  "session": "London",
+  "candle": {
+    "time": "2026-05-03T11:59:00Z",
     "open": 1.0840,
     "high": 1.0850,
     "low": 1.0835,
     "close": 1.0845,
-    "volume": 5000,
-    "timestamp": "2026-05-03T12:00:00Z"
+    "volume": 5000
   },
-  "freshness": "LIVE",
-  "session": "London",
   "is_synthetic": false
 }
 ```
@@ -113,9 +113,9 @@ INSERT INTO wp_smc_sf_candles (
 
 ### Simulate Webhook (using curl):
 ```bash
-curl -X POST https://your-wordpress-site.com/wp-json/sniper/v1/snapshot \
+curl -X POST https://your-wordpress-site.com/wp-json/sniper/v1/ea/market-stream \
   -H "Content-Type: application/json" \
-  -H "Authorization: Basic $(echo -n 'username:password' | base64)" \
+  -H "X-API-KEY: your-ea-api-key" \
   -d @test-payload.json
 ```
 
@@ -151,7 +151,7 @@ tail -f /path/to/wp-content/debug.log
 
 ## Troubleshooting
 - **EA not sending**: Check MT5 Experts tab for errors, verify webhook URL
-- **Auth failures**: Verify Application Password is correct
+- **Auth failures**: Verify `SMC_SF_EA_API_KEY`, EA `ApiKey`, and payload `user_id`
 - **Data not stored**: Check PHP error logs, verify database permissions
 - **Dashboard not updating**: Clear transients, check API responses
 

@@ -21,9 +21,14 @@ if (!class_exists('WP_REST_Server')) {
 if (!class_exists('WP_REST_Request')) {
     class WP_REST_Request {
         private $params;
+        private $headers;
 
-        public function __construct($params = array()) {
+        public function __construct($params = array(), $headers = array()) {
             $this->params = is_array($params) ? $params : array();
+            $this->headers = array();
+            foreach ((array) $headers as $key => $value) {
+                $this->headers[strtolower($key)] = $value;
+            }
         }
 
         public function get_json_params() {
@@ -32,6 +37,11 @@ if (!class_exists('WP_REST_Request')) {
 
         public function get_param($key) {
             return isset($this->params[$key]) ? $this->params[$key] : null;
+        }
+
+        public function get_header($key) {
+            $key = strtolower($key);
+            return isset($this->headers[$key]) ? $this->headers[$key] : '';
         }
     }
 }
@@ -80,6 +90,28 @@ if (!function_exists('get_current_user_id')) {
     }
 }
 
+if (!defined('SMC_SF_EA_API_KEY')) {
+    define('SMC_SF_EA_API_KEY', 'test-key');
+}
+
+if (!function_exists('get_userdata')) {
+    function get_userdata($user_id) {
+        return $user_id > 0 ? (object) array('ID' => $user_id) : false;
+    }
+}
+
+if (!function_exists('user_can')) {
+    function user_can($user, $capability) {
+        return $capability === 'read' && !empty($user->ID);
+    }
+}
+
+if (!function_exists('wp_set_current_user')) {
+    function wp_set_current_user($user_id) {
+        $GLOBALS['test_current_user_id'] = (int) $user_id;
+    }
+}
+
 if (!function_exists('current_time')) {
     function current_time($type, $gmt = 0) {
         return gmdate('Y-m-d H:i:s');
@@ -89,6 +121,13 @@ if (!function_exists('current_time')) {
 if (!function_exists('wp_json_encode')) {
     function wp_json_encode($data) {
         return json_encode($data);
+    }
+}
+
+if (!function_exists('set_transient')) {
+    function set_transient($key, $value, $expiration = 0) {
+        $GLOBALS['test_transients'][$key] = $value;
+        return true;
     }
 }
 
@@ -162,6 +201,18 @@ if (!function_exists('add_filter')) {
 // Include the plugin
 require_once __DIR__ . '/../../smc-superfib-sniper.php';
 
+function dispatch_ea_market_stream($plugin, $payload, $headers = array()) {
+    if (empty($headers)) {
+        $headers = array('X-API-KEY' => 'test-key');
+    }
+    $request = new WP_REST_Request($payload, $headers);
+    $permission = $plugin->permission_ea_market_stream($request);
+    if ($permission !== true) {
+        return $permission;
+    }
+    return $plugin->post_ea_market_stream($request);
+}
+
 // Test the EA market stream endpoint
 function test_ea_market_stream() {
     global $wpdb;
@@ -173,14 +224,18 @@ function test_ea_market_stream() {
 
     // Test 1: Valid payload with both snapshot and candle
     echo "Test 1: Valid payload with snapshot and candle\n";
+    $now = time();
     $payload = array(
+        'user_id' => 7,
         'symbol' => 'EURUSD',
         'timeframe' => 'M15',
-        'timestamp' => gmdate('c'), // Current time
+        'timestamp' => gmdate('c', $now),
         'bid' => 1.08521,
         'ask' => 1.08534,
+        'freshness' => 'LIVE',
+        'session' => 'London',
         'candle' => array(
-            'time' => gmdate('c'),
+            'time' => gmdate('c', $now - 60),
             'open' => 1.08450,
             'high' => 1.08550,
             'low' => 1.08420,
@@ -189,8 +244,7 @@ function test_ea_market_stream() {
         )
     );
 
-    $request = new WP_REST_Request($payload);
-    $response = $plugin->post_ea_market_stream($request);
+    $response = dispatch_ea_market_stream($plugin, $payload);
 
     if ($response instanceof WP_REST_Response && isset($response->data['ok']) && $response->data['ok']) {
         echo "✓ SUCCESS: Response OK\n";
@@ -226,11 +280,23 @@ function test_ea_market_stream() {
             $snapshot = reset($wpdb->tables[$snapshots_table]);
             $expected_snapshot_time = gmdate('Y-m-d H:i:s', strtotime($payload['timestamp']));
             if ($snapshot['updated_at'] === $expected_snapshot_time) {
-                echo "✓ SUCCESS: Snapshot uses payload timestamp for updated_at\n";
-            } else {
-                echo "✗ FAILED: Snapshot updated_at does not match payload timestamp\n";
-            }
+            echo "✓ SUCCESS: Snapshot uses payload timestamp for updated_at\n";
+        } else {
+            echo "✗ FAILED: Snapshot updated_at does not match payload timestamp\n";
         }
+
+        if (($GLOBALS['test_transients']['smc_sf_freshness_7_EURUSD'] ?? null) === 'LIVE') {
+            echo "✓ SUCCESS: Freshness transient stored\n";
+        } else {
+            echo "✗ FAILED: Freshness transient missing\n";
+        }
+
+        if (($GLOBALS['test_transients']['smc_sf_session_7_EURUSD'] ?? null) === 'London') {
+            echo "✓ SUCCESS: Session transient stored\n";
+        } else {
+            echo "✗ FAILED: Session transient missing\n";
+        }
+    }
     } else {
         echo "✗ FAILED: Invalid response\n";
         var_dump($response);
@@ -238,17 +304,37 @@ function test_ea_market_stream() {
 
     echo "\n";
 
-    // Test 2: Stale data rejection
-    echo "Test 2: Stale data rejection (>5 minutes old)\n";
+    // Test 2: Permission requires user_id before callback runs.
+    echo "Test 2: Missing user_id rejected by EA permission gate\n";
+    $missing_user_payload = array(
+        'symbol' => 'EURUSD',
+        'timestamp' => gmdate('c'),
+        'bid' => 1.08521,
+        'ask' => 1.08534
+    );
+
+    $missing_user_response = dispatch_ea_market_stream($plugin, $missing_user_payload);
+
+    if ($missing_user_response instanceof WP_Error && $missing_user_response->code === 'smc_sf_user_required') {
+        echo "✓ SUCCESS: Missing user_id correctly rejected\n";
+    } else {
+        echo "✗ FAILED: Missing user_id not rejected\n";
+        var_dump($missing_user_response);
+    }
+
+    echo "\n";
+
+    // Test 3: Stale data rejection
+    echo "Test 3: Stale data rejection (>120 seconds old)\n";
     $stale_payload = array(
+        'user_id' => 7,
         'symbol' => 'EURUSD',
         'timestamp' => gmdate('c', time() - 400), // 400 seconds ago
         'bid' => 1.08521,
         'ask' => 1.08534
     );
 
-    $stale_request = new WP_REST_Request($stale_payload);
-    $stale_response = $plugin->post_ea_market_stream($stale_request);
+    $stale_response = dispatch_ea_market_stream($plugin, $stale_payload);
 
     if ($stale_response instanceof WP_Error && $stale_response->code === 'stale_data') {
         echo "✓ SUCCESS: Stale data correctly rejected\n";
@@ -259,15 +345,15 @@ function test_ea_market_stream() {
 
     echo "\n";
 
-    // Test 3: Invalid payload (missing symbol)
-    echo "Test 3: Invalid payload (missing symbol)\n";
+    // Test 4: Invalid payload (missing symbol)
+    echo "Test 4: Invalid payload (missing symbol)\n";
     $invalid_payload = array(
+        'user_id' => 7,
         'bid' => 1.08521,
         'ask' => 1.08534
     );
 
-    $invalid_request = new WP_REST_Request($invalid_payload);
-    $invalid_response = $plugin->post_ea_market_stream($invalid_request);
+    $invalid_response = dispatch_ea_market_stream($plugin, $invalid_payload);
 
     if ($invalid_response instanceof WP_Error && $invalid_response->code === 'invalid_payload') {
         echo "✓ SUCCESS: Invalid payload correctly rejected\n";
@@ -278,17 +364,17 @@ function test_ea_market_stream() {
 
     echo "\n";
 
-    // Test 4: Snapshot only (no candle)
-    echo "Test 4: Snapshot only payload\n";
+    // Test 5: Snapshot only (no candle)
+    echo "Test 5: Snapshot only payload\n";
     $snapshot_only_payload = array(
+        'user_id' => 7,
         'symbol' => 'GBPUSD',
         'timestamp' => gmdate('c'),
         'bid' => 1.27500,
         'ask' => 1.27515
     );
 
-    $snapshot_request = new WP_REST_Request($snapshot_only_payload);
-    $snapshot_response = $plugin->post_ea_market_stream($snapshot_request);
+    $snapshot_response = dispatch_ea_market_stream($plugin, $snapshot_only_payload);
 
     if ($snapshot_response instanceof WP_REST_Response && $snapshot_response->data['snapshots_inserted'] === 1) {
         echo "✓ SUCCESS: Snapshot-only payload accepted\n";

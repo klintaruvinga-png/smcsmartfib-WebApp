@@ -211,25 +211,23 @@
 ### 10.1 Webhook Payload Format
 ```json
 {
+  "user_id": 7,
   "symbol": "EURUSD",
   "normalized_symbol": "EURUSD",
-  "tick": {
-    "bid": 1.0845,
-    "ask": 1.0847,
-    "spread": 2,
-    "timestamp": "2026-05-03T12:00:00.000Z",
-    "volume": 100
-  },
-  "candle_m1": {
+  "timeframe": "M1",
+  "timestamp": "2026-05-03T12:00:00Z",
+  "bid": 1.0845,
+  "ask": 1.0847,
+  "freshness": "LIVE",
+  "session": "London",
+  "candle": {
+    "time": "2026-05-03T11:59:00Z",
     "open": 1.0840,
     "high": 1.0850,
     "low": 1.0835,
     "close": 1.0845,
-    "volume": 5000,
-    "timestamp": "2026-05-03T12:00:00Z"
+    "volume": 5000
   },
-  "freshness": "LIVE",
-  "session": "London",
   "is_synthetic": false
 }
 ```

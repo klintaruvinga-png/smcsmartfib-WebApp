@@ -969,12 +969,24 @@ final class SMC_SuperFib_Sniper_REST {
             }
         }
 
+        if (!empty($payload['freshness'])) {
+            $freshness = strtoupper(sanitize_text_field($payload['freshness']));
+            set_transient('smc_sf_freshness_' . $user_id . '_' . $symbol, $freshness, 300);
+        }
+
+        if (!empty($payload['session'])) {
+            $session = sanitize_text_field($payload['session']);
+            set_transient('smc_sf_session_' . $user_id . '_' . $symbol, $session, 300);
+        }
+
         // Audit successful ingestion
         $this->audit($user_id, 'ea.market_stream.ingested', array(
             'symbol' => $symbol,
             'snapshots_inserted' => $inserted_snapshots,
             'candles_inserted' => $inserted_candles,
-            'timestamp' => $payload['timestamp'] ?? null
+            'timestamp' => $payload['timestamp'] ?? null,
+            'freshness' => $payload['freshness'] ?? null,
+            'session' => $payload['session'] ?? null
         ));
 
         return rest_ensure_response(array(
