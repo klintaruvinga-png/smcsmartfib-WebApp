@@ -474,8 +474,19 @@ final class SMC_SuperFib_Sniper_REST {
             }
         }
 
+        $has_fresh_mt5_snapshot = false;
+        foreach ($settings['watchlist'] as $symbol) {
+            $cached_price = $this->get_cached_price($user_id, $symbol, $settings['staleThresholdSec']);
+            if ($cached_price && ($cached_price['source'] ?? '') === 'mt5' && ($cached_price['state'] ?? '') === 'live') {
+                $has_fresh_mt5_snapshot = true;
+                break;
+            }
+        }
+
         if ($feed_any_rate_limited) {
             $feed_status = 'rate-limited';
+        } elseif ($has_fresh_mt5_snapshot) {
+            $feed_status = 'live';
         } elseif ($key_status !== 'ok') {
             $feed_status = 'blocked';
         } elseif (!$feed_has_stale_symbols && $batch_age <= 120) {
@@ -1064,7 +1075,9 @@ final class SMC_SuperFib_Sniper_REST {
         global $wpdb;
 
         $mid = ($bid + $ask) / 2;
-        $spread = ($ask - $bid) * 10000; // Convert to pips (assuming 4-decimal pairs)
+        $spec = $this->get_instrument_spec($symbol);
+        $pip_size = isset($spec['pip_size']) && (float) $spec['pip_size'] > 0 ? (float) $spec['pip_size'] : 0.0001;
+        $spread = ($ask - $bid) / $pip_size; // Convert to pips using per-instrument pip size
         $updated_at = $this->normalize_market_timestamp($updated_at, $this->now_mysql());
 
         $result = $wpdb->replace(
@@ -2357,6 +2370,7 @@ final class SMC_SuperFib_Sniper_REST {
             'ask' => (float) $row['ask'],
             'mid' => (float) $row['mid'],
             'changePct1d' => (float) $row['change_pct_1d'],
+            'source' => isset($row['source']) ? (string) $row['source'] : 'twelve-data',
             'updatedAt' => $this->to_iso($row['updated_at']),
             'state' => $this->is_stale($row['updated_at'], $stale_threshold_sec !== null ? $stale_threshold_sec : $this->get_settings($user_id)['staleThresholdSec']) ? 'stale' : $row['state'],
         );
@@ -2475,9 +2489,14 @@ final class SMC_SuperFib_Sniper_REST {
     // backend-confirmed, or 'OK' when everything is healthy.
 
     private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol = null, $chop = null) {
+        $is_mt5_authority = false;
+        if ($symbol !== null) {
+            $is_mt5_authority = $this->is_mt5_authoritative($user_id, $symbol);
+        }
+
         $key_status = $this->get_twelve_key_status($user_id);
-        if ($key_status === 'missing') return 'KEY_MISSING';
-        if ($key_status === 'invalid') return 'KEY_INVALID';
+        if (!$is_mt5_authority && $key_status === 'missing') return 'KEY_MISSING';
+        if (!$is_mt5_authority && $key_status === 'invalid') return 'KEY_INVALID';
         if ($this->is_feed_rate_limited($user_id, $symbol)) return 'RATE_LIMITED';
 
         if (empty($price) || !isset($price['mid']) || (float) $price['mid'] <= 0) {
@@ -2506,6 +2525,14 @@ final class SMC_SuperFib_Sniper_REST {
         if ($chop !== null && (float) $chop >= 0.7) return 'CHOP_GATE_BLOCKED';
 
         return 'OK';
+    }
+
+
+    private function is_mt5_authoritative($user_id, $symbol) {
+        if (!$symbol) return false;
+        $settings = $this->get_settings($user_id);
+        $cached_price = $this->get_cached_price($user_id, $symbol, $settings['staleThresholdSec']);
+        return $cached_price && ($cached_price['source'] ?? '') === 'mt5' && ($cached_price['state'] ?? '') === 'live';
     }
 
     // ── Rate-limit transient helpers ─────────────────────────────────────────

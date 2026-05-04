@@ -81,6 +81,10 @@ public:
     {
         string normalized = ToUpperCase(symbol);
         normalized = StripSuffixes(normalized);
+
+        if (!IsKnownSymbol(normalized))
+            normalized = StripCompactSuffixes(normalized);
+
         if (StringLen(normalized) > 12)
             normalized = StringSubstr(normalized, 0, 12);
         return normalized;
@@ -89,6 +93,32 @@ public:
     bool IsValidSymbol(string symbol)
     {
         return IsKnownSymbol(NormalizeSymbol(symbol));
+    }
+
+
+    string StripCompactSuffixes(string symbol)
+    {
+        string candidates[6];
+        int n = 0;
+        candidates[n++] = "RAW";
+        candidates[n++] = "PRO";
+        candidates[n++] = "ECN";
+        candidates[n++] = "MICRO";
+        candidates[n++] = "M";
+        candidates[n++] = "C";
+
+        for (int i = 0; i < n; i++)
+        {
+            int suffixLen = StringLen(candidates[i]);
+            int pos = StringLen(symbol) - suffixLen;
+            if (pos > 0 && StringSubstr(symbol, pos) == candidates[i])
+            {
+                string trimmed = StringSubstr(symbol, 0, pos);
+                if (IsKnownSymbol(trimmed))
+                    return trimmed;
+            }
+        }
+        return symbol;
     }
 
     string StripSuffixes(string symbol)
