@@ -226,9 +226,10 @@ final class SMC_SuperFib_Sniper_REST {
         $this->route('/user/watchlist', WP_REST_Server::READABLE, 'get_user_watchlist', true);
         $this->route('/user/watchlist', WP_REST_Server::CREATABLE, 'post_user_watchlist', true);
         $this->route('/user/watchlist/add', WP_REST_Server::CREATABLE, 'post_watchlist_add', true);
+        $this->route('/user/watchlist/remove', WP_REST_Server::CREATABLE, 'post_watchlist_remove', true);
         $this->route('/instruments', WP_REST_Server::READABLE, 'get_instruments', true);
         $this->route('/market-data-authority', WP_REST_Server::READABLE, 'get_market_data_authority', true);
-        $this->route('/authority-diagnostics', WP_REST_Server::READABLE, 'get_authority_diagnostics', false);
+        $this->route('/authority-diagnostics', WP_REST_Server::READABLE, 'get_authority_diagnostics', true);
     }
 
     private function route($path, $methods, $callback, $auth_required) {
@@ -793,7 +794,7 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     public function get_authority_diagnostics(WP_REST_Request $request) {
-        $user_id = get_current_user_id() ?: 1; // Default to user 1 if not logged in
+        $user_id = get_current_user_id();
         $symbol  = strtoupper(sanitize_text_field($request->get_param('symbol') ?: ''));
 
         if (!$symbol) {
