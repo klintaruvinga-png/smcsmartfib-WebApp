@@ -1005,19 +1005,31 @@ final class SMC_SuperFib_Sniper_REST {
         $timeframe = $this->normalize_mt5_timeframe($payload['timeframe'] ?? 'M15');
         $snapshot_updated_at = $this->normalize_market_timestamp($payload['timestamp'] ?? null, $this->now_mysql());
 
-        // Freshness enforcement: reject stale data (>120 seconds drift).
+        // HARDENING: Separate snapshot-freshness from candle-freshness.
+        // The top-level timestamp is the EA's tick time (broker clock). During weekend,
+        // thin-market, or broker-jitter conditions this can drift 60–180s while the
+        // bid/ask snapshot is still the most current available price.
+        // Only hard-reject at 300s (5 min) at the payload level; candle staleness is
+        // enforced at 180s inside insert_mt5_candle() with a full audit trail.
+        // This preserves snapshots during low-liquidity sessions.
         if (!empty($payload['timestamp'])) {
             $data_timestamp = strtotime($payload['timestamp']);
             $now_timestamp = time();
             $age_seconds = $now_timestamp - $data_timestamp;
             
-            if ($age_seconds > 120) {
+            if ($data_timestamp === false || $age_seconds > 300) {
                 $this->audit($user_id, 'ea.market_stream.stale_data_rejected', array(
                     'symbol' => $symbol,
                     'timestamp' => $payload['timestamp'],
-                    'age_seconds' => $age_seconds
+                    'age_seconds' => $age_seconds,
+                    'rejection_level' => 'payload',
                 ));
-                return new WP_Error('stale_data', 'Rejected market data older than 120 seconds', array('status' => 400));
+                return new WP_Error('stale_data', 'Rejected market data older than 300 seconds', array('status' => 400));
+            }
+
+            // Warn (but don't reject) between 120–300s so the log shows drift without losing the snapshot.
+            if ($age_seconds > 120) {
+                error_log("MT5 DRIFT WARNING: {$symbol} | payload_age={$age_seconds}s | snapshot will write, candle gated separately");
             }
         }
 
@@ -1037,7 +1049,7 @@ final class SMC_SuperFib_Sniper_REST {
                 $result = $this->upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $snapshot_updated_at);
                 if ($result) {
                     $inserted_snapshots = 1;
-                    error_log("MT5 SNAPSHOT WRITE: {$symbol} | bid={$bid} ask={$ask} time={$snapshot_updated_at}");
+                    error_log("MT5 SNAPSHOT WRITE: {$symbol} | bid={$bid} ask={$ask} | broker_ts={$snapshot_updated_at} | server_write=" . gmdate('Y-m-d H:i:s'));
                 }
             } else {
                 $this->audit($user_id, 'ea.market_stream.invalid_prices', array(
@@ -1127,7 +1139,9 @@ final class SMC_SuperFib_Sniper_REST {
         $spec = $this->get_instrument_spec($symbol);
         $pip_size = isset($spec['pip_size']) && (float) $spec['pip_size'] > 0 ? (float) $spec['pip_size'] : 0.0001;
         $spread = ($ask - $bid) / $pip_size; // Convert to pips using per-instrument pip size
-        $updated_at = $this->normalize_market_timestamp($updated_at, $this->now_mysql());
+        // HARDENING: updated_at must be server-receive time to prevent broker clock drift freezing staleness checks.
+        // Regression guard: Preserve current $updated_at param for diagnostics, but override for DB write.
+        $updated_at = $this->now_mysql(); // Always server time — ignore EA timestamp for staleness
 
         $result = $wpdb->replace(
             $this->table('snapshots'),
@@ -1178,8 +1192,19 @@ final class SMC_SuperFib_Sniper_REST {
             $stream_ts = strtotime($stream_timestamp);
             if ($candle_ts !== false && $stream_ts !== false) {
                 $age_seconds = $stream_ts - $candle_ts;
-                if ($age_seconds > 120) {
-                    error_log("STALE REJECTED: {$symbol} | age={$age_seconds}");
+                // HARDENING: M1 candles are already 60s old by design (closed bar).
+                // Raise threshold to 180s (60s natural lag + 120s broker-jitter headroom).
+                // Candles > 180s stale relative to stream timestamp are genuinely old.
+                // REGRESSION: Log via audit() not just error_log() so rejections are visible.
+                if ($age_seconds > 180) {
+                    error_log("STALE REJECTED: {$symbol} | age={$age_seconds}s | candle={$candle['time']} | stream={$stream_timestamp}");
+                    $this->audit($user_id, 'ea.market_stream.stale_candle_rejected', array(
+                        'symbol' => $symbol,
+                        'timeframe' => $timeframe,
+                        'candle_time' => $candle['time'],
+                        'stream_timestamp' => $stream_timestamp,
+                        'age_seconds' => $age_seconds,
+                    ));
                     return false;
                 }
             }
@@ -2522,6 +2547,15 @@ final class SMC_SuperFib_Sniper_REST {
             return null;
         }
 
+        // HARDENING: Use iso_age_sec() to avoid PHP 8 strtotime issues.
+        // Regression guard: Preserve existing logic; extract to variable for clarity.
+        $threshold = $stale_threshold_sec !== null
+            ? $stale_threshold_sec
+            : $this->get_settings($user_id)['staleThresholdSec'];
+        $price_state = $this->iso_age_sec($this->to_iso($row['updated_at'])) > $threshold
+            ? 'stale'
+            : $row['state'];
+
         return array(
             'symbol' => $row['symbol'],
             'bid' => (float) $row['bid'],
@@ -2530,7 +2564,7 @@ final class SMC_SuperFib_Sniper_REST {
             'changePct1d' => (float) $row['change_pct_1d'],
             'source' => isset($row['source']) ? (string) $row['source'] : 'twelve-data',
             'updatedAt' => $this->to_iso($row['updated_at']),
-            'state' => $this->is_stale($row['updated_at'], $stale_threshold_sec !== null ? $stale_threshold_sec : $this->get_settings($user_id)['staleThresholdSec']) ? 'stale' : $row['state'],
+            'state' => $price_state,  // PATCHED
         );
     }
 

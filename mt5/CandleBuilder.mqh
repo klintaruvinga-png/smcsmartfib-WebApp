@@ -15,6 +15,7 @@ private:
     datetime lastCandleTime[100];    // Last candle time per symbol
     string symbolList[100];
     int symbolCount;
+    bool ringFull[100];   // true once candleIndices[i] has wrapped past 499
 
     // Current candle being built
     MqlRates currentCandles[100];
@@ -27,6 +28,7 @@ public:
         ArrayInitialize(candleIndices, 0);
         ArrayInitialize(candleCounts, 0);
         ArrayInitialize(lastCandleTime, 0);
+        ArrayInitialize(ringFull, false);
         ZeroMemory(currentCandles);   // ArrayInitialize doesn't support struct arrays
     }
 
@@ -61,7 +63,9 @@ public:
             if (lastCandleTime[index] != 0)
             {
                 candlesM1[index][candleIndices[index]] = currentCandles[index];
-                candleIndices[index] = (candleIndices[index] + 1) % 500;
+                int next = (candleIndices[index] + 1) % 500;
+                if (next == 0) ringFull[index] = true;
+                candleIndices[index] = next;
                 if (candleCounts[index] < 500)
                     candleCounts[index]++;
             }
@@ -109,15 +113,18 @@ public:
         if (index == -1)
             return false;
 
-        // candleIndices[index] is the modulo next-write pointer, so 0 is valid
-        // after wrap. Use candleCounts[index] for cold-start and history bounds.
-        int available = candleCounts[index];
-        if (available == 0)
-            return false;  // no bar committed yet
-        if (shift < 0)
-            return false;
-        if (shift >= available)
-            return false;  // requested bar is older than available history
+        int committed = candleIndices[index];
+        if (!ringFull[index]) {
+            // Ring not yet full: candleIndices is a direct count of committed bars.
+            if (committed == 0)
+                return false;  // cold start — no bar written yet
+            if (shift >= committed)
+                return false;  // shift requests older bar than history holds
+        } else {
+            // Ring is full: all 500 slots valid. Any shift 0–499 is safe.
+            if (shift >= 500)
+                return false;  // caller error — out of range
+        }
 
         int candleIndex = (candleIndices[index] - 1 - shift + 500) % 500;
         candle = candlesM1[index][candleIndex];
@@ -142,7 +149,9 @@ public:
         synthetic.real_volume = 0;
 
         candlesM1[index][candleIndices[index]] = synthetic;
-        candleIndices[index] = (candleIndices[index] + 1) % 500;
+        int nextIdx = (candleIndices[index] + 1) % 500;
+        if (nextIdx == 0) ringFull[index] = true;
+        candleIndices[index] = nextIdx;
         if (candleCounts[index] < 500)
             candleCounts[index]++;
     }
