@@ -150,7 +150,7 @@ public:
     {
         return candleBuilder.GetCandle(
                    symbolNormalizer.NormalizeSymbol(symbol),
-                   PERIOD_M1, 1, candle);
+                   PERIOD_M1, 0, candle);
     }
 
     // ---- Webhook ----
@@ -199,20 +199,32 @@ public:
         if (hasCandle && candleBuilder.ValidateCandle(candle))
         {
             datetime candleTime = candle.time;
-            json += ",\"candle\":{";
-            json += "\"time\":\""  + TimeToIso8601(candleTime) + "\",";
-            json += "\"open\":"    + DoubleToString(candle.open,  digits)      + ",";
-            json += "\"high\":"    + DoubleToString(candle.high,  digits)      + ",";
-            json += "\"low\":"     + DoubleToString(candle.low,   digits)      + ",";
-            json += "\"close\":"   + DoubleToString(candle.close, digits)      + ",";
-            json += "\"volume\":"  + IntegerToString((long)candle.tick_volume);
-            json += "}";
+            
+            // REGRESSION GUARD: Reject live/future candles if candle indexing regresses.
+            if (candleTime >= now)
+            {
+                Print("REGRESSION GUARD: Rejecting future candle for ", symbol,
+                      " | candleTime=", TimeToString(candleTime, TIME_DATE|TIME_SECONDS),
+                      " | now=", TimeToString(now, TIME_DATE|TIME_SECONDS),
+                      " | Expected latest closed candle (shift=0 in CandleBuilder indexing)");
+            }
+            else
+            {
+                json += ",\"candle\":{";
+                json += "\"time\":\""  + TimeToIso8601(candleTime) + "\",";
+                json += "\"open\":"    + DoubleToString(candle.open,  digits)      + ",";
+                json += "\"high\":"    + DoubleToString(candle.high,  digits)      + ",";
+                json += "\"low\":"     + DoubleToString(candle.low,   digits)      + ",";
+                json += "\"close\":"   + DoubleToString(candle.close, digits)      + ",";
+                json += "\"volume\":"  + IntegerToString((long)candle.tick_volume);
+                json += "}";
 
-            Print("SHIFT CHECK → candle_time=", TimeToString(candleTime, TIME_DATE|TIME_SECONDS),
-                  " | current=", TimeToString(now, TIME_DATE|TIME_SECONDS));
-            Print("EA SEND → ", symbol,
-                  " | candle_time=", TimeToString(candleTime, TIME_DATE|TIME_SECONDS),
-                  " | now=", TimeToString(now, TIME_DATE|TIME_SECONDS));
+                Print("SHIFT CHECK → candle_time=", TimeToString(candleTime, TIME_DATE|TIME_SECONDS),
+                      " | current=", TimeToString(now, TIME_DATE|TIME_SECONDS));
+                Print("EA SEND → ", symbol,
+                      " | candle_time=", TimeToString(candleTime, TIME_DATE|TIME_SECONDS),
+                      " | now=", TimeToString(now, TIME_DATE|TIME_SECONDS));
+            }
         }
 
         json += "}";
@@ -225,12 +237,21 @@ public:
         if (StringLen(webhookUrl) == 0)
             return false;
 
+        // REGRESSION GUARD: Validate API key is configured before attempting send
+        if (StringLen(authHeader) == 0)
+        {
+            Print("REGRESSION GUARD: authHeader is empty! API key not configured. Check Initialize() call.");
+            return false;
+        }
+
         string payload = BuildWebhookPayload(symbol);
         if (StringLen(payload) == 0)
         {
             Print("SMC_MarketDataEA: empty payload for symbol=", symbol);
             return false;
         }
+
+        Print("WEBHOOK DEBUG: Payload size=", StringLen(payload), " | auth_header_len=", StringLen(authHeader));
 
         char   postData[];
         char   result[];
