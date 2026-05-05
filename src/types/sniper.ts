@@ -13,17 +13,19 @@ export type EngineBlocker =
   | "RATE_LIMITED"
   | "QUOTE_UNAVAILABLE"
   | "PRICE_STALE"
+  | "PRICE_NOT_MT5_FRESH"
   | "CANDLES_MISSING"
   | "CANDLES_STALE"
   | "INSUFFICIENT_CANDLE_HISTORY"
   | "READY_NOT_CONFIRMED_STALE_DATA"
   | "CHOP_GATE_BLOCKED"
   | "OK";
+export type PriceSource = "mt5" | "twelve-data" | "unknown" | "mock";
 
 export interface SymbolDiagnostic {
   symbol: Symbol;
   priceState: FreshnessState;
-  candleState: "live" | "stale" | "missing";
+  candleState: "live" | "stale" | "missing" | "not_checked";
   lastPriceAt: string | null;
   lastCandleAt: string | null;
   candleCount: number;
@@ -106,6 +108,8 @@ export interface PairPrice {
   changePct1d: number;
   updatedAt: string;
   state: FreshnessState;
+  source: PriceSource;
+  age_sec?: number;
 }
 
 export interface ChartCandle {

@@ -4,6 +4,7 @@ import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { BiasBadge, ChopMeter, GateBadge } from "@/components/sniper/Indicators";
 import { WarningLine } from "@/components/sniper/Warnings";
 import { fmtPrice, fmtPct, relTime } from "@/lib/format";
+import { MOCK_MODE } from "@/lib/api/sniperClient";
 import { cn } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
 import type { EngineBlocker } from "@/types/sniper";
@@ -28,6 +29,7 @@ function blockerWarning(blocker: EngineBlocker | undefined): string | null {
     RATE_LIMITED: "Feed rate-limited — cooling down",
     QUOTE_UNAVAILABLE: "Price unavailable",
     PRICE_STALE: "Price data stale",
+    PRICE_NOT_MT5_FRESH: "No fresh MT5 price",
     CANDLES_MISSING: "No candle history",
     CANDLES_STALE: "Candles stale (>2 h old)",
     INSUFFICIENT_CANDLE_HISTORY: "Insufficient candle history (<30 bars)",
@@ -41,6 +43,31 @@ function LivePage() {
   const { data, isLoading } = useSnapshot();
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
   if (isLoading || !data) return <div className="text-mute text-sm">Loading radar…</div>;
+
+  const parseUpdatedAt = (value: string): Date =>
+    value.includes("T") ? new Date(value) : new Date(`${value.replace(" ", "T")}Z`);
+
+  const mt5Prices = data.prices.filter((price) => {
+    if (MOCK_MODE && price.source === "mock") return true;
+    if (price.source !== "mt5") {
+      console.debug("[live] skipped non-MT5 price", price.symbol, price.source);
+      return false;
+    }
+
+    const parsed = parseUpdatedAt(price.updatedAt);
+    const ageMs = Number.isFinite(price.age_sec)
+      ? Number(price.age_sec) * 1000
+      : Date.now() - parsed.getTime();
+    if (!Number.isFinite(ageMs) || ageMs > 10_000) {
+      console.debug(
+        "[live] skipped stale MT5 price",
+        price.symbol,
+        Number.isFinite(ageMs) ? `${(ageMs / 1000).toFixed(1)}s old` : price.updatedAt,
+      );
+      return false;
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-4">
@@ -60,7 +87,13 @@ function LivePage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {data.prices.map((price) => {
+        {mt5Prices.length === 0 && (
+          <div className="col-span-full py-10 text-center text-sm text-mute">
+            No live MT5 prices - verify EA connection and symbol push.
+          </div>
+        )}
+
+        {mt5Prices.map((price) => {
           const regime = data.regimes.find((r) => r.symbol === price.symbol);
           const gate = data.gates.find((g) => g.symbol === price.symbol);
           const diagnostic = (data.diagnostics ?? []).find((d) => d.symbol === price.symbol);

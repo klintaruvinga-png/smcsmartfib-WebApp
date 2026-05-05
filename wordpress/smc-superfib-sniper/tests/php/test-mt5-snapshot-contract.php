@@ -510,8 +510,8 @@ $wpdb->replace($wpdb->prefix . 'smc_sf_user_settings', array(
     'user_id' => 7,
     'settings' => json_encode(array(
         'backendUrl' => 'https://example.com/wp-json',
-        'refreshIntervalSec' => 15,
-        'staleThresholdSec' => 180,
+        'refreshIntervalSec' => 2,
+        'staleThresholdSec' => 10,
         'watchlist' => array('EURUSD', 'USDJPY'),
         'riskAllocation' => array('perTradePct' => 0.5, 'dailyMaxPct' => 2.0, 'ddCapPct' => 6.0),
     )),
@@ -537,7 +537,7 @@ foreach (array('EURUSD' => 1.1000, 'USDJPY' => 156.0000) as $symbol => $base) {
         'change_pct_1d' => 0,
         'source' => 'mt5',
         'state' => 'live',
-        'updated_at' => gmdate('Y-m-d H:i:s', time() - 10),
+        'updated_at' => gmdate('Y-m-d H:i:s', time() - 5),
     ));
 
     for ($i = 0; $i < 450; $i++) {
@@ -569,6 +569,38 @@ $quote = $fetchQuote->invoke($instance, 7, 'EURUSD');
 assert_true(is_array($quote), 'fetch_quote should return cached MT5 data for MT5-live symbols');
 assert_same('EURUSD', $quote['symbol'], 'fetch_quote MT5 guard returned the wrong symbol');
 assert_same('live', $quote['state'], 'fetch_quote MT5 guard must preserve live state');
+assert_same('mt5', $quote['source'], 'fetch_quote MT5 guard must preserve source authority');
+assert_true(isset($quote['age_sec']) && $quote['age_sec'] <= 10, 'fetch_quote MT5 guard must expose fresh age_sec');
+
+$wpdb->replace($snapshotTable, array(
+    'user_id' => 7,
+    'symbol' => 'XAUUSD',
+    'bid' => 2330.00,
+    'ask' => 2330.50,
+    'mid' => 2330.25,
+    'spread' => 50,
+    'change_pct_1d' => 0,
+    'source' => 'twelve-data',
+    'state' => 'live',
+    'updated_at' => gmdate('Y-m-d H:i:s'),
+));
+$tdQuote = $fetchQuote->invoke($instance, 7, 'XAUUSD');
+assert_same(null, $tdQuote, 'fetch_quote must not return Twelve Data rows after MT5-only decommission');
+
+$runEngine = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'run_engine_for_symbols');
+$runEngine->setAccessible(true);
+$guarded = $runEngine->invoke($instance, 7, array('XAUUSD'), array(array(
+    'symbol' => 'XAUUSD',
+    'bid' => 2330.00,
+    'ask' => 2330.50,
+    'mid' => 2330.25,
+    'changePct1d' => 0,
+    'updatedAt' => gmdate('c'),
+    'state' => 'live',
+    'source' => 'twelve-data',
+    'age_sec' => 0,
+)), true);
+assert_same('PRICE_NOT_MT5_FRESH', $guarded['diagnostics'][0]['engineBlocker'] ?? null, 'engine guard must block non-MT5 prices before candle analysis');
 
 $chart = $instance->get_chart_snapshot(new WP_REST_Request(array(
     'symbol' => 'EURUSD',

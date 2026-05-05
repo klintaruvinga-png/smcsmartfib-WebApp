@@ -3,7 +3,7 @@
   "workspaces": {
     "": {
       "name": "tanstack_start_ts",
-      "version": "13.0.0",
+    "version": "13.0.1",
       "dependencies": {
         "@cloudflare/vite-plugin": "^1.25.5",
         "@hookform/resolvers": "^5.2.2",

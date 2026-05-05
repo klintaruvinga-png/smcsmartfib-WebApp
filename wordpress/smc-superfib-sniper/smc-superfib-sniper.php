@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SMC SuperFIB Signal Engine & Account Manager
  * Description: WordPress REST backend for the SMC SuperFIB Dashboard.
- * Version: 13.0.0
+ * Version: 13.0.1
  * Author: Kudzanai Lloyd Taruvinga For Munhumukapa Holdings Group
  */
 
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
 require_once __DIR__ . '/class-market-data-service.php';
 
 final class SMC_SuperFib_Sniper_REST {
-    const VERSION = '13.0.0';
+    const VERSION = '13.0.1';
     const NAMESPACE = 'sniper/v1';
     const TWELVE_PROVIDER = 'twelve_data';
 
@@ -587,8 +587,8 @@ final class SMC_SuperFib_Sniper_REST {
         $current = $this->get_settings($user_id);
         $settings = array_merge($current, array(
             'backendUrl' => isset($payload['backendUrl']) ? esc_url_raw($payload['backendUrl']) : $current['backendUrl'],
-            'refreshIntervalSec' => $this->int_between($payload, 'refreshIntervalSec', 5, 60, $current['refreshIntervalSec']),
-            'staleThresholdSec' => $this->int_between($payload, 'staleThresholdSec', 30, 600, $current['staleThresholdSec']),
+            'refreshIntervalSec' => $this->int_between($payload, 'refreshIntervalSec', 2, 60, $current['refreshIntervalSec']),
+            'staleThresholdSec' => $this->int_between($payload, 'staleThresholdSec', 10, 60, $current['staleThresholdSec']),
             'watchlist' => $this->sanitize_symbols(isset($payload['watchlist']) ? $payload['watchlist'] : $current['watchlist']),
             'riskAllocation' => $this->sanitize_risk_allocation(isset($payload['riskAllocation']) ? $payload['riskAllocation'] : $current['riskAllocation'], $current['riskAllocation']),
         ));
@@ -1557,9 +1557,51 @@ final class SMC_SuperFib_Sniper_REST {
         $signals = array();
         $plans = array();
         $diagnostics = array();
+        $engine_stale_threshold_sec = (int) $this->get_settings($user_id)['staleThresholdSec'];
 
         foreach ($symbols as $symbol) {
             $price = $this->find_price($prices, $symbol);
+
+            $price_source = is_array($price) ? ($price['source'] ?? 'unknown') : 'unknown';
+            $price_state = is_array($price) ? ($price['state'] ?? 'offline') : 'offline';
+            $price_age = is_array($price) && isset($price['age_sec'])
+                ? (int) $price['age_sec']
+                : (is_array($price) && isset($price['updatedAt']) ? $this->iso_age_sec($price['updatedAt']) : PHP_INT_MAX);
+
+            if ($price_source !== 'mt5' || $price_state !== 'live' || $price_age > $engine_stale_threshold_sec) {
+                error_log(sprintf(
+                    '[engine_guard] skipped %s | source=%s state=%s age=%ds',
+                    $symbol,
+                    (string) $price_source,
+                    (string) $price_state,
+                    (int) $price_age
+                ));
+                $regimes[] = array(
+                    'symbol' => $symbol,
+                    'bias' => 'RANGING',
+                    'chop' => 1,
+                    'nearestFib' => null,
+                    'updatedAt' => gmdate('c'),
+                    'state' => 'stale',
+                );
+                $gates[] = array(
+                    'symbol' => $symbol,
+                    'allow' => 'BLOCKED',
+                    'reason' => 'price_not_mt5_fresh',
+                    'state' => 'stale',
+                );
+                $diagnostics[] = array(
+                    'symbol' => $symbol,
+                    'priceState' => $price_state === 'live' ? 'stale' : $price_state,
+                    'candleState' => 'not_checked',
+                    'lastPriceAt' => is_array($price) ? ($price['updatedAt'] ?? null) : null,
+                    'lastCandleAt' => null,
+                    'candleCount' => 0,
+                    'engineBlocker' => 'PRICE_NOT_MT5_FRESH',
+                );
+                continue;
+            }
+
             $state = $this->build_symbol_state($user_id, $symbol, $price);
             $regimes[] = $state['regime'];
             $gates[] = $state['gate'];
@@ -2070,6 +2112,8 @@ final class SMC_SuperFib_Sniper_REST {
                     'changePct1d' => 0,
                     'updatedAt' => gmdate('c'),
                     'state' => $this->get_twelve_key_status($user_id) === 'ok' ? 'unavailable' : 'blocked',
+                    'source' => 'unknown',
+                    'age_sec' => PHP_INT_MAX,
                 );
             }
         }
@@ -2078,135 +2122,12 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function fetch_quote($user_id, $symbol) {
-        global $wpdb;
-
         if ($this->is_mt5_authoritative($user_id, $symbol)) {
             return $this->get_cached_price($user_id, $symbol);
         }
 
-        $key = $this->get_twelve_key($user_id);
-        if (is_wp_error($key) || !$key) {
-            return null;
-        }
-
-        // Quote TTL: skip upstream call if we fetched this symbol recently.
-        // Also skip while this symbol is rate-limited; return the DB-cached price instead.
-        $quote_ttl_key = 'smc_sf_qt_' . $user_id . '_' . md5($symbol);
-        if (get_transient($quote_ttl_key) !== false || $this->is_feed_rate_limited($user_id, $symbol)) {
-            return $this->get_cached_price($user_id, $symbol);
-        }
-
-        $url = add_query_arg(array(
-            'symbol' => $this->twelve_symbol($symbol),
-            'apikey' => $key,
-        ), 'https://api.twelvedata.com/quote');
-        $response = wp_remote_get($url, array('timeout' => 12));
-        if (is_wp_error($response)) {
-            return null;
-        }
-
-        $code = wp_remote_retrieve_response_code($response);
-        $body = json_decode(wp_remote_retrieve_body($response), true);
-        if ($code === 429 || (isset($body['code']) && (int) $body['code'] === 429)) {
-            // Track rate-limit in a transient — do NOT change key_status.
-            // A 429 is a temporary feed condition; invalidating key_status would prevent
-            // get_twelve_key() from returning the stored key after the cooldown expires.
-            $this->set_feed_rate_limited($user_id, $symbol);
-            return null;
-        }
-        // Check 5xx BEFORE checking body['status']: Twelve Data outage responses carry
-        // status:"error" in the body at the same time as a 5xx HTTP code, so if the body
-        // check ran first the 5xx escape hatch would never be reached.
-        if ($code >= 500) {
-            return null;
-        }
-        // Only revoke key status for authentication failures. A 400/404 means the symbol
-        // is unsupported or malformed, not that the key is invalid; branding one bad watchlist
-        // entry as an invalid key would block the entire feed.
-        if ($code === 401 || $code === 403 || (isset($body['code']) && in_array((int) $body['code'], array(401, 403), true))) {
-            $this->set_twelve_key_status($user_id, 'invalid');
-            return null;
-        }
-        if ($code >= 400 || (isset($body['status']) && $body['status'] === 'error')) {
-            return null;
-        }
-
-        $mid = isset($body['close']) ? (float) $body['close'] : (isset($body['price']) ? (float) $body['price'] : 0);
-        if ($mid <= 0) {
-            return null;
-        }
-
-        $bid = isset($body['bid']) ? (float) $body['bid'] : $mid;
-        $ask = isset($body['ask']) ? (float) $body['ask'] : $mid;
-        // Prefer current day's open for intraday percent change; fall back to previous_close
-        // only when the day-open field is absent from the /quote response.
-        $day_open = isset($body['open']) ? (float) $body['open'] : 0;
-        $prev_close = isset($body['previous_close']) ? (float) $body['previous_close'] : 0;
-        if ($day_open > 0) {
-            $change = (($mid - $day_open) / $day_open) * 100;
-        } elseif ($prev_close > 0) {
-            $change = (($mid - $prev_close) / $prev_close) * 100;
-        } else {
-            $change = 0;
-        }
-        $row = array(
-            'symbol' => $symbol,
-            'bid' => $bid,
-            'ask' => $ask,
-            'mid' => $mid,
-            'changePct1d' => round($change, 4),
-            'updatedAt' => gmdate('c'),
-            'state' => 'live',
-        );
-
-        // MT5 is the authoritative real-time source. If the row was written by MT5 within
-        // the last 60 seconds, skip the twelve-data overwrite so live EA prices persist.
-        $existing = $wpdb->get_row( $wpdb->prepare(
-            "SELECT source, updated_at, bid, ask, mid, change_pct_1d FROM {$this->table('snapshots')} WHERE user_id = %d AND symbol = %s",
-            $user_id, $symbol
-        ) );
-        $age_seconds = $existing ? ( strtotime($this->now_mysql()) - strtotime($existing->updated_at) ) : -1;
-        $mt5_is_fresh = $existing
-            && $existing->source === 'mt5'
-            && $age_seconds >= 0
-            && $age_seconds < 60;
-
-        if ( $mt5_is_fresh ) {
-            // Return the stored MT5 values so callers serve authoritative EA prices,
-            // not the just-fetched Twelve Data quote.
-            set_transient($quote_ttl_key, 1, 45);
-            $this->set_twelve_key_status($user_id, 'ok');
-            return array(
-                'symbol'      => $symbol,
-                'bid'         => (float) $existing->bid,
-                'ask'         => (float) $existing->ask,
-                'mid'         => (float) $existing->mid,
-                'changePct1d' => (float) $existing->change_pct_1d,
-                'updatedAt'   => $this->to_iso($existing->updated_at),
-                'state'       => 'live',
-            );
-        }
-
-        $wpdb->replace(
-            $this->table('snapshots'),
-            array(
-                'user_id'       => $user_id,
-                'symbol'        => $symbol,
-                'bid'           => $bid,
-                'ask'           => $ask,
-                'mid'           => $mid,
-                'change_pct_1d' => $row['changePct1d'],
-                'source'        => 'twelve-data',
-                'state'         => 'live',
-                'updated_at'    => $this->now_mysql(),
-            ),
-            array('%d', '%s', '%f', '%f', '%f', '%f', '%s', '%s', '%s')
-        );
-
-        // Mark this symbol's quote as freshly fetched for 45 seconds to prevent API spam.
-        set_transient($quote_ttl_key, 1, 45);
-        $this->set_twelve_key_status($user_id, 'ok');
-        return $row;
+        error_log(sprintf('[fetch_quote] no fresh MT5 data for %s; returning null', $symbol));
+        return null;
     }
 
     private function fetch_candles($user_id, $symbol, $timeframe, $outputsize) {
@@ -2445,8 +2366,8 @@ final class SMC_SuperFib_Sniper_REST {
         $default = array(
             'backendUrl' => rest_url(),
             'apiKeyStatus' => $this->get_twelve_key_status($user_id),
-            'refreshIntervalSec' => 15,
-            'staleThresholdSec' => 180,
+            'refreshIntervalSec' => 2,
+            'staleThresholdSec' => 10,
             'watchlist' => array('GBPUSD', 'AUDUSD', 'EURUSD', 'NZDUSD', 'USDJPY', 'AUDJPY', 'EURJPY', 'XAUUSD'),
             'riskAllocation' => array('perTradePct' => 0.5, 'dailyMaxPct' => 2.0, 'ddCapPct' => 6.0),
         );
@@ -2600,7 +2521,7 @@ final class SMC_SuperFib_Sniper_REST {
         if (!$computed_at) {
             return false;
         }
-        if ((time() - $computed_at) > max(5, (int) $refresh_interval_sec)) {
+        if ((time() - $computed_at) > max(2, (int) $refresh_interval_sec)) {
             return false;
         }
 
@@ -2631,7 +2552,9 @@ final class SMC_SuperFib_Sniper_REST {
         $threshold = $stale_threshold_sec !== null
             ? $stale_threshold_sec
             : $this->get_settings($user_id)['staleThresholdSec'];
-        $price_state = $this->iso_age_sec($this->to_iso($row['updated_at'])) > $threshold
+        $updated_at_iso = $this->to_iso($row['updated_at']);
+        $age_sec = $this->iso_age_sec($updated_at_iso);
+        $price_state = $age_sec > $threshold
             ? 'stale'
             : $row['state'];
 
@@ -2641,9 +2564,10 @@ final class SMC_SuperFib_Sniper_REST {
             'ask' => (float) $row['ask'],
             'mid' => (float) $row['mid'],
             'changePct1d' => (float) $row['change_pct_1d'],
-            'source' => isset($row['source']) ? (string) $row['source'] : 'twelve-data',
-            'updatedAt' => $this->to_iso($row['updated_at']),
+            'source' => isset($row['source']) && $row['source'] !== '' ? (string) $row['source'] : 'unknown',
+            'updatedAt' => $updated_at_iso,
             'state' => $price_state,  // PATCHED
+            'age_sec' => (int) $age_sec,
         );
     }
 
