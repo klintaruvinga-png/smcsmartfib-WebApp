@@ -55,12 +55,19 @@ This document reflects the strategy behavior implemented in the current reposito
 - `Implemented` `draw styling`: `F1` renders as the recent/thin Fib, `F2` renders as a standard mid-session Fib, and `F3` renders as the oldest/thick Fib.
 - `Implemented` `neutral Fib zones`: Both `50%` and `62.5%` are now treated as neutral chop territory in the local Fib drawing logic, mirroring buyside behavior.
 - `Implemented` `HTF authority projection`: HTF Authority Fib (AF) is now the F3 from the next higher timeframe.
+=======
+- `Implemented` `HTF authority AF`: HTF Authority is now the F3 from the next higher timeframe.
+>>>>>>> Stashed changes
   - `15/30/60` charts use `H4` F3
   - `H4` charts use `D1` F3
   - `D1` charts use `M1` F3
   - `W1` charts use `Y1` F3
   - `M1` charts use `Y1` F3
+<<<<<<< Updated upstream
 - `Implemented` `HTF star confirmation`: Higher timeframe SF now carries visual star rating confirmation on the local chart.
+=======
+- `Implemented` `HTF star confirmation`: Higher timeframe AF now carries visual star rating confirmation on the local chart.
+>>>>>>> Stashed changes
 - `Deprecated` `EF`: All EF inputs, draw paths, alerts, table rows, and TP fallback logic were removed from the current patch.
 
 ## Versioned Update Log
@@ -70,4 +77,8 @@ This document reflects the strategy behavior implemented in the current reposito
 - `2026-05-01` Recreated `stratupdate.md` because the file was missing from the tracked workspace. Reconciled current backend code and documented the active strategy divergence: F3/equilibrium territory no longer blocks signals or plans, direction now falls back to bias in the center of the range, `f3Chop` no longer exposes `blocked`, and the dashboard remains a backend-mirror execution surface with immediate post-key-refresh invalidation.
 - `2026-05-02` Recreated `stratupdate.md` on the current branch from the last reconciled baseline because the file was again absent from `main`. Documented the backend instrument registry as the active symbol-support and pip-model authority, replaced the stale fixed-lot description with risk-derived lot sizing, recorded stage-correct TP routing plus deterministic execution order IDs, and noted that unsupported-symbol data errors no longer invalidate the full Twelve Data feed.
 - `2026-05-05` Documented v13.0.0 MT5 authority behavior: MT5-live symbols bypass Twelve Data in refresh and quote paths, EA pushes clear same-symbol TD cooldown state, backend sync receives EA heartbeats, MT5 day-change derives from UTC-day M1 opens, and heartbeat pruning plus candle aggregation soak are deferred maintenance items.
+<<<<<<< Updated upstream
 - `2026-05-05` Added current Pine session patch notes: recency-renamed F1/F2/F3 contract, buyside neutral zone mirror for `50%` and `62.5%`, HTF authority as higher-timeframe SF projection, HTF star confirmation on local charts, and complete removal of EF paths from the current patch. Updated HTF authority to use F3 from next higher timeframe (15/30/60->H4 F3, H4->D1 F3, D1->M1 F3, W1/M1->Y1 F3).
+=======
+- `2026-05-05` Documented the final Pine patch: recency-renamed F1/F2/F3 contract, buyside neutral zone mirror for `50%` and `62.5%`, HTF AF as higher-timeframe F3, HTF star confirmation, and removal of EF paths from the current patch.
+>>>>>>> Stashed changes
