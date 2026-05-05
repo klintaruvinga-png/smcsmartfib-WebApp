@@ -150,7 +150,7 @@ public:
     {
         return candleBuilder.GetCandle(
                    symbolNormalizer.NormalizeSymbol(symbol),
-                   PERIOD_M1, 1, candle);
+                   PERIOD_M1, 0, candle);
     }
 
     // ---- Webhook ----
@@ -163,7 +163,7 @@ public:
         TickData tick;
         MqlRates candle;
         bool hasTick   = tickProcessor.GetLastTick(norm, tick);
-        bool hasCandle = candleBuilder.GetCandle(norm, PERIOD_M1, 1, candle);
+        bool hasCandle = candleBuilder.GetCandle(norm, PERIOD_M1, 0, candle);
 
         if (!hasTick)
         {
@@ -200,13 +200,13 @@ public:
         {
             datetime candleTime = candle.time;
             
-            // REGRESSION GUARD: Reject future candles (shift=0 indicates live candle, not closed)
+            // REGRESSION GUARD: Reject live/future candles if candle indexing regresses.
             if (candleTime >= now)
             {
                 Print("REGRESSION GUARD: Rejecting future candle for ", symbol,
                       " | candleTime=", TimeToString(candleTime, TIME_DATE|TIME_SECONDS),
                       " | now=", TimeToString(now, TIME_DATE|TIME_SECONDS),
-                      " | This indicates shift=0 was used instead of shift=1");
+                      " | Expected latest closed candle (shift=0 in CandleBuilder indexing)");
             }
             else
             {
