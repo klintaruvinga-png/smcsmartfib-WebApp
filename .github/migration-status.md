@@ -2,10 +2,10 @@
 
 **Last Updated**: 2026-05-05  
 **Current Phase**: 0 (Stabilization)  
-**Overall Progress**: 10%  
+**Overall Progress**: 15%  
 **Status**: In Progress
 
-> Snapshot: EA-to-backend MT5 candle ingestion verified for multiple symbols; backend DB candle writes confirmed. Phase 0 stabilization is now actively progressing.
+> Snapshot: MT5 candle ingestion verified; staleness fixes applied (updated_at server time, thresholds adjusted, ring buffer protected). Phase 0 stabilization advancing with regression guards intact.
 
 ---
 
