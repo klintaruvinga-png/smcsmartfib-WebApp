@@ -1156,9 +1156,12 @@ final class SMC_SuperFib_Sniper_REST {
         $spec = $this->get_instrument_spec($symbol);
         $pip_size = isset($spec['pip_size']) && (float) $spec['pip_size'] > 0 ? (float) $spec['pip_size'] : 0.0001;
         $spread = ($ask - $bid) / $pip_size; // Convert to pips using per-instrument pip size
-        // HARDENING: updated_at must be server-receive time to prevent broker clock drift freezing staleness checks.
-        // Regression guard: Preserve current $updated_at param for diagnostics, but override for DB write.
-        $updated_at = $this->now_mysql(); // Always server time — ignore EA timestamp for staleness
+        // FIXED: Preserve broker timestamp for accurate staleness detection.
+        // Delayed packets (up to 300s old) are accepted but must reflect their true age
+        // to prevent stale data from appearing fresh and bypassing Twelve Data fallback.
+        if ($updated_at === null) {
+            $updated_at = $this->now_mysql(); // Fallback to server time if no timestamp provided
+        }
 
         $change_pct_1d = $this->mt5_change_pct_1d($user_id, $symbol, $bid);
 

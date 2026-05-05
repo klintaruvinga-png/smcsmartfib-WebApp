@@ -364,10 +364,10 @@ function test_ea_market_stream() {
         if (isset($wpdb->tables[$snapshots_table])) {
             $snapshot = reset($wpdb->tables[$snapshots_table]);
             $expected_snapshot_time = gmdate('Y-m-d H:i:s', strtotime($payload['timestamp']));
-            if ($snapshot['updated_at'] !== $expected_snapshot_time) {
-                echo "SUCCESS: Snapshot uses server receive time for updated_at\n";
+            if ($snapshot['updated_at'] === $expected_snapshot_time) {
+                echo "SUCCESS: Snapshot preserves broker timestamp for accurate staleness detection\n";
             } else {
-                throw new RuntimeException('Snapshot updated_at must not trust the EA payload timestamp');
+                throw new RuntimeException('Snapshot updated_at must preserve the EA payload timestamp for data freshness');
             }
 
             if (!isset($GLOBALS['test_transients']['smc_sf_rl_7_eurusd']) && !isset($GLOBALS['test_transients']['smc_sf_qt_7_' . md5('EURUSD')])) {
