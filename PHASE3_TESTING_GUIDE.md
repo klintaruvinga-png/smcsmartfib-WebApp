@@ -59,12 +59,17 @@ Ensure these tables exist with `source` columns:
 - [ ] Freshness state stored as transient
 - [ ] Session state stored as transient
 - [ ] Timestamps normalized to MySQL format
+- [ ] Same-symbol TD quote-TTL and rate-limit transients clear after successful MT5 snapshot writes
+- [ ] `engine_runs` receives heartbeat rows after successful MT5 snapshot writes
+- [ ] MT5 `change_pct_1d` is non-zero after the first UTC-day M1 candle exists, or `0` during cold start
 
 ### ✅ Dashboard Integration
 - [ ] GET `/sniper/v1/market-data-authority` returns MT5 as authoritative
 - [ ] Dashboard shows "MT5" as data source
 - [ ] Freshness indicators update (LIVE/DELAYED/STALE)
 - [ ] Session indicators show current market session
+- [ ] MT5-live symbols do not display stale Twelve Data `rate-limited` state after a successful EA push
+- [ ] Non-EA watchlist symbols still surface real Twelve Data `rate-limited` state when TD returns 429
 
 ## Sample Test Data
 
@@ -145,7 +150,8 @@ tail -f /path/to/wp-content/debug.log
 - [ ] MT5 EA sends webhooks without errors
 - [ ] Backend stores data with `source='mt5'`
 - [ ] Dashboard recognizes MT5 as authoritative data source
-- [ ] No data conflicts between MT5 and Twelve Data
+- [ ] No data conflicts between MT5 and Twelve Data for MT5-live symbols
+- [ ] Twelve Data remains the visible fallback/feed state for non-EA watchlist symbols
 - [ ] Freshness and session states update correctly
 - [ ] 72-hour stability test passes (no frozen quotes, proper session handling)
 

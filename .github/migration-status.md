@@ -2,10 +2,10 @@
 
 **Last Updated**: 2026-05-05  
 **Current Phase**: 0 (Stabilization)  
-**Overall Progress**: 15%  
+**Overall Progress**: 18%
 **Status**: In Progress
 
-> Snapshot: MT5 candle ingestion verified; staleness fixes applied (updated_at server time, thresholds adjusted, ring buffer protected). Phase 0 stabilization advancing with regression guards intact.
+> Snapshot: v13.0.0 MT5 authority patch verified. MT5-live symbols bypass Twelve Data, EA pushes clear same-symbol TD cooldown state, backendSync now receives EA heartbeats, and MT5 day-change derives from UTC-day M1 opens. Phase 0 remains in stabilization pending live soak and candle-history aggregation verification.
 
 ---
 
@@ -13,7 +13,7 @@
 
 | Phase | Objective | Status | % Complete | Blocker | Target End |
 |-------|-----------|--------|-----------|---------|------------|
-| 0 | Stabilize existing platform | NOT-STARTED | 0% | — | 2026-05-17 |
+| 0 | Stabilize existing platform | IN-PROGRESS | 35% | Live soak + candle-history aggregation verification | 2026-05-17 |
 | 1 | MT5 bridge infrastructure | NOT-STARTED | 0% | Phase 0 complete | 2026-06-01 |
 | 2 | Read-only trade telemetry | NOT-STARTED | 0% | Phase 1 complete | 2026-06-15 |
 | 3 | MT5 market data engine | NOT-STARTED | 0% | Phase 2 complete | 2026-07-15 |
@@ -41,19 +41,19 @@
 
 **Objective**: Fix current dashboard/backend instability before migration  
 **Owner**: Track B  
-**Status**: NOT-STARTED  
+**Status**: IN-PROGRESS
 **Completion Target**: 2026-05-17
 
 ### Deliverables
-- [ ] Refresh stability: no fake-live states, no stale-timestamp corruption, no frozen ticker states
+- [x] Refresh stability hardening: server-time MT5 snapshots, MT5-live TD bypass, same-symbol TD cooldown clearing, and no stale-timestamp corruption in the covered paths
 - [ ] Signal engine stability: deterministic LIVE/STALE states, proper regime gating, valid freshness rules
 - [ ] Backend parity: Pine/backend/dashboard alignment verified
 
 ### Success Criteria
 - [ ] Price feed stable for 72h+
 - [ ] Signal engine remains consistent
-- [ ] No false LIVE states
-- [ ] No stale-loop deadlocks
+- [x] No false LIVE states in covered MT5 snapshot/feed-health regression paths
+- [x] No stale-loop deadlocks in covered same-symbol MT5/TD cooldown regression paths
 
 ### Test Checklist
 - [ ] Refresh for 24h+
@@ -61,6 +61,7 @@
 - [ ] Weekend behavior
 - [ ] Disconnect/reconnect testing
 - [ ] Backend restart testing
+- [ ] MT5 M1 -> 15min aggregation verification for symbols previously showing `insufficient candle history`
 
 ### Parity Status
 ```
@@ -70,7 +71,8 @@ Freshness Logic: [PENDING]
 ```
 
 ### Blockers
-- *None identified yet*
+- Live 24h/72h soak evidence not complete
+- MT5 M1 -> 15min candle-history aggregation path still needs focused verification
 
 ---
 
@@ -357,7 +359,8 @@ Confluence Detection: [PENDING]
 
 | Issue | Severity | Detected | Phase Impact | Status |
 |-------|----------|----------|--------------|--------|
-| *None currently* | — | — | — | — |
+| `engine_runs` heartbeat row growth needs pruning policy | Low | 2026-05-05 v13 verification | Phase 0 maintenance | Deferred; add WP-Cron cleanup after live soak sets retention window |
+| Non-EA watchlist symbols can still show TD `rate-limited` | Medium | 2026-05-05 v13 verification | Health display for TD-dependent symbols | Accepted behavior; do not clear globally from EA pushes |
 
 > **New escalations automatically flagged** by phase monitoring agent when:
 > - Parity drops below threshold
@@ -371,7 +374,9 @@ Confluence Detection: [PENDING]
 
 | Report | Date | Phase | Issues Found | Status |
 |--------|------|-------|--------------|--------|
-| *Awaiting Phase 0 completion* | — | 0 | — | — |
+| `BUG_SWEEP_REPORT_2026-05-05_V13-MT5-Authority-Verification.md` | 2026-05-05 | 0 | 0 blockers; 2 deferred maintenance items | Verified |
+| `BUG_SWEEP_REPORT_2026-05-05_MT5-Candle-Ingestion-Verification.md` | 2026-05-05 | 0 | Candle ingestion verified; hourly/reconnect checks pending | Verified |
+| `BUG_SWEEP_REPORT_2026-05-04_POST_PATCH_VERIFICATION.md` | 2026-05-04 | 0 | 40/40 regression pass; 3 deferred risks | Verified |
 
 > **Auto-ingested from**: `.github/docs/BUG_SWEEP_REPORT_*.md`
 
