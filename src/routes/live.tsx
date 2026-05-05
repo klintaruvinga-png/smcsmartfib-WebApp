@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useSnapshot, useEngineBatch } from "@/hooks/useSniperData";
+import { useSnapshot, useEngineBatch, useUserSettings } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { BiasBadge, ChopMeter, GateBadge } from "@/components/sniper/Indicators";
 import { WarningLine } from "@/components/sniper/Warnings";
@@ -41,11 +41,16 @@ function blockerWarning(blocker: EngineBlocker | undefined): string | null {
 
 function LivePage() {
   const { data, isLoading } = useSnapshot();
+  const { data: settings } = useUserSettings();
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
   if (isLoading || !data) return <div className="text-mute text-sm">Loading radar…</div>;
 
   const parseUpdatedAt = (value: string): Date =>
     value.includes("T") ? new Date(value) : new Date(`${value.replace(" ", "T")}Z`);
+  const staleThresholdMs = Math.max(
+    10,
+    Math.min(60, settings?.staleThresholdSec ?? 10),
+  ) * 1000;
 
   const mt5Prices = data.prices.filter((price) => {
     if (MOCK_MODE && price.source === "mock") return true;
@@ -53,16 +58,22 @@ function LivePage() {
       console.debug("[live] skipped non-MT5 price", price.symbol, price.source);
       return false;
     }
+    if (price.state !== "live") {
+      console.debug("[live] skipped non-live MT5 price", price.symbol, price.state);
+      return false;
+    }
 
     const parsed = parseUpdatedAt(price.updatedAt);
     const ageMs = Number.isFinite(price.age_sec)
       ? Number(price.age_sec) * 1000
       : Date.now() - parsed.getTime();
-    if (!Number.isFinite(ageMs) || ageMs > 10_000) {
+    if (!Number.isFinite(ageMs) || ageMs > staleThresholdMs) {
       console.debug(
         "[live] skipped stale MT5 price",
         price.symbol,
-        Number.isFinite(ageMs) ? `${(ageMs / 1000).toFixed(1)}s old` : price.updatedAt,
+        Number.isFinite(ageMs)
+          ? `${(ageMs / 1000).toFixed(1)}s old / ${(staleThresholdMs / 1000).toFixed(0)}s threshold`
+          : price.updatedAt,
       );
       return false;
     }
