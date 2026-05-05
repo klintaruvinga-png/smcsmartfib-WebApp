@@ -150,7 +150,7 @@ public:
     {
         return candleBuilder.GetCandle(
                    symbolNormalizer.NormalizeSymbol(symbol),
-                   PERIOD_M1, 0, candle);
+                   PERIOD_M1, 1, candle);
     }
 
     // ---- Webhook ----
@@ -171,6 +171,13 @@ public:
             return "";
         }
 
+        datetime latestClosedCandleTime = candle.time;
+        Print("EA PAYLOAD DEBUG → symbol=", symbol,
+              " | hasTick=", hasTick,
+              " | hasCandle=", hasCandle,
+              " | latestClosedCandle=", TimeToString(latestClosedCandleTime, TIME_DATE|TIME_SECONDS));
+
+        datetime now = TimeCurrent();
         int digits = (int) SymbolInfoInteger(symbol, SYMBOL_DIGITS);
         if (digits < 0) digits = 5;
 
@@ -183,7 +190,7 @@ public:
         json += "\"symbol\":\""           + symbol                                    + "\",";
         json += "\"normalized_symbol\":\"" + norm                                     + "\",";
         json += "\"timeframe\":\"M1\",";
-        json += "\"timestamp\":\""        + TimeToIso8601(tick.timestamp)             + "\",";
+        json += "\"timestamp\":\""        + TimeToIso8601(tick.timestamp) + "\",";
         json += "\"bid\":"                + DoubleToString(tick.bid, digits)           + ",";
         json += "\"ask\":"                + DoubleToString(tick.ask, digits)           + ",";
         json += "\"freshness\":\""        + FreshnessStateName(GetFreshnessState(symbol)) + "\",";
@@ -191,14 +198,21 @@ public:
 
         if (hasCandle && candleBuilder.ValidateCandle(candle))
         {
+            datetime candleTime = candle.time;
             json += ",\"candle\":{";
-            json += "\"time\":\""  + TimeToIso8601(candle.time)               + "\",";
+            json += "\"time\":\""  + TimeToIso8601(candleTime) + "\",";
             json += "\"open\":"    + DoubleToString(candle.open,  digits)      + ",";
             json += "\"high\":"    + DoubleToString(candle.high,  digits)      + ",";
             json += "\"low\":"     + DoubleToString(candle.low,   digits)      + ",";
             json += "\"close\":"   + DoubleToString(candle.close, digits)      + ",";
             json += "\"volume\":"  + IntegerToString((long)candle.tick_volume);
             json += "}";
+
+            Print("SHIFT CHECK → candle_time=", TimeToString(candleTime, TIME_DATE|TIME_SECONDS),
+                  " | current=", TimeToString(now, TIME_DATE|TIME_SECONDS));
+            Print("EA SEND → ", symbol,
+                  " | candle_time=", TimeToString(candleTime, TIME_DATE|TIME_SECONDS),
+                  " | now=", TimeToString(now, TIME_DATE|TIME_SECONDS));
         }
 
         json += "}";
