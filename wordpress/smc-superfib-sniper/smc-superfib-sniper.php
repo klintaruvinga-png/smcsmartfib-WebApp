@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SMC SuperFIB Signal Engine & Account Manager
  * Description: WordPress REST backend for the SMC SuperFIB Dashboard.
- * Version: 1.0.0
+ * Version: 13.0.0
  * Author: Kudzanai Lloyd Taruvinga For Munhumukapa Holdings Group
  */
 
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
 require_once __DIR__ . '/class-market-data-service.php';
 
 final class SMC_SuperFib_Sniper_REST {
-    const VERSION = '1.0.0';
+    const VERSION = '13.0.0';
     const NAMESPACE = 'sniper/v1';
     const TWELVE_PROVIDER = 'twelve_data';
 
@@ -981,6 +981,8 @@ final class SMC_SuperFib_Sniper_REST {
      * }
      */
     public function post_ea_market_stream(WP_REST_Request $request) {
+        global $wpdb;
+
         $payload = $request->get_json_params();
         $user_id = isset($payload['user_id']) ? (int) $payload['user_id'] : 0;
         if ($user_id <= 0) {
@@ -1049,6 +1051,8 @@ final class SMC_SuperFib_Sniper_REST {
                 $result = $this->upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $snapshot_updated_at);
                 if ($result) {
                     $inserted_snapshots = 1;
+                    delete_transient('smc_sf_qt_' . $user_id . '_' . md5($symbol));
+                    delete_transient($this->rl_transient_key($user_id, $symbol));
                     error_log("MT5 SNAPSHOT WRITE: {$symbol} | bid={$bid} ask={$ask} | broker_ts={$snapshot_updated_at} | server_write=" . gmdate('Y-m-d H:i:s'));
                 }
             } else {
@@ -1109,6 +1113,19 @@ final class SMC_SuperFib_Sniper_REST {
             set_transient('smc_sf_session_' . $user_id . '_' . $symbol, $session, 300);
         }
 
+        if ($inserted_snapshots > 0) {
+            $wpdb->insert(
+                $this->table('engine_runs'),
+                array(
+                    'user_id' => $user_id,
+                    'status' => 'heartbeat',
+                    'summary' => wp_json_encode(array('source' => 'ea_push', 'symbol' => $symbol)),
+                    'created_at' => $this->now_mysql(),
+                ),
+                array('%d', '%s', '%s', '%s')
+            );
+        }
+
         // Audit successful ingestion
         $this->audit($user_id, 'ea.market_stream.ingested', array(
             'symbol' => $symbol,
@@ -1143,6 +1160,8 @@ final class SMC_SuperFib_Sniper_REST {
         // Regression guard: Preserve current $updated_at param for diagnostics, but override for DB write.
         $updated_at = $this->now_mysql(); // Always server time — ignore EA timestamp for staleness
 
+        $change_pct_1d = $this->mt5_change_pct_1d($user_id, $symbol, $bid);
+
         $result = $wpdb->replace(
             $this->table('snapshots'),
             array(
@@ -1152,7 +1171,7 @@ final class SMC_SuperFib_Sniper_REST {
                 'ask' => $ask,
                 'mid' => $mid,
                 'spread' => $spread,
-                'change_pct_1d' => 0, // MT5 doesn't provide this, will be calculated separately
+                'change_pct_1d' => $change_pct_1d,
                 'source' => 'mt5',
                 'state' => 'live',
                 'updated_at' => $updated_at
@@ -1164,6 +1183,27 @@ final class SMC_SuperFib_Sniper_REST {
         error_log("SNAPSHOT DB ERROR: " . $wpdb->last_error);
 
         return $result !== false;
+    }
+
+    private function mt5_change_pct_1d($user_id, $symbol, $current_bid) {
+        global $wpdb;
+
+        $day_open = $wpdb->get_var($wpdb->prepare(
+            "SELECT open FROM {$this->table('candles')}
+             WHERE user_id = %d AND symbol = %s AND source = 'mt5'
+               AND timeframe = '1min' AND candle_time >= %s
+             ORDER BY candle_time ASC LIMIT 1",
+            $user_id,
+            $symbol,
+            gmdate('Y-m-d') . ' 00:00:00'
+        ));
+
+        $day_open = (float) $day_open;
+        if ($day_open <= 0 || (float) $current_bid <= 0) {
+            return 0;
+        }
+
+        return round((((float) $current_bid - $day_open) / $day_open) * 100, 4);
     }
 
     /**
@@ -1982,6 +2022,14 @@ final class SMC_SuperFib_Sniper_REST {
         $prices = array();
         $stale_threshold_sec = $this->get_settings($user_id)['staleThresholdSec'];
         foreach ($symbols as $symbol) {
+            if ($this->is_mt5_authoritative($user_id, $symbol)) {
+                $cached = $this->get_cached_price($user_id, $symbol, $stale_threshold_sec);
+                if ($cached) {
+                    $prices[] = $cached;
+                    continue;
+                }
+            }
+
             $quote = $this->fetch_quote($user_id, $symbol);
             if ($quote) {
                 $prices[] = $quote;
@@ -2004,6 +2052,10 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function fetch_quote($user_id, $symbol) {
         global $wpdb;
+
+        if ($this->is_mt5_authoritative($user_id, $symbol)) {
+            return $this->get_cached_price($user_id, $symbol);
+        }
 
         $key = $this->get_twelve_key($user_id);
         if (is_wp_error($key) || !$key) {

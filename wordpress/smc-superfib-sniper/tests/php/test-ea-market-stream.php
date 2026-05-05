@@ -131,6 +131,25 @@ if (!function_exists('set_transient')) {
     }
 }
 
+if (!function_exists('get_transient')) {
+    function get_transient($key) {
+        return array_key_exists($key, $GLOBALS['test_transients']) ? $GLOBALS['test_transients'][$key] : false;
+    }
+}
+
+if (!function_exists('delete_transient')) {
+    function delete_transient($key) {
+        unset($GLOBALS['test_transients'][$key]);
+        return true;
+    }
+}
+
+if (!function_exists('sanitize_key')) {
+    function sanitize_key($key) {
+        return strtolower(preg_replace('/[^a-zA-Z0-9_\\-]/', '', (string) $key));
+    }
+}
+
 if (!function_exists('rest_ensure_response')) {
     function rest_ensure_response($data) {
         return new WP_REST_Response($data);
@@ -142,6 +161,7 @@ if (!class_exists('TestWpdb')) {
         public $prefix = 'wp_';
         public $tables = array();
         public $queries = array();
+        public $last_error = '';
 
         public function replace($table, $data, $formats = array()) {
             $this->queries[] = array('type' => 'replace', 'table' => $table, 'data' => $data);
@@ -154,7 +174,52 @@ if (!class_exists('TestWpdb')) {
         }
 
         public function prepare($query, ...$args) {
-            return $query; // Simplified for testing
+            if (count($args) === 1 && is_array($args[0])) {
+                $args = $args[0];
+            }
+            $out = '';
+            $parts = preg_split('/(%(?:\d+\$)?[dfs])/', $query, -1, PREG_SPLIT_DELIM_CAPTURE);
+            $arg_index = 0;
+            foreach ($parts as $part) {
+                if (preg_match('/^%(?:\d+\$)?([dfs])$/', $part, $matches)) {
+                    $value = array_key_exists($arg_index, $args) ? $args[$arg_index++] : null;
+                    if ($matches[1] === 'd') {
+                        $out .= (string) (int) $value;
+                    } elseif ($matches[1] === 'f') {
+                        $out .= (string) (float) $value;
+                    } else {
+                        $out .= "'" . str_replace("'", "''", (string) $value) . "'";
+                    }
+                } else {
+                    $out .= $part;
+                }
+            }
+            return $out;
+        }
+
+        public function get_var($query) {
+            if (strpos($query, 'SELECT open FROM') !== false && strpos($query, 'smc_sf_candles') !== false) {
+                preg_match('/FROM ([^\\s]+)/', $query, $table_match);
+                preg_match('/user_id = (\\d+)/', $query, $user_match);
+                preg_match("/symbol = '([^']+)'/", $query, $symbol_match);
+                preg_match("/candle_time >= '([^']+)'/", $query, $since_match);
+                $table = $table_match[1] ?? '';
+                $user_id = (int) ($user_match[1] ?? 0);
+                $symbol = $symbol_match[1] ?? '';
+                $since = $since_match[1] ?? '';
+                $rows = array();
+                foreach ($this->tables[$table] ?? array() as $row) {
+                    if ((int) $row['user_id'] === $user_id && $row['symbol'] === $symbol && ($row['source'] ?? '') === 'mt5' && ($row['timeframe'] ?? '') === '1min' && strcmp($row['candle_time'], $since) >= 0) {
+                        $rows[] = $row;
+                    }
+                }
+                usort($rows, function ($a, $b) {
+                    return strcmp($a['candle_time'], $b['candle_time']);
+                });
+                return $rows ? $rows[0]['open'] : null;
+            }
+
+            return null;
         }
 
         public function insert($table, $data, $formats = array()) {
@@ -221,10 +286,25 @@ function test_ea_market_stream() {
     echo "=================================\n\n";
 
     $plugin = new SMC_SuperFib_Sniper_REST();
+    $wpdb->replace('wp_smc_sf_candles', array(
+        'user_id' => 7,
+        'symbol' => 'EURUSD',
+        'timeframe' => '1min',
+        'candle_time' => gmdate('Y-m-d') . ' 00:00:00',
+        'open' => 1.08000,
+        'high' => 1.08020,
+        'low' => 1.07980,
+        'close' => 1.08010,
+        'volume' => 10,
+        'source' => 'mt5',
+        'created_at' => gmdate('Y-m-d H:i:s'),
+    ));
+    $GLOBALS['test_transients']['smc_sf_rl_7_eurusd'] = time();
+    $GLOBALS['test_transients']['smc_sf_qt_7_' . md5('EURUSD')] = 1;
 
     // Test 1: Valid payload with both snapshot and candle
     echo "Test 1: Valid payload with snapshot and candle\n";
-    $now = time();
+    $now = time() - 10;
     $payload = array(
         'user_id' => 7,
         'symbol' => 'EURUSD',
@@ -261,11 +341,16 @@ function test_ea_market_stream() {
             echo "  Symbol: " . $snapshot['symbol'] . "\n";
             echo "  Source: " . $snapshot['source'] . "\n";
             echo "  State: " . $snapshot['state'] . "\n";
+            if ((float) $snapshot['change_pct_1d'] !== 0.0) {
+                echo "✓ SUCCESS: MT5 change_pct_1d derived from day open\n";
+            } else {
+                throw new RuntimeException('MT5 change_pct_1d should be derived from the first M1 open of the day');
+            }
         }
 
         if (isset($wpdb->tables[$candles_table])) {
             echo "✓ SUCCESS: Candle stored in database\n";
-            $candle = reset($wpdb->tables[$candles_table]);
+            $candle = end($wpdb->tables[$candles_table]);
             echo "  Symbol: " . $candle['symbol'] . "\n";
             echo "  Timeframe: " . $candle['timeframe'] . "\n";
             echo "  Source: " . $candle['source'] . "\n";
@@ -279,23 +364,37 @@ function test_ea_market_stream() {
         if (isset($wpdb->tables[$snapshots_table])) {
             $snapshot = reset($wpdb->tables[$snapshots_table]);
             $expected_snapshot_time = gmdate('Y-m-d H:i:s', strtotime($payload['timestamp']));
-            if ($snapshot['updated_at'] === $expected_snapshot_time) {
-            echo "✓ SUCCESS: Snapshot uses payload timestamp for updated_at\n";
-        } else {
-            echo "✗ FAILED: Snapshot updated_at does not match payload timestamp\n";
-        }
+            if ($snapshot['updated_at'] !== $expected_snapshot_time) {
+                echo "SUCCESS: Snapshot uses server receive time for updated_at\n";
+            } else {
+                throw new RuntimeException('Snapshot updated_at must not trust the EA payload timestamp');
+            }
 
-        if (($GLOBALS['test_transients']['smc_sf_freshness_7_EURUSD'] ?? null) === 'LIVE') {
-            echo "✓ SUCCESS: Freshness transient stored\n";
-        } else {
-            echo "✗ FAILED: Freshness transient missing\n";
-        }
+            if (!isset($GLOBALS['test_transients']['smc_sf_rl_7_eurusd']) && !isset($GLOBALS['test_transients']['smc_sf_qt_7_' . md5('EURUSD')])) {
+                echo "SUCCESS: MT5 push clears stale Twelve Data per-symbol cooldown transients\n";
+            } else {
+                throw new RuntimeException('MT5 push should clear stale TD rate-limit and quote-TTL transients');
+            }
 
-        if (($GLOBALS['test_transients']['smc_sf_session_7_EURUSD'] ?? null) === 'London') {
-            echo "✓ SUCCESS: Session transient stored\n";
-        } else {
-            echo "✗ FAILED: Session transient missing\n";
-        }
+            $engine_runs = $wpdb->tables['wp_smc_sf_engine_runs'] ?? array();
+            $heartbeat = end($engine_runs);
+            if (($heartbeat['status'] ?? null) === 'heartbeat') {
+                echo "SUCCESS: EA push writes backendSync heartbeat\n";
+            } else {
+                throw new RuntimeException('EA push should write an engine_runs heartbeat row');
+            }
+
+            if (($GLOBALS['test_transients']['smc_sf_freshness_7_EURUSD'] ?? null) === 'LIVE') {
+                echo "✓ SUCCESS: Freshness transient stored\n";
+            } else {
+                echo "✗ FAILED: Freshness transient missing\n";
+            }
+
+            if (($GLOBALS['test_transients']['smc_sf_session_7_EURUSD'] ?? null) === 'London') {
+                echo "✓ SUCCESS: Session transient stored\n";
+            } else {
+                echo "✗ FAILED: Session transient missing\n";
+            }
     }
     } else {
         echo "✗ FAILED: Invalid response\n";

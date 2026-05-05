@@ -4,6 +4,7 @@ Install `smc-superfib-sniper.php` as a WordPress plugin on `trader.stokvelsociet
 
 ## Runtime contract
 
+- Plugin version: `13.0.0`
 - REST namespace: `/wp-json/sniper/v1`
 - Auth: logged-in WordPress user + `X-WP-Nonce`
 - Twelve Data key: submitted from the frontend, encrypted in WordPress, never returned by REST

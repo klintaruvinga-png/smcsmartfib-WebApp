@@ -563,4 +563,11 @@ assert_true(is_array($health), 'Health endpoint should return an array in the te
 assert_same('missing', $health['twelveDataKeyStatus'], 'Test setup should have no Twelve Data key');
 assert_same('live', $health['feedStatus'], 'Fresh MT5 price plus aggregated M1 candles must make feedStatus live without a Twelve Data key');
 
+$fetchQuote = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'fetch_quote');
+$fetchQuote->setAccessible(true);
+$quote = $fetchQuote->invoke($instance, 7, 'EURUSD');
+assert_true(is_array($quote), 'fetch_quote should return cached MT5 data for MT5-live symbols');
+assert_same('EURUSD', $quote['symbol'], 'fetch_quote MT5 guard returned the wrong symbol');
+assert_same('live', $quote['state'], 'fetch_quote MT5 guard must preserve live state');
+
 fwrite(STDOUT, 'mt5 snapshot contract checks passed' . PHP_EOL);
