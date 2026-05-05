@@ -570,4 +570,13 @@ assert_true(is_array($quote), 'fetch_quote should return cached MT5 data for MT5
 assert_same('EURUSD', $quote['symbol'], 'fetch_quote MT5 guard returned the wrong symbol');
 assert_same('live', $quote['state'], 'fetch_quote MT5 guard must preserve live state');
 
+$chart = $instance->get_chart_snapshot(new WP_REST_Request(array(
+    'symbol' => 'EURUSD',
+    'timeframe' => '15min',
+)));
+assert_true(is_array($chart), 'Chart snapshot should return an array');
+assert_true(!empty($chart['candles']), 'Chart snapshot should include candles for MT5-backed symbols');
+$lastChartCandle = end($chart['candles']);
+assert_same($lastChartCandle['time'], $chart['updatedAt'], 'Chart snapshot updatedAt must reflect the last candle time, not response time');
+
 fwrite(STDOUT, 'mt5 snapshot contract checks passed' . PHP_EOL);

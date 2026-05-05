@@ -1317,8 +1317,10 @@ final class SMC_SuperFib_Sniper_REST {
         $timeframe = sanitize_text_field($request->get_param('timeframe') ?: '15min');
         $candles = $this->fetch_candles($user_id, $symbol, $timeframe, 120);
         $state = 'offline';
+        $updated_at = null;
         if (!empty($candles)) {
             $last_candle = end($candles);
+            $updated_at = isset($last_candle['time']) ? $last_candle['time'] : null;
             $state = $this->is_chart_candle_fresh($last_candle['time'] ?? null, $timeframe) ? 'live' : 'stale';
         } else {
             $state = $this->get_twelve_key_status($user_id) === 'ok' ? 'stale' : 'blocked';
@@ -1330,7 +1332,7 @@ final class SMC_SuperFib_Sniper_REST {
             'timeframe' => $timeframe,
             'candles' => $candles,
             'fibLevels' => $levels,
-            'updatedAt' => gmdate('c'),
+            'updatedAt' => $updated_at,
             'state' => $state,
         ));
     }

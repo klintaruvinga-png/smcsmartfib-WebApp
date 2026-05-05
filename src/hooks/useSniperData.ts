@@ -142,6 +142,7 @@ export function useEngineBatch() {
         queryClient.invalidateQueries({ queryKey: ["live-signals"] });
         queryClient.invalidateQueries({ queryKey: ["engine-health"] });
         queryClient.invalidateQueries({ queryKey: ["ladders"] });
+        queryClient.invalidateQueries({ queryKey: ["chart"] });
       },
     },
   );
