@@ -105,7 +105,20 @@ public:
         if (index == -1)
             return false;
 
-        int candleIndex = (candleIndices[index] - 1 - shift + 500) % 500;
+        // COLD-START GUARD: candleIndices[index] is the next write position.
+        // When it equals 0 no bar has ever been committed to the ring buffer.
+        // Reading slot (0 - 1 - shift + 500) % 500 = 499 lands on zero-initialized
+        // memory and returns candle.time == 0 (epoch / "1970-01-01") while still
+        // returning true — silently corrupting timestamp truth for the caller.
+        // Once the ring has wrapped past 500 all slots are valid; before that,
+        // cap the accessible range to committed bars only.
+        int committed = candleIndices[index];
+        if (committed == 0)
+            return false;  // no bar committed yet
+        if (shift >= committed && committed < 500)
+            return false;  // requested bar is older than available history
+
+        int candleIndex = (committed - 1 - shift + 500) % 500;
         candle = candlesM1[index][candleIndex];
         return true;
     }
@@ -134,7 +147,11 @@ public:
     // Validate candle
     bool ValidateCandle(MqlRates& candle)
     {
-        return candle.tick_volume > 0 && candle.high >= candle.low;
+        // time > 0 : rejects zero-initialized structs (epoch / cold-start slots)
+        //            and synthetic candles whose timestamp was never set.
+        // tick_volume > 0 : rejects empty/placeholder bars.
+        // high >= low : basic OHLC sanity.
+        return candle.time > 0 && candle.tick_volume > 0 && candle.high >= candle.low;
     }
 
 private:
