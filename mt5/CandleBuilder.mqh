@@ -10,7 +10,8 @@ class CandleBuilder
 {
 private:
     MqlRates candlesM1[100][500];   // M1 candles per symbol (last 500)
-    int candleIndices[100];          // Current index per symbol
+    int candleIndices[100];          // Next write index per symbol
+    int candleCounts[100];           // Committed candle count per symbol, capped at 500
     datetime lastCandleTime[100];    // Last candle time per symbol
     string symbolList[100];
     int symbolCount;
@@ -24,6 +25,7 @@ public:
     {
         symbolCount = 0;
         ArrayInitialize(candleIndices, 0);
+        ArrayInitialize(candleCounts, 0);
         ArrayInitialize(lastCandleTime, 0);
         ZeroMemory(currentCandles);   // ArrayInitialize doesn't support struct arrays
     }
@@ -60,6 +62,8 @@ public:
             {
                 candlesM1[index][candleIndices[index]] = currentCandles[index];
                 candleIndices[index] = (candleIndices[index] + 1) % 500;
+                if (candleCounts[index] < 500)
+                    candleCounts[index]++;
             }
 
             // Initialize new candle
@@ -105,20 +109,17 @@ public:
         if (index == -1)
             return false;
 
-        // COLD-START GUARD: candleIndices[index] is the next write position.
-        // When it equals 0 no bar has ever been committed to the ring buffer.
-        // Reading slot (0 - 1 - shift + 500) % 500 = 499 lands on zero-initialized
-        // memory and returns candle.time == 0 (epoch / "1970-01-01") while still
-        // returning true — silently corrupting timestamp truth for the caller.
-        // Once the ring has wrapped past 500 all slots are valid; before that,
-        // cap the accessible range to committed bars only.
-        int committed = candleIndices[index];
-        if (committed == 0)
+        // candleIndices[index] is the modulo next-write pointer, so 0 is valid
+        // after wrap. Use candleCounts[index] for cold-start and history bounds.
+        int available = candleCounts[index];
+        if (available == 0)
             return false;  // no bar committed yet
-        if (shift >= committed && committed < 500)
+        if (shift < 0)
+            return false;
+        if (shift >= available)
             return false;  // requested bar is older than available history
 
-        int candleIndex = (committed - 1 - shift + 500) % 500;
+        int candleIndex = (candleIndices[index] - 1 - shift + 500) % 500;
         candle = candlesM1[index][candleIndex];
         return true;
     }
@@ -142,6 +143,8 @@ public:
 
         candlesM1[index][candleIndices[index]] = synthetic;
         candleIndices[index] = (candleIndices[index] + 1) % 500;
+        if (candleCounts[index] < 500)
+            candleCounts[index]++;
     }
 
     // Validate candle
