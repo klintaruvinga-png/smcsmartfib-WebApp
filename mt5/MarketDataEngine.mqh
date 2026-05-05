@@ -75,6 +75,18 @@ public:
         authHeader = auth;
         wpUserId   = userId;
 
+        // Force symbol selection and pre-warm broker history for every tracked symbol.
+        // Without SymbolSelect() MT5 may have no M1 history loaded, causing CopyRates()
+        // to return 0 bars and iTime() to return 0 (epoch) on the first periodic cycle.
+        MqlRates warmup[];
+        for (int i = 0; i < symbolCount; i++)
+        {
+            SymbolSelect(symbols[i], true);
+            int loaded = CopyRates(symbols[i], PERIOD_M1, 0, 100, warmup);
+            Print("SMC_MarketDataEA: history preload symbol=", symbols[i],
+                  " | bars_loaded=", loaded);
+        }
+
         // Build the HTTP headers string once — reused on every WebRequest call.
         cachedHeaders  = "Content-Type: application/json\r\n";
         cachedHeaders += "Accept: application/json\r\n";
@@ -150,20 +162,26 @@ public:
     {
         return candleBuilder.GetCandle(
                    symbolNormalizer.NormalizeSymbol(symbol),
-                   PERIOD_M1, 1, candle);
+                   PERIOD_M1, 0, candle);
     }
 
     // ---- Webhook ----
 
     // Build the JSON payload for one symbol snapshot.
+    //
+    // Candle source: CopyRates() directly from the MT5 broker feed, NOT the
+    // CandleBuilder ring buffer. CandleBuilder.GetCandle() returns hasCandle=true
+    // with a zero-initialized MqlRates struct when no bar has completed yet (cold
+    // start), and ValidateCandle() does not catch time==0, so the ring buffer path
+    // was emitting "1970-01-01T00:00:00Z" on every periodic cycle until the first
+    // full minute bar closed. CopyRates() returns the actual broker history and
+    // returns < 1 when no data is available — a clean, unambiguous signal.
     string BuildWebhookPayload(string symbol)
     {
         string norm = symbolNormalizer.NormalizeSymbol(symbol);
 
         TickData tick;
-        MqlRates candle;
-        bool hasTick   = tickProcessor.GetLastTick(norm, tick);
-        bool hasCandle = candleBuilder.GetCandle(norm, PERIOD_M1, 1, candle);
+        bool hasTick = tickProcessor.GetLastTick(norm, tick);
 
         if (!hasTick)
         {
@@ -171,60 +189,71 @@ public:
             return "";
         }
 
-        datetime latestClosedCandleTime = candle.time;
+        datetime now   = TimeCurrent();
+        int digits     = (int) SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+        if (digits < 0) digits = 5;
+
+        // --- Candle: read last closed M1 bar directly from broker history ---
+        // index=1 in CopyRates() is the last CLOSED bar (index=0 is the forming bar).
+        // This is standard MT5 convention and is independent of CandleBuilder state.
+        MqlRates rates[];
+        int      copied     = CopyRates(symbol, PERIOD_M1, 1, 1, rates);
+        bool     hasCandle  = (copied == 1 && rates[0].time > 0);
+
+        datetime candleTime = hasCandle ? rates[0].time : 0;
+
         Print("EA PAYLOAD DEBUG → symbol=", symbol,
               " | hasTick=", hasTick,
               " | hasCandle=", hasCandle,
-              " | latestClosedCandle=", TimeToString(latestClosedCandleTime, TIME_DATE|TIME_SECONDS));
-
-        datetime now = TimeCurrent();
-        int digits = (int) SymbolInfoInteger(symbol, SYMBOL_DIGITS);
-        if (digits < 0) digits = 5;
+              " | latestClosedCandle=", TimeToString(candleTime, TIME_DATE|TIME_SECONDS));
 
         string json = "{";
 
-        // user_id — lets PHP resolve ownership without a WP session cookie.
         if (wpUserId > 0)
-            json += "\"user_id\":"        + IntegerToString(wpUserId) + ",";
+            json += "\"user_id\":"         + IntegerToString(wpUserId) + ",";
 
-        json += "\"symbol\":\""           + symbol                                    + "\",";
-        json += "\"normalized_symbol\":\"" + norm                                     + "\",";
+        json += "\"symbol\":\""            + symbol                                     + "\",";
+        json += "\"normalized_symbol\":\"" + norm                                       + "\",";
         json += "\"timeframe\":\"M1\",";
-        json += "\"timestamp\":\""        + TimeToIso8601(tick.timestamp) + "\",";
-        json += "\"bid\":"                + DoubleToString(tick.bid, digits)           + ",";
-        json += "\"ask\":"                + DoubleToString(tick.ask, digits)           + ",";
-        json += "\"freshness\":\""        + FreshnessStateName(GetFreshnessState(symbol)) + "\",";
-        json += "\"session\":\""          + GetSessionName()                          + "\"";
+        json += "\"timestamp\":\""         + TimeToIso8601(tick.timestamp) + "\",";
+        json += "\"bid\":"                 + DoubleToString(tick.bid, digits)            + ",";
+        json += "\"ask\":"                 + DoubleToString(tick.ask, digits)            + ",";
+        json += "\"freshness\":\""         + FreshnessStateName(GetFreshnessState(symbol)) + "\",";
+        json += "\"session\":\""           + GetSessionName()                           + "\"";
 
-        if (hasCandle && candleBuilder.ValidateCandle(candle))
+        if (hasCandle)
         {
-            datetime candleTime = candle.time;
-            
-            // REGRESSION GUARD: Reject future candles (shift=0 indicates live candle, not closed)
+            // REGRESSION GUARD: closed bar must be in the past, never equal to or
+            // ahead of wall-clock time (would indicate a data/clock fault).
             if (candleTime >= now)
             {
-                Print("REGRESSION GUARD: Rejecting future candle for ", symbol,
+                Print("REGRESSION GUARD: candle time is not in the past for ", symbol,
                       " | candleTime=", TimeToString(candleTime, TIME_DATE|TIME_SECONDS),
-                      " | now=", TimeToString(now, TIME_DATE|TIME_SECONDS),
-                      " | This indicates shift=0 was used instead of shift=1");
+                      " | now=",        TimeToString(now,        TIME_DATE|TIME_SECONDS));
             }
             else
             {
                 json += ",\"candle\":{";
-                json += "\"time\":\""  + TimeToIso8601(candleTime) + "\",";
-                json += "\"open\":"    + DoubleToString(candle.open,  digits)      + ",";
-                json += "\"high\":"    + DoubleToString(candle.high,  digits)      + ",";
-                json += "\"low\":"     + DoubleToString(candle.low,   digits)      + ",";
-                json += "\"close\":"   + DoubleToString(candle.close, digits)      + ",";
-                json += "\"volume\":"  + IntegerToString((long)candle.tick_volume);
+                json += "\"time\":\""  + TimeToIso8601(candleTime)                    + "\",";
+                json += "\"open\":"    + DoubleToString(rates[0].open,        digits)  + ",";
+                json += "\"high\":"    + DoubleToString(rates[0].high,        digits)  + ",";
+                json += "\"low\":"     + DoubleToString(rates[0].low,         digits)  + ",";
+                json += "\"close\":"   + DoubleToString(rates[0].close,       digits)  + ",";
+                json += "\"volume\":"  + IntegerToString((long)rates[0].tick_volume);
                 json += "}";
 
-                Print("SHIFT CHECK → candle_time=", TimeToString(candleTime, TIME_DATE|TIME_SECONDS),
-                      " | current=", TimeToString(now, TIME_DATE|TIME_SECONDS));
                 Print("EA SEND → ", symbol,
                       " | candle_time=", TimeToString(candleTime, TIME_DATE|TIME_SECONDS),
-                      " | now=", TimeToString(now, TIME_DATE|TIME_SECONDS));
+                      " | now=",         TimeToString(now,         TIME_DATE|TIME_SECONDS));
             }
+        }
+        else
+        {
+            // copied < 1: broker history not loaded yet for this symbol.
+            // Snapshot (bid/ask) will still be sent; candle omitted safely.
+            Print("HISTORY NOT READY → symbol=", symbol,
+                  " | copied=", copied,
+                  " — candle omitted from payload; snapshot will still send.");
         }
 
         json += "}";
