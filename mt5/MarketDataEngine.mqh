@@ -163,7 +163,7 @@ public:
         TickData tick;
         MqlRates candle;
         bool hasTick   = tickProcessor.GetLastTick(norm, tick);
-        bool hasCandle = candleBuilder.GetCandle(norm, PERIOD_M1, 1, candle);
+        bool hasCandle = candleBuilder.GetCandle(norm, PERIOD_M1, 0, candle);
 
         if (!hasTick)
         {
@@ -171,11 +171,11 @@ public:
             return "";
         }
 
-        datetime prevCandleTime = iTime(symbol, PERIOD_M1, 1);
+        datetime latestClosedCandleTime = candle.time;
         Print("EA PAYLOAD DEBUG → symbol=", symbol,
               " | hasTick=", hasTick,
               " | hasCandle=", hasCandle,
-              " | prevCandle=", TimeToString(prevCandleTime, TIME_DATE|TIME_SECONDS));
+              " | latestClosedCandle=", TimeToString(latestClosedCandleTime, TIME_DATE|TIME_SECONDS));
 
         datetime now = TimeCurrent();
         int digits = (int) SymbolInfoInteger(symbol, SYMBOL_DIGITS);
@@ -190,7 +190,7 @@ public:
         json += "\"symbol\":\""           + symbol                                    + "\",";
         json += "\"normalized_symbol\":\"" + norm                                     + "\",";
         json += "\"timeframe\":\"M1\",";
-        json += "\"timestamp\":\""        + TimeToIso8601(now) + "\",";
+        json += "\"timestamp\":\""        + TimeToIso8601(tick.timestamp) + "\",";
         json += "\"bid\":"                + DoubleToString(tick.bid, digits)           + ",";
         json += "\"ask\":"                + DoubleToString(tick.ask, digits)           + ",";
         json += "\"freshness\":\""        + FreshnessStateName(GetFreshnessState(symbol)) + "\",";
@@ -198,7 +198,7 @@ public:
 
         if (hasCandle && candleBuilder.ValidateCandle(candle))
         {
-            datetime candleTime = iTime(symbol, PERIOD_M1, 1);
+            datetime candleTime = candle.time;
             json += ",\"candle\":{";
             json += "\"time\":\""  + TimeToIso8601(candleTime) + "\",";
             json += "\"open\":"    + DoubleToString(candle.open,  digits)      + ",";
