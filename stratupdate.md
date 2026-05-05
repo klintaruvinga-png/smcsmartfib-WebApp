@@ -54,6 +54,7 @@ This document reflects the strategy behavior implemented in the current reposito
 - `Implemented` `default visibility`: `show_f1_inp = true`, `show_f2_inp = false`, `show_f3_inp = false` so the most recent Fib remains visible by default.
 - `Implemented` `draw styling`: `F1` renders as the recent/thin Fib, `F2` renders as a standard mid-session Fib, and `F3` renders as the oldest/thick Fib.
 - `Implemented` `neutral Fib zones`: Both `50%` and `62.5%` are now treated as neutral chop territory in the local Fib drawing logic, mirroring buyside behavior.
+<<<<<<< Updated upstream
 - `Implemented` `HTF authority projection`: HTF Authority Fib (AF) is now the F3 from the next higher timeframe.
 =======
 - `Implemented` `HTF authority AF`: HTF Authority is now the F3 from the next higher timeframe.
