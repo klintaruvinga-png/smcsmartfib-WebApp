@@ -1,9 +1,11 @@
 # SMC SuperFIB → MT5 Migration Status Board
 
-**Last Updated**: 2026-05-03  
+**Last Updated**: 2026-05-05  
 **Current Phase**: 0 (Stabilization)  
-**Overall Progress**: 0%  
-**Status**: Not Started
+**Overall Progress**: 10%  
+**Status**: In Progress
+
+> Snapshot: EA-to-backend MT5 candle ingestion verified for multiple symbols; backend DB candle writes confirmed. Phase 0 stabilization is now actively progressing.
 
 ---
 
