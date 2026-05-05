@@ -1054,10 +1054,14 @@ final class SMC_SuperFib_Sniper_REST {
             
             // Validate required candle fields
             if (isset($candle['time'], $candle['open'], $candle['high'], $candle['low'], $candle['close'])) {
-                // REGRESSION GUARD: Reject candles with epoch or empty timestamps
+                // REGRESSION GUARD: Reject candles with epoch or pre-2000 timestamps.
+                // A valid live candle must be after 2000-01-01 (Unix ts 946684800).
+                // This catches both zero-datetime (1970) and any other MQL5 uninitialised
+                // MqlRates.time value that slips through the EA-side epoch guard.
                 $candle_ts = strtotime($candle['time']);
-                if ($candle_ts === false || $candle_ts <= 0 || $candle_ts < 100000) {
-                    error_log("REGRESSION GUARD: Rejecting candle with invalid timestamp for {$symbol} | time={$candle['time']} | parsed_ts={$candle_ts}");
+                $min_valid_ts = 946684800; // 2000-01-01 00:00:00 UTC
+                if ($candle_ts === false || $candle_ts <= 0 || $candle_ts < $min_valid_ts) {
+                    error_log("REGRESSION GUARD: Rejecting candle with invalid/epoch timestamp for {$symbol} | time={$candle['time']} | parsed_ts={$candle_ts} | min_valid={$min_valid_ts}");
                     $this->audit($user_id, 'ea.market_stream.invalid_candle_timestamp', array(
                         'symbol' => $symbol,
                         'candle_time' => $candle['time'],
