@@ -1054,12 +1054,23 @@ final class SMC_SuperFib_Sniper_REST {
             
             // Validate required candle fields
             if (isset($candle['time'], $candle['open'], $candle['high'], $candle['low'], $candle['close'])) {
-                $result = $this->insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $payload['timestamp'] ?? null);
-                if ($result) {
-                    $inserted_candles = 1;
-                    error_log("MT5 CANDLE WRITE: {$symbol} | tf={$timeframe} | time={$candle['time']}");
+                // REGRESSION GUARD: Reject candles with epoch or empty timestamps
+                $candle_ts = strtotime($candle['time']);
+                if ($candle_ts === false || $candle_ts <= 0 || $candle_ts < 100000) {
+                    error_log("REGRESSION GUARD: Rejecting candle with invalid timestamp for {$symbol} | time={$candle['time']} | parsed_ts={$candle_ts}");
+                    $this->audit($user_id, 'ea.market_stream.invalid_candle_timestamp', array(
+                        'symbol' => $symbol,
+                        'candle_time' => $candle['time'],
+                        'parsed_timestamp' => $candle_ts
+                    ));
                 } else {
-                    error_log("MT5 CANDLE INSERT FAILED: {$symbol} | tf={$timeframe} | time={$candle['time']} | stream_timestamp=" . ($payload['timestamp'] ?? 'null'));
+                    $result = $this->insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $payload['timestamp'] ?? null);
+                    if ($result) {
+                        $inserted_candles = 1;
+                        error_log("MT5 CANDLE WRITE: {$symbol} | tf={$timeframe} | time={$candle['time']}");
+                    } else {
+                        error_log("MT5 CANDLE INSERT FAILED: {$symbol} | tf={$timeframe} | time={$candle['time']} | stream_timestamp=" . ($payload['timestamp'] ?? 'null'));
+                    }
                 }
             } else {
                 error_log("MT5 CANDLE PAYLOAD INVALID: " . print_r($candle, true));
