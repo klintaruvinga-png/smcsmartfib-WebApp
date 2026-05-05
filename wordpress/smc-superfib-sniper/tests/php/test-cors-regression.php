@@ -65,11 +65,19 @@ if (!$validateMethod->invoke(null)) {
     $errors[] = 'CORS regression guard validation failed.';
 }
 
+$headersMethod = $ref->getMethod('get_cors_allowed_headers');
+$headersMethod->setAccessible(true);
+$allowedHeaders = $headersMethod->invoke(null);
+if (strpos($allowedHeaders, 'X-Sniper-Secret') === false) {
+    $errors[] = 'CORS regression guard missing X-Sniper-Secret in allowed headers.';
+}
+
 $cases = [
     ['origin' => 'https://example.test', 'allowed' => true],
     ['origin' => 'https://smcsuperfibwebapp.klintaruvinga.workers.dev', 'allowed' => true],
     ['origin' => 'https://another-test.workers.dev', 'allowed' => true],
     ['origin' => 'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app', 'allowed' => true],
+    ['origin' => 'https://smcsmartfib.lovable.app', 'allowed' => true],
     ['origin' => 'https://malicious.example.com', 'allowed' => false],
 ];
 

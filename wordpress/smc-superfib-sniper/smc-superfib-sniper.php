@@ -42,6 +42,11 @@ final class SMC_SuperFib_Sniper_REST {
             return $value;
         }, 15);
 
+        // Early preflight handler: send CORS headers for OPTIONS before WordPress performs routing.
+        add_action('init', function() {
+            self::handle_options_preflight_request();
+        }, 0);
+
         // Regression guard: Validate CORS configuration consistency
         if (!self::validate_cors_origins_consistency()) {
             error_log('CORS configuration validation failed. Check allowed origins consistency.');
@@ -373,7 +378,7 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private static function get_cors_allowed_headers() {
-        return 'Authorization, Content-Type, X-WP-Nonce, X-EA-API-Key, X-API-KEY';
+        return 'Authorization, Content-Type, X-WP-Nonce, X-Sniper-Secret, X-EA-API-Key, X-API-KEY';
     }
 
     private static function send_cors_headers_for_origin($origin) {
@@ -382,6 +387,23 @@ final class SMC_SuperFib_Sniper_REST {
         header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
         header('Access-Control-Allow-Headers: ' . self::get_cors_allowed_headers());
         header('Access-Control-Allow-Credentials: true');
+        header('Access-Control-Max-Age: 86400');
+    }
+
+    private static function handle_options_preflight_request() {
+        if (isset($_SERVER['REQUEST_METHOD']) && strtoupper($_SERVER['REQUEST_METHOD']) === 'OPTIONS') {
+            $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+            if (strpos($request_uri, '/wp-json/sniper/v1/') !== false) {
+                $allowed = self::get_allowed_origins();
+                $origin  = isset($_SERVER['HTTP_ORIGIN']) ? esc_url_raw(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
+                if ($origin && self::is_allowed_origin($origin, $allowed)) {
+                    self::send_cors_headers_for_origin($origin);
+                    header('Content-Length: 0');
+                    http_response_code(204);
+                    exit;
+                }
+            }
+        }
     }
 
     /**
@@ -423,7 +445,7 @@ final class SMC_SuperFib_Sniper_REST {
         if (self::is_allowed_origin($origin, $allowed)) {
             header('Access-Control-Allow-Origin: ' . $origin);
             header('Access-Control-Allow-Credentials: true');
-            header('Access-Control-Allow-Headers: Content-Type, X-WP-Nonce, Authorization, X-EA-API-Key, X-API-KEY');
+            header('Access-Control-Allow-Headers: ' . self::get_cors_allowed_headers());
             header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
         }
 
