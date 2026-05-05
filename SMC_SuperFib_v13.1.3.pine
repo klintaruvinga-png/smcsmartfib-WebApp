@@ -17,23 +17,12 @@ _auto_session_tf =
      _tf_secs_for_session <= 14400 ? "Monthly"   :
      _tf_secs_for_session <= 86400 ? "Quarterly" : "Yearly"
 session_tf = session_tf_override_on ? session_tf_override : _auto_session_tf
-<<<<<<< Updated upstream:SMC_SuperFib_v13.0.0.pine
-// v13.2: HTF Authority Fib (AF) is the F3 from the next higher timeframe.
-_authority_tf =
-     tf_cur == "15" or tf_cur == "30" or tf_cur == "60" ? "240" :
-     tf_cur == "240"                              ? "D"   :
-     tf_cur == "D"                                ? "M"   :
-     tf_cur == "W"                                ? "12M" :
-     tf_cur == "M"                                ? "12M" : "12M"
-=======
-string _authority_session_tf = ""
 // v13.2: HTF Authority Fib (AF) is the F3 from the next higher session.
-_authority_session_tf =
+string _authority_session_tf =
      session_tf == "Daily"      ? "Weekly"   :
      session_tf == "Weekly"     ? "Monthly"  :
      session_tf == "Monthly"    ? "Quarterly" :
      session_tf == "Quarterly"  ? "Yearly"   : "Yearly"
->>>>>>> Stashed changes:SMC_SuperFib_v13.1.3.pine
 pip_type          = input.string("USD",    "Pair type",       options=["USD","JPY"],                         group=GD, display=display.none)
 show_bands        = input.bool(true,  "Zone tolerance bands",   group=GD, display=display.none)
 show_chop         = input.bool(true,  "Chop zone fill",         group=GD, display=display.none)
@@ -487,13 +476,8 @@ raw_open  = request.security(syminfo.tickerid, data_tf, open[1],  lookahead=barm
 raw_close = request.security(syminfo.tickerid, data_tf, close[1], lookahead=barmerge.lookahead_off)
 raw_time  = request.security(syminfo.tickerid, data_tf, time[1],  lookahead=barmerge.lookahead_off)
 
-<<<<<<< Updated upstream:SMC_SuperFib_v13.0.0.pine
-// v8: Authority data feed — one TF above local session
-auth_data_tf   = _authority_tf
-=======
 // v8: Authority data feed — one session above local session
 auth_data_tf   = _authority_session_tf == "Weekly" ? "60" : "D"
->>>>>>> Stashed changes:SMC_SuperFib_v13.1.3.pine
 auth_raw_high  = request.security(syminfo.tickerid, auth_data_tf, high[1],  lookahead=barmerge.lookahead_off)
 auth_raw_low   = request.security(syminfo.tickerid, auth_data_tf, low[1],   lookahead=barmerge.lookahead_off)
 auth_raw_open  = request.security(syminfo.tickerid, auth_data_tf, open[1],  lookahead=barmerge.lookahead_off)
@@ -615,9 +599,6 @@ if not na(raw_time)
 if not na(auth_raw_time)
     int auth_new_key = get_period_key(auth_raw_time, _authority_session_tf)
     if auth_new_key != auth_cur_key and auth_cur_key != 0
-<<<<<<< Updated upstream:SMC_SuperFib_v13.0.0.pine
-        // v13.2 HTF projection only uses the most recently completed higher timeframe SF range.
-=======
         // v13.2 HTF AF uses the F3 range from the next higher timeframe.
         auth_s3_high   := auth_s2_high
         auth_s3_low    := auth_s2_low
@@ -631,7 +612,6 @@ if not na(auth_raw_time)
         auth_s1_low    := auth_cur_low
         auth_s1_open   := auth_cur_open
         auth_s1_close  := auth_cur_close
->>>>>>> Stashed changes:SMC_SuperFib_v13.1.3.pine
         auth_cur_key   := auth_new_key
         auth_cur_high  := auth_raw_high
         auth_cur_low   := auth_raw_low
@@ -707,17 +687,6 @@ if barstate.islast
         f3_low  := na
 
     // Authority anchors follow the same recency numbering.
-<<<<<<< Updated upstream:SMC_SuperFib_v13.0.0.pine
-    auth_f1_high := auth_raw_high
-    auth_f1_low  := auth_raw_low
-    auth_f1_bull := auth_raw_close >= auth_raw_open
-    auth_f2_high := na
-    auth_f2_low  := na
-    auth_f2_bull := false
-    auth_f3_high := na
-    auth_f3_low  := na
-    auth_f3_bull := false
-=======
     auth_f1_high := auth_s1_high
     auth_f1_low  := auth_s1_low
     auth_f1_bull := auth_s1_close >= auth_s1_open
@@ -727,7 +696,11 @@ if barstate.islast
     auth_f3_high := auth_s3_high
     auth_f3_low  := auth_s3_low
     auth_f3_bull := auth_s3_close >= auth_s3_open
->>>>>>> Stashed changes:SMC_SuperFib_v13.1.3.pine
+
+    // HTF auth compression guard — mirror the local compression logic for authority fibs.
+    if not na(auth_f1_high) and not na(auth_f1_low) and (auth_f1_high - auth_f1_low) < _cg_thresh
+        auth_f1_high := na
+        auth_f1_low  := na
 
     if ov_f1_high != 0.0
         f1_high := ov_f1_high
@@ -2578,31 +2551,17 @@ if _anchors_changed
                     sf_draw_bi(_lp50, _half, _ctier50, _sf_star_final, 0, _x_sf, _idx50, _xbl_sf_smart)
                     array.push(_sf_drawn, _lp50)
 
-<<<<<<< Updated upstream:SMC_SuperFib_v13.0.0.pine
-    // ── v13.2: HTF Authority SF — projection of the next higher timeframe SF range
+    // ── v13.2: HTF Authority AF — most recent closed session of the one-up timeframe (auth_s1 = auth_f1).
     if not na(_xb_auth_smart) and show_authority_sf and _den_ess
         bool _htf_ok = not na(auth_f1_high) and not na(auth_f1_low) and (auth_f1_high - auth_f1_low) >= _fib_min_range
         if _htf_ok
             float _auth_comp_hi = auth_f1_high
             float _auth_comp_lo = auth_f1_low
             int _htf_star = int(f_hybrid_stars(close, _auth_comp_hi, _auth_comp_lo, 1))
-            string _auth_tf_label = _authority_tf == "240" ? "H4" : _authority_tf == "D" ? "D1" : _authority_tf == "W" ? "W1" : _authority_tf == "M" ? "M1" : _authority_tf
-            draw_fib_bi(_xb_auth_smart, _auth_comp_hi, _auth_comp_lo, auth_f1_bull, 2, "HTF " + _auth_tf_label + " SF", _xbl_auth_smart)
-            if show_labels
-                _lbl = label.new(_xbl_auth_smart, _auth_comp_hi, "HTF " + _auth_tf_label + " SF " + star_str(_htf_star), xloc=xloc.bar_index, style=label.style_label_left, color=color.new(color.white, 100), textcolor=color.new(#FFD700, 0), size=size.normal)
-=======
-    // ── v13.2: HTF Authority AF — uses the F3 range from the next higher timeframe.
-    if not na(_xb_auth_smart) and show_authority_sf and _den_ess
-        bool _htf_ok = not na(auth_f3_high) and not na(auth_f3_low) and (auth_f3_high - auth_f3_low) >= _fib_min_range
-        if _htf_ok
-            float _auth_comp_hi = auth_f3_high
-            float _auth_comp_lo = auth_f3_low
-            int _htf_star = int(f_hybrid_stars(close, _auth_comp_hi, _auth_comp_lo, 1))
             string _auth_tf_label = _authority_session_tf == "Daily" ? "D1" : _authority_session_tf == "Weekly" ? "W1" : _authority_session_tf == "Monthly" ? "M1" : _authority_session_tf == "Quarterly" ? "Q1" : _authority_session_tf == "Yearly" ? "Y1" : _authority_session_tf
-            draw_fib_bi(_xb_auth_smart, _auth_comp_hi, _auth_comp_lo, auth_f3_bull, 2, "HTF " + _auth_tf_label + " AF", _xbl_auth_smart)
+            draw_fib_bi(_xb_auth_smart, _auth_comp_hi, _auth_comp_lo, auth_f1_bull, 2, "HTF " + _auth_tf_label + " AF", _xbl_auth_smart)
             if show_labels
                 _lbl = label.new(_xbl_auth_smart, _auth_comp_hi, "HTF " + _auth_tf_label + " AF " + star_str(_htf_star), xloc=xloc.bar_index, style=label.style_label_left, color=color.new(color.white, 100), textcolor=color.new(#FFD700, 0), size=size.normal)
->>>>>>> Stashed changes:SMC_SuperFib_v13.1.3.pine
                 array.push(_fib_labels, _lbl)
 
     _last_f1h      := nz(f1_high)
