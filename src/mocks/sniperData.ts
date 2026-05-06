@@ -390,17 +390,50 @@ export const mockAccount: AccountState = {
   state: "mock",
 };
 
+function xorshift32(seed: number): () => number {
+  let s = seed >>> 0 || 1;
+  return () => {
+    s ^= s << 13;
+    s ^= s >> 17;
+    s ^= s << 5;
+    return (s >>> 0) / 0xffffffff;
+  };
+}
+
+function symbolSeed(symbol: string): number {
+  return [...symbol].reduce((acc, c) => (acc * 31 + c.charCodeAt(0)) | 0, 0x9e3779b9);
+}
+
 // Synthetic price series for charts
 export function mockPriceSeries(symbol: Symbol, points = 80) {
   const base = mockPrices.find((p) => p.symbol === symbol)?.mid ?? 1;
-  const vol = base * 0.0015;
-  let v = base;
+  const drift = 0.00008;
+  const volatility = 0.0012;
+  const maxTickPct = 0.0005;
+  const tickSize = symbol === "XAUUSD" ? 0.01 : symbol.endsWith("JPY") ? 0.001 : 0.0001;
+  const decimals = symbol === "XAUUSD" ? 2 : symbol.endsWith("JPY") ? 3 : 5;
+  const pointCount = Number.isFinite(points) ? Math.max(1, Math.floor(points)) : 80;
+  const nowTs = Date.now();
+  const rand = xorshift32(symbolSeed(symbol));
   const out: { t: number; p: number }[] = [];
-  for (let i = points - 1; i >= 0; i--) {
-    v += (Math.random() - 0.5) * vol;
+
+  out.push({
+    t: nowTs - (pointCount - 1) * 60_000,
+    p: Number(base.toFixed(decimals)),
+  });
+
+  let v = base;
+  for (let i = pointCount - 2; i >= 0; i -= 1) {
+    const shock = (rand() - 0.5) * 2;
+    const rawPct = drift + volatility * shock;
+    const cappedPct = Math.max(-maxTickPct, Math.min(maxTickPct, rawPct));
+
+    v = Math.max(tickSize, v * (1 + cappedPct));
+    v = Math.round(v / tickSize) * tickSize;
+
     out.push({
-      t: Date.now() - i * 60_000,
-      p: Number(v.toFixed(symbol === "XAUUSD" ? 2 : symbol.endsWith("JPY") ? 3 : 5)),
+      t: nowTs - i * 60_000,
+      p: Number(v.toFixed(decimals)),
     });
   }
   return out;

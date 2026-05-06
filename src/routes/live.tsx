@@ -1,12 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useSnapshot, useEngineBatch, useUserSettings } from "@/hooks/useSniperData";
+import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { useTickFlash } from "@/hooks/useTickFlash";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { BiasBadge, ChopMeter, GateBadge } from "@/components/sniper/Indicators";
 import { WarningLine } from "@/components/sniper/Warnings";
 import { fmtPrice, fmtPct, relTime } from "@/lib/format";
 import { MOCK_MODE } from "@/lib/api/sniperClient";
-import { tickMotionStyle } from "@/lib/tickMotion";
+import { tickMotionHoldMs, tickMotionStyle } from "@/lib/tickMotion";
 import { cn } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
 import type {
@@ -142,11 +143,6 @@ function PriceCard({
   diagnostic: SymbolDiagnostic | undefined;
   staleThresholdMs: number;
 }) {
-  // Tick flashes — driven by polling updates of mid / bid / ask / chop.
-  const midFlash = useTickFlash(price.mid);
-  const bidFlash = useTickFlash(price.bid);
-  const askFlash = useTickFlash(price.ask);
-  const chopFlash = useTickFlash(regime?.chop);
   const midTickStyle = tickMotionStyle(`${price.symbol}:mid`, {
     baseDurationMs: 330,
     durationSpreadMs: 120,
@@ -167,6 +163,37 @@ function PriceCard({
     durationSpreadMs: 100,
     delayMaxMs: 80,
   });
+  const midFlashHoldMs = tickMotionHoldMs({
+    baseDurationMs: 330,
+    durationSpreadMs: 120,
+    delayMaxMs: 90,
+  });
+  const bidFlashHoldMs = tickMotionHoldMs({
+    baseDurationMs: 280,
+    durationSpreadMs: 110,
+    delayMaxMs: 120,
+  });
+  const askFlashHoldMs = tickMotionHoldMs({
+    baseDurationMs: 290,
+    durationSpreadMs: 130,
+    delayMaxMs: 110,
+  });
+  const { value: animatedMid, direction: midDir } = useAnimatedNumber(
+    price.mid,
+    320,
+    midFlashHoldMs,
+  );
+  const { value: animatedBid, direction: bidDir } = useAnimatedNumber(
+    price.bid,
+    280,
+    bidFlashHoldMs,
+  );
+  const { value: animatedAsk, direction: askDir } = useAnimatedNumber(
+    price.ask,
+    280,
+    askFlashHoldMs,
+  );
+  const chopFlash = useTickFlash(regime?.chop);
 
   const backendLive = price.state === "live";
   const clientStale =
@@ -199,12 +226,12 @@ function PriceCard({
         <div
           style={midTickStyle}
           className={cn(
-            "font-mono text-2xl font-semibold tabular-nums rounded px-1 -mx-1",
-            midFlash === "up" && "tick-flash-up",
-            midFlash === "down" && "tick-flash-down",
+            "font-mono text-2xl font-semibold tabular-nums rounded px-1 -mx-1 price-smooth",
+            midDir === "up" && "tick-flash-up",
+            midDir === "down" && "tick-flash-down",
           )}
         >
-          {priceUnavailable ? "—" : fmtPrice(price.mid, price.symbol)}
+          {priceUnavailable ? "—" : fmtPrice(animatedMid ?? price.mid, price.symbol)}
         </div>
         <div
           className={cn("font-mono text-sm", price.changePct1d >= 0 ? "text-buy" : "text-sell")}
@@ -217,22 +244,22 @@ function PriceCard({
         <span
           style={bidTickStyle}
           className={cn(
-            "rounded px-1 -mx-1",
-            bidFlash === "up" && "tick-flash-up",
-            bidFlash === "down" && "tick-flash-down",
+            "font-mono tabular-nums rounded px-1 -mx-1 price-smooth",
+            bidDir === "up" && "tick-flash-up-fast",
+            bidDir === "down" && "tick-flash-down-fast",
           )}
         >
-          BID {priceUnavailable ? "—" : fmtPrice(price.bid, price.symbol)}
+          BID {priceUnavailable ? "—" : fmtPrice(animatedBid ?? price.bid, price.symbol)}
         </span>
         <span
           style={askTickStyle}
           className={cn(
-            "rounded px-1 -mx-1",
-            askFlash === "up" && "tick-flash-up",
-            askFlash === "down" && "tick-flash-down",
+            "font-mono tabular-nums rounded px-1 -mx-1 price-smooth",
+            askDir === "up" && "tick-flash-up-fast",
+            askDir === "down" && "tick-flash-down-fast",
           )}
         >
-          ASK {priceUnavailable ? "—" : fmtPrice(price.ask, price.symbol)}
+          ASK {priceUnavailable ? "—" : fmtPrice(animatedAsk ?? price.ask, price.symbol)}
         </span>
       </div>
 
