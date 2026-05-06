@@ -55,9 +55,17 @@ const HEADER_TICK_MOTION: TickMotionOptions = {
 
 function HeaderTickerItem({ price }: { price: PairPrice }) {
   const flashHoldMs = tickMotionHoldMs(HEADER_TICK_MOTION);
-  const { value: animatedMid, direction: midDir } = useAnimatedNumber(price.mid, 280, flashHoldMs);
+  const {
+    value: animatedMid,
+    direction: midDir,
+    motionKey: midMotionKey,
+    motionImpulse: midMotionImpulse,
+  } = useAnimatedNumber(price.mid, 280, flashHoldMs);
   const { value: animatedChange } = useAnimatedNumber(price.changePct1d, 100);
-  const motionStyle = tickMotionStyle(`${price.symbol}:header-mid`, HEADER_TICK_MOTION);
+  const motionStyle = tickMotionStyle(`${price.symbol}:header-mid`, HEADER_TICK_MOTION, {
+    motionKey: midMotionKey,
+    motionImpulse: midMotionImpulse,
+  });
 
   return (
     <div style={motionStyle} className="flex items-center gap-2 whitespace-nowrap font-mono text-xs">
