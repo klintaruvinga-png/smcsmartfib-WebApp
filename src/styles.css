@@ -243,4 +243,53 @@
     background: linear-gradient(135deg, var(--accent-2), var(--accent));
     box-shadow: 0 4px 16px -4px rgba(216, 163, 93, 0.45);
   }
+
+  /* Tick flash — transient highlight when a polled value changes. */
+  .tick-flash-up {
+    animation: tick-flash-up 700ms ease-out;
+  }
+  .tick-flash-down {
+    animation: tick-flash-down 700ms ease-out;
+  }
+  @keyframes tick-flash-up {
+    0% {
+      background-color: color-mix(in oklab, var(--buy) 32%, transparent);
+      color: var(--buy);
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
+  @keyframes tick-flash-down {
+    0% {
+      background-color: color-mix(in oklab, var(--sell) 32%, transparent);
+      color: var(--sell);
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
+
+  .live-dot {
+    position: relative;
+  }
+  .live-dot::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: 9999px;
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--buy) 60%, transparent);
+    animation: live-pulse 1.6s ease-out infinite;
+  }
+  @keyframes live-pulse {
+    0% {
+      box-shadow: 0 0 0 0 color-mix(in oklab, var(--buy) 55%, transparent);
+    }
+    70% {
+      box-shadow: 0 0 0 6px color-mix(in oklab, var(--buy) 0%, transparent);
+    }
+    100% {
+      box-shadow: 0 0 0 0 color-mix(in oklab, var(--buy) 0%, transparent);
+    }
+  }
 }
