@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useSnapshot, useEngineBatch, useUserSettings } from "@/hooks/useSniperData";
+import { useTickFlash } from "@/hooks/useTickFlash";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { BiasBadge, ChopMeter, GateBadge } from "@/components/sniper/Indicators";
 import { WarningLine } from "@/components/sniper/Warnings";
@@ -7,7 +8,13 @@ import { fmtPrice, fmtPct, relTime } from "@/lib/format";
 import { MOCK_MODE } from "@/lib/api/sniperClient";
 import { cn } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
-import type { EngineBlocker } from "@/types/sniper";
+import type {
+  EngineBlocker,
+  PriceTick,
+  RegimeSnapshot,
+  GateState,
+  SymbolDiagnostic,
+} from "@/types/sniper";
 
 export const Route = createFileRoute("/live")({
   head: () => ({
