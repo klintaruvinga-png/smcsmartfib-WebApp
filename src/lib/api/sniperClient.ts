@@ -50,10 +50,11 @@ import {
 const DEFAULT_BACKEND_URL =
   import.meta.env.VITE_SNIPER_BACKEND_URL ?? "https://trader.stokvelsociety.co.za/wp-json";
 
+// Default to LIVE backend. Only use mock data when explicitly opted in via
+// VITE_SNIPER_MOCK_MODE=true. Previously this defaulted to mock in dev, which
+// made the UI look frozen because every poll returned the same static objects.
 export const MOCK_MODE =
-  String(
-    import.meta.env.VITE_SNIPER_MOCK_MODE ?? (import.meta.env.DEV ? "true" : "false"),
-  ).toLowerCase() === "true";
+  String(import.meta.env.VITE_SNIPER_MOCK_MODE ?? "false").toLowerCase() === "true";
 
 let backendUrl = DEFAULT_BACKEND_URL;
 export function setBackendUrl(url: string) {
