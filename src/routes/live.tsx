@@ -6,6 +6,7 @@ import { BiasBadge, ChopMeter, GateBadge } from "@/components/sniper/Indicators"
 import { WarningLine } from "@/components/sniper/Warnings";
 import { fmtPrice, fmtPct, relTime } from "@/lib/format";
 import { MOCK_MODE } from "@/lib/api/sniperClient";
+import { tickMotionStyle } from "@/lib/tickMotion";
 import { cn } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
 import type {
@@ -146,6 +147,26 @@ function PriceCard({
   const bidFlash = useTickFlash(price.bid);
   const askFlash = useTickFlash(price.ask);
   const chopFlash = useTickFlash(regime?.chop);
+  const midTickStyle = tickMotionStyle(`${price.symbol}:mid`, {
+    baseDurationMs: 330,
+    durationSpreadMs: 120,
+    delayMaxMs: 90,
+  });
+  const bidTickStyle = tickMotionStyle(`${price.symbol}:bid`, {
+    baseDurationMs: 280,
+    durationSpreadMs: 110,
+    delayMaxMs: 120,
+  });
+  const askTickStyle = tickMotionStyle(`${price.symbol}:ask`, {
+    baseDurationMs: 290,
+    durationSpreadMs: 130,
+    delayMaxMs: 110,
+  });
+  const chopTickStyle = tickMotionStyle(`${price.symbol}:chop`, {
+    baseDurationMs: 300,
+    durationSpreadMs: 100,
+    delayMaxMs: 80,
+  });
 
   const backendLive = price.state === "live";
   const clientStale =
@@ -176,6 +197,7 @@ function PriceCard({
 
       <div className="flex items-baseline justify-between">
         <div
+          style={midTickStyle}
           className={cn(
             "font-mono text-2xl font-semibold tabular-nums rounded px-1 -mx-1",
             midFlash === "up" && "tick-flash-up",
@@ -193,6 +215,7 @@ function PriceCard({
 
       <div className="flex items-center justify-between text-[10px] font-mono text-mute">
         <span
+          style={bidTickStyle}
           className={cn(
             "rounded px-1 -mx-1",
             bidFlash === "up" && "tick-flash-up",
@@ -202,6 +225,7 @@ function PriceCard({
           BID {priceUnavailable ? "—" : fmtPrice(price.bid, price.symbol)}
         </span>
         <span
+          style={askTickStyle}
           className={cn(
             "rounded px-1 -mx-1",
             askFlash === "up" && "tick-flash-up",
@@ -226,6 +250,7 @@ function PriceCard({
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-mono uppercase tracking-wider text-mute">Chop</span>
               <span
+                style={chopTickStyle}
                 className={cn(
                   "text-[10px] font-mono text-dim rounded px-1 -mx-1",
                   chopFlash === "up" && "tick-flash-up",
