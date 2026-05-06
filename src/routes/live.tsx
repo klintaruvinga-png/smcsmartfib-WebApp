@@ -143,21 +143,6 @@ function PriceCard({
   diagnostic: SymbolDiagnostic | undefined;
   staleThresholdMs: number;
 }) {
-  const midTickStyle = tickMotionStyle(`${price.symbol}:mid`, {
-    baseDurationMs: 330,
-    durationSpreadMs: 120,
-    delayMaxMs: 90,
-  });
-  const bidTickStyle = tickMotionStyle(`${price.symbol}:bid`, {
-    baseDurationMs: 280,
-    durationSpreadMs: 110,
-    delayMaxMs: 120,
-  });
-  const askTickStyle = tickMotionStyle(`${price.symbol}:ask`, {
-    baseDurationMs: 290,
-    durationSpreadMs: 130,
-    delayMaxMs: 110,
-  });
   const chopTickStyle = tickMotionStyle(`${price.symbol}:chop`, {
     baseDurationMs: 300,
     durationSpreadMs: 100,
@@ -178,22 +163,64 @@ function PriceCard({
     durationSpreadMs: 130,
     delayMaxMs: 110,
   });
-  const { value: animatedMid, direction: midDir } = useAnimatedNumber(
+  const {
+    value: animatedMid,
+    direction: midDir,
+    motionKey: midMotionKey,
+    motionImpulse: midMotionImpulse,
+  } = useAnimatedNumber(
     price.mid,
     320,
     midFlashHoldMs,
   );
-  const { value: animatedBid, direction: bidDir } = useAnimatedNumber(
+  const {
+    value: animatedBid,
+    direction: bidDir,
+    motionKey: bidMotionKey,
+    motionImpulse: bidMotionImpulse,
+  } = useAnimatedNumber(
     price.bid,
     280,
     bidFlashHoldMs,
   );
-  const { value: animatedAsk, direction: askDir } = useAnimatedNumber(
+  const {
+    value: animatedAsk,
+    direction: askDir,
+    motionKey: askMotionKey,
+    motionImpulse: askMotionImpulse,
+  } = useAnimatedNumber(
     price.ask,
     280,
     askFlashHoldMs,
   );
   const chopFlash = useTickFlash(regime?.chop);
+  const midTickStyle = tickMotionStyle(
+    `${price.symbol}:mid`,
+    {
+      baseDurationMs: 330,
+      durationSpreadMs: 120,
+      delayMaxMs: 90,
+    },
+    { motionKey: midMotionKey, motionImpulse: midMotionImpulse },
+  );
+  const bidTickStyle = tickMotionStyle(
+    `${price.symbol}:bid`,
+    {
+      baseDurationMs: 280,
+      durationSpreadMs: 110,
+      delayMaxMs: 120,
+    },
+    { motionKey: bidMotionKey, motionImpulse: bidMotionImpulse },
+  );
+  const askTickStyle = tickMotionStyle(
+    `${price.symbol}:ask`,
+    {
+      baseDurationMs: 290,
+      durationSpreadMs: 130,
+      delayMaxMs: 110,
+    },
+    { motionKey: askMotionKey, motionImpulse: askMotionImpulse },
+  );
 
   const backendLive = price.state === "live";
   const clientStale =
