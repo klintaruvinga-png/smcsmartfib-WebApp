@@ -26,7 +26,7 @@ final class SMC_SuperFib_Sniper_REST {
         // Send CORS headers on all REST responses (success, error, auth failure, etc)
         add_filter('rest_post_dispatch', function($response, $server, $request) {
             $allowed = self::get_allowed_origins();
-            $origin  = isset($_SERVER['HTTP_ORIGIN']) ? esc_url_raw(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
+            $origin  = isset($_SERVER['HTTP_ORIGIN']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
             if ($origin && self::is_allowed_origin($origin, $allowed)) {
                 self::send_cors_headers_for_origin($origin);
             }
@@ -35,7 +35,7 @@ final class SMC_SuperFib_Sniper_REST {
         
         add_filter('rest_pre_serve_request', function($value) {
             $allowed = self::get_allowed_origins();
-            $origin  = isset($_SERVER['HTTP_ORIGIN']) ? esc_url_raw(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
+            $origin  = isset($_SERVER['HTTP_ORIGIN']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
             if ($origin && self::is_allowed_origin($origin, $allowed)) {
                 self::send_cors_headers_for_origin($origin);
             }
@@ -395,7 +395,7 @@ final class SMC_SuperFib_Sniper_REST {
             $request_uri = $_SERVER['REQUEST_URI'] ?? '';
             if (strpos($request_uri, '/wp-json/sniper/v1/') !== false) {
                 $allowed = self::get_allowed_origins();
-                $origin  = isset($_SERVER['HTTP_ORIGIN']) ? esc_url_raw(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
+                $origin  = isset($_SERVER['HTTP_ORIGIN']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
                 if ($origin && self::is_allowed_origin($origin, $allowed)) {
                     self::send_cors_headers_for_origin($origin);
                     header('Content-Length: 0');
@@ -432,7 +432,7 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     public function send_cors_headers($served, $result, $request, $server) {
-        $origin = isset($_SERVER['HTTP_ORIGIN']) ? esc_url_raw(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
+        $origin = isset($_SERVER['HTTP_ORIGIN']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
 
         // Always send Vary: Origin so caches never serve one origin's CORS headers to another.
         header('Vary: Origin', false);
@@ -524,7 +524,8 @@ final class SMC_SuperFib_Sniper_REST {
             } elseif ($mt5_price_live || !$cached_price || ($cached_price['state'] ?? 'offline') !== 'live') {
                 $feed_has_stale_symbols = true;
             }
-            if ($this->is_feed_rate_limited($user_id, $symbol)) {
+            // MT5 authority should not be punished by stale Twelve Data rate-limit state.
+            if (!$mt5_price_live && $this->is_feed_rate_limited($user_id, $symbol)) {
                 $feed_any_rate_limited = true;
             }
         }
@@ -588,7 +589,7 @@ final class SMC_SuperFib_Sniper_REST {
         $settings = array_merge($current, array(
             'backendUrl' => isset($payload['backendUrl']) ? esc_url_raw($payload['backendUrl']) : $current['backendUrl'],
             'refreshIntervalSec' => $this->int_between($payload, 'refreshIntervalSec', 2, 60, $current['refreshIntervalSec']),
-            'staleThresholdSec' => $this->int_between($payload, 'staleThresholdSec', 10, 60, $current['staleThresholdSec']),
+            'staleThresholdSec' => $this->int_between($payload, 'staleThresholdSec', 10, 120, $current['staleThresholdSec']),
             'watchlist' => $this->sanitize_symbols(isset($payload['watchlist']) ? $payload['watchlist'] : $current['watchlist']),
             'riskAllocation' => $this->sanitize_risk_allocation(isset($payload['riskAllocation']) ? $payload['riskAllocation'] : $current['riskAllocation'], $current['riskAllocation']),
         ));
@@ -1125,6 +1126,40 @@ final class SMC_SuperFib_Sniper_REST {
             error_log("MT5 CANDLE PAYLOAD MISSING OR INVALID FOR SYMBOL: {$symbol}");
         }
 
+        // Insert M15 candle if provided (separate from M1).
+        // This is critical: the engine requires at least 30 closed M15 bars to run.
+        // Without M15 candles, the engine hard-exits at fetch_candles() with INSUFFICIENT_CANDLE_HISTORY.
+        if (!empty($payload['candle_m15']) && is_array($payload['candle_m15'])) {
+            $candle_m15 = $payload['candle_m15'];
+            
+            if (isset($candle_m15['time'], $candle_m15['open'], $candle_m15['high'], $candle_m15['low'], $candle_m15['close'])) {
+                $candle_m15_ts = strtotime($candle_m15['time']);
+                $min_valid_ts = 946684800; // 2000-01-01 00:00:00 UTC
+                if ($candle_m15_ts === false || $candle_m15_ts <= 0 || $candle_m15_ts < $min_valid_ts) {
+                    error_log("REGRESSION GUARD: Rejecting M15 candle with invalid/epoch timestamp for {$symbol} | time={$candle_m15['time']} | parsed_ts={$candle_m15_ts} | min_valid={$min_valid_ts}");
+                    $this->audit($user_id, 'ea.market_stream.invalid_m15_candle_timestamp', array(
+                        'symbol' => $symbol,
+                        'candle_time' => $candle_m15['time'],
+                        'parsed_timestamp' => $candle_m15_ts
+                    ));
+                } else {
+                    $result = $this->insert_mt5_candle($user_id, $symbol, '15min', $candle_m15, $payload['timestamp'] ?? null, 1800);
+                    if ($result) {
+                        $inserted_candles++;  // ← ADD THIS LINE: count M15 inserts in API response
+                        error_log("MT5 M15 CANDLE WRITE: {$symbol} | timeframe=15min | time={$candle_m15['time']}");
+                    } else {
+                        error_log("MT5 M15 CANDLE INSERT FAILED: {$symbol} | timeframe=15min | time={$candle_m15['time']} | stream_timestamp=" . ($payload['timestamp'] ?? 'null'));
+                    }
+                }
+            } else {
+                error_log("MT5 M15 CANDLE PAYLOAD INVALID: " . print_r($candle_m15, true));
+                $this->audit($user_id, 'ea.market_stream.invalid_m15_candle', array(
+                    'symbol' => $symbol,
+                    'candle_m15' => $candle_m15
+                ));
+            }
+        }
+
         if (!empty($payload['freshness'])) {
             $freshness = strtoupper(sanitize_text_field($payload['freshness']));
             set_transient('smc_sf_freshness_' . $user_id . '_' . $symbol, $freshness, 300);
@@ -1235,7 +1270,7 @@ final class SMC_SuperFib_Sniper_REST {
      * Insert MT5 candle data
      * Regression guard: Atomic operation with proper source tagging
      */
-    private function insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $stream_timestamp = null) {
+    private function insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $stream_timestamp = null, $max_age_sec = 180) {
         global $wpdb;
 
         // Parse timestamp to MySQL format
@@ -1259,9 +1294,9 @@ final class SMC_SuperFib_Sniper_REST {
                 $age_seconds = $stream_ts - $candle_ts;
                 // HARDENING: M1 candles are already 60s old by design (closed bar).
                 // Raise threshold to 180s (60s natural lag + 120s broker-jitter headroom).
-                // Candles > 180s stale relative to stream timestamp are genuinely old.
+                // For M15 candles we pass a larger limit because a closed bar is naturally 15-30 minutes old.
                 // REGRESSION: Log via audit() not just error_log() so rejections are visible.
-                if ($age_seconds > 180) {
+                if ($age_seconds > $max_age_sec) {
                     error_log("STALE REJECTED: {$symbol} | age={$age_seconds}s | candle={$candle['time']} | stream={$stream_timestamp}");
                     $this->audit($user_id, 'ea.market_stream.stale_candle_rejected', array(
                         'symbol' => $symbol,
@@ -2367,7 +2402,7 @@ final class SMC_SuperFib_Sniper_REST {
             'backendUrl' => rest_url(),
             'apiKeyStatus' => $this->get_twelve_key_status($user_id),
             'refreshIntervalSec' => 2,
-            'staleThresholdSec' => 10,
+            'staleThresholdSec' => 60,
             'watchlist' => array('GBPUSD', 'AUDUSD', 'EURUSD', 'NZDUSD', 'USDJPY', 'AUDJPY', 'EURJPY', 'XAUUSD'),
             'riskAllocation' => array('perTradePct' => 0.5, 'dailyMaxPct' => 2.0, 'ddCapPct' => 6.0),
         );
@@ -3107,9 +3142,23 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         $value = trim((string) $raw_time);
+        
+        // Convert MQL5 format (2026.05.06 12:34:56) to ISO 8601 (2026-05-06T12:34:56)
+        // This regex handles both dot and dash separators for dates
         $value = preg_replace('/^(\d{4})\.(\d{2})\.(\d{2})/', '$1-$2-$3', $value);
+        
+        // HARDENING: If no timezone marker is present, treat as UTC explicitly.
+        // Valid timezone markers: Z, +HH:MM, -HH:MM, etc.
+        // Without this, PHP's strtotime() treats ambiguous times inconsistently across timezones.
+        if (!preg_match('/[Z+\-]\d{0,2}:?\d{0,2}$/', $value) && !str_ends_with($value, 'Z')) {
+            // No timezone marker — force UTC interpretation
+            $value = $value . 'Z';
+            error_log("TIMESTAMP NORMALIZED TO UTC: raw={$raw_time} | normalized={$value}");
+        }
+        
         $ts = strtotime($value);
         if ($ts === false) {
+            error_log("FAILED TO PARSE TIMESTAMP: raw={$raw_time} | value={$value}");
             return $fallback;
         }
 
