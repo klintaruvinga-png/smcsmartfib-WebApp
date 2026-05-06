@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-interface TickMotionOptions {
+export interface TickMotionOptions {
   baseDurationMs: number;
   durationSpreadMs: number;
   delayMaxMs: number;
@@ -20,6 +20,20 @@ function hashString(input: string): number {
 
 function ranged(hash: number, base: number, spread: number): number {
   return base + (spread > 0 ? hash % (spread + 1) : 0);
+}
+
+export function tickMotionHoldMs({
+  baseDurationMs,
+  durationSpreadMs,
+  delayMaxMs,
+  dotBaseDurationMs = baseDurationMs,
+  dotDurationSpreadMs = durationSpreadMs,
+  dotDelayMaxMs = delayMaxMs,
+}: TickMotionOptions): number {
+  const flashTotal = baseDurationMs + durationSpreadMs + delayMaxMs;
+  const dotTotal = dotBaseDurationMs + dotDurationSpreadMs + dotDelayMaxMs;
+  // Leave one frame of slack so the class survives until the CSS animation completes.
+  return Math.max(flashTotal, dotTotal) + 16;
 }
 
 export function tickMotionStyle(

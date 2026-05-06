@@ -9,7 +9,7 @@ import {
 } from "@/hooks/useSniperData";
 import { useTickFlash } from "@/hooks/useTickFlash";
 import { fmtPrice, fmtPct } from "@/lib/format";
-import { tickMotionStyle } from "@/lib/tickMotion";
+import { tickMotionHoldMs, tickMotionStyle, type TickMotionOptions } from "@/lib/tickMotion";
 import { SyncChip, SignalStatusChip } from "@/components/sniper/Chips";
 import { cn, deduplicateById } from "@/lib/utils";
 import type { PairPrice } from "@/types/sniper";
@@ -44,16 +44,18 @@ const NAV = [
   { to: "/account", label: "Account", short: "Acct", icon: Settings },
 ] as const;
 
+const HEADER_TICK_MOTION: TickMotionOptions = {
+  baseDurationMs: 220,
+  durationSpreadMs: 120,
+  delayMaxMs: 110,
+  dotBaseDurationMs: 180,
+  dotDurationSpreadMs: 110,
+  dotDelayMaxMs: 90,
+};
+
 function HeaderTickerItem({ price }: { price: PairPrice }) {
-  const flash = useTickFlash(price.mid, 320);
-  const motionStyle = tickMotionStyle(`${price.symbol}:header-mid`, {
-    baseDurationMs: 220,
-    durationSpreadMs: 120,
-    delayMaxMs: 110,
-    dotBaseDurationMs: 180,
-    dotDurationSpreadMs: 110,
-    dotDelayMaxMs: 90,
-  });
+  const flash = useTickFlash(price.mid, tickMotionHoldMs(HEADER_TICK_MOTION));
+  const motionStyle = tickMotionStyle(`${price.symbol}:header-mid`, HEADER_TICK_MOTION);
 
   return (
     <div style={motionStyle} className="flex items-center gap-2 whitespace-nowrap font-mono text-xs">
