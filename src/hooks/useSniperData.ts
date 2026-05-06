@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient, setBackendUrl } from "@/lib/api/sniperClient";
 import type { Symbol, SymbolDiagnostic, TradePlan } from "@/types/sniper";
 
-const DEFAULT_POLL_MS = 15_000;
+const DEFAULT_POLL_MS = 2_000;
 
 function useBackendReady() {
   const { data } = useUserSettings();
@@ -142,6 +142,7 @@ export function useEngineBatch() {
         queryClient.invalidateQueries({ queryKey: ["live-signals"] });
         queryClient.invalidateQueries({ queryKey: ["engine-health"] });
         queryClient.invalidateQueries({ queryKey: ["ladders"] });
+        queryClient.invalidateQueries({ queryKey: ["chart"] });
       },
     },
   );

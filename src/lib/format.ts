@@ -25,8 +25,12 @@ export function fmtZAR(value: number): string {
   return `R${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
-export function relTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
+export function relTime(iso: string | null | undefined): string {
+  if (!iso) return "unknown";
+  const timestamp = new Date(iso).getTime();
+  if (!Number.isFinite(timestamp)) return "unknown";
+  const diff = Date.now() - timestamp;
+  if (diff <= 0) return "just now";
   const s = Math.floor(diff / 1000);
   if (s < 60) return `${s}s ago`;
   const m = Math.floor(s / 60);

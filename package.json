@@ -1,5 +1,6 @@
 {
   "name": "tanstack_start_ts",
+  "version": "13.0.1",
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -9,7 +10,8 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "check:mql": "node ./mt5/check-mql-includes.mjs"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",

@@ -366,7 +366,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
         <Field label={`Refresh interval (${s.refreshIntervalSec}s)`}>
           <input
             type="range"
-            min={5}
+            min={2}
             max={60}
             value={s.refreshIntervalSec}
             onChange={(e) => updateSettingsDraft({ ...s, refreshIntervalSec: +e.target.value })}
@@ -376,8 +376,8 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
         <Field label={`Stale threshold (${s.staleThresholdSec}s)`}>
           <input
             type="range"
-            min={30}
-            max={600}
+            min={10}
+            max={60}
             step={10}
             value={s.staleThresholdSec}
             onChange={(e) => updateSettingsDraft({ ...s, staleThresholdSec: +e.target.value })}

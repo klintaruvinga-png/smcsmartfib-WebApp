@@ -37,6 +37,7 @@ export const mockPrices: PairPrice[] = [
     changePct1d: 0.42,
     updatedAt: now(),
     state: "mock",
+    source: "mock",
   },
   {
     symbol: "AUDUSD",
@@ -46,6 +47,7 @@ export const mockPrices: PairPrice[] = [
     changePct1d: -0.18,
     updatedAt: now(),
     state: "mock",
+    source: "mock",
   },
   {
     symbol: "EURUSD",
@@ -55,6 +57,7 @@ export const mockPrices: PairPrice[] = [
     changePct1d: 0.11,
     updatedAt: now(),
     state: "mock",
+    source: "mock",
   },
   {
     symbol: "NZDUSD",
@@ -64,6 +67,7 @@ export const mockPrices: PairPrice[] = [
     changePct1d: -0.34,
     updatedAt: minutesAgo(4),
     state: "stale",
+    source: "mock",
   },
   {
     symbol: "USDJPY",
@@ -73,6 +77,7 @@ export const mockPrices: PairPrice[] = [
     changePct1d: 0.61,
     updatedAt: now(),
     state: "mock",
+    source: "mock",
   },
   {
     symbol: "AUDJPY",
@@ -82,6 +87,7 @@ export const mockPrices: PairPrice[] = [
     changePct1d: 0.45,
     updatedAt: minutesAgo(6),
     state: "stale",
+    source: "mock",
   },
   {
     symbol: "EURJPY",
@@ -91,6 +97,7 @@ export const mockPrices: PairPrice[] = [
     changePct1d: 0.72,
     updatedAt: now(),
     state: "mock",
+    source: "mock",
   },
   {
     symbol: "XAUUSD",
@@ -100,6 +107,7 @@ export const mockPrices: PairPrice[] = [
     changePct1d: -0.22,
     updatedAt: now(),
     state: "unavailable",
+    source: "mock",
   },
 ];
 
@@ -354,8 +362,8 @@ export const mockEngineHealth: EngineHealth = {
 export const mockSettings: DashboardSettings = {
   backendUrl: "https://trader.stokvelsociety.co.za/wp-json",
   apiKeyStatus: "missing",
-  refreshIntervalSec: 15,
-  staleThresholdSec: 180,
+  refreshIntervalSec: 2,
+  staleThresholdSec: 10,
   watchlist: WATCHLIST,
   riskAllocation: { perTradePct: 0.5, dailyMaxPct: 2.0, ddCapPct: 6.0 },
 };

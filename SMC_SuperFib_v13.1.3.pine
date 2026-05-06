@@ -1,22 +1,28 @@
 //@version=6
 const string INDICATOR_NAME = "SMC SuperFib"
-const string INDICATOR_BUILD = "v12.0.9.1 - AM Bug Run"
+const string INDICATOR_BUILD = "v13.1.3 - HTF F3 authority + level mirror patch"
 indicator(INDICATOR_NAME + " " + INDICATOR_BUILD + " Smart Layout", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500, max_bars_back=5000)
 
 var GD = "Display"
 session_tf_override_on = input.bool(false, "Override auto session", group=GD, display=display.none)
-session_tf_override    = input.string("Yearly", "Session size (manual)", options=["Yearly","Monthly","Weekly","Daily"], group=GD, display=display.none)
+session_tf_override    = input.string("Yearly", "Session size (manual)", options=["Yearly","Quarterly","Monthly","Weekly","Daily"], group=GD, display=display.none)
 _tf_secs_for_session = timeframe.in_seconds(timeframe.period)
+string tf_cur = timeframe.period  // current chart timeframe; declare once and reuse globally
+// v13.1: Corrected session TF ladder:
+//   ≤30m (1800s) → Daily  |  ≤1H (3600s) → Weekly  |  ≤4H (14400s) → Monthly
+//   ≤1D (86400s) → Quarterly  |  else → Yearly
 _auto_session_tf =
-     _tf_secs_for_session <= 3600   ? "Daily"   :
-     _tf_secs_for_session <= 14400  ? "Weekly"  :
-     _tf_secs_for_session <= 86400  ? "Monthly" : "Yearly"
+     _tf_secs_for_session <= 1800  ? "Daily"     :
+     _tf_secs_for_session <= 3600  ? "Weekly"    :
+     _tf_secs_for_session <= 14400 ? "Monthly"   :
+     _tf_secs_for_session <= 86400 ? "Quarterly" : "Yearly"
 session_tf = session_tf_override_on ? session_tf_override : _auto_session_tf
-// v8: Authority TF is one session level above the active session (auto or override)
-_authority_tf =
-     session_tf == "Daily"   ? "Weekly"  :
-     session_tf == "Weekly"  ? "Monthly" :
-     session_tf == "Monthly" ? "Yearly"  : "Yearly"
+// v13.2: HTF Authority Fib (AF) is the F3 from the next higher session.
+string _authority_session_tf =
+     session_tf == "Daily"      ? "Weekly"   :
+     session_tf == "Weekly"     ? "Monthly"  :
+     session_tf == "Monthly"    ? "Quarterly" :
+     session_tf == "Quarterly"  ? "Yearly"   : "Yearly"
 pip_type          = input.string("USD",    "Pair type",       options=["USD","JPY"],                         group=GD, display=display.none)
 show_bands        = input.bool(true,  "Zone tolerance bands",   group=GD, display=display.none)
 show_chop         = input.bool(true,  "Chop zone fill",         group=GD, display=display.none)
@@ -42,16 +48,10 @@ extend_years      = input.int(3, "Fib back extension (years)", minval=1, maxval=
 show_authority_sf  = input.bool(true, "Show HTF Authority SF", group=GD, display=display.none)
 
 var GV = "Fib Visibility"
-show_f1_inp       = input.bool(false, "Show Fib 1 (oldest — thick)", group=GV, display=display.none)
-show_f2_inp       = input.bool(false, "Show Fib 2 (swap — purple)",  group=GV, display=display.none)
-show_f3_inp       = input.bool(true,  "Show Fib 3 (recent — thin)",  group=GV, display=display.none)
+show_f1_inp       = input.bool(true,  "Show Fib 1 (S1 - most recent)", group=GV, display=display.none)
+show_f2_inp       = input.bool(false, "Show Fib 2 (S2 - middle)",      group=GV, display=display.none)
+show_f3_inp       = input.bool(false, "Show Fib 3 (S3 - oldest)",      group=GV, display=display.none)
 show_superfib_inp = input.bool(true,  "Show SuperFib zones",         group=GV, display=display.none)
-show_ef           = input.bool(true,  "Show Entry Fib (EF)",         group=GV, display=display.none)
-
-var GEF_PT = "EF Pre-Trigger"
-show_ef_pretrig     = input.bool(true,  "Show EF pre‑trigger labels",      group=GEF_PT, display=display.none)
-ef_pretrig_filter   = input.bool(true,  "Gate pre‑trigger to regime+zone", group=GEF_PT, display=display.none)
-ef_pretrig_cooldown = input.int(5,      "Min bars between pre-triggers",   minval=1, maxval=50, group=GEF_PT, display=display.none)
 
 var GN = "Engine"
 sf_tolerance      = input.float(1.0,  "SuperFib tolerance (%)",     minval=0.1, maxval=5.0,  step=0.1, group=GN, display=display.none)
@@ -72,7 +72,6 @@ exec_pivot_lb      = input.int(4,    "Execution pivot lookback (bars)",        m
 sweep_min_tier     = input.string("Tier2", "Minimum sweep candidate tier",
     options=["Tier1","Tier2","Tier3"], group=GN, display=display.none)
 require_disp_mss   = input.bool(true,"Require displacement for MSS",          group=GN, display=display.none)
-ef_ltf_no_fallback = input.bool(true,"Disable year-fallback EF on 1H and below", group=GN, display=display.none)
 
 var GCG = "Compression Guard"
 cg_min_range_usd  = input.float(20.0,  "Min swing range pips (USD)", minval=5.0, maxval=200.0, step=1.0, group=GCG, display=display.none)
@@ -87,24 +86,6 @@ ov_f2_low  = input.price(0.0, "Fib 2 Low",  group=GO, display=display.none)
 ov_f3_high = input.price(0.0, "Fib 3 High", group=GO, display=display.none)
 ov_f3_low  = input.price(0.0, "Fib 3 Low",  group=GO, display=display.none)
 
-var GEF = "Entry Fib (EF) Colours"
-show_ef_labels   = input.bool(true,  "Show EF labels", group=GEF, display=display.none)
-show_ef_targets  = input.bool(true,  "Show EF targets", group=GEF, display=display.none)
-show_ef_ote_zone = input.bool(true,  "Show EF OTE zone", group=GEF, display=display.none)
-show_ef_sltp     = input.bool(true,  "Show EF SL/TP refs", group=GEF, display=display.none)
-ef_col_prem  = input.color(color.new(color.red,   35), "EF premium colour", group=GEF, display=display.none)
-ef_col_disc  = input.color(color.new(color.green, 35), "EF discount colour",group=GEF, display=display.none)
-ef_col_chop  = input.color(color.new(color.gray,  55), "EF chop colour",    group=GEF, display=display.none)
-
-var GEF_PROX = "EF Proximity"
-ef_prox_pips_usd = input.float(15.0, "Proximity pips (USD)", minval=5.0, maxval=50.0, step=1.0, group=GEF_PROX, display=display.none)
-ef_prox_pips_jpy = input.float(40.0, "Proximity pips (JPY)", minval=10.0, maxval=100.0, step=1.0, group=GEF_PROX, display=display.none)
-ef_pre_width     = input.float(1.5,  "Pre‑trigger width (× prox)", minval=1.0, maxval=3.0, step=0.1, group=GEF_PROX, display=display.none)
-ef_min_range_pips = input.float(20.0, "EF minimum execution leg (pips)", minval=5.0, maxval=300.0, step=1.0, group=GEF_PROX, display=display.none)
-ef_disp_mult     = input.float(1.2,  "EF displacement threshold (× ATR)", minval=0.5, maxval=5.0, step=0.1, group=GEF_PROX, display=display.none)
-ef_fresh_bars    = input.int(80,     "EF leg freshness (bars)", minval=10, maxval=400, group=GEF_PROX, display=display.none)
-ef_fallback_year = input.bool(true,  "Fallback to current-year anchors if no valid execution leg", group=GEF_PROX, display=display.none)
-
 var GSLTP = "SL/TP Display"
 show_sltp     = input.bool(true,      "Show SL/TP lines on signals", group=GSLTP, display=display.none)
 sltp_offset   = input.float(0.0,      "SL/TP offset (pips)",         minval=0.0, step=0.5, group=GSLTP, display=display.none)
@@ -116,8 +97,6 @@ var GICT = "ICT Hybrid Engine"
 ict_enabled        = input.bool(true,  "Enable ICT Hybrid Engine",        group=GICT, display=display.none)
 show_ict_table     = input.bool(true,  "Show ICT dashboard table",        group=GICT, display=display.none)
 ict_struct_lb      = input.int(20,     "ICT structure lookback (bars)",   minval=5, maxval=100, group=GICT, display=display.none)
-ict_prox_usd       = input.float(20.0, "EF proximity filter (USD pips)",  minval=5.0, maxval=100.0, group=GICT, display=display.none)
-ict_prox_jpy       = input.float(50.0, "EF proximity filter (JPY pips)",  minval=10.0, maxval=200.0, group=GICT, display=display.none)
 sl_atr_mult_usd    = input.float(1.2,  "SL ATR multiplier (USD)",         minval=0.5, maxval=5.0, step=0.1, group=GICT, display=display.none)
 sl_atr_mult_jpy    = input.float(1.5,  "SL ATR multiplier (JPY)",         minval=0.5, maxval=5.0, step=0.1, group=GICT, display=display.none)
 ict_bias_gate      = input.float(0.10, "Min pressure bias to confirm",    minval=0.0, maxval=1.0, step=0.05, group=GICT, display=display.none)
@@ -147,7 +126,6 @@ webhook_secret    = input.string("1c6ae2599d37c8ed0a182f63e6dd2b60fbcb3d6f", "We
 
 int FIB_ID_SF      = 0
 int FIB_ID_AUTH_SF = 5
-int FIB_ID_EF      = 1
 int FIB_ID_F3      = 2
 int FIB_ID_F2      = 3
 int FIB_ID_F1      = 4
@@ -160,9 +138,6 @@ disc_edge    = #66CC66
 disc_key     = #22AA22
 disc_ext1    = #0D8A0D
 disc_ext2    = #005500
-swap_ext     = #4B0082
-swap_key     = #7722CC
-swap_edge    = #AA55EE
 C_CHOP_BNDRY = color.new(color.orange, 20)
 C_CHOP_FILL  = color.new(color.gray,   82)
 ARR_UP       = #22AA22
@@ -186,7 +161,6 @@ C_BUY_ENTRY  = color.new(#008800, 0)
 C_SL_LINE    = color.new(#FF6600, 0)
 C_TP_LINE    = color.new(#0066FF, 0)
 C_ENTRY_BUFFER = color.new(#FFD700, 80)
-C_PRETRIG    = color.new(#FFD700, 55)
 
 C_TBL_BG_HEAD  = color.new(#0D1117, 20)
 C_TBL_BG_DATA  = color.new(#0D1117, 15)
@@ -217,7 +191,6 @@ _smart_label_gap   = smart_label_gap_bars > 0 ? smart_label_gap_bars : tf_secs <
 band_size       = pip_type == "JPY" ? 0.80 : 0.0030
 pip_mult        = pip_type == "JPY" ? 0.01  : 0.0001
 show_ext        = true
-ef_enabled      = show_ef
 
 cg_min_range_price = (pip_type == "JPY" ? cg_min_range_jpy : cg_min_range_usd) * syminfo.mintick * 10
 
@@ -271,14 +244,12 @@ var int[] _smart_active_ids = array.new_int()
 
 var int _xb_sf_smart   = na
 var int _xb_auth_smart = na
-var int _xb_ef_smart   = na
 var int _xb_f3_smart   = na
 var int _xb_f2_smart   = na
 var int _xb_f1_smart   = na
 
 var int _xbl_sf_smart   = na
 var int _xbl_auth_smart = na
-var int _xbl_ef_smart   = na
 var int _xbl_f3_smart   = na
 var int _xbl_f2_smart   = na
 var int _xbl_f1_smart   = na
@@ -330,13 +301,9 @@ f_daily_label_time(slot_idx) =>
 
     _active_ct = array.size(_smart_active_ids)
 
-    _label_month_step = _active_ct >= 3 ? 2 : 1
-
-    _tm = _cm + 1 + slot_idx * _label_month_step
-    _ty = _cy + (_tm - 1) / 12
-    _fm = _tm - ((_tm - 1) / 12) * 12
-
-    timestamp("America/New_York", int(_ty), int(_fm), 10, 0, 0)
+    // v13.1: 1D = Quarterly session — labels advance by quarter (3 months per step)
+    _label_qtr_step = _active_ct >= 3 ? 2 : 1
+    _anchor_qtr(_cy, _cm, 1 + slot_idx * _label_qtr_step)
 
 f_get_slot_label_time(slot_idx) =>
     int _result = na
@@ -362,13 +329,11 @@ f_left_edge_bi() =>
 f_assign_smart_fib_bar_slots() =>
     int _xb_sf_smart_local   = na
     int _xb_auth_smart_local = na
-    int _xb_ef_smart_local   = na
     int _xb_f3_smart_local   = na
     int _xb_f2_smart_local   = na
     int _xb_f1_smart_local   = na
     int _xbl_sf_smart_local   = na
     int _xbl_auth_smart_local = na
-    int _xbl_ef_smart_local   = na
     int _xbl_f3_smart_local   = na
     int _xbl_f2_smart_local   = na
     int _xbl_f1_smart_local   = na
@@ -384,9 +349,6 @@ f_assign_smart_fib_bar_slots() =>
             else if _fid == FIB_ID_AUTH_SF
                 _xb_auth_smart_local  := _col_bi
                 _xbl_auth_smart_local := _lbl_bi
-            else if _fid == FIB_ID_EF
-                _xb_ef_smart_local  := _col_bi
-                _xbl_ef_smart_local := _lbl_bi
             else if _fid == FIB_ID_F3
                 _xb_f3_smart_local  := _col_bi
                 _xbl_f3_smart_local := _lbl_bi
@@ -397,7 +359,7 @@ f_assign_smart_fib_bar_slots() =>
                 _xb_f1_smart_local  := _col_bi
                 _xbl_f1_smart_local := _lbl_bi
 
-    [_xb_sf_smart_local, _xb_auth_smart_local, _xb_ef_smart_local, _xb_f3_smart_local, _xb_f2_smart_local, _xb_f1_smart_local, _xbl_sf_smart_local, _xbl_auth_smart_local, _xbl_ef_smart_local, _xbl_f3_smart_local, _xbl_f2_smart_local, _xbl_f1_smart_local]
+    [_xb_sf_smart_local, _xb_auth_smart_local, _xb_f3_smart_local, _xb_f2_smart_local, _xb_f1_smart_local, _xbl_sf_smart_local, _xbl_auth_smart_local, _xbl_f3_smart_local, _xbl_f2_smart_local, _xbl_f1_smart_local]
 
 if barstate.islast
     if _is_yearly
@@ -428,12 +390,13 @@ if barstate.islast
     else if _is_daily
         _cy = year(time,  "America/New_York")
         _cm = month(time, "America/New_York")
-        _t1 := _anchor_mo(_cy, _cm, 1)
-        _t2 := _anchor_mo(_cy, _cm, 2)
-        _t3 := _anchor_mo(_cy, _cm, 3)
-        _t4 := _anchor_mo(_cy, _cm, 4)
-        _t5 := _anchor_mo(_cy, _cm, 5)
-        _t6 := _anchor_mo(_cy, _cm, 6)
+        // v13.1: 1D chart now uses Quarterly session — space columns by quarter
+        _t1 := _anchor_qtr(_cy, _cm, 1)
+        _t2 := _anchor_qtr(_cy, _cm, 2)
+        _t3 := _anchor_qtr(_cy, _cm, 3)
+        _t4 := _anchor_qtr(_cy, _cm, 4)
+        _t5 := _anchor_qtr(_cy, _cm, 5)
+        _t6 := _anchor_qtr(_cy, _cm, 6)
     else if _is_h4
         _t1 := next_sunday(time)
         _t2 := _t1 + 7 * 86400000
@@ -504,7 +467,8 @@ if barstate.islast and show_period_lines and _den_full
         else if show_line_month
             line.new(t, close*2, t, close*0, xloc=xloc.bar_time, extend=extend.both, color=C_LINE_MONTH,   width=1, style=line.style_solid)
 
-data_tf = session_tf == "Yearly" ? "D" : session_tf == "Monthly" ? "D" : session_tf == "Weekly" ? "60" : "15"
+// v13.1: Quarterly uses "D" feed (same as Yearly/Monthly — quarterly spans built from daily bars)
+data_tf = session_tf == "Yearly" ? "D" : session_tf == "Quarterly" ? "D" : session_tf == "Monthly" ? "D" : session_tf == "Weekly" ? "60" : "15"
 
 raw_high  = request.security(syminfo.tickerid, data_tf, high[1],  lookahead=barmerge.lookahead_off)
 raw_low   = request.security(syminfo.tickerid, data_tf, low[1],   lookahead=barmerge.lookahead_off)
@@ -512,8 +476,8 @@ raw_open  = request.security(syminfo.tickerid, data_tf, open[1],  lookahead=barm
 raw_close = request.security(syminfo.tickerid, data_tf, close[1], lookahead=barmerge.lookahead_off)
 raw_time  = request.security(syminfo.tickerid, data_tf, time[1],  lookahead=barmerge.lookahead_off)
 
-// v8: Authority data feed — one TF above local session
-auth_data_tf   = _authority_tf == "Yearly" ? "D" : _authority_tf == "Monthly" ? "D" : _authority_tf == "Weekly" ? "60" : "15"
+// v8: Authority data feed — one session above local session
+auth_data_tf   = _authority_session_tf == "Weekly" ? "60" : "D"
 auth_raw_high  = request.security(syminfo.tickerid, auth_data_tf, high[1],  lookahead=barmerge.lookahead_off)
 auth_raw_low   = request.security(syminfo.tickerid, auth_data_tf, low[1],   lookahead=barmerge.lookahead_off)
 auth_raw_open  = request.security(syminfo.tickerid, auth_data_tf, open[1],  lookahead=barmerge.lookahead_off)
@@ -521,15 +485,22 @@ auth_raw_close = request.security(syminfo.tickerid, auth_data_tf, close[1], look
 auth_raw_time  = request.security(syminfo.tickerid, auth_data_tf, time[1],  lookahead=barmerge.lookahead_off)
 
 get_period_key(t, stf) =>
-    stf == "Yearly"  ? year(t) :
-     stf == "Monthly" ? year(t) * 100 + month(t) :
-     stf == "Weekly"  ? year(t) * 100 + weekofyear(t) :
-     year(t) * 10000 + month(t) * 100 + dayofmonth(t)
+    _mo = month(t)
+    _qtr = _mo <= 3 ? 1 : _mo <= 6 ? 2 : _mo <= 9 ? 3 : 4
+    _hr = hour(t)
+    stf == "Yearly"    ? year(t) :
+     stf == "Quarterly" ? year(t) * 10 + _qtr :
+     stf == "Monthly"   ? year(t) * 100 + month(t) :
+     stf == "Weekly"    ? year(t) * 100 + weekofyear(t) :
+     stf == "D"         ? year(t) * 10000 + month(t) * 100 + dayofmonth(t) :
+     stf == "240"       ? year(t) * 1000000 + month(t) * 10000 + dayofmonth(t) * 100 + math.floor(_hr / 4) :
+     year(t) * 1000000 + month(t) * 10000 + dayofmonth(t) * 100 + _hr
 
 fmt_key(k) =>
-    session_tf == "Yearly"  ? str.tostring(k) :
-     session_tf == "Monthly" ? str.tostring(math.floor(k / 100)) + "/" + str.tostring(k - math.floor(k/100)*100) :
-     session_tf == "Weekly"  ? "Wk" + str.tostring(k - math.floor(k/100)*100) :
+    session_tf == "Yearly"    ? str.tostring(k) :
+     session_tf == "Quarterly" ? str.tostring(math.floor(k / 10)) + "/Q" + str.tostring(k - math.floor(k / 10) * 10) :
+     session_tf == "Monthly"   ? str.tostring(math.floor(k / 100)) + "/" + str.tostring(k - math.floor(k/100)*100) :
+     session_tf == "Weekly"    ? "Wk" + str.tostring(k - math.floor(k/100)*100) :
      str.tostring(k)
 
 var int   cur_key    = 0
@@ -626,21 +597,21 @@ if not na(raw_time)
 
 // v8: Authority session accumulator — same logic, authority TF grouping
 if not na(auth_raw_time)
-    int auth_new_key = get_period_key(auth_raw_time, _authority_tf)
+    int auth_new_key = get_period_key(auth_raw_time, _authority_session_tf)
     if auth_new_key != auth_cur_key and auth_cur_key != 0
-        // v9: shift s2 → s3 before s1 → s2
-        auth_s3_high  := auth_s2_high
-        auth_s3_low   := auth_s2_low
-        auth_s3_open  := auth_s2_open
-        auth_s3_close := auth_s2_close
-        auth_s2_high  := auth_s1_high
-        auth_s2_low   := auth_s1_low
-        auth_s2_open  := auth_s1_open
-        auth_s2_close := auth_s1_close
-        auth_s1_high  := auth_cur_high
-        auth_s1_low   := auth_cur_low
-        auth_s1_open  := auth_cur_open
-        auth_s1_close := auth_cur_close
+        // v13.2 HTF AF uses the F3 range from the next higher timeframe.
+        auth_s3_high   := auth_s2_high
+        auth_s3_low    := auth_s2_low
+        auth_s3_open   := auth_s2_open
+        auth_s3_close  := auth_s2_close
+        auth_s2_high   := auth_s1_high
+        auth_s2_low    := auth_s1_low
+        auth_s2_open   := auth_s1_open
+        auth_s2_close  := auth_s1_close
+        auth_s1_high   := auth_cur_high
+        auth_s1_low    := auth_cur_low
+        auth_s1_open   := auth_cur_open
+        auth_s1_close  := auth_cur_close
         auth_cur_key   := auth_new_key
         auth_cur_high  := auth_raw_high
         auth_cur_low   := auth_raw_low
@@ -666,7 +637,6 @@ var float  f2_low     = na
 var float  f3_high    = na
 var float  f3_low     = na
 var bool   f1_bull    = false
-var bool   f2_expanded = false
 var bool   f2_is_bull = false
 var bool   f3_bull    = false
 var string f1_name    = ""
@@ -685,57 +655,52 @@ var float auth_f2_low  = na
 var bool  auth_f2_bull = false
 
 if barstate.islast
-    f1_high := s2_high
-    f1_low  := s2_low
-    f1_bull := s2_close >= s2_open
-    f3_high := s1_high
-    f3_low  := s1_low
-    f3_bull := s1_close >= s1_open
-    // v8/v9: Authority anchors
-    // auth_f3 = most recent (auth_s1), auth_f2 = middle (auth_s2), auth_f1 = oldest (auth_s3)
-    auth_f3_high := auth_s1_high
-    auth_f3_low  := auth_s1_low
-    auth_f3_bull := auth_s1_close >= auth_s1_open
+    // v13.1.1: F numbering now follows recency.
+    // S1 = most recent completed session -> F1
+    // S2 = previous session              -> F2
+    // S3 = oldest tracked session        -> F3
+    // No swap logic: each Fib uses its own session wick high/low.
+    f1_high := s1_high
+    f1_low  := s1_low
+    f1_bull := s1_close >= s1_open
+
+    f2_high := s2_high
+    f2_low  := s2_low
+    f2_is_bull := s2_close >= s2_open
+
+    f3_high := s3_high
+    f3_low  := s3_low
+    f3_bull := s3_close >= s3_open
+
+    // ── v13.1: Compression guard — null-out Fibs whose range is below the
+    //   cg_min_range threshold so they are excluded from drawing AND SF calc.
+    //   Uses existing cg_min_range_usd / cg_min_range_jpy inputs.
+    _cg_thresh = cg_min_range_price   // already computed as price units above
+    if not na(f1_high) and not na(f1_low) and (f1_high - f1_low) < _cg_thresh
+        f1_high := na
+        f1_low  := na
+    if not na(f2_high) and not na(f2_low) and (f2_high - f2_low) < _cg_thresh
+        f2_high := na
+        f2_low  := na
+    if not na(f3_high) and not na(f3_low) and (f3_high - f3_low) < _cg_thresh
+        f3_high := na
+        f3_low  := na
+
+    // Authority anchors follow the same recency numbering.
+    auth_f1_high := auth_s1_high
+    auth_f1_low  := auth_s1_low
+    auth_f1_bull := auth_s1_close >= auth_s1_open
     auth_f2_high := auth_s2_high
     auth_f2_low  := auth_s2_low
     auth_f2_bull := auth_s2_close >= auth_s2_open
-    auth_f1_high := auth_s3_high
-    auth_f1_low  := auth_s3_low
-    auth_f1_bull := auth_s3_close >= auth_s3_open
+    auth_f3_high := auth_s3_high
+    auth_f3_low  := auth_s3_low
+    auth_f3_bull := auth_s3_close >= auth_s3_open
 
-    if not na(s1_high) and not na(s2_high) and not na(s1_low) and not na(s2_low)
-        f2_expanded := false
-        if f3_bull
-            f2_high    := s2_high
-            f2_low     := s1_low
-            f2_is_bull := false
-        else
-            f2_high    := s1_high
-            f2_low     := s2_low
-            f2_is_bull := true
-
-        _same_dir         = f3_bull == f1_bull
-        _swap_rng         = math.abs(f2_high - f2_low)
-        _full_bear        = math.abs(s2_high - s1_low)
-        _full_bull        = math.abs(s1_high - s2_low)
-        _full_rng         = f3_bull ? _full_bull : _full_bear
-        _f2_expand_thresh = pip_type == "JPY" ? 0.35 : 0.25
-
-        if _same_dir and _full_rng > 0 and (_swap_rng / _full_rng) < _f2_expand_thresh
-            f2_expanded := true
-            if f3_bull
-                f2_high    := s1_high
-                f2_low     := s2_low
-                f2_is_bull := true
-            else
-                f2_high    := s2_high
-                f2_low     := s1_low
-                f2_is_bull := false
-    else
-        f2_expanded := false
-        f2_is_bull := false
-        f2_high    := na
-        f2_low     := na
+    // HTF auth compression guard — mirror the local compression logic for authority fibs.
+    if not na(auth_f1_high) and not na(auth_f1_low) and (auth_f1_high - auth_f1_low) < _cg_thresh
+        auth_f1_high := na
+        auth_f1_low  := na
 
     if ov_f1_high != 0.0
         f1_high := ov_f1_high
@@ -751,61 +716,8 @@ if barstate.islast
         f3_low  := ov_f3_low
 
     f1_name := "F1"
+    f2_name := "F2"
     f3_name := "F3"
-    f2_name := f2_expanded ? "SWAP EXP" : "SWAP"
-
-var float ef_curr_year_high = na
-var float ef_curr_year_low  = na
-
-ef_is_new_year = not na(time[1]) and year(time, "America/New_York") != year(time[1], "America/New_York")
-if ef_is_new_year
-    ef_curr_year_high := high
-    ef_curr_year_low  := low
-else
-    ef_curr_year_high := math.max(nz(ef_curr_year_high), high)
-    ef_curr_year_low  := math.min(nz(ef_curr_year_low),  low)
-
-var float ef_anchor_low  = na
-var float ef_anchor_high = na
-var int   ef_anchor_dir  = 0
-var int   ef_anchor_bar  = na
-
-var float ef_0   = na
-var float ef_100 = na
-float ef_range         = na
-bool  ef_ascending     = false
-bool  ef_is_bull       = false
-string ef_mode_str     = "NONE"
-
-float ef_l000   = na
-float ef_l050   = na
-float ef_l062   = na
-float ef_l0705  = na
-float ef_l079   = na
-float ef_l100   = na
-float ef_lm1    = na
-float ef_lm2    = na
-float ef_lm25   = na
-float ef_lm4    = na
-float ef_l0625  = na
-float ef_l075   = na
-float ef_l0375  = na
-float ef_l025   = na
-float ef_ote_lo = na
-float ef_ote_hi = na
-float prox_pips = na
-float prox_thresh = na
-float ef_dist_ote_lo = na
-float ef_dist_ote_hi = na
-float ef_dist_sweet  = na
-bool  ef_in_ote_zone = false
-bool  ef_near_sweet_spot = false
-bool  ef_near_entry_buy  = false
-bool  ef_near_entry_sell = false
-bool  ef_near_entry      = false
-bool  ef_pre_trigger_raw = false
-bool  ict_in_ote_buy     = false
-bool  ict_in_ote_sell    = false
 
 ict_ph = ta.pivothigh(high, ict_struct_lb, ict_struct_lb)
 ict_pl = ta.pivotlow(low,   ict_struct_lb, ict_struct_lb)
@@ -903,32 +815,55 @@ f_matrix_tf_for_profile(_p) =>
 f_pd_tf_for_profile(_p) =>
     _p == 1 ? "D" : _p == 2 ? "W" : "M"
 
+f_sf_recency_weights(_f1_valid, _f2_valid, _f3_valid) =>
+    int _valid = (_f1_valid ? 1 : 0) + (_f2_valid ? 1 : 0) + (_f3_valid ? 1 : 0)
+    float _w1 = 0.0
+    float _w2 = 0.0
+    float _w3 = 0.0
+    if _valid == 3
+        _w1 := 0.40
+        _w2 := 0.35
+        _w3 := 0.25
+    else if _valid == 2
+        if _f1_valid
+            _w1 := 0.55
+            if _f2_valid
+                _w2 := 0.45
+            else
+                _w3 := 0.45
+        else
+            _w2 := 0.55
+            _w3 := 0.45
+    else if _valid == 1
+        _w1 := _f1_valid ? 1.0 : 0.0
+        _w2 := _f2_valid ? 1.0 : 0.0
+        _w3 := _f3_valid ? 1.0 : 0.0
+    [_w1, _w2, _w3, _valid]
+
+// F1 is most recent, F2 middle, F3 oldest. Weights are 40/35/25 for 3 valid
+// Fibs and 55/45 for any 2 valid Fibs, with recency always dominant.
 f_get_sf_anchor_range() =>
     float _sf_hi = na
     float _sf_lo = na
-    int _valid = 0
     bool _f1_valid = not na(f1_high) and not na(f1_low)
     bool _f2_valid = not na(f2_high) and not na(f2_low)
     bool _f3_valid = not na(f3_high) and not na(f3_low)
-    if _f1_valid or _f2_valid or _f3_valid
+    [_w1, _w2, _w3, _valid] = f_sf_recency_weights(_f1_valid, _f2_valid, _f3_valid)
+    float _wtot = _w1 + _w2 + _w3
+    if _valid >= 1 and _wtot > 0.0
         float _sum_hi = 0.0
         float _sum_lo = 0.0
-        int _cnt = 0
         if _f1_valid
-            _sum_hi += f1_high
-            _sum_lo += f1_low
-            _cnt += 1
+            _sum_hi += f1_high * _w1
+            _sum_lo += f1_low  * _w1
         if _f2_valid
-            _sum_hi += f2_high
-            _sum_lo += f2_low
-            _cnt += 1
+            _sum_hi += f2_high * _w2
+            _sum_lo += f2_low  * _w2
         if _f3_valid
-            _sum_hi += f3_high
-            _sum_lo += f3_low
-            _cnt += 1
-        _sf_hi := _sum_hi / _cnt
-        _sf_lo := _sum_lo / _cnt
-        _valid := _cnt
+            _sum_hi += f3_high * _w3
+            _sum_lo += f3_low  * _w3
+        _sf_hi := _sum_hi / _wtot
+        _sf_lo := _sum_lo / _wtot
     [_sf_hi, _sf_lo, _valid]
 
 f_sign_pressure(_bp, _sp, _gate) =>
@@ -945,8 +880,13 @@ resolved_pd_tf     = ict_use_auto_pd_tf ? f_pd_tf_for_profile(bias_profile) : ht
 [bp2, sp2] = fib_pressure_component(f2_high, f2_low)
 [bp3, sp3] = fib_pressure_component(f3_high, f3_low)
 
-bull_pressure_raw = ict_use_sf_pressure ? (not na(sf_pressure_hi) and not na(sf_pressure_lo) ? sf_bp : 0.5) : (bp1 * 0.25 + bp2 * 0.30 + bp3 * 0.45)
-bear_pressure_raw = ict_use_sf_pressure ? (not na(sf_pressure_hi) and not na(sf_pressure_lo) ? sf_sp : 0.5) : (sp1 * 0.25 + sp2 * 0.30 + sp3 * 0.45)
+_bp_f1_valid = not na(f1_high) and not na(f1_low)
+_bp_f2_valid = not na(f2_high) and not na(f2_low)
+_bp_f3_valid = not na(f3_high) and not na(f3_low)
+[_bp_w1, _bp_w2, _bp_w3, _bp_valid_count] = f_sf_recency_weights(_bp_f1_valid, _bp_f2_valid, _bp_f3_valid)
+
+bull_pressure_raw = ict_use_sf_pressure ? (not na(sf_pressure_hi) and not na(sf_pressure_lo) ? sf_bp : 0.5) : (bp1 * _bp_w1 + bp2 * _bp_w2 + bp3 * _bp_w3)
+bear_pressure_raw = ict_use_sf_pressure ? (not na(sf_pressure_hi) and not na(sf_pressure_lo) ? sf_sp : 0.5) : (sp1 * _bp_w1 + sp2 * _bp_w2 + sp3 * _bp_w3)
 total_pressure    = bull_pressure_raw + bear_pressure_raw
 bull_pressure     = total_pressure > 0 ? bull_pressure_raw / total_pressure : 0.5
 bear_pressure     = total_pressure > 0 ? bear_pressure_raw / total_pressure : 0.5
@@ -1148,7 +1088,7 @@ else if not is_hh and not is_hl and not is_ll and not is_lh
         prev_regime := regime
         regime      := 0
 
-ef_atr_now = ta.atr(14)
+mss_atr_now = ta.atr(14)
 
 var bool mss_bullish = false
 var bool mss_bearish = false
@@ -1168,11 +1108,11 @@ if confirmed_sweep_down
     _mss_sweep_dir := -1
 
 _disp_body_ratio  = math.abs(close - open) / math.max(high - low, syminfo.mintick)
-_disp_range_atr   = ef_atr_now > 0 ? (high - low) / ef_atr_now : 0.0
+_disp_range_atr   = mss_atr_now > 0 ? (high - low) / mss_atr_now : 0.0
 _disp_fvg_bull    = low > high[2]
 _disp_fvg_bear    = high < low[2]
-_disp_extend_bull = not na(exec_sh1) ? (close - exec_sh1) >= ef_atr_now * 0.2 : false
-_disp_extend_bear = not na(exec_sl1) ? (exec_sl1 - close) >= ef_atr_now * 0.2 : false
+_disp_extend_bull = not na(exec_sh1) ? (close - exec_sh1) >= mss_atr_now * 0.2 : false
+_disp_extend_bear = not na(exec_sl1) ? (exec_sl1 - close) >= mss_atr_now * 0.2 : false
 
 _disp_score_bull = (_disp_body_ratio >= 0.55 ? 1 : 0) +
                    (_disp_range_atr   >= 1.30 ? 1 : 0) +
@@ -1218,117 +1158,6 @@ if not na(_mss_sweep_bar) and alert_bar_ready
 
 if mss_bullish or mss_bearish
     mss_bar := bar_index
-ef_leg_min = ef_min_range_pips * pip_mult
-
-bull_leg_low  = not na(exec_sl1) ? exec_sl1 : nz(last_swing_low, low)
-bull_leg_high = high
-bear_leg_high = not na(exec_sh1) ? exec_sh1 : nz(last_swing_high, high)
-bear_leg_low  = low
-
-bull_leg_range = math.abs(bull_leg_high - bull_leg_low)
-bear_leg_range = math.abs(bear_leg_high - bear_leg_low)
-
-bull_leg_valid = sweep_down and mss_bullish and bull_leg_range >= ef_leg_min and (close - bull_leg_low) >= ef_atr_now * ef_disp_mult
-bear_leg_valid = sweep_up and mss_bearish and bear_leg_range >= ef_leg_min and (bear_leg_high - close) >= ef_atr_now * ef_disp_mult
-
-if bull_leg_valid
-    ef_anchor_low  := bull_leg_low
-    ef_anchor_high := bull_leg_high
-    ef_anchor_dir  := 1
-    ef_anchor_bar  := bar_index
-else if bear_leg_valid
-    ef_anchor_low  := bear_leg_low
-    ef_anchor_high := bear_leg_high
-    ef_anchor_dir  := -1
-    ef_anchor_bar  := bar_index
-
-var bool ef_is_narrative = false
-if bull_leg_valid or bear_leg_valid
-    ef_is_narrative := true
-
-_ltf_bars         = tf_secs <= 3600
-_fallback_allowed = ef_fallback_year and (not (_ltf_bars and ef_ltf_no_fallback))
-if _fallback_allowed and (na(ef_anchor_low) or na(ef_anchor_high) or (bar_index - nz(ef_anchor_bar, bar_index)) > ef_fresh_bars)
-    if not na(ef_curr_year_high) and not na(ef_curr_year_low)
-        ef_anchor_low  := ef_curr_year_low
-        ef_anchor_high := ef_curr_year_high
-
-        _htf_fb_dir = 0
-        if regime == -1 or (regime == 2 and prev_regime == 1)
-            _htf_fb_dir := -1
-        else if regime == 1 or (regime == 2 and prev_regime == -1)
-            _htf_fb_dir := 1
-        else
-            _htf_fb_dir := close >= (ef_curr_year_high + ef_curr_year_low) * 0.5 ? 1 : -1
-        ef_anchor_dir := _htf_fb_dir
-        ef_anchor_bar  := bar_index
-        ef_is_narrative := false
-
-if not na(ef_anchor_low) and not na(ef_anchor_high) and ef_anchor_high > ef_anchor_low
-    if ef_anchor_dir == 1
-        ef_0   := ef_anchor_low
-        ef_100 := ef_anchor_high
-    else
-        ef_0   := ef_anchor_high
-        ef_100 := ef_anchor_low
-else
-    ef_0   := na
-    ef_100 := na
-
-ef_range     := math.abs(ef_100 - ef_0)
-ef_ascending := ef_100 > ef_0
-ef_is_bull   := ef_anchor_dir == 1
-ef_mode_str  := ef_is_bull ? "BULL_EXEC" : ef_anchor_dir == -1 ? "BEAR_EXEC" : "NONE"
-
-ef_lvl(ratio) =>
-    if ef_ascending
-        ef_0 + ef_range * ratio
-    else
-        ef_0 - ef_range * ratio
-
-ef_l000   := ef_lvl(0.000)
-ef_l050   := ef_lvl(0.500)
-ef_l062   := ef_lvl(0.620)
-ef_l0705  := ef_lvl(0.705)
-ef_l079   := ef_lvl(0.790)
-ef_l100   := ef_lvl(1.000)
-ef_lm1    := ef_lvl(2.000)
-ef_lm2    := ef_lvl(3.000)
-ef_lm25   := ef_lvl(3.500)
-ef_lm4    := ef_lvl(5.000)
-
-ef_l0625 := ef_l062
-ef_l075  := ef_l0705
-ef_l0375 := ef_lvl(0.375)
-ef_l025  := ef_lvl(0.250)
-
-ef_ote_lo := math.min(ef_l062, ef_l079)
-ef_ote_hi := math.max(ef_l062, ef_l079)
-
-prox_pips   := pip_type == "JPY" ? ef_prox_pips_jpy : ef_prox_pips_usd
-prox_thresh := prox_pips * pip_mult
-
-ef_dist_ote_lo := math.abs(close - ef_ote_lo)
-ef_dist_ote_hi := math.abs(close - ef_ote_hi)
-ef_dist_sweet  := math.abs(close - ef_l0705)
-
-ef_in_ote_zone     := not na(ef_ote_lo) and not na(ef_ote_hi) and close >= ef_ote_lo and close <= ef_ote_hi
-ef_near_sweet_spot := ef_dist_sweet <= prox_thresh
-
-ef_near_entry_buy  := ef_anchor_dir == 1 and (ef_in_ote_zone or ef_near_sweet_spot)
-ef_near_entry_sell := ef_anchor_dir == -1 and (ef_in_ote_zone or ef_near_sweet_spot)
-ef_near_entry      := ef_near_entry_sell or ef_near_entry_buy
-
-ef_pre_trigger_raw := (ef_dist_ote_lo <= prox_thresh * ef_pre_width or ef_dist_ote_hi <= prox_thresh * ef_pre_width or ef_dist_sweet <= prox_thresh * ef_pre_width)
-
-ict_in_ote_buy  := ef_near_entry_buy
-ict_in_ote_sell := ef_near_entry_sell
-
-var int bars_in_zone = 0
-if ef_in_ote_zone
-    bars_in_zone := bars_in_zone + 1
-else
-    bars_in_zone := 0
 
 valid_sequence = not na(sweep_bar) and not na(mss_bar) and mss_bar > sweep_bar and (bar_index - sweep_bar) <= 10
 sequence_status := valid_sequence ? "READY" :
@@ -1411,7 +1240,6 @@ bear_poi_mid  = not na(bear_poi_high) and not na(bear_poi_low) ? (bear_poi_high 
 bull_poi_fresh = not na(last_bear_age) and last_bear_age <= 12
 bear_poi_fresh = not na(last_bull_age) and last_bull_age <= 12
 
-tf_cur = timeframe.period
 session_tag = not na(time(tf_cur, "0200-0500", "America/New_York")) ? "LONDON_KZ" :
               not na(time(tf_cur, "0800-1100", "America/New_York")) ? "NEW_YORK_KZ" :
               not na(time(tf_cur, "1330-1600", "America/New_York")) ? "NEW_YORK_PM" : "OFF_SESSION"
@@ -1447,8 +1275,8 @@ bgcolor(disp_kz and not na(time(tf_cur, "1330-1600", "America/New_York")) ? colo
 atr14 = ta.atr(14)
 
 cur_price_zone() =>
-    ref_hi = not na(f3_high) and f3_high != 0.0 ? f3_high : not na(f1_high) ? f1_high : na
-    ref_lo = not na(f3_low)  and f3_low  != 0.0 ? f3_low  : not na(f1_low)  ? f1_low  : na
+    ref_hi = not na(f1_high) and f1_high != 0.0 ? f1_high : not na(f2_high) ? f2_high : not na(f3_high) ? f3_high : na
+    ref_lo = not na(f1_low)  and f1_low  != 0.0 ? f1_low  : not na(f2_low)  ? f2_low  : not na(f3_low)  ? f3_low  : na
     if na(ref_hi) or na(ref_lo) or ref_hi == ref_lo
         0
     else
@@ -1510,15 +1338,15 @@ sf_key(hi, lo, idx) =>
         float(na)
 
 base_stars_at_close() =>
-    ref_hi = not na(f3_high) and f3_high != 0.0 ? f3_high : not na(f1_high) ? f1_high : na
-    ref_lo = not na(f3_low)  and f3_low  != 0.0 ? f3_low  : not na(f1_low)  ? f1_low  : na
+    ref_hi = not na(f1_high) and f1_high != 0.0 ? f1_high : not na(f2_high) ? f2_high : not na(f3_high) ? f3_high : na
+    ref_lo = not na(f1_low)  and f1_low  != 0.0 ? f1_low  : not na(f2_low)  ? f2_low  : not na(f3_low)  ? f3_low  : na
     if na(ref_hi) or na(ref_lo) or ref_hi == ref_lo
         0
     else
         _have_f1 = not na(f1_high) and not na(f1_low)
         _have_f2 = not na(f2_high) and not na(f2_low)
         _have_f3 = not na(f3_high) and not na(f3_low)
-        _ref_rng = _have_f3 ? (f3_high - f3_low) : _have_f1 ? (f1_high - f1_low) : (f2_high - f2_low)
+        _ref_rng = _have_f1 ? (f1_high - f1_low) : _have_f2 ? (f2_high - f2_low) : (f3_high - f3_low)
         _w       = _ref_rng * (sf_tolerance / 100)
         _best    = 0
         _dyn_max = fib_level_count - 1
@@ -1553,8 +1381,8 @@ base_stars_at_close() =>
         _best
 
 depth_bonus_at_close(pz) =>
-    ref_hi = not na(f3_high) and f3_high != 0.0 ? f3_high : not na(f1_high) ? f1_high : na
-    ref_lo = not na(f3_low)  and f3_low  != 0.0 ? f3_low  : not na(f1_low)  ? f1_low  : na
+    ref_hi = not na(f1_high) and f1_high != 0.0 ? f1_high : not na(f2_high) ? f2_high : not na(f3_high) ? f3_high : na
+    ref_lo = not na(f1_low)  and f1_low  != 0.0 ? f1_low  : not na(f2_low)  ? f2_low  : not na(f3_low)  ? f3_low  : na
     if na(ref_hi) or na(ref_lo) or ref_hi == ref_lo
         0
     else
@@ -1586,8 +1414,8 @@ depth_bonus_at_close(pz) =>
             _is_ext ? 2 : 1
 
 pivot_approach_bonus(pz) =>
-    ref_hi = not na(f3_high) and f3_high != 0.0 ? f3_high : not na(f1_high) ? f1_high : na
-    ref_lo = not na(f3_low)  and f3_low  != 0.0 ? f3_low  : not na(f1_low)  ? f1_low  : na
+    ref_hi = not na(f1_high) and f1_high != 0.0 ? f1_high : not na(f2_high) ? f2_high : not na(f3_high) ? f3_high : na
+    ref_lo = not na(f1_low)  and f1_low  != 0.0 ? f1_low  : not na(f2_low)  ? f2_low  : not na(f3_low)  ? f3_low  : na
     if na(ref_hi) or na(ref_lo) or ref_hi == ref_lo
         0
     else
@@ -1716,14 +1544,12 @@ bear_fvg_low_bound = math.min(htf_high1, htf_low3)
 bear_fvg_high_bound = math.max(htf_high1, htf_low3)
 bull_pd_support = (
     (htf_bull_fvg and low <= bull_fvg_high_bound + pd_tol and low >= bull_fvg_low_bound - pd_tol) or
-    (bull_poi_fresh and not na(bull_poi_mid) and low <= bull_poi_high + pd_tol and low >= bull_poi_low - pd_tol) or
-    (ef_anchor_dir == 1 and ef_near_entry_buy)
+    (bull_poi_fresh and not na(bull_poi_mid) and low <= bull_poi_high + pd_tol and low >= bull_poi_low - pd_tol)
 )
 
 bear_pd_support = (
     (htf_bear_fvg and high <= bear_fvg_high_bound + pd_tol and high >= bear_fvg_low_bound - pd_tol) or
-    (bear_poi_fresh and not na(bear_poi_mid) and high <= bear_poi_high + pd_tol and high >= bear_poi_low - pd_tol) or
-    (ef_anchor_dir == -1 and ef_near_entry_sell)
+    (bear_poi_fresh and not na(bear_poi_mid) and high <= bear_poi_high + pd_tol and high >= bear_poi_low - pd_tol)
 )
 
 pd_array_dir = bull_pd_support and not bear_pd_support ? 1 : bear_pd_support and not bull_pd_support ? -1 : 0
@@ -1905,9 +1731,9 @@ draw_vert_arrow_bi(x_bi, hi, lo, point_up, vc, lw) =>
     _base = line.new(x_bi - wing_w, base_y, x_bi + wing_w, base_y, xloc=xloc.bar_index, color=vc, width=lw, style=line.style_solid)
     array.push(_fib_lines, _base)
 
-draw_level_bi(x_bi, price, bsz, fib_name, level_pct, lc, bc, tc, depth, int _label_x_bi=na) =>
+draw_level_bi(x_bi, price, bsz, fib_name, level_pct, lc, bc, tc, depth, int _label_x_bi=na, int _lw_adj=0) =>
     if price != 0.0 and not na(price)
-        draw_hline_bi(x_bi, price, lc, get_lw(depth), line.style_solid)
+        draw_hline_bi(x_bi, price, lc, math.max(1, get_lw(depth) + _lw_adj), line.style_solid)
         if show_bands
             draw_band_bi(x_bi, price, bsz, bc, depth)
         if show_labels
@@ -1915,17 +1741,17 @@ draw_level_bi(x_bi, price, bsz, fib_name, level_pct, lc, bc, tc, depth, int _lab
             _lx = na(_label_x_bi) ? x_bi : _label_x_bi
             draw_lbl_bi(_lx, price, lbl_text, tc, not na(_label_x_bi))
 
-draw_fib_bi(x_bi, hi, lo, is_swap, point_up, lw_base, fib_name, int _label_x_bi=na) =>
+draw_fib_bi(x_bi, hi, lo, point_up, lw_base, fib_name, int _label_x_bi=na) =>
     if not na(hi) and not na(lo) and hi != 0.0 and lo != 0.0 and hi != lo
-        p_edge  = is_swap ? swap_edge : prem_edge
-        p_key   = is_swap ? swap_key  : prem_key
-        p_ext1  = is_swap ? swap_ext  : prem_ext1
-        p_ext2  = is_swap ? swap_ext  : prem_ext2
-        d_edge  = is_swap ? swap_edge : disc_edge
-        d_key   = is_swap ? swap_key  : disc_key
-        d_ext1  = is_swap ? swap_ext  : disc_ext1
-        d_ext2  = is_swap ? swap_ext  : disc_ext2
-        arr_col = is_swap ? swap_key : point_up ? ARR_UP : ARR_DOWN
+        p_edge  = prem_edge
+        p_key   = prem_key
+        p_ext1  = prem_ext1
+        p_ext2  = prem_ext2
+        d_edge  = disc_edge
+        d_key   = disc_key
+        d_ext1  = disc_ext1
+        d_ext2  = disc_ext2
+        arr_col = point_up ? ARR_UP : ARR_DOWN
         rng     = math.abs(hi - lo)
 
         for _idx = 0 to array.size(fib_ratios) - 1
@@ -1936,7 +1762,7 @@ draw_fib_bi(x_bi, hi, lo, is_swap, point_up, lw_base, fib_name, int _label_x_bi=
             _is_ext   = _ratio < 0.0 or _ratio > 1.0
             _is_base  = _ratio >= 0.0 and _ratio <= 1.0
             _is_prem  = _ratio <= 0.5
-            _is_chop  = _ratio > 0.375 and _ratio < 0.625
+            _is_chop  = _ratio > 0.375 and _ratio <= 0.625
             _is_50    = math.abs(_ratio - 0.5) < 0.001
 
             if _is_ext and not show_ext
@@ -1947,15 +1773,15 @@ draw_fib_bi(x_bi, hi, lo, is_swap, point_up, lw_base, fib_name, int _label_x_bi=
             tc = color.white
             depth = 1
             if _is_50
-                lc := is_swap ? color.new(swap_edge,50) : color.new(color.gray,50)
+                lc := color.new(color.gray,50)
                 bc := color.new(color.gray,95)
-                tc := is_swap ? color.new(swap_edge,30) : color.new(color.gray,30)
+                tc := color.new(color.gray,30)
                 depth := 1
                 _lbl := "50% ✕"
             else if _is_chop and _is_base
-                lc := is_swap ? swap_edge : C_CHOP_BNDRY
+                lc := C_CHOP_BNDRY
                 bc := lc
-                tc := is_swap ? color.new(swap_edge,10) : color.new(color.orange,10)
+                tc := color.new(color.orange,10)
                 depth := 1
                 _lbl := _lbl + " ⛔"
             else if _is_ext and _ratio < 0.0
@@ -1987,7 +1813,8 @@ draw_fib_bi(x_bi, hi, lo, is_swap, point_up, lw_base, fib_name, int _label_x_bi=
                 tc := lc
                 depth := _is_key ? 3 : 2
             _bsz = _is_50 ? 0.0 : band_size
-            draw_level_bi(x_bi, _price, _bsz, fib_name, _lbl, lc, bc, tc, depth, _label_x_bi)
+            _lw_adj = lw_base == 1 ? -1 : lw_base == 2 ? 0 : 1
+            draw_level_bi(x_bi, _price, _bsz, fib_name, _lbl, lc, bc, tc, depth, _label_x_bi, _lw_adj)
 
         if show_bands
             _x_left = f_left_edge_bi()
@@ -2018,68 +1845,6 @@ var int    ladder_score_val       = 0
 var string ladder_model           = na
 var float  ladder_zone_price      = na
 var bool   ladder_alert_sent      = false
-
-draw_ef_dotted_bi(x_bi, int _label_x_bi=na) =>
-    if not na(ef_0) and not na(ef_100) and ef_0 != ef_100
-        _lvl0    = ef_l000
-        _lvl50   = ef_l050
-        _lvl62   = ef_l062
-        _lvl705  = ef_l0705
-        _lvl79   = ef_l079
-        _lvl100  = ef_l100
-        _sl_ref  = ef_is_bull ? ef_anchor_low : ef_anchor_high
-
-        _ef_tp_draw_ok = ef_is_narrative or
-             (state == "ACTIVE" and
-              ((ladder_direction == "BUY"  and ef_anchor_dir == 1) or
-               (ladder_direction == "SELL" and ef_anchor_dir == -1)))
-        draw_hline_bi(x_bi, _lvl0,   ef_col_prem, 2, line.style_solid)
-        draw_hline_bi(x_bi, _lvl50,  color.new(color.gray,35), 1, line.style_dotted)
-        draw_hline_bi(x_bi, _lvl62,  ef_col_chop, 1, line.style_solid)
-        draw_hline_bi(x_bi, _lvl705, C_ICT_OTE, 2, line.style_solid)
-        draw_hline_bi(x_bi, _lvl79,  ef_col_disc, 1, line.style_solid)
-        draw_hline_bi(x_bi, _lvl100, ef_col_disc, 2, line.style_solid)
-        if show_ef_ote_zone
-            _x_left = f_left_edge_bi()
-            _ote_box = box.new(_x_left, ef_ote_hi, x_bi, ef_ote_lo, xloc=xloc.bar_index, border_color=C_ICT_OTE, bgcolor=color.new(C_ICT_OTE,85), border_width=2)
-            array.push(_fib_boxes, _ote_box)
-        if show_ef_targets and show_ext and _ef_tp_draw_ok
-            draw_hline_bi(x_bi, ef_lm1,  C_TP_LINE, 1, line.style_dashed)
-            draw_hline_bi(x_bi, ef_lm2,  C_TP_LINE, 1, line.style_dashed)
-            if _den_full
-                draw_hline_bi(x_bi, ef_lm25, C_TP_LINE, 1, line.style_dotted)
-                draw_hline_bi(x_bi, ef_lm4,  C_TP_LINE, 1, line.style_dotted)
-
-        if show_ef_sltp and _ef_tp_draw_ok
-            draw_hline_bi(x_bi, _sl_ref, C_SL_LINE, 1, line.style_dotted)
-        sz_ef = lbl_size == "tiny" ? size.tiny : lbl_size == "large" ? size.large : lbl_size == "normal" ? size.normal : size.small
-        _lx = na(_label_x_bi) ? x_bi + _smart_label_gap : _label_x_bi
-        if show_labels and show_ef_labels
-            _t0   = ef_is_bull ? "EF 0 — Swing Low / Invalidation" : "EF 0 — Swing High / Invalidation"
-            _t100 = ef_is_bull ? "EF 100 — Impulse High" : "EF 100 — Impulse Low"
-            _l0 = label.new(_lx, _lvl0,   _t0   + " @ " + str.tostring(_lvl0, format.mintick),   xloc=xloc.bar_index, style=label.style_label_left, color=color.new(color.white,100), textcolor=ef_col_prem, size=sz_ef)
-            array.push(_fib_labels, _l0)
-            _l50 = label.new(_lx, _lvl50,  "EF 50 — Equilibrium @ " + str.tostring(_lvl50, format.mintick), xloc=xloc.bar_index, style=label.style_label_left, color=color.new(color.white,100), textcolor=color.new(color.gray, 0), size=sz_ef)
-            array.push(_fib_labels, _l50)
-
-            _ote_dir_tag = ef_is_bull ? " [BUY OTE]" : " [SELL OTE]"
-            _l62 = label.new(_lx, _lvl62,  "EF 62 — OTE Start" + _ote_dir_tag + " @ " + str.tostring(_lvl62, format.mintick), xloc=xloc.bar_index, style=label.style_label_left, color=color.new(color.white,100), textcolor=ef_col_chop, size=sz_ef)
-            array.push(_fib_labels, _l62)
-            _l705 = label.new(_lx, _lvl705, "EF 70.5 — Sweet Spot" + _ote_dir_tag + " @ " + str.tostring(_lvl705, format.mintick), xloc=xloc.bar_index, style=label.style_label_left, color=color.new(color.black,75), textcolor=C_ICT_OTE, size=sz_ef)
-            array.push(_fib_labels, _l705)
-            _l79 = label.new(_lx, _lvl79,  "EF 79 — OTE End" + _ote_dir_tag + " @ " + str.tostring(_lvl79, format.mintick), xloc=xloc.bar_index, style=label.style_label_left, color=color.new(color.white,100), textcolor=ef_col_disc, size=sz_ef)
-            array.push(_fib_labels, _l79)
-            _l100 = label.new(_lx, _lvl100, _t100 + " @ " + str.tostring(_lvl100, format.mintick), xloc=xloc.bar_index, style=label.style_label_left, color=color.new(color.white,100), textcolor=ef_col_disc, size=sz_ef)
-            array.push(_fib_labels, _l100)
-
-            if show_ef_targets and show_ext and _ef_tp_draw_ok
-                _lm1 = label.new(_lx, ef_lm1, "TP1 — -1 @ " + str.tostring(ef_lm1, format.mintick), xloc=xloc.bar_index, style=label.style_label_left, color=color.new(C_TP_LINE,85), textcolor=color.white, size=sz_ef)
-                array.push(_fib_labels, _lm1)
-                _lm2 = label.new(_lx, ef_lm2, "TP2 — -2 @ " + str.tostring(ef_lm2, format.mintick), xloc=xloc.bar_index, style=label.style_label_left, color=color.new(C_TP_LINE,85), textcolor=color.white, size=sz_ef)
-                array.push(_fib_labels, _lm2)
-                if _den_full
-                    _lm25 = label.new(_lx, ef_lm25, "TP3 — -2.5 @ " + str.tostring(ef_lm25, format.mintick), xloc=xloc.bar_index, style=label.style_label_left, color=color.new(C_TP_LINE,90), textcolor=color.white, size=sz_ef)
-                    array.push(_fib_labels, _lm25)
 
 sf_draw_bi(p, half, color_tier, sf_stars_final, zone, x_bi, key_idx, int _label_x_bi=na) =>
     is_sell    = zone >= 1
@@ -2126,18 +1891,11 @@ get_sl_from_sweep(direction, is_sweep_up, is_sweep_down, swing_hi, swing_lo) =>
     sl
 
 get_tp_price_from_zone(zone_price, direction) =>
-
     float tp = na
     if direction == "SELL"
-        if not na(ef_lm1) and ef_lm1 < zone_price
-            tp := ef_lm1
-        else if not na(ef_lm2) and ef_lm2 < zone_price
-            tp := ef_lm2
+        tp := not na(f1_low) and f1_low < zone_price ? f1_low : not na(f2_low) and f2_low < zone_price ? f2_low : not na(f3_low) and f3_low < zone_price ? f3_low : na
     else
-        if not na(ef_lm1) and ef_lm1 > zone_price
-            tp := ef_lm1
-        else if not na(ef_lm2) and ef_lm2 > zone_price
-            tp := ef_lm2
+        tp := not na(f1_high) and f1_high > zone_price ? f1_high : not na(f2_high) and f2_high > zone_price ? f2_high : not na(f3_high) and f3_high > zone_price ? f3_high : na
     tp
 
 draw_signal_hybrid(is_bull, model_tag, eff_stars, bias_ok, struct_ok, score_val) =>
@@ -2162,23 +1920,12 @@ var float last_poi_low = na
 var int last_poi_freshness = na
 
 compute_score(pz, bst) =>
-    ef_al = 0
-    if (pz == 1 and ef_near_entry_sell) or (pz == -1 and ef_near_entry_buy)
-        ef_al := 2
-    else
-        sell_p = pz == 1 and (ef_dist_ote_lo <= prox_thresh * 2 or ef_dist_sweet <= prox_thresh * 2)
-        buy_p  = pz == -1 and (ef_dist_ote_hi <= prox_thresh * 2 or ef_dist_sweet <= prox_thresh * 2)
-        if sell_p or buy_p
-            ef_al := 1
-    ote_al = 0
-    if not na(ef_ote_lo) and not na(ef_ote_hi) and close >= ef_ote_lo and close <= ef_ote_hi
-        ote_al := 2
     sb = 0
     if (pz == 1 and ict_struct_trend == -1) or (pz == -1 and ict_struct_trend == 1)
         sb := 1
     else if ict_struct_trend != 0 and ((pz == 1 and ict_struct_trend != -1) or (pz == -1 and ict_struct_trend != 1))
         sb := -1
-    bst + ef_al + ote_al + sb
+    bst + sb
 
 pda_rank_bonus(liq_type) =>
     liq_type == "EQH" or liq_type == "EQL" ? 10 :
@@ -2211,13 +1958,11 @@ calc_execution_quality(zone_price, is_buy, rr_ok) =>
     zone_dist = not na(zone_price) ? math.abs(close - zone_price) * (pip_type == "JPY" ? 100.0 : 10000.0) : na
     q += not na(zone_dist) ? math.max(0, 25 - int(math.min(zone_dist, 25.0))) : 0
 
-    q += ((is_buy and ef_near_entry_buy) or ((not is_buy) and ef_near_entry_sell)) ? (ef_is_narrative ? 20 : 10) : 0
     q += rr_ok ? 25 : 0
     q += session_ok ? 10 : 0
     q += valid_sequence ? 10 : 0
     q += not na(zone_dist) and zone_dist <= 20 ? 10 : 0
 
-    q += bars_in_zone > 0 ? (bars_in_zone <= 3 ? 10 : bars_in_zone <= 6 ? 0 : -15) : 0
     q += reaction_candle_quality ? 10 : 0
     math.max(0, math.min(q, 100))
 
@@ -2233,7 +1978,7 @@ gen_ladder_id(direction) =>
 spread_val() =>
     pip_type == "JPY" ? 0.15 * pip_mult : 0.00015
 
-_need_star_cache = show_signals or ef_pretrig_filter
+_need_star_cache = show_signals
 _cached_pz  = _need_star_cache ? cur_price_zone()               : 0
 _cached_bst = _need_star_cache ? base_stars_at_close()          : 0
 _cached_dbo = _need_star_cache ? depth_bonus_at_close(_cached_pz) : 0
@@ -2248,11 +1993,9 @@ if show_signals and regime_ok
     htf_fvg_bonus   = (pz == -1 and htf_bull_fvg) or (pz == 1 and htf_bear_fvg) ? 2 : 0
     htf_trend_bonus = (pz == -1 and htf_trend == 1) or (pz == 1 and htf_trend == -1) ? 1 : 0
     htf_bonus       = htf_fvg_bonus + htf_trend_bonus
-    ict_ote_bonus = ict_enabled and ((pz == -1 and ict_in_ote_buy) or (pz == 1 and ict_in_ote_sell)) ? 1 : 0
-
     _narrative_ok    = liquidity_type != "NONE" and (mss_bullish or mss_bearish) and valid_sequence
     _narrative_bonus = _narrative_ok ? 1 : 0
-    eff_base      = math.min(bst + dbo + pab + htf_bonus + _narrative_bonus + ict_ote_bonus, 5)
+    eff_base      = math.min(bst + dbo + pab + htf_bonus + _narrative_bonus, 5)
     score        := compute_score(pz, bst)
 
     bull_poi_ok = bull_poi_fresh and not na(bull_poi_mid)
@@ -2285,11 +2028,11 @@ if show_signals and regime_ok
         float zone_price_val = poi_mid_val
         if na(zone_price_val)
             if direction == "SELL"
-                if not na(f3_high)
-                    zone_price_val := f3_high
+                if not na(f1_high)
+                    zone_price_val := f1_high
             else
-                if not na(f3_low)
-                    zone_price_val := f3_low
+                if not na(f1_low)
+                    zone_price_val := f1_low
 
         if not na(zone_price_val)
             spread = spread_val()
@@ -2456,20 +2199,6 @@ if state == "ACTIVE" and alert_bar_ready
 plotshape(state == "ACTIVE" and ladder_direction == "BUY",  "Signal Buy",  shape.triangleup,   location.belowbar, color.new(C_BUY_ENTRY, 40),  size=size.tiny, display=display.all - display.status_line)
 plotshape(state == "ACTIVE" and ladder_direction == "SELL", "Signal Sell", shape.triangledown, location.abovebar, color.new(C_SELL_ENTRY, 40), size=size.tiny, display=display.all - display.status_line)
 
-var int ef_pretrig_last_bar = 0
-
-ef_pretrig_sell_gate = (not ef_pretrig_filter) or (regime_ok and _cached_pz == 1  and _cached_bst >= 2)
-ef_pretrig_buy_gate  = (not ef_pretrig_filter) or (regime_ok and _cached_pz == -1 and _cached_bst >= 2)
-ef_pretrig_sell = ef_pre_trigger_raw and ef_near_entry_sell and ef_pretrig_sell_gate and sweep_up and (bar_index - ef_pretrig_last_bar) >= ef_pretrig_cooldown and not ef_pre_trigger_raw[1]
-ef_pretrig_buy  = ef_pre_trigger_raw and ef_near_entry_buy  and ef_pretrig_buy_gate  and sweep_down and (bar_index - ef_pretrig_last_bar) >= ef_pretrig_cooldown and not ef_pre_trigger_raw[1]
-
-if show_ef_pretrig and (ef_pretrig_sell or ef_pretrig_buy)
-    ef_pretrig_last_bar := bar_index
-    if ef_pretrig_sell
-        label.new(bar_index, high + atr14 * 0.6, "⚡ EF SELL ZONE", style=label.style_label_down, color=C_PRETRIG, textcolor=color.black, size=sig_sz)
-    else
-        label.new(bar_index, low  - atr14 * 0.6, "⚡ EF BUY ZONE",  style=label.style_label_up,   color=C_PRETRIG, textcolor=color.black, size=sig_sz)
-
 var table hm_tbl_full = na
 var table hm_tbl_mini = na
 var bool _tbl_full_init = false
@@ -2482,7 +2211,7 @@ if ict_enabled and show_ict_table and context_stack_minimized and not _tbl_mini_
     _tbl_mini_init := true
 
 if ict_enabled and show_ict_table and not context_stack_minimized and not _tbl_full_init
-    hm_tbl_full := table.new(position.top_right, 2, 16,
+    hm_tbl_full := table.new(position.top_right, 2, 15,
                  bgcolor=C_TBL_BG_DATA, border_color=C_TBL_BORDER,
                  border_width=1, frame_color=C_TBL_BORDER, frame_width=1)
     _tbl_full_init := true
@@ -2518,7 +2247,7 @@ if ict_enabled and show_ict_table and barstate.islast
             hm_tbl_mini := na
             _tbl_mini_init := false
         if not _tbl_full_init
-            hm_tbl_full := table.new(position.top_right, 2, 16,
+            hm_tbl_full := table.new(position.top_right, 2, 15,
                          bgcolor=C_TBL_BG_DATA, border_color=C_TBL_BORDER,
                          border_width=1, frame_color=C_TBL_BORDER, frame_width=1)
             _tbl_full_init := true
@@ -2526,8 +2255,6 @@ if ict_enabled and show_ict_table and barstate.islast
         struct_col  = ict_struct_trend == 1 ? C_TBL_BULL : ict_struct_trend == -1 ? C_TBL_BEAR : ict_struct_trend == 2 ? color.new(#FF8C00,0) : C_TBL_NEUTRAL
         bull_score_str = str.tostring(bull_bias_score)
         bear_score_str = str.tostring(bear_bias_score)
-        in_ote_str  = ict_in_ote_buy ? "BUY ZONE" : ict_in_ote_sell ? "SELL ZONE" : "—"
-        in_ote_col  = ict_in_ote_buy ? C_TBL_BULL : ict_in_ote_sell ? C_TBL_BEAR : C_TBL_NEUTRAL
         score_col   = score >= score_threshold ? C_TBL_BULL : score >= score_threshold - 1 ? color.new(#F5A623,0) : C_TBL_BEAR
         ev_col      = state == "ACTIVE" ? C_TBL_BULL : C_TBL_BEAR
         stage_col   = state == "ACTIVE" ? C_TBL_BULL : C_TBL_NEUTRAL
@@ -2548,7 +2275,6 @@ if ict_enabled and show_ict_table and barstate.islast
         table.cell(hm_tbl_full, 0, 12, "SEQUENCE", text_color=C_TBL_LBL, text_size=size.tiny, bgcolor=C_TBL_BG_DATA)
         table.cell(hm_tbl_full, 0, 13, "SWEEP STATE", text_color=C_TBL_LBL, text_size=size.tiny, bgcolor=C_TBL_BG_DATA)
         table.cell(hm_tbl_full, 0, 14, "DISPLACEMENT", text_color=C_TBL_LBL, text_size=size.tiny, bgcolor=C_TBL_BG_DATA)
-        table.cell(hm_tbl_full, 0, 15, "EF SOURCE", text_color=C_TBL_LBL, text_size=size.tiny, bgcolor=C_TBL_BG_DATA)
         table.cell(hm_tbl_full, 1,  1, struct_str, text_color=struct_col, text_size=size.small, bgcolor=C_TBL_BG_DATA)
         table.cell(hm_tbl_full, 1,  2, htf_dol_display, text_color=htf_dol_col, text_size=size.small, bgcolor=C_TBL_BG_DATA)
         table.cell(hm_tbl_full, 1,  3, matrix_display, text_color=matrix_col, text_size=size.small, bgcolor=C_TBL_BG_DATA)
@@ -2606,17 +2332,6 @@ if ict_enabled and show_ict_table and barstate.islast
             _disp_col := C_TBL_NEUTRAL
         table.cell(hm_tbl_full, 1, 14, _disp_str, text_color=_disp_col, text_size=size.small, bgcolor=C_TBL_BG_DATA)
 
-        string _ef_dir_tag = ef_anchor_dir == 1 ? " ▲" : ef_anchor_dir == -1 ? " ▼" : ""
-        string _ef_src_str = "NONE"
-        color  _ef_src_col = C_TBL_BEAR
-        if ef_is_narrative
-            _ef_src_str := "NARRATIVE ✓" + _ef_dir_tag
-            _ef_src_col := C_TBL_BULL
-        else if not na(ef_anchor_low)
-            _ef_src_str := "HTF_FALLBACK" + _ef_dir_tag
-            _ef_src_col := color.new(#F5A623, 0)
-        table.cell(hm_tbl_full, 1, 15, _ef_src_str, text_color=_ef_src_col, text_size=size.small, bgcolor=C_TBL_BG_DATA)
-
 var array<float> _sf_drawn = array.new_float()
 
 sf_is_dup(price, half) =>
@@ -2634,8 +2349,6 @@ var float _last_f2h = na
 var float _last_f2l = na
 var float _last_f3h = na
 var float _last_f3l = na
-var float _last_efh = na
-var float _last_efl = na
 var bool  _last_allowFib = false
 var string _last_state = na
 var string _last_ladder_direction = na
@@ -2646,14 +2359,12 @@ var int   _last_t4  = na
 var int   _last_t5  = na
 var int   _last_x_sf   = na
 var int   _last_x_auth = na
-var int   _last_x_ef   = na
 var int   _last_x_f3   = na
 var int   _last_x_f2   = na
 var int   _last_x_f1   = na
 
 if barstate.islast
     float _fib_min_range_local = (pip_type == "JPY" ? sf_min_pips_jpy : sf_min_pips_usd) * pip_mult
-    bool _ef_can_draw = ef_enabled and not na(ef_0) and not na(ef_100) and ef_0 != ef_100 and _den_full
     bool _f3_can_draw = allowFib and show_f3_inp and not na(f3_high) and not na(f3_low) and _den_full and (f3_high - f3_low) >= _fib_min_range_local
     bool _f2_can_draw = allowFib and show_f2_inp and not na(f2_high) and not na(f2_low) and _den_full and (f2_high - f2_low) >= _fib_min_range_local
     bool _f1_can_draw = allowFib and show_f1_inp and not na(f1_high) and not na(f1_low) and _den_full and (f1_high - f1_low) >= _fib_min_range_local
@@ -2662,7 +2373,7 @@ if barstate.islast
     _have_f2_l = not na(f2_high) and not na(f2_low)
     _have_f3_l = not na(f3_high) and not na(f3_low)
     _n_fibs_l  = (_have_f1_l ? 1 : 0) + (_have_f2_l ? 1 : 0) + (_have_f3_l ? 1 : 0)
-    _ref_range_l = _have_f3_l ? (f3_high - f3_low) : _have_f1_l ? (f1_high - f1_low) : (f2_high - f2_low)
+    _ref_range_l = _have_f1_l ? (f1_high - f1_low) : _have_f2_l ? (f2_high - f2_low) : (f3_high - f3_low)
     _min_range_price_l = (pip_type == "JPY" ? sf_min_pips_jpy : sf_min_pips_usd) * pip_mult
     _ref_range_ok_l = _ref_range_l >= _min_range_price_l
     _f1_valid_l = _have_f1_l and _ref_range_ok_l and (f1_high - f1_low) >= _min_range_price_l and (f1_high - f1_low) > _ref_range_l * 0.15
@@ -2670,32 +2381,28 @@ if barstate.islast
     _f3_valid_l = _have_f3_l and _ref_range_ok_l and (f3_high - f3_low) >= _min_range_price_l and (f3_high - f3_low) > _ref_range_l * 0.15
     _sf_valid_l = _n_fibs_l >= 1 and ((_f1_valid_l ? 1 : 0) + (_f2_valid_l ? 1 : 0) + (_f3_valid_l ? 1 : 0)) >= 2
     bool _sf_can_draw   = show_superfib_inp and _den_ess and allowFib and _sf_valid_l
-    bool _auth_can_draw = show_authority_sf and _den_ess and not na(auth_f3_high) and not na(auth_f3_low) and (auth_f3_high - auth_f3_low) >= _min_range_price_l
+    bool _auth_can_draw = show_authority_sf and _den_ess and not na(auth_f1_high) and not na(auth_f1_low) and (auth_f1_high - auth_f1_low) >= _min_range_price_l
 
     array.clear(_smart_active_ids)
     if _sf_can_draw
         array.push(_smart_active_ids, FIB_ID_SF)
     if _auth_can_draw
         array.push(_smart_active_ids, FIB_ID_AUTH_SF)
-    if _ef_can_draw
-        array.push(_smart_active_ids, FIB_ID_EF)
-    if _f3_can_draw
-        array.push(_smart_active_ids, FIB_ID_F3)
-    if _f2_can_draw
-        array.push(_smart_active_ids, FIB_ID_F2)
     if _f1_can_draw
         array.push(_smart_active_ids, FIB_ID_F1)
+    if _f2_can_draw
+        array.push(_smart_active_ids, FIB_ID_F2)
+    if _f3_can_draw
+        array.push(_smart_active_ids, FIB_ID_F3)
 
-    [_xb_sf_smart_next, _xb_auth_smart_next, _xb_ef_smart_next, _xb_f3_smart_next, _xb_f2_smart_next, _xb_f1_smart_next, _xbl_sf_smart_next, _xbl_auth_smart_next, _xbl_ef_smart_next, _xbl_f3_smart_next, _xbl_f2_smart_next, _xbl_f1_smart_next] = f_assign_smart_fib_bar_slots()
+    [_xb_sf_smart_next, _xb_auth_smart_next, _xb_f3_smart_next, _xb_f2_smart_next, _xb_f1_smart_next, _xbl_sf_smart_next, _xbl_auth_smart_next, _xbl_f3_smart_next, _xbl_f2_smart_next, _xbl_f1_smart_next] = f_assign_smart_fib_bar_slots()
     _xb_sf_smart   := _xb_sf_smart_next
     _xb_auth_smart := _xb_auth_smart_next
-    _xb_ef_smart   := _xb_ef_smart_next
     _xb_f3_smart   := _xb_f3_smart_next
     _xb_f2_smart   := _xb_f2_smart_next
     _xb_f1_smart   := _xb_f1_smart_next
     _xbl_sf_smart   := _xbl_sf_smart_next
     _xbl_auth_smart := _xbl_auth_smart_next
-    _xbl_ef_smart   := _xbl_ef_smart_next
     _xbl_f3_smart   := _xbl_f3_smart_next
     _xbl_f2_smart   := _xbl_f2_smart_next
     _xbl_f1_smart   := _xbl_f1_smart_next
@@ -2704,8 +2411,6 @@ _anchors_changed = barstate.islast and (
     nz(f1_high) != nz(_last_f1h) or nz(f1_low)  != nz(_last_f1l) or
     nz(f2_high) != nz(_last_f2h) or nz(f2_low)  != nz(_last_f2l) or
     nz(f3_high) != nz(_last_f3h) or nz(f3_low)  != nz(_last_f3l) or
-    nz(ef_anchor_high) != nz(_last_efh) or
-    nz(ef_anchor_low)  != nz(_last_efl) or
     state != _last_state or
     ladder_direction != _last_ladder_direction or
     allowFib != _last_allowFib or
@@ -2713,7 +2418,6 @@ _anchors_changed = barstate.islast and (
     nz(_t3) != nz(_last_t3) or nz(_t4) != nz(_last_t4) or
     nz(_t5) != nz(_last_t5) or
     nz(_xb_sf_smart)   != nz(_last_x_sf)   or nz(_xb_auth_smart) != nz(_last_x_auth) or
-    nz(_xb_ef_smart)   != nz(_last_x_ef)   or
     nz(_xb_f3_smart)   != nz(_last_x_f3)   or nz(_xb_f2_smart)   != nz(_last_x_f2)   or
     nz(_xb_f1_smart)   != nz(_last_x_f1))
 
@@ -2726,18 +2430,15 @@ if _anchors_changed
     if allowFib
         if not na(_xb_f1_smart) and show_f1_inp and not na(f1_high) and not na(f1_low) and _den_full
             if (f1_high - f1_low) >= _fib_min_range
-                draw_fib_bi(_xb_f1_smart, f1_high, f1_low, false, f1_bull, 3, f1_name, _xbl_f1_smart)
+                draw_fib_bi(_xb_f1_smart, f1_high, f1_low, f1_bull, 1, f1_name, _xbl_f1_smart)
 
         if not na(_xb_f2_smart) and show_f2_inp and not na(f2_high) and not na(f2_low) and _den_full
             if (f2_high - f2_low) >= _fib_min_range
-                draw_fib_bi(_xb_f2_smart, f2_high, f2_low, true, f2_is_bull, 2, f2_name, _xbl_f2_smart)
+                draw_fib_bi(_xb_f2_smart, f2_high, f2_low, f2_is_bull, 2, f2_name, _xbl_f2_smart)
 
         if not na(_xb_f3_smart) and show_f3_inp and not na(f3_high) and not na(f3_low) and _den_full
             if (f3_high - f3_low) >= _fib_min_range
-                draw_fib_bi(_xb_f3_smart, f3_high, f3_low, false, f3_bull, 1, f3_name, _xbl_f3_smart)
-
-    if not na(_xb_ef_smart) and ef_enabled and not na(ef_0) and not na(ef_100) and ef_0 != ef_100 and _den_full
-        draw_ef_dotted_bi(_xb_ef_smart, _xbl_ef_smart)
+                draw_fib_bi(_xb_f3_smart, f3_high, f3_low, f3_bull, 3, f3_name, _xbl_f3_smart)
 
     if show_superfib_inp and _den_ess and allowFib
         _have_f1 = not na(f1_high) and not na(f1_low)
@@ -2746,7 +2447,7 @@ if _anchors_changed
         _n_fibs  = (_have_f1 ? 1 : 0) + (_have_f2 ? 1 : 0) + (_have_f3 ? 1 : 0)
 
         if _n_fibs >= 1
-            _ref_range = _have_f3 ? (f3_high - f3_low) : _have_f1 ? (f1_high - f1_low) : (f2_high - f2_low)
+            _ref_range = _have_f1 ? (f1_high - f1_low) : _have_f2 ? (f2_high - f2_low) : (f3_high - f3_low)
 
             _w_raw = _ref_range * (sf_tolerance / 100)
             _w_floor = 3.0 * pip_mult
@@ -2775,23 +2476,25 @@ if _anchors_changed
             float _sf_anchor_lo = na
 
             if _sf_valid
+                [_draw_w1, _draw_w2, _draw_w3, _draw_valid_count] = f_sf_recency_weights(_sf_f1, _sf_f2, _sf_f3)
                 float _sum_hi = 0.0
                 float _sum_lo = 0.0
-                float _cnt    = 0.0
+                float _wtot   = 0.0
                 if _sf_f1
-                    _sum_hi := _sum_hi + f1_high
-                    _sum_lo := _sum_lo + f1_low
-                    _cnt    := _cnt + 1.0
+                    _sum_hi := _sum_hi + f1_high * _draw_w1
+                    _sum_lo := _sum_lo + f1_low  * _draw_w1
+                    _wtot   := _wtot + _draw_w1
                 if _sf_f2
-                    _sum_hi := _sum_hi + f2_high
-                    _sum_lo := _sum_lo + f2_low
-                    _cnt    := _cnt + 1.0
+                    _sum_hi := _sum_hi + f2_high * _draw_w2
+                    _sum_lo := _sum_lo + f2_low  * _draw_w2
+                    _wtot   := _wtot + _draw_w2
                 if _sf_f3
-                    _sum_hi := _sum_hi + f3_high
-                    _sum_lo := _sum_lo + f3_low
-                    _cnt    := _cnt + 1.0
-                _sf_anchor_hi := _sum_hi / _cnt
-                _sf_anchor_lo := _sum_lo / _cnt
+                    _sum_hi := _sum_hi + f3_high * _draw_w3
+                    _sum_lo := _sum_lo + f3_low  * _draw_w3
+                    _wtot   := _wtot + _draw_w3
+                if _wtot > 0.0
+                    _sf_anchor_hi := _sum_hi / _wtot
+                    _sf_anchor_lo := _sum_lo / _wtot
 
             if _sf_valid and not na(_sf_anchor_hi) and not na(_sf_anchor_lo) and _sf_anchor_hi > _sf_anchor_lo
 
@@ -2848,49 +2551,18 @@ if _anchors_changed
                     sf_draw_bi(_lp50, _half, _ctier50, _sf_star_final, 0, _x_sf, _idx50, _xbl_sf_smart)
                     array.push(_sf_drawn, _lp50)
 
-    // ── v9: HTF Authority SF — direction-aware weighted composite ────────────
+    // ── v13.2: HTF Authority AF — most recent closed session of the one-up timeframe (auth_s1 = auth_f1).
     if not na(_xb_auth_smart) and show_authority_sf and _den_ess
-        float _ah_f3 = auth_f3_high
-        float _al_f3 = auth_f3_low
-        float _ah_f2 = auth_f2_high
-        float _al_f2 = auth_f2_low
-        float _ah_f1 = auth_f1_high
-        float _al_f1 = auth_f1_low
-
-        // Weights: F3=0.60 (dominant/recent), F2=0.25, F1=0.15 (oldest)
-        float _W3 = 0.60
-        float _W2 = 0.25
-        float _W1 = 0.15
-
-        // Validity gate: min range + direction alignment with F3 (dominant leg)
-        bool _htf_f3_ok = not na(_ah_f3) and not na(_al_f3) and (_ah_f3 - _al_f3) >= _fib_min_range
-        bool _htf_f2_ok = not na(_ah_f2) and not na(_al_f2) and (_ah_f2 - _al_f2) >= _fib_min_range and (auth_f2_bull == auth_f3_bull)
-        bool _htf_f1_ok = not na(_ah_f1) and not na(_al_f1) and (_ah_f1 - _al_f1) >= _fib_min_range and (auth_f1_bull == auth_f3_bull)
-
-        // Build composite — only include valid, aligned legs; renormalize weights
-        float _wsum_hi = 0.0
-        float _wsum_lo = 0.0
-        float _wtot    = 0.0
-        if _htf_f3_ok
-            _wsum_hi := _wsum_hi + _ah_f3 * _W3
-            _wsum_lo := _wsum_lo + _al_f3 * _W3
-            _wtot    := _wtot    + _W3
-        if _htf_f2_ok
-            _wsum_hi := _wsum_hi + _ah_f2 * _W2
-            _wsum_lo := _wsum_lo + _al_f2 * _W2
-            _wtot    := _wtot    + _W2
-        if _htf_f1_ok
-            _wsum_hi := _wsum_hi + _ah_f1 * _W1
-            _wsum_lo := _wsum_lo + _al_f1 * _W1
-            _wtot    := _wtot    + _W1
-
-        // Draw only if F3 is valid (F3 is the minimum requirement); fallback
-        // to fewer legs is automatic via renormalization (e.g. F3-only → _wtot=0.60)
-        if _htf_f3_ok and _wtot > 0.0
-            float _auth_comp_hi = _wsum_hi / _wtot
-            float _auth_comp_lo = _wsum_lo / _wtot
-            if (_auth_comp_hi - _auth_comp_lo) >= _fib_min_range
-                draw_fib_bi(_xb_auth_smart, _auth_comp_hi, _auth_comp_lo, false, auth_f3_bull, 2, "HTF " + _authority_tf + " SF", _xbl_auth_smart)
+        bool _htf_ok = not na(auth_f1_high) and not na(auth_f1_low) and (auth_f1_high - auth_f1_low) >= _fib_min_range
+        if _htf_ok
+            float _auth_comp_hi = auth_f1_high
+            float _auth_comp_lo = auth_f1_low
+            int _htf_star = int(f_hybrid_stars(close, _auth_comp_hi, _auth_comp_lo, 1))
+            string _auth_tf_label = _authority_session_tf == "Daily" ? "D1" : _authority_session_tf == "Weekly" ? "W1" : _authority_session_tf == "Monthly" ? "M1" : _authority_session_tf == "Quarterly" ? "Q1" : _authority_session_tf == "Yearly" ? "Y1" : _authority_session_tf
+            draw_fib_bi(_xb_auth_smart, _auth_comp_hi, _auth_comp_lo, auth_f1_bull, 2, "HTF " + _auth_tf_label + " AF", _xbl_auth_smart)
+            if show_labels
+                _lbl = label.new(_xbl_auth_smart, _auth_comp_hi, "HTF " + _auth_tf_label + " AF " + star_str(_htf_star), xloc=xloc.bar_index, style=label.style_label_left, color=color.new(color.white, 100), textcolor=color.new(#FFD700, 0), size=size.normal)
+                array.push(_fib_labels, _lbl)
 
     _last_f1h      := nz(f1_high)
     _last_f1l      := nz(f1_low)
@@ -2898,8 +2570,6 @@ if _anchors_changed
     _last_f2l      := nz(f2_low)
     _last_f3h      := nz(f3_high)
     _last_f3l      := nz(f3_low)
-    _last_efh      := nz(ef_anchor_high)
-    _last_efl      := nz(ef_anchor_low)
     _last_state    := state
     _last_ladder_direction := ladder_direction
     _last_allowFib := allowFib
@@ -2910,7 +2580,6 @@ if _anchors_changed
     _last_t5       := nz(_t5)
     _last_x_sf     := nz(_xb_sf_smart)
     _last_x_auth   := nz(_xb_auth_smart)
-    _last_x_ef     := nz(_xb_ef_smart)
     _last_x_f3     := nz(_xb_f3_smart)
     _last_x_f2     := nz(_xb_f2_smart)
     _last_x_f1     := nz(_xb_f1_smart)
@@ -2929,21 +2598,11 @@ alertcondition(condition = alert_bar_ready and bool(_chg_trend_up),   title = "S
 alertcondition(condition = alert_bar_ready and bool(_chg_trend_down), title = "Sniper: TREND DOWN")
 alertcondition(condition = alert_bar_ready and bool(_chg_reversal),   title = "Sniper: REVERSAL ZONE")
 alertcondition(condition = alert_bar_ready and bool(_chg_ranging),    title = "Sniper: RANGING")
-alertcondition(condition = alert_bar_ready and ict_in_ote_buy  and not ict_in_ote_buy[1],  title = "EF: PRE-TRIGGER BUY (OTE)")
-alertcondition(condition = alert_bar_ready and ict_in_ote_sell and not ict_in_ote_sell[1], title = "EF: PRE-TRIGGER SELL (OTE)")
 final_bias_bull_now = final_bias_bull and not final_bias_bull[1]
 final_bias_bear_now = final_bias_bear and not final_bias_bear[1]
 alertcondition(condition = alert_bar_ready and final_bias_bull_now, title = "ICT Bias Shifted Bull")
 alertcondition(condition = alert_bar_ready and final_bias_bear_now, title = "ICT Bias Shifted Bear")
-alertcondition(condition = alert_bar_ready and (ef_pretrig_sell or ef_pretrig_buy), title = "EF: PRE-TRIGGER")
 
 if alert_bar_ready and regime != regime[1]
     alert(message="{\"secret\":\"" + webhook_secret + "\",\"event_source\":\"tradingview\",\"event_version\":\"tv1\",\"event_type\":\"REGIME\",\"instrument_id\":\"" + syminfo.tickerid + "\",\"symbol\":\"" + syminfo.ticker + "\",\"display_symbol\":\"" + syminfo.ticker + "\",\"pair\":\"" + syminfo.ticker + "\",\"regime\":\"" + _clean_regime + "\",\"price\":\"" + str.tostring(close) + "\",\"timeframe\":\"" + timeframe.period + "\",\"session_tf\":\"" + session_tf + "\",\"fib_timeframe\":\"" + session_tf + "\",\"timestamp\":\"" + str.tostring(time) + "\",\"f1_high\":" + str.tostring(nz(f1_high, 0.0)) + ",\"f1_low\":" + str.tostring(nz(f1_low, 0.0)) + ",\"f2_high\":" + str.tostring(nz(f2_high, 0.0)) + ",\"f2_low\":" + str.tostring(nz(f2_low, 0.0)) + ",\"f3_high\":" + str.tostring(nz(f3_high, 0.0)) + ",\"f3_low\":" + str.tostring(nz(f3_low, 0.0)) + ",\"struct_trend\":\"" + str.tostring(ict_struct_trend) + "\",\"pressure_bias\":\"" + str.tostring(math.round(pressure_bias * 100) / 100) + "\",\"htf_dol\":\"" + (htf_dol_dir == 1 ? "BSL" : htf_dol_dir == -1 ? "SSL" : "NEUTRAL") + "\",\"matrix\":\"" + matrix_str + "\",\"pd_array\":\"" + (pd_array_dir == 1 ? "BULL_PDA" : pd_array_dir == -1 ? "BEAR_PDA" : "MIXED") + "\",\"final_bias\":\"" + final_bias_str + "\",\"bull_bias_score\":" + str.tostring(bull_bias_score) + ",\"bear_bias_score\":" + str.tostring(bear_bias_score) + ",\"bias_profile\":\"" + bias_profile_name + "\",\"matrix_tf\":\"" + resolved_matrix_tf + "\",\"pd_tf\":\"" + resolved_pd_tf + "\",\"fib_disagreement_penalty\":" + str.tostring(fib_disagreement_penalty) + ",\"sequence_status\":\"" + sequence_status + "\",\"liquidity\":{\"type\":\"" + liquidity_type + "\",\"price\":" + str.tostring(nz(liquidity_price, 0.0)) + "},\"structure\":{\"major_bos\":" + ((major_bull_close or major_bear_close) ? "true" : "false") + ",\"internal_shift\":" + ((mss_bullish or mss_bearish) ? "true" : "false") + ",\"choch\":" + (regime == 2 ? "true" : "false") + ",\"session_tag\":\"" + session_tag + "\"}}", freq=alert.freq_once_per_bar_close)
 
-if alert_bar_ready and (ef_pretrig_sell or ef_pretrig_buy)
-    _ef_is_buy = ef_pretrig_buy
-    _ef_setup_q = calc_setup_quality(_ef_is_buy, _ef_is_buy ? major_bull_close : major_bear_close, _ef_is_buy ? bull_poi_fresh : bear_poi_fresh, _ef_is_buy ? bull_fvg_support : bear_fvg_support, _ef_is_buy ? bull_poi_fresh : bear_poi_fresh)
-    _ef_exec_q = calc_execution_quality(ef_dist_sweet <= prox_thresh * ef_pre_width ? ef_l0705 : (ef_pretrig_sell ? ef_ote_hi : ef_ote_lo), _ef_is_buy, true)
-    _ef_grade = grade_setup(_ef_setup_q, _ef_exec_q, true, true, _ef_is_buy ? major_bull_close : major_bear_close)
-    _ef_lvl = ef_dist_sweet <= prox_thresh * ef_pre_width ? ef_l0705 : (ef_pretrig_sell ? ef_ote_hi : ef_ote_lo)
-    alert("{\"secret\":\"" + webhook_secret + "\",\"event_source\":\"tradingview\",\"event_version\":\"tv1\",\"event_type\":\"SIGNAL\",\"signal_type\":\"EF_PRE_TRIGGER\",\"instrument_id\":\"" + syminfo.tickerid + "\",\"symbol\":\"" + syminfo.ticker + "\",\"display_symbol\":\"" + syminfo.ticker + "\",\"pair\":\"" + syminfo.ticker + "\",\"timeframe\":\"" + timeframe.period + "\",\"session_tf\":\"" + session_tf + "\",\"fib_timeframe\":\"" + session_tf + "\",\"direction\":\"" + (ef_pretrig_sell ? "SELL" : "BUY") + "\",\"level\":" + str.tostring(_ef_lvl) + ",\"ef_mode\":\"" + ef_mode_str + "\",\"ef_high\":" + str.tostring(ef_anchor_high) + ",\"ef_low\":" + str.tostring(ef_anchor_low) + ",\"ef_ote_low\":" + str.tostring(ef_ote_lo) + ",\"ef_ote_high\":" + str.tostring(ef_ote_hi) + ",\"ef_sweet\":" + str.tostring(ef_l0705) + ",\"ef_sl_ref\":" + str.tostring(ef_anchor_dir == 1 ? ef_anchor_low : ef_anchor_high) + ",\"ef_tp1\":" + str.tostring(ef_lm1) + ",\"ef_tp2\":" + str.tostring(ef_lm2) + ",\"market_price\":" + str.tostring(close) + ",\"regime\":\"" + _clean_regime + "\",\"sequence_status\":\"" + sequence_status + "\",\"setup_class\":\"" + _ef_grade + "\",\"setup_quality\":" + str.tostring(_ef_setup_q) + ",\"execution_quality\":" + str.tostring(_ef_exec_q) + ",\"liquidity\":{\"type\":\"" + liquidity_type + "\",\"price\":" + str.tostring(nz(liquidity_price, 0.0)) + "},\"structure\":{\"major_bos\":" + ((_ef_is_buy ? major_bull_close : major_bear_close) ? "true" : "false") + ",\"internal_shift\":" + ((_ef_is_buy ? mss_bullish : mss_bearish) ? "true" : "false") + ",\"choch\":" + (regime == 2 ? "true" : "false") + ",\"session_tag\":\"" + session_tag + "\"},\"poi\":{\"type\":\"" + (_ef_is_buy ? (bull_fvg_support ? "BULL_OB_FVG" : "BULL_OB") : (bear_fvg_support ? "BEAR_OB_FVG" : "BEAR_OB")) + "\",\"high\":" + str.tostring(nz(_ef_is_buy ? bull_poi_high : bear_poi_high, 0.0)) + ",\"low\":" + str.tostring(nz(_ef_is_buy ? bull_poi_low : bear_poi_low, 0.0)) + ",\"freshness_bars\":" + str.tostring(nz(_ef_is_buy ? last_bear_age : last_bull_age, 999)) + ",\"has_adjacent_fvg\":" + ((_ef_is_buy ? bull_fvg_support : bear_fvg_support) ? "true" : "false") + "},\"timestamp\":\"" + str.tostring(time) + "\"}", alert.freq_once_per_bar_close)

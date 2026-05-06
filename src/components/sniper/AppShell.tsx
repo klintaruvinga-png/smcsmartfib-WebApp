@@ -27,6 +27,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { clearCredentials } from "@/lib/auth";
+import { APP_VERSION_LABEL } from "@/lib/version";
 
 const NAV = [
   { to: "/plan", label: "Plan", short: "Plan", icon: Target },
@@ -42,8 +43,9 @@ const NAV = [
 
 function HeaderTicker() {
   const { data } = useSnapshot();
+  // Treat the header strip as authoritative live market data, not a generic cache view.
   const items = (data?.prices ?? []).filter(
-    (p) => p.mid > 0 && p.state !== "unavailable" && p.state !== "blocked",
+    (p) => p.mid > 0 && (p.state === "live" || p.state === "mock"),
   );
   // Duplicate for seamless loop
   const loop = [...items, ...items];
@@ -126,7 +128,9 @@ function BrandMark() {
       </div>
       <div className="flex flex-col leading-tight">
         <span className="text-sm font-semibold tracking-tight text-tx">SMC SuperFIB</span>
-        <span className="text-[10px] tracking-[0.18em] text-mute font-mono">v1.0.0</span>
+        <span className="text-[10px] tracking-[0.18em] text-mute font-mono">
+          {APP_VERSION_LABEL}
+        </span>
       </div>
     </Link>
   );
@@ -165,7 +169,7 @@ function LeftRail() {
       </nav>
       <div className="mt-auto p-3 border-t border-bd space-y-2">
         <div className="text-[10px] font-mono text-mute leading-relaxed">
-          SMC SuperFIB v1.0.0
+          SMC SuperFIB {APP_VERSION_LABEL}
           <br />
           Backend = source of truth
         </div>

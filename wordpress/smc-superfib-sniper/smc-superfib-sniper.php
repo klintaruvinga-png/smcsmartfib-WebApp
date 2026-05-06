@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SMC SuperFIB Signal Engine & Account Manager
  * Description: WordPress REST backend for the SMC SuperFIB Dashboard.
- * Version: 1.0.0
+ * Version: 13.0.1
  * Author: Kudzanai Lloyd Taruvinga For Munhumukapa Holdings Group
  */
 
@@ -10,8 +10,10 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+require_once __DIR__ . '/class-market-data-service.php';
+
 final class SMC_SuperFib_Sniper_REST {
-    const VERSION = '1.0.0';
+    const VERSION = '13.0.1';
     const NAMESPACE = 'sniper/v1';
     const TWELVE_PROVIDER = 'twelve_data';
 
@@ -20,38 +22,55 @@ final class SMC_SuperFib_Sniper_REST {
     public static function boot() {
         $instance = new self();
         add_action('rest_api_init', array($instance, 'register_routes'));
-        add_filter('rest_pre_serve_request', array($instance, 'send_cors_headers'), 10, 4);
-        register_activation_hook(__FILE__, array(__CLASS__, 'activate'));
+        
+        // Send CORS headers on all REST responses (success, error, auth failure, etc)
+        add_filter('rest_post_dispatch', function($response, $server, $request) {
+            $allowed = self::get_allowed_origins();
+            $origin  = isset($_SERVER['HTTP_ORIGIN']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
+            if ($origin && self::is_allowed_origin($origin, $allowed)) {
+                self::send_cors_headers_for_origin($origin);
+            }
+            return $response;
+        }, 10, 3);
+        
+        add_filter('rest_pre_serve_request', function($value) {
+            $allowed = self::get_allowed_origins();
+            $origin  = isset($_SERVER['HTTP_ORIGIN']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
+            if ($origin && self::is_allowed_origin($origin, $allowed)) {
+                self::send_cors_headers_for_origin($origin);
+            }
+            return $value;
+        }, 15);
+
+        // Early preflight handler: send CORS headers for OPTIONS before WordPress performs routing.
+        add_action('init', function() {
+            self::handle_options_preflight_request();
+        }, 0);
+
+        // Regression guard: Validate CORS configuration consistency
+        if (!self::validate_cors_origins_consistency()) {
+            error_log('CORS configuration validation failed. Check allowed origins consistency.');
+        }
 
         // Respond to CORS preflight (OPTIONS) requests before WordPress processes them.
         // Without this, the browser's preflight check silently fails and blocks POST/DELETE.
-        add_action('init', function () use ($instance) {
-            if (!isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'OPTIONS') {
-                return;
+        add_action('wp_loaded', function() {
+            if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+                // Check if this is a request to our REST API
+                $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+                if (strpos($request_uri, '/wp-json/sniper/v1/') !== false) {
+                    $allowed = self::get_allowed_origins();
+                    $origin  = $_SERVER['HTTP_ORIGIN'] ?? '';
+                    if ($origin && self::is_allowed_origin($origin, $allowed)) {
+                        self::send_cors_headers_for_origin($origin);
+                        header('Access-Control-Max-Age: 86400');
+                        header('Content-Length: 0');
+                        http_response_code(204);
+                        exit;
+                    }
+                }
             }
-            $origin = isset($_SERVER['HTTP_ORIGIN']) ? esc_url_raw(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
-            if (!$origin) {
-                return;
-            }
-            $allowed = apply_filters('smc_sf_allowed_origins', array(
-                home_url(),
-                'https://trader.stokvelsociety.co.za',
-                'https://smcsuperfibwebapp.klintaruvinga.workers.dev',
-                'https://smcsmartfib.lovable.app',
-                'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
-            ));
-            if (!self::is_allowed_origin($origin, $allowed)) {
-                return;
-            }
-            header('Vary: Origin', false);
-            header('Access-Control-Allow-Origin: ' . $origin);
-            header('Access-Control-Allow-Credentials: true');
-            header('Access-Control-Allow-Headers: Content-Type, X-WP-Nonce, Authorization');
-            header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
-            header('Access-Control-Max-Age: 86400');
-            status_header(204);
-            exit;
-        });
+        }, 1); // Priority 1 — runs before anything else touches the response
     }
 
     public static function activate() {
@@ -89,6 +108,7 @@ final class SMC_SuperFib_Sniper_REST {
             low DECIMAL(20,8) NOT NULL,
             close DECIMAL(20,8) NOT NULL,
             volume DECIMAL(24,8) NULL,
+            source VARCHAR(20) NOT NULL DEFAULT 'twelve-data',
             created_at DATETIME NOT NULL,
             PRIMARY KEY  (id),
             UNIQUE KEY candle_lookup (user_id, symbol, timeframe, candle_time),
@@ -101,7 +121,9 @@ final class SMC_SuperFib_Sniper_REST {
             bid DECIMAL(20,8) NOT NULL DEFAULT 0,
             ask DECIMAL(20,8) NOT NULL DEFAULT 0,
             mid DECIMAL(20,8) NOT NULL DEFAULT 0,
+            spread INT NOT NULL DEFAULT 0,
             change_pct_1d DECIMAL(12,6) NOT NULL DEFAULT 0,
+            source VARCHAR(20) NOT NULL DEFAULT 'twelve-data',
             state VARCHAR(32) NOT NULL DEFAULT 'offline',
             updated_at DATETIME NOT NULL,
             PRIMARY KEY  (user_id, symbol)
@@ -219,6 +241,15 @@ final class SMC_SuperFib_Sniper_REST {
         $this->route('/user/watchlist/add', WP_REST_Server::CREATABLE, 'post_watchlist_add', true);
         $this->route('/user/watchlist/remove', WP_REST_Server::CREATABLE, 'post_watchlist_remove', true);
         $this->route('/instruments', WP_REST_Server::READABLE, 'get_instruments', true);
+        $this->route('/market-data-authority', WP_REST_Server::READABLE, 'get_market_data_authority', true);
+        $this->route('/authority-diagnostics', WP_REST_Server::READABLE, 'get_authority_diagnostics', true);
+
+        // MT5 EA market data ingestion endpoint (API key auth, no session/cookies).
+        register_rest_route(self::NAMESPACE, '/ea/market-stream', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($this, 'post_ea_market_stream'),
+            'permission_callback' => array($this, 'permission_ea_market_stream'),
+        ));
     }
 
     private function route($path, $methods, $callback, $auth_required) {
@@ -237,17 +268,169 @@ final class SMC_SuperFib_Sniper_REST {
         return true;
     }
 
+    public function permission_ea_market_stream(WP_REST_Request $request) {
+        $provided = trim((string) $this->get_ea_api_key($request));
+        if ($provided === '') {
+            return new WP_Error('smc_sf_api_key_missing', 'X-EA-API-Key or X-API-KEY header required.', array('status' => 401));
+        }
+
+        $configured = trim((string) (defined('SMC_SF_EA_API_KEY') ? SMC_SF_EA_API_KEY : getenv('SMC_SF_EA_API_KEY')));
+        if ($configured === '') {
+            error_log('SMC SuperFIB: SMC_SF_EA_API_KEY is not configured.');
+            return new WP_Error('smc_sf_api_key_unconfigured', 'EA ingest key not configured.', array('status' => 503));
+        }
+
+        if (!hash_equals($configured, $provided)) {
+            return new WP_Error('smc_sf_api_key_invalid', 'Invalid API key.', array('status' => 403));
+        }
+
+        $payload = (array) $request->get_json_params();
+        $ea_user_id = isset($payload['user_id']) ? (int) $payload['user_id'] : 0;
+        if ($ea_user_id <= 0) {
+            return new WP_Error('smc_sf_user_required', 'user_id is required for EA ingest.', array('status' => 400));
+        }
+
+        $user = get_userdata($ea_user_id);
+        if (!$user || !user_can($user, 'read')) {
+            return new WP_Error('smc_sf_user_invalid', 'user_id must reference a valid readable user.', array('status' => 403));
+        }
+
+        // Bind ingest writes to a concrete WordPress user context.
+        wp_set_current_user($ea_user_id);
+
+        return true;
+    }
+
+    public function verify_ea_api_key(WP_REST_Request $request): bool
+    {
+        $expected = defined('SMC_SF_EA_API_KEY') ? SMC_SF_EA_API_KEY : '';
+        if (empty($expected)) return false;
+
+        $sent = trim((string) $this->get_ea_api_key($request));
+        return $sent !== '' && hash_equals($expected, $sent);
+    }
+
+    private function get_ea_api_key(WP_REST_Request $request): string
+    {
+        $header_names = array(
+            'x-ea-api-key',
+            'x_ea_api_key',
+            'x-api-key',
+            'x_api_key',
+        );
+
+        foreach ($header_names as $name) {
+            $value = trim((string) $request->get_header($name));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
+    private function resolve_ea_user_id(): int
+    {
+        // EA key is global — resolve to the admin user
+        // who owns the plugin installation
+        $admin = get_users(array(
+            'role'    => 'administrator',
+            'number'  => 1,
+            'orderby' => 'ID',
+            'order'   => 'ASC',
+            'fields'  => array('ID'),
+        ));
+        return !empty($admin) ? (int) $admin[0]->ID : 1;
+    }
+
     private static function is_allowed_origin($origin, $allowed) {
-        if (in_array(untrailingslashit($origin), array_map('untrailingslashit', $allowed), true)) {
+        $normalized = untrailingslashit($origin);
+        $allowed_normalized = array_map('untrailingslashit', $allowed);
+
+        if (in_array($normalized, $allowed_normalized, true)) {
             return true;
         }
-        // Allow any Lovable preview host used by the dashboard.
+
         $host = wp_parse_url($origin, PHP_URL_HOST);
-        return $host && (bool) preg_match('/^(?:[0-9a-f\-]+\.lovableproject\.com|id-preview--[0-9a-z\-]+\.lovable\.app)$/', $host);
+        if (!$host) {
+            return false;
+        }
+
+        if (preg_match('/^(?:[0-9a-f\-]+\.lovableproject\.com|id-preview--[0-9a-z\-]+\.lovable\.app)$/', $host)) {
+            return true;
+        }
+
+        // Allow only explicitly trusted Worker hostnames listed in get_allowed_origins().
+        // Do not allow wildcard *.workers.dev because CORS credentials are enabled.
+        return false;
+    }
+
+    private static function get_allowed_origins() {
+        return apply_filters('smc_sf_allowed_origins', array(
+            home_url(),
+            'https://trader.stokvelsociety.co.za',
+            'https://smcsuperfibwebapp.klintaruvinga.workers.dev',
+            'https://smcsmartfib.lovable.app',
+            'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
+        ));
+    }
+
+    private static function get_cors_allowed_headers() {
+        return 'Authorization, Content-Type, X-WP-Nonce, X-Sniper-Secret, X-EA-API-Key, X-API-KEY';
+    }
+
+    private static function send_cors_headers_for_origin($origin) {
+        header('Vary: Origin', false);
+        header('Access-Control-Allow-Origin: ' . $origin);
+        header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
+        header('Access-Control-Allow-Headers: ' . self::get_cors_allowed_headers());
+        header('Access-Control-Allow-Credentials: true');
+        header('Access-Control-Max-Age: 86400');
+    }
+
+    private static function handle_options_preflight_request() {
+        if (isset($_SERVER['REQUEST_METHOD']) && strtoupper($_SERVER['REQUEST_METHOD']) === 'OPTIONS') {
+            $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+            if (strpos($request_uri, '/wp-json/sniper/v1/') !== false) {
+                $allowed = self::get_allowed_origins();
+                $origin  = isset($_SERVER['HTTP_ORIGIN']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
+                if ($origin && self::is_allowed_origin($origin, $allowed)) {
+                    self::send_cors_headers_for_origin($origin);
+                    header('Content-Length: 0');
+                    http_response_code(204);
+                    exit;
+                }
+            }
+        }
+    }
+
+    /**
+     * Regression guard: Ensure CORS allowed origins are consistently defined.
+     * This prevents future CORS issues from protocol prefix mismatches.
+     */
+    private static function validate_cors_origins_consistency() {
+        $allowed_origins = self::get_allowed_origins();
+        $normalized_origins = array_map('untrailingslashit', $allowed_origins);
+
+        // Validate that all origins include protocol (no bare hostnames)
+        foreach ($allowed_origins as $origin) {
+            if (!wp_parse_url($origin, PHP_URL_SCHEME)) {
+                error_log('CORS REGRESSION GUARD: Origin missing protocol: ' . $origin . '. All origins must include https:// prefix.');
+                return false;
+            }
+        }
+
+        // Validate that there are no duplicate origins after normalization.
+        if (count($normalized_origins) !== count(array_unique($normalized_origins))) {
+            error_log('CORS REGRESSION GUARD: Duplicate origins found after normalization in allowed origins.');
+            return false;
+        }
+
+        return true;
     }
 
     public function send_cors_headers($served, $result, $request, $server) {
-        $origin = isset($_SERVER['HTTP_ORIGIN']) ? esc_url_raw(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
+        $origin = isset($_SERVER['HTTP_ORIGIN']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
 
         // Always send Vary: Origin so caches never serve one origin's CORS headers to another.
         header('Vary: Origin', false);
@@ -256,17 +439,11 @@ final class SMC_SuperFib_Sniper_REST {
             return $served;
         }
 
-        $allowed = apply_filters('smc_sf_allowed_origins', array(
-            home_url(),
-            'https://trader.stokvelsociety.co.za',
-            'https://smcsuperfibwebapp.klintaruvinga.workers.dev',
-            'https://smcsmartfib.lovable.app',
-            'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
-        ));
+        $allowed = self::get_allowed_origins();
         if (self::is_allowed_origin($origin, $allowed)) {
             header('Access-Control-Allow-Origin: ' . $origin);
             header('Access-Control-Allow-Credentials: true');
-            header('Access-Control-Allow-Headers: Content-Type, X-WP-Nonce, Authorization');
+            header('Access-Control-Allow-Headers: ' . self::get_cors_allowed_headers());
             header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
         }
 
@@ -324,17 +501,38 @@ final class SMC_SuperFib_Sniper_REST {
         $settings = $this->get_settings($user_id);
         $feed_has_stale_symbols = false;
         $feed_any_rate_limited = false;
+        $mt5_live_symbols = 0;
+        $watchlist_count = count($settings['watchlist']);
         foreach ($settings['watchlist'] as $symbol) {
             $cached_price = $this->get_cached_price($user_id, $symbol, $settings['staleThresholdSec']);
-            if (!$cached_price || ($cached_price['state'] ?? 'offline') !== 'live') {
+            $mt5_price_live = $cached_price
+                && ($cached_price['source'] ?? '') === 'mt5'
+                && ($cached_price['state'] ?? '') === 'live';
+            $mt5_candles_live = false;
+            if ($mt5_price_live) {
+                $candles = $this->fetch_candles($user_id, $symbol, '15min', 30);
+                $last_candle = !empty($candles) ? end($candles) : null;
+                $mt5_candles_live = count($candles) >= 30
+                    && $last_candle
+                    && $this->is_chart_candle_fresh($last_candle['time'] ?? null, '15min');
+            }
+
+            if ($mt5_price_live && $mt5_candles_live) {
+                $mt5_live_symbols++;
+            } elseif ($mt5_price_live || !$cached_price || ($cached_price['state'] ?? 'offline') !== 'live') {
                 $feed_has_stale_symbols = true;
             }
-            if ($this->is_feed_rate_limited($user_id, $symbol)) {
+            // MT5 authority should not be punished by stale Twelve Data rate-limit state.
+            if (!$mt5_price_live && $this->is_feed_rate_limited($user_id, $symbol)) {
                 $feed_any_rate_limited = true;
             }
         }
 
-        if ($feed_any_rate_limited) {
+        $all_symbols_mt5_live = $watchlist_count > 0 && $mt5_live_symbols === $watchlist_count;
+
+        if ($all_symbols_mt5_live) {
+            $feed_status = 'live';
+        } elseif ($feed_any_rate_limited) {
             $feed_status = 'rate-limited';
         } elseif ($key_status !== 'ok') {
             $feed_status = 'blocked';
@@ -388,8 +586,8 @@ final class SMC_SuperFib_Sniper_REST {
         $current = $this->get_settings($user_id);
         $settings = array_merge($current, array(
             'backendUrl' => isset($payload['backendUrl']) ? esc_url_raw($payload['backendUrl']) : $current['backendUrl'],
-            'refreshIntervalSec' => $this->int_between($payload, 'refreshIntervalSec', 5, 60, $current['refreshIntervalSec']),
-            'staleThresholdSec' => $this->int_between($payload, 'staleThresholdSec', 30, 600, $current['staleThresholdSec']),
+            'refreshIntervalSec' => $this->int_between($payload, 'refreshIntervalSec', 2, 60, $current['refreshIntervalSec']),
+            'staleThresholdSec' => $this->int_between($payload, 'staleThresholdSec', 10, 120, $current['staleThresholdSec']),
             'watchlist' => $this->sanitize_symbols(isset($payload['watchlist']) ? $payload['watchlist'] : $current['watchlist']),
             'riskAllocation' => $this->sanitize_risk_allocation(isset($payload['riskAllocation']) ? $payload['riskAllocation'] : $current['riskAllocation'], $current['riskAllocation']),
         ));
@@ -603,12 +801,546 @@ final class SMC_SuperFib_Sniper_REST {
         return rest_ensure_response($snapshot);
     }
 
-    // Pine webhook stub — intentionally audit-only until Pine alert integration is implemented.
+    // MT5 webhook — process and store market data from MT5 EA
     public function post_snapshot(WP_REST_Request $request) {
+        global $wpdb;
+
+        $permission = $this->permission_user();
+        if ($permission !== true) {
+            return $permission;
+        }
+
         $user_id = get_current_user_id();
         $payload = $request->get_json_params();
-        $this->audit($user_id, 'snapshot.posted', is_array($payload) ? $payload : array());
+
+        if (!is_array($payload) || !isset($payload['symbol'])) {
+            return new WP_REST_Response(array('error' => 'Invalid payload'), 400);
+        }
+
+        $symbol = strtoupper(sanitize_text_field($payload['symbol']));
+        $normalized_symbol = isset($payload['normalized_symbol']) ? strtoupper(sanitize_text_field($payload['normalized_symbol'])) : $symbol;
+        $freshness_raw = isset($payload['freshness']) ? sanitize_text_field($payload['freshness']) : '';
+        $snapshot_state = $this->mt5_freshness_to_snapshot_state($freshness_raw);
+
+        // Store tick data as price snapshot
+        if (isset($payload['tick'])) {
+            $tick = $payload['tick'];
+            $bid = isset($tick['bid']) ? (float) $tick['bid'] : 0;
+            $ask = isset($tick['ask']) ? (float) $tick['ask'] : 0;
+            $spread = isset($tick['spread']) ? (int) $tick['spread'] : 0;
+            $timestamp_mysql = $this->normalize_market_timestamp(isset($tick['timestamp']) ? $tick['timestamp'] : null, $this->now_mysql());
+            $tick_snapshot_state = $freshness_raw !== '' ? $snapshot_state : 'live';
+
+            $mid = ($bid + $ask) / 2;
+            $changePct1d = 0; // Placeholder, could be calculated from historical data
+
+            $wpdb->replace(
+                $this->table('snapshots'),
+                array(
+                    'user_id' => $user_id,
+                    'symbol' => $normalized_symbol,
+                    'bid' => $bid,
+                    'ask' => $ask,
+                    'mid' => $mid,
+                    'spread' => $spread,
+                    'change_pct_1d' => $changePct1d,
+                    'source' => 'mt5',
+                    'state' => $tick_snapshot_state,
+                    'updated_at' => $timestamp_mysql,
+                ),
+                array('%d', '%s', '%f', '%f', '%f', '%d', '%f', '%s', '%s', '%s')
+            );
+        } elseif ($freshness_raw !== '') {
+            // Preserve the last authoritative quote timestamp when MT5 is only reporting a
+            // freshness/session transition. Bumping updated_at here would fake a live quote.
+            $wpdb->update(
+                $this->table('snapshots'),
+                array(
+                    'state' => $snapshot_state,
+                    'source' => 'mt5',
+                ),
+                array(
+                    'user_id' => $user_id,
+                    'symbol' => $normalized_symbol,
+                ),
+                array('%s', '%s'),
+                array('%d', '%s')
+            );
+        }
+
+        // Store M1 candle
+        if (isset($payload['candle_m1'])) {
+            $candle = $payload['candle_m1'];
+            $timeframe = '1min';
+            $candle_time = $this->normalize_market_timestamp(isset($candle['timestamp']) ? $candle['timestamp'] : null, $this->now_mysql());
+
+            $wpdb->replace(
+                $this->table('candles'),
+                array(
+                    'user_id' => $user_id,
+                    'symbol' => $normalized_symbol,
+                    'timeframe' => $timeframe,
+                    'candle_time' => $candle_time,
+                    'open' => (float) $candle['open'],
+                    'high' => (float) $candle['high'],
+                    'low' => (float) $candle['low'],
+                    'close' => (float) $candle['close'],
+                    'volume' => isset($candle['volume']) ? (string) $candle['volume'] : null,
+                    'source' => 'mt5',
+                    'created_at' => $this->now_mysql(),
+                ),
+                array('%d', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%s', '%s', '%s')
+            );
+        }
+
+        // Store freshness state (could add to snapshots or new table)
+        // For now, store in transients or extend snapshots table
+        if (isset($payload['freshness'])) {
+            $freshness = strtoupper($freshness_raw);
+            set_transient('smc_sf_freshness_' . $user_id . '_' . $normalized_symbol, $freshness, 300); // 5 min
+        }
+
+        // Store session state
+        if (isset($payload['session'])) {
+            $session = sanitize_text_field($payload['session']);
+            set_transient('smc_sf_session_' . $user_id . '_' . $normalized_symbol, $session, 300);
+        }
+
+        $this->audit($user_id, 'mt5_snapshot.processed', array(
+            'symbol' => $symbol,
+            'normalized_symbol' => $normalized_symbol,
+            'has_tick' => isset($payload['tick']),
+            'has_candle' => isset($payload['candle_m1']),
+            'freshness' => $payload['freshness'] ?? null,
+            'session' => $payload['session'] ?? null,
+            'is_synthetic' => $payload['is_synthetic'] ?? false,
+        ));
+
         return rest_ensure_response(array('ok' => true));
+    }
+
+    public function get_market_data_authority(WP_REST_Request $request) {
+        $user_id = get_current_user_id();
+        $symbol  = strtoupper(sanitize_text_field($request->get_param('symbol') ?: ''));
+
+        $svc = new SMC_MarketData_Service();
+
+        if ($symbol) {
+            return rest_ensure_response($svc->get_authority_state($user_id, $symbol));
+        }
+
+        $watched = $this->get_settings($user_id)['watchlist'];
+        if (empty($watched)) {
+            $snapshot = $this->ensure_engine_snapshot($user_id);
+            $watched = $snapshot['meta']['watchlist'] ?? array_column($snapshot['prices'] ?? array(), 'symbol');
+        }
+        $watched = array_values(array_unique(array_filter(array_map('strval', is_array($watched) ? $watched : array()))));
+        $result   = array();
+        foreach ($watched as $sym) {
+            $result[$sym] = $svc->get_authority_state($user_id, $sym);
+        }
+        return rest_ensure_response($result);
+    }
+
+    public function get_authority_diagnostics(WP_REST_Request $request) {
+        $user_id = get_current_user_id();
+        $symbol  = strtoupper(sanitize_text_field($request->get_param('symbol') ?: ''));
+
+        if (!$symbol) {
+            return new WP_REST_Response(array('error' => 'symbol required'), 400);
+        }
+
+        global $wpdb;
+        $row = $wpdb->get_row($wpdb->prepare(
+            "SELECT source, updated_at FROM {$this->table('snapshots')} WHERE user_id = %d AND symbol = %s",
+            $user_id,
+            $symbol
+        ));
+
+        if (!$row) {
+            return rest_ensure_response(array(
+                'symbol' => $symbol,
+                'authority' => 'unavailable',
+                'authorityAgeSec' => null,
+                'lastUpdateTime' => null,
+            ));
+        }
+
+        $now_ts = strtotime($this->now_mysql());
+        $update_ts = strtotime($row->updated_at);
+        $age_sec = max(0, $now_ts - $update_ts);
+
+        return rest_ensure_response(array(
+            'symbol' => $symbol,
+            'authority' => $row->source,  // 'mt5', 'twelve-data', or 'unavailable'
+            'authorityAgeSec' => $age_sec,
+            'lastUpdateTime' => $this->to_iso($row->updated_at),
+            'authorityStale' => ($row->source === 'mt5' && $age_sec >= 60),
+            'willFallbackToTD' => ($row->source === 'mt5' && $age_sec >= 60),
+        ));
+    }
+
+    /**
+     * MT5 EA market data ingestion endpoint
+     * Accepts live price snapshots and OHLC candles from MT5 Expert Advisor
+     * 
+     * Expected payload:
+     * {
+     *   "symbol": "EURUSD",
+     *   "timeframe": "M15",
+     *   "timestamp": "2026-05-04T12:30:00Z",
+     *   "bid": 1.08521,
+     *   "ask": 1.08534,
+     *   "candle": {
+     *     "time": "2026-05-04T12:30:00Z",
+     *     "open": 1.08450,
+     *     "high": 1.08550,
+     *     "low": 1.08420,
+     *     "close": 1.08510,
+     *     "volume": 1234
+     *   }
+     * }
+     */
+    public function post_ea_market_stream(WP_REST_Request $request) {
+        global $wpdb;
+
+        $payload = $request->get_json_params();
+        $user_id = isset($payload['user_id']) ? (int) $payload['user_id'] : 0;
+        if ($user_id <= 0) {
+            $user_id = $this->resolve_ea_user_id();
+        }
+
+        $user = get_userdata($user_id);
+        if (!$user || !user_can($user, 'read')) {
+            return new WP_Error('smc_sf_user_invalid', 'user_id must reference a valid readable user.', array('status' => 403));
+        }
+
+        // Regression guard: Validate payload structure
+        if (!$payload || !isset($payload['symbol'])) {
+            $this->audit($user_id, 'ea.market_stream.invalid_payload', array('reason' => 'missing_symbol', 'payload' => $payload));
+            return new WP_Error('invalid_payload', 'Missing required symbol field', array('status' => 400));
+        }
+
+        $symbol = sanitize_text_field(strtoupper($payload['symbol']));
+        if (!empty($payload['normalized_symbol'])) {
+            $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper(sanitize_text_field($payload['normalized_symbol'])));
+        }
+        $timeframe = $this->normalize_mt5_timeframe($payload['timeframe'] ?? 'M15');
+        $snapshot_updated_at = $this->normalize_market_timestamp($payload['timestamp'] ?? null, $this->now_mysql());
+
+        // HARDENING: Separate snapshot-freshness from candle-freshness.
+        // The top-level timestamp is the EA's tick time (broker clock). During weekend,
+        // thin-market, or broker-jitter conditions this can drift 60–180s while the
+        // bid/ask snapshot is still the most current available price.
+        // Only hard-reject at 300s (5 min) at the payload level; candle staleness is
+        // enforced at 180s inside insert_mt5_candle() with a full audit trail.
+        // This preserves snapshots during low-liquidity sessions.
+        if (!empty($payload['timestamp'])) {
+            $normalized_payload_timestamp = $this->normalize_market_timestamp($payload['timestamp'], null);
+            $data_timestamp = $normalized_payload_timestamp ? strtotime($normalized_payload_timestamp) : false;
+
+            if ($data_timestamp === false) {
+                $this->audit($user_id, 'ea.market_stream.stale_data_rejected', array(
+                    'symbol' => $symbol,
+                    'timestamp' => $payload['timestamp'],
+                    'normalized_timestamp' => $normalized_payload_timestamp,
+                    'reason' => 'unparseable_timestamp',
+                    'rejection_level' => 'payload',
+                ));
+                return new WP_Error('stale_data', 'Rejected market data with unparseable timestamp', array('status' => 400));
+            }
+
+            $now_timestamp = time();
+            $age_seconds = $now_timestamp - $data_timestamp;
+
+            if ($age_seconds > 300) {
+                $this->audit($user_id, 'ea.market_stream.stale_data_rejected', array(
+                    'symbol' => $symbol,
+                    'timestamp' => $payload['timestamp'],
+                    'normalized_timestamp' => $normalized_payload_timestamp,
+                    'age_seconds' => $age_seconds,
+                    'rejection_level' => 'payload',
+                ));
+                return new WP_Error('stale_data', 'Rejected market data older than 300 seconds', array('status' => 400));
+            }
+
+            // Warn (but don't reject) between 120–300s so the log shows drift without losing the snapshot.
+            if ($age_seconds > 120) {
+                error_log("MT5 DRIFT WARNING: {$symbol} | payload_age={$age_seconds}s | snapshot will write, candle gated separately");
+            }
+        }
+
+        $inserted_snapshots = 0;
+        $inserted_candles = 0;
+
+        if (!isset($payload['bid'], $payload['ask'])) {
+            return new WP_Error('missing_prices', 'bid and ask are required.', array('status' => 400));
+        }
+
+        // Insert price snapshot (bid/ask required).
+        if (isset($payload['bid'], $payload['ask'])) {
+            $bid = (float) $payload['bid'];
+            $ask = (float) $payload['ask'];
+            
+            if ($bid > 0 && $ask > 0 && $bid <= $ask) {
+                $result = $this->upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $snapshot_updated_at);
+                if ($result) {
+                    $inserted_snapshots = 1;
+                    delete_transient('smc_sf_qt_' . $user_id . '_' . md5($symbol));
+                    delete_transient($this->rl_transient_key($user_id, $symbol));
+                    error_log("MT5 SNAPSHOT WRITE: {$symbol} | bid={$bid} ask={$ask} | broker_ts={$snapshot_updated_at} | server_write=" . gmdate('Y-m-d H:i:s'));
+                }
+            } else {
+                $this->audit($user_id, 'ea.market_stream.invalid_prices', array(
+                    'symbol' => $symbol,
+                    'bid' => $bid,
+                    'ask' => $ask
+                ));
+            }
+        }
+
+        // Insert candle if provided (closed candle only, dedupe via UNIQUE candle key).
+        if (!empty($payload['candle']) && is_array($payload['candle'])) {
+            $candle = $payload['candle'];
+            
+            // Validate required candle fields
+            if (isset($candle['time'], $candle['open'], $candle['high'], $candle['low'], $candle['close'])) {
+                // REGRESSION GUARD: Reject candles with epoch or pre-2000 timestamps.
+                // A valid live candle must be after 2000-01-01 (Unix ts 946684800).
+                // This catches both zero-datetime (1970) and any other MQL5 uninitialised
+                // MqlRates.time value that slips through the EA-side epoch guard.
+                $candle_ts = strtotime($candle['time']);
+                $min_valid_ts = 946684800; // 2000-01-01 00:00:00 UTC
+                if ($candle_ts === false || $candle_ts <= 0 || $candle_ts < $min_valid_ts) {
+                    error_log("REGRESSION GUARD: Rejecting candle with invalid/epoch timestamp for {$symbol} | time={$candle['time']} | parsed_ts={$candle_ts} | min_valid={$min_valid_ts}");
+                    $this->audit($user_id, 'ea.market_stream.invalid_candle_timestamp', array(
+                        'symbol' => $symbol,
+                        'candle_time' => $candle['time'],
+                        'parsed_timestamp' => $candle_ts
+                    ));
+                } else {
+                    $result = $this->insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $payload['timestamp'] ?? null);
+                    if ($result) {
+                        $inserted_candles = 1;
+                        error_log("MT5 CANDLE WRITE: {$symbol} | tf={$timeframe} | time={$candle['time']}");
+                    } else {
+                        error_log("MT5 CANDLE INSERT FAILED: {$symbol} | tf={$timeframe} | time={$candle['time']} | stream_timestamp=" . ($payload['timestamp'] ?? 'null'));
+                    }
+                }
+            } else {
+                error_log("MT5 CANDLE PAYLOAD INVALID: " . print_r($candle, true));
+                $this->audit($user_id, 'ea.market_stream.invalid_candle', array(
+                    'symbol' => $symbol,
+                    'candle' => $candle
+                ));
+            }
+        } else {
+            error_log("MT5 CANDLE PAYLOAD MISSING OR INVALID FOR SYMBOL: {$symbol}");
+        }
+
+        // Insert M15 candle if provided (separate from M1).
+        // This is critical: the engine requires at least 30 closed M15 bars to run.
+        // Without M15 candles, the engine hard-exits at fetch_candles() with INSUFFICIENT_CANDLE_HISTORY.
+        if (!empty($payload['candle_m15']) && is_array($payload['candle_m15'])) {
+            $candle_m15 = $payload['candle_m15'];
+            
+            if (isset($candle_m15['time'], $candle_m15['open'], $candle_m15['high'], $candle_m15['low'], $candle_m15['close'])) {
+                $candle_m15_ts = strtotime($candle_m15['time']);
+                $min_valid_ts = 946684800; // 2000-01-01 00:00:00 UTC
+                if ($candle_m15_ts === false || $candle_m15_ts <= 0 || $candle_m15_ts < $min_valid_ts) {
+                    error_log("REGRESSION GUARD: Rejecting M15 candle with invalid/epoch timestamp for {$symbol} | time={$candle_m15['time']} | parsed_ts={$candle_m15_ts} | min_valid={$min_valid_ts}");
+                    $this->audit($user_id, 'ea.market_stream.invalid_m15_candle_timestamp', array(
+                        'symbol' => $symbol,
+                        'candle_time' => $candle_m15['time'],
+                        'parsed_timestamp' => $candle_m15_ts
+                    ));
+                } else {
+                    $result = $this->insert_mt5_candle($user_id, $symbol, '15min', $candle_m15, $payload['timestamp'] ?? null, 1800);
+                    if ($result) {
+                        $inserted_candles++;  // ← ADD THIS LINE: count M15 inserts in API response
+                        error_log("MT5 M15 CANDLE WRITE: {$symbol} | timeframe=15min | time={$candle_m15['time']}");
+                    } else {
+                        error_log("MT5 M15 CANDLE INSERT FAILED: {$symbol} | timeframe=15min | time={$candle_m15['time']} | stream_timestamp=" . ($payload['timestamp'] ?? 'null'));
+                    }
+                }
+            } else {
+                error_log("MT5 M15 CANDLE PAYLOAD INVALID: " . print_r($candle_m15, true));
+                $this->audit($user_id, 'ea.market_stream.invalid_m15_candle', array(
+                    'symbol' => $symbol,
+                    'candle_m15' => $candle_m15
+                ));
+            }
+        }
+
+        if (!empty($payload['freshness'])) {
+            $freshness = strtoupper(sanitize_text_field($payload['freshness']));
+            set_transient('smc_sf_freshness_' . $user_id . '_' . $symbol, $freshness, 300);
+        }
+
+        if (!empty($payload['session'])) {
+            $session = sanitize_text_field($payload['session']);
+            set_transient('smc_sf_session_' . $user_id . '_' . $symbol, $session, 300);
+        }
+
+        if ($inserted_snapshots > 0) {
+            $wpdb->insert(
+                $this->table('engine_runs'),
+                array(
+                    'user_id' => $user_id,
+                    'status' => 'heartbeat',
+                    'summary' => wp_json_encode(array('source' => 'ea_push', 'symbol' => $symbol)),
+                    'created_at' => $this->now_mysql(),
+                ),
+                array('%d', '%s', '%s', '%s')
+            );
+        }
+
+        // Audit successful ingestion
+        $this->audit($user_id, 'ea.market_stream.ingested', array(
+            'symbol' => $symbol,
+            'snapshots_inserted' => $inserted_snapshots,
+            'candles_inserted' => $inserted_candles,
+            'timestamp' => $payload['timestamp'] ?? null,
+            'freshness' => $payload['freshness'] ?? null,
+            'session' => $payload['session'] ?? null
+        ));
+
+        return rest_ensure_response(array(
+            'ok' => true,
+            'symbol' => $symbol,
+            'snapshots_inserted' => $inserted_snapshots,
+            'candles_inserted' => $inserted_candles,
+            'server_time' => gmdate('c')
+        ));
+    }
+
+    /**
+     * Insert or update MT5 price snapshot
+     * Regression guard: Atomic operation with proper source tagging
+     */
+    private function upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $updated_at = null) {
+        global $wpdb;
+
+        $mid = ($bid + $ask) / 2;
+        $spec = $this->get_instrument_spec($symbol);
+        $pip_size = isset($spec['pip_size']) && (float) $spec['pip_size'] > 0 ? (float) $spec['pip_size'] : 0.0001;
+        $spread = ($ask - $bid) / $pip_size; // Convert to pips using per-instrument pip size
+        // FIXED: Preserve broker timestamp for accurate staleness detection.
+        // Delayed packets (up to 300s old) are accepted but must reflect their true age
+        // to prevent stale data from appearing fresh and bypassing Twelve Data fallback.
+        if ($updated_at === null) {
+            $updated_at = $this->now_mysql(); // Fallback to server time if no timestamp provided
+        }
+
+        $change_pct_1d = $this->mt5_change_pct_1d($user_id, $symbol, $bid);
+
+        $result = $wpdb->replace(
+            $this->table('snapshots'),
+            array(
+                'user_id' => $user_id,
+                'symbol' => $symbol,
+                'bid' => $bid,
+                'ask' => $ask,
+                'mid' => $mid,
+                'spread' => $spread,
+                'change_pct_1d' => $change_pct_1d,
+                'source' => 'mt5',
+                'state' => 'live',
+                'updated_at' => $updated_at
+            ),
+            array('%d', '%s', '%f', '%f', '%f', '%d', '%f', '%s', '%s', '%s')
+        );
+
+        error_log("SNAPSHOT DB RESULT: " . print_r($result, true));
+        error_log("SNAPSHOT DB ERROR: " . $wpdb->last_error);
+
+        return $result !== false;
+    }
+
+    private function mt5_change_pct_1d($user_id, $symbol, $current_bid) {
+        global $wpdb;
+
+        $day_open = $wpdb->get_var($wpdb->prepare(
+            "SELECT open FROM {$this->table('candles')}
+             WHERE user_id = %d AND symbol = %s AND source = 'mt5'
+               AND timeframe = '1min' AND candle_time >= %s
+             ORDER BY candle_time ASC LIMIT 1",
+            $user_id,
+            $symbol,
+            gmdate('Y-m-d') . ' 00:00:00'
+        ));
+
+        $day_open = (float) $day_open;
+        if ($day_open <= 0 || (float) $current_bid <= 0) {
+            return 0;
+        }
+
+        return round((((float) $current_bid - $day_open) / $day_open) * 100, 4);
+    }
+
+    /**
+     * Insert MT5 candle data
+     * Regression guard: Atomic operation with proper source tagging
+     */
+    private function insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $stream_timestamp = null, $max_age_sec = 180) {
+        global $wpdb;
+
+        // Parse timestamp to MySQL format
+        $candle_time = gmdate('Y-m-d H:i:s', strtotime($candle['time']));
+        if ($stream_timestamp && strtotime($candle['time']) >= strtotime($stream_timestamp)) {
+            error_log("CANDLE CHECK: candle_time={$candle['time']} | stream={$stream_timestamp}");
+            error_log("CANDLE REJECTED: {$symbol} | candle_time={$candle['time']} >= stream={$stream_timestamp}");
+            $this->audit($user_id, 'ea.market_stream.open_or_future_candle_rejected', array(
+                'symbol' => $symbol,
+                'timeframe' => $timeframe,
+                'candle_time' => $candle['time'],
+                'stream_timestamp' => $stream_timestamp,
+            ));
+            return false;
+        }
+
+        if ($stream_timestamp) {
+            $candle_ts = strtotime($candle['time']);
+            $stream_ts = strtotime($stream_timestamp);
+            if ($candle_ts !== false && $stream_ts !== false) {
+                $age_seconds = $stream_ts - $candle_ts;
+                // HARDENING: M1 candles are already 60s old by design (closed bar).
+                // Raise threshold to 180s (60s natural lag + 120s broker-jitter headroom).
+                // For M15 candles we pass a larger limit because a closed bar is naturally 15-30 minutes old.
+                // REGRESSION: Log via audit() not just error_log() so rejections are visible.
+                if ($age_seconds > $max_age_sec) {
+                    error_log("STALE REJECTED: {$symbol} | age={$age_seconds}s | candle={$candle['time']} | stream={$stream_timestamp}");
+                    $this->audit($user_id, 'ea.market_stream.stale_candle_rejected', array(
+                        'symbol' => $symbol,
+                        'timeframe' => $timeframe,
+                        'candle_time' => $candle['time'],
+                        'stream_timestamp' => $stream_timestamp,
+                        'age_seconds' => $age_seconds,
+                    ));
+                    return false;
+                }
+            }
+        }
+
+        $result = $wpdb->replace(
+            $this->table('candles'),
+            array(
+                'user_id' => $user_id,
+                'symbol' => $symbol,
+                'timeframe' => $timeframe,
+                'candle_time' => $candle_time,
+                'open' => (float) $candle['open'],
+                'high' => (float) $candle['high'],
+                'low' => (float) $candle['low'],
+                'close' => (float) $candle['close'],
+                'volume' => isset($candle['volume']) ? (string) $candle['volume'] : '0',
+                'source' => 'mt5',
+                'created_at' => $this->now_mysql()
+            ),
+            array('%d', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%s', '%s', '%s')
+        );
+
+        return $result !== false;
     }
 
     public function get_regimes() {
@@ -654,8 +1386,10 @@ final class SMC_SuperFib_Sniper_REST {
         $timeframe = sanitize_text_field($request->get_param('timeframe') ?: '15min');
         $candles = $this->fetch_candles($user_id, $symbol, $timeframe, 120);
         $state = 'offline';
+        $updated_at = null;
         if (!empty($candles)) {
             $last_candle = end($candles);
+            $updated_at = isset($last_candle['time']) ? $last_candle['time'] : null;
             $state = $this->is_chart_candle_fresh($last_candle['time'] ?? null, $timeframe) ? 'live' : 'stale';
         } else {
             $state = $this->get_twelve_key_status($user_id) === 'ok' ? 'stale' : 'blocked';
@@ -667,7 +1401,7 @@ final class SMC_SuperFib_Sniper_REST {
             'timeframe' => $timeframe,
             'candles' => $candles,
             'fibLevels' => $levels,
-            'updatedAt' => gmdate('c'),
+            'updatedAt' => $updated_at,
             'state' => $state,
         ));
     }
@@ -837,7 +1571,7 @@ final class SMC_SuperFib_Sniper_REST {
         ));
     }
 
-    private function run_engine_for_symbols($user_id, $symbols, $prices) {
+    private function run_engine_for_symbols($user_id, $symbols, $prices, $force = false) {
         global $wpdb;
         $symbols_sorted = $symbols;
         sort($symbols_sorted);
@@ -856,8 +1590,12 @@ final class SMC_SuperFib_Sniper_REST {
             'symbols' => $symbols_sorted,
             'prices' => $price_fingerprint,
         )));
+        // HARDENING: Skip transient cache when a forced refresh is requested so that
+        // post_engine_batch() always produces a freshly computed engine result, not the
+        // 5-second-old cached snapshot that was present before quote/candle transients
+        // were cleared.
         $cached = get_transient($transient_key);
-        if (is_array($cached)) {
+        if (!$force && is_array($cached)) {
             return $cached;
         }
 
@@ -866,9 +1604,51 @@ final class SMC_SuperFib_Sniper_REST {
         $signals = array();
         $plans = array();
         $diagnostics = array();
+        $engine_stale_threshold_sec = (int) $this->get_settings($user_id)['staleThresholdSec'];
 
         foreach ($symbols as $symbol) {
             $price = $this->find_price($prices, $symbol);
+
+            $price_source = is_array($price) ? ($price['source'] ?? 'unknown') : 'unknown';
+            $price_state = is_array($price) ? ($price['state'] ?? 'offline') : 'offline';
+            $price_age = is_array($price) && isset($price['age_sec'])
+                ? (int) $price['age_sec']
+                : (is_array($price) && isset($price['updatedAt']) ? $this->iso_age_sec($price['updatedAt']) : PHP_INT_MAX);
+
+            if ($price_source !== 'mt5' || $price_state !== 'live' || $price_age > $engine_stale_threshold_sec) {
+                error_log(sprintf(
+                    '[engine_guard] skipped %s | source=%s state=%s age=%ds',
+                    $symbol,
+                    (string) $price_source,
+                    (string) $price_state,
+                    (int) $price_age
+                ));
+                $regimes[] = array(
+                    'symbol' => $symbol,
+                    'bias' => 'RANGING',
+                    'chop' => 1,
+                    'nearestFib' => null,
+                    'updatedAt' => gmdate('c'),
+                    'state' => 'stale',
+                );
+                $gates[] = array(
+                    'symbol' => $symbol,
+                    'allow' => 'BLOCKED',
+                    'reason' => 'price_not_mt5_fresh',
+                    'state' => 'stale',
+                );
+                $diagnostics[] = array(
+                    'symbol' => $symbol,
+                    'priceState' => $price_state,  // Trust backend's live/stale state; don't override to stale
+                    'candleState' => 'not_checked',
+                    'lastPriceAt' => is_array($price) ? ($price['updatedAt'] ?? null) : null,
+                    'lastCandleAt' => null,
+                    'candleCount' => 0,
+                    'engineBlocker' => 'PRICE_NOT_MT5_FRESH',
+                );
+                continue;
+            }
+
             $state = $this->build_symbol_state($user_id, $symbol, $price);
             $regimes[] = $state['regime'];
             $gates[] = $state['gate'];
@@ -933,7 +1713,8 @@ final class SMC_SuperFib_Sniper_REST {
         $has_key = $this->get_twelve_key_status($user_id) === 'ok';
         $settings = $this->get_settings($user_id);
         $stale_threshold_sec = $settings['staleThresholdSec'];
-        $state = $has_key ? 'stale' : 'blocked';
+        $mt5_price_authority = $this->is_mt5_authoritative($user_id, $symbol);
+        $state = ($has_key || $mt5_price_authority) ? 'stale' : 'blocked';
 
         if (!$price) {
             $price = array('symbol' => $symbol, 'mid' => 0, 'updatedAt' => gmdate('c'), 'state' => $state);
@@ -947,7 +1728,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         if (count($candles) < 30 || (float) $price['mid'] <= 0) {
             $early_blocker = $this->determine_engine_blocker($user_id, $price, $candles, false, 'WATCH', $symbol);
-            $early_gate_reason = $has_key ? 'insufficient candle history' : 'Twelve Data key missing';
+            $early_gate_reason = ($has_key || $mt5_price_authority) ? 'insufficient candle history' : 'Twelve Data key missing';
             if ($early_blocker === 'KEY_MISSING' || $early_blocker === 'KEY_INVALID') {
                 $early_gate_reason = 'Twelve Data key ' . ($early_blocker === 'KEY_MISSING' ? 'missing' : 'invalid');
             } elseif ($early_blocker === 'RATE_LIMITED') {
@@ -997,6 +1778,10 @@ final class SMC_SuperFib_Sniper_REST {
             $status = 'WATCH';
         } elseif (!$sequence[$direction]['mss']) {
             $status = 'ARMED';
+        } elseif ($chop >= 0.7) {
+            // CRITICAL: Block READY status when chop >= 0.7 (F3 caution zone).
+            // SMC methodology requires no entries in high-chop equilibrium.
+            $status = 'ARMED';
         } else {
             $status = 'READY';
         }
@@ -1023,11 +1808,23 @@ final class SMC_SuperFib_Sniper_REST {
         $symbol_state   = $data_live ? 'live' : 'stale';
         $candle_state   = empty($candles) ? 'missing' : ($candles_fresh ? 'live' : 'stale');
 
-        $gate = array(
-            'symbol' => $symbol,
-            'allow' => $direction === 'LONG' ? 'BUY' : 'SELL',
-            'state' => $symbol_state,
-        );
+        // CRITICAL HARDENING: Block gate when chop >= 0.7 (F3 caution zone).
+        // SMC methodology requires no entries in high-chop equilibrium; this was
+        // missing from the live backend while the mock data showed BLOCKED correctly.
+        if ($chop >= 0.7) {
+            $gate = array(
+                'symbol' => $symbol,
+                'allow'  => 'BLOCKED',
+                'reason' => 'chop > 0.7 — F3 caution zone',
+                'state'  => $symbol_state,
+            );
+        } else {
+            $gate = array(
+                'symbol' => $symbol,
+                'allow'  => $direction === 'LONG' ? 'BUY' : 'SELL',
+                'state'  => $symbol_state,
+            );
+        }
 
         $regime = array(
             'symbol' => $symbol,
@@ -1046,7 +1843,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         // Anchor the signal identity to the latest analysed candle so the same setup stays stable
         // within one 15m bar, while later intraday setups get a distinct execution queue identity.
-        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol);
+        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol, $chop);
 
         $signal_anchor = $last_candle && !empty($last_candle['time']) ? $last_candle['time'] : gmdate('c');
         $signal_id = 'sig-' . substr(md5($user_id . '|' . $symbol . '|' . $direction . '|' . $signal_anchor), 0, 16);
@@ -1058,6 +1855,9 @@ final class SMC_SuperFib_Sniper_REST {
             'confluence' => $confluence,
             'verdict' => $this->verdict($status, $confluence, $chop),
             'computedBy' => 'backend',
+            // CRITICAL HARDENING: Never backend-confirm a signal unless status is READY
+            // (which already incorporates chop gate blocking). Without this guard, 
+            // post_execute_signals() would still accept and queue non-READY signals.
             'backendConfirmed' => $status === 'READY' && $data_live,
             'engineBlocker' => $engine_blocker,
             'createdAt' => $signal_anchor,
@@ -1196,7 +1996,7 @@ final class SMC_SuperFib_Sniper_REST {
     private function pip_value_per_standard_lot($user_id, $symbol, $spec) {
         $fallback = isset($spec['pip_val']) ? (float) $spec['pip_val'] : 10.0;
         if (!is_array($spec) || ($spec['type'] ?? '') !== 'forex') {
-            return $fallback;
+            return $fallback_value;
         }
 
         $market_mids = $this->market_mids_for_symbol($user_id, $symbol);
@@ -1208,18 +2008,18 @@ final class SMC_SuperFib_Sniper_REST {
         $contract_size = isset($spec['contract_size']) ? (float) $spec['contract_size'] : 0.0;
         $pip_size = isset($spec['pip_size']) ? (float) $spec['pip_size'] : 0.0;
         if (($spec['type'] ?? '') !== 'forex' || $contract_size <= 0 || $pip_size <= 0) {
-            return $fallback;
+            return $fallback_value;
         }
 
         $pair = $this->split_symbol_pair($symbol);
         if (!$pair) {
-            return $fallback;
+            return $fallback_value;
         }
 
         list($base, $quote) = $pair;
         $quote_to_usd = $this->quote_to_usd_rate_from_market($base, $quote, $market_mids);
         if ($quote_to_usd <= 0) {
-            return $fallback;
+            return $fallback_value;
         }
 
         return round($contract_size * $pip_size * $quote_to_usd, 6);
@@ -1304,17 +2104,6 @@ final class SMC_SuperFib_Sniper_REST {
         return array(substr($key, 0, 3), substr($key, 3, 3));
     }
 
-    private function get_tp_price_from_zone($zone_price, $direction) {
-        // Ported from Pine: basic implementation using EF levels
-        // Assume zone_price is the high/low, and TP is offset
-        $offset = 0.002; // Placeholder
-        if ($direction === 'LONG') {
-            return $zone_price + $offset;
-        } else {
-            return $zone_price - $offset;
-        }
-    }
-
     private function sequence_state($candles) {
         $prior = array_slice($candles, -35, 25);
         $recent = array_slice($candles, -10);
@@ -1349,6 +2138,14 @@ final class SMC_SuperFib_Sniper_REST {
         $prices = array();
         $stale_threshold_sec = $this->get_settings($user_id)['staleThresholdSec'];
         foreach ($symbols as $symbol) {
+            if ($this->is_mt5_authoritative($user_id, $symbol)) {
+                $cached = $this->get_cached_price($user_id, $symbol, $stale_threshold_sec);
+                if ($cached) {
+                    $prices[] = $cached;
+                    continue;
+                }
+            }
+
             $quote = $this->fetch_quote($user_id, $symbol);
             if ($quote) {
                 $prices[] = $quote;
@@ -1362,6 +2159,8 @@ final class SMC_SuperFib_Sniper_REST {
                     'changePct1d' => 0,
                     'updatedAt' => gmdate('c'),
                     'state' => $this->get_twelve_key_status($user_id) === 'ok' ? 'unavailable' : 'blocked',
+                    'source' => 'unknown',
+                    'age_sec' => PHP_INT_MAX,
                 );
             }
         }
@@ -1370,102 +2169,12 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function fetch_quote($user_id, $symbol) {
-        global $wpdb;
-
-        $key = $this->get_twelve_key($user_id);
-        if (is_wp_error($key) || !$key) {
-            return null;
-        }
-
-        // Quote TTL: skip upstream call if we fetched this symbol recently.
-        // Also skip while this symbol is rate-limited; return the DB-cached price instead.
-        $quote_ttl_key = 'smc_sf_qt_' . $user_id . '_' . md5($symbol);
-        if (get_transient($quote_ttl_key) !== false || $this->is_feed_rate_limited($user_id, $symbol)) {
+        if ($this->is_mt5_authoritative($user_id, $symbol)) {
             return $this->get_cached_price($user_id, $symbol);
         }
 
-        $url = add_query_arg(array(
-            'symbol' => $this->twelve_symbol($symbol),
-            'apikey' => $key,
-        ), 'https://api.twelvedata.com/quote');
-        $response = wp_remote_get($url, array('timeout' => 12));
-        if (is_wp_error($response)) {
-            return null;
-        }
-
-        $code = wp_remote_retrieve_response_code($response);
-        $body = json_decode(wp_remote_retrieve_body($response), true);
-        if ($code === 429 || (isset($body['code']) && (int) $body['code'] === 429)) {
-            // Track rate-limit in a transient — do NOT change key_status.
-            // A 429 is a temporary feed condition; invalidating key_status would prevent
-            // get_twelve_key() from returning the stored key after the cooldown expires.
-            $this->set_feed_rate_limited($user_id, $symbol);
-            return null;
-        }
-        // Check 5xx BEFORE checking body['status']: Twelve Data outage responses carry
-        // status:"error" in the body at the same time as a 5xx HTTP code, so if the body
-        // check ran first the 5xx escape hatch would never be reached.
-        if ($code >= 500) {
-            return null;
-        }
-        // Only revoke key status for authentication failures. A 400/404 means the symbol
-        // is unsupported or malformed, not that the key is invalid; branding one bad watchlist
-        // entry as an invalid key would block the entire feed.
-        if ($code === 401 || $code === 403 || (isset($body['code']) && in_array((int) $body['code'], array(401, 403), true))) {
-            $this->set_twelve_key_status($user_id, 'invalid');
-            return null;
-        }
-        if ($code >= 400 || (isset($body['status']) && $body['status'] === 'error')) {
-            return null;
-        }
-
-        $mid = isset($body['close']) ? (float) $body['close'] : (isset($body['price']) ? (float) $body['price'] : 0);
-        if ($mid <= 0) {
-            return null;
-        }
-
-        $bid = isset($body['bid']) ? (float) $body['bid'] : $mid;
-        $ask = isset($body['ask']) ? (float) $body['ask'] : $mid;
-        // Prefer current day's open for intraday percent change; fall back to previous_close
-        // only when the day-open field is absent from the /quote response.
-        $day_open = isset($body['open']) ? (float) $body['open'] : 0;
-        $prev_close = isset($body['previous_close']) ? (float) $body['previous_close'] : 0;
-        if ($day_open > 0) {
-            $change = (($mid - $day_open) / $day_open) * 100;
-        } elseif ($prev_close > 0) {
-            $change = (($mid - $prev_close) / $prev_close) * 100;
-        } else {
-            $change = 0;
-        }
-        $row = array(
-            'symbol' => $symbol,
-            'bid' => $bid,
-            'ask' => $ask,
-            'mid' => $mid,
-            'changePct1d' => round($change, 4),
-            'updatedAt' => gmdate('c'),
-            'state' => 'live',
-        );
-
-        $wpdb->replace(
-            $this->table('snapshots'),
-            array(
-                'user_id' => $user_id,
-                'symbol' => $symbol,
-                'bid' => $bid,
-                'ask' => $ask,
-                'mid' => $mid,
-                'change_pct_1d' => $row['changePct1d'],
-                'state' => 'live',
-                'updated_at' => $this->now_mysql(),
-            ),
-            array('%d', '%s', '%f', '%f', '%f', '%f', '%s', '%s')
-        );
-
-        // Mark this symbol's quote as freshly fetched for 45 seconds to prevent API spam.
-        set_transient($quote_ttl_key, 1, 45);
-        $this->set_twelve_key_status($user_id, 'ok');
-        return $row;
+        error_log(sprintf('[fetch_quote] no fresh MT5 data for %s; returning null', $symbol));
+        return null;
     }
 
     private function fetch_candles($user_id, $symbol, $timeframe, $outputsize) {
@@ -1502,22 +2211,32 @@ final class SMC_SuperFib_Sniper_REST {
                                 continue;
                             }
                             $time = gmdate('Y-m-d H:i:s', strtotime($item['datetime']));
-                            $wpdb->replace(
-                                $this->table('candles'),
-                                array(
-                                    'user_id' => $user_id,
-                                    'symbol' => $symbol,
-                                    'timeframe' => $timeframe,
-                                    'candle_time' => $time,
-                                    'open' => (float) $item['open'],
-                                    'high' => (float) $item['high'],
-                                    'low' => (float) $item['low'],
-                                    'close' => (float) $item['close'],
-                                    'volume' => isset($item['volume']) ? (string) $item['volume'] : null,
-                                    'created_at' => $this->now_mysql(),
-                                ),
-                                array('%d', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%s', '%s')
-                            );
+                            // HARDENING: INSERT … ON DUPLICATE KEY UPDATE instead of REPLACE so
+                            // that MT5-authoritative candles (source='mt5') are never silently
+                            // overwritten. REPLACE deletes then re-inserts, erasing the source flag.
+                            $wpdb->query($wpdb->prepare(
+                                "INSERT INTO `{$this->table('candles')}`
+                                     (user_id, symbol, timeframe, candle_time, open, high, low, close, volume, source, created_at)
+                                 VALUES (%d, %s, %s, %s, %f, %f, %f, %f, %s, 'twelve-data', %s)
+                                 ON DUPLICATE KEY UPDATE
+                                     open       = IF(source = 'mt5', open,       VALUES(open)),
+                                     high       = IF(source = 'mt5', high,       VALUES(high)),
+                                     low        = IF(source = 'mt5', low,        VALUES(low)),
+                                     close      = IF(source = 'mt5', close,      VALUES(close)),
+                                     volume     = IF(source = 'mt5', volume,     VALUES(volume)),
+                                     source     = IF(source = 'mt5', 'mt5',      'twelve-data'),
+                                     created_at = IF(source = 'mt5', created_at, VALUES(created_at))",
+                                $user_id,
+                                $symbol,
+                                $timeframe,
+                                $time,
+                                (float) $item['open'],
+                                (float) $item['high'],
+                                (float) $item['low'],
+                                (float) $item['close'],
+                                isset($item['volume']) ? (string) $item['volume'] : null,
+                                $this->now_mysql()
+                            ));
                         }
                         // Mark candles as freshly fetched for 90 seconds to prevent API spam.
                         set_transient($candle_ttl_key, 1, 90);
@@ -1531,15 +2250,66 @@ final class SMC_SuperFib_Sniper_REST {
             }
         }
 
-        $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT candle_time, open, high, low, close FROM {$this->table('candles')} WHERE user_id = %d AND symbol = %s AND timeframe = %s ORDER BY candle_time DESC LIMIT %d",
+        // HARDENING: Fetch source alongside candle data for MT5 prioritization
+        $all_candles = $wpdb->get_results($wpdb->prepare(
+            "SELECT candle_time, open, high, low, close, source FROM {$this->table('candles')} WHERE user_id = %d AND symbol = %s AND timeframe = %s ORDER BY candle_time DESC",
             $user_id,
             $symbol,
-            $timeframe,
-            $outputsize
+            $timeframe
         ), ARRAY_A);
 
+        // Deduplicate by candle_time, preferring MT5 over TwelveData
+        $deduped = array();
+        foreach ($all_candles as $candle) {
+            $time_key = $candle['candle_time'];
+            if (!isset($deduped[$time_key])) {
+                // First occurrence: store it
+                $deduped[$time_key] = $candle;
+            } elseif ($candle['source'] === 'mt5' && $deduped[$time_key]['source'] !== 'mt5') {
+                // Replace with MT5 if current is higher-priority source
+                $deduped[$time_key] = $candle;
+            }
+            // Otherwise: keep existing (MT5 preferred, or existing is already MT5)
+        }
+
+        // Take top N candles (by most recent timestamps)
+        $rows = array_slice($deduped, 0, $outputsize);
+
+        if ($timeframe !== '1min') {
+            $mt5_aggregated = $this->fetch_aggregated_mt5_m1_candles($user_id, $symbol, $timeframe, $outputsize);
+            if (!empty($mt5_aggregated)) {
+                $canonical_latest = 0;
+                if (!empty($rows[0]['candle_time'])) {
+                    $canonical_latest = strtotime($rows[0]['candle_time'] . ' UTC');
+                    if ($canonical_latest === false) {
+                        $canonical_latest = 0;
+                    }
+                }
+
+                $mt5_latest = 0;
+                $mt5_last = end($mt5_aggregated);
+                if (!empty($mt5_last['time'])) {
+                    $mt5_latest = strtotime($mt5_last['time']);
+                    if ($mt5_latest === false) {
+                        $mt5_latest = 0;
+                    }
+                }
+
+                $tf_seconds = max(60, (int) $this->timeframe_seconds($timeframe));
+                $freshness_window = max($tf_seconds * 2, 300);
+                $mt5_is_recent = $mt5_latest > 0 && (time() - $mt5_latest) <= $freshness_window;
+                $mt5_has_coverage = count($mt5_aggregated) >= min(max(1, (int) $outputsize), 5);
+                $mt5_not_older_than_canonical = $canonical_latest <= 0 || $mt5_latest >= ($canonical_latest - $tf_seconds);
+
+                if ($mt5_is_recent && $mt5_has_coverage && $mt5_not_older_than_canonical) {
+                    return $mt5_aggregated;
+                }
+            }
+        }
+
+        // Reverse to chronological order (oldest to newest)
         $rows = array_reverse($rows);
+
         return array_map(function ($row) {
             return array(
                 'time' => $this->to_iso($row['candle_time']),
@@ -1549,6 +2319,65 @@ final class SMC_SuperFib_Sniper_REST {
                 'close' => (float) $row['close'],
             );
         }, $rows);
+    }
+
+    private function fetch_aggregated_mt5_m1_candles($user_id, $symbol, $timeframe, $outputsize) {
+        global $wpdb;
+
+        $tf_seconds = $this->timeframe_seconds($timeframe);
+        if ($tf_seconds <= 60) {
+            return array();
+        }
+
+        $m1_rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT candle_time, open, high, low, close, volume FROM {$this->table('candles')} WHERE user_id = %d AND symbol = %s AND timeframe = %s AND source = %s ORDER BY candle_time ASC",
+            $user_id,
+            $symbol,
+            '1min',
+            'mt5'
+        ), ARRAY_A);
+
+        if (empty($m1_rows)) {
+            return array();
+        }
+
+        $buckets = array();
+        $now = time();
+        foreach ($m1_rows as $row) {
+            $ts = strtotime($row['candle_time'] . ' UTC');
+            if ($ts === false) {
+                continue;
+            }
+
+            $bucket_start = (int) (floor($ts / $tf_seconds) * $tf_seconds);
+            if (($bucket_start + $tf_seconds) > $now) {
+                continue;
+            }
+
+            if (!isset($buckets[$bucket_start])) {
+                $buckets[$bucket_start] = array(
+                    'time' => gmdate('c', $bucket_start),
+                    'open' => (float) $row['open'],
+                    'high' => (float) $row['high'],
+                    'low' => (float) $row['low'],
+                    'close' => (float) $row['close'],
+                    'volume' => isset($row['volume']) ? (int) $row['volume'] : 0,
+                );
+                continue;
+            }
+
+            $buckets[$bucket_start]['high'] = max($buckets[$bucket_start]['high'], (float) $row['high']);
+            $buckets[$bucket_start]['low'] = min($buckets[$bucket_start]['low'], (float) $row['low']);
+            $buckets[$bucket_start]['close'] = (float) $row['close'];
+            $buckets[$bucket_start]['volume'] += isset($row['volume']) ? (int) $row['volume'] : 0;
+        }
+
+        if (empty($buckets)) {
+            return array();
+        }
+
+        ksort($buckets);
+        return array_slice(array_values($buckets), -1 * max(1, (int) $outputsize));
     }
 
     private function validate_twelve_key($api_key) {
@@ -1584,8 +2413,8 @@ final class SMC_SuperFib_Sniper_REST {
         $default = array(
             'backendUrl' => rest_url(),
             'apiKeyStatus' => $this->get_twelve_key_status($user_id),
-            'refreshIntervalSec' => 15,
-            'staleThresholdSec' => 180,
+            'refreshIntervalSec' => 2,
+            'staleThresholdSec' => 60,
             'watchlist' => array('GBPUSD', 'AUDUSD', 'EURUSD', 'NZDUSD', 'USDJPY', 'AUDJPY', 'EURJPY', 'XAUUSD'),
             'riskAllocation' => array('perTradePct' => 0.5, 'dailyMaxPct' => 2.0, 'ddCapPct' => 6.0),
         );
@@ -1704,7 +2533,7 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         $prices = $this->refresh_prices($user_id, $symbols);
-        $engine = $this->run_engine_for_symbols($user_id, $symbols, $prices);
+        $engine = $this->run_engine_for_symbols($user_id, $symbols, $prices, $force);
         $snapshot = array(
             'prices' => $prices,
             'regimes' => $engine['regimes'],
@@ -1739,7 +2568,7 @@ final class SMC_SuperFib_Sniper_REST {
         if (!$computed_at) {
             return false;
         }
-        if ((time() - $computed_at) > max(5, (int) $refresh_interval_sec)) {
+        if ((time() - $computed_at) > max(2, (int) $refresh_interval_sec)) {
             return false;
         }
 
@@ -1765,14 +2594,27 @@ final class SMC_SuperFib_Sniper_REST {
             return null;
         }
 
+        // HARDENING: Use iso_age_sec() to avoid PHP 8 strtotime issues.
+        // Regression guard: Preserve existing logic; extract to variable for clarity.
+        $threshold = $stale_threshold_sec !== null
+            ? $stale_threshold_sec
+            : $this->get_settings($user_id)['staleThresholdSec'];
+        $updated_at_iso = $this->to_iso($row['updated_at']);
+        $age_sec = $this->iso_age_sec($updated_at_iso);
+        $price_state = $age_sec > $threshold
+            ? 'stale'
+            : $row['state'];
+
         return array(
             'symbol' => $row['symbol'],
             'bid' => (float) $row['bid'],
             'ask' => (float) $row['ask'],
             'mid' => (float) $row['mid'],
             'changePct1d' => (float) $row['change_pct_1d'],
-            'updatedAt' => $this->to_iso($row['updated_at']),
-            'state' => $this->is_stale($row['updated_at'], $stale_threshold_sec !== null ? $stale_threshold_sec : $this->get_settings($user_id)['staleThresholdSec']) ? 'stale' : $row['state'],
+            'source' => isset($row['source']) && $row['source'] !== '' ? (string) $row['source'] : 'unknown',
+            'updatedAt' => $updated_at_iso,
+            'state' => $price_state,  // PATCHED
+            'age_sec' => (int) $age_sec,
         );
     }
 
@@ -1888,10 +2730,15 @@ final class SMC_SuperFib_Sniper_REST {
     // Returns a single string reason explaining why a READY signal cannot be
     // backend-confirmed, or 'OK' when everything is healthy.
 
-    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol = null) {
+    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol = null, $chop = null) {
+        $is_mt5_authority = false;
+        if ($symbol !== null) {
+            $is_mt5_authority = $this->is_mt5_authoritative($user_id, $symbol);
+        }
+
         $key_status = $this->get_twelve_key_status($user_id);
-        if ($key_status === 'missing') return 'KEY_MISSING';
-        if ($key_status === 'invalid') return 'KEY_INVALID';
+        if (!$is_mt5_authority && $key_status === 'missing') return 'KEY_MISSING';
+        if (!$is_mt5_authority && $key_status === 'invalid') return 'KEY_INVALID';
         if ($this->is_feed_rate_limited($user_id, $symbol)) return 'RATE_LIMITED';
 
         if (empty($price) || !isset($price['mid']) || (float) $price['mid'] <= 0) {
@@ -1912,7 +2759,22 @@ final class SMC_SuperFib_Sniper_REST {
         if ($candle_age_sec > 7200) return 'CANDLES_STALE';
 
         if ($status === 'READY' && !$data_live) return 'READY_NOT_CONFIRMED_STALE_DATA';
+
+        // CRITICAL HARDENING: Gate is BLOCKED when chop >= 0.7; signal must never be
+        // backend-confirmed in this state. Without this check, post_execute_signals()
+        // can still queue a READY+confirmed signal even though the gate is BLOCKED,
+        // breaking the chop-gate contract introduced by the gate patch.
+        if ($chop !== null && (float) $chop >= 0.7) return 'CHOP_GATE_BLOCKED';
+
         return 'OK';
+    }
+
+
+    private function is_mt5_authoritative($user_id, $symbol) {
+        if (!$symbol) return false;
+        $settings = $this->get_settings($user_id);
+        $cached_price = $this->get_cached_price($user_id, $symbol, $settings['staleThresholdSec']);
+        return $cached_price && ($cached_price['source'] ?? '') === 'mt5' && ($cached_price['state'] ?? '') === 'live';
     }
 
     // ── Rate-limit transient helpers ─────────────────────────────────────────
@@ -2172,7 +3034,7 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function sanitize_risk_allocation($payload, $fallback) {
         if (!is_array($payload)) {
-            return $fallback;
+            return $fallback_value;
         }
         return array(
             'perTradePct' => $this->float_between($payload, 'perTradePct', 0.1, 5.0, $fallback['perTradePct']),
@@ -2183,14 +3045,14 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function int_between($payload, $key, $min, $max, $fallback) {
         if (!is_array($payload) || !isset($payload[$key])) {
-            return $fallback;
+            return $fallback_value;
         }
         return max($min, min($max, (int) $payload[$key]));
     }
 
     private function float_between($payload, $key, $min, $max, $fallback) {
         if (!is_array($payload) || !isset($payload[$key])) {
-            return $fallback;
+            return $fallback_value;
         }
         return max($min, min($max, (float) $payload[$key]));
     }
@@ -2228,13 +3090,45 @@ final class SMC_SuperFib_Sniper_REST {
      * Returns age in seconds for an ISO 8601 timestamp (e.g. from gmdate('c')).
      * Unlike is_stale(), this does NOT append ' UTC' — ISO strings already carry
      * timezone info, and appending ' UTC' causes strtotime() to return false in PHP 8.
+     * 
+     * P2 FIX: Handle timezone abbreviations (UTC, GMT, etc.) before forcing Z suffix.
+     * Timestamps like "2026-05-06 12:34:56 UTC" must NOT become "2026-05-06 12:34:56 UTCZ".
      */
     private function iso_age_sec($iso_time) {
         if (!$iso_time) {
             return PHP_INT_MAX;
         }
-        $ts = strtotime((string) $iso_time);
+        
+        $value = trim((string) $iso_time);
+        
+        // Strip timezone abbreviations (UTC, GMT, EST, PST, etc.) that appear at the end
+        $value = preg_replace('/\s+(UTC|GMT|[A-Z]{3,4})\s*$/', '', $value);
+        
+        // If timestamp doesn't already have a timezone offset ([+-]HH:MM or Z), add Z
+        if (!preg_match('/([+-]\d{2}:\d{2}|Z)\s*$/', $value)) {
+            $value .= 'Z';
+        }
+        
+        $ts = strtotime($value);
         return $ts !== false ? (time() - $ts) : PHP_INT_MAX;
+    }
+
+    /**
+     * Parse an MT5 timestamp (YYYY.MM.DD HH:MM:SS) or ISO 8601 string into MySQL format.
+     * MQL5's TimeToString(TIME_DATE|TIME_SECONDS) produces "YYYY.MM.DD HH:MM:SS" which
+     * PHP strtotime() does not reliably handle — replace dots with dashes before parsing.
+     */
+    private function parse_mt5_timestamp($raw) {
+        if (!$raw) {
+            return $this->now_mysql();
+        }
+        $s = trim((string) $raw);
+        // Convert MT5 dot-date format: "2024.01.15 10:30:45" → "2024-01-15 10:30:45"
+        if (preg_match('/^\d{4}\.\d{2}\.\d{2}[ T]\d{2}:\d{2}:\d{2}/', $s)) {
+            $s = preg_replace('/^(\d{4})\.(\d{2})\.(\d{2})/', '$1-$2-$3', $s);
+        }
+        $ts = strtotime($s);
+        return $ts !== false ? gmdate('Y-m-d H:i:s', $ts) : $this->now_mysql();
     }
 
     private function timeframe_seconds($timeframe) {
@@ -2267,6 +3161,72 @@ final class SMC_SuperFib_Sniper_REST {
         return (time() - $candle_ts) <= $threshold_sec;
     }
 
+    private function normalize_market_timestamp($raw_time, $fallback = null) {
+        $fallback_value = (func_num_args() >= 2) ? $fallback : $this->now_mysql();
+        if ($raw_time === null || $raw_time === '') {
+            return $fallback_value;
+        }
+
+        $value = trim((string) $raw_time);
+        
+        // Convert MQL5 format (2026.05.06 12:34:56) to ISO 8601 (2026-05-06T12:34:56)
+        // This regex handles both dot and dash separators for dates
+        $value = preg_replace('/^(\d{4})\.(\d{2})\.(\d{2})/', '$1-$2-$3', $value);
+        
+        // HARDENING: If no timezone marker is present, treat as UTC explicitly.
+        // Valid timezone markers: Z, +HH:MM, -HH:MM, etc.
+        // Without this, PHP's strtotime() treats ambiguous times inconsistently across timezones.
+        if (!preg_match('/[Z+\-]\d{0,2}:?\d{0,2}$/', $value) && !str_ends_with($value, 'Z')) {
+            // No timezone marker — force UTC interpretation
+            $value = $value . 'Z';
+            error_log("TIMESTAMP NORMALIZED TO UTC: raw={$raw_time} | normalized={$value}");
+        }
+        
+        $ts = strtotime($value);
+        if ($ts === false) {
+            error_log("FAILED TO PARSE TIMESTAMP: raw={$raw_time} | value={$value}");
+            return $fallback_value;
+        }
+
+        return gmdate('Y-m-d H:i:s', $ts);
+    }
+
+    private function normalize_mt5_timeframe($timeframe) {
+        $value = strtoupper(trim((string) $timeframe));
+        $mt5_map = array(
+            'M1' => '1min',
+            'M5' => '5min',
+            'M15' => '15min',
+            'M30' => '30min',
+            'H1' => '1h',
+            'H4' => '4h',
+            'D1' => '1day',
+            'W1' => '1week',
+            'MN1' => '1month',
+        );
+
+        if (isset($mt5_map[$value])) {
+            return $mt5_map[$value];
+        }
+
+        return sanitize_text_field($timeframe ?: '15min');
+    }
+
+    private function mt5_freshness_to_snapshot_state($freshness) {
+        switch (strtoupper(trim((string) $freshness))) {
+            case 'LIVE':
+                return 'live';
+            case 'DELAYED':
+            case 'STALE':
+                return 'stale';
+            case 'CLOSED':
+            case 'DISCONNECTED':
+                return 'offline';
+            default:
+                return 'offline';
+        }
+    }
+
     private function table($name) {
         global $wpdb;
         return $wpdb->prefix . 'smc_sf_' . $name;
@@ -2284,4 +3244,6 @@ final class SMC_SuperFib_Sniper_REST {
     }
 }
 
-SMC_SuperFib_Sniper_REST::boot();
+register_activation_hook(__FILE__, array('SMC_SuperFib_Sniper_REST', 'activate'));
+
+add_action('plugins_loaded', array('SMC_SuperFib_Sniper_REST', 'boot'));

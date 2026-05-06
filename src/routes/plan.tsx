@@ -45,16 +45,10 @@ function PlanPage() {
   const top =
     uniqueSignals?.find(
       (s) =>
-        s.backendConfirmed &&
-        s.status === "READY" &&
-        ladders?.some((l) => l.signalId === s.id),
+        s.backendConfirmed && s.status === "READY" && ladders?.some((l) => l.signalId === s.id),
     ) ??
-    uniqueSignals?.find(
-      (s) => s.status === "READY" && ladders?.some((l) => l.signalId === s.id),
-    ) ??
-    uniqueSignals?.find(
-      (s) => s.backendConfirmed && ladders?.some((l) => l.signalId === s.id),
-    ) ??
+    uniqueSignals?.find((s) => s.status === "READY" && ladders?.some((l) => l.signalId === s.id)) ??
+    uniqueSignals?.find((s) => s.backendConfirmed && ladders?.some((l) => l.signalId === s.id)) ??
     uniqueSignals?.find((s) => ladders?.some((l) => l.signalId === s.id)) ??
     uniqueSignals?.find((s) => s.status === "READY") ??
     uniqueSignals?.[0];
@@ -269,19 +263,39 @@ function PlanPage() {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <span>State:</span>
-              <span className={cn("font-mono text-sm", plan.state === 'ACTIVE' ? 'text-buy' : 'text-sell')}>
+              <span
+                className={cn(
+                  "font-mono text-sm",
+                  plan.state === "ACTIVE" ? "text-buy" : "text-sell",
+                )}
+              >
                 {plan.state}
               </span>
             </div>
             <div className="grid grid-cols-3 gap-2">
-              <div className={cn("rounded px-2 py-1 text-center text-xs font-mono", plan.stageFills.e1 ? 'bg-buy/20 text-buy' : 'bg-bg2 text-dim')}>
-                E1 {plan.stageFills.e1 ? 'Filled' : 'Pending'}
+              <div
+                className={cn(
+                  "rounded px-2 py-1 text-center text-xs font-mono",
+                  plan.stageFills.e1 ? "bg-buy/20 text-buy" : "bg-bg2 text-dim",
+                )}
+              >
+                E1 {plan.stageFills.e1 ? "Filled" : "Pending"}
               </div>
-              <div className={cn("rounded px-2 py-1 text-center text-xs font-mono", plan.stageFills.e2 ? 'bg-buy/20 text-buy' : 'bg-bg2 text-dim')}>
-                E2 {plan.stageFills.e2 ? 'Filled' : 'Pending'}
+              <div
+                className={cn(
+                  "rounded px-2 py-1 text-center text-xs font-mono",
+                  plan.stageFills.e2 ? "bg-buy/20 text-buy" : "bg-bg2 text-dim",
+                )}
+              >
+                E2 {plan.stageFills.e2 ? "Filled" : "Pending"}
               </div>
-              <div className={cn("rounded px-2 py-1 text-center text-xs font-mono", plan.stageFills.e3 ? 'bg-buy/20 text-buy' : 'bg-bg2 text-dim')}>
-                E3 {plan.stageFills.e3 ? 'Filled' : 'Pending'}
+              <div
+                className={cn(
+                  "rounded px-2 py-1 text-center text-xs font-mono",
+                  plan.stageFills.e3 ? "bg-buy/20 text-buy" : "bg-bg2 text-dim",
+                )}
+              >
+                E3 {plan.stageFills.e3 ? "Filled" : "Pending"}
               </div>
             </div>
           </div>
