@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useSnapshot, useEngineBatch, useUserSettings } from "@/hooks/useSniperData";
+import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { useTickFlash } from "@/hooks/useTickFlash";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { BiasBadge, ChopMeter, GateBadge } from "@/components/sniper/Indicators";
@@ -142,10 +143,9 @@ function PriceCard({
   diagnostic: SymbolDiagnostic | undefined;
   staleThresholdMs: number;
 }) {
-  // Tick flashes — driven by polling updates of mid / bid / ask / chop.
-  const midFlash = useTickFlash(price.mid);
-  const bidFlash = useTickFlash(price.bid);
-  const askFlash = useTickFlash(price.ask);
+  const { value: animatedMid, direction: midDir } = useAnimatedNumber(price.mid, 320);
+  const { value: animatedBid, direction: bidDir } = useAnimatedNumber(price.bid, 280);
+  const { value: animatedAsk, direction: askDir } = useAnimatedNumber(price.ask, 280);
   const chopFlash = useTickFlash(regime?.chop);
   const midTickStyle = tickMotionStyle(`${price.symbol}:mid`, {
     baseDurationMs: 330,
@@ -199,12 +199,12 @@ function PriceCard({
         <div
           style={midTickStyle}
           className={cn(
-            "font-mono text-2xl font-semibold tabular-nums rounded px-1 -mx-1",
-            midFlash === "up" && "tick-flash-up",
-            midFlash === "down" && "tick-flash-down",
+            "font-mono text-2xl font-semibold tabular-nums rounded px-1 -mx-1 price-smooth",
+            midDir === "up" && "tick-flash-up",
+            midDir === "down" && "tick-flash-down",
           )}
         >
-          {priceUnavailable ? "—" : fmtPrice(price.mid, price.symbol)}
+          {priceUnavailable ? "—" : fmtPrice(animatedMid ?? price.mid, price.symbol)}
         </div>
         <div
           className={cn("font-mono text-sm", price.changePct1d >= 0 ? "text-buy" : "text-sell")}
@@ -217,22 +217,22 @@ function PriceCard({
         <span
           style={bidTickStyle}
           className={cn(
-            "rounded px-1 -mx-1",
-            bidFlash === "up" && "tick-flash-up",
-            bidFlash === "down" && "tick-flash-down",
+            "font-mono tabular-nums rounded px-1 -mx-1 price-smooth",
+            bidDir === "up" && "tick-flash-up-fast",
+            bidDir === "down" && "tick-flash-down-fast",
           )}
         >
-          BID {priceUnavailable ? "—" : fmtPrice(price.bid, price.symbol)}
+          BID {priceUnavailable ? "—" : fmtPrice(animatedBid ?? price.bid, price.symbol)}
         </span>
         <span
           style={askTickStyle}
           className={cn(
-            "rounded px-1 -mx-1",
-            askFlash === "up" && "tick-flash-up",
-            askFlash === "down" && "tick-flash-down",
+            "font-mono tabular-nums rounded px-1 -mx-1 price-smooth",
+            askDir === "up" && "tick-flash-up-fast",
+            askDir === "down" && "tick-flash-down-fast",
           )}
         >
-          ASK {priceUnavailable ? "—" : fmtPrice(price.ask, price.symbol)}
+          ASK {priceUnavailable ? "—" : fmtPrice(animatedAsk ?? price.ask, price.symbol)}
         </span>
       </div>
 

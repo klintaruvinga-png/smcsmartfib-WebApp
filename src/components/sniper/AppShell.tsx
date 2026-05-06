@@ -7,9 +7,9 @@ import {
   useSession,
   useUserSettings,
 } from "@/hooks/useSniperData";
-import { useTickFlash } from "@/hooks/useTickFlash";
+import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { fmtPrice, fmtPct } from "@/lib/format";
-import { tickMotionHoldMs, tickMotionStyle, type TickMotionOptions } from "@/lib/tickMotion";
+import { tickMotionStyle, type TickMotionOptions } from "@/lib/tickMotion";
 import { SyncChip, SignalStatusChip } from "@/components/sniper/Chips";
 import { cn, deduplicateById } from "@/lib/utils";
 import type { PairPrice } from "@/types/sniper";
@@ -54,7 +54,8 @@ const HEADER_TICK_MOTION: TickMotionOptions = {
 };
 
 function HeaderTickerItem({ price }: { price: PairPrice }) {
-  const flash = useTickFlash(price.mid, tickMotionHoldMs(HEADER_TICK_MOTION));
+  const { value: animatedMid, direction: midDir } = useAnimatedNumber(price.mid, 280);
+  const { value: animatedChange } = useAnimatedNumber(price.changePct1d, 100);
   const motionStyle = tickMotionStyle(`${price.symbol}:header-mid`, HEADER_TICK_MOTION);
 
   return (
@@ -62,29 +63,27 @@ function HeaderTickerItem({ price }: { price: PairPrice }) {
       <span
         className={cn(
           "header-tick-dot",
-          flash === "up" && "header-tick-dot-up",
-          flash === "down" && "header-tick-dot-down",
+          midDir === "up" && "header-tick-dot-up",
+          midDir === "down" && "header-tick-dot-down",
         )}
       />
       <span className="text-mute">{price.symbol}</span>
       <span
         className={cn(
-          "text-tx rounded px-1 -mx-1 tabular-nums",
-          flash === "up" && "tick-flash-up-fast",
-          flash === "down" && "tick-flash-down-fast",
+          "text-tx rounded px-1 -mx-1 tabular-nums price-smooth",
+          midDir === "up" && "tick-flash-up-fast",
+          midDir === "down" && "tick-flash-down-fast",
         )}
       >
-        {fmtPrice(price.mid, price.symbol)}
+        {fmtPrice(animatedMid ?? price.mid, price.symbol)}
       </span>
       <span
         className={cn(
-          "rounded px-1 -mx-1 tabular-nums",
+          "rounded px-1 -mx-1 tabular-nums price-smooth",
           price.changePct1d >= 0 ? "text-buy" : "text-sell",
-          flash === "up" && "tick-flash-up-fast",
-          flash === "down" && "tick-flash-down-fast",
         )}
       >
-        {fmtPct(price.changePct1d)}
+        {fmtPct(animatedChange ?? price.changePct1d)}
       </span>
     </div>
   );
