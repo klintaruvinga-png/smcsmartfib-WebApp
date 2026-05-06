@@ -190,6 +190,7 @@ export type AnimationDirection = "up" | "down" | null;
 export interface AnimatedNumberResult {
   value: number | undefined;
   direction: AnimationDirection;
+  heldDirection: AnimationDirection;
   motionKey: number;
   motionImpulse: number;
 }
@@ -198,12 +199,14 @@ export function useAnimatedNumber(
   value: number | undefined,
   durationMs = 300,
   holdMs = durationMs,
+  resetKey?: string | number | null,
 ): AnimatedNumberResult {
   const numericValue = toFiniteNumber(value);
   const safeDurationMs = Number.isFinite(durationMs) && durationMs > 0 ? durationMs : 300;
   const safeHoldMs = Number.isFinite(holdMs) && holdMs > 0 ? holdMs : safeDurationMs;
   const [animated, setAnimated] = useState<number | undefined>(numericValue);
   const [direction, setDirection] = useState<AnimationDirection>(null);
+  const [heldDirection, setHeldDirection] = useState<AnimationDirection>(null);
 
   const rafRef = useRef<number | null>(null);
   const directionTimeoutRef = useRef<number | null>(null);
@@ -216,8 +219,37 @@ export function useAnimatedNumber(
   const lastUpdateAtRef = useRef<number | null>(null);
   const motionSamplesRef = useRef<MotionSample[]>([]);
   const randomSeedRef = useRef((Math.random() * 0xffffffff) >>> 0);
+  const resetKeyRef = useRef(resetKey);
   const durationRef = useRef(safeDurationMs);
   durationRef.current = safeDurationMs;
+
+  useEffect(() => {
+    if (resetKeyRef.current === resetKey) {
+      return;
+    }
+    resetKeyRef.current = resetKey;
+
+    if (rafRef.current !== null && typeof window !== "undefined") {
+      window.cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    if (directionTimeoutRef.current !== null && typeof window !== "undefined") {
+      window.clearTimeout(directionTimeoutRef.current);
+      directionTimeoutRef.current = null;
+    }
+
+    hasValueRef.current = false;
+    fromRef.current = numericValue ?? 0;
+    toRef.current = numericValue ?? 0;
+    currentRef.current = numericValue ?? 0;
+    motionKeyRef.current = 0;
+    motionImpulseRef.current = 0;
+    lastUpdateAtRef.current = null;
+    motionSamplesRef.current = [];
+    setDirection(null);
+    setHeldDirection(null);
+    setAnimated(numericValue);
+  }, [numericValue, resetKey]);
 
   useEffect(() => {
     if (numericValue === undefined) {
@@ -234,6 +266,7 @@ export function useAnimatedNumber(
       motionSamplesRef.current = [];
       setAnimated(undefined);
       setDirection(null);
+      setHeldDirection(null);
       return;
     }
 
@@ -246,6 +279,7 @@ export function useAnimatedNumber(
         typeof performance !== "undefined" ? performance.now() : Date.now();
       setAnimated(numericValue);
       setDirection(null);
+      setHeldDirection(null);
       return;
     }
 
@@ -262,6 +296,7 @@ export function useAnimatedNumber(
     }
     setDirection(dir);
     if (dir !== null) {
+      setHeldDirection(dir);
       directionTimeoutRef.current = window.setTimeout(() => {
         directionTimeoutRef.current = null;
         setDirection(null);
@@ -349,6 +384,7 @@ export function useAnimatedNumber(
   return {
     value: animated,
     direction,
+    heldDirection,
     motionKey: motionKeyRef.current,
     motionImpulse: motionImpulseRef.current,
   };
