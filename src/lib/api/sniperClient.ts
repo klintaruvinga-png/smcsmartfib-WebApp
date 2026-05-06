@@ -72,6 +72,8 @@ interface RequestOpts {
   authenticated?: boolean;
   /** Allow successful responses with no payload body (e.g. known 204 endpoints). */
   allowEmptyResponse?: boolean;
+  /** Add a cache-busting query param and bypass browser cache for time-sensitive GETs. */
+  cacheBust?: boolean;
 }
 
 async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
@@ -92,12 +94,16 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
     }
   }
 
-  const url = `${backendUrl.replace(/\/$/, "")}/sniper/v1${path}`;
+  let url = `${backendUrl.replace(/\/$/, "")}/sniper/v1${path}`;
+  if ((opts.method ?? "GET") === "GET" && opts.cacheBust) {
+    url += `${url.includes("?") ? "&" : "?"}_=${Date.now()}`;
+  }
 
   try {
     const res = await fetch(url, {
       method: opts.method ?? "GET",
       headers,
+      cache: opts.cacheBust ? "no-store" : "default",
       credentials: opts.authenticated === false ? "omit" : "include",
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     });
@@ -136,6 +142,50 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
   }
 }
 
+function toFiniteNumber(value: unknown, fallback = 0): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
+function normalizeSnapshot(snapshot: {
+  prices: PairPrice[];
+  regimes: RegimeState[];
+  gates: GateState[];
+  diagnostics: SymbolDiagnostic[];
+}): {
+  prices: PairPrice[];
+  regimes: RegimeState[];
+  gates: GateState[];
+  diagnostics: SymbolDiagnostic[];
+} {
+  return {
+    ...snapshot,
+    prices: (snapshot.prices ?? []).map((price) => ({
+      ...price,
+      bid: toFiniteNumber(price.bid),
+      ask: toFiniteNumber(price.ask),
+      mid: toFiniteNumber(price.mid),
+      changePct1d: toFiniteNumber(price.changePct1d),
+      age_sec:
+        price.age_sec === undefined ? undefined : toFiniteNumber(price.age_sec, Number(price.age_sec)),
+    })),
+    regimes: (snapshot.regimes ?? []).map((regime) => ({
+      ...regime,
+      chop: toFiniteNumber(regime.chop),
+      nearestFib:
+        regime.nearestFib === null || regime.nearestFib === undefined
+          ? null
+          : toFiniteNumber(regime.nearestFib, Number(regime.nearestFib)),
+    })),
+    gates: snapshot.gates ?? [],
+    diagnostics: snapshot.diagnostics ?? [],
+  };
+}
+
 // ──────────────── Public / shared ────────────────
 export const apiClient = {
   async getSnapshot(mock = MOCK_MODE) {
@@ -148,12 +198,13 @@ export const apiClient = {
         diagnostics: [] as SymbolDiagnostic[],
       };
     }
-    return call<{
+    const snapshot = await call<{
       prices: PairPrice[];
       regimes: RegimeState[];
       gates: GateState[];
       diagnostics: SymbolDiagnostic[];
-    }>("/snapshot");
+    }>("/snapshot", { cacheBust: true });
+    return normalizeSnapshot(snapshot);
   },
   async getChartSnapshot(
     symbol: Symbol,
