@@ -70,7 +70,7 @@ function PlanPage() {
     heldDirection: heldTopMidDir,
     motionKey: topMotionKey,
     motionImpulse: topMotionImpulse,
-  } = useAnimatedNumber(topPrice?.mid, 300, topFlashHoldMs);
+  } = useAnimatedNumber(topPrice?.mid, 300, topFlashHoldMs, top?.symbol ?? null);
   const topPriceStyle = tickMotionStyle(`${top?.symbol ?? "plan"}:hero-mid`, PLAN_HERO_TICK_MOTION, {
     motionKey: topMotionKey,
     motionImpulse: topMotionImpulse,
