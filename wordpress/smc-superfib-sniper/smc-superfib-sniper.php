@@ -3078,12 +3078,26 @@ final class SMC_SuperFib_Sniper_REST {
      * Returns age in seconds for an ISO 8601 timestamp (e.g. from gmdate('c')).
      * Unlike is_stale(), this does NOT append ' UTC' — ISO strings already carry
      * timezone info, and appending ' UTC' causes strtotime() to return false in PHP 8.
+     * 
+     * P2 FIX: Handle timezone abbreviations (UTC, GMT, etc.) before forcing Z suffix.
+     * Timestamps like "2026-05-06 12:34:56 UTC" must NOT become "2026-05-06 12:34:56 UTCZ".
      */
     private function iso_age_sec($iso_time) {
         if (!$iso_time) {
             return PHP_INT_MAX;
         }
-        $ts = strtotime((string) $iso_time);
+        
+        $value = trim((string) $iso_time);
+        
+        // Strip timezone abbreviations (UTC, GMT, EST, PST, etc.) that appear at the end
+        $value = preg_replace('/\s+(UTC|GMT|[A-Z]{3,4})\s*$/', '', $value);
+        
+        // If timestamp doesn't already have a timezone offset ([+-]HH:MM or Z), add Z
+        if (!preg_match('/([+-]\d{2}:\d{2}|Z)\s*$/', $value)) {
+            $value .= 'Z';
+        }
+        
+        $ts = strtotime($value);
         return $ts !== false ? (time() - $ts) : PHP_INT_MAX;
     }
 
