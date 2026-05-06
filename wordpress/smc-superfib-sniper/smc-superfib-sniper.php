@@ -360,10 +360,8 @@ final class SMC_SuperFib_Sniper_REST {
             return true;
         }
 
-        if (preg_match('/\.workers\.dev$/', $host)) {
-            return true;
-        }
-
+        // Allow only explicitly trusted Worker hostnames listed in get_allowed_origins().
+        // Do not allow wildcard *.workers.dev because CORS credentials are enabled.
         return false;
     }
 
@@ -1038,14 +1036,28 @@ final class SMC_SuperFib_Sniper_REST {
         // enforced at 180s inside insert_mt5_candle() with a full audit trail.
         // This preserves snapshots during low-liquidity sessions.
         if (!empty($payload['timestamp'])) {
-            $data_timestamp = strtotime($payload['timestamp']);
-            $now_timestamp = time();
-            $age_seconds = $now_timestamp - $data_timestamp;
-            
-            if ($data_timestamp === false || $age_seconds > 300) {
+            $normalized_payload_timestamp = $this->normalize_market_timestamp($payload['timestamp'], null);
+            $data_timestamp = $normalized_payload_timestamp ? strtotime($normalized_payload_timestamp) : false;
+
+            if ($data_timestamp === false) {
                 $this->audit($user_id, 'ea.market_stream.stale_data_rejected', array(
                     'symbol' => $symbol,
                     'timestamp' => $payload['timestamp'],
+                    'normalized_timestamp' => $normalized_payload_timestamp,
+                    'reason' => 'unparseable_timestamp',
+                    'rejection_level' => 'payload',
+                ));
+                return new WP_Error('stale_data', 'Rejected market data with unparseable timestamp', array('status' => 400));
+            }
+
+            $now_timestamp = time();
+            $age_seconds = $now_timestamp - $data_timestamp;
+
+            if ($age_seconds > 300) {
+                $this->audit($user_id, 'ea.market_stream.stale_data_rejected', array(
+                    'symbol' => $symbol,
+                    'timestamp' => $payload['timestamp'],
+                    'normalized_timestamp' => $normalized_payload_timestamp,
                     'age_seconds' => $age_seconds,
                     'rejection_level' => 'payload',
                 ));
