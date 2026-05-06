@@ -10,8 +10,8 @@ import { cn } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
 import type {
   EngineBlocker,
-  PriceTick,
-  RegimeSnapshot,
+  PairPrice,
+  RegimeState,
   GateState,
   SymbolDiagnostic,
 } from "@/types/sniper";
