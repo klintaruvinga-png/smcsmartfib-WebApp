@@ -21,13 +21,16 @@ export interface AnimatedNumberResult {
 export function useAnimatedNumber(
   value: number | undefined,
   durationMs = 300,
+  holdMs = durationMs,
 ): AnimatedNumberResult {
   const numericValue = toFiniteNumber(value);
   const safeDurationMs = Number.isFinite(durationMs) && durationMs > 0 ? durationMs : 300;
+  const safeHoldMs = Number.isFinite(holdMs) && holdMs > 0 ? holdMs : safeDurationMs;
   const [animated, setAnimated] = useState<number | undefined>(numericValue);
   const [direction, setDirection] = useState<AnimationDirection>(null);
 
   const rafRef = useRef<number | null>(null);
+  const directionTimeoutRef = useRef<number | null>(null);
   const fromRef = useRef<number>(numericValue ?? 0);
   const toRef = useRef<number>(numericValue ?? 0);
   const currentRef = useRef<number>(numericValue ?? 0);
@@ -40,6 +43,10 @@ export function useAnimatedNumber(
       if (rafRef.current !== null && typeof window !== "undefined") {
         window.cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
+      }
+      if (directionTimeoutRef.current !== null && typeof window !== "undefined") {
+        window.clearTimeout(directionTimeoutRef.current);
+        directionTimeoutRef.current = null;
       }
       hasValueRef.current = false;
       setAnimated(undefined);
@@ -61,7 +68,17 @@ export function useAnimatedNumber(
     const dir: AnimationDirection =
       numericValue > prev ? "up" : numericValue < prev ? "down" : null;
 
+    if (directionTimeoutRef.current !== null) {
+      window.clearTimeout(directionTimeoutRef.current);
+      directionTimeoutRef.current = null;
+    }
     setDirection(dir);
+    if (dir !== null) {
+      directionTimeoutRef.current = window.setTimeout(() => {
+        directionTimeoutRef.current = null;
+        setDirection(null);
+      }, safeHoldMs);
+    }
 
     fromRef.current = Number.isFinite(currentRef.current) ? currentRef.current : numericValue;
     toRef.current = numericValue;
@@ -74,7 +91,6 @@ export function useAnimatedNumber(
     if (dir === null || prefersReducedMotion() || typeof window === "undefined") {
       currentRef.current = numericValue;
       setAnimated(numericValue);
-      setDirection(null);
       return;
     }
 
@@ -95,7 +111,6 @@ export function useAnimatedNumber(
         currentRef.current = toRef.current;
         rafRef.current = null;
         setAnimated(toRef.current);
-        setDirection(null);
       }
     };
 

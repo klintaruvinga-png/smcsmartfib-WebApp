@@ -7,7 +7,7 @@ import { BiasBadge, ChopMeter, GateBadge } from "@/components/sniper/Indicators"
 import { WarningLine } from "@/components/sniper/Warnings";
 import { fmtPrice, fmtPct, relTime } from "@/lib/format";
 import { MOCK_MODE } from "@/lib/api/sniperClient";
-import { tickMotionStyle } from "@/lib/tickMotion";
+import { tickMotionHoldMs, tickMotionStyle } from "@/lib/tickMotion";
 import { cn } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
 import type {
@@ -143,10 +143,6 @@ function PriceCard({
   diagnostic: SymbolDiagnostic | undefined;
   staleThresholdMs: number;
 }) {
-  const { value: animatedMid, direction: midDir } = useAnimatedNumber(price.mid, 320);
-  const { value: animatedBid, direction: bidDir } = useAnimatedNumber(price.bid, 280);
-  const { value: animatedAsk, direction: askDir } = useAnimatedNumber(price.ask, 280);
-  const chopFlash = useTickFlash(regime?.chop);
   const midTickStyle = tickMotionStyle(`${price.symbol}:mid`, {
     baseDurationMs: 330,
     durationSpreadMs: 120,
@@ -167,6 +163,37 @@ function PriceCard({
     durationSpreadMs: 100,
     delayMaxMs: 80,
   });
+  const midFlashHoldMs = tickMotionHoldMs({
+    baseDurationMs: 330,
+    durationSpreadMs: 120,
+    delayMaxMs: 90,
+  });
+  const bidFlashHoldMs = tickMotionHoldMs({
+    baseDurationMs: 280,
+    durationSpreadMs: 110,
+    delayMaxMs: 120,
+  });
+  const askFlashHoldMs = tickMotionHoldMs({
+    baseDurationMs: 290,
+    durationSpreadMs: 130,
+    delayMaxMs: 110,
+  });
+  const { value: animatedMid, direction: midDir } = useAnimatedNumber(
+    price.mid,
+    320,
+    midFlashHoldMs,
+  );
+  const { value: animatedBid, direction: bidDir } = useAnimatedNumber(
+    price.bid,
+    280,
+    bidFlashHoldMs,
+  );
+  const { value: animatedAsk, direction: askDir } = useAnimatedNumber(
+    price.ask,
+    280,
+    askFlashHoldMs,
+  );
+  const chopFlash = useTickFlash(regime?.chop);
 
   const backendLive = price.state === "live";
   const clientStale =

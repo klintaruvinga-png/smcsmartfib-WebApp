@@ -9,7 +9,7 @@ import {
 } from "@/hooks/useSniperData";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { fmtPrice, fmtPct } from "@/lib/format";
-import { tickMotionStyle, type TickMotionOptions } from "@/lib/tickMotion";
+import { tickMotionHoldMs, tickMotionStyle, type TickMotionOptions } from "@/lib/tickMotion";
 import { SyncChip, SignalStatusChip } from "@/components/sniper/Chips";
 import { cn, deduplicateById } from "@/lib/utils";
 import type { PairPrice } from "@/types/sniper";
@@ -54,7 +54,8 @@ const HEADER_TICK_MOTION: TickMotionOptions = {
 };
 
 function HeaderTickerItem({ price }: { price: PairPrice }) {
-  const { value: animatedMid, direction: midDir } = useAnimatedNumber(price.mid, 280);
+  const flashHoldMs = tickMotionHoldMs(HEADER_TICK_MOTION);
+  const { value: animatedMid, direction: midDir } = useAnimatedNumber(price.mid, 280, flashHoldMs);
   const { value: animatedChange } = useAnimatedNumber(price.changePct1d, 100);
   const motionStyle = tickMotionStyle(`${price.symbol}:header-mid`, HEADER_TICK_MOTION);
 
