@@ -169,13 +169,15 @@ public:
 
     // Build the JSON payload for one symbol snapshot.
     //
-    // Candle source: CopyRates() directly from the MT5 broker feed, NOT the
-    // CandleBuilder ring buffer. CandleBuilder.GetCandle() returns hasCandle=true
-    // with a zero-initialized MqlRates struct when no bar has completed yet (cold
-    // start), and ValidateCandle() does not catch time==0, so the ring buffer path
-    // was emitting "1970-01-01T00:00:00Z" on every periodic cycle until the first
-    // full minute bar closed. CopyRates() returns the actual broker history and
-    // returns < 1 when no data is available — a clean, unambiguous signal.
+    // Candle sources:
+    // 1. M1 (1-minute): Last closed bar from CopyRates(PERIOD_M1)
+    // 2. M15 (15-minute): Last closed bar from CopyRates(PERIOD_M15)
+    //
+    // CopyRates() directly from the MT5 broker feed, NOT the CandleBuilder ring buffer.
+    // CandleBuilder.GetCandle() returns hasCandle=true with a zero-initialized MqlRates
+    // struct when no bar has completed yet (cold start), and ValidateCandle() does not
+    // catch time==0, so the ring buffer path was emitting "1970-01-01T00:00:00Z" on
+    // every periodic cycle. CopyRates() returns the actual broker history cleanly.
     string BuildWebhookPayload(string symbol)
     {
         string norm = symbolNormalizer.NormalizeSymbol(symbol);
@@ -193,19 +195,25 @@ public:
         int digits     = (int) SymbolInfoInteger(symbol, SYMBOL_DIGITS);
         if (digits < 0) digits = 5;
 
-        // --- Candle: read last closed M1 bar directly from broker history ---
+        // --- M1 Candle: read last closed M1 bar directly from broker history ---
         // index=1 in CopyRates() is the last CLOSED bar (index=0 is the forming bar).
-        // This is standard MT5 convention and is independent of CandleBuilder state.
-        MqlRates rates[];
-        int      copied     = CopyRates(symbol, PERIOD_M1, 1, 1, rates);
-        bool     hasCandle  = (copied == 1 && rates[0].time > 0);
+        MqlRates rates_m1[];
+        int      copied_m1     = CopyRates(symbol, PERIOD_M1, 1, 1, rates_m1);
+        bool     hasCandle_m1  = (copied_m1 == 1 && rates_m1[0].time > 0);
+        datetime candleTime_m1 = hasCandle_m1 ? rates_m1[0].time : 0;
 
-        datetime candleTime = hasCandle ? rates[0].time : 0;
+        // --- M15 Candle: read last closed M15 bar directly from broker history ---
+        MqlRates rates_m15[];
+        int      copied_m15     = CopyRates(symbol, PERIOD_M15, 1, 1, rates_m15);
+        bool     hasCandle_m15  = (copied_m15 == 1 && rates_m15[0].time > 0);
+        datetime candleTime_m15 = hasCandle_m15 ? rates_m15[0].time : 0;
 
         Print("EA PAYLOAD DEBUG → symbol=", symbol,
               " | hasTick=", hasTick,
-              " | hasCandle=", hasCandle,
-              " | latestClosedCandle=", TimeToString(candleTime, TIME_DATE|TIME_SECONDS));
+              " | hasCandle_m1=", hasCandle_m1,
+              " | hasCandle_m15=", hasCandle_m15,
+              " | latestClosedCandle_m1=", TimeToString(candleTime_m1, TIME_DATE|TIME_SECONDS),
+              " | latestClosedCandle_m15=", TimeToString(candleTime_m15, TIME_DATE|TIME_SECONDS));
 
         string json = "{";
 
@@ -221,39 +229,70 @@ public:
         json += "\"freshness\":\""         + FreshnessStateName(GetFreshnessState(symbol)) + "\",";
         json += "\"session\":\""           + GetSessionName()                           + "\"";
 
-        if (hasCandle)
+        // M1 Candle
+        if (hasCandle_m1)
         {
             // REGRESSION GUARD: closed bar must be in the past, never equal to or
             // ahead of wall-clock time (would indicate a data/clock fault).
-            if (candleTime >= now)
+            if (candleTime_m1 >= now)
             {
-                Print("REGRESSION GUARD: candle time is not in the past for ", symbol,
-                      " | candleTime=", TimeToString(candleTime, TIME_DATE|TIME_SECONDS),
-                      " | now=",        TimeToString(now,        TIME_DATE|TIME_SECONDS));
+                Print("REGRESSION GUARD: M1 candle time is not in the past for ", symbol,
+                      " | candleTime=", TimeToString(candleTime_m1, TIME_DATE|TIME_SECONDS),
+                      " | now=",        TimeToString(now,          TIME_DATE|TIME_SECONDS));
             }
             else
             {
                 json += ",\"candle\":{";
-                json += "\"time\":\""  + TimeToIso8601(candleTime)                    + "\",";
-                json += "\"open\":"    + DoubleToString(rates[0].open,        digits)  + ",";
-                json += "\"high\":"    + DoubleToString(rates[0].high,        digits)  + ",";
-                json += "\"low\":"     + DoubleToString(rates[0].low,         digits)  + ",";
-                json += "\"close\":"   + DoubleToString(rates[0].close,       digits)  + ",";
-                json += "\"volume\":"  + IntegerToString((long)rates[0].tick_volume);
+                json += "\"time\":\""  + TimeToIso8601(candleTime_m1)                 + "\",";
+                json += "\"open\":"    + DoubleToString(rates_m1[0].open,        digits)  + ",";
+                json += "\"high\":"    + DoubleToString(rates_m1[0].high,        digits)  + ",";
+                json += "\"low\":"     + DoubleToString(rates_m1[0].low,         digits)  + ",";
+                json += "\"close\":"   + DoubleToString(rates_m1[0].close,       digits)  + ",";
+                json += "\"volume\":"  + IntegerToString((long)rates_m1[0].tick_volume);
                 json += "}";
 
                 Print("EA SEND → ", symbol,
-                      " | candle_time=", TimeToString(candleTime, TIME_DATE|TIME_SECONDS),
-                      " | now=",         TimeToString(now,         TIME_DATE|TIME_SECONDS));
+                      " | M1_time=", TimeToString(candleTime_m1, TIME_DATE|TIME_SECONDS),
+                      " | now=",      TimeToString(now,          TIME_DATE|TIME_SECONDS));
             }
         }
         else
         {
-            // copied < 1: broker history not loaded yet for this symbol.
-            // Snapshot (bid/ask) will still be sent; candle omitted safely.
             Print("HISTORY NOT READY → symbol=", symbol,
-                  " | copied=", copied,
-                  " — candle omitted from payload; snapshot will still send.");
+                  " | copied_m1=", copied_m1,
+                  " — M1 candle omitted from payload; snapshot will still send.");
+        }
+
+        // M15 Candle
+        if (hasCandle_m15)
+        {
+            if (candleTime_m15 >= now)
+            {
+                Print("REGRESSION GUARD: M15 candle time is not in the past for ", symbol,
+                      " | candleTime=", TimeToString(candleTime_m15, TIME_DATE|TIME_SECONDS),
+                      " | now=",        TimeToString(now,           TIME_DATE|TIME_SECONDS));
+            }
+            else
+            {
+                json += ",\"candle_m15\":{";
+                json += "\"time\":\""  + TimeToIso8601(candleTime_m15)                + "\",";
+                json += "\"open\":"    + DoubleToString(rates_m15[0].open,       digits)  + ",";
+                json += "\"high\":"    + DoubleToString(rates_m15[0].high,       digits)  + ",";
+                json += "\"low\":"     + DoubleToString(rates_m15[0].low,        digits)  + ",";
+                json += "\"close\":"   + DoubleToString(rates_m15[0].close,      digits)  + ",";
+                json += "\"volume\":"  + IntegerToString((long)rates_m15[0].tick_volume);
+                json += "}";
+
+                Print("EA SEND → ", symbol,
+                      " | M15_time=", TimeToString(candleTime_m15, TIME_DATE|TIME_SECONDS),
+                      " | now=",       TimeToString(now,           TIME_DATE|TIME_SECONDS));
+            }
+        }
+        else
+        {
+            Print("HISTORY NOT READY → symbol=", symbol,
+                  " | copied_m15=", copied_m15,
+                  " — M15 candle omitted from payload.");
         }
 
         json += "}";
@@ -322,17 +361,22 @@ private:
     // Convert datetime to ISO 8601 UTC string (YYYY-MM-DDTHH:MM:SSZ).
     //
     // TimeToStruct() decomposes broker server-local time, not UTC. Appending Z
-    // without converting first produces a false UTC claim: a UTC+2 broker tick at
-    // server-time 12:00 would be stored as "12:00Z" instead of "10:00Z", shifting
-    // candle buckets by the broker offset and breaking UNIQUE KEY alignment.
+    // Fixed: Use TimeGMT() directly to avoid fragile offset calculations.
+    // This ensures timestamps are always genuine UTC, eliminating the risk of
+    // broker offset mismatches or DST-related drift. Every timestamp sent to
+    // the PHP backend must be in UTC with a 'Z' suffix (ISO 8601 format).
     //
-    // Fix: subtract the broker UTC offset (TimeCurrent() - TimeGMT()) before
-    // decomposing so the formatted components are genuine UTC.
+    // Example: If broker is UTC+3 and local time is 05:44:55,
+    // then TimeGMT() returns 02:44:55 UTC, which is what gets sent.
     string TimeToIso8601(datetime t)
     {
+        // If t is in broker-local time (from TimeCurrent() or CopyRates()),
+        // convert it to UTC by applying the broker offset.
         datetime brokerUtcOffset = TimeCurrent() - TimeGMT();
+        datetime utcTime = t - brokerUtcOffset;
+        
         MqlDateTime dt;
-        TimeToStruct(t - brokerUtcOffset, dt);
+        TimeToStruct(utcTime, dt);
         return StringFormat("%04d-%02d-%02dT%02d:%02d:%02dZ",
                             dt.year, dt.mon, dt.day,
                             dt.hour, dt.min, dt.sec);
