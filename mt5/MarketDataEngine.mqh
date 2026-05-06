@@ -305,10 +305,17 @@ public:
         if (StringLen(webhookUrl) == 0)
             return false;
 
-        // REGRESSION GUARD: Validate API key is configured before attempting send
-        if (StringLen(authHeader) == 0)
+        // Last line of defence: do not attempt HTTP if the EA has no usable API key.
+        string apiKeyValue = authHeader;
+        int headerSep = StringFind(apiKeyValue, ":");
+        if (headerSep >= 0)
+            apiKeyValue = StringSubstr(apiKeyValue, headerSep + 1);
+        StringTrimLeft(apiKeyValue);
+        StringTrimRight(apiKeyValue);
+
+        if (StringLen(apiKeyValue) == 0)
         {
-            Print("REGRESSION GUARD: authHeader is empty! API key not configured. Check Initialize() call.");
+            Print("SMC_MarketDataEA: ApiKey not set - configure it in EA Inputs and re-attach the EA.");
             return false;
         }
 

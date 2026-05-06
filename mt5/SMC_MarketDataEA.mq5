@@ -7,7 +7,7 @@
 //|  2. Set ApiKey to match SMC_SF_EA_API_KEY in wp-config.php.     |
 //|  3. Set UserId to the WordPress user_id that owns the stream.   |
 //|  4. Allow WebRequest for your domain in                         |
-//|     Tools → Options → Expert Advisors.                          |
+//|     Tools -> Options -> Expert Advisors.                        |
 //+------------------------------------------------------------------+
 #property copyright "SMC SuperFib"
 #property version   "1.00"
@@ -29,13 +29,39 @@ input string Symbols    = "EURUSD,GBPUSD,XAUUSD,USDJPY,GBPJPY,AUDUSD";
 MarketDataEngine engine;
 SymbolNormalizer g_symbolNormalizer;
 
-// Module-level symbol list — OnTimer() needs it to poll non-chart symbols.
+// Module-level symbol list - OnTimer() needs it to poll non-chart symbols.
 // OnTick() only fires for the chart symbol; without this loop every other
 // symbol stays at FRESHNESS_DISCONNECTED permanently.
 string g_symArray[];
 int    g_symCount = 0;
 string g_rawSymArray[];
 int    g_rawSymCount = 0;
+bool   g_configValid = true;
+int    g_warnCounter = 0;
+
+bool IsBlankInput(string value)
+{
+    StringTrimLeft(value);
+    StringTrimRight(value);
+    return StringLen(value) == 0;
+}
+
+string BuildConfigIssueSummary()
+{
+    string issues = "";
+
+    if (IsBlankInput(WebhookURL))
+        issues += "WebhookURL is empty; ";
+    if (IsBlankInput(ApiKey))
+        issues += "ApiKey is empty; ";
+    if (UserId <= 0)
+        issues += "UserId must be >= 1; ";
+
+    if (StringLen(issues) >= 2)
+        issues = StringSubstr(issues, 0, StringLen(issues) - 2);
+
+    return issues;
+}
 
 bool TrySelectBrokerSymbol(string symbol)
 {
@@ -98,24 +124,34 @@ bool ResolveBrokerSymbol(string configured, string& resolved)
 
 int OnInit()
 {
-    // --- Validate inputs ---
-    if (StringLen(WebhookURL) == 0)
+    g_configValid = true;
+    g_warnCounter = 0;
+
+    string webhookUrl = WebhookURL;
+    string apiKey     = ApiKey;
+    StringTrimLeft(webhookUrl);
+    StringTrimRight(webhookUrl);
+    StringTrimLeft(apiKey);
+    StringTrimRight(apiKey);
+
+    // Soft-validate user config so the EA can still attach and run its timer.
+    if (StringLen(webhookUrl) == 0)
     {
-        Print("SMC_MarketDataEA: WebhookURL is required");
-        return INIT_FAILED;
+        Print("WARNING: SMC_MarketDataEA WebhookURL is empty. EA will attach, but backend sends are disabled until you set WebhookURL in Inputs and re-attach the EA.");
+        g_configValid = false;
     }
-    if (StringLen(ApiKey) == 0)
+    if (StringLen(apiKey) == 0)
     {
-        Print("SMC_MarketDataEA: ApiKey is required — set it to match SMC_SF_EA_API_KEY in wp-config.php");
-        return INIT_FAILED;
+        Print("WARNING: SMC_MarketDataEA ApiKey is empty. EA will attach, but backend sends are disabled until you set ApiKey to match SMC_SF_EA_API_KEY in Inputs and re-attach the EA.");
+        g_configValid = false;
     }
     if (UserId <= 0)
     {
-        Print("SMC_MarketDataEA: UserId must be a valid WordPress user_id (>= 1)");
-        return INIT_FAILED;
+        Print("WARNING: SMC_MarketDataEA UserId must be a valid WordPress user_id (>= 1). EA will attach, but backend sends are disabled until you correct UserId in Inputs and re-attach the EA.");
+        g_configValid = false;
     }
 
-    // --- Parse symbol list ---
+    // Parse symbol list.
     g_rawSymCount = StringSplit(Symbols, ',', g_rawSymArray);
     if (g_rawSymCount <= 0)
     {
@@ -153,17 +189,24 @@ int OnInit()
         return INIT_FAILED;
     }
 
-    // Build the full auth header line — engine stores and reuses it.
+    // Build the full auth header line - engine stores and reuses it.
     // Header name MUST match what PHP reads: get_header('x_ea_api_key')
-    string auth = "X-EA-API-Key: " + ApiKey;
+    string auth = "";
+    if (StringLen(apiKey) > 0)
+        auth = "X-EA-API-Key: " + apiKey;
 
-    if (!engine.Initialize(g_symArray, g_symCount, WebhookURL, auth, UserId))
+    if (!engine.Initialize(g_symArray, g_symCount, webhookUrl, auth, UserId))
     {
         Print("SMC_MarketDataEA: engine init failed");
         return INIT_FAILED;
     }
 
     EventSetTimer(TimerSec);
+    if (!g_configValid)
+    {
+        Print("WARNING: SMC_MarketDataEA started with invalid backend config. ", BuildConfigIssueSummary(),
+              ". Backend sends are disabled; update Inputs and re-attach the EA.");
+    }
     Print("SMC_MarketDataEA: started, monitoring ", g_symCount, " resolved symbols");
     return INIT_SUCCEEDED;
 }
@@ -175,7 +218,7 @@ void OnDeinit(const int reason)
 
 void OnTick()
 {
-    // Real-time tick for the chart symbol — forward to engine immediately.
+    // Real-time tick for the chart symbol - forward to engine immediately.
     MqlTick tick;
     if (!SymbolInfoTick(Symbol(), tick))
         return;
@@ -185,6 +228,17 @@ void OnTick()
 
 void OnTimer()
 {
+    if (!g_configValid)
+    {
+        g_warnCounter++;
+        if (g_warnCounter % 6 == 0)
+        {
+            Print("WARNING: SMC_MarketDataEA backend send is still disabled. ", BuildConfigIssueSummary(),
+                  ". Update Inputs and re-attach the EA.");
+        }
+        return;
+    }
+
     // Poll all non-chart symbols so their freshness state stays accurate.
     // In MQL5, OnTick() only fires for the chart symbol; without this loop
     // every other watched symbol remains at FRESHNESS_DISCONNECTED.
