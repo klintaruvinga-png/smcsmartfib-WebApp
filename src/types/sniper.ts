@@ -125,7 +125,7 @@ export interface ChartSnapshot {
   timeframe: string;
   candles: ChartCandle[];
   fibLevels: FibLevel[];
-  updatedAt: string;
+  updatedAt: string | null;
   state: FreshnessState;
 }
 

@@ -47,10 +47,7 @@ function LivePage() {
 
   const parseUpdatedAt = (value: string): Date =>
     value.includes("T") ? new Date(value) : new Date(`${value.replace(" ", "T")}Z`);
-  const staleThresholdMs = Math.max(
-    10,
-    Math.min(60, settings?.staleThresholdSec ?? 10),
-  ) * 1000;
+  const staleThresholdMs = Math.max(10, Math.min(60, settings?.staleThresholdSec ?? 10)) * 1000;
 
   const mt5Prices = data.prices.filter((price) => {
     if (MOCK_MODE && price.source === "mock") return true;

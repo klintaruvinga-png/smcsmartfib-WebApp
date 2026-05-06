@@ -1996,7 +1996,7 @@ final class SMC_SuperFib_Sniper_REST {
     private function pip_value_per_standard_lot($user_id, $symbol, $spec) {
         $fallback = isset($spec['pip_val']) ? (float) $spec['pip_val'] : 10.0;
         if (!is_array($spec) || ($spec['type'] ?? '') !== 'forex') {
-            return $fallback_value;
+            return $fallback;
         }
 
         $market_mids = $this->market_mids_for_symbol($user_id, $symbol);
@@ -2008,18 +2008,18 @@ final class SMC_SuperFib_Sniper_REST {
         $contract_size = isset($spec['contract_size']) ? (float) $spec['contract_size'] : 0.0;
         $pip_size = isset($spec['pip_size']) ? (float) $spec['pip_size'] : 0.0;
         if (($spec['type'] ?? '') !== 'forex' || $contract_size <= 0 || $pip_size <= 0) {
-            return $fallback_value;
+            return $fallback;
         }
 
         $pair = $this->split_symbol_pair($symbol);
         if (!$pair) {
-            return $fallback_value;
+            return $fallback;
         }
 
         list($base, $quote) = $pair;
         $quote_to_usd = $this->quote_to_usd_rate_from_market($base, $quote, $market_mids);
         if ($quote_to_usd <= 0) {
-            return $fallback_value;
+            return $fallback;
         }
 
         return round($contract_size * $pip_size * $quote_to_usd, 6);
@@ -3034,7 +3034,7 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function sanitize_risk_allocation($payload, $fallback) {
         if (!is_array($payload)) {
-            return $fallback_value;
+            return $fallback;
         }
         return array(
             'perTradePct' => $this->float_between($payload, 'perTradePct', 0.1, 5.0, $fallback['perTradePct']),
@@ -3045,14 +3045,14 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function int_between($payload, $key, $min, $max, $fallback) {
         if (!is_array($payload) || !isset($payload[$key])) {
-            return $fallback_value;
+            return $fallback;
         }
         return max($min, min($max, (int) $payload[$key]));
     }
 
     private function float_between($payload, $key, $min, $max, $fallback) {
         if (!is_array($payload) || !isset($payload[$key])) {
-            return $fallback_value;
+            return $fallback;
         }
         return max($min, min($max, (float) $payload[$key]));
     }
