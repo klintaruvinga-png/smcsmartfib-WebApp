@@ -1996,7 +1996,7 @@ final class SMC_SuperFib_Sniper_REST {
     private function pip_value_per_standard_lot($user_id, $symbol, $spec) {
         $fallback = isset($spec['pip_val']) ? (float) $spec['pip_val'] : 10.0;
         if (!is_array($spec) || ($spec['type'] ?? '') !== 'forex') {
-            return $fallback;
+            return $fallback_value;
         }
 
         $market_mids = $this->market_mids_for_symbol($user_id, $symbol);
@@ -2008,18 +2008,18 @@ final class SMC_SuperFib_Sniper_REST {
         $contract_size = isset($spec['contract_size']) ? (float) $spec['contract_size'] : 0.0;
         $pip_size = isset($spec['pip_size']) ? (float) $spec['pip_size'] : 0.0;
         if (($spec['type'] ?? '') !== 'forex' || $contract_size <= 0 || $pip_size <= 0) {
-            return $fallback;
+            return $fallback_value;
         }
 
         $pair = $this->split_symbol_pair($symbol);
         if (!$pair) {
-            return $fallback;
+            return $fallback_value;
         }
 
         list($base, $quote) = $pair;
         $quote_to_usd = $this->quote_to_usd_rate_from_market($base, $quote, $market_mids);
         if ($quote_to_usd <= 0) {
-            return $fallback;
+            return $fallback_value;
         }
 
         return round($contract_size * $pip_size * $quote_to_usd, 6);
@@ -3034,7 +3034,7 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function sanitize_risk_allocation($payload, $fallback) {
         if (!is_array($payload)) {
-            return $fallback;
+            return $fallback_value;
         }
         return array(
             'perTradePct' => $this->float_between($payload, 'perTradePct', 0.1, 5.0, $fallback['perTradePct']),
@@ -3045,14 +3045,14 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function int_between($payload, $key, $min, $max, $fallback) {
         if (!is_array($payload) || !isset($payload[$key])) {
-            return $fallback;
+            return $fallback_value;
         }
         return max($min, min($max, (int) $payload[$key]));
     }
 
     private function float_between($payload, $key, $min, $max, $fallback) {
         if (!is_array($payload) || !isset($payload[$key])) {
-            return $fallback;
+            return $fallback_value;
         }
         return max($min, min($max, (float) $payload[$key]));
     }
@@ -3162,9 +3162,9 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function normalize_market_timestamp($raw_time, $fallback = null) {
-        $fallback = $fallback ?: $this->now_mysql();
+        $fallback_value = (func_num_args() >= 2) ? $fallback : $this->now_mysql();
         if ($raw_time === null || $raw_time === '') {
-            return $fallback;
+            return $fallback_value;
         }
 
         $value = trim((string) $raw_time);
@@ -3185,7 +3185,7 @@ final class SMC_SuperFib_Sniper_REST {
         $ts = strtotime($value);
         if ($ts === false) {
             error_log("FAILED TO PARSE TIMESTAMP: raw={$raw_time} | value={$value}");
-            return $fallback;
+            return $fallback_value;
         }
 
         return gmdate('Y-m-d H:i:s', $ts);
