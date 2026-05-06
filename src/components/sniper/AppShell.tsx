@@ -7,9 +7,12 @@ import {
   useSession,
   useUserSettings,
 } from "@/hooks/useSniperData";
+import { useTickFlash } from "@/hooks/useTickFlash";
 import { fmtPrice, fmtPct } from "@/lib/format";
+import { tickMotionHoldMs, tickMotionStyle, type TickMotionOptions } from "@/lib/tickMotion";
 import { SyncChip, SignalStatusChip } from "@/components/sniper/Chips";
 import { cn, deduplicateById } from "@/lib/utils";
+import type { PairPrice } from "@/types/sniper";
 import {
   Activity,
   BarChart3,
@@ -41,6 +44,52 @@ const NAV = [
   { to: "/account", label: "Account", short: "Acct", icon: Settings },
 ] as const;
 
+const HEADER_TICK_MOTION: TickMotionOptions = {
+  baseDurationMs: 220,
+  durationSpreadMs: 120,
+  delayMaxMs: 110,
+  dotBaseDurationMs: 180,
+  dotDurationSpreadMs: 110,
+  dotDelayMaxMs: 90,
+};
+
+function HeaderTickerItem({ price }: { price: PairPrice }) {
+  const flash = useTickFlash(price.mid, tickMotionHoldMs(HEADER_TICK_MOTION));
+  const motionStyle = tickMotionStyle(`${price.symbol}:header-mid`, HEADER_TICK_MOTION);
+
+  return (
+    <div style={motionStyle} className="flex items-center gap-2 whitespace-nowrap font-mono text-xs">
+      <span
+        className={cn(
+          "header-tick-dot",
+          flash === "up" && "header-tick-dot-up",
+          flash === "down" && "header-tick-dot-down",
+        )}
+      />
+      <span className="text-mute">{price.symbol}</span>
+      <span
+        className={cn(
+          "text-tx rounded px-1 -mx-1 tabular-nums",
+          flash === "up" && "tick-flash-up-fast",
+          flash === "down" && "tick-flash-down-fast",
+        )}
+      >
+        {fmtPrice(price.mid, price.symbol)}
+      </span>
+      <span
+        className={cn(
+          "rounded px-1 -mx-1 tabular-nums",
+          price.changePct1d >= 0 ? "text-buy" : "text-sell",
+          flash === "up" && "tick-flash-up-fast",
+          flash === "down" && "tick-flash-down-fast",
+        )}
+      >
+        {fmtPct(price.changePct1d)}
+      </span>
+    </div>
+  );
+}
+
 function HeaderTicker() {
   const { data } = useSnapshot();
   // Treat the header strip as authoritative live market data, not a generic cache view.
@@ -53,16 +102,7 @@ function HeaderTicker() {
     <div className="relative flex-1 overflow-hidden border-y border-bd bg-bg2/40">
       <div className="ticker-track flex w-max items-center gap-6 py-2 px-4">
         {loop.map((p, i) => (
-          <div
-            key={`${p.symbol}-${i}`}
-            className="flex items-center gap-2 whitespace-nowrap font-mono text-xs"
-          >
-            <span className="text-mute">{p.symbol}</span>
-            <span className="text-tx">{fmtPrice(p.mid, p.symbol)}</span>
-            <span className={cn(p.changePct1d >= 0 ? "text-buy" : "text-sell")}>
-              {fmtPct(p.changePct1d)}
-            </span>
-          </div>
+          <HeaderTickerItem key={`${p.symbol}-${i}`} price={p} />
         ))}
       </div>
       <div className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-bg to-transparent" />

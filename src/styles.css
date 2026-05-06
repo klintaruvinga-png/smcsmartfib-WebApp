@@ -192,12 +192,12 @@
     border-radius: 9999px;
     background: var(--buy);
     box-shadow: 0 0 0 0 rgba(70, 209, 154, 0.7);
-    animation: pulse-dot 1.6s ease-out infinite;
+    animation: pulse-dot 0.95s ease-out infinite;
   }
   .pulse-dot.warn {
     background: var(--warn);
     box-shadow: 0 0 0 0 rgba(241, 182, 92, 0.7);
-    animation: pulse-warn 1.6s ease-out infinite;
+    animation: pulse-warn 0.95s ease-out infinite;
   }
   .pulse-dot.sell {
     background: var(--sell);
@@ -246,10 +246,20 @@
 
   /* Tick flash — transient highlight when a polled value changes. */
   .tick-flash-up {
-    animation: tick-flash-up 700ms ease-out;
+    animation: tick-flash-up var(--tick-flash-duration, 420ms) cubic-bezier(0.2, 0.9, 0.2, 1)
+      var(--tick-flash-delay, 0ms);
   }
   .tick-flash-down {
-    animation: tick-flash-down 700ms ease-out;
+    animation: tick-flash-down var(--tick-flash-duration, 420ms) cubic-bezier(0.2, 0.9, 0.2, 1)
+      var(--tick-flash-delay, 0ms);
+  }
+  .tick-flash-up-fast {
+    animation: tick-flash-up-fast var(--tick-flash-duration, 320ms)
+      cubic-bezier(0.18, 0.9, 0.15, 1) var(--tick-flash-delay, 0ms);
+  }
+  .tick-flash-down-fast {
+    animation: tick-flash-down-fast var(--tick-flash-duration, 320ms)
+      cubic-bezier(0.18, 0.9, 0.15, 1) var(--tick-flash-delay, 0ms);
   }
   @keyframes tick-flash-up {
     0% {
@@ -269,6 +279,70 @@
       background-color: transparent;
     }
   }
+  @keyframes tick-flash-up-fast {
+    0% {
+      background-color: color-mix(in oklab, var(--buy) 38%, transparent);
+      color: var(--buy);
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
+  @keyframes tick-flash-down-fast {
+    0% {
+      background-color: color-mix(in oklab, var(--sell) 38%, transparent);
+      color: var(--sell);
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
+
+  .header-tick-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 9999px;
+    background: color-mix(in oklab, var(--mute) 50%, transparent);
+    opacity: 0.8;
+  }
+  .header-tick-dot-up {
+    background: var(--buy);
+    animation: header-tick-up var(--tick-flash-dot-duration, 320ms) linear
+      var(--tick-flash-dot-delay, 0ms);
+  }
+  .header-tick-dot-down {
+    background: var(--sell);
+    animation: header-tick-down var(--tick-flash-dot-duration, 320ms) linear
+      var(--tick-flash-dot-delay, 0ms);
+  }
+  @keyframes header-tick-up {
+    0% {
+      transform: scale(0.8);
+      box-shadow: 0 0 0 0 color-mix(in oklab, var(--buy) 55%, transparent);
+    }
+    60% {
+      transform: scale(1.7);
+      box-shadow: 0 0 0 4px color-mix(in oklab, var(--buy) 0%, transparent);
+    }
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 color-mix(in oklab, var(--buy) 0%, transparent);
+    }
+  }
+  @keyframes header-tick-down {
+    0% {
+      transform: scale(0.8);
+      box-shadow: 0 0 0 0 color-mix(in oklab, var(--sell) 55%, transparent);
+    }
+    60% {
+      transform: scale(1.7);
+      box-shadow: 0 0 0 4px color-mix(in oklab, var(--sell) 0%, transparent);
+    }
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 color-mix(in oklab, var(--sell) 0%, transparent);
+    }
+  }
 
   .live-dot {
     position: relative;
@@ -279,7 +353,7 @@
     inset: -2px;
     border-radius: 9999px;
     box-shadow: 0 0 0 0 color-mix(in oklab, var(--buy) 60%, transparent);
-    animation: live-pulse 1.6s ease-out infinite;
+    animation: live-pulse 0.95s ease-out infinite;
   }
   @keyframes live-pulse {
     0% {
