@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useSnapshot, useEngineBatch, useUserSettings } from "@/hooks/useSniperData";
+import { useTickFlash } from "@/hooks/useTickFlash";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { BiasBadge, ChopMeter, GateBadge } from "@/components/sniper/Indicators";
 import { WarningLine } from "@/components/sniper/Warnings";
@@ -7,7 +8,13 @@ import { fmtPrice, fmtPct, relTime } from "@/lib/format";
 import { MOCK_MODE } from "@/lib/api/sniperClient";
 import { cn } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
-import type { EngineBlocker } from "@/types/sniper";
+import type {
+  EngineBlocker,
+  PairPrice,
+  RegimeState,
+  GateState,
+  SymbolDiagnostic,
+} from "@/types/sniper";
 
 export const Route = createFileRoute("/live")({
   head: () => ({
@@ -105,109 +112,153 @@ function LivePage() {
           const regime = data.regimes.find((r) => r.symbol === price.symbol);
           const gate = data.gates.find((g) => g.symbol === price.symbol);
           const diagnostic = (data.diagnostics ?? []).find((d) => d.symbol === price.symbol);
-          // Trust the backend's `state` flag as the source of truth.
-          // Only fall back to comparing `updatedAt` against the client clock when
-          // the backend explicitly does NOT report the feed as live — some
-          // backends stamp an older `updatedAt` (e.g. last bar close) while
-          // still serving live ticks, which would otherwise produce a false
-          // "stale" badge on healthy cards.
-          const backendLive = price.state === "live";
-          const clientStale =
-            !backendLive && price.updatedAt
-              ? Date.now() - new Date(price.updatedAt).getTime() > staleThresholdMs
-              : false;
-          const stale = price.state === "stale" || regime?.state === "stale" || clientStale;
-          const priceUnavailable =
-            price.mid === 0 && (price.state === "unavailable" || gate?.allow === "BLOCKED");
-          const diagWarning = blockerWarning(diagnostic?.engineBlocker);
-          const staleTimestamp = diagnostic?.lastPriceAt ?? price.updatedAt;
           return (
-            <div
+            <PriceCard
               key={price.symbol}
-              className={cn(
-                "rounded-lg border bg-bg1/60 p-3.5 space-y-3",
-                price.state === "unavailable" || gate?.allow === "BLOCKED"
-                  ? "border-sell/30"
-                  : stale
-                    ? "border-warn/30"
-                    : "border-bd",
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <div className="font-mono text-base font-semibold">{price.symbol}</div>
-                <FreshnessBadge state={price.state} />
-              </div>
-
-              <div className="flex items-baseline justify-between">
-                <div className="font-mono text-2xl font-semibold tabular-nums">
-                  {priceUnavailable ? "—" : fmtPrice(price.mid, price.symbol)}
-                </div>
-                <div
-                  className={cn(
-                    "font-mono text-sm",
-                    price.changePct1d >= 0 ? "text-buy" : "text-sell",
-                  )}
-                >
-                  {priceUnavailable ? "—" : fmtPct(price.changePct1d)}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-[10px] font-mono text-mute">
-                <span>BID {priceUnavailable ? "—" : fmtPrice(price.bid, price.symbol)}</span>
-                <span>ASK {priceUnavailable ? "—" : fmtPrice(price.ask, price.symbol)}</span>
-              </div>
-
-              <div className="border-t border-bd pt-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-mute">
-                    Regime
-                  </span>
-                  {regime && <BiasBadge bias={regime.bias} />}
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-mute">
-                    Gate
-                  </span>
-                  {gate && <GateBadge allow={gate.allow} />}
-                </div>
-                {regime && (
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-mono uppercase tracking-wider text-mute">
-                        Chop
-                      </span>
-                      <span className="text-[10px] font-mono text-dim">
-                        Fib {regime.nearestFib ? fmtPrice(regime.nearestFib, price.symbol) : "—"}
-                      </span>
-                    </div>
-                    <ChopMeter value={regime.chop} />
-                  </div>
-                )}
-              </div>
-
-              {gate?.reason && <WarningLine level="block">Gate blocked: {gate.reason}</WarningLine>}
-              {diagWarning && !gate?.reason && (
-                <WarningLine
-                  level={
-                    diagnostic?.engineBlocker === "KEY_MISSING" ||
-                    diagnostic?.engineBlocker === "KEY_INVALID" ||
-                    diagnostic?.engineBlocker === "RATE_LIMITED"
-                      ? "block"
-                      : "warn"
-                  }
-                >
-                  {diagWarning}
-                </WarningLine>
-              )}
-              {stale && !gate?.reason && !diagWarning && (
-                <WarningLine level="warn">
-                  Price data stale — last update {relTime(staleTimestamp)}.
-                </WarningLine>
-              )}
-            </div>
+              price={price}
+              regime={regime}
+              gate={gate}
+              diagnostic={diagnostic}
+              staleThresholdMs={staleThresholdMs}
+            />
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function PriceCard({
+  price,
+  regime,
+  gate,
+  diagnostic,
+  staleThresholdMs,
+}: {
+  price: PairPrice;
+  regime: RegimeState | undefined;
+  gate: GateState | undefined;
+  diagnostic: SymbolDiagnostic | undefined;
+  staleThresholdMs: number;
+}) {
+  // Tick flashes — driven by polling updates of mid / bid / ask / chop.
+  const midFlash = useTickFlash(price.mid);
+  const bidFlash = useTickFlash(price.bid);
+  const askFlash = useTickFlash(price.ask);
+  const chopFlash = useTickFlash(regime?.chop);
+
+  const backendLive = price.state === "live";
+  const clientStale =
+    !backendLive && price.updatedAt
+      ? Date.now() - new Date(price.updatedAt).getTime() > staleThresholdMs
+      : false;
+  const stale = price.state === "stale" || regime?.state === "stale" || clientStale;
+  const priceUnavailable =
+    price.mid === 0 && (price.state === "unavailable" || gate?.allow === "BLOCKED");
+  const diagWarning = blockerWarning(diagnostic?.engineBlocker);
+  const staleTimestamp = diagnostic?.lastPriceAt ?? price.updatedAt;
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border bg-bg1/60 p-3.5 space-y-3 transition-colors",
+        price.state === "unavailable" || gate?.allow === "BLOCKED"
+          ? "border-sell/30"
+          : stale
+            ? "border-warn/30"
+            : "border-bd",
+      )}
+    >
+      <div className="flex items-center justify-between">
+        <div className="font-mono text-base font-semibold">{price.symbol}</div>
+        <FreshnessBadge state={price.state} />
+      </div>
+
+      <div className="flex items-baseline justify-between">
+        <div
+          className={cn(
+            "font-mono text-2xl font-semibold tabular-nums rounded px-1 -mx-1",
+            midFlash === "up" && "tick-flash-up",
+            midFlash === "down" && "tick-flash-down",
+          )}
+        >
+          {priceUnavailable ? "—" : fmtPrice(price.mid, price.symbol)}
+        </div>
+        <div
+          className={cn("font-mono text-sm", price.changePct1d >= 0 ? "text-buy" : "text-sell")}
+        >
+          {priceUnavailable ? "—" : fmtPct(price.changePct1d)}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between text-[10px] font-mono text-mute">
+        <span
+          className={cn(
+            "rounded px-1 -mx-1",
+            bidFlash === "up" && "tick-flash-up",
+            bidFlash === "down" && "tick-flash-down",
+          )}
+        >
+          BID {priceUnavailable ? "—" : fmtPrice(price.bid, price.symbol)}
+        </span>
+        <span
+          className={cn(
+            "rounded px-1 -mx-1",
+            askFlash === "up" && "tick-flash-up",
+            askFlash === "down" && "tick-flash-down",
+          )}
+        >
+          ASK {priceUnavailable ? "—" : fmtPrice(price.ask, price.symbol)}
+        </span>
+      </div>
+
+      <div className="border-t border-bd pt-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-mute">Regime</span>
+          {regime && <BiasBadge bias={regime.bias} />}
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-mute">Gate</span>
+          {gate && <GateBadge allow={gate.allow} />}
+        </div>
+        {regime && (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-mute">Chop</span>
+              <span
+                className={cn(
+                  "text-[10px] font-mono text-dim rounded px-1 -mx-1",
+                  chopFlash === "up" && "tick-flash-up",
+                  chopFlash === "down" && "tick-flash-down",
+                )}
+              >
+                Fib {regime.nearestFib ? fmtPrice(regime.nearestFib, price.symbol) : "—"}
+              </span>
+            </div>
+            <ChopMeter value={regime.chop} />
+          </div>
+        )}
+      </div>
+
+      {gate?.reason && <WarningLine level="block">Gate blocked: {gate.reason}</WarningLine>}
+      {diagWarning && !gate?.reason && (
+        <WarningLine
+          level={
+            diagnostic?.engineBlocker === "KEY_MISSING" ||
+            diagnostic?.engineBlocker === "KEY_INVALID" ||
+            diagnostic?.engineBlocker === "RATE_LIMITED"
+              ? "block"
+              : "warn"
+          }
+        >
+          {diagWarning}
+        </WarningLine>
+      )}
+      {stale && !gate?.reason && !diagWarning && (
+        <WarningLine level="warn">
+          Price data stale — last update {relTime(staleTimestamp)}.
+        </WarningLine>
+      )}
     </div>
   );
 }
