@@ -108,13 +108,18 @@ function LivePage() {
           const regime = data.regimes.find((r) => r.symbol === price.symbol);
           const gate = data.gates.find((g) => g.symbol === price.symbol);
           const diagnostic = (data.diagnostics ?? []).find((d) => d.symbol === price.symbol);
-          // Preserve backend freshness authority; the browser clock must not override
-          // backend-live data into a stale warning state.
-          const stale =
-            price.state === "stale" ||
-            regime?.state === "stale" ||
-            diagnostic?.priceState === "stale" ||
-            diagnostic?.candleState === "stale";
+          // Trust the backend's `state` flag as the source of truth.
+          // Only fall back to comparing `updatedAt` against the client clock when
+          // the backend explicitly does NOT report the feed as live — some
+          // backends stamp an older `updatedAt` (e.g. last bar close) while
+          // still serving live ticks, which would otherwise produce a false
+          // "stale" badge on healthy cards.
+          const backendLive = price.state === "live";
+          const clientStale =
+            !backendLive && price.updatedAt
+              ? Date.now() - new Date(price.updatedAt).getTime() > staleThresholdMs
+              : false;
+          const stale = price.state === "stale" || regime?.state === "stale" || clientStale;
           const priceUnavailable =
             price.mid === 0 && (price.state === "unavailable" || gate?.allow === "BLOCKED");
           const diagWarning = blockerWarning(diagnostic?.engineBlocker);
