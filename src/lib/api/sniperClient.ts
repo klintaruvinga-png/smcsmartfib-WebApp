@@ -52,7 +52,7 @@ const DEFAULT_BACKEND_URL =
 
 export const MOCK_MODE =
   String(
-    import.meta.env.VITE_SNIPER_MOCK_MODE ?? (import.meta.env.DEV ? "true" : "false"),
+    import.meta.env.VITE_SNIPER_MOCK_MODE ?? "false",
   ).toLowerCase() === "true";
 
 let backendUrl = DEFAULT_BACKEND_URL;
