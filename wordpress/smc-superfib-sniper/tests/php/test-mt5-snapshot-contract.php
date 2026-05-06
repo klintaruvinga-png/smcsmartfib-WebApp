@@ -572,6 +572,37 @@ assert_same('live', $quote['state'], 'fetch_quote MT5 guard must preserve live s
 assert_same('mt5', $quote['source'], 'fetch_quote MT5 guard must preserve source authority');
 assert_true(isset($quote['age_sec']) && $quote['age_sec'] <= 10, 'fetch_quote MT5 guard must expose fresh age_sec');
 
+$GLOBALS['test_transients']['smc_sf_rl_7_eurusd'] = time();
+$wpdb->replace($snapshotTable, array(
+    'user_id' => 7,
+    'symbol' => 'EURUSD',
+    'bid' => 1.1000,
+    'ask' => 1.1002,
+    'mid' => 1.1001,
+    'spread' => 2,
+    'change_pct_1d' => 0,
+    'source' => 'mt5',
+    'state' => 'live',
+    'updated_at' => gmdate('Y-m-d H:i:s', time() - 600),
+));
+
+$staleHealth = $instance->get_health();
+assert_same('stale', $staleHealth['feedStatus'], 'EA-authoritative stale symbols must degrade to stale instead of reusing Twelve Data rate-limit state');
+
+$staleQuote = $fetchQuote->invoke($instance, 7, 'EURUSD');
+assert_true(is_array($staleQuote), 'fetch_quote should still expose the MT5 snapshot for EA-authoritative symbols');
+assert_same('mt5', $staleQuote['source'], 'fetch_quote must keep MT5 as authority even when the quote is stale');
+assert_same('stale', $staleQuote['state'], 'fetch_quote must surface stale MT5 state without falling back to Twelve Data');
+
+$fetchCandles = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'fetch_candles');
+$fetchCandles->setAccessible(true);
+$staleCandles = $fetchCandles->invoke($instance, 7, 'EURUSD', '15min', 30);
+
+$determineBlocker = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'determine_engine_blocker');
+$determineBlocker->setAccessible(true);
+$staleBlocker = $determineBlocker->invoke($instance, 7, $staleQuote, $staleCandles, false, 'WATCH', 'EURUSD');
+assert_same('PRICE_STALE', $staleBlocker, 'EA-authoritative stale symbols must not surface RATE_LIMITED from stale Twelve Data cooldown state');
+
 $wpdb->replace($snapshotTable, array(
     'user_id' => 7,
     'symbol' => 'XAUUSD',

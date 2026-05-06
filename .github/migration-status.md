@@ -1,11 +1,11 @@
 # SMC SuperFIB → MT5 Migration Status Board
 
-**Last Updated**: 2026-05-05  
+**Last Updated**: 2026-05-06  
 **Current Phase**: 0 (Stabilization)  
 **Overall Progress**: 18%
 **Status**: In Progress
 
-> Snapshot: v13.0.0 MT5 authority patch verified. MT5-live symbols bypass Twelve Data, EA pushes clear same-symbol TD cooldown state, backendSync now receives EA heartbeats, and MT5 day-change derives from UTC-day M1 opens. Phase 0 remains in stabilization pending live soak and candle-history aggregation verification.
+> Snapshot: v13.0.0 MT5 authority hardening verified. EA-authoritative symbols now ignore stale Twelve Data cooldown and key-status escalation in health/blocker paths, MT5-live symbols bypass Twelve Data, EA pushes clear same-symbol TD cooldown state, backendSync receives EA heartbeats, and MT5 day-change derives from UTC-day M1 opens. Phase 0 remains in stabilization pending live soak and candle-history aggregation verification.
 
 ---
 
@@ -46,6 +46,7 @@
 
 ### Deliverables
 - [x] Refresh stability hardening: server-time MT5 snapshots, MT5-live TD bypass, same-symbol TD cooldown clearing, and no stale-timestamp corruption in the covered paths
+- [x] EA authority hardening: stale Twelve Data rate-limit/key-status state no longer overrides EA-owned symbol health or engine blocker decisions
 - [ ] Signal engine stability: deterministic LIVE/STALE states, proper regime gating, valid freshness rules
 - [ ] Backend parity: Pine/backend/dashboard alignment verified
 
@@ -54,6 +55,7 @@
 - [ ] Signal engine remains consistent
 - [x] No false LIVE states in covered MT5 snapshot/feed-health regression paths
 - [x] No stale-loop deadlocks in covered same-symbol MT5/TD cooldown regression paths
+- [x] No false `rate-limited` or `blocked` state for EA-authoritative symbols from stale Twelve Data cooldown/key status
 
 ### Test Checklist
 - [ ] Refresh for 24h+

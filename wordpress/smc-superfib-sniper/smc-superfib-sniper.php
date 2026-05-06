@@ -501,13 +501,19 @@ final class SMC_SuperFib_Sniper_REST {
         $settings = $this->get_settings($user_id);
         $feed_has_stale_symbols = false;
         $feed_any_rate_limited = false;
+        $feed_requires_twelve_data = false;
         $mt5_live_symbols = 0;
         $watchlist_count = count($settings['watchlist']);
         foreach ($settings['watchlist'] as $symbol) {
+            $mt5_authority = $this->is_mt5_authoritative($user_id, $symbol);
+            if (!$mt5_authority) {
+                $feed_requires_twelve_data = true;
+            }
             $cached_price = $this->get_cached_price($user_id, $symbol, $settings['staleThresholdSec']);
             $mt5_price_live = $cached_price
                 && ($cached_price['source'] ?? '') === 'mt5'
                 && ($cached_price['state'] ?? '') === 'live';
+            $symbol_rate_limited = $this->is_feed_rate_limited($user_id, $symbol);
             $mt5_candles_live = false;
             if ($mt5_price_live) {
                 $candles = $this->fetch_candles($user_id, $symbol, '15min', 30);
@@ -522,9 +528,21 @@ final class SMC_SuperFib_Sniper_REST {
             } elseif ($mt5_price_live || !$cached_price || ($cached_price['state'] ?? 'offline') !== 'live') {
                 $feed_has_stale_symbols = true;
             }
-            // MT5 authority should not be punished by stale Twelve Data rate-limit state.
-            if (!$mt5_price_live && $this->is_feed_rate_limited($user_id, $symbol)) {
+            if (!$mt5_authority && $symbol_rate_limited) {
                 $feed_any_rate_limited = true;
+            }
+
+            if ($symbol_rate_limited || !$mt5_price_live || !$mt5_candles_live) {
+                $this->log_feed_debug('health.symbol', array(
+                    'symbol' => $symbol,
+                    'mt5_authority' => $mt5_authority,
+                    'price_source' => $cached_price['source'] ?? 'none',
+                    'price_state' => $cached_price['state'] ?? 'missing',
+                    'price_age_sec' => isset($cached_price['age_sec']) ? (int) $cached_price['age_sec'] : null,
+                    'mt5_price_live' => $mt5_price_live,
+                    'mt5_candles_live' => $mt5_candles_live,
+                    'rate_limited' => $symbol_rate_limited,
+                ));
             }
         }
 
@@ -534,7 +552,7 @@ final class SMC_SuperFib_Sniper_REST {
             $feed_status = 'live';
         } elseif ($feed_any_rate_limited) {
             $feed_status = 'rate-limited';
-        } elseif ($key_status !== 'ok') {
+        } elseif ($feed_requires_twelve_data && $key_status !== 'ok') {
             $feed_status = 'blocked';
         } elseif (!$feed_has_stale_symbols && $batch_age <= 120) {
             $feed_status = 'live';
@@ -543,6 +561,19 @@ final class SMC_SuperFib_Sniper_REST {
         }
         // priceFeed kept for backwards compatibility.
         $price_feed = ($feed_status === 'live') ? 'live' : (($feed_status === 'blocked') ? 'blocked' : 'stale');
+
+        if ($feed_status !== 'live' || $feed_any_rate_limited || $feed_has_stale_symbols) {
+            $this->log_feed_debug('health.summary', array(
+                'feed_status' => $feed_status,
+                'price_feed' => $price_feed,
+                'backend_sync' => $backend_sync,
+                'watchlist_count' => $watchlist_count,
+                'mt5_live_symbols' => $mt5_live_symbols,
+                'requires_twelve_data' => $feed_requires_twelve_data,
+                'stale_symbols' => $feed_has_stale_symbols,
+                'rate_limited' => $feed_any_rate_limited,
+            ));
+        }
 
         // engineRunState: whether the last engine run used fresh data or a cached result.
         if (!$last_run) {
@@ -1713,8 +1744,8 @@ final class SMC_SuperFib_Sniper_REST {
         $has_key = $this->get_twelve_key_status($user_id) === 'ok';
         $settings = $this->get_settings($user_id);
         $stale_threshold_sec = $settings['staleThresholdSec'];
-        $mt5_price_authority = $this->is_mt5_authoritative($user_id, $symbol);
-        $state = ($has_key || $mt5_price_authority) ? 'stale' : 'blocked';
+        $mt5_authority = $this->is_mt5_authoritative($user_id, $symbol);
+        $state = ($has_key || $mt5_authority) ? 'stale' : 'blocked';
 
         if (!$price) {
             $price = array('symbol' => $symbol, 'mid' => 0, 'updatedAt' => gmdate('c'), 'state' => $state);
@@ -1728,7 +1759,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         if (count($candles) < 30 || (float) $price['mid'] <= 0) {
             $early_blocker = $this->determine_engine_blocker($user_id, $price, $candles, false, 'WATCH', $symbol);
-            $early_gate_reason = ($has_key || $mt5_price_authority) ? 'insufficient candle history' : 'Twelve Data key missing';
+            $early_gate_reason = ($has_key || $mt5_authority) ? 'insufficient candle history' : 'Twelve Data key missing';
             if ($early_blocker === 'KEY_MISSING' || $early_blocker === 'KEY_INVALID') {
                 $early_gate_reason = 'Twelve Data key ' . ($early_blocker === 'KEY_MISSING' ? 'missing' : 'invalid');
             } elseif ($early_blocker === 'RATE_LIMITED') {
@@ -2170,20 +2201,50 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function fetch_quote($user_id, $symbol) {
         if ($this->is_mt5_authoritative($user_id, $symbol)) {
-            return $this->get_cached_price($user_id, $symbol);
+            $cached = $this->get_cached_price($user_id, $symbol);
+            if (!$cached) {
+                $this->log_feed_debug('fetch_quote.mt5_missing', array(
+                    'symbol' => $symbol,
+                    'rate_limited' => $this->is_feed_rate_limited($user_id, $symbol),
+                ));
+            } elseif (($cached['state'] ?? 'offline') !== 'live') {
+                $this->log_feed_debug('fetch_quote.mt5_stale', array(
+                    'symbol' => $symbol,
+                    'state' => $cached['state'] ?? 'missing',
+                    'age_sec' => isset($cached['age_sec']) ? (int) $cached['age_sec'] : null,
+                    'rate_limited' => $this->is_feed_rate_limited($user_id, $symbol),
+                ));
+            }
+            return $cached;
         }
 
-        error_log(sprintf('[fetch_quote] no fresh MT5 data for %s; returning null', $symbol));
+        $cached = $this->get_cached_price($user_id, $symbol);
+        $this->log_feed_debug('fetch_quote.non_mt5', array(
+            'symbol' => $symbol,
+            'cached_source' => $cached['source'] ?? 'none',
+            'cached_state' => $cached['state'] ?? 'missing',
+            'rate_limited' => $this->is_feed_rate_limited($user_id, $symbol),
+        ));
         return null;
     }
 
     private function fetch_candles($user_id, $symbol, $timeframe, $outputsize) {
         global $wpdb;
 
-        // Candle TTL: skip upstream call when candles were fetched recently or feed is rate-limited.
-        // The stored DB candles remain available regardless.
+        // Candle TTL: skip upstream call when candles were fetched recently, when the symbol is
+        // MT5-authoritative, or when a non-MT5 symbol is in Twelve Data cooldown.
         $candle_ttl_key = 'smc_sf_ct_' . $user_id . '_' . md5($symbol . '|' . $timeframe);
-        $candle_ttl_active = get_transient($candle_ttl_key) !== false || $this->is_feed_rate_limited($user_id, $symbol);
+        $mt5_authority = $this->is_mt5_authoritative($user_id, $symbol);
+        $candle_ttl_hit = get_transient($candle_ttl_key) !== false;
+        $symbol_rate_limited = $this->is_feed_rate_limited($user_id, $symbol);
+        $candle_ttl_active = $mt5_authority || $candle_ttl_hit || (!$mt5_authority && $symbol_rate_limited);
+
+        if ($mt5_authority && $symbol_rate_limited) {
+            $this->log_feed_debug('fetch_candles.rate_limit_ignored', array(
+                'symbol' => $symbol,
+                'timeframe' => $timeframe,
+            ));
+        }
 
         $key = $this->get_twelve_key($user_id);
         if (!$candle_ttl_active && !is_wp_error($key) && $key) {
@@ -2201,6 +2262,11 @@ final class SMC_SuperFib_Sniper_REST {
                 if ($td_code === 429 || (isset($body['code']) && (int) $body['code'] === 429)) {
                     // Transient-based rate-limit — do NOT change key_status so get_twelve_key() keeps working after cooldown.
                     $this->set_feed_rate_limited($user_id, $symbol);
+                    $this->log_feed_debug('fetch_candles.rate_limited', array(
+                        'symbol' => $symbol,
+                        'timeframe' => $timeframe,
+                        'authority' => 'twelve-data',
+                    ));
                 } elseif ($td_code === 401 || $td_code === 403 || (isset($body['code']) && in_array((int) $body['code'], array(401, 403), true))) {
                     // Only auth failures invalidate the key; a 400/404 for an unsupported symbol must not.
                     $this->set_twelve_key_status($user_id, 'invalid');
@@ -2305,6 +2371,14 @@ final class SMC_SuperFib_Sniper_REST {
                     return $mt5_aggregated;
                 }
             }
+        }
+
+        if ($mt5_authority && count($rows) < min(30, (int) $outputsize)) {
+            $this->log_feed_debug('fetch_candles.mt5_gap', array(
+                'symbol' => $symbol,
+                'timeframe' => $timeframe,
+                'rows' => count($rows),
+            ));
         }
 
         // Reverse to chronological order (oldest to newest)
@@ -2737,9 +2811,26 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         $key_status = $this->get_twelve_key_status($user_id);
+        $symbol_rate_limited = $symbol !== null && $this->is_feed_rate_limited($user_id, $symbol);
         if (!$is_mt5_authority && $key_status === 'missing') return 'KEY_MISSING';
         if (!$is_mt5_authority && $key_status === 'invalid') return 'KEY_INVALID';
-        if ($this->is_feed_rate_limited($user_id, $symbol)) return 'RATE_LIMITED';
+        if (!$is_mt5_authority && $symbol_rate_limited) {
+            $this->log_feed_debug('engine_blocker.rate_limited', array(
+                'symbol' => $symbol,
+                'status' => $status,
+                'price_state' => $price['state'] ?? 'missing',
+                'candle_count' => is_array($candles) ? count($candles) : 0,
+            ));
+            return 'RATE_LIMITED';
+        }
+        if ($is_mt5_authority && $symbol_rate_limited) {
+            $this->log_feed_debug('engine_blocker.rate_limit_ignored', array(
+                'symbol' => $symbol,
+                'status' => $status,
+                'price_state' => $price['state'] ?? 'missing',
+                'candle_count' => is_array($candles) ? count($candles) : 0,
+            ));
+        }
 
         if (empty($price) || !isset($price['mid']) || (float) $price['mid'] <= 0) {
             return 'QUOTE_UNAVAILABLE';
@@ -2772,9 +2863,13 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function is_mt5_authoritative($user_id, $symbol) {
         if (!$symbol) return false;
-        $settings = $this->get_settings($user_id);
-        $cached_price = $this->get_cached_price($user_id, $symbol, $settings['staleThresholdSec']);
-        return $cached_price && ($cached_price['source'] ?? '') === 'mt5' && ($cached_price['state'] ?? '') === 'live';
+        $cached_price = $this->get_cached_price($user_id, $symbol, PHP_INT_MAX);
+        if ($cached_price && ($cached_price['source'] ?? '') === 'mt5') {
+            return true;
+        }
+
+        $svc = new SMC_MarketData_Service();
+        return $svc->has_mt5_data($user_id, $symbol);
     }
 
     // ── Rate-limit transient helpers ─────────────────────────────────────────
@@ -2821,6 +2916,22 @@ final class SMC_SuperFib_Sniper_REST {
         foreach ($settings['watchlist'] as $symbol) {
             delete_transient($this->rl_transient_key($user_id, $symbol));
         }
+    }
+
+    private function log_feed_debug($event, $context = array()) {
+        $parts = array();
+        foreach ($context as $key => $value) {
+            if (is_bool($value)) {
+                $value = $value ? 'yes' : 'no';
+            } elseif ($value === null) {
+                $value = 'null';
+            } elseif (is_array($value)) {
+                $value = wp_json_encode($value);
+            }
+            $parts[] = $key . '=' . $value;
+        }
+
+        error_log('[smc_feed] ' . $event . (empty($parts) ? '' : ' | ' . implode(' ', $parts)));
     }
 
     private function set_twelve_key_status($user_id, $status) {
