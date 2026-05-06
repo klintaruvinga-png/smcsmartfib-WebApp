@@ -1627,7 +1627,7 @@ final class SMC_SuperFib_Sniper_REST {
                 );
                 $diagnostics[] = array(
                     'symbol' => $symbol,
-                    'priceState' => $price_state === 'live' ? 'stale' : $price_state,
+                    'priceState' => $price_state,  // Trust backend's live/stale state; don't override to stale
                     'candleState' => 'not_checked',
                     'lastPriceAt' => is_array($price) ? ($price['updatedAt'] ?? null) : null,
                     'lastCandleAt' => null,
