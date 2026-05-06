@@ -14,6 +14,15 @@ export interface TickMotionEvent {
   motionImpulse?: number;
 }
 
+interface ResolvedTickMotionTimings {
+  durationBase: number;
+  durationSpread: number;
+  delaySpread: number;
+  dotDurationBase: number;
+  dotDurationSpread: number;
+  dotDelaySpread: number;
+}
+
 function hashString(input: string): number {
   let hash = 2166136261;
   for (let i = 0; i < input.length; i += 1) {
@@ -31,16 +40,38 @@ function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
-export function tickMotionHoldMs({
-  baseDurationMs,
-  durationSpreadMs,
-  delayMaxMs,
-  dotBaseDurationMs = baseDurationMs,
-  dotDurationSpreadMs = durationSpreadMs,
-  dotDelayMaxMs = delayMaxMs,
-}: TickMotionOptions): number {
-  const flashTotal = baseDurationMs + durationSpreadMs + delayMaxMs;
-  const dotTotal = dotBaseDurationMs + dotDurationSpreadMs + dotDelayMaxMs;
+function resolveTickMotionTimings(
+  {
+    baseDurationMs,
+    durationSpreadMs,
+    delayMaxMs,
+    dotBaseDurationMs = baseDurationMs,
+    dotDurationSpreadMs = durationSpreadMs,
+    dotDelayMaxMs = delayMaxMs,
+  }: TickMotionOptions,
+  impulse: number,
+): ResolvedTickMotionTimings {
+  return {
+    durationBase: baseDurationMs + Math.round(baseDurationMs * 0.14 * impulse),
+    durationSpread: Math.max(12, Math.round(durationSpreadMs * (0.55 + impulse * 0.8))),
+    delaySpread: Math.max(0, Math.round(delayMaxMs * (1.05 - impulse * 0.65))),
+    dotDurationBase: dotBaseDurationMs + Math.round(dotBaseDurationMs * 0.12 * impulse),
+    dotDurationSpread: Math.max(12, Math.round(dotDurationSpreadMs * (0.5 + impulse * 0.9))),
+    dotDelaySpread: Math.max(0, Math.round(dotDelayMaxMs * (1.05 - impulse * 0.6))),
+  };
+}
+
+export function tickMotionHoldMs(
+  options: TickMotionOptions,
+  motionEvent?: TickMotionEvent,
+): number {
+  const timings = resolveTickMotionTimings(
+    options,
+    motionEvent ? clamp01(motionEvent.motionImpulse ?? 0) : 1,
+  );
+  const flashTotal = timings.durationBase + timings.durationSpread + timings.delaySpread;
+  const dotTotal =
+    timings.dotDurationBase + timings.dotDurationSpread + timings.dotDelaySpread;
   // Leave one frame of slack so the class survives until the CSS animation completes.
   return Math.max(flashTotal, dotTotal) + 16;
 }
@@ -63,12 +94,24 @@ export function tickMotionStyle(
   const delayHash = hashString(`${key}:${eventKey}:delay`);
   const dotDurationHash = hashString(`${key}:${eventKey}:dot-duration`);
   const dotDelayHash = hashString(`${key}:${eventKey}:dot-delay`);
-  const durationBase = baseDurationMs + Math.round(baseDurationMs * 0.14 * impulse);
-  const durationSpread = Math.max(12, Math.round(durationSpreadMs * (0.55 + impulse * 0.8)));
-  const delaySpread = Math.max(0, Math.round(delayMaxMs * (1.05 - impulse * 0.65)));
-  const dotDurationBase = dotBaseDurationMs + Math.round(dotBaseDurationMs * 0.12 * impulse);
-  const dotDurationSpread = Math.max(12, Math.round(dotDurationSpreadMs * (0.5 + impulse * 0.9)));
-  const dotDelaySpread = Math.max(0, Math.round(dotDelayMaxMs * (1.05 - impulse * 0.6)));
+  const {
+    durationBase,
+    durationSpread,
+    delaySpread,
+    dotDurationBase,
+    dotDurationSpread,
+    dotDelaySpread,
+  } = resolveTickMotionTimings(
+    {
+      baseDurationMs,
+      durationSpreadMs,
+      delayMaxMs,
+      dotBaseDurationMs,
+      dotDurationSpreadMs,
+      dotDelayMaxMs,
+    },
+    impulse,
+  );
 
   return {
     "--tick-flash-duration": `${ranged(durationHash, durationBase, durationSpread)}ms`,
