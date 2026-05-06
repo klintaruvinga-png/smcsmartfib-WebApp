@@ -262,6 +262,28 @@
     transition: color 0.2s ease, background-color 0.25s ease;
   }
 
+  .tick-hold-up {
+    color: var(--buy);
+    background-color: color-mix(in oklab, var(--buy) 12%, transparent);
+  }
+
+  .tick-hold-down {
+    color: var(--sell);
+    background-color: color-mix(in oklab, var(--sell) 12%, transparent);
+  }
+
+  .tick-surface-hold-up {
+    border-color: color-mix(in oklab, var(--buy) 34%, var(--border) 66%);
+    background-color: color-mix(in oklab, var(--buy) 6%, var(--bg-1) 94%);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--buy) 10%, transparent);
+  }
+
+  .tick-surface-hold-down {
+    border-color: color-mix(in oklab, var(--sell) 34%, var(--border) 66%);
+    background-color: color-mix(in oklab, var(--sell) 6%, var(--bg-1) 94%);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--sell) 10%, transparent);
+  }
+
   /* Tick flash — transient highlight when a polled value changes. */
   .tick-flash-up {
     animation: tick-flash-up var(--tick-flash-duration, 420ms) cubic-bezier(0.2, 0.9, 0.2, 1)
@@ -334,10 +356,16 @@
     animation: header-tick-up var(--tick-flash-dot-duration, 320ms) linear
       var(--tick-flash-dot-delay, 0ms);
   }
+  .header-tick-dot-hold-up {
+    background: color-mix(in oklab, var(--buy) 72%, transparent);
+  }
   .header-tick-dot-down {
     background: var(--sell);
     animation: header-tick-down var(--tick-flash-dot-duration, 320ms) linear
       var(--tick-flash-dot-delay, 0ms);
+  }
+  .header-tick-dot-hold-down {
+    background: color-mix(in oklab, var(--sell) 72%, transparent);
   }
   @keyframes header-tick-up {
     0% {

@@ -58,6 +58,7 @@ function HeaderTickerItem({ price }: { price: PairPrice }) {
   const {
     value: animatedMid,
     direction: midDir,
+    heldDirection: heldMidDir,
     motionKey: midMotionKey,
     motionImpulse: midMotionImpulse,
   } = useAnimatedNumber(price.mid, 280, flashHoldMs);
@@ -72,6 +73,8 @@ function HeaderTickerItem({ price }: { price: PairPrice }) {
       <span
         className={cn(
           "header-tick-dot",
+          heldMidDir === "up" && "header-tick-dot-hold-up",
+          heldMidDir === "down" && "header-tick-dot-hold-down",
           midDir === "up" && "header-tick-dot-up",
           midDir === "down" && "header-tick-dot-down",
         )}
@@ -80,6 +83,8 @@ function HeaderTickerItem({ price }: { price: PairPrice }) {
       <span
         className={cn(
           "text-tx rounded px-1 -mx-1 tabular-nums price-smooth",
+          heldMidDir === "up" && "tick-hold-up",
+          heldMidDir === "down" && "tick-hold-down",
           midDir === "up" && "tick-flash-up-fast",
           midDir === "down" && "tick-flash-down-fast",
         )}

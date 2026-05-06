@@ -166,6 +166,7 @@ function PriceCard({
   const {
     value: animatedMid,
     direction: midDir,
+    heldDirection: heldMidDir,
     motionKey: midMotionKey,
     motionImpulse: midMotionImpulse,
   } = useAnimatedNumber(
@@ -176,6 +177,7 @@ function PriceCard({
   const {
     value: animatedBid,
     direction: bidDir,
+    heldDirection: heldBidDir,
     motionKey: bidMotionKey,
     motionImpulse: bidMotionImpulse,
   } = useAnimatedNumber(
@@ -186,6 +188,7 @@ function PriceCard({
   const {
     value: animatedAsk,
     direction: askDir,
+    heldDirection: heldAskDir,
     motionKey: askMotionKey,
     motionImpulse: askMotionImpulse,
   } = useAnimatedNumber(
@@ -232,6 +235,9 @@ function PriceCard({
     price.mid === 0 && (price.state === "unavailable" || gate?.allow === "BLOCKED");
   const diagWarning = blockerWarning(diagnostic?.engineBlocker);
   const staleTimestamp = diagnostic?.lastPriceAt ?? price.updatedAt;
+  const restTickDir = heldMidDir;
+  const canHoldTheme =
+    !priceUnavailable && !stale && price.state !== "unavailable" && gate?.allow !== "BLOCKED";
 
   return (
     <div
@@ -242,6 +248,8 @@ function PriceCard({
           : stale
             ? "border-warn/30"
             : "border-bd",
+        canHoldTheme && restTickDir === "up" && "tick-surface-hold-up",
+        canHoldTheme && restTickDir === "down" && "tick-surface-hold-down",
       )}
     >
       <div className="flex items-center justify-between">
@@ -254,6 +262,8 @@ function PriceCard({
           style={midTickStyle}
           className={cn(
             "font-mono text-2xl font-semibold tabular-nums rounded px-1 -mx-1 price-smooth",
+            heldMidDir === "up" && "tick-hold-up",
+            heldMidDir === "down" && "tick-hold-down",
             midDir === "up" && "tick-flash-up",
             midDir === "down" && "tick-flash-down",
           )}
@@ -272,6 +282,8 @@ function PriceCard({
           style={bidTickStyle}
           className={cn(
             "font-mono tabular-nums rounded px-1 -mx-1 price-smooth",
+            heldBidDir === "up" && "tick-hold-up",
+            heldBidDir === "down" && "tick-hold-down",
             bidDir === "up" && "tick-flash-up-fast",
             bidDir === "down" && "tick-flash-down-fast",
           )}
@@ -282,6 +294,8 @@ function PriceCard({
           style={askTickStyle}
           className={cn(
             "font-mono tabular-nums rounded px-1 -mx-1 price-smooth",
+            heldAskDir === "up" && "tick-hold-up",
+            heldAskDir === "down" && "tick-hold-down",
             askDir === "up" && "tick-flash-up-fast",
             askDir === "down" && "tick-flash-down-fast",
           )}

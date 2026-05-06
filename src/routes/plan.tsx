@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useLiveSignals, useLadders } from "@/hooks/useSniperData";
+import { useLiveSignals, useLadders, useSnapshot } from "@/hooks/useSniperData";
+import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { VerdictBadge } from "@/components/sniper/VerdictBadge";
 import { WarningLine, DivergenceBanner } from "@/components/sniper/Warnings";
 import { fmtPrice, fmtPct, fmtUSC, fmtZAR, relTime } from "@/lib/format";
+import { tickMotionHoldMs, tickMotionStyle, type TickMotionOptions } from "@/lib/tickMotion";
 import { ArrowUpRight, ArrowDownRight, Send, Loader2, AlertTriangle, Search } from "lucide-react";
 import { cn, deduplicateById } from "@/lib/utils";
 import { apiClient } from "@/lib/api/sniperClient";
@@ -28,9 +30,16 @@ export const Route = createFileRoute("/plan")({
   component: PlanPage,
 });
 
+const PLAN_HERO_TICK_MOTION: TickMotionOptions = {
+  baseDurationMs: 280,
+  durationSpreadMs: 120,
+  delayMaxMs: 100,
+};
+
 function PlanPage() {
   const { data: signals, isLoading: signalsLoading } = useLiveSignals();
   const { data: ladders, isLoading: laddersLoading } = useLadders();
+  const { data: snapshot } = useSnapshot();
 
   const VERDICT_RANK: Record<string, number> = { "A+": 4, A: 3, B: 2, C: 1 };
   // CRITICAL: Deduplicate signals by ID and keep all candidates.
@@ -53,6 +62,22 @@ function PlanPage() {
     uniqueSignals?.find((s) => s.status === "READY") ??
     uniqueSignals?.[0];
   const plan = top ? (ladders?.find((l) => l.signalId === top.id) ?? null) : null;
+  const topPrice = top ? snapshot?.prices.find((price) => price.symbol === top.symbol) : undefined;
+  const topFlashHoldMs = tickMotionHoldMs(PLAN_HERO_TICK_MOTION);
+  const {
+    value: animatedTopMid,
+    direction: topMidDir,
+    heldDirection: heldTopMidDir,
+    motionKey: topMotionKey,
+    motionImpulse: topMotionImpulse,
+  } = useAnimatedNumber(topPrice?.mid, 300, topFlashHoldMs);
+  const topPriceStyle = tickMotionStyle(`${top?.symbol ?? "plan"}:hero-mid`, PLAN_HERO_TICK_MOTION, {
+    motionKey: topMotionKey,
+    motionImpulse: topMotionImpulse,
+  });
+  const topPriceLive = Boolean(
+    topPrice && topPrice.mid > 0 && (topPrice.state === "live" || topPrice.state === "mock"),
+  );
 
   if (signalsLoading || laddersLoading) {
     return (
@@ -132,7 +157,13 @@ function PlanPage() {
       )}
 
       {/* Hero candidate */}
-      <div className="rounded-lg border border-bd bg-bg1/60 p-4 lg:p-5">
+      <div
+        className={cn(
+          "rounded-lg border border-bd bg-bg1/60 p-4 lg:p-5 transition-colors",
+          topPriceLive && heldTopMidDir === "up" && "tick-surface-hold-up",
+          topPriceLive && heldTopMidDir === "down" && "tick-surface-hold-down",
+        )}
+      >
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <VerdictBadge verdict={top.verdict} large />
@@ -169,6 +200,20 @@ function PlanPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {topPriceLive && topPrice && (
+              <span
+                style={topPriceStyle}
+                className={cn(
+                  "rounded border border-bd px-2 py-1 text-xs font-mono font-semibold tabular-nums price-smooth",
+                  heldTopMidDir === "up" && "tick-hold-up",
+                  heldTopMidDir === "down" && "tick-hold-down",
+                  topMidDir === "up" && "tick-flash-up-fast",
+                  topMidDir === "down" && "tick-flash-down-fast",
+                )}
+              >
+                {fmtPrice(animatedTopMid ?? topPrice.mid, top.symbol)}
+              </span>
+            )}
             <span
               className={cn(
                 "inline-flex items-center rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider font-mono",

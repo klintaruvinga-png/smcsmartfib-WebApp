@@ -190,6 +190,7 @@ export type AnimationDirection = "up" | "down" | null;
 export interface AnimatedNumberResult {
   value: number | undefined;
   direction: AnimationDirection;
+  heldDirection: AnimationDirection;
   motionKey: number;
   motionImpulse: number;
 }
@@ -204,6 +205,7 @@ export function useAnimatedNumber(
   const safeHoldMs = Number.isFinite(holdMs) && holdMs > 0 ? holdMs : safeDurationMs;
   const [animated, setAnimated] = useState<number | undefined>(numericValue);
   const [direction, setDirection] = useState<AnimationDirection>(null);
+  const [heldDirection, setHeldDirection] = useState<AnimationDirection>(null);
 
   const rafRef = useRef<number | null>(null);
   const directionTimeoutRef = useRef<number | null>(null);
@@ -234,6 +236,7 @@ export function useAnimatedNumber(
       motionSamplesRef.current = [];
       setAnimated(undefined);
       setDirection(null);
+      setHeldDirection(null);
       return;
     }
 
@@ -246,6 +249,7 @@ export function useAnimatedNumber(
         typeof performance !== "undefined" ? performance.now() : Date.now();
       setAnimated(numericValue);
       setDirection(null);
+      setHeldDirection(null);
       return;
     }
 
@@ -262,6 +266,7 @@ export function useAnimatedNumber(
     }
     setDirection(dir);
     if (dir !== null) {
+      setHeldDirection(dir);
       directionTimeoutRef.current = window.setTimeout(() => {
         directionTimeoutRef.current = null;
         setDirection(null);
@@ -349,6 +354,7 @@ export function useAnimatedNumber(
   return {
     value: animated,
     direction,
+    heldDirection,
     motionKey: motionKeyRef.current,
     motionImpulse: motionImpulseRef.current,
   };
