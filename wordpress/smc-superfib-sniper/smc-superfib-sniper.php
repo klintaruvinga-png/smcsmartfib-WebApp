@@ -84,6 +84,11 @@ final class SMC_SuperFib_Sniper_REST {
             return;
         }
 
+        $rest_api_settings = array(
+            'root'  => esc_url_raw(rest_url()),
+            'nonce' => wp_create_nonce('wp_rest'),
+        );
+
         wp_register_script(
             'smc-superfib-sniper-rest-bootstrap',
             false,
@@ -94,13 +99,10 @@ final class SMC_SuperFib_Sniper_REST {
 
         wp_enqueue_script('smc-superfib-sniper-rest-bootstrap');
 
-        wp_localize_script(
+        wp_add_inline_script(
             'smc-superfib-sniper-rest-bootstrap',
-            'wpApiSettings',
-            array(
-                'root'  => esc_url_raw(rest_url()),
-                'nonce' => wp_create_nonce('wp_rest'),
-            )
+            'window.wpApiSettings = Object.assign({}, window.wpApiSettings || {}, ' . wp_json_encode($rest_api_settings) . ');',
+            'before'
         );
     }
 
