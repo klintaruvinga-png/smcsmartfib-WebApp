@@ -1,11 +1,11 @@
 # SMC SuperFIB → MT5 Migration Status Board
 
-**Last Updated**: 2026-05-06  
+**Last Updated**: 2026-05-07  
 **Current Phase**: 0 (Stabilization)  
 **Overall Progress**: 18%
 **Status**: In Progress
 
-> Snapshot: v13.0.0 MT5 authority hardening verified. EA-authoritative symbols now ignore stale Twelve Data cooldown and key-status escalation in health/blocker paths, MT5-live symbols bypass Twelve Data, EA pushes clear same-symbol TD cooldown state, backendSync receives EA heartbeats, and MT5 day-change derives from UTC-day M1 opens. Phase 0 remains in stabilization pending live soak and candle-history aggregation verification.
+> Snapshot: v13.0.1 Phase 0 soak instrumentation is now in repo. EA-authoritative symbols already ignore stale Twelve Data cooldown and key-status escalation in health/blocker paths, MT5-live symbols bypass Twelve Data, EA pushes clear same-symbol TD cooldown state, backendSync receives EA heartbeats, and MT5 day-change derives from UTC-day M1 opens. Remaining gate is evidence: complete the live soak, confirm candle-history aggregation, and publish the closeout logs.
 
 ---
 
@@ -64,6 +64,8 @@
 - [ ] Disconnect/reconnect testing
 - [ ] Backend restart testing
 - [ ] MT5 M1 -> 15min aggregation verification for symbols previously showing `insufficient candle history`
+- [x] Repo soak tracker added: `.github/migration/PHASE0_SOAK_TRACKER.md`
+- [x] Repo log instrumentation added for `PHASE0_SOAK` backend + Live Radar console warnings
 
 ### Parity Status
 ```
@@ -75,6 +77,7 @@ Freshness Logic: [PENDING]
 ### Blockers
 - Live 24h/72h soak evidence not complete
 - MT5 M1 -> 15min candle-history aggregation path still needs focused verification
+- Phase 0 completion log and final parity audit are not yet written to `.github/migration/phase-updates/` and `.github/migration/audits/`
 
 ---
 

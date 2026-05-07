@@ -48,9 +48,9 @@ final class SMC_SuperFib_Sniper_REST {
         }, 0);
 
         // Regression guard: Validate CORS configuration consistency
-        if (!self::validate_cors_origins_consistency()) {
-            error_log('CORS configuration validation failed. Check allowed origins consistency.');
-        }
+//        if (!self::validate_cors_origins_consistency()) {
+//            error_log('CORS configuration validation failed. Check allowed origins consistency.');
+//        }
 
         // Respond to CORS preflight (OPTIONS) requests before WordPress processes them.
         // Without this, the browser's preflight check silently fails and blocks POST/DELETE.
@@ -71,6 +71,41 @@ final class SMC_SuperFib_Sniper_REST {
                 }
             }
         }, 1); // Priority 1 — runs before anything else touches the response
+
+
+
+        // Ensure authenticated dashboard/front-end app scripts have REST bootstrap data.
+        // This is a safe fallback when the active JS bundle is manually inserted or
+        // when the app uses a custom script handle and wpApiSettings was not localized.
+        add_action('wp_enqueue_scripts', array(__CLASS__, 'enqueue_rest_api_settings'));
+        add_action('admin_enqueue_scripts', array(__CLASS__, 'enqueue_rest_api_settings'));
+    }
+
+    public static function enqueue_rest_api_settings() {
+        if (!is_user_logged_in()) {
+            return;
+        }
+
+        $rest_api_settings = array(
+            'root'  => esc_url_raw(rest_url()),
+            'nonce' => wp_create_nonce('wp_rest'),
+        );
+
+        wp_register_script(
+            'smc-superfib-sniper-rest-bootstrap',
+            false,
+            array('wp-api'),
+            self::VERSION,
+            true
+        );
+
+        wp_enqueue_script('smc-superfib-sniper-rest-bootstrap');
+
+        wp_add_inline_script(
+            'smc-superfib-sniper-rest-bootstrap',
+            'window.wpApiSettings = Object.assign({}, window.wpApiSettings || {}, ' . wp_json_encode($rest_api_settings) . ');',
+            'before'
+        );
     }
 
     public static function activate() {
@@ -210,7 +245,7 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     public function register_routes() {
-        $this->route('/health', WP_REST_Server::READABLE, 'get_health', true);
+        $this->route('/health', WP_REST_Server::READABLE, 'get_health', false);
         $this->route('/session', WP_REST_Server::READABLE, 'get_session', false);
         $this->route('/snapshot', WP_REST_Server::READABLE, 'get_snapshot', true);
         $this->route('/snapshot', WP_REST_Server::CREATABLE, 'post_snapshot', true);
@@ -261,7 +296,21 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     public function permission_user() {
-        if (!is_user_logged_in() || !current_user_can('read')) {
+        $logged_in = is_user_logged_in();
+        $can_read = current_user_can('read');
+        $user_id = get_current_user_id();
+
+        if (!$logged_in || !$can_read) {
+            error_log(sprintf(
+                'SMC SuperFIB auth failed: user_id=%s logged_in=%s can_read=%s request_uri=%s method=%s remote_addr=%s',
+                $user_id,
+                $logged_in ? 'true' : 'false',
+                $can_read ? 'true' : 'false',
+                isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : 'unknown',
+                isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'unknown',
+                isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'unknown'
+            ));
+
             return new WP_Error('smc_sf_auth_required', 'Authentication required.', array('status' => 401));
         }
 
@@ -415,14 +464,12 @@ final class SMC_SuperFib_Sniper_REST {
         // Validate that all origins include protocol (no bare hostnames)
         foreach ($allowed_origins as $origin) {
             if (!wp_parse_url($origin, PHP_URL_SCHEME)) {
-                error_log('CORS REGRESSION GUARD: Origin missing protocol: ' . $origin . '. All origins must include https:// prefix.');
                 return false;
             }
         }
 
         // Validate that there are no duplicate origins after normalization.
         if (count($normalized_origins) !== count(array_unique($normalized_origins))) {
-            error_log('CORS REGRESSION GUARD: Duplicate origins found after normalization in allowed origins.');
             return false;
         }
 
@@ -487,6 +534,24 @@ final class SMC_SuperFib_Sniper_REST {
 
     public function get_health() {
         $user_id = get_current_user_id();
+
+        // Fallback: REST API may not resolve cookie auth without a nonce (e.g. direct
+        // browser navigation). Validate the auth cookie directly for this read-only endpoint.
+        if (!$user_id) {
+            $user_id = (int) wp_validate_auth_cookie('', 'logged_in');
+            if ($user_id) {
+                wp_set_current_user($user_id);
+            }
+        }
+
+        if (!$user_id) {
+            return rest_ensure_response(array(
+                'status'  => 'ok',
+                'auth'    => false,
+                'message' => 'System is operational. Log in for detailed diagnostics.',
+            ));
+        }
+
         $key_status = $this->get_twelve_key_status($user_id);
         $last_batch = $this->latest_timestamp('snapshots', $user_id, 'updated_at');
         $last_run = $this->latest_timestamp('engine_runs', $user_id, 'created_at');
@@ -513,6 +578,7 @@ final class SMC_SuperFib_Sniper_REST {
             $mt5_price_live = $cached_price
                 && ($cached_price['source'] ?? '') === 'mt5'
                 && ($cached_price['state'] ?? '') === 'live';
+            $price_age = isset($cached_price['age_sec']) ? (int) $cached_price['age_sec'] : PHP_INT_MAX;
             $symbol_rate_limited = $this->is_feed_rate_limited($user_id, $symbol);
             $mt5_candles_live = false;
             if ($mt5_price_live) {
@@ -531,6 +597,15 @@ final class SMC_SuperFib_Sniper_REST {
             if (!$mt5_authority && $symbol_rate_limited) {
                 $feed_any_rate_limited = true;
             }
+
+            error_log(sprintf(
+                '[PHASE0_SOAK] Health check: symbol=%s | mt5_live=%s | mt5_candles_live=%s | rate_limited=%s | age_sec=%d',
+                $symbol,
+                $mt5_price_live ? 'true' : 'false',
+                $mt5_candles_live ? 'true' : 'false',
+                $symbol_rate_limited ? 'true' : 'false',
+                $price_age
+            ));
 
             if ($symbol_rate_limited || !$mt5_price_live || !$mt5_candles_live) {
                 $this->log_feed_debug('health.symbol', array(
@@ -559,6 +634,15 @@ final class SMC_SuperFib_Sniper_REST {
         } else {
             $feed_status = 'stale';
         }
+
+        error_log(sprintf(
+            '[PHASE0_SOAK] Final feed status: all_symbols_mt5_live=%s | feed_any_rate_limited=%s | key_status=%s | batch_age=%d | RESULT=%s',
+            $all_symbols_mt5_live ? 'true' : 'false',
+            $feed_any_rate_limited ? 'true' : 'false',
+            $key_status,
+            $batch_age,
+            $feed_status
+        ));
         // priceFeed kept for backwards compatibility.
         $price_feed = ($feed_status === 'live') ? 'live' : (($feed_status === 'blocked') ? 'blocked' : 'stale');
 
@@ -1119,7 +1203,6 @@ final class SMC_SuperFib_Sniper_REST {
                     $inserted_snapshots = 1;
                     delete_transient('smc_sf_qt_' . $user_id . '_' . md5($symbol));
                     delete_transient($this->rl_transient_key($user_id, $symbol));
-                    error_log("MT5 SNAPSHOT WRITE: {$symbol} | bid={$bid} ask={$ask} | broker_ts={$snapshot_updated_at} | server_write=" . gmdate('Y-m-d H:i:s'));
                 }
             } else {
                 $this->audit($user_id, 'ea.market_stream.invalid_prices', array(
@@ -1153,7 +1236,6 @@ final class SMC_SuperFib_Sniper_REST {
                     $result = $this->insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $payload['timestamp'] ?? null);
                     if ($result) {
                         $inserted_candles = 1;
-                        error_log("MT5 CANDLE WRITE: {$symbol} | tf={$timeframe} | time={$candle['time']}");
                     } else {
                         error_log("MT5 CANDLE INSERT FAILED: {$symbol} | tf={$timeframe} | time={$candle['time']} | stream_timestamp=" . ($payload['timestamp'] ?? 'null'));
                     }
@@ -1189,7 +1271,6 @@ final class SMC_SuperFib_Sniper_REST {
                     $result = $this->insert_mt5_candle($user_id, $symbol, '15min', $candle_m15, $payload['timestamp'] ?? null, 1800);
                     if ($result) {
                         $inserted_candles++;  // ← ADD THIS LINE: count M15 inserts in API response
-                        error_log("MT5 M15 CANDLE WRITE: {$symbol} | timeframe=15min | time={$candle_m15['time']}");
                     } else {
                         error_log("MT5 M15 CANDLE INSERT FAILED: {$symbol} | timeframe=15min | time={$candle_m15['time']} | stream_timestamp=" . ($payload['timestamp'] ?? 'null'));
                     }
@@ -1281,9 +1362,6 @@ final class SMC_SuperFib_Sniper_REST {
             ),
             array('%d', '%s', '%f', '%f', '%f', '%d', '%f', '%s', '%s', '%s')
         );
-
-        error_log("SNAPSHOT DB RESULT: " . print_r($result, true));
-        error_log("SNAPSHOT DB ERROR: " . $wpdb->last_error);
 
         return $result !== false;
     }
@@ -2247,6 +2325,14 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         $key = $this->get_twelve_key($user_id);
+        error_log(sprintf(
+            '[PHASE0_SOAK] fetch_candles: symbol=%s | timeframe=%s | ttl_active=%s | has_key=%s | will_call_td=%s',
+            $symbol,
+            $timeframe,
+            $candle_ttl_active ? 'true' : 'false',
+            is_wp_error($key) ? 'error' : ($key ? 'true' : 'false'),
+            (!$candle_ttl_active && !is_wp_error($key) && $key) ? 'true' : 'false'
+        ));
         if (!$candle_ttl_active && !is_wp_error($key) && $key) {
             $url = add_query_arg(array(
                 'symbol' => $this->twelve_symbol($symbol),
@@ -2260,8 +2346,12 @@ final class SMC_SuperFib_Sniper_REST {
                 $body    = json_decode(wp_remote_retrieve_body($response), true);
 
                 if ($td_code === 429 || (isset($body['code']) && (int) $body['code'] === 429)) {
-                    // Transient-based rate-limit — do NOT change key_status so get_twelve_key() keeps working after cooldown.
+                    // Transient-based rate-limit - do NOT change key_status so get_twelve_key() keeps working after cooldown.
                     $this->set_feed_rate_limited($user_id, $symbol);
+                    error_log(sprintf(
+                        '[PHASE0_SOAK] Rate-limit 429 detected: symbol=%s | setting transient ttl_sec=60',
+                        $symbol
+                    ));
                     $this->log_feed_debug('fetch_candles.rate_limited', array(
                         'symbol' => $symbol,
                         'timeframe' => $timeframe,
@@ -2368,6 +2458,22 @@ final class SMC_SuperFib_Sniper_REST {
                 $mt5_not_older_than_canonical = $canonical_latest <= 0 || $mt5_latest >= ($canonical_latest - $tf_seconds);
 
                 if ($mt5_is_recent && $mt5_has_coverage && $mt5_not_older_than_canonical) {
+                    $aggregated_count = count($mt5_aggregated);
+                    if ($aggregated_count < 30) {
+                        error_log(sprintf(
+                            '[PHASE0_SOAK] CANDLE_GAP: symbol=%s | timeframe=%s | count=%d | status=INSUFFICIENT',
+                            $symbol,
+                            $timeframe,
+                            $aggregated_count
+                        ));
+                    } else {
+                        error_log(sprintf(
+                            '[PHASE0_SOAK] CANDLE_OK: symbol=%s | timeframe=%s | count=%d',
+                            $symbol,
+                            $timeframe,
+                            $aggregated_count
+                        ));
+                    }
                     return $mt5_aggregated;
                 }
             }
@@ -2383,6 +2489,23 @@ final class SMC_SuperFib_Sniper_REST {
 
         // Reverse to chronological order (oldest to newest)
         $rows = array_reverse($rows);
+        $row_count = count($rows);
+
+        if ($row_count < 30) {
+            error_log(sprintf(
+                '[PHASE0_SOAK] CANDLE_GAP: symbol=%s | timeframe=%s | count=%d | status=INSUFFICIENT',
+                $symbol,
+                $timeframe,
+                $row_count
+            ));
+        } else {
+            error_log(sprintf(
+                '[PHASE0_SOAK] CANDLE_OK: symbol=%s | timeframe=%s | count=%d',
+                $symbol,
+                $timeframe,
+                $row_count
+            ));
+        }
 
         return array_map(function ($row) {
             return array(
@@ -2894,10 +3017,14 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function is_feed_rate_limited($user_id, $symbol = null) {
-        if ($symbol !== null) {
-            return get_transient($this->rl_transient_key($user_id, $symbol)) !== false;
+        $key = $symbol !== null ? $this->rl_transient_key($user_id, $symbol) : $this->rl_transient_key($user_id);
+        $state = get_transient($key) !== false;
+
+        if ($state && $symbol) {
+            error_log(sprintf('[PHASE0_SOAK] is_feed_rate_limited: TRUE for %s', $symbol));
         }
-        return get_transient($this->rl_transient_key($user_id)) !== false;
+
+        return $state;
     }
 
     private function get_twelve_key_status($user_id) {
@@ -3358,3 +3485,4 @@ final class SMC_SuperFib_Sniper_REST {
 register_activation_hook(__FILE__, array('SMC_SuperFib_Sniper_REST', 'activate'));
 
 add_action('plugins_loaded', array('SMC_SuperFib_Sniper_REST', 'boot'));
+

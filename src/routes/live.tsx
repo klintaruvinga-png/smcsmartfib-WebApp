@@ -10,6 +10,7 @@ import { MOCK_MODE } from "@/lib/api/sniperClient";
 import { tickMotionHoldMs, tickMotionStyle } from "@/lib/tickMotion";
 import { cn } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
+import { useEffect } from "react";
 import type {
   EngineBlocker,
   PairPrice,
@@ -169,33 +170,21 @@ function PriceCard({
     heldDirection: heldMidDir,
     motionKey: midMotionKey,
     motionImpulse: midMotionImpulse,
-  } = useAnimatedNumber(
-    price.mid,
-    320,
-    midFlashHoldMs,
-  );
+  } = useAnimatedNumber(price.mid, 320, midFlashHoldMs);
   const {
     value: animatedBid,
     direction: bidDir,
     heldDirection: heldBidDir,
     motionKey: bidMotionKey,
     motionImpulse: bidMotionImpulse,
-  } = useAnimatedNumber(
-    price.bid,
-    280,
-    bidFlashHoldMs,
-  );
+  } = useAnimatedNumber(price.bid, 280, bidFlashHoldMs);
   const {
     value: animatedAsk,
     direction: askDir,
     heldDirection: heldAskDir,
     motionKey: askMotionKey,
     motionImpulse: askMotionImpulse,
-  } = useAnimatedNumber(
-    price.ask,
-    280,
-    askFlashHoldMs,
-  );
+  } = useAnimatedNumber(price.ask, 280, askFlashHoldMs);
   const chopFlash = useTickFlash(regime?.chop);
   const midTickStyle = tickMotionStyle(
     `${price.symbol}:mid`,
@@ -239,6 +228,17 @@ function PriceCard({
   const canHoldTheme =
     !priceUnavailable && !stale && price.state !== "unavailable" && gate?.allow !== "BLOCKED";
 
+  useEffect(() => {
+    if (diagnostic?.engineBlocker === "RATE_LIMITED") {
+      console.warn(`[PHASE0_SOAK] Live Radar: ${price.symbol} blocked by RATE_LIMITED`, {
+        diagnostic,
+        price,
+        regime,
+        gate,
+      });
+    }
+  }, [diagnostic, gate, price, price.symbol, regime]);
+
   return (
     <div
       className={cn(
@@ -270,9 +270,7 @@ function PriceCard({
         >
           {priceUnavailable ? "—" : fmtPrice(animatedMid ?? price.mid, price.symbol)}
         </div>
-        <div
-          className={cn("font-mono text-sm", price.changePct1d >= 0 ? "text-buy" : "text-sell")}
-        >
+        <div className={cn("font-mono text-sm", price.changePct1d >= 0 ? "text-buy" : "text-sell")}>
           {priceUnavailable ? "—" : fmtPct(price.changePct1d)}
         </div>
       </div>
