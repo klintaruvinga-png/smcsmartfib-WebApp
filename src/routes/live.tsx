@@ -51,6 +51,7 @@ function blockerWarning(blocker: EngineBlocker | undefined): string | null {
 function LivePage() {
   const { data, isLoading } = useSnapshot();
   const { data: settings } = useUserSettings();
+  const pollMs = usePollMs() ?? 2000;
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
   if (isLoading || !data) return <div className="text-mute text-sm">Loading radar…</div>;
 
@@ -122,6 +123,7 @@ function LivePage() {
               gate={gate}
               diagnostic={diagnostic}
               staleThresholdMs={staleThresholdMs}
+              pollMs={pollMs}
             />
           );
         })}
