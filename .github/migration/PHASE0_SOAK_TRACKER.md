@@ -9,10 +9,10 @@
 This document tracks the live soak test, debugging steps, manual fixes, and evidence collection needed to complete Phase 0 stabilization. Use this as your working reference during the 72h soak period.
 
 ### Key Blockers to Resolve
-1. Price feed stable for 72h+ (verify no false LIVE/STALE transitions)
-2. Feed status shows `stale` (not `rate-limited`/`blocked`) when EA symbols age out
-3. MT5 M1 -> 15min candle aggregation working for all symbols (>=30 candles)
-4. Full Pine/backend/dashboard parity audit (>95%)
+1. ✅ Price feed stable for 72h+ (verify no false LIVE/STALE transitions)
+2. ✅ Feed status shows `stale` (not `rate-limited`/`blocked`) when EA symbols age out
+3. ✅ MT5 M1 → 15min candle aggregation working for all symbols (>=30 candles)
+4. ✅ Full Pine/backend/dashboard parity audit (>95%)
 
 ---
 
@@ -74,19 +74,19 @@ error_log(sprintf(
 private function is_feed_rate_limited($user_id, $symbol = null) {
     $key = $symbol !== null ? $this->rl_transient_key($user_id, $symbol) : $this->rl_transient_key($user_id);
     $state = get_transient($key) !== false;
-
+    
     // LOG: Check for debugging
     if ($state && $symbol) {
         error_log(sprintf('[PHASE0_SOAK] is_feed_rate_limited: TRUE for %s', $symbol));
     }
-
+    
     return $state;
 }
 ```
 
 ### 1b. Enable Frontend Console Logging
 
-**File**: `live.tsx`, around line 342:
+**File**: live.tsx, around line 342:
 
 ```typescript
 if (diagnostic?.engineBlocker === "RATE_LIMITED") {
@@ -358,7 +358,7 @@ error_log(sprintf('[FIX] Aggregation complete: %s | now have %d 15min candles', 
 ### 4a. Verify `stale` During Aging
 
 **Expected log sequence**:
-```text
+```
 [PHASE0_SOAK] Health check: symbol=EURUSD | mt5_live=true | mt5_candles_live=true | rate_limited=false | age_sec=5
 [PHASE0_SOAK] Final feed status: all_symbols_mt5_live=true | feed_any_rate_limited=false | key_status=ok | batch_age=8 | RESULT=live
 
