@@ -762,6 +762,7 @@ final class SMC_SuperFib_Sniper_REST {
         $symbols = isset($payload['watchlist']) && is_array($payload['watchlist']) ? $payload['watchlist'] : array();
         $validated = $this->validate_watchlist_symbols($symbols);
         $this->save_watchlist($user_id, $validated);
+        $this->delete_engine_snapshot($user_id);
         $this->audit($user_id, 'watchlist.saved', array('watchlist' => $validated));
         return rest_ensure_response(array('ok' => true, 'watchlist' => $validated));
     }
@@ -782,6 +783,7 @@ final class SMC_SuperFib_Sniper_REST {
             $watchlist[] = $symbol;
             $watchlist = array_slice($watchlist, 0, 24);
             $this->save_watchlist($user_id, $watchlist);
+            $this->delete_engine_snapshot($user_id);
             $this->audit($user_id, 'watchlist.add', array('symbol' => $symbol));
         }
         return rest_ensure_response(array('ok' => true, 'watchlist' => $watchlist));
@@ -800,7 +802,8 @@ final class SMC_SuperFib_Sniper_REST {
             return $w !== $symbol;
         }));
         $this->save_watchlist($user_id, $watchlist);
-        // Remove stale snapshot so the symbol does not reappear as a ghost price tile.
+        $this->delete_engine_snapshot($user_id);
+        // Remove stale price row so the symbol does not reappear as a ghost price tile.
         $wpdb->delete($this->table('snapshots'), array('user_id' => $user_id, 'symbol' => $symbol), array('%d', '%s'));
         $this->audit($user_id, 'watchlist.remove', array('symbol' => $symbol));
         return rest_ensure_response(array('ok' => true, 'watchlist' => $watchlist));
@@ -2666,16 +2669,13 @@ final class SMC_SuperFib_Sniper_REST {
         return true;
     }
 
+    private function delete_engine_snapshot($user_id) {
+        delete_user_meta($user_id, 'smc_sf_engine_snapshot');
+        error_log("SMC_SF: engine snapshot invalidated for user {$user_id} after watchlist change");
+    }
+
     private function is_engine_snapshot_current($snapshot, $expected_symbols, $refresh_interval_sec) {
         if (!is_array($snapshot) || empty($snapshot['prices']) || empty($snapshot['meta']['computedAt'])) {
-            return false;
-        }
-
-        $computed_at = strtotime((string) $snapshot['meta']['computedAt']);
-        if (!$computed_at) {
-            return false;
-        }
-        if ((time() - $computed_at) > max(2, (int) $refresh_interval_sec)) {
             return false;
         }
 
@@ -2687,7 +2687,19 @@ final class SMC_SuperFib_Sniper_REST {
         $expected_symbols = array_values(array_unique(array_filter(array_map('strval', is_array($expected_symbols) ? $expected_symbols : array()))));
         sort($expected_symbols);
 
-        return $snapshot_symbols === $expected_symbols;
+        if ($snapshot_symbols !== $expected_symbols) {
+            return false;
+        }
+
+        $computed_at = strtotime((string) $snapshot['meta']['computedAt']);
+        if (!$computed_at) {
+            return false;
+        }
+        if ((time() - $computed_at) > max(2, (int) $refresh_interval_sec)) {
+            return false;
+        }
+
+        return true;
     }
 
     private function get_cached_price($user_id, $symbol, $stale_threshold_sec = null) {

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient, setBackendUrl } from "@/lib/api/sniperClient";
-import type { Symbol, SymbolDiagnostic, TradePlan } from "@/types/sniper";
+import type { DashboardSettings, Symbol, SymbolDiagnostic, TradePlan } from "@/types/sniper";
 
 const DEFAULT_POLL_MS = 2_000;
 
@@ -95,6 +95,97 @@ export function useSession() {
 export function useWatchlist() {
   const { data } = useUserSettings();
   return data?.watchlist ?? [];
+}
+
+type WatchlistMutationContext = {
+  previousSettings?: DashboardSettings;
+};
+
+async function cancelWatchlistQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  await Promise.all([
+    queryClient.cancelQueries({ queryKey: ["user-settings"] }),
+    queryClient.cancelQueries({ queryKey: ["snapshot"] }),
+    queryClient.cancelQueries({ queryKey: ["live-signals"] }),
+    queryClient.cancelQueries({ queryKey: ["ladders"] }),
+    queryClient.cancelQueries({ queryKey: ["engine-health"] }),
+    queryClient.cancelQueries({ queryKey: ["chart"] }),
+  ]);
+}
+
+async function invalidateWatchlistQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["snapshot"], refetchType: "none" }),
+    queryClient.invalidateQueries({ queryKey: ["live-signals"], refetchType: "none" }),
+    queryClient.invalidateQueries({ queryKey: ["ladders"], refetchType: "none" }),
+    queryClient.invalidateQueries({ queryKey: ["engine-health"], refetchType: "none" }),
+    queryClient.invalidateQueries({ queryKey: ["chart"], refetchType: "none" }),
+  ]);
+  await Promise.all([
+    queryClient.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
+    queryClient.refetchQueries({ queryKey: ["live-signals"], type: "active" }),
+    queryClient.refetchQueries({ queryKey: ["ladders"], type: "active" }),
+    queryClient.refetchQueries({ queryKey: ["engine-health"], type: "active" }),
+    queryClient.refetchQueries({ queryKey: ["chart"], type: "active" }),
+  ]);
+}
+
+export function useWatchlistAdd() {
+  const queryClient = useQueryClient();
+  return useMutation<{ ok: boolean; watchlist: Symbol[] }, Error, string, WatchlistMutationContext>({
+    mutationFn: (symbol: string) => apiClient.postWatchlistAdd(symbol),
+    onMutate: async (symbol: string) => {
+      await cancelWatchlistQueries(queryClient);
+      const previousSettings = queryClient.getQueryData<DashboardSettings>(["user-settings"]);
+      queryClient.setQueryData<DashboardSettings>(["user-settings"], (old) => {
+        if (!old) return old;
+        const nextSymbol = symbol as Symbol;
+        if (old.watchlist.includes(nextSymbol)) return old;
+        return { ...old, watchlist: [...old.watchlist, nextSymbol].slice(0, 24) };
+      });
+      return { previousSettings };
+    },
+    onSuccess: async (result) => {
+      queryClient.setQueryData<DashboardSettings>(["user-settings"], (old) =>
+        old ? { ...old, watchlist: result.watchlist } : old,
+      );
+      await invalidateWatchlistQueries(queryClient);
+    },
+    onError: (_error, _symbol, context) => {
+      if (context?.previousSettings) {
+        queryClient.setQueryData(["user-settings"], context.previousSettings);
+      }
+    },
+  });
+}
+
+export function useWatchlistRemove() {
+  const queryClient = useQueryClient();
+  return useMutation<{ ok: boolean; watchlist: Symbol[] }, Error, string, WatchlistMutationContext>({
+    mutationFn: (symbol: string) => apiClient.postWatchlistRemove(symbol),
+    onMutate: async (symbol: string) => {
+      await cancelWatchlistQueries(queryClient);
+      const previousSettings = queryClient.getQueryData<DashboardSettings>(["user-settings"]);
+      queryClient.setQueryData<DashboardSettings>(["user-settings"], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          watchlist: old.watchlist.filter((entry) => entry !== (symbol as Symbol)),
+        };
+      });
+      return { previousSettings };
+    },
+    onSuccess: async (result) => {
+      queryClient.setQueryData<DashboardSettings>(["user-settings"], (old) =>
+        old ? { ...old, watchlist: result.watchlist } : old,
+      );
+      await invalidateWatchlistQueries(queryClient);
+    },
+    onError: (_error, _symbol, context) => {
+      if (context?.previousSettings) {
+        queryClient.setQueryData(["user-settings"], context.previousSettings);
+      }
+    },
+  });
 }
 
 export function useEngineHealth() {

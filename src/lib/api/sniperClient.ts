@@ -336,7 +336,14 @@ export const apiClient = {
       }
       return { ok: true, watchlist: mockSettings.watchlist };
     }
-    return call("/user/watchlist/add", { method: "POST", body: { symbol } });
+    const result = await call<{ ok: boolean; watchlist?: Symbol[] }>("/user/watchlist/add", {
+      method: "POST",
+      body: { symbol },
+    });
+    if (!Array.isArray(result.watchlist)) {
+      throw new Error("/user/watchlist/add: backend response missing watchlist array");
+    }
+    return { ok: result.ok, watchlist: result.watchlist };
   },
   async postWatchlistRemove(
     symbol: string,
@@ -346,6 +353,13 @@ export const apiClient = {
       mockSettings.watchlist = mockSettings.watchlist.filter((s) => s !== symbol);
       return { ok: true, watchlist: mockSettings.watchlist };
     }
-    return call("/user/watchlist/remove", { method: "POST", body: { symbol } });
+    const result = await call<{ ok: boolean; watchlist?: Symbol[] }>("/user/watchlist/remove", {
+      method: "POST",
+      body: { symbol },
+    });
+    if (!Array.isArray(result.watchlist)) {
+      throw new Error("/user/watchlist/remove: backend response missing watchlist array");
+    }
+    return { ok: result.ok, watchlist: result.watchlist };
   },
 };

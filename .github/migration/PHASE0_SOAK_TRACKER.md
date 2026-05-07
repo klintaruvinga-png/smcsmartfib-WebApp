@@ -200,6 +200,23 @@ DELETE FROM wp_options WHERE option_name = 'smc_sf_rl_<USER_ID>_<SYMBOL>';
 - [ ] Logs show clean state after restart
 - [ ] feedStatus correctly reflects current state
 
+### 2f. Watchlist Persistence Hotfix (2026-05-07)
+
+**Expected behavior**: Account watchlist add/remove persists without flashback in Settings, and removed symbols do not reappear as ghost tiles in Live Radar / Signal Engine on the next active refresh.
+
+**Patch scope**:
+- Backend `smc-superfib-sniper.php`: watchlist save/add/remove now delete `smc_sf_engine_snapshot`, and engine snapshot symbol-set parity is checked before timestamp freshness.
+- Frontend `useSniperData.ts` + `account.tsx`: watchlist mutations now run through centralized React Query mutations with optimistic cache writes, rollback on failure, in-flight query cancellation, and dependent query invalidation.
+- Frontend `sniperClient.ts`: watchlist REST responses now fail closed if the backend omits the `watchlist` array.
+
+**Verification**:
+- [x] `php -l wordpress\\smc-superfib-sniper\\smc-superfib-sniper.php`
+- [x] `php wordpress\\smc-superfib-sniper\\tests\\php\\test-watchlist-snapshot-regression.php`
+- [x] `php wordpress\\smc-superfib-sniper\\tests\\php\\test-rest-bootstrap-settings.php`
+- [x] `npm run build`
+- [ ] Live WordPress smoke: add symbol in Account, confirm no flip-back before poll completes
+- [ ] Live WordPress smoke: remove symbol in Account, confirm Live Radar / Signal Engine drop it within one active refresh
+
 ---
 
 ## Step 3: Candle History Verification (Parallel with Soak)
@@ -524,6 +541,7 @@ define('WP_DEBUG_LOG', true);
 - Backend candle snapshot shows BTCUSD has sufficient stored history (`15min=396`, `1min=582`), so the frontend BTCUSD insufficient-history gate does not match backend candle availability and should be treated as a parity/anomaly item.
 - Aggregate T+0 candle totals were confirmed, and the per-symbol T+0 snapshot has been copied into this tracker.
 - `Final feed status ... RESULT=stale` was observed at `2026-05-07 08:18:34 UTC` with `all_symbols_mt5_live=false` and `feed_any_rate_limited=false`.
+- A focused watchlist persistence hotfix was applied on `2026-05-07`: backend watchlist writes now invalidate `smc_sf_engine_snapshot`, and frontend watchlist mutations now cancel/refetch dependent caches to prevent symbol flashback and ghost tiles.
 - Additional non-MT5 debug lines observed:
 
 ```text
