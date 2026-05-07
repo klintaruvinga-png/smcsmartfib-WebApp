@@ -140,7 +140,8 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
   async function removePair(p: string) {
     if (watchlistBusy) return;
     try {
-      await removeWatchlistMutation.mutateAsync(p);
+      const result = await removeWatchlistMutation.mutateAsync(p);
+      setS((prev) => ({ ...prev, watchlist: result.watchlist }));
       toast.success(`${p} removed`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to remove symbol");
@@ -156,7 +157,8 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
       qc.getQueryData<DashboardSettings>(["user-settings"])?.watchlist ?? settings.watchlist;
     if (!sym || currentWatchlist.includes(sym as never)) return;
     try {
-      await addWatchlistMutation.mutateAsync(sym);
+      const result = await addWatchlistMutation.mutateAsync(sym);
+      setS((prev) => ({ ...prev, watchlist: result.watchlist }));
       setNewPair("");
       toast.success(`${sym} added to watchlist`);
     } catch (error) {
