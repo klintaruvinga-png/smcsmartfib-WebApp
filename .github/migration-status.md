@@ -66,6 +66,8 @@
 - [ ] Disconnect/reconnect testing
 - [ ] Backend restart testing
 - [ ] MT5 M1 -> 15min aggregation verification for symbols previously showing `insufficient candle history`
+- [x] Repo soak tracker added: `.github/migration/PHASE0_SOAK_TRACKER.md`
+- [x] Repo log instrumentation added for `PHASE0_SOAK` backend + Live Radar console warnings
 
 ### Parity Status
 ```
@@ -77,6 +79,7 @@ Freshness Logic: [PENDING]
 ### Blockers
 - Live 24h/72h soak evidence not complete
 - MT5 M1 -> 15min candle-history aggregation path still needs focused verification
+- Phase 0 completion log and final parity audit are not yet written to `.github/migration/phase-updates/` and `.github/migration/audits/`
 
 ---
 

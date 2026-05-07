@@ -7,6 +7,8 @@
 - **Migration Manager Agent** (`.github/agents/migration-project-manager.agent.md`): Phase tracking, report auto-ingestion, escalation, weekly status generation
 
 **Status Board**: `../migration-status.md`
+**Phase 0 Soak Tracker**: `./PHASE0_SOAK_TRACKER.md`
+**Live Soak Log Tag**: `PHASE0_SOAK` in WordPress `wp-content/debug.log` and the browser console for `RATE_LIMITED` blockers
 
 **Integration Workflow**:
 ```
@@ -46,6 +48,7 @@ Migration Manager (auto-ingestion every 30 min)
 **Output**:
 - `.github/docs/BUG_SWEEP_REPORT_[YYYY-MM-DD].md` — Bug scan with CRITICAL/HIGH issues
 - `.github/migration/audits/phase-[X]-[engine]-parity-[YYYY-MM-DD].md` — Parity audit with % metrics
+- `.github/migration/PHASE0_SOAK_TRACKER.md` — manual runbook for the active Phase 0 soak, evidence checklist, and operator actions
 
 ---
 
@@ -209,6 +212,7 @@ For auto-ingestion to work, reports **MUST** follow the templates exactly:
 ├── migration/
 │   ├── README.md                             ← This file
 │   ├── QUICK_REFERENCE.md                    ← Command reference
+│   ├── PHASE0_SOAK_TRACKER.md                ← Active Phase 0 soak runbook and manual checklist
 │   ├── migration-status.md                   ← Global status board (all phases)
 │   ├── BUG_SCAN_TEMPLATE.md                  ← Template for bug scan reports
 │   ├── audits/
@@ -272,6 +276,11 @@ Contains:
 ---
 
 ## File Types & Naming Conventions
+
+### Phase 0 Soak Tracker
+- **Path**: `./PHASE0_SOAK_TRACKER.md`
+- **Purpose**: live soak checklist, logging instructions, transient cleanup steps, candle-history verification, parity closeout
+- **Evidence referenced**: WordPress `wp-content/debug.log`, browser console warnings, `.github/migration/test-logs/`, `.github/migration/audits/`, `.github/migration/phase-updates/`
 
 ### Parity Audits
 - **Path**: `./audits/`

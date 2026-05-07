@@ -10,6 +10,7 @@ import { MOCK_MODE } from "@/lib/api/sniperClient";
 import { tickMotionHoldMs, tickMotionStyle } from "@/lib/tickMotion";
 import { cn } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
+import { useEffect } from "react";
 import type {
   EngineBlocker,
   PairPrice,
@@ -231,6 +232,17 @@ function PriceCard({
   const canHoldTheme =
     !priceUnavailable && !stale && price.state !== "unavailable" && gate?.allow !== "BLOCKED";
 
+  useEffect(() => {
+    if (diagnostic?.engineBlocker === "RATE_LIMITED") {
+      console.warn(`[PHASE0_SOAK] Live Radar: ${price.symbol} blocked by RATE_LIMITED`, {
+        diagnostic,
+        price,
+        regime,
+        gate,
+      });
+    }
+  }, [diagnostic, gate, price, price.symbol, regime]);
+
   return (
     <div
       className={cn(
@@ -262,9 +274,7 @@ function PriceCard({
         >
           {priceUnavailable ? "—" : fmtPrice(animatedMid ?? price.mid, price.symbol)}
         </div>
-        <div
-          className={cn("font-mono text-sm", price.changePct1d >= 0 ? "text-buy" : "text-sell")}
-        >
+        <div className={cn("font-mono text-sm", price.changePct1d >= 0 ? "text-buy" : "text-sell")}>
           {priceUnavailable ? "—" : fmtPct(price.changePct1d)}
         </div>
       </div>

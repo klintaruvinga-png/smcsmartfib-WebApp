@@ -22,6 +22,13 @@ Install `smc-superfib-sniper.php` as a WordPress plugin on `trader.stokvelsociet
 - Add scheduled pruning for high-frequency `engine_runs` heartbeat rows after live soak defines the desired retention window.
 - Verify the MT5 M1 -> 15min aggregation path for any symbol still showing `insufficient candle history`; do not weaken the 30-candle gate without proof.
 
+## Phase 0 soak logging
+
+- Backend emits `PHASE0_SOAK` lines for per-symbol `/health` feed decisions, final `feedStatus`, candle fetch TTL/rate-limit transitions, and candle coverage counts.
+- Frontend `src/routes/live.tsx` emits `console.warn` with the `PHASE0_SOAK` tag when a card is blocked by `RATE_LIMITED`.
+- Primary operator runbook: `.github/migration/PHASE0_SOAK_TRACKER.md`
+- Primary backend log target: WordPress `wp-content/debug.log`
+
 ## Frontend env
 
 ```env
