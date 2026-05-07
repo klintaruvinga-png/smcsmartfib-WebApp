@@ -103,7 +103,8 @@ final class SMC_SuperFib_Sniper_REST {
 
         wp_add_inline_script(
             'smc-superfib-sniper-rest-bootstrap',
-            'window.wpApiSettings = Object.assign({}, window.wpApiSettings || {}, ' . wp_json_encode($rest_api_settings) . ');',
+            'window.wpApiSettings = Object.assign({}, window.wpApiSettings || {}, ' . wp_json_encode($rest_api_settings) . ');'
+            . 'window.SNIPER = Object.assign({}, window.SNIPER || {}, { root: ' . wp_json_encode($rest_api_settings['root']) . ', nonce: ' . wp_json_encode($rest_api_settings['nonce']) . ' });',
             'before'
         );
     }
