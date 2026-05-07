@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useSnapshot, useEngineBatch, useUserSettings, usePollMs } from "@/hooks/useSniperData";
+import { useSnapshot, useEngineBatch, usePollMs } from "@/hooks/useSniperData";
 import { useStreamingTicks } from "@/hooks/useStreamingTicks";
 import { useTickFlash } from "@/hooks/useTickFlash";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
@@ -51,14 +51,9 @@ function blockerWarning(blocker: EngineBlocker | undefined): string | null {
 
 function LivePage() {
   const { data, isLoading } = useSnapshot();
-  const { data: settings } = useUserSettings();
   const pollMs = usePollMs() ?? 2000;
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
   if (isLoading || !data) return <div className="text-mute text-sm">Loading radar…</div>;
-
-  const parseUpdatedAt = (value: string): Date =>
-    value.includes("T") ? new Date(value) : new Date(`${value.replace(" ", "T")}Z`);
-  const staleThresholdMs = Math.max(10, Math.min(60, settings?.staleThresholdSec ?? 10)) * 1000;
 
   const mt5Prices = data.prices.filter((price) => {
     if (MOCK_MODE && price.source === "mock") return true;
@@ -68,21 +63,6 @@ function LivePage() {
     }
     if (price.state !== "live") {
       console.debug("[live] skipped non-live MT5 price", price.symbol, price.state);
-      return false;
-    }
-
-    const parsed = parseUpdatedAt(price.updatedAt);
-    const ageMs = Number.isFinite(price.age_sec)
-      ? Number(price.age_sec) * 1000
-      : Date.now() - parsed.getTime();
-    if (!Number.isFinite(ageMs) || ageMs > staleThresholdMs) {
-      console.debug(
-        "[live] skipped stale MT5 price",
-        price.symbol,
-        Number.isFinite(ageMs)
-          ? `${(ageMs / 1000).toFixed(1)}s old / ${(staleThresholdMs / 1000).toFixed(0)}s threshold`
-          : price.updatedAt,
-      );
       return false;
     }
     return true;
@@ -123,7 +103,6 @@ function LivePage() {
               regime={regime}
               gate={gate}
               diagnostic={diagnostic}
-              staleThresholdMs={staleThresholdMs}
               pollMs={pollMs}
             />
           );
@@ -138,14 +117,12 @@ function PriceCard({
   regime,
   gate,
   diagnostic,
-  staleThresholdMs,
   pollMs,
 }: {
   price: PairPrice;
   regime: RegimeState | undefined;
   gate: GateState | undefined;
   diagnostic: SymbolDiagnostic | undefined;
-  staleThresholdMs: number;
   pollMs: number;
 }) {
   const chopTickStyle = tickMotionStyle(`${price.symbol}:chop`, {
@@ -218,15 +195,17 @@ function PriceCard({
     { motionKey: askMotionKey, motionImpulse: askMotionImpulse },
   );
 
-  const backendLive = price.state === "live";
-  const clientStale =
-    !backendLive && price.updatedAt
-      ? Date.now() - new Date(price.updatedAt).getTime() > staleThresholdMs
-      : false;
-  const stale = price.state === "stale" || regime?.state === "stale" || clientStale;
+  // Preserve backend freshness authority. Do not reclassify cards from browser-clock math.
+  const stale = price.state === "stale" || regime?.state === "stale";
   const priceUnavailable =
     price.mid === 0 && (price.state === "unavailable" || gate?.allow === "BLOCKED");
   const diagWarning = blockerWarning(diagnostic?.engineBlocker);
+  const diagLevel =
+    diagnostic?.engineBlocker === "KEY_MISSING" ||
+    diagnostic?.engineBlocker === "KEY_INVALID" ||
+    diagnostic?.engineBlocker === "RATE_LIMITED"
+      ? "block"
+      : "warn";
   const staleTimestamp = diagnostic?.lastPriceAt ?? price.updatedAt;
   const restTickDir = heldMidDir;
   const canHoldTheme =
@@ -336,19 +315,7 @@ function PriceCard({
       </div>
 
       {gate?.reason && <WarningLine level="block">Gate blocked: {gate.reason}</WarningLine>}
-      {diagWarning && !gate?.reason && (
-        <WarningLine
-          level={
-            diagnostic?.engineBlocker === "KEY_MISSING" ||
-            diagnostic?.engineBlocker === "KEY_INVALID" ||
-            diagnostic?.engineBlocker === "RATE_LIMITED"
-              ? "block"
-              : "warn"
-          }
-        >
-          {diagWarning}
-        </WarningLine>
-      )}
+      {diagWarning && !gate?.reason && <WarningLine level={diagLevel}>{diagWarning}</WarningLine>}
       {stale && !gate?.reason && !diagWarning && (
         <WarningLine level="warn">
           Price data stale — last update {relTime(staleTimestamp)}.
