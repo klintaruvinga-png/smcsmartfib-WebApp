@@ -4,7 +4,7 @@
  * In MOCK_MODE every function returns the typed mock model with state: 'mock'.
  */
 
-import { getAuthHeader, clearCredentials } from "@/lib/auth";
+import { getAuthHeader, clearCredentials, getWordPressNonce } from "@/lib/auth";
 
 export class AuthError extends Error {
   constructor() {
@@ -85,12 +85,9 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
     if (authHeader) {
       headers["Authorization"] = authHeader;
     } else {
-      // Fall back to nonce when served directly from WordPress (window.SNIPER injected)
-      const win =
-        typeof window !== "undefined"
-          ? (window as unknown as { SNIPER?: { nonce?: string } })
-          : undefined;
-      if (win?.SNIPER?.nonce) headers["X-WP-Nonce"] = win.SNIPER.nonce;
+      // Fall back to the WordPress REST nonce when served from WordPress.
+      const nonce = getWordPressNonce();
+      if (nonce) headers["X-WP-Nonce"] = nonce;
     }
   }
 

@@ -1,5 +1,10 @@
 const KEY = "smc_wp_auth";
 
+type WordPressWindow = Window & {
+  SNIPER?: { nonce?: string };
+  wpApiSettings?: { nonce?: string };
+};
+
 export function setCredentials(username: string, appPassword: string): void {
   sessionStorage.setItem(KEY, btoa(`${username}:${appPassword}`));
 }
@@ -21,6 +26,11 @@ export function hasCredentials(): boolean {
 
 export function hasWordPressNonce(): boolean {
   if (typeof window === "undefined") return false;
-  const wpWindow = window as Window & { SNIPER?: { nonce?: string } };
-  return Boolean(wpWindow.SNIPER?.nonce);
+  return Boolean(getWordPressNonce());
+}
+
+export function getWordPressNonce(): string | null {
+  if (typeof window === "undefined") return null;
+  const wpWindow = window as WordPressWindow;
+  return wpWindow.SNIPER?.nonce ?? wpWindow.wpApiSettings?.nonce ?? null;
 }
