@@ -156,12 +156,13 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
     const currentWatchlist =
       qc.getQueryData<DashboardSettings>(["user-settings"])?.watchlist ?? settings.watchlist;
     if (!sym || currentWatchlist.includes(sym as never)) return;
+    setNewPair("");
     try {
       const result = await addWatchlistMutation.mutateAsync(sym);
       setS((prev) => ({ ...prev, watchlist: result.watchlist }));
-      setNewPair("");
       toast.success(`${sym} added to watchlist`);
     } catch (error) {
+      setNewPair(sym);
       toast.error(error instanceof Error ? error.message : "Failed to add symbol");
     }
   }
