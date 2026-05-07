@@ -1,7 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useUserSettings, useUserRiskProfile, useEngineHealth } from "@/hooks/useSniperData";
+import {
+  useUserSettings,
+  useUserRiskProfile,
+  useEngineHealth,
+  useWatchlistAdd,
+  useWatchlistRemove,
+} from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { WarningLine } from "@/components/sniper/Warnings";
 import { cn } from "@/lib/utils";
@@ -111,7 +117,9 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
   const [busy, setBusy] = useState<"settings" | "test-key" | "save-key" | "delete-key" | null>(
     null,
   );
-  const [watchlistBusy, setWatchlistBusy] = useState<string | null>(null);
+  const addWatchlistMutation = useWatchlistAdd();
+  const removeWatchlistMutation = useWatchlistRemove();
+  const watchlistBusy = addWatchlistMutation.isPending || removeWatchlistMutation.isPending;
 
   useEffect(() => {
     if (!settingsDirty) {
@@ -131,23 +139,11 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
 
   async function removePair(p: string) {
     if (watchlistBusy) return;
-    setWatchlistBusy(p);
     try {
-      const result = await apiClient.postWatchlistRemove(p);
-      qc.setQueryData<DashboardSettings>(["user-settings"], (old) =>
-        old ? { ...old, watchlist: result.watchlist } : old,
-      );
-      setS((prev) => ({ ...prev, watchlist: result.watchlist }));
-      await Promise.all([
-        qc.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
-        qc.invalidateQueries({ queryKey: ["live-signals"] }),
-        qc.invalidateQueries({ queryKey: ["user-settings"] }),
-      ]);
+      await removeWatchlistMutation.mutateAsync(p);
       toast.success(`${p} removed`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to remove symbol");
-    } finally {
-      setWatchlistBusy(null);
     }
   }
 
@@ -156,25 +152,15 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
       .trim()
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, "");
-    if (!sym || s.watchlist.includes(sym as never)) return;
-    setWatchlistBusy("add");
+    const currentWatchlist =
+      qc.getQueryData<DashboardSettings>(["user-settings"])?.watchlist ?? settings.watchlist;
+    if (!sym || currentWatchlist.includes(sym as never)) return;
     try {
-      const result = await apiClient.postWatchlistAdd(sym);
-      qc.setQueryData<DashboardSettings>(["user-settings"], (old) =>
-        old ? { ...old, watchlist: result.watchlist } : old,
-      );
-      setS((prev) => ({ ...prev, watchlist: result.watchlist }));
+      await addWatchlistMutation.mutateAsync(sym);
       setNewPair("");
-      await Promise.all([
-        qc.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
-        qc.invalidateQueries({ queryKey: ["live-signals"] }),
-        qc.invalidateQueries({ queryKey: ["user-settings"] }),
-      ]);
       toast.success(`${sym} added to watchlist`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to add symbol");
-    } finally {
-      setWatchlistBusy(null);
     }
   }
 
@@ -293,7 +279,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
         <div className="flex justify-end">
           <button
             onClick={() => void saveSettings()}
-            disabled={busy === "settings" || watchlistBusy !== null}
+            disabled={busy === "settings" || watchlistBusy}
             className="rounded-md border border-buy/50 bg-buy/15 px-3 py-1.5 text-xs font-semibold text-buy hover:bg-buy/25 disabled:opacity-60"
           >
             {busy === "settings" ? "Saving..." : "Save settings"}
@@ -387,7 +373,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
         <div className="flex justify-end">
           <button
             onClick={() => void saveSettings()}
-            disabled={busy === "settings" || watchlistBusy !== null || !settingsDirty}
+            disabled={busy === "settings" || watchlistBusy || !settingsDirty}
             className="rounded-md border border-buy/50 bg-buy/15 px-3 py-1.5 text-xs font-semibold text-buy hover:bg-buy/25 disabled:opacity-60"
           >
             {busy === "settings" ? "Saving..." : "Save"}
@@ -397,7 +383,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
 
       <Card title="Watchlist" className="lg:col-span-2">
         <div className="flex flex-wrap gap-1.5 mb-3">
-          {s.watchlist.map((p) => (
+          {settings.watchlist.map((p) => (
             <span
               key={p}
               className="inline-flex items-center gap-1.5 rounded border border-bd bg-bg2/60 px-2 py-1 font-mono text-xs text-dim"
@@ -405,7 +391,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
               {p}
               <button
                 onClick={() => removePair(p)}
-                disabled={watchlistBusy !== null}
+                disabled={watchlistBusy}
                 className="text-mute hover:text-sell disabled:opacity-40"
               >
                 <X className="h-3 w-3" />
@@ -423,10 +409,10 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
           />
           <button
             onClick={addPair}
-            disabled={watchlistBusy !== null || !newPair.trim()}
+            disabled={watchlistBusy || !newPair.trim()}
             className="rounded border border-bd bg-bg2 px-3 py-1.5 text-xs text-dim hover:text-tx hover:border-bd2 disabled:opacity-50"
           >
-            {watchlistBusy === "add" ? "Adding..." : "Add"}
+            {addWatchlistMutation.isPending ? "Adding..." : "Add"}
           </button>
         </div>
       </Card>
@@ -458,7 +444,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
         <div className="flex justify-end">
           <button
             onClick={() => void saveSettings()}
-            disabled={busy === "settings" || watchlistBusy !== null || !settingsDirty}
+            disabled={busy === "settings" || watchlistBusy || !settingsDirty}
             className="rounded-md border border-buy/50 bg-buy/15 px-3 py-1.5 text-xs font-semibold text-buy hover:bg-buy/25 disabled:opacity-60"
           >
             {busy === "settings" ? "Saving..." : "Save"}
