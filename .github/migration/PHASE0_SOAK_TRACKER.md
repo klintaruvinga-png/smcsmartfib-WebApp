@@ -1,0 +1,532 @@
+# Phase 0 Live Soak & Completion Tracking Guide
+**Started**: 2026-05-06  
+**Target Completion**: 2026-05-17  
+**Status**: Started 09:45 SAST by Kudzie
+
+---
+
+## Overview
+This document tracks the live soak test, debugging steps, manual fixes, and evidence collection needed to complete Phase 0 stabilization. Use this as your working reference during the 72h soak period.
+
+### Key Blockers to Resolve
+1. Price feed stable for 72h+ (verify no false LIVE/STALE transitions)
+2. Feed status shows `stale` (not `rate-limited`/`blocked`) when EA symbols age out
+3. MT5 M1 -> 15min candle aggregation working for all symbols (>=30 candles)
+4. Full Pine/backend/dashboard parity audit (>95%)
+
+---
+
+## Step 1: Pre-Soak Setup & Logging Configuration
+
+### 1a. Enable Detailed Logging in Backend
+
+**File**: `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+
+Add the following log statements (if not already present) for tracking feed status and rate-limit state:
+
+#### Location 1: Around line 498-545 (feedStatus calculation)
+```php
+// LOG: Per-symbol MT5 authority check and rate-limit state
+error_log(sprintf(
+    '[PHASE0_SOAK] Health check: symbol=%s | mt5_live=%s | mt5_candles_live=%s | rate_limited=%s | age_sec=%d',
+    $symbol,
+    $mt5_price_live ? 'true' : 'false',
+    $mt5_candles_live ? 'true' : 'false',
+    $this->is_feed_rate_limited($user_id, $symbol) ? 'true' : 'false',
+    $price_age ?? PHP_INT_MAX
+));
+
+// LOG: Final feedStatus decision
+error_log(sprintf(
+    '[PHASE0_SOAK] Final feed status: all_symbols_mt5_live=%s | feed_any_rate_limited=%s | key_status=%s | batch_age=%d | RESULT=%s',
+    $all_symbols_mt5_live ? 'true' : 'false',
+    $feed_any_rate_limited ? 'true' : 'false',
+    $key_status,
+    $batch_age,
+    $feed_status
+));
+```
+
+#### Location 2: Around line 2186 (candle TTL check)
+```php
+// LOG: Candle fetch attempt
+error_log(sprintf(
+    '[PHASE0_SOAK] fetch_candles: symbol=%s | timeframe=%s | ttl_active=%s | has_key=%s | will_call_td=%s',
+    $symbol,
+    $timeframe,
+    $candle_ttl_active ? 'true' : 'false',
+    is_wp_error($key) ? 'error' : ($key ? 'true' : 'false'),
+    (!$candle_ttl_active && !is_wp_error($key) && $key) ? 'true' : 'false'
+));
+```
+
+#### Location 3: Around line 2203 (429 response)
+```php
+// LOG: Rate-limit transient set
+error_log(sprintf(
+    '[PHASE0_SOAK] Rate-limit 429 detected: symbol=%s | setting transient ttl_sec=60',
+    $symbol
+));
+```
+
+#### Location 4: Around line 2818-2820 (is_feed_rate_limited check)
+```php
+private function is_feed_rate_limited($user_id, $symbol = null) {
+    $key = $symbol !== null ? $this->rl_transient_key($user_id, $symbol) : $this->rl_transient_key($user_id);
+    $state = get_transient($key) !== false;
+
+    // LOG: Check for debugging
+    if ($state && $symbol) {
+        error_log(sprintf('[PHASE0_SOAK] is_feed_rate_limited: TRUE for %s', $symbol));
+    }
+
+    return $state;
+}
+```
+
+### 1b. Enable Frontend Console Logging
+
+**File**: `live.tsx`, around line 342:
+
+```typescript
+if (diagnostic?.engineBlocker === "RATE_LIMITED") {
+  console.warn(
+    `[PHASE0_SOAK] Live Radar: ${price.symbol} blocked by RATE_LIMITED`,
+    { diagnostic, price, regime, gate }
+  );
+}
+```
+
+### 1c. Monitor WordPress Logs
+
+**Command to tail logs** (run in terminal):
+```bash
+# On Windows PowerShell with WSL:
+tail -f /var/www/html/wp-content/debug.log | grep "PHASE0_SOAK"
+
+# Or live monitoring:
+Get-Content -Path "C:\path\to\wp-content\debug.log" -Tail 50 -Wait | findstr "PHASE0_SOAK"
+```
+
+---
+
+## Step 2: Run Live Soak (72h Monitoring)
+
+### 2a. Baseline Snapshot (T+0:00)
+
+When starting the EA, record:
+- [x] Start time: 2026-05-06 09:45 SAST
+- [x] Started by: Kudzie
+- [x] EA symbols running: Backend is feeding EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD, USDCHF, NZDUSD, EURJPY, EURGBP, GBPJPY, EURCHF, AUDJPY, EURAUD, BTCUSD, ETHUSD, SOLUSD, DXYUSD, Boom 500 Index, Volatility 75(1s) Index, US Tech 100, Germany 40, US SP 500, Wall Street 30
+- [x] Frontend watchlist: USDJPY, NZDUSD, USDCHF, EURJPY, BTCUSD, EURUSD, AUDUSD, GBPUSD
+- [x] MT5 terminal status: Online, running multiple clients
+- [x] Backend health endpoint: https://trader.stokvelsociety.co.za/wp-json/sniper/v1/health
+- [x] T+0 health response: `feedStatus=stale`, `backendSync=live`, `twelveDataKeyStatus=OK`
+- [x] `auth=true` confirmed at T+0
+- [x] Twelve Data key status: OK
+- [x] Watchlist live symbols at T+0: 7 currency pairs plus BTCUSD live; BTCUSD price moves, but its gate is blocked by insufficient candle history
+- [x] Per-symbol T+0 candle counts copied into tracker
+
+**Manual health check**:
+```bash
+curl -s https://your-backend.com/health | jq '.feedStatus, .backendSync, .twelveDataKeyStatus'
+
+HealthCheck Endpoint
+via URL https://trader.stokvelsociety.co.za/wp-json/sniper/v1/health
+
+Via browser console
+fetch('/wp-json/sniper/v1/health', {
+  credentials: 'include',
+  headers: { 'X-WP-Nonce': wpApiSettings.nonce }
+}).then(r => r.json()).then(d => console.table(d))
+```
+
+**Baseline log evidence**:
+- [x] `[PHASE0_SOAK]` lines present in `debug.log`
+- [x] `Final feed status ... RESULT=stale` captured
+
+```text
+[07-May-2026 07:54:04 UTC] [PHASE0_SOAK] fetch_candles: symbol=GBPUSD | timeframe=15min | ttl_active=true | has_key=true | will_call_td=false
+[07-May-2026 07:54:04 UTC] [PHASE0_SOAK] CANDLE_OK: symbol=GBPUSD | timeframe=15min | count=120
+[07-May-2026 07:54:04 UTC] [PHASE0_SOAK] fetch_candles: symbol=AUDUSD | timeframe=15min | ttl_active=true | has_key=true | will_call_td=false
+[07-May-2026 08:18:34 UTC] [PHASE0_SOAK] Final feed status: all_symbols_mt5_live=false | feed_any_rate_limited=false | key_status=ok | batch_age=3 | RESULT=stale
+```
+
+### 2b. Continuous Monitoring Checkpoint Table
+
+| Checkpoint | Time | Feed Status | Candle Totals / Coverage | Candles OK | Notes |
+|-----------|------|-------------|--------------------------|------------|-------|
+| T+0h | 09:45 | stale | 15min=9670, 1min=73783 | Yes | Aggregate totals confirmed. Per-symbol counts copied below. No symbols were under 30 candles; lowest count observed was 33. BTCUSD live, but frontend gate still reported insufficient candle history. |
+| T+12h | __ | __ | __ | __ | |
+| T+24h | __ | __ | __ | __ | **Day 1 complete** |
+| T+36h | __ | __ | __ | __ | |
+| T+48h | __ | __ | __ | __ | **Day 2 complete** |
+| T+60h | __ | __ | __ | __ | |
+| T+72h | __ | __ | __ | __ | **Soak complete** |
+
+### 2c. Test Scenario A: Symbol Aging (Market Close/Weekend)
+
+**Expected behavior**: Feed status should show `stale` not `rate-limited`
+
+**Check**:
+- [x] Review logs for: `[PHASE0_SOAK] Final feed status: ... RESULT=stale`
+- [x] Verify `mt5_live=false` and `rate_limited=false`
+- [ ] Screenshot Live Radar showing `stale` state
+
+**If stuck on `rate-limited`**:
+```sql
+-- Check for stuck transients
+SELECT option_name, option_value FROM wp_options
+WHERE option_name LIKE '%smc_sf_rl_%';
+
+-- Delete stuck transient (manual fix):
+DELETE FROM wp_options WHERE option_name = 'smc_sf_rl_<USER_ID>_<SYMBOL>';
+```
+
+### 2d. Test Scenario B: Force Refresh
+
+**Expected behavior**: All transients clear, feed recovers automatically
+
+**Check**:
+- [ ] Logs show transient deletion: `[PHASE0_SOAK] Cleared rate-limit transients`
+- [ ] feedStatus updates to `live` or `stale` based on fresh data
+- [ ] No symbols remain stuck on `rate-limited`
+
+### 2e. Test Scenario C: Backend Restart
+
+**Expected behavior**: Transients clear, feed recovers to normal state
+
+**Check**:
+- [ ] Logs show clean state after restart
+- [ ] feedStatus correctly reflects current state
+
+---
+
+## Step 3: Candle History Verification (Parallel with Soak)
+
+### 3a. Enable Candle Gap Logging
+
+**File**: `smc-superfib-sniper.php`, lines 2180-2210:
+
+```php
+private function fetch_candles($user_id, $symbol, $timeframe, $outputsize) {
+    // ... existing code ...
+
+    global $wpdb;
+    $stored_candles = $wpdb->get_results($wpdb->prepare(
+        "SELECT * FROM {$this->table('candles')} WHERE user_id = %d AND symbol = %s AND timeframe = %s ORDER BY candle_time DESC LIMIT 120",
+        $user_id,
+        $symbol,
+        $timeframe
+    ));
+
+    $count = count($stored_candles);
+    if ($count < 30) {
+        error_log(sprintf(
+            '[PHASE0_SOAK] CANDLE_GAP: symbol=%s | timeframe=%s | count=%d | status=INSUFFICIENT',
+            $symbol,
+            $timeframe,
+            $count
+        ));
+    } else {
+        error_log(sprintf(
+            '[PHASE0_SOAK] CANDLE_OK: symbol=%s | timeframe=%s | count=%d',
+            $symbol,
+            $timeframe,
+            $count
+        ));
+    }
+
+    return $stored_candles;
+}
+```
+
+### 3b. Candle Count Query
+
+Run periodically during soak:
+```sql
+SELECT
+    symbol,
+    timeframe,
+    COUNT(*) AS candle_count,
+    MIN(candle_time) AS oldest,
+    MAX(candle_time) AS newest
+FROM wp_smc_sf_candles
+WHERE user_id = YOUR_USER_ID
+GROUP BY symbol, timeframe
+ORDER BY symbol, timeframe;
+```
+
+### 3c. Candle History Tracker
+
+| Symbol | Timeframe | T+24h | T+48h | T+72h | Status |
+|--------|-----------|-------|-------|-------|--------|
+| | M1 | | | | |
+| | 15min | | | | |
+
+**Target**: All symbols >=30 candles in 15min by T+72h
+
+**T+0 per-symbol candle snapshot (`user_id = 1`)**:
+
+| Symbol | Timeframe | Candle Count | Oldest | Newest |
+|--------|-----------|-------------:|--------|--------|
+| GERMANY40 | 15min | 33 | 2026-05-06 12:14:57 | 2026-05-07 08:59:57 |
+| WALLSTREET | 15min | 33 | 2026-05-06 12:14:57 | 2026-05-07 08:59:57 |
+| DXYUSD | 15min | 33 | 2026-05-06 12:14:57 | 2026-05-07 08:59:57 |
+| BOOM500IND | 15min | 34 | 2026-05-06 12:14:57 | 2026-05-07 08:59:57 |
+| USSP500 | 15min | 34 | 2026-05-06 12:14:57 | 2026-05-07 08:59:57 |
+| VOLATILITY7 | 15min | 35 | 2026-05-06 12:14:57 | 2026-05-07 08:59:57 |
+| USTECH100 | 15min | 36 | 2026-05-06 12:14:57 | 2026-05-07 08:59:57 |
+| SOLUSD | 15min | 53 | 2026-05-06 12:14:57 | 2026-05-07 09:00:00 |
+| ETHUSD | 15min | 173 | 2026-05-01 07:45:00 | 2026-05-07 09:00:00 |
+| EURAUD | 15min | 317 | 2026-05-06 12:14:57 | 2026-05-07 09:00:00 |
+| XAUUSD | 15min | 320 | 2026-05-01 01:15:00 | 2026-05-05 15:45:00 |
+| EURCHF | 15min | 321 | 2026-05-06 12:14:57 | 2026-05-07 09:00:07 |
+| WALLSTREET | 1min | 352 | 2026-05-06 12:42:57 | 2026-05-07 09:26:57 |
+| USTECH100 | 1min | 355 | 2026-05-06 12:42:57 | 2026-05-07 09:26:57 |
+| GERMANY40 | 1min | 357 | 2026-05-06 12:42:57 | 2026-05-07 09:26:57 |
+| DXYUSD | 1min | 359 | 2026-05-06 12:42:57 | 2026-05-07 09:26:57 |
+| USSP500 | 1min | 360 | 2026-05-06 12:42:57 | 2026-05-07 09:26:57 |
+| VOLATILITY7 | 1min | 362 | 2026-05-06 12:42:57 | 2026-05-07 09:26:57 |
+| BOOM500IND | 1min | 378 | 2026-05-06 12:42:57 | 2026-05-07 09:26:57 |
+| BTCUSD | 15min | 396 | 2026-05-01 07:45:00 | 2026-05-07 09:00:00 |
+| USDCAD | 15min | 551 | 2026-05-05 09:45:00 | 2026-05-07 09:00:00 |
+| EURGBP | 15min | 552 | 2026-05-05 09:15:00 | 2026-05-07 09:00:05 |
+| GBPJPY | 15min | 554 | 2026-05-05 09:15:00 | 2026-05-07 09:00:06 |
+| USDCHF | 15min | 554 | 2026-05-05 09:45:00 | 2026-05-07 09:00:01 |
+| SOLUSD | 1min | 576 | 2026-05-06 12:42:57 | 2026-05-07 09:27:00 |
+| ETHUSD | 1min | 577 | 2026-05-06 12:41:58 | 2026-05-07 09:27:00 |
+| BTCUSD | 1min | 582 | 2026-05-06 12:41:57 | 2026-05-07 09:26:59 |
+| EURJPY | 15min | 669 | 2026-05-01 01:15:00 | 2026-05-07 09:00:04 |
+| EURUSD | 15min | 814 | 2026-04-30 20:45:00 | 2026-05-07 09:00:00 |
+| AUDJPY | 15min | 864 | 2026-05-01 01:15:00 | 2026-05-07 09:00:00 |
+| AUDUSD | 15min | 902 | 2026-04-30 20:45:00 | 2026-05-07 09:00:00 |
+| USDJPY | 15min | 910 | 2026-05-01 01:15:00 | 2026-05-07 09:00:00 |
+| NZDUSD | 15min | 914 | 2026-05-01 01:15:00 | 2026-05-07 09:00:02 |
+| CADJPY | 1min | 943 | 2026-05-05 17:18:58 | 2026-05-06 02:43:59 |
+| CHFJPY | 1min | 953 | 2026-05-05 17:18:58 | 2026-05-06 02:43:59 |
+| GBPUSD | 15min | 977 | 2026-04-30 20:45:00 | 2026-05-07 09:00:00 |
+| EURCHF | 1min | 3567 | 2026-05-06 12:30:57 | 2026-05-07 09:28:00 |
+| EURAUD | 1min | 3593 | 2026-05-06 12:30:57 | 2026-05-07 09:26:59 |
+| USDCHF | 1min | 4690 | 2026-05-06 03:22:58 | 2026-05-07 09:27:56 |
+| USDCAD | 1min | 4710 | 2026-05-06 03:22:59 | 2026-05-07 09:27:00 |
+| EURJPY | 1min | 4750 | 2026-05-06 03:23:00 | 2026-05-07 09:27:59 |
+| EURUSD | 1min | 5179 | 2026-05-03 12:00:00 | 2026-05-07 09:26:59 |
+| AUDJPY | 1min | 5533 | 2026-05-05 17:18:58 | 2026-05-07 09:27:59 |
+| NZDUSD | 1min | 5700 | 2026-05-05 17:18:58 | 2026-05-07 09:27:59 |
+| EURGBP | 1min | 5739 | 2026-05-05 17:18:58 | 2026-05-07 09:27:59 |
+| GBPUSD | 1min | 7032 | 2026-05-05 01:50:00 | 2026-05-07 09:27:00 |
+| USDJPY | 1min | 7095 | 2026-05-05 01:50:00 | 2026-05-07 09:27:00 |
+| AUDUSD | 1min | 7447 | 2026-05-05 01:50:00 | 2026-05-07 09:27:00 |
+| GBPJPY | 1min | 7661 | 2026-05-05 01:50:00 | 2026-05-07 09:28:00 |
+
+- [x] No symbols exist with candle count under 30
+- [x] Lowest candle count observed was 33
+
+### 3d. Manual Fix: Trigger Aggregation
+
+If symbol is stuck with <30 candles:
+```php
+// Force M1 -> 15min aggregation:
+$m1_candles = $this->fetch_candles($user_id, $symbol, '1min', 1000);
+$this->aggregate_m1_to_15min($user_id, $symbol, $m1_candles);
+$m15_candles = $this->fetch_candles($user_id, $symbol, '15min', 120);
+error_log(sprintf('[FIX] Aggregation complete: %s | now have %d 15min candles', $symbol, count($m15_candles)));
+```
+
+---
+
+## Step 4: Feed Status Behavior Verification
+
+### 4a. Verify `stale` During Aging
+
+**Expected log sequence**:
+```text
+[PHASE0_SOAK] Health check: symbol=EURUSD | mt5_live=true | mt5_candles_live=true | rate_limited=false | age_sec=5
+[PHASE0_SOAK] Final feed status: all_symbols_mt5_live=true | feed_any_rate_limited=false | key_status=ok | batch_age=8 | RESULT=live
+
+... hours pass, no EA pushes ...
+
+[PHASE0_SOAK] Health check: symbol=EURUSD | mt5_live=false | mt5_candles_live=false | rate_limited=false | age_sec=18000
+[PHASE0_SOAK] Final feed status: all_symbols_mt5_live=false | feed_any_rate_limited=false | key_status=ok | batch_age=18005 | RESULT=stale
+```
+
+**Verification checks**:
+- [ ] `mt5_live` transitions true -> false
+- [x] `feed_any_rate_limited` stays false
+- [x] `RESULT` is `stale` (not `rate-limited`)
+
+### 4b. If Stuck on `rate-limited`
+
+1. Find which symbol is causing it
+2. Check transient state:
+   ```sql
+   SELECT * FROM wp_options WHERE option_name LIKE '%smc_sf_rl_%';
+   ```
+3. Delete if stale:
+   ```php
+   delete_transient('smc_sf_rl_<USER_ID>_<SYMBOL>');
+   ```
+
+---
+
+## Step 5: Regression Checklist (T+24h, T+48h, T+72h)
+
+### 5a. No False LIVE States
+- [ ] No stale prices showing as `live`
+- [ ] feedStatus doesn't show `live` when batch_age > 120
+
+### 5b. No Stale-Loop Deadlocks
+- [ ] feedStatus not flipping rapidly (>1 per minute)
+- [ ] No timestamp corruption in logs
+
+### 5c. Sufficient Candles
+- [x] All symbols have >=30 candles
+- [x] No symbols stuck at <10 candles
+
+### 5d. Heartbeat Growth
+```sql
+SELECT COUNT(*) FROM wp_smc_sf_engine_runs
+WHERE user_id = YOUR_USER_ID
+  AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR);
+```
+- [ ] Row count grows linearly (1-2 per refresh cycle)
+- [ ] Not zero (EA must be running)
+
+---
+
+## Step 6: Parity Audit After Soak
+
+### 6a. Run Full Comparison
+
+After T+72h, compare:
+- **Pine signals** (manual review or logs)
+- **Backend signals** (query signals table)
+- **Dashboard signals** (screenshot or API)
+
+**Expected**: >=95% match on direction, status, levels, regime, gate state
+
+### 6b. Create Parity Report
+
+File: `.github/migration/audits/phase-0-full-parity-2026-05-10.md`
+
+```markdown
+# Phase 0 Full Parity Audit - [Date]
+
+**Soak Period**: 2026-05-06 to 2026-05-[XX]  
+**Symbols Tested**: [list]
+
+## Signal Engine Parity
+- Sample Size: [N]
+- Match Rate: [X]%
+- Status: PASS (>95%) | FAIL
+
+## Fib Engine Parity
+- Sample Size: [N]
+- Match Rate: [X]%
+- Status: PASS (>95%) | FAIL
+
+## Regime Parity
+- Sample Size: [N]
+- Match Rate: [X]%
+- Status: PASS (>95%) | FAIL
+
+## Candle History Verification
+- All symbols >=30 M1 candles: YES | NO
+- All symbols >=30 15min candles: YES | NO
+- Aggregation working: YES | NO
+
+## Feed Status Behavior
+- EA symbols age to `stale` not `rate-limited`: YES | NO
+- Non-EA symbols show real TD `rate-limited`: YES | NO
+- Force refresh clears transients: YES | NO
+
+## Summary
+Phase 0 Stabilization: READY FOR PHASE 1 | NEEDS MORE WORK
+```
+
+---
+
+## Step 7: Phase 0 Completion
+
+### 7a. Completion Log
+
+File: `.github/migration/phase-updates/phase-0-completion-2026-05-10.md`
+
+```markdown
+# Phase 0 Completion Log - [Date]
+
+## Actions Taken
+- [x] Enabled detailed logging
+- [x] Ran 72h live soak
+- [x] Verified feed status transitions
+- [x] Confirmed candle history adequate
+- [x] Ran full parity audit
+- [x] Resolved regressions
+
+## Blockers Resolved
+- Live soak completed
+- Feed status verified
+- Candles aggregating
+- Parity >95%
+
+## Status: PHASE 0 COMPLETE
+**Ready for Phase 1: MT5 Bridge Infrastructure**
+```
+
+### 7b. Update Migration Status
+
+Update migration-status.md:
+- Change Phase 0 status from `IN-PROGRESS` to `COMPLETE`
+- Set completion date
+- Unlock Phase 1
+
+---
+
+## Troubleshooting Quick Ref
+
+### Symbol Stuck on `rate-limited` After EA Push
+**Fix**: Delete transient or verify MT5 authority
+```php
+delete_transient('smc_sf_rl_<USER_ID>_<SYMBOL>');
+```
+
+### Candles Stuck <30
+**Fix**: Verify Twelve Data key or manually trigger aggregation
+```php
+$this->aggregate_m1_to_15min($user_id, $symbol, $m1_candles);
+```
+
+### feedStatus Shows `blocked` for EA Symbols
+**Fix**: Check `is_mt5_authoritative()` logic in `build_symbol_state()`
+
+### Logs Not Appearing
+**Fix**: Enable WordPress debug logging in `wp-config.php`
+```php
+define('WP_DEBUG', true);
+define('WP_DEBUG_LOG', true);
+```
+
+---
+
+## Sign-Off
+
+**Soak Started**: 2026-05-06 09:45 SAST by Kudzie  
+**Soak Completed**: ________________ by ________________  
+**All Criteria Met**: [ ] YES [ ] NO  
+**Ready for Phase 1**: [ ] YES [ ] NO  
+
+---
+
+## Observations & Notes
+
+- BTCUSD is live in the frontend and price moves, but its gate is blocked by insufficient candle history.
+- Backend candle snapshot shows BTCUSD has sufficient stored history (`15min=396`, `1min=582`), so the frontend BTCUSD insufficient-history gate does not match backend candle availability and should be treated as a parity/anomaly item.
+- Aggregate T+0 candle totals were confirmed, and the per-symbol T+0 snapshot has been copied into this tracker.
+- `Final feed status ... RESULT=stale` was observed at `2026-05-07 08:18:34 UTC` with `all_symbols_mt5_live=false` and `feed_any_rate_limited=false`.
+- Additional non-MT5 debug lines observed:
+
+```text
+[07-May-2026 08:57:53 UTC] [smc_feed] fetch_quote.non_mt5 | symbol=JPYUSD cached_source=twelve-data cached_state=stale rate_limited=no
+[07-May-2026 08:57:56 UTC] [smc_feed] fetch_quote.non_mt5 | symbol=XAUUSD cached_source=none cached_state=missing rate_limited=no
+```
