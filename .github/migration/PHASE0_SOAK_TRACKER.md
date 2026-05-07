@@ -206,7 +206,7 @@ DELETE FROM wp_options WHERE option_name = 'smc_sf_rl_<USER_ID>_<SYMBOL>';
 
 **Patch scope**:
 - Backend `smc-superfib-sniper.php`: watchlist save/add/remove now delete `smc_sf_engine_snapshot`, and engine snapshot symbol-set parity is checked before timestamp freshness.
-- Frontend `useSniperData.ts` + `account.tsx`: watchlist mutations now run through centralized React Query mutations with optimistic cache writes, rollback on failure, in-flight query cancellation, and dependent query invalidation.
+- Frontend `useSniperData.ts` + `account.tsx`: watchlist mutations now run through centralized React Query mutations with optimistic cache writes, rollback on failure, in-flight query cancellation, dependent query invalidation, a 30s `user-settings` `staleTime`, and a post-mutation authoritative `user-settings` refetch. The Account draft watchlist is also kept in sync so a dirty settings save cannot write an old watchlist back over the mutation result.
 - Frontend `sniperClient.ts`: watchlist REST responses now fail closed if the backend omits the `watchlist` array.
 
 **Verification**:

@@ -140,7 +140,8 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
   async function removePair(p: string) {
     if (watchlistBusy) return;
     try {
-      await removeWatchlistMutation.mutateAsync(p);
+      const result = await removeWatchlistMutation.mutateAsync(p);
+      setS((prev) => ({ ...prev, watchlist: result.watchlist }));
       toast.success(`${p} removed`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to remove symbol");
@@ -155,11 +156,14 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
     const currentWatchlist =
       qc.getQueryData<DashboardSettings>(["user-settings"])?.watchlist ?? settings.watchlist;
     if (!sym || currentWatchlist.includes(sym as never)) return;
+    setNewPair("");
     try {
-      await addWatchlistMutation.mutateAsync(sym);
-      setNewPair("");
+      const result = await addWatchlistMutation.mutateAsync(sym);
+      setS((prev) => ({ ...prev, watchlist: result.watchlist }));
       toast.success(`${sym} added to watchlist`);
     } catch (error) {
+      // Only restore the failed symbol if the user has not already typed a replacement.
+      setNewPair((current) => (current.trim() ? current : sym));
       toast.error(error instanceof Error ? error.message : "Failed to add symbol");
     }
   }
