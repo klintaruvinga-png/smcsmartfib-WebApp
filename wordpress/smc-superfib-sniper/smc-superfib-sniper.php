@@ -72,8 +72,6 @@ final class SMC_SuperFib_Sniper_REST {
             }
         }, 1); // Priority 1 — runs before anything else touches the response
 
-
-
         // Ensure authenticated dashboard/front-end app scripts have REST bootstrap data.
         // This is a safe fallback when the active JS bundle is manually inserted or
         // when the app uses a custom script handle and wpApiSettings was not localized.

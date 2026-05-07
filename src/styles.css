@@ -273,15 +273,27 @@
   }
 
   .tick-surface-hold-up {
-    border-color: color-mix(in oklab, var(--buy) 34%, var(--border) 66%);
-    background-color: color-mix(in oklab, var(--buy) 6%, var(--bg-1) 94%);
-    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--buy) 10%, transparent);
+    border-color: color-mix(in oklab, var(--buy) 38%, var(--border) 62%);
+    background-color: color-mix(in oklab, var(--buy) 11%, var(--bg-1) 89%);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklab, var(--buy) 16%, transparent),
+      0 0 18px -8px color-mix(in oklab, var(--buy) 35%, transparent);
+    transition:
+      background-color 600ms ease-out,
+      border-color 600ms ease-out,
+      box-shadow 600ms ease-out;
   }
 
   .tick-surface-hold-down {
-    border-color: color-mix(in oklab, var(--sell) 34%, var(--border) 66%);
-    background-color: color-mix(in oklab, var(--sell) 6%, var(--bg-1) 94%);
-    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--sell) 10%, transparent);
+    border-color: color-mix(in oklab, var(--sell) 38%, var(--border) 62%);
+    background-color: color-mix(in oklab, var(--sell) 11%, var(--bg-1) 89%);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklab, var(--sell) 16%, transparent),
+      0 0 18px -8px color-mix(in oklab, var(--sell) 35%, transparent);
+    transition:
+      background-color 600ms ease-out,
+      border-color 600ms ease-out,
+      box-shadow 600ms ease-out;
   }
 
   /* Tick flash — transient highlight when a polled value changes. */

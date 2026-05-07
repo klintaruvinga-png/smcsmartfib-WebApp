@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useSnapshot, useEngineBatch, useUserSettings } from "@/hooks/useSniperData";
-import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
+import { useSnapshot, useEngineBatch, useUserSettings, usePollMs } from "@/hooks/useSniperData";
+import { useStreamingTicks } from "@/hooks/useStreamingTicks";
 import { useTickFlash } from "@/hooks/useTickFlash";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { BiasBadge, ChopMeter, GateBadge } from "@/components/sniper/Indicators";
@@ -52,6 +52,7 @@ function blockerWarning(blocker: EngineBlocker | undefined): string | null {
 function LivePage() {
   const { data, isLoading } = useSnapshot();
   const { data: settings } = useUserSettings();
+  const pollMs = usePollMs() ?? 2000;
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
   if (isLoading || !data) return <div className="text-mute text-sm">Loading radar…</div>;
 
@@ -123,6 +124,7 @@ function LivePage() {
               gate={gate}
               diagnostic={diagnostic}
               staleThresholdMs={staleThresholdMs}
+              pollMs={pollMs}
             />
           );
         })}
@@ -137,12 +139,14 @@ function PriceCard({
   gate,
   diagnostic,
   staleThresholdMs,
+  pollMs,
 }: {
   price: PairPrice;
   regime: RegimeState | undefined;
   gate: GateState | undefined;
   diagnostic: SymbolDiagnostic | undefined;
   staleThresholdMs: number;
+  pollMs: number;
 }) {
   const chopTickStyle = tickMotionStyle(`${price.symbol}:chop`, {
     baseDurationMs: 300,
@@ -170,21 +174,21 @@ function PriceCard({
     heldDirection: heldMidDir,
     motionKey: midMotionKey,
     motionImpulse: midMotionImpulse,
-  } = useAnimatedNumber(price.mid, 320, midFlashHoldMs);
+  } = useStreamingTicks(price.mid, pollMs, midFlashHoldMs);
   const {
     value: animatedBid,
     direction: bidDir,
     heldDirection: heldBidDir,
     motionKey: bidMotionKey,
     motionImpulse: bidMotionImpulse,
-  } = useAnimatedNumber(price.bid, 280, bidFlashHoldMs);
+  } = useStreamingTicks(price.bid, pollMs, bidFlashHoldMs);
   const {
     value: animatedAsk,
     direction: askDir,
     heldDirection: heldAskDir,
     motionKey: askMotionKey,
     motionImpulse: askMotionImpulse,
-  } = useAnimatedNumber(price.ask, 280, askFlashHoldMs);
+  } = useStreamingTicks(price.ask, pollMs, askFlashHoldMs);
   const chopFlash = useTickFlash(regime?.chop);
   const midTickStyle = tickMotionStyle(
     `${price.symbol}:mid`,
