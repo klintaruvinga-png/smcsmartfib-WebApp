@@ -162,7 +162,8 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
       setS((prev) => ({ ...prev, watchlist: result.watchlist }));
       toast.success(`${sym} added to watchlist`);
     } catch (error) {
-      setNewPair(sym);
+      // Only restore the failed symbol if the user has not already typed a replacement.
+      setNewPair((current) => (current.trim() ? current : sym));
       toast.error(error instanceof Error ? error.message : "Failed to add symbol");
     }
   }
