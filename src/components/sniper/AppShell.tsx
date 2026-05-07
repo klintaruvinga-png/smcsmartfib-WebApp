@@ -6,8 +6,10 @@ import {
   useEngineHealth,
   useSession,
   useUserSettings,
+  usePollMs,
 } from "@/hooks/useSniperData";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
+import { useStreamingTicks } from "@/hooks/useStreamingTicks";
 import { fmtPrice, fmtPct } from "@/lib/format";
 import { tickMotionHoldMs, tickMotionStyle, type TickMotionOptions } from "@/lib/tickMotion";
 import { SyncChip, SignalStatusChip } from "@/components/sniper/Chips";
@@ -53,7 +55,7 @@ const HEADER_TICK_MOTION: TickMotionOptions = {
   dotDelayMaxMs: 90,
 };
 
-function HeaderTickerItem({ price }: { price: PairPrice }) {
+function HeaderTickerItem({ price, pollMs }: { price: PairPrice; pollMs: number }) {
   const flashHoldMs = tickMotionHoldMs(HEADER_TICK_MOTION);
   const {
     value: animatedMid,
@@ -61,7 +63,7 @@ function HeaderTickerItem({ price }: { price: PairPrice }) {
     heldDirection: heldMidDir,
     motionKey: midMotionKey,
     motionImpulse: midMotionImpulse,
-  } = useAnimatedNumber(price.mid, 280, flashHoldMs);
+  } = useStreamingTicks(price.mid, pollMs, flashHoldMs);
   const { value: animatedChange } = useAnimatedNumber(price.changePct1d, 100);
   const motionStyle = tickMotionStyle(`${price.symbol}:header-mid`, HEADER_TICK_MOTION, {
     motionKey: midMotionKey,
@@ -105,6 +107,7 @@ function HeaderTickerItem({ price }: { price: PairPrice }) {
 
 function HeaderTicker() {
   const { data } = useSnapshot();
+  const pollMs = usePollMs() ?? 2000;
   // Treat the header strip as authoritative live market data, not a generic cache view.
   const items = (data?.prices ?? []).filter(
     (p) => p.mid > 0 && (p.state === "live" || p.state === "mock"),
@@ -115,7 +118,7 @@ function HeaderTicker() {
     <div className="relative flex-1 overflow-hidden border-y border-bd bg-bg2/40">
       <div className="ticker-track flex w-max items-center gap-6 py-2 px-4">
         {loop.map((p, i) => (
-          <HeaderTickerItem key={`${p.symbol}-${i}`} price={p} />
+          <HeaderTickerItem key={`${p.symbol}-${i}`} price={p} pollMs={pollMs} />
         ))}
       </div>
       <div className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-bg to-transparent" />
