@@ -71,6 +71,37 @@ final class SMC_SuperFib_Sniper_REST {
                 }
             }
         }, 1); // Priority 1 — runs before anything else touches the response
+
+        // Ensure authenticated dashboard/front-end app scripts have REST bootstrap data.
+        // This is a safe fallback when the active JS bundle is manually inserted or
+        // when the app uses a custom script handle and wpApiSettings was not localized.
+        add_action('wp_enqueue_scripts', array(__CLASS__, 'enqueue_rest_api_settings'));
+        add_action('admin_enqueue_scripts', array(__CLASS__, 'enqueue_rest_api_settings'));
+    }
+
+    public static function enqueue_rest_api_settings() {
+        if (!is_user_logged_in()) {
+            return;
+        }
+
+        wp_register_script(
+            'smc-superfib-sniper-rest-bootstrap',
+            false,
+            array('wp-api'),
+            self::VERSION,
+            true
+        );
+
+        wp_enqueue_script('smc-superfib-sniper-rest-bootstrap');
+
+        wp_localize_script(
+            'smc-superfib-sniper-rest-bootstrap',
+            'wpApiSettings',
+            array(
+                'root'  => esc_url_raw(rest_url()),
+                'nonce' => wp_create_nonce('wp_rest'),
+            )
+        );
     }
 
     public static function activate() {
