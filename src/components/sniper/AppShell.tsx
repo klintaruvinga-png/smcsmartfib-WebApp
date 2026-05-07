@@ -55,7 +55,7 @@ const HEADER_TICK_MOTION: TickMotionOptions = {
   dotDelayMaxMs: 90,
 };
 
-function HeaderTickerItem({ price }: { price: PairPrice }) {
+function HeaderTickerItem({ price, pollMs }: { price: PairPrice; pollMs: number }) {
   const flashHoldMs = tickMotionHoldMs(HEADER_TICK_MOTION);
   const {
     value: animatedMid,
@@ -63,7 +63,7 @@ function HeaderTickerItem({ price }: { price: PairPrice }) {
     heldDirection: heldMidDir,
     motionKey: midMotionKey,
     motionImpulse: midMotionImpulse,
-  } = useAnimatedNumber(price.mid, 280, flashHoldMs);
+  } = useStreamingTicks(price.mid, pollMs, flashHoldMs);
   const { value: animatedChange } = useAnimatedNumber(price.changePct1d, 100);
   const motionStyle = tickMotionStyle(`${price.symbol}:header-mid`, HEADER_TICK_MOTION, {
     motionKey: midMotionKey,
