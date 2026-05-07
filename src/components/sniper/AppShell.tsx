@@ -107,6 +107,7 @@ function HeaderTickerItem({ price, pollMs }: { price: PairPrice; pollMs: number 
 
 function HeaderTicker() {
   const { data } = useSnapshot();
+  const pollMs = usePollMs() ?? 2000;
   // Treat the header strip as authoritative live market data, not a generic cache view.
   const items = (data?.prices ?? []).filter(
     (p) => p.mid > 0 && (p.state === "live" || p.state === "mock"),
@@ -117,7 +118,7 @@ function HeaderTicker() {
     <div className="relative flex-1 overflow-hidden border-y border-bd bg-bg2/40">
       <div className="ticker-track flex w-max items-center gap-6 py-2 px-4">
         {loop.map((p, i) => (
-          <HeaderTickerItem key={`${p.symbol}-${i}`} price={p} />
+          <HeaderTickerItem key={`${p.symbol}-${i}`} price={p} pollMs={pollMs} />
         ))}
       </div>
       <div className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-bg to-transparent" />
