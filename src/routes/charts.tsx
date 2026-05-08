@@ -1,11 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSnapshot, usePollMs } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { fmtPrice, fmtPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { LineChart, Line, ResponsiveContainer, ReferenceLine, YAxis, Tooltip } from "recharts";
+import {
+  createChart,
+  LineSeries,
+  type IChartApi,
+  type ISeriesApi,
+  type UTCTimestamp,
+  type IPriceLine,
+} from "lightweight-charts";
 import type { ChartSnapshot, Symbol } from "@/types/sniper";
 import { apiClient } from "@/lib/api/sniperClient";
 
@@ -95,56 +102,7 @@ function ChartsPage() {
           <FreshnessBadge state={chart?.state ?? price.state} />
         </div>
 
-        <div className="h-[320px] -mx-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={series} margin={{ top: 5, right: 60, bottom: 5, left: 5 }}>
-              <YAxis
-                domain={["dataMin", "dataMax"]}
-                tickFormatter={(v: number) => fmtPrice(v, activeSymbol)}
-                width={70}
-                tick={{ fill: "#9cb0c9", fontSize: 10, fontFamily: "JetBrains Mono" }}
-                axisLine={{ stroke: "rgba(164,191,223,0.24)" }}
-                tickLine={false}
-                orientation="right"
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "#102033",
-                  border: "1px solid rgba(164,191,223,0.34)",
-                  borderRadius: 6,
-                  fontFamily: "JetBrains Mono",
-                  fontSize: 11,
-                }}
-                labelFormatter={() => ""}
-                formatter={(v: number) => [fmtPrice(v, activeSymbol), "PRICE"]}
-              />
-              {fibs.map((f) => (
-                <ReferenceLine
-                  key={`${f.family}-${f.label}`}
-                  y={f.price}
-                  stroke="#d8a35d"
-                  strokeDasharray="3 3"
-                  strokeOpacity={0.55}
-                  label={{
-                    value: `${f.label} / ${fmtPrice(f.price, activeSymbol)}`,
-                    position: "right",
-                    fill: "#d8a35d",
-                    fontSize: 9,
-                    fontFamily: "JetBrains Mono",
-                  }}
-                />
-              ))}
-              <Line
-                type="monotone"
-                dataKey="p"
-                stroke="#59a8ff"
-                strokeWidth={1.5}
-                dot={false}
-                isAnimationActive={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        <TVChart series={series} fibs={fibs} symbol={activeSymbol} />
 
         <div className="mt-4 flex flex-wrap gap-2">
           {fibs.map((f) => (
@@ -165,3 +123,122 @@ function ChartsPage() {
     </div>
   );
 }
+
+type FibLevel = { family: string; label: string; price: number };
+
+function TVChart({
+  series,
+  fibs,
+  symbol,
+}: {
+  series: { t: number; p: number }[];
+  fibs: FibLevel[];
+  symbol: Symbol | string;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const priceLinesRef = useRef<IPriceLine[]>([]);
+
+  const precision = useMemo(() => {
+    const sample = fmtPrice(1, symbol);
+    const dot = sample.indexOf(".");
+    return dot >= 0 ? sample.length - dot - 1 : 2;
+  }, [symbol]);
+
+  // init chart
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const chart = createChart(containerRef.current, {
+      layout: {
+        background: { color: "transparent" },
+        textColor: "#9cb0c9",
+        fontFamily: "JetBrains Mono",
+        fontSize: 10,
+      },
+      grid: {
+        vertLines: { color: "rgba(164,191,223,0.08)" },
+        horzLines: { color: "rgba(164,191,223,0.08)" },
+      },
+      rightPriceScale: {
+        borderColor: "rgba(164,191,223,0.24)",
+        scaleMargins: { top: 0.1, bottom: 0.1 },
+      },
+      timeScale: {
+        borderColor: "rgba(164,191,223,0.24)",
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      crosshair: { mode: 1 },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: true,
+      },
+      handleScale: {
+        axisPressedMouseMove: { time: true, price: true },
+        mouseWheel: true,
+        pinch: true,
+      },
+      autoSize: true,
+    });
+    const lineSeries = chart.addSeries(LineSeries, {
+      color: "#59a8ff",
+      lineWidth: 2,
+      priceFormat: { type: "price", precision, minMove: Math.pow(10, -precision) },
+    });
+    chartRef.current = chart;
+    seriesRef.current = lineSeries;
+    return () => {
+      chart.remove();
+      chartRef.current = null;
+      seriesRef.current = null;
+      priceLinesRef.current = [];
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [precision]);
+
+  // update data
+  useEffect(() => {
+    const s = seriesRef.current;
+    if (!s) return;
+    // dedupe + sort ascending by time (lightweight-charts requirement)
+    const map = new Map<number, number>();
+    for (const pt of series) {
+      const sec = Math.floor(pt.t / 1000);
+      map.set(sec, pt.p);
+    }
+    const data = Array.from(map.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([t, p]) => ({ time: t as UTCTimestamp, value: p }));
+    s.setData(data);
+  }, [series]);
+
+  // update fib lines
+  useEffect(() => {
+    const s = seriesRef.current;
+    if (!s) return;
+    for (const pl of priceLinesRef.current) s.removePriceLine(pl);
+    priceLinesRef.current = fibs.map((f) =>
+      s.createPriceLine({
+        price: f.price,
+        color: "#d8a35d",
+        lineWidth: 1,
+        lineStyle: 2, // dashed
+        axisLabelVisible: true,
+        title: `${f.label}`,
+      }),
+    );
+  }, [fibs]);
+
+  return (
+    <div className="-mx-2">
+      <div ref={containerRef} className="h-[360px] w-full" />
+      <div className="px-2 mt-1 text-[10px] text-mute font-mono">
+        Drag to pan · Scroll to zoom · Drag axes to scale
+      </div>
+    </div>
+  );
+}
+
