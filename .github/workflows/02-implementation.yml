@@ -1,0 +1,68 @@
+name: 02 - Claude Implementation
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Branch or ref containing reports/copilot-research.md
+        required: false
+        type: string
+  workflow_run:
+    workflows: ["01 - Research Intake"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  implement:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source ref
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || inputs.source_ref || github.ref_name }}
+
+      - name: Validate required inputs
+        run: |
+          test -f .github/prompts/claude-implement-prompt.md
+          test -f reports/copilot-research.md
+
+      - name: Load implementation prompt
+        id: prompt
+        run: |
+          {
+            echo 'prompt<<EOF'
+            cat .github/prompts/claude-implement-prompt.md
+            echo
+            echo 'Repository context:'
+            echo '- Current branch should contain reports/copilot-research.md and write reports/codex-plan.md plus reports/claude-implementation.md.'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run Claude Code implementation
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GH_PAT }}
+          prompt: ${{ steps.prompt.outputs.prompt }}
+          claude_args: "--max-turns 8"
+
+      - name: Create PR if needed
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          REPO: ${{ github.repository }}
+        run: |
+          CURRENT_BRANCH="$(git branch --show-current)"
+          if [ -z "$CURRENT_BRANCH" ] || [ "$CURRENT_BRANCH" = "$DEFAULT_BRANCH" ]; then
+            exit 0
+          fi
+
+          gh pr view "$CURRENT_BRANCH" --repo "$REPO" --json number >/dev/null 2>&1 && exit 0
+          gh pr create --repo "$REPO" --base "$DEFAULT_BRANCH" --head "$CURRENT_BRANCH" --fill

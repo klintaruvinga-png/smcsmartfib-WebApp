@@ -1,0 +1,76 @@
+name: 03 - Autonomous Review Loop
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: review-loop-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  remediate:
+    if: >
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (
+        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, 'Severity:')) ||
+        (github.event_name == 'pull_request_review' && contains(github.event.review.body, 'Severity:'))
+      )
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Validate remediation prompt
+        run: test -f .github/prompts/claude-remediate-prompt.md
+
+      - name: Capture review context
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          EVENT_JSON: ${{ toJson(github.event) }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          mkdir -p reports
+          printf '%s\n' "$EVENT_JSON" > reports/review-event.json
+          gh pr view "$PR_NUMBER" --repo "$REPO" --json title,body,files,reviews,comments > reports/codex-review.json
+
+      - name: Load remediation prompt
+        id: prompt
+        run: |
+          {
+            echo 'prompt<<EOF'
+            cat .github/prompts/claude-remediate-prompt.md
+            echo
+            echo 'Repository context:'
+            echo '- Review payload: reports/review-event.json'
+            echo '- Aggregated PR review data: reports/codex-review.json'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run Claude remediation
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GH_PAT }}
+          prompt: ${{ steps.prompt.outputs.prompt }}
+          claude_args: "--max-turns 6"
+
+      - name: Commit and push remediation changes
+        run: |
+          if git diff --quiet && git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.email "bot@superfib.local"
+          git config user.name "SuperFIB Bot"
+          git add -A
+          git commit -m "fix(remediation): address review feedback"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
