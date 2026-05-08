@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useSnapshot, useEngineBatch, usePollMs } from "@/hooks/useSniperData";
+import { useSnapshot, useEngineBatch, usePollMs, useWatchlist } from "@/hooks/useSniperData";
 import { useStreamingTicks } from "@/hooks/useStreamingTicks";
 import { useTickFlash } from "@/hooks/useTickFlash";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
