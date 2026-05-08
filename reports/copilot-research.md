@@ -1,99 +1,55 @@
-# SMC_ISSUE Research Report: Test issue for workflow validation
+# 1. Issue classification
+- Severity: HIGH
+- Category: data-contract
+- Layer(s) affected: PHP-backend / REST-API / Dashboard-JS
+- Phase impact: Phase 0
 
-## Issue classification
-**Type:** Workflow Validation Test  
-**Severity:** Low (Test Issue)  
-**Category:** Process Validation  
-**Status:** Open (Intentionally created for testing)  
+# 2. Confirmed evidence
+- `src/routes/charts.tsx`: `TVChart` uses `const fibs = chart?.fibLevels ?? []` and maps every `f` to `s.createPriceLine(...)` without any filter. (lines 56, 243-256)
+- `src/routes/charts.tsx`: local type `type FibLevel = { family: string; label: string; price: number };` excludes `ratio` and `role`, even though backend API data includes them. (line 127)
+- `src/routes/charts.tsx`: price lines are created with `title: `${f.label}`` and `axisLabelVisible: true`, so labels are rendered only from `f.label`. (lines 243-256)
+- `src/lib/api/sniperClient.ts`: `getChartSnapshot()` returns `ChartSnapshot` with `fibLevels` from backend or mock; mock mode uses `mockFibLevels()` to build each item with `family`, `ratio`, `label`, `price`, `role`. (lines 209-232)
+- `src/mocks/sniperData.ts`: `mockFibLevels()` defines only `[0, 25, 50, 62.5, 75, 100]`, omitting all extension ratios. (lines 442-453)
+- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`: `$ratios` includes `0, 100, 25, -25` and many other extension values. (line 20)
+- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`: `get_chart_snapshot()` returns `fibLevels` from `fib_levels_from_candles()` and `fib_levels()`, which iterates over `$this->ratios` and emits `family`, `ratio`, `label`, `price`, `role`. (lines 1494-1517, 2838-2859)
+- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`: `fib_role($ratio)` classifies negative ratios as `premium-extension` and >100 as `discount-extension`. (lines 2893-2908)
 
-This is an intentionally created test issue designed to validate the AI-assisted development workflow. The issue tests three key capabilities: research intake and analysis, report generation with proper formatting, and artifact commitment processes. No actual codebase defects are present.
+# 3. Root cause hypothesis
+- Confirmed: backend `$ratios` array already includes 0, 100, 25, and -25. (php line 20)
+- Confirmed: frontend chart component does not explicitly filter `fibs`; it maps all API response entries to price lines. (charts.tsx lines 243-256)
+- Hypothesis: missing +25/−25 extension levels may be caused by mock fixture mismatch in `src/mocks/sniperData.ts` rather than explicit frontend filtering. (mock ratios line 442)
+- Hypothesis: fib labels appear absent because `createPriceLine()` is populated only with `${f.label}`, and `f.family` is available but never integrated into the rendered title. (charts.tsx line 254)
+- Hypothesis: local `FibLevel` typing in `charts.tsx` hides `ratio`/`role`, reducing the component’s ability to render family/ratio metadata. (charts.tsx line 127)
 
-## Root cause hypothesis
-The "issue" is not a genuine bug or feature gap, but rather a controlled test case to verify that the AI research and reporting pipeline functions correctly. The root cause is the need to validate workflow integrity for:
+# 4. Blast radius
+- `src/routes/charts.tsx` — chart rendering and fib line creation
+- `src/types/sniper.ts` — `FibLevel` interface definition and expected API contract
+- `src/lib/api/sniperClient.ts` — `/charts` API consumption and mock fallback
+- `src/mocks/sniperData.ts` — mock fib level fixture for dashboard preview
+- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` — REST endpoint and backend fib ratio construction
+- Systems: Dashboard-JS rendering, REST-API fib contract, PHP backend fib-level service
+- Parity surface: Backend → REST → Dashboard; missing levels or labels can cause Dashboard display to drift from backend fib contract
 
-1. **Research Intake:** Ability to analyze codebase structure, understand system architecture, and identify relevant components
-2. **Report Rendering:** Proper formatting of structured reports with required sections and accurate content
-3. **Prompt Injection Safety:** Ensuring malicious or unintended prompt execution is prevented
-4. **Artifact Commitment:** Successful generation and commit of research artifacts to version control
+# 5. Regression surface
+- Current behavior depends on `ChartSnapshot.fibLevels` contract from backend; any change must preserve `family`, `ratio`, `label`, `price`, `role` shape
+- Existing frontend guard: `const fibs = chart?.fibLevels ?? []` avoids runtime crash when `fibLevels` is absent. (charts.tsx line 56)
+- Existing backend guard: `fib_levels_from_candles()` returns an empty array when candles are missing. (php lines 2838-2845)
+- Tests/audits: `wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` appears to cover snapshot contract behavior, and `.github/docs/BUG_SWEEP_REPORT_2026-05-05.md` references chart snapshot handling
 
-The test validates that the AI can distinguish between genuine issues and test scenarios while maintaining workflow discipline.
+# 6. Resolution path options
+- Path A: narrowest plausible correction is in `src/routes/charts.tsx` and `src/mocks/sniperData.ts` by ensuring the chart uses full `FibLevel` objects and labels include both percent and family name, while mock fixtures include extension ratios.
+- Path B: broader correction is audit of the `/charts` API contract plus frontend mock alignment, ensuring backend fibLevels fields are consistently passed through and no discrepancy exists between live and mock data.
+- Recommended: Path A, because evidence shows the backend already supplies required ratios and the dashboard currently maps all fibs directly to chart lines.
 
-## Blast radius (all affected files and systems)
-**Primary Systems Affected:**
-- AI Workflow Validation Framework (meta)
-- Research Report Generation System
-- Artifact Commitment Pipeline
+# 7. Risk flags
+- High-risk system involved: Yes — dashboard rendering and REST fib contract affect user-visible chart integrity
+- Requires parity re-validation: Yes — backend fib data versus dashboard display should be verified across REST and mock modes
+- Migration-blocking: No — this appears to be a Phase 0 stabilization issue rather than a migration gate blocker
+- Human review required before merge: Yes — display contract changes should be validated by a reviewer familiar with fib chart conventions and API consumption
 
-**No Actual Codebase Impact:**
-- Pine Script Indicator (SMC_SuperFib_v13.1.3.pine) - Unaffected
-- WordPress REST Backend (smc-superfib-sniper.php) - Unaffected  
-- JavaScript Dashboard (src/ components) - Unaffected
-- MT5 Market Data EA (SMC_MarketDataEA.mq5) - Unaffected
-- Database Schema and API Endpoints - Unaffected
+# 8. Handoff package
+- Epicentre files to inspect first: `src/routes/charts.tsx`, `src/types/sniper.ts`, `src/lib/api/sniperClient.ts`, `src/mocks/sniperData.ts`, `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+- Inputs Codex must verify before planning: live `/charts` response payload for `fibLevels`, current mock mode fib values, title rendering behavior of `createPriceLine()`, and whether `f.family` is present in runtime data
+- Open unknowns: whether the dashboard is running in mock mode during failure, whether `lightweight-charts` axis labels are being clipped or suppressed in the canvas, and whether any additional frontend filter exists outside `charts.tsx` in the active runtime path
 
-**Files Analyzed During Research:**
-- wordpress/smc-superfib-sniper/smc-superfib-sniper.php (3500+ lines)
-- SMC_SuperFib_v13.1.3.pine (Pine Script indicator)
-- src/lib/api/sniperClient.ts (Frontend API client)
-- mt5/SMC_MarketDataEA.mq5 (MT5 data ingestion)
-- src/router.tsx (React routing)
-- Various component and type files
 
-## Regression surface
-**Zero Regression Risk:** This is a test issue with no code changes or behavioral modifications.
-
-**Validation Points Tested:**
-- Codebase exploration without unintended modifications
-- Report generation without introducing artifacts
-- Git operations without committing unintended changes
-- Prompt handling without executing dangerous commands
-
-## Fix strategy options
-
-### Option 1: Workflow Validation Success (Recommended)
-- **Description:** Mark the test as passed since research, report generation, and artifact handling completed successfully
-- **Implementation:** Close the issue with validation confirmation
-- **Pros:** Confirms workflow integrity, no code changes needed
-- **Cons:** None
-- **Effort:** Minimal (issue closure)
-
-### Option 2: Enhanced Workflow Documentation
-- **Description:** Use this test to document and improve the research workflow process
-- **Implementation:** Add workflow validation procedures to project documentation
-- **Pros:** Improves future validation processes
-- **Cons:** Additional documentation effort
-- **Effort:** Low
-
-### Option 3: Automated Validation Framework
-- **Description:** Create automated tests for the AI workflow validation process
-- **Implementation:** Develop scripts to verify research intake, report formatting, and artifact generation
-- **Pros:** Prevents future workflow regressions
-- **Cons:** Development overhead
-- **Effort:** Medium
-
-## Risk flags
-- **None:** This is a controlled test with zero production impact
-- **Process Risk:** If workflow validation fails, it indicates potential issues with AI-assisted development processes
-- **Security Risk:** Prompt injection validation ensures safe handling of user inputs
-
-## Handoff package summary
-**Deliverables:**
-- This comprehensive research report (reports/copilot-research.md)
-- Codebase analysis covering all major components
-- Workflow validation confirmation
-- Structured findings with all required sections
-
-**Next Steps:**
-1. Review this report for completeness and accuracy
-2. Confirm workflow validation success
-3. Close the test issue
-4. Consider implementing Option 2 for improved documentation
-
-**Validation Results:**
-- ✅ Research intake: Successfully analyzed multi-language codebase
-- ✅ Report rendering: Generated properly formatted structured report
-- ✅ Prompt injection: No unsafe command execution detected
-- ✅ Artifact commitment: Report file created and ready for commit
-
-**Contact:** AI Research Agent  
-**Date:** May 8, 2026
