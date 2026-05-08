@@ -102,56 +102,7 @@ function ChartsPage() {
           <FreshnessBadge state={chart?.state ?? price.state} />
         </div>
 
-        <div className="h-[320px] -mx-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={series} margin={{ top: 5, right: 60, bottom: 5, left: 5 }}>
-              <YAxis
-                domain={["dataMin", "dataMax"]}
-                tickFormatter={(v: number) => fmtPrice(v, activeSymbol)}
-                width={70}
-                tick={{ fill: "#9cb0c9", fontSize: 10, fontFamily: "JetBrains Mono" }}
-                axisLine={{ stroke: "rgba(164,191,223,0.24)" }}
-                tickLine={false}
-                orientation="right"
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "#102033",
-                  border: "1px solid rgba(164,191,223,0.34)",
-                  borderRadius: 6,
-                  fontFamily: "JetBrains Mono",
-                  fontSize: 11,
-                }}
-                labelFormatter={() => ""}
-                formatter={(v: number) => [fmtPrice(v, activeSymbol), "PRICE"]}
-              />
-              {fibs.map((f) => (
-                <ReferenceLine
-                  key={`${f.family}-${f.label}`}
-                  y={f.price}
-                  stroke="#d8a35d"
-                  strokeDasharray="3 3"
-                  strokeOpacity={0.55}
-                  label={{
-                    value: `${f.label} / ${fmtPrice(f.price, activeSymbol)}`,
-                    position: "right",
-                    fill: "#d8a35d",
-                    fontSize: 9,
-                    fontFamily: "JetBrains Mono",
-                  }}
-                />
-              ))}
-              <Line
-                type="monotone"
-                dataKey="p"
-                stroke="#59a8ff"
-                strokeWidth={1.5}
-                dot={false}
-                isAnimationActive={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        <TVChart series={series} fibs={fibs} symbol={activeSymbol} />
 
         <div className="mt-4 flex flex-wrap gap-2">
           {fibs.map((f) => (
