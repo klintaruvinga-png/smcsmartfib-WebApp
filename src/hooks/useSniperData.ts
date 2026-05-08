@@ -114,8 +114,12 @@ async function cancelWatchlistQueries(queryClient: ReturnType<typeof useQueryCli
 }
 
 async function invalidateWatchlistQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  // NOTE: do NOT invalidate/refetch ["user-settings"] here. The watchlist
+  // mutation response is the canonical source of truth for the watchlist; the
+  // backend GET /user/settings can lag the mutation by one cycle and would
+  // otherwise overwrite the freshly-added/removed symbol, causing the Account
+  // chip to flicker off and back on.
   await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ["user-settings"], refetchType: "none" }),
     queryClient.invalidateQueries({ queryKey: ["snapshot"], refetchType: "none" }),
     queryClient.invalidateQueries({ queryKey: ["live-signals"], refetchType: "none" }),
     queryClient.invalidateQueries({ queryKey: ["ladders"], refetchType: "none" }),
@@ -123,7 +127,6 @@ async function invalidateWatchlistQueries(queryClient: ReturnType<typeof useQuer
     queryClient.invalidateQueries({ queryKey: ["chart"], refetchType: "none" }),
   ]);
   await Promise.all([
-    queryClient.refetchQueries({ queryKey: ["user-settings"], type: "active" }),
     queryClient.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
     queryClient.refetchQueries({ queryKey: ["live-signals"], type: "active" }),
     queryClient.refetchQueries({ queryKey: ["ladders"], type: "active" }),
