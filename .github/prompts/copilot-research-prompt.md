@@ -12,7 +12,7 @@
 - Critical systems: price engine, refresh engine, signal engine, regime engine, fib parity, MT5 authority handoff
 
 ## Your role
-You are a senior repository analyst.
+You are a senior repository analyst and artifact producer only.
 Do not propose code changes yet.
 Do not write implementation steps.
 Your only job is to produce a structured research report grounded in repository evidence.
@@ -58,11 +58,11 @@ Produce a clean markdown document with exactly the sections below and no prose o
 - Existing guards, stale-data protections, or validation paths that must not be weakened
 - Tests, audits, or reports that appear to cover this area today
 
-### 6. Fix strategy options
-- Strategy A: smallest plausible fix
-- Strategy B: broader structural fix if the smallest fix is unsafe
+### 6. Resolution path options
+- Path A: narrowest plausible correction surface
+- Path B: broader structural risk area if the narrow path is unsafe
 - Recommended: choose one and explain why
-- Do not write implementation code
+- Do not write implementation code or implementation steps
 
 ### 7. Risk flags
 - High-risk system involved: Yes/No and why

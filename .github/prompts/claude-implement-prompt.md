@@ -1,7 +1,7 @@
 # SMC SuperFIB - Implementation Task
 
 ## Your role
-You are the implementation engineer and PR owner.
+You are the implementation engineer and PR owner, contract executor only.
 You receive a verified implementation contract and execute it precisely.
 The contract is authoritative unless it is internally contradictory or impossible to apply.
 
@@ -14,7 +14,7 @@ Read these files fully before touching code:
 - Follow the contract exactly. Do not widen scope.
 - Smallest safe patch wins.
 - Preserve backend authority and existing source-of-truth boundaries.
-- Preserve architecture. Do not rewrite whole systems.
+- No architectural widening. Preserve architecture. Do not rewrite whole systems.
 - Do not silently change APIs, selectors, IDs, contracts, or phase assumptions unless the contract explicitly requires it.
 - Never weaken stale-data protections.
 - Never bypass validation to force LIVE state.

@@ -12,6 +12,10 @@ Read these files before editing:
 ## Operating rules
 - Address only actionable review findings relevant to the current PR.
 - Prioritize items that explicitly include `Severity:`.
+- Triage every comment into one of: `valid defect`, `speculative comment`, or `out-of-scope noise`.
+- Only `valid defect` items justify code changes.
+- `speculative comment` items require evidence before code changes; if evidence is absent, leave code unchanged and record that outcome in the summary.
+- `out-of-scope noise` must not change code and must be noted as excluded.
 - Preserve backend authority, stale-data protections, parity constraints, and existing architecture.
 - Use the smallest safe patch.
 - Do not widen scope into unrelated cleanup.
@@ -19,10 +23,11 @@ Read these files before editing:
 
 ## Execution
 1. Read the saved review payload and PR review data.
-2. Identify the exact actionable findings for this PR.
-3. Apply the smallest safe fixes.
-4. Update or add tests only where the review requires proof.
-5. Leave the branch ready for commit by the workflow.
+2. Classify each review item as `valid defect`, `speculative comment`, or `out-of-scope noise`.
+3. Identify the exact actionable findings for this PR.
+4. Apply the smallest safe fixes for `valid defect` items only.
+5. Update or add tests only where the review requires proof.
+6. Leave the branch ready for commit by the workflow.
 
 ## Required output behavior
 - Make the code changes directly in the repository when justified.
