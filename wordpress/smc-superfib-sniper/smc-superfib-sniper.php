@@ -130,6 +130,10 @@ final class SMC_SuperFib_Sniper_REST {
         error_log('[PHASE0_SOAK] smc_sf_prune_tables: pruned engine_runs (>7d) and audit_events (>14d)');
     }
 
+    public static function deactivate(): void {
+        wp_clear_scheduled_hook('smc_sf_prune_tables');
+    }
+
     public static function activate() {
         global $wpdb;
 
@@ -3495,6 +3499,7 @@ final class SMC_SuperFib_Sniper_REST {
 }
 
 register_activation_hook(__FILE__, array('SMC_SuperFib_Sniper_REST', 'activate'));
+register_deactivation_hook(__FILE__, array('SMC_SuperFib_Sniper_REST', 'deactivate'));
 
 add_action('plugins_loaded', array('SMC_SuperFib_Sniper_REST', 'boot'));
 
