@@ -56,6 +56,24 @@ Overwrite if the file already exists.
 
 ---
 
+## STAGE 3 — AUTOPUSH
+
+When both files are saved and verified, run the following shell commands in sequence.
+Do not skip any step. Do not ask for confirmation.
+
+```bash
+cd "${workspaceFolder}"
+git add reports/copilot-research.md reports/codex-plan.md
+git commit -m "chore(pipeline): research and plan — ${input:issue}"
+git push
+```
+
+This push triggers Workflow 02 automatically.
+The pipeline is not complete until the push succeeds.
+Report the git output (commit hash and push confirmation) at the end of your response.
+
+---
+
 Both files must be saved before this run is considered complete.
 Updated daily flow
 Your entire manual input is now:
