@@ -136,6 +136,7 @@ function TVChart({
   symbol: Symbol | string;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const priceLinesRef = useRef<IPriceLine[]>([]);
@@ -145,6 +146,22 @@ function TVChart({
     const dot = sample.indexOf(".");
     return dot >= 0 ? sample.length - dot - 1 : 2;
   }, [symbol]);
+
+  function positionLabels() {
+    const s = seriesRef.current;
+    const overlay = overlayRef.current;
+    if (!s || !overlay) return;
+    for (const el of Array.from(overlay.children) as HTMLDivElement[]) {
+      const price = parseFloat(el.dataset.price ?? "0");
+      const y = s.priceToCoordinate(price);
+      if (y == null) {
+        el.style.display = "none";
+      } else {
+        el.style.display = "block";
+        el.style.top = `${y - 8}px`;
+      }
+    }
+  }
 
   // init chart
   useEffect(() => {
@@ -190,7 +207,14 @@ function TVChart({
     });
     chartRef.current = chart;
     seriesRef.current = lineSeries;
+    // Reposition overlay labels whenever the visible range or crosshair changes
+    chart.subscribeCrosshairMove(positionLabels);
+    chart.timeScale().subscribeVisibleTimeRangeChange(positionLabels);
+    const container = containerRef.current;
+    const onWheel = () => requestAnimationFrame(positionLabels);
+    container.addEventListener("wheel", onWheel, { passive: true });
     return () => {
+      container.removeEventListener("wheel", onWheel);
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
@@ -213,12 +237,15 @@ function TVChart({
       .sort((a, b) => a[0] - b[0])
       .map(([t, p]) => ({ time: t as UTCTimestamp, value: p }));
     s.setData(data);
+    // Autoscale may shift price lines after data refresh; realign overlay labels
+    requestAnimationFrame(positionLabels);
   }, [series]);
 
   // update fib lines
   useEffect(() => {
     const s = seriesRef.current;
-    if (!s) return;
+    const overlay = overlayRef.current;
+    if (!s || !overlay) return;
     for (const pl of priceLinesRef.current) s.removePriceLine(pl);
     priceLinesRef.current = fibs.map((f) =>
       s.createPriceLine({
@@ -227,14 +254,32 @@ function TVChart({
         lineWidth: 1,
         lineStyle: 2, // dashed
         axisLabelVisible: true,
-        title: `${f.label}`,
+        title: "",
       }),
     );
+    // Rebuild HTML label overlay — labels render on chart body, not price axis
+    overlay.innerHTML = "";
+    for (const f of fibs) {
+      const el = document.createElement("div");
+      el.dataset.price = String(f.price);
+      el.style.cssText =
+        "position:absolute;left:4px;font-size:9px;font-family:'JetBrains Mono',monospace;" +
+        "color:#d8a35d;pointer-events:none;white-space:nowrap;line-height:16px;";
+      el.textContent = f.label;
+      overlay.appendChild(el);
+    }
+    positionLabels();
   }, [fibs]);
 
   return (
     <div className="-mx-2">
-      <div ref={containerRef} className="h-[360px] w-full" />
+      <div className="relative h-[360px] w-full">
+        <div ref={containerRef} className="h-full w-full" />
+        <div
+          ref={overlayRef}
+          className="absolute inset-0 pointer-events-none overflow-hidden"
+        />
+      </div>
       <div className="px-2 mt-1 text-[10px] text-mute font-mono">
         Drag to pan · Scroll to zoom · Drag axes to scale
       </div>

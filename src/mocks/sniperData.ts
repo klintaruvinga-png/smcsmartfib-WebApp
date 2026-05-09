@@ -439,16 +439,30 @@ export function mockPriceSeries(symbol: Symbol, points = 80) {
   return out;
 }
 
+// Must match backend's 16-ratio set exactly (ratio_label / fib_role PHP functions)
+const ALL_FIB_RATIOS = [-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300] as const;
+
+function fibLabel(ratio: number): string {
+  return Number.isInteger(ratio) ? `${ratio}%` : `${ratio}%`;
+}
+
+function fibRole(ratio: number): FibRole {
+  if (ratio < 0) return "premium-extension";
+  if (ratio > 100) return "discount-extension";
+  if (ratio < 50) return "premium";
+  if (ratio === 50) return "equilibrium";
+  return "discount";
+}
+
 export function mockFibLevels(symbol: Symbol) {
   const base = mockPrices.find((p) => p.symbol === symbol)?.mid ?? 1;
   const range = base * 0.005;
-  const ratios = [0, 25, 50, 62.5, 75, 100] as const;
 
-  return ratios.map((ratio) => ({
+  return ALL_FIB_RATIOS.map((ratio) => ({
     ratio,
-    label: `${ratio}%`,
+    label: fibLabel(ratio),
     price: base + range - (ratio / 100) * range * 2,
-    role: (ratio < 50 ? "premium" : ratio === 50 ? "equilibrium" : "discount") as FibRole,
+    role: fibRole(ratio) as FibRole,
   }));
 }
 
