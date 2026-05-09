@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "check:mql": "node ./mt5/check-mql-includes.mjs"
+    "check:mql": "node ./mt5/check-mql-includes.mjs",
+    "pipeline": "node scripts/pipeline-watcher.js"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
