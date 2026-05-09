@@ -11,9 +11,25 @@ if (!function_exists('add_filter')) {
 if (!function_exists('register_activation_hook')) {
     function register_activation_hook(...$args) {}
 }
+if (!function_exists('register_deactivation_hook')) {
+    function register_deactivation_hook(...$args) {}
+}
 if (!function_exists('plugin_dir_path')) {
     function plugin_dir_path($file) {
         return dirname($file) . DIRECTORY_SEPARATOR;
+    }
+}
+if (!class_exists('WP_REST_Request')) {
+    class WP_REST_Request {
+        private $json_params;
+
+        public function __construct($json_params = array()) {
+            $this->json_params = is_array($json_params) ? $json_params : array();
+        }
+
+        public function get_json_params() {
+            return $this->json_params;
+        }
     }
 }
 if (!class_exists('TestWpdb')) {
@@ -66,11 +82,25 @@ if (!class_exists('TestWpdb')) {
                 return $this->tables[$table][$user_id]['settings'] ?? null;
             }
 
+            if (preg_match("/SELECT data FROM ([^ ]+) WHERE user_id = (\\d+)/", $query, $matches)) {
+                $table = $matches[1];
+                $user_id = (string) ((int) $matches[2]);
+                return $this->tables[$table][$user_id]['data'] ?? null;
+            }
+
             if (preg_match("/SELECT key_status FROM ([^ ]+) WHERE user_id = (\\d+) AND provider = '([^']+)'/", $query)) {
                 return null;
             }
 
             return null;
+        }
+
+        public function insert($table, $data, $formats = array()) {
+            if (!isset($this->tables[$table])) {
+                $this->tables[$table] = array();
+            }
+            $this->tables[$table][] = $data;
+            return 1;
         }
     }
 }
@@ -93,8 +123,24 @@ if (!function_exists('rest_url')) {
         return 'https://example.com/wp-json';
     }
 }
+if (!function_exists('rest_ensure_response')) {
+    function rest_ensure_response($value) {
+        return $value;
+    }
+}
+if (!function_exists('get_current_user_id')) {
+    function get_current_user_id() {
+        return $GLOBALS['test_current_user_id'] ?? 0;
+    }
+}
+if (!function_exists('esc_url_raw')) {
+    function esc_url_raw($value) {
+        return (string) $value;
+    }
+}
 
 $GLOBALS['smc_watchlist_deleted_meta'] = array();
+$GLOBALS['test_current_user_id'] = 7;
 
 global $wpdb;
 $wpdb = new TestWpdb();
@@ -189,6 +235,26 @@ assert_same(
     array('GBPUSD', 'USDJPY'),
     $savedSettings['watchlist'] ?? null,
     'save_watchlist must persist a canonical uppercase de-duplicated watchlist'
+);
+
+$GLOBALS['smc_watchlist_deleted_meta'] = array();
+$response = $instance->post_user_settings(new WP_REST_Request(array(
+    'backendUrl' => 'https://example.com/wp-json',
+    'refreshIntervalSec' => 5,
+    'staleThresholdSec' => 60,
+    'watchlist' => array('EURUSD', 'GBPUSD'),
+    'riskAllocation' => array('perTradePct' => 0.5, 'dailyMaxPct' => 2.0, 'ddCapPct' => 6.0),
+)));
+assert_same(array('ok' => true), $response, 'post_user_settings must return success in the test harness');
+assert_same(
+    array(
+        array(
+            'user_id' => 7,
+            'meta_key' => 'smc_sf_engine_snapshot',
+        ),
+    ),
+    $GLOBALS['smc_watchlist_deleted_meta'],
+    'post_user_settings must invalidate the cached engine snapshot when the saved watchlist changes'
 );
 
 fwrite(STDOUT, 'watchlist snapshot regression checks passed' . PHP_EOL);

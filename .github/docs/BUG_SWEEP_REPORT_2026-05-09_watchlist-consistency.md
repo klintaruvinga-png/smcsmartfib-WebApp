@@ -4,41 +4,43 @@ Date: 2026-05-09
 
 ## Scope
 
-Cross-section watchlist consistency for Account, Live Radar, Signal Engine, Charts, and the header ticker, with backend authority preserved.
+Watchlist state consistency across Account, Live Radar, Signal Engine, Charts, and the header ticker, plus backend cache invalidation on persisted watchlist changes.
 
 ## Confirmed findings
 
-1. Frontend canonicalization gap
-   - `src/hooks/useSniperData.ts` normalized watchlists by trimming only.
-   - Snapshot prices and live signals are keyed by uppercase symbols.
-   - Mixed-case `user-settings.watchlist` entries could therefore gate out valid uppercase snapshot and signal symbols in downstream sections.
+1. `POST /user/settings` persisted `watchlist` changes without invalidating `smc_sf_engine_snapshot`.
+   - File: `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+   - Impact: a saved watchlist change could leave snapshot-backed dashboard sections reading the old symbol universe until the next engine refresh.
 
-2. Backend lowercase symbol corruption
-   - `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` sanitized symbols with `preg_replace('/[^A-Z0-9]/', ...)` before `strtoupper(...)`.
-   - Lowercase letters were removed instead of normalized.
-   - Legacy persisted watchlists or lowercase `/user/watchlist/*` payloads could collapse symbols, producing partial or missing watchlists and stale downstream authority lookups.
+2. The dashboard was not using one shared watchlist clamp/order helper across all user-visible consumers.
+   - Files: `src/hooks/useSniperData.ts`, `src/routes/live.tsx`, `src/routes/charts.tsx`, `src/components/sniper/AppShell.tsx`
+   - Impact: Live, Charts, and the header ticker could reconcile symbol membership independently instead of through one canonical clamp/order path.
 
-3. Draft-state divergence risk in Account
-   - `src/routes/account.tsx` updated the local draft from raw mutation results instead of the canonical query cache snapshot.
-   - If the backend returned a non-canonical array, the local draft could drift from the canonical watchlist used by other sections.
+3. Account watchlist rendering and duplicate checks were not both anchored to the canonical watchlist selector.
+   - File: `src/routes/account.tsx`
+   - Impact: the Account write path could diverge from the canonical read path during in-flight cache updates.
 
 ## Fixes applied
 
-- Canonicalized `user-settings.watchlist` at fetch time in `src/hooks/useSniperData.ts`.
-- Added `useCanonicalWatchlist()` so consumers share the same canonical list and set.
-- Rewired `live`, `signals`, `charts`, and the header ticker to the shared selector.
-- Synced the Account draft watchlist from the canonical `user-settings` cache after add/remove mutations.
-- Added `normalize_symbol_token()` in the backend and applied it to watchlist mutation paths and watchlist-adjacent symbol helpers.
-- Normalized backend watchlists on `get_settings()` read and `save_watchlist()` write.
-- Extended PHP regression coverage for watchlist snapshot invalidation plus watchlist normalization on read/write.
+- Added shared frontend helpers in `src/hooks/useSniperData.ts`:
+  - `clampSymbolToWatchlist()`
+  - `filterItemsByWatchlist()`
+- Rewired `src/routes/live.tsx` and `src/components/sniper/AppShell.tsx` to derive watchlist-gated price tiles from the same canonical helper.
+- Rewired `src/routes/charts.tsx` to clamp route-local selection through the shared helper whenever watchlist membership changes.
+- Rewired `src/routes/account.tsx` to use the canonical watchlist selector for duplicate prevention and watchlist rendering.
+- Memoized the `watchlistOnly` signals path in `src/routes/signals.tsx` so recomputation stays tied to the current canonical watchlist set.
+- Hardened `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` so `post_user_settings()` invalidates `smc_sf_engine_snapshot` whenever the persisted watchlist changes.
+- Extended `wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php` to cover the settings-save invalidation branch.
 
-## Validation
+## Validation run
 
+- `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`
 - `npx eslint src/hooks/useSniperData.ts src/routes/account.tsx src/routes/live.tsx src/routes/signals.tsx src/routes/charts.tsx src/components/sniper/AppShell.tsx`
 - `npm run build`
-- `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`
+- `npm run lint`
+  - Fails on unrelated pre-existing repo issues, including `scripts/pipeline-watcher.js`
 
 ## Residual risks
 
-- No live interactive backend session was available here to replay Account add/remove end-to-end through UI navigation and reload.
-- Existing non-watchlist mojibake text remains in some route copy and should be handled separately if copy cleanup is desired.
+- Interactive add/remove verification against a live authenticated backend session was not available in this environment.
+- `Signal Engine` still depends on backend-ranked candidate ordering by design; this patch only normalized watchlist membership, not signal ordering.

@@ -703,12 +703,16 @@ final class SMC_SuperFib_Sniper_REST {
             'watchlist' => $this->sanitize_symbols(isset($payload['watchlist']) ? $payload['watchlist'] : $current['watchlist']),
             'riskAllocation' => $this->sanitize_risk_allocation(isset($payload['riskAllocation']) ? $payload['riskAllocation'] : $current['riskAllocation'], $current['riskAllocation']),
         ));
+        $watchlist_changed = $current['watchlist'] !== $settings['watchlist'];
 
         $this->replace_json('user_settings', array(
             'user_id' => $user_id,
             'settings' => $settings,
             'updated_at' => $this->now_mysql(),
         ));
+        if ($watchlist_changed) {
+            $this->delete_engine_snapshot($user_id);
+        }
 
         // Keep riskProfile in sync when the Settings tab edits the three overlapping risk-cap
         // fields so execution sizing always sees the latest user intent regardless of which tab
