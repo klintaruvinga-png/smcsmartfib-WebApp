@@ -47,10 +47,11 @@ final class SMC_SuperFib_Sniper_REST {
             self::handle_options_preflight_request();
         }, 0);
 
-        // Regression guard: Validate CORS configuration consistency
-//        if (!self::validate_cors_origins_consistency()) {
-//            error_log('CORS configuration validation failed. Check allowed origins consistency.');
-//        }
+        // Regression guard: Validate CORS configuration consistency on every boot.
+        // Non-fatal: logs a warning but never blocks plugin load.
+        if (!self::validate_cors_origins_consistency()) {
+            error_log('SMC SuperFIB: CORS configuration inconsistency detected. Check allowed origins for protocol prefix or duplicate entries.');
+        }
 
         // Respond to CORS preflight (OPTIONS) requests before WordPress processes them.
         // Without this, the browser's preflight check silently fails and blocks POST/DELETE.
@@ -504,6 +505,12 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     public function get_session() {
+        // PARITY NOTE (MT5 migration): This endpoint returns SMC killzone windows, NOT full
+        // session hours. The MT5 SessionManager.mqh uses full sessions (London 07-15, NY 12-20)
+        // for market-open detection and freshness state transitions. The killzone windows here
+        // (London 07-11, NY 12-16) are intentional for signal-entry timing display only and
+        // do NOT affect engine or freshness authority logic. This gap is tracked as a known
+        // display-only parity divergence in the migration audit.
         $hour = (int) gmdate('H');
         if ($hour >= 7 && $hour < 11) {
             $name = 'London';
@@ -2408,12 +2415,18 @@ final class SMC_SuperFib_Sniper_REST {
             }
         }
 
-        // HARDENING: Fetch source alongside candle data for MT5 prioritization
+        // HARDENING: Fetch source alongside candle data for MT5 prioritization.
+        // REGRESSION GUARD: Use LIMIT to prevent unbounded table scans. The candles table grows
+        // indefinitely; without a LIMIT this query fetches ALL historical bars on every engine
+        // run, causing memory/timeout degradation. We fetch 2× $outputsize with a floor of 200
+        // to ensure enough headroom for MT5/TwelveData deduplication before slicing to $outputsize.
+        $fetch_limit = max(200, (int) $outputsize * 2);
         $all_candles = $wpdb->get_results($wpdb->prepare(
-            "SELECT candle_time, open, high, low, close, source FROM {$this->table('candles')} WHERE user_id = %d AND symbol = %s AND timeframe = %s ORDER BY candle_time DESC",
+            "SELECT candle_time, open, high, low, close, source FROM {$this->table('candles')} WHERE user_id = %d AND symbol = %s AND timeframe = %s ORDER BY candle_time DESC LIMIT %d",
             $user_id,
             $symbol,
-            $timeframe
+            $timeframe,
+            $fetch_limit
         ), ARRAY_A);
 
         // Deduplicate by candle_time, preferring MT5 over TwelveData
@@ -3425,7 +3438,10 @@ final class SMC_SuperFib_Sniper_REST {
         // HARDENING: If no timezone marker is present, treat as UTC explicitly.
         // Valid timezone markers: Z, +HH:MM, -HH:MM, etc.
         // Without this, PHP's strtotime() treats ambiguous times inconsistently across timezones.
-        if (!preg_match('/[Z+\-]\d{0,2}:?\d{0,2}$/', $value) && !str_ends_with($value, 'Z')) {
+        // REGRESSION GUARD: str_ends_with() requires PHP 8.0+. The regex already covers the 'Z'
+        // suffix case ([Z+\-] matches Z with \d{0,2} allowing zero digits), so the redundant
+        // str_ends_with() check is removed for PHP 7.x compatibility.
+        if (!preg_match('/[Z+\-]\d{0,2}:?\d{0,2}$/', $value)) {
             // No timezone marker — force UTC interpretation
             $value = $value . 'Z';
             error_log("TIMESTAMP NORMALIZED TO UTC: raw={$raw_time} | normalized={$value}");

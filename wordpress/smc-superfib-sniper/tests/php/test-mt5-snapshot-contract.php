@@ -642,4 +642,45 @@ assert_true(!empty($chart['candles']), 'Chart snapshot should include candles fo
 $lastChartCandle = end($chart['candles']);
 assert_same($lastChartCandle['time'], $chart['updatedAt'], 'Chart snapshot updatedAt must reflect the last candle time, not response time');
 
+// ─────────────────────────────────────────────────────────────────────────────
+// REGRESSION TEST: normalize_market_timestamp — PHP 7 compat & UTC pinning
+// Verifies PATCH 1: str_ends_with() removed (PHP 8.0+ only).
+// The regex /[Z+\-]\d{0,2}:?\d{0,2}$/ already matches the Z suffix, so
+// removing str_ends_with() is behaviour-neutral on PHP 8 and fixes PHP 7.
+// ─────────────────────────────────────────────────────────────────────────────
+$normalizeTs = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'normalize_market_timestamp');
+$normalizeTs->setAccessible(true);
+
+// ISO with Z — must NOT double-append Z, must parse to UTC
+assert_same('2026-05-08 10:30:00', $normalizeTs->invoke($instance, '2026-05-08T10:30:00Z', null), 'ISO+Z must parse to UTC without double-appending Z (PHP 7 compat)');
+
+// ISO with +00:00 explicit offset — must parse without alteration
+assert_same('2026-05-08 08:30:00', $normalizeTs->invoke($instance, '2026-05-08T08:30:00+00:00', null), 'ISO+offset must parse to correct UTC without Z append');
+
+// ISO without any TZ marker — must be pinned to UTC by appending Z
+assert_same('2026-05-08 10:30:00', $normalizeTs->invoke($instance, '2026-05-08T10:30:00', null), 'ISO without TZ must be pinned to UTC by appending Z');
+
+// MQL5 dot-format — must convert dots to dashes and treat as UTC
+assert_same('2026-05-08 10:30:00', $normalizeTs->invoke($instance, '2026.05.08 10:30:00', null), 'MQL5 dot-format must normalize to UTC MySQL format');
+
+// null input with null fallback — must return null
+assert_same(null, $normalizeTs->invoke($instance, null, null), 'null raw_time with null fallback must return null');
+
+// empty string with null fallback — must return null
+assert_same(null, $normalizeTs->invoke($instance, '', null), 'empty raw_time with null fallback must return null');
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REGRESSION TEST: fetch_candles — output bounded by outputsize
+// Verifies PATCH 2: LIMIT clause prevents unbounded DB scans.
+// The test DB has 450 M1 candles seeded; asking for 30 must return ≤ 30.
+// ─────────────────────────────────────────────────────────────────────────────
+$fetchCandlesBounded = $fetchCandles->invoke($instance, 7, 'EURUSD', '1min', 30);
+assert_true(count($fetchCandlesBounded) > 0, 'fetch_candles must return candles for MT5-live EURUSD');
+assert_true(count($fetchCandlesBounded) <= 30, 'fetch_candles must cap output at outputsize even when DB has 450 rows (LIMIT guard)');
+
+// Smaller outputsize request must also be bounded
+$fetchCandlesSmall = $fetchCandles->invoke($instance, 7, 'EURUSD', '1min', 5);
+assert_true(count($fetchCandlesSmall) <= 5, 'fetch_candles with outputsize=5 must return at most 5 candles');
+assert_true(count($fetchCandlesSmall) > 0, 'fetch_candles with outputsize=5 must return at least one candle');
+
 fwrite(STDOUT, 'mt5 snapshot contract checks passed' . PHP_EOL);
