@@ -1,124 +1,60 @@
-# SMC SuperFIB - Fib Level Chart Rendering Issue Research
+# SMC SuperFIB - Progress Page Demo Data Issue Research
 
 ## 1. Issue classification
-- **Severity**: HIGH
-- **Category**: data-contract, wiring
-- **Layer(s) affected**: Dashboard-JS, PHP-backend, REST-API
-- **Phase impact**: Phase 0 stabilization
+- **Severity**: MEDIUM
+- **Category**: stale-data
+- **Layer(s) affected**: Dashboard-JS / workflow
+- **Phase impact**: Phase 0
 
 ## 2. Confirmed evidence
+- **File**: `src/routes/progress.tsx`
+- **Confirmed**: the `/progress` route is implemented entirely in the dashboard frontend and does not reference any `/user/progress` service call.
+- **Confirmed**: `ProgressPage` uses `useUserAccount()` and `useUserRiskProfile()` only, while the streak and milestone panels are rendered as explicit unavailable placeholders.
+- **Confirmed**: the source text in `src/routes/progress.tsx` includes direct user-facing disclaimers:
+  - `Streak estimates are unavailable until /user/progress is implemented.`
+  - `Milestone progress is unavailable until the /user/progress endpoint is implemented.`
+- **Confirmed**: there is no other repository reference to `/user/progress` or a matching API contract in `**/*.{ts,tsx,js,jsx,php,md}`.
+- **Confirmed**: the progress page currently relies on account-level data only and makes no backend progress query.
 
-### Frontend Rendering (src/routes/charts.tsx)
-- **File**: `src/routes/charts.tsx`, lines 127-245
-- **Component**: `TVChart` function receives `fibs: FibLevel[]` and renders via lightweight-charts
-- **Chart Library**: lightweight-charts v5.2.0 (from package.json)
-- **Price Line Rendering** (line 224-231):
-  ```typescript
-  priceLinesRef.current = fibs.map((f) =>
-    s.createPriceLine({
-      price: f.price,
-      color: "#d8a35d",
-      lineWidth: 1,
-      lineStyle: 2, // dashed
-      axisLabelVisible: true,
-      title: `${f.label}`,
-    }),
-  );
-  ```
-- **Data Source**: Receives `fibs` from API at line 56: `const fibs = chart?.fibLevels ?? []`
-- **Behavior**: Maps ALL received fibs directly to price lines — NO filtering logic
-- **Type Definition** (line 127): `type FibLevel = { family: string; label: string; price: number };`
-  - Confirmed: Actual API includes `ratio` and `role` fields (src/types/sniper.ts line 95-100)
-  - Local type is incomplete but doesn't prevent rendering
+## 3. Root cause hypothesis
+- **Confirmed**: the progress page is a frontend-only placeholder surface awaiting a backend `/user/progress` endpoint.
+- **Hypothesis**: the page was initially designed to display live streak and milestone metrics, but the backend contract was never implemented, so the demo/default state persisted.
+- **Hypothesis**: because the UI route currently uses account data and placeholder text, it may still be perceived as live progress if placeholder visuals are not clearly separated from real data.
+- **Confirmed**: the explicit `/user/progress` dependency exists only in comments/text, not in actual code paths.
 
-### Backend Fib Level Data (wordpress/smc-superfib-sniper/smc-superfib-sniper.php)
-- **Ratios Array** (line 20):
-  ```php
-  private $ratios = array(-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300);
-  ```
-  - **Count**: 16 total ratios
-  - **Core Levels**: 0, 25, 50, 62.5, 75, 100 (6 levels)
-  - **Extensions**: -200, -162.5, -100, -62.5, -25, 125, 162.5, 200, 262.5, 300 (10 levels)
-  - **Confirmed**: Includes 0%, 100%, +25%, AND -25%
+## 4. Blast radius
+- **Primary file**: `src/routes/progress.tsx`
+- **Affected system**: dashboard progress UI
+- **At risk**: any user-facing interpretation of the `/progress` page as live account status
+- **Parity surface**: backend progress contract does not exist, so dashboard assumptions cannot be validated against backend data
+- **Potential collateral**: page metadata and navigation (`/progress` route) may continue to expose an unfinished user flow until backend support is added
 
-- **API Endpoint** (line 252): `register_routes()` maps `/charts` to `get_chart_snapshot()`
-- **Generation Function** (line 1494-1510):
-  ```php
-  public function get_chart_snapshot(WP_REST_Request $request) {
-    $candles = $this->fetch_candles($user_id, $symbol, $timeframe, 120);
-    $levels = $this->fib_levels_from_candles($candles);
-    return rest_ensure_response(array('fibLevels' => $levels, ...));
-  }
-  ```
+## 5. Regression surface
+- **Working behavior to preserve**: the account equity card and drawdown remaining card should continue to show actual account data via `useUserAccount()`.
+- **Guard**: explicit unavailable messaging in the streak/milestones cards is the current safety mechanism.
+- **Risk if patched incorrectly**: removing the placeholder messaging without a real backend endpoint could reintroduce misleading live metrics.
+- **Existing coverage**: the repo contains no explicit progress endpoint or data contract for `/user/progress`, so regression protections are limited to this frontend route.
 
-- **Level Construction** (line 2838-2857):
-  - `fib_levels_from_candles()` extracts high/low from candles
-  - `fib_levels($high, $low, 'LTF_SF')` iterates through ALL `$this->ratios`
-  - For each ratio, generates object with `family`, `ratio`, `label`, `price`, `role`
-  - **Confirmed**: NO filtering — backend sends all 16 ratios
+## 6. Resolution path options
+- **Path A**: keep the frontend progress route stable and continue presenting streak/milestone panels as unavailable until `/user/progress` is implemented.
+- **Path B**: implement a backend `/user/progress` endpoint and wire the dashboard progress page to it, replacing placeholder UI with real progress metrics.
+- **Recommended**: Path A for now, because the required backend contract is not present in the repository and the issue specifically calls out missing `/user/progress` support.
 
-- **Label Generation** (line 2860-2865):
-  ```php
-  private function ratio_label($ratio) {
-    if (floor((float) $ratio) === (float) $ratio) {
-      return (string) (int) $ratio . '%';
-    }
-    return rtrim(rtrim(number_format((float) $ratio, 1, '.', ''), '0'), '.') . '%';
-  }
-  ```
-  - **Expected Output**: "0%", "100%", "-25%", "+125%" etc.
-  - **Confirmed**: Generates labels for all ratios including negatives
+## 7. Risk flags
+- **High-risk system involved**: No. This is a frontend presentation issue, not a core engine or pricing contract.
+- **Requires parity re-validation**: No, not until `/user/progress` is implemented.
+- **Migration-blocking**: No. This is a stabilization/UI issue in Phase 0.
+- **Human review required before merge**: Yes. UI messaging and placeholder behavior should be reviewed to ensure users are not misled.
 
-- **Role Classification** (line 2893-2908):
-  ```php
-  private function fib_role($ratio) {
-    if ($ratio < 0) return 'premium-extension';
-    if ($ratio > 100) return 'discount-extension';
-    if ($ratio < 50) return 'premium';
-    if ((float) $ratio === 50.0) return 'equilibrium';
-    return 'discount';
-  }
-  ```
-  - **Confirmed**: Correctly classifies extensions as `*-extension` roles
-
-### Mock Data Completeness Gap (src/mocks/sniperData.ts, line 442-453)
-```typescript
-export function mockFibLevels(symbol: Symbol) {
-  const base = mockPrices.find((p) => p.symbol === symbol)?.mid ?? 1;
-  const range = base * 0.005;
-  const ratios = [0, 25, 50, 62.5, 75, 100] as const;  // ONLY 6 ratios
-
-  return ratios.map((ratio) => ({
-    ratio,
-    label: `${ratio}%`,
-    price: base + range - (ratio / 100) * range * 2,
-    role: (ratio < 50 ? "premium" : ratio === 50 ? "equilibrium" : "discount") as FibRole,
-  }));
-}
-```
-- **Gap Analysis**: Mock has 6 ratios, backend has 16
-- **Missing from Mock** (10 ratios):
-  - Negative extensions: -200, -162.5, -100, -62.5, -25
-  - Positive extensions: 125, 162.5, 200, 262.5, 300
-- **Present in Mock**: 0, 25, 50, 62.5, 75, 100 (matches core levels)
-- **Parity Failure**: 63% of ratios missing from mock
-
-### API Consumption (src/lib/api/sniperClient.ts, line 209-232)
-```typescript
-async getChartSnapshot(...): Promise<ChartSnapshot> {
-  if (mock) {
-    // Uses mockFibLevels() which has only 6 ratios
-    return { fibLevels: mockFibLevels(symbol).map(f => ({
-      family: "LTF_SF" as const,
-      ratio: f.ratio,
-      label: f.label,
-      price: f.price,
-      role: f.role,
-    })), ... };
-  }
-  return call<ChartSnapshot>(`/charts?symbol=...`);  // Real backend
-}
-```
+## 8. Handoff package
+- **Epicentre files to inspect first**: `src/routes/progress.tsx`
+- **Inputs Codex must verify before planning**:
+  - whether `/user/progress` is intended to be a backend API path
+  - whether current progress page card content should remain placeholder-only until that endpoint exists
+  - whether any backend progress contract lives outside this repo
+- **Open unknowns**:
+  - whether `/user/progress` is planned but implemented in another repository or service
+  - whether progress metrics should derive from existing account/trade data instead of a new endpoint
 - **Confirmed**: Mock mode hard-codes incomplete fib set via `mockFibLevels()`
 
 ## 3. Root cause hypothesis
