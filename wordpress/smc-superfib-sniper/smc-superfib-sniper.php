@@ -78,6 +78,13 @@ final class SMC_SuperFib_Sniper_REST {
         // when the app uses a custom script handle and wpApiSettings was not localized.
         add_action('wp_enqueue_scripts', array(__CLASS__, 'enqueue_rest_api_settings'));
         add_action('admin_enqueue_scripts', array(__CLASS__, 'enqueue_rest_api_settings'));
+
+        // WP-Cron: prune engine_runs and audit_events daily to prevent unbounded table growth.
+        // During Phase 0 soak, these tables accumulate heartbeat rows on every engine tick.
+        add_action('smc_sf_prune_tables', array(__CLASS__, 'prune_old_table_rows'));
+        if (!wp_next_scheduled('smc_sf_prune_tables')) {
+            wp_schedule_event(time(), 'daily', 'smc_sf_prune_tables');
+        }
     }
 
     public static function enqueue_rest_api_settings() {
@@ -106,6 +113,21 @@ final class SMC_SuperFib_Sniper_REST {
             . 'window.SNIPER = Object.assign({}, window.SNIPER || {}, { root: ' . wp_json_encode($rest_api_settings['root']) . ', nonce: ' . wp_json_encode($rest_api_settings['nonce']) . ' });',
             'before'
         );
+    }
+
+    public static function prune_old_table_rows(): void {
+        global $wpdb;
+        // engine_runs: heartbeat + completion rows accumulate on every engine tick — keep 7 days
+        $wpdb->query($wpdb->prepare(
+            "DELETE FROM `{$wpdb->prefix}smc_sf_engine_runs` WHERE created_at < %s",
+            gmdate('Y-m-d H:i:s', strtotime('-7 days'))
+        ));
+        // audit_events: diagnostic traces — keep 14 days for post-mortem analysis
+        $wpdb->query($wpdb->prepare(
+            "DELETE FROM `{$wpdb->prefix}smc_sf_audit_events` WHERE created_at < %s",
+            gmdate('Y-m-d H:i:s', strtotime('-14 days'))
+        ));
+        error_log('[PHASE0_SOAK] smc_sf_prune_tables: pruned engine_runs (>7d) and audit_events (>14d)');
     }
 
     public static function activate() {
@@ -350,15 +372,6 @@ final class SMC_SuperFib_Sniper_REST {
         return true;
     }
 
-    public function verify_ea_api_key(WP_REST_Request $request): bool
-    {
-        $expected = defined('SMC_SF_EA_API_KEY') ? SMC_SF_EA_API_KEY : '';
-        if (empty($expected)) return false;
-
-        $sent = trim((string) $this->get_ea_api_key($request));
-        return $sent !== '' && hash_equals($expected, $sent);
-    }
-
     private function get_ea_api_key(WP_REST_Request $request): string
     {
         $header_names = array(
@@ -474,34 +487,6 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         return true;
-    }
-
-    public function send_cors_headers($served, $result, $request, $server) {
-        $origin = isset($_SERVER['HTTP_ORIGIN']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
-
-        // Always send Vary: Origin so caches never serve one origin's CORS headers to another.
-        header('Vary: Origin', false);
-
-        if (!$origin) {
-            return $served;
-        }
-
-        $allowed = self::get_allowed_origins();
-        if (self::is_allowed_origin($origin, $allowed)) {
-            header('Access-Control-Allow-Origin: ' . $origin);
-            header('Access-Control-Allow-Credentials: true');
-            header('Access-Control-Allow-Headers: ' . self::get_cors_allowed_headers());
-            header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
-        }
-
-        // Prevent proxies and browsers from caching authenticated user-specific REST responses.
-        $route = $request->get_route();
-        if (strpos($route, '/sniper/v1/user/') === 0 || strpos($route, '/sniper/v1/health') === 0 || $route === '/sniper/v1/snapshot') {
-            header('Cache-Control: no-store, no-cache, must-revalidate');
-            header('Pragma: no-cache');
-        }
-
-        return $served;
     }
 
     public function get_session() {

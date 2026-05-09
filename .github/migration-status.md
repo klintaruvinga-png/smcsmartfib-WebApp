@@ -1,11 +1,11 @@
 # SMC SuperFIB → MT5 Migration Status Board
 
-**Last Updated**: 2026-05-07  
+**Last Updated**: 2026-05-10  
 **Current Phase**: 0 (Stabilization)  
-**Overall Progress**: 18%
+**Overall Progress**: 38%
 **Status**: In Progress
 
-> Snapshot: v13.0.0 MT5 authority hardening verified. EA-authoritative symbols now ignore stale Twelve Data cooldown and key-status escalation in health/blocker paths, MT5-live symbols bypass Twelve Data, EA pushes clear same-symbol TD cooldown state, backendSync receives EA heartbeats, and MT5 day-change derives from UTC-day M1 opens. On 2026-05-07 the watchlist persistence path was hardened as well: watchlist writes now invalidate the cached engine snapshot, symbol-set parity is checked before snapshot freshness timestamps, and frontend watchlist mutations are centralized with optimistic rollback/cancel guards to prevent flicker and ghost symbols. Phase 0 remains in stabilization pending live soak and candle-history aggregation verification.
+> Snapshot: v13.0.0 MT5 authority hardening verified. EA-authoritative symbols now ignore stale Twelve Data cooldown and key-status escalation in health/blocker paths, MT5-live symbols bypass Twelve Data, EA pushes clear same-symbol TD cooldown state, backendSync receives EA heartbeats, and MT5 day-change derives from UTC-day M1 opens. On 2026-05-07 the watchlist persistence path was hardened. On 2026-05-09 the charts route was stabilized (backendReady gate, lightweight-charts lockfile). On 2026-05-10 DB hygiene was addressed: WP-Cron daily pruning added for engine_runs (7-day retention) and audit_events (14-day retention); dead unreachable methods verify_ea_api_key() and send_cors_headers() removed from the plugin. Phase 0 remains in stabilization pending live soak and candle-history aggregation verification.
 
 ---
 
@@ -366,7 +366,7 @@ Confluence Detection: [PENDING]
 
 | Issue | Severity | Detected | Phase Impact | Status |
 |-------|----------|----------|--------------|--------|
-| `engine_runs` heartbeat row growth needs pruning policy | Low | 2026-05-05 v13 verification | Phase 0 maintenance | Deferred; add WP-Cron cleanup after live soak sets retention window |
+| `engine_runs` heartbeat row growth needs pruning policy | Low | 2026-05-05 v13 verification | Phase 0 maintenance | **RESOLVED 2026-05-10**: WP-Cron daily pruning job added (7-day retention for engine_runs, 14-day for audit_events) |
 | Non-EA watchlist symbols can still show TD `rate-limited` | Medium | 2026-05-05 v13 verification | Health display for TD-dependent symbols | Accepted behavior; do not clear globally from EA pushes |
 
 > **New escalations automatically flagged** by phase monitoring agent when:
@@ -381,6 +381,8 @@ Confluence Detection: [PENDING]
 
 | Report | Date | Phase | Issues Found | Status |
 |--------|------|-------|--------------|--------|
+| `BUG_SWEEP_REPORT_2026-05-10.md` | 2026-05-10 | 0 | 3 confirmed (1 high DB growth, 2 low dead methods) — all patched | Verified |
+| `BUG_SWEEP_REPORT_2026-05-09.md` | 2026-05-09 | 0 | 2 confirmed (charts route lockfile + backendReady gate) — all patched | Verified |
 | `BUG_SWEEP_REPORT_2026-05-05_V13-MT5-Authority-Verification.md` | 2026-05-05 | 0 | 0 blockers; 2 deferred maintenance items | Verified |
 | `BUG_SWEEP_REPORT_2026-05-05_MT5-Candle-Ingestion-Verification.md` | 2026-05-05 | 0 | Candle ingestion verified; hourly/reconnect checks pending | Verified |
 | `BUG_SWEEP_REPORT_2026-05-04_POST_PATCH_VERIFICATION.md` | 2026-05-04 | 0 | 40/40 regression pass; 3 deferred risks | Verified |
