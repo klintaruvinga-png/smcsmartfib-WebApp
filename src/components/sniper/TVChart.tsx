@@ -97,9 +97,6 @@ export function TVChart({
 
     chart.subscribeCrosshairMove(positionLabels);
     chart.timeScale().subscribeVisibleTimeRangeChange(positionLabels);
-    chart
-      .priceScale("right")
-      .subscribeVisiblePriceRangeChange(() => requestAnimationFrame(positionLabels));
     const container = containerRef.current;
     const onWheel = () => requestAnimationFrame(positionLabels);
     container.addEventListener("wheel", onWheel, { passive: true });
