@@ -148,7 +148,6 @@ function TVChart({
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const priceLinesRef = useRef<IPriceLine[]>([]);
-
   const precision = useMemo(() => {
     const sample = fmtPrice(1, symbol);
     const dot = sample.indexOf(".");
@@ -224,7 +223,6 @@ function TVChart({
     chart
       .priceScale("right")
       .subscribeVisiblePriceRangeChange(() => requestAnimationFrame(positionLabels));
-
     const container = containerRef.current;
     const onWheel = () => requestAnimationFrame(positionLabels);
     container.addEventListener("wheel", onWheel, { passive: true });
