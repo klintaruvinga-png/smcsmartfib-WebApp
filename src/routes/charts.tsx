@@ -243,12 +243,14 @@ function TVChart({
     if (!seriesApi) return;
 
     const data = Array.from(
-      series.reduce((points, pt) => {
-        const sec = Math.floor(pt.t / 1000);
-        if (!Number.isFinite(sec) || !Number.isFinite(pt.p)) return points;
-        points.set(sec, pt.p);
-        return points;
-      }, new Map<number, number>()).entries(),
+      series
+        .reduce((points, pt) => {
+          const sec = Math.floor(pt.t / 1000);
+          if (!Number.isFinite(sec) || !Number.isFinite(pt.p)) return points;
+          points.set(sec, pt.p);
+          return points;
+        }, new Map<number, number>())
+        .entries(),
     )
       .sort((a, b) => a[0] - b[0])
       .map(([time, value]) => ({ time: time as UTCTimestamp, value }));

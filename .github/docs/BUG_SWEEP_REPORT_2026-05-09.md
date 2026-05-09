@@ -2,7 +2,7 @@
 
 - Overall health: stable on the audited charts route after patch; one confirmed high-severity dashboard migration blocker and one medium-severity backend-authority drift were found on the charts path.
 - Bugs found: 2 confirmed issues on `src/routes/charts.tsx`, both remediated in this run.
-- Fixes applied: replaced an unresolvable chart dependency with the already-installed chart stack and gated chart polling on configured backend readiness.
+- Fixes applied: completed the chart-route merge back onto the `lightweight-charts` implementation, restored a resolvable lockfile/install state for the declared dependency, and kept chart polling gated on configured backend readiness.
 - Remaining risks: full-workspace lint still fails on pre-existing CRLF/Prettier drift outside the audited scope; fib/regime/signal replay parity was not rerun end-to-end in this pass.
 - Migration readiness: ready for continued phase-0 soak on the chart rendering and refresh path.
 
@@ -12,7 +12,7 @@
 
 | Severity | Component | Root Cause | Impact | Blocker Status |
 |---|---|---|---|---|
-| HIGH | `src/routes/charts.tsx` production chart route | The route imported `lightweight-charts`, but the package was not resolvable in the current installed workspace, causing `vite build` to fail. | Production build blocked; migration packaging could not complete. | Blocks deployment until patched. |
+| HIGH | `src/routes/charts.tsx` production chart route | The merge-resolved route depended on `lightweight-charts`, but the local workspace lockfile/install state did not contain a resolvable package entry, causing `vite build` to fail. | Production build blocked; migration packaging could not complete. | Blocks deployment until patched. |
 
 ## Wiring And Freshness Authority
 
@@ -30,9 +30,9 @@
 
 | File | Change | Hardening Added |
 |---|---|---|
-| `src/routes/charts.tsx` | Replaced `lightweight-charts` usage with a `recharts`-based render path using deduped/sorted backend candles and backend fib overlays. | Removes the missing-package build failure and adds empty-candle guarding instead of failing at runtime. |
+| `src/routes/charts.tsx` | Resolved the merge back onto the `lightweight-charts` render path while preserving backend-readiness gating and the backend-provided fib overlay behavior. | Keeps the shipping chart implementation, restores pan/zoom/axis-scale behavior, and avoids frontend fib recalculation drift. |
 | `src/routes/charts.tsx` | Added a backend-readiness gate and disabled polling until the configured backend URL exists. | Prevents early requests against the default backend and keeps chart refresh behavior aligned with shared backend-authority rules. |
-| `src/hooks/useSniperData.ts` | Exported `useBackendReady()` for reuse by chart consumers. | Centralizes readiness gating rather than duplicating route-local checks. |
+| `package-lock.json` | Synced the lockfile to include the already-declared `lightweight-charts` dependency and its transitive `fancy-canvas` package. | Makes the resolved chart route installable/buildable in a clean workspace instead of relying on undeclared local state. |
 
 # Parity Verification Results
 
@@ -46,7 +46,7 @@
 # Remaining Risks
 
 - Full repository lint still fails on unrelated formatting drift and should be normalized separately.
-- The new chart implementation increases client bundle usage through `recharts`; the route now builds cleanly, but bundle budgets should still be watched.
+- The restored `lightweight-charts` path now builds cleanly, but chart-route bundle/runtime weight should still be watched during soak.
 - Pine to backend to MT5 replay parity for fib anchors, regime classification, and signal generation remains a separate follow-up outside this route-level fix.
 
 # Regression Checklist
@@ -59,7 +59,7 @@
 
 # Safe Deployment Order
 
-1. Deploy the frontend patch for `src/routes/charts.tsx` and `src/hooks/useSniperData.ts`.
+1. Deploy the frontend patch for `src/routes/charts.tsx` together with the synced `package-lock.json`.
 2. Validate the Charts page with a configured backend and confirm candle/fib data loads only after settings are available.
 3. Run a separate formatting cleanup before restoring `npm run lint` as a deployment gate.
 
@@ -73,4 +73,4 @@
 
 - `npx eslint src/routes/charts.tsx`
 - `npm run build`
-- Pre-patch failure reproduced: unresolved import `lightweight-charts` in `src/routes/charts.tsx`
+- Pre-patch failure reproduced: unresolved `lightweight-charts` import caused by missing local lockfile/install state
