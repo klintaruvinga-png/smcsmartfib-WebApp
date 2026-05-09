@@ -1,5 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useSnapshot, useEngineBatch, usePollMs, useWatchlist } from "@/hooks/useSniperData";
+import {
+  useSnapshot,
+  useEngineBatch,
+  usePollMs,
+  useCanonicalWatchlist,
+} from "@/hooks/useSniperData";
 import { useStreamingTicks } from "@/hooks/useStreamingTicks";
 import { useTickFlash } from "@/hooks/useTickFlash";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
@@ -22,9 +27,9 @@ import type {
 export const Route = createFileRoute("/live")({
   head: () => ({
     meta: [
-      { title: "Live Radar — SMC SuperFIB" },
+      { title: "Live Radar â€” SMC SuperFIB" },
       { name: "description", content: "Per-pair live prices, regime, gate state and chop meter." },
-      { property: "og:title", content: "Live Radar — SMC SuperFIB" },
+      { property: "og:title", content: "Live Radar â€” SMC SuperFIB" },
       { property: "og:description", content: "Real-time multi-pair regime + gate radar." },
     ],
   }),
@@ -36,15 +41,15 @@ function blockerWarning(blocker: EngineBlocker | undefined): string | null {
   const map: Partial<Record<EngineBlocker, string>> = {
     KEY_MISSING: "Twelve Data key not set",
     KEY_INVALID: "Twelve Data key invalid",
-    RATE_LIMITED: "Feed rate-limited — cooling down",
+    RATE_LIMITED: "Feed rate-limited â€” cooling down",
     QUOTE_UNAVAILABLE: "Price unavailable",
     PRICE_STALE: "Price data stale",
     PRICE_NOT_MT5_FRESH: "No fresh MT5 price",
     CANDLES_MISSING: "No candle history",
     CANDLES_STALE: "Candles stale (>2 h old)",
     INSUFFICIENT_CANDLE_HISTORY: "Insufficient candle history (<30 bars)",
-    READY_NOT_CONFIRMED_STALE_DATA: "READY but stale data — confirmation blocked",
-    CHOP_GATE_BLOCKED: "Gate blocked — chop > 0.7 (F3 caution zone)",
+    READY_NOT_CONFIRMED_STALE_DATA: "READY but stale data â€” confirmation blocked",
+    CHOP_GATE_BLOCKED: "Gate blocked â€” chop > 0.7 (F3 caution zone)",
   };
   return map[blocker] ?? blocker.replace(/_/g, " ").toLowerCase();
 }
@@ -53,14 +58,13 @@ function LivePage() {
   const { data, isLoading } = useSnapshot();
   const pollMs = usePollMs() ?? 2000;
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
-  const watchlist = useWatchlist();
-  if (isLoading || !data) return <div className="text-mute text-sm">Loading radar…</div>;
+  const { watchlist, watchlistSet } = useCanonicalWatchlist();
+  if (isLoading || !data) return <div className="text-mute text-sm">Loading radarâ€¦</div>;
 
-  const watchlistSet = new Set<string>(watchlist);
   const mt5Prices = data.prices.filter((price) => {
     // Hard-gate by canonical watchlist so Account add/remove reflects immediately,
     // even before the next backend snapshot lands.
-    if (watchlistSet.size > 0 && !watchlistSet.has(price.symbol)) return false;
+    if (!watchlistSet.has(price.symbol)) return false;
     if (MOCK_MODE && price.source === "mock") return true;
     if (price.source !== "mt5") {
       console.debug("[live] skipped non-MT5 price", price.symbol, price.source);
@@ -78,7 +82,7 @@ function LivePage() {
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Live Radar</h1>
-          <p className="text-xs text-mute mt-0.5">Prices · Regime · Gate · Chop</p>
+          <p className="text-xs text-mute mt-0.5">Prices Â· Regime Â· Gate Â· Chop</p>
         </div>
         <button
           onClick={() => runBatch(undefined)}
@@ -86,14 +90,16 @@ function LivePage() {
           className="flex items-center gap-1.5 rounded border border-bd bg-bg2/60 px-3 py-1.5 text-[11px] font-mono text-dim hover:text-fg hover:border-info/40 disabled:opacity-50 transition-colors"
         >
           <RefreshCw className={cn("h-3 w-3", batchRunning && "animate-spin")} />
-          {batchRunning ? "Refreshing…" : "Force refresh"}
+          {batchRunning ? "Refreshingâ€¦" : "Force refresh"}
         </button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {mt5Prices.length === 0 && (
           <div className="col-span-full py-10 text-center text-sm text-mute">
-            No live MT5 prices - verify EA connection and symbol push.
+            {watchlist.length === 0
+              ? "No watchlist symbols. Add symbols in Account to populate Live Radar."
+              : "No live MT5 prices - verify EA connection and symbol push."}
           </div>
         )}
 
@@ -256,10 +262,10 @@ function PriceCard({
             midDir === "down" && "tick-flash-down",
           )}
         >
-          {priceUnavailable ? "—" : fmtPrice(animatedMid ?? price.mid, price.symbol)}
+          {priceUnavailable ? "â€”" : fmtPrice(animatedMid ?? price.mid, price.symbol)}
         </div>
         <div className={cn("font-mono text-sm", price.changePct1d >= 0 ? "text-buy" : "text-sell")}>
-          {priceUnavailable ? "—" : fmtPct(price.changePct1d)}
+          {priceUnavailable ? "â€”" : fmtPct(price.changePct1d)}
         </div>
       </div>
 
@@ -274,7 +280,7 @@ function PriceCard({
             bidDir === "down" && "tick-flash-down-fast",
           )}
         >
-          BID {priceUnavailable ? "—" : fmtPrice(animatedBid ?? price.bid, price.symbol)}
+          BID {priceUnavailable ? "â€”" : fmtPrice(animatedBid ?? price.bid, price.symbol)}
         </span>
         <span
           style={askTickStyle}
@@ -286,7 +292,7 @@ function PriceCard({
             askDir === "down" && "tick-flash-down-fast",
           )}
         >
-          ASK {priceUnavailable ? "—" : fmtPrice(animatedAsk ?? price.ask, price.symbol)}
+          ASK {priceUnavailable ? "â€”" : fmtPrice(animatedAsk ?? price.ask, price.symbol)}
         </span>
       </div>
 
@@ -311,7 +317,7 @@ function PriceCard({
                   chopFlash === "down" && "tick-flash-down",
                 )}
               >
-                Fib {regime.nearestFib ? fmtPrice(regime.nearestFib, price.symbol) : "—"}
+                Fib {regime.nearestFib ? fmtPrice(regime.nearestFib, price.symbol) : "â€”"}
               </span>
             </div>
             <ChopMeter value={regime.chop} />
@@ -323,7 +329,7 @@ function PriceCard({
       {diagWarning && !gate?.reason && <WarningLine level={diagLevel}>{diagWarning}</WarningLine>}
       {stale && !gate?.reason && !diagWarning && (
         <WarningLine level="warn">
-          Price data stale — last update {relTime(staleTimestamp)}.
+          Price data stale â€” last update {relTime(staleTimestamp)}.
         </WarningLine>
       )}
     </div>

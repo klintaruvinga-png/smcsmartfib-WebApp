@@ -818,7 +818,7 @@ final class SMC_SuperFib_Sniper_REST {
     public function post_watchlist_add(WP_REST_Request $request) {
         $user_id = get_current_user_id();
         $payload = $request->get_json_params();
-        $symbol = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) ($payload['symbol'] ?? '')));
+        $symbol = $this->normalize_symbol_token($payload['symbol'] ?? '');
         if ($symbol === '') {
             return new WP_Error('smc_sf_watchlist_symbol_missing', 'Symbol is required.', array('status' => 400));
         }
@@ -841,7 +841,7 @@ final class SMC_SuperFib_Sniper_REST {
         global $wpdb;
         $user_id = get_current_user_id();
         $payload = $request->get_json_params();
-        $symbol = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) ($payload['symbol'] ?? '')));
+        $symbol = $this->normalize_symbol_token($payload['symbol'] ?? '');
         if ($symbol === '') {
             return new WP_Error('smc_sf_watchlist_symbol_missing', 'Symbol is required.', array('status' => 400));
         }
@@ -2199,13 +2199,17 @@ final class SMC_SuperFib_Sniper_REST {
         return 0.0;
     }
 
+    private function normalize_symbol_token($symbol) {
+        return preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $symbol));
+    }
+
     private function reference_mid_from_market($market_mids, $symbol) {
-        $key = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $symbol));
+        $key = $this->normalize_symbol_token($symbol);
         return isset($market_mids[$key]) ? (float) $market_mids[$key] : 0.0;
     }
 
     private function split_symbol_pair($symbol) {
-        $key = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $symbol));
+        $key = $this->normalize_symbol_token($symbol);
         if (!preg_match('/^[A-Z]{6}$/', $key)) {
             return null;
         }
@@ -2633,6 +2637,7 @@ final class SMC_SuperFib_Sniper_REST {
             }
         }
         $default['apiKeyStatus'] = $this->get_twelve_key_status($user_id);
+        $default['watchlist'] = $this->sanitize_symbols($default['watchlist']);
 
         return $default;
     }
@@ -3236,13 +3241,13 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function get_instrument_spec($symbol) {
-        $key = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $symbol));
+        $key = $this->normalize_symbol_token($symbol);
         $specs = $this->instrument_specs();
         return isset($specs[$key]) ? $specs[$key] : null;
     }
 
     private function is_supported_symbol($symbol) {
-        $key = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $symbol));
+        $key = $this->normalize_symbol_token($symbol);
         $specs = $this->instrument_specs();
         return isset($specs[$key]);
     }
@@ -3259,7 +3264,7 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function save_watchlist($user_id, $watchlist) {
         $current = $this->get_settings($user_id);
-        $current['watchlist'] = $watchlist;
+        $current['watchlist'] = $this->sanitize_symbols($watchlist);
         $this->replace_json('user_settings', array(
             'user_id' => $user_id,
             'settings' => $current,
@@ -3273,7 +3278,7 @@ final class SMC_SuperFib_Sniper_REST {
         }
         $out = array();
         foreach ($symbols as $symbol) {
-            $clean = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $symbol));
+            $clean = $this->normalize_symbol_token($symbol);
             // Reject empty strings and suspiciously long tokens (longest real symbol is ~10 chars).
             if ($clean === '' || strlen($clean) > 12) {
                 continue;
@@ -3311,7 +3316,7 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function twelve_symbol($symbol) {
-        $key = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $symbol));
+        $key = $this->normalize_symbol_token($symbol);
         // All-alpha 6-letter tokens (forex pairs, metals, crypto like BTC/USD) are
         // slash-formatted by Twelve Data. Symbols with digits (US30, NAS100) pass through.
         // This covers both registry-known pairs and any legacy user-watchlist entries.

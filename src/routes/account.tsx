@@ -24,12 +24,12 @@ import type {
 export const Route = createFileRoute("/account")({
   head: () => ({
     meta: [
-      { title: "Account & Settings — SMC SuperFIB" },
+      { title: "Account & Settings â€” SMC SuperFIB" },
       {
         name: "description",
         content: "Backend URL, API key status, refresh interval, watchlist and risk profile.",
       },
-      { property: "og:title", content: "Account & Settings — SMC SuperFIB" },
+      { property: "og:title", content: "Account & Settings â€” SMC SuperFIB" },
       { property: "og:description", content: "Configure your dashboard and risk profile." },
     ],
   }),
@@ -43,7 +43,7 @@ function AccountPage() {
   const { data: settings } = useUserSettings();
   const { data: risk } = useUserRiskProfile();
 
-  if (!settings || !risk) return <div className="text-mute text-sm">Loading settings…</div>;
+  if (!settings || !risk) return <div className="text-mute text-sm">Loading settingsâ€¦</div>;
 
   return (
     <div className="space-y-4">
@@ -54,7 +54,7 @@ function AccountPage() {
 
       {MOCK_MODE && (
         <WarningLine level="warn">
-          App running in MOCK_MODE. Real REST calls disabled — all data is synthetic.
+          App running in MOCK_MODE. Real REST calls disabled â€” all data is synthetic.
         </WarningLine>
       )}
 
@@ -121,6 +121,12 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
   const removeWatchlistMutation = useWatchlistRemove();
   const watchlistBusy = addWatchlistMutation.isPending || removeWatchlistMutation.isPending;
 
+  function syncDraftWatchlistFromCache(fallbackWatchlist: DashboardSettings["watchlist"]) {
+    const canonicalWatchlist =
+      qc.getQueryData<DashboardSettings>(["user-settings"])?.watchlist ?? fallbackWatchlist;
+    setS((prev) => ({ ...prev, watchlist: canonicalWatchlist }));
+  }
+
   useEffect(() => {
     if (!settingsDirty) {
       setS(settings);
@@ -141,7 +147,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
     if (watchlistBusy) return;
     try {
       const result = await removeWatchlistMutation.mutateAsync(p);
-      setS((prev) => ({ ...prev, watchlist: result.watchlist }));
+      syncDraftWatchlistFromCache(result.watchlist);
       toast.success(`${p} removed`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to remove symbol");
@@ -159,7 +165,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
     setNewPair("");
     try {
       const result = await addWatchlistMutation.mutateAsync(sym);
-      setS((prev) => ({ ...prev, watchlist: result.watchlist }));
+      syncDraftWatchlistFromCache(result.watchlist);
       toast.success(`${sym} added to watchlist`);
     } catch (error) {
       // Only restore the failed symbol if the user has not already typed a replacement.
