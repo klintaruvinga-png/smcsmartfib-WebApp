@@ -145,6 +145,23 @@ export function filterItemsByWatchlist<T extends { symbol: string }>(
   return ordered;
 }
 
+/**
+ * Align the canonical watchlist with backend items. Returns an entry per watchlist
+ * symbol — `item` is undefined when the backend snapshot has not yet emitted data
+ * for that symbol. This keeps newly-added symbols visible (as "awaiting data")
+ * instead of disappearing on the next sparse snapshot.
+ */
+export function alignWatchlistItems<T extends { symbol: string }>(
+  items: readonly T[] | undefined | null,
+  watchlist: readonly Symbol[],
+): { symbol: Symbol; item: T | undefined }[] {
+  const itemsBySymbol = new Map<string, T>();
+  for (const item of items ?? []) {
+    if (!itemsBySymbol.has(item.symbol)) itemsBySymbol.set(item.symbol, item);
+  }
+  return watchlist.map((symbol) => ({ symbol, item: itemsBySymbol.get(symbol) }));
+}
+
 export function useWatchlist() {
   const { data } = useUserSettings();
   return useMemo(() => normalizeWatchlist(data?.watchlist), [data?.watchlist]);
