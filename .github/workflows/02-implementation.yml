@@ -1,4 +1,4 @@
-name: 02 - Implementation
+name: 02 - Artifact Validation
 
 on:
   push:
@@ -6,15 +6,14 @@ on:
       - reports/codex-plan.md
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: implementation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  implement:
+  validate:
     runs-on: ubuntu-latest
 
     steps:
@@ -28,28 +27,14 @@ jobs:
         run: |
           test -f reports/copilot-research.md || (echo "Missing reports/copilot-research.md" && exit 1)
           test -f reports/codex-plan.md || (echo "Missing reports/codex-plan.md" && exit 1)
+          test ! -f .smc-workflow-state.json || (echo ".smc-workflow-state.json must remain local-only" && exit 1)
 
-      - name: Upload plan artifact
+      - name: Upload pipeline artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: codex-plan-${{ github.sha }}
-          path: reports/codex-plan.md
+          name: pipeline-artifacts-${{ github.sha }}
+          path: |
+            reports/copilot-research.md
+            reports/codex-plan.md
           if-no-files-found: error
           retention-days: 14
-
-      - name: Load implementation prompt
-        id: prompt
-        run: |
-          {
-            echo 'prompt<<EOF'
-            cat .github/prompts/claude-implement-prompt.md
-            echo 'EOF'
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Run Claude implementation
-        uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          github_token: ${{ secrets.GH_PAT }}
-          prompt: ${{ steps.prompt.outputs.prompt }}
-          claude_args: "--max-turns 10"

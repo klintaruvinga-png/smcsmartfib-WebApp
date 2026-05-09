@@ -10,15 +10,15 @@ be asked.
 - If a PR already exists for the branch, skip silently and do not error.
 - Always use `--fill` so the PR title and body are populated from the
   commit messages.
-- Always create as `--draft` first. This prevents accidental auto-merge
-  while the Codex review loop is still running.
+- Always create a normal open PR. The PR-created Codex review stage depends
+  on an active PR, not a draft PR.
 - Never ask for permission before creating the PR.
 - Never skip this step even if the patch was small or experimental.
 
 ### Exact command to run
 
 ```bash
-gh pr create --fill --draft 2>/dev/null || echo "PR already exists, skipping."
+gh pr create --fill 2>/dev/null || echo "PR already exists, skipping."
 ```
 
 ### PR body must always include

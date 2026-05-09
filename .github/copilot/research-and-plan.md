@@ -2,15 +2,28 @@
 
 ## Step 1 - Validate Input
 
-The user MUST provide an issue description after the command.
+Preferred UX:
 
-Format:
+```
+/research-and-plan
+```
+
+Type one issue sentence when prompted.
+
+Fallback format:
+
 ```
 /research-and-plan
 SMC_ISSUE: [description of the issue]
 ```
 
-If `SMC_ISSUE:` is missing, respond:
+Normalize both entry paths to one internal payload:
+
+```text
+SMC_ISSUE: [single-line issue description]
+```
+
+If the issue payload is empty, missing, multi-line, or unresolved, respond:
 
 ```
 ERROR: Missing issue description.
@@ -38,7 +51,7 @@ Confirm to the user:
 
 ```
 Workflow locked - State: RESEARCHING
-Copilot editing blocked. Claude Code will implement via Workflow 02.
+Copilot editing blocked. Research only.
 ```
 
 ## Step 3 - Research
@@ -51,45 +64,37 @@ Follow the research contract in `.github/prompts/copilot-research-prompt.md` exa
 
 Save findings to `reports/copilot-research.md` (overwrite if exists).
 
-Update `.smc-workflow-state.json` -> `"state": "PLANNING"`.
+Update `.smc-workflow-state.json` to:
 
-## Step 4 - Plan
-
-Follow the planning contract in `.github/prompts/codex-plan-prompt.md` exactly.
-
-Read `reports/copilot-research.md` as the only input.
-Produce a tight implementation contract.
-
-Save output to `reports/codex-plan.md` (overwrite if exists).
-
-Update `.smc-workflow-state.json` -> `"state": "READY_FOR_IMPLEMENTATION"`.
-
-## Step 5 - Autopush
-
-Run these shell commands in sequence. Do NOT skip any step. Do NOT ask for confirmation.
-
-```bash
-cd "${workspaceFolder}"
-git add reports/copilot-research.md reports/codex-plan.md .smc-workflow-state.json
-git commit -m "chore(pipeline): research and plan - [issue slug]"
-git push
+```json
+{
+  "workflow": "research-and-plan",
+  "state": "PLANNING",
+  "issue": "[the SMC_ISSUE value]",
+  "editing_locked": true
+}
 ```
 
-Report the git output (commit hash + push confirmation).
+## Step 4 - Handoff
 
-The push triggers **Workflow 02** automatically, which runs Claude Code to implement the plan and open a PR.
+Do NOT write `reports/codex-plan.md` yourself.
 
-## Step 6 - Confirm Handoff
+The local `npm run pipeline` runner owns the next two stages:
+
+- Claude hardens `reports/copilot-research.md` into `reports/codex-plan.md`
+- Codex implements from `reports/codex-plan.md`, pushes a branch, and opens a normal PR
+
+## Step 5 - Confirm Handoff
 
 ```
 Pipeline handed off.
 reports/copilot-research.md - saved
-reports/codex-plan.md - saved
-Copilot editing remains locked - Claude Code owns implementation
-Workflow 02 triggered - Claude will implement and open a PR
+Workflow state - PLANNING
+Copilot editing remains locked
+Local pipeline runner should now harden the plan with Claude
+Codex will implement and open a normal PR after the plan is ready
 
-No further action required until merge.
+Do not edit source files or planning artifacts after this point.
 ```
 
-Do NOT perform any source code edits after this point.
 Copilot's role in this issue is complete.

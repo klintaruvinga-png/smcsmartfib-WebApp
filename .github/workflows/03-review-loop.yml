@@ -19,11 +19,18 @@ jobs:
     if: >
       github.event.pull_request.head.repo.full_name == github.repository &&
       (
-        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, 'Severity:')) ||
-        (github.event_name == 'pull_request_review' && contains(github.event.review.body, 'Severity:'))
+        (
+          github.event_name == 'pull_request_review_comment' &&
+          contains(github.event.comment.body, 'Severity:') &&
+          contains(github.event.comment.body, 'Source: Codex')
+        ) ||
+        (
+          github.event_name == 'pull_request_review' &&
+          contains(github.event.review.body, 'Severity:') &&
+          contains(github.event.review.body, 'Source: Codex')
+        )
       )
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
