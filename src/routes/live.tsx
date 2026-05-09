@@ -60,29 +60,19 @@ function LivePage() {
   const pollMs = usePollMs() ?? 2000;
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
   const { watchlist } = useCanonicalWatchlist();
-  if (isLoading || !data) return <div className="text-mute text-sm">Loading radarâ€¦</div>;
+  if (isLoading || !data) return <div className="text-mute text-sm">Loading radar...</div>;
 
-  const mt5Prices = filterItemsByWatchlist(data.prices, watchlist).filter((price) => {
-    // Hard-gate by canonical watchlist order so Account add/remove reflects immediately,
-    // even before the next backend snapshot lands.
-    if (MOCK_MODE && price.source === "mock") return true;
-    if (price.source !== "mt5") {
-      console.debug("[live] skipped non-MT5 price", price.symbol, price.source);
-      return false;
-    }
-    if (price.state !== "live") {
-      console.debug("[live] skipped non-live MT5 price", price.symbol, price.state);
-      return false;
-    }
-    return true;
-  });
+  // Render every watchlist symbol — placeholder cards for symbols missing from
+  // the snapshot prevent the radar flickering 4→2→3 when sparse snapshots
+  // arrive, and keep newly-added symbols visible immediately.
+  const aligned = alignWatchlistItems(data.prices, watchlist);
 
   return (
     <div className="space-y-4">
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Live Radar</h1>
-          <p className="text-xs text-mute mt-0.5">Prices Â· Regime Â· Gate Â· Chop</p>
+          <p className="text-xs text-mute mt-0.5">Prices · Regime · Gate · Chop</p>
         </div>
         <button
           onClick={() => runBatch(undefined)}
@@ -90,27 +80,32 @@ function LivePage() {
           className="flex items-center gap-1.5 rounded border border-bd bg-bg2/60 px-3 py-1.5 text-[11px] font-mono text-dim hover:text-fg hover:border-info/40 disabled:opacity-50 transition-colors"
         >
           <RefreshCw className={cn("h-3 w-3", batchRunning && "animate-spin")} />
-          {batchRunning ? "Refreshingâ€¦" : "Force refresh"}
+          {batchRunning ? "Refreshing..." : "Force refresh"}
         </button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {mt5Prices.length === 0 && (
+        {aligned.length === 0 && (
           <div className="col-span-full py-10 text-center text-sm text-mute">
-            {watchlist.length === 0
-              ? "No watchlist symbols. Add symbols in Account to populate Live Radar."
-              : "No live MT5 prices - verify EA connection and symbol push."}
+            No watchlist symbols. Add symbols in Account to populate Live Radar.
           </div>
         )}
 
-        {mt5Prices.map((price) => {
-          const regime = data.regimes.find((r) => r.symbol === price.symbol);
-          const gate = data.gates.find((g) => g.symbol === price.symbol);
-          const diagnostic = (data.diagnostics ?? []).find((d) => d.symbol === price.symbol);
+        {aligned.map(({ symbol, item: price }) => {
+          const showPending =
+            !price ||
+            (!MOCK_MODE && (price.source !== "mt5" || price.state !== "live")) ||
+            (MOCK_MODE && price.source !== "mock" && price.source !== "mt5");
+          if (showPending) {
+            return <PendingCard key={symbol} symbol={symbol} />;
+          }
+          const regime = data.regimes.find((r) => r.symbol === price!.symbol);
+          const gate = data.gates.find((g) => g.symbol === price!.symbol);
+          const diagnostic = (data.diagnostics ?? []).find((d) => d.symbol === price!.symbol);
           return (
             <PriceCard
-              key={price.symbol}
-              price={price}
+              key={price!.symbol}
+              price={price!}
               regime={regime}
               gate={gate}
               diagnostic={diagnostic}
@@ -119,6 +114,21 @@ function LivePage() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function PendingCard({ symbol }: { symbol: string }) {
+  return (
+    <div className="rounded-lg border border-bd bg-bg1/40 p-3.5 space-y-3 opacity-70">
+      <div className="flex items-center justify-between">
+        <div className="font-mono text-base font-semibold">{symbol}</div>
+        <span className="text-[10px] font-mono uppercase text-mute border border-bd rounded px-1.5 py-0.5">
+          awaiting
+        </span>
+      </div>
+      <div className="font-mono text-2xl font-semibold tabular-nums text-dim">—</div>
+      <div className="text-[10px] font-mono text-mute">Waiting for backend snapshot...</div>
     </div>
   );
 }
