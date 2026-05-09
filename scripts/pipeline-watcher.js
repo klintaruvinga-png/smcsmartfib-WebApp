@@ -54,6 +54,7 @@ function buildObservedKey() {
     statMtime(PLAN_FILE),
     statMtime(PLAN_METADATA_FILE),
     statMtime(STATE_FILE),
+    statMtime(IMPLEMENTATION_FILE),
   ].join(":");
 }
 
@@ -75,6 +76,14 @@ function markReadyForImplementation(state, source) {
     editing_locked: false,
     plan_hardened_at: new Date().toISOString(),
     plan_source: source,
+  });
+}
+
+function markImplementationComplete(state) {
+  writeJson(STATE_FILE, {
+    ...state,
+    state: "IMPLEMENTATION_COMPLETE",
+    implementation_completed_at: new Date().toISOString(),
   });
 }
 
@@ -308,9 +317,26 @@ function runClaudePlanHardening(state) {
   });
 }
 
+function isImplementationAlreadyDone(state) {
+  if (!fs.existsSync(IMPLEMENTATION_FILE)) {
+    return false;
+  }
+  // If the implementation file is newer than when the plan was hardened, Codex already
+  // completed this cycle. Protect against re-runs on every watcher restart.
+  const implMtime = statMtime(IMPLEMENTATION_FILE);
+  const hardened = Date.parse(state.plan_hardened_at ?? "");
+  return Number.isFinite(hardened) && implMtime > hardened;
+}
+
 function runCodexImplementation(state) {
   if (!fs.existsSync(RESEARCH_FILE) || !fs.existsSync(PLAN_FILE)) {
     log("READY_FOR_IMPLEMENTATION requires both research and plan artifacts");
+    return;
+  }
+
+  if (isImplementationAlreadyDone(state)) {
+    log("Codex implementation already complete for this cycle - marking IMPLEMENTATION_COMPLETE");
+    markImplementationComplete(state);
     return;
   }
 
@@ -368,7 +394,8 @@ function runCodexImplementation(state) {
       throw new Error("Codex implementation finished without reports/codex-implementation.md");
     }
 
-    log("Codex implementation run complete");
+    markImplementationComplete(state);
+    log("Codex implementation run complete - state IMPLEMENTATION_COMPLETE");
   });
 }
 
@@ -401,6 +428,12 @@ function evaluatePipeline() {
     }
 
     runCodexImplementation(state);
+    return;
+  }
+
+  if (state.state === "IMPLEMENTATION_COMPLETE") {
+    log("Pipeline cycle complete - waiting for next issue");
+    return;
   }
 }
 
