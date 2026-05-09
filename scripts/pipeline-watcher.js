@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync, execSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -9,6 +10,7 @@ const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.join(__dirname, "..");
 const RESEARCH_FILE = path.join(REPO_ROOT, "reports", "copilot-research.md");
 const PLAN_FILE = path.join(REPO_ROOT, "reports", "codex-plan.md");
+const PLAN_METADATA_FILE = path.join(REPO_ROOT, "reports", "codex-plan.meta.json");
 const IMPLEMENTATION_FILE = path.join(REPO_ROOT, "reports", "codex-implementation.md");
 const STATE_FILE = path.join(REPO_ROOT, ".smc-workflow-state.json");
 // Write-only JSON lock — status field ("running"|"done") determines liveness.
@@ -47,7 +49,12 @@ function statMtime(filePath) {
 }
 
 function buildObservedKey() {
-  return [statMtime(RESEARCH_FILE), statMtime(PLAN_FILE), statMtime(STATE_FILE)].join(":");
+  return [
+    statMtime(RESEARCH_FILE),
+    statMtime(PLAN_FILE),
+    statMtime(PLAN_METADATA_FILE),
+    statMtime(STATE_FILE),
+  ].join(":");
 }
 
 function readJson(filePath) {
@@ -95,12 +102,49 @@ function isUsablePlan(text) {
   return requiredSections.every((section) => text.includes(section));
 }
 
-function hasUsablePlanArtifact() {
-  if (!fs.existsSync(PLAN_FILE)) {
+function hashFile(filePath) {
+  return createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+}
+
+function readPlanMetadata() {
+  if (!fs.existsSync(PLAN_METADATA_FILE)) {
+    return null;
+  }
+
+  try {
+    return readJson(PLAN_METADATA_FILE);
+  } catch {
+    return null;
+  }
+}
+
+function writePlanMetadata(state) {
+  writeJson(PLAN_METADATA_FILE, {
+    issue: state.issue ?? "",
+    research_hash: hashFile(RESEARCH_FILE),
+    written_at: new Date().toISOString(),
+  });
+}
+
+function hasUsablePlanArtifactForState(state) {
+  if (!fs.existsSync(RESEARCH_FILE) || !fs.existsSync(PLAN_FILE)) {
     return false;
   }
 
   try {
+    const metadata = readPlanMetadata();
+    if (!metadata) {
+      return false;
+    }
+
+    if (metadata.issue !== (state.issue ?? "")) {
+      return false;
+    }
+
+    if (metadata.research_hash !== hashFile(RESEARCH_FILE)) {
+      return false;
+    }
+
     return isUsablePlan(fs.readFileSync(PLAN_FILE, "utf8"));
   } catch {
     return false;
@@ -258,6 +302,7 @@ function runClaudePlanHardening(state) {
     }
 
     fs.writeFileSync(PLAN_FILE, `${planText}\n`, "utf8");
+    writePlanMetadata(state);
     markReadyForImplementation(state, "claude");
     log("Claude plan hardening complete - state READY_FOR_IMPLEMENTATION");
   });
@@ -339,8 +384,7 @@ function evaluatePipeline() {
       return;
     }
 
-    const hasUsablePlan = hasUsablePlanArtifact();
-    if (!hasUsablePlan || statMtime(RESEARCH_FILE) > statMtime(PLAN_FILE)) {
+    if (!hasUsablePlanArtifactForState(state)) {
       runClaudePlanHardening(state);
       return;
     }
