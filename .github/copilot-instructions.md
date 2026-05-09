@@ -1,5 +1,41 @@
 # Workflow Governance Rules
 
+## Intake Trigger Check (MANDATORY)
+
+Before deciding whether to edit, inspect the current user message for either of these trigger markers:
+
+- `/research-and-plan`
+- `SMC_ISSUE:`
+
+If either marker is present:
+
+1. Enter intake mode immediately.
+2. Parse the issue text from the message or prompted input.
+3. Validate that the issue payload is:
+   - present
+   - single-line
+   - not an unresolved template token
+4. Create or update `.smc-workflow-state.json` with:
+   - `workflow: "research-and-plan"`
+   - `state: "RESEARCHING"` before research starts
+   - `state: "PLANNING"` after `reports/copilot-research.md` is written
+   - `editing_locked: true` for both states
+5. Produce `reports/copilot-research.md` only.
+6. Do NOT edit source files.
+7. Do NOT write `reports/codex-plan.md`.
+8. Do NOT implement the fix directly.
+9. Do NOT treat the absence of `.smc-workflow-state.json` as permission to patch the issue.
+
+If validation fails, respond with:
+
+```text
+ERROR: Missing issue description.
+Usage: /research-and-plan
+SMC_ISSUE: [describe the issue]
+```
+
+The intake trigger check takes priority over every normal edit path below.
+
 ## Pre-Edit Check (MANDATORY)
 
 Before performing ANY file edit, code generation, apply_patch, or write operation:
