@@ -5,31 +5,47 @@ import { fmtUSC, fmtPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Flame } from "lucide-react";
 
+const PROGRESS_NOT_IMPLEMENTED = true;
+
 export const Route = createFileRoute("/progress")({
-  head: () => ({
-    meta: [
-      { title: "Progress — SMC SuperFIB" },
-      { name: "description", content: "Account pulse, milestones and trading streaks." },
-      { property: "og:title", content: "Progress — SMC SuperFIB" },
-      { property: "og:description", content: "Track milestones and account growth." },
-    ],
-  }),
+  head: () => {
+    const progressDescription = PROGRESS_NOT_IMPLEMENTED
+      ? "Account pulse and drawdown visibility while progress tracking is unavailable."
+      : "Account pulse, milestones and trading streaks.";
+    const progressOgDescription = PROGRESS_NOT_IMPLEMENTED
+      ? "Track account pulse and drawdown visibility."
+      : "Track milestones and account growth.";
+
+    return {
+      meta: [
+        { title: "Progress - SMC SuperFIB" },
+        { name: "description", content: progressDescription },
+        { property: "og:title", content: "Progress - SMC SuperFIB" },
+        { property: "og:description", content: progressOgDescription },
+      ],
+    };
+  },
   component: ProgressPage,
 });
-
-const PROGRESS_NOT_IMPLEMENTED = true;
 
 function ProgressPage() {
   const { data: account } = useUserAccount();
   const { data: risk } = useUserRiskProfile();
   if (!account) return null;
   const ddCap = risk?.ddCapPct ?? 6.0;
+  const progressSubtitle = PROGRESS_NOT_IMPLEMENTED
+    ? "Pulse - equity - drawdown"
+    : "Pulse - streaks - milestones";
+  const streakIconClass = PROGRESS_NOT_IMPLEMENTED ? "h-6 w-6 text-mute" : "h-6 w-6 text-warn";
+  const unavailableNoteClass = PROGRESS_NOT_IMPLEMENTED
+    ? "text-[11px] font-mono text-mute mt-0.5"
+    : "text-[10px] font-mono text-mute mt-0.5";
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Progress</h1>
-        <p className="text-xs text-mute mt-0.5">Pulse · streaks · milestones</p>
+        <p className="text-xs text-mute mt-0.5">{progressSubtitle}</p>
       </div>
 
       {/* Pulse */}
@@ -52,10 +68,10 @@ function ProgressPage() {
         <div className="rounded-lg border border-bd bg-bg1/60 p-4">
           <div className="text-[11px] font-mono uppercase tracking-wider text-mute">Streak</div>
           <div className="flex items-center gap-2 mt-2">
-            <Flame className="h-6 w-6 text-warn" />
+            <Flame className={streakIconClass} />
             <span className="font-mono text-sm font-semibold">Unavailable</span>
           </div>
-          <div className="text-[10px] font-mono text-mute mt-0.5">
+          <div className={unavailableNoteClass}>
             Streak estimates are unavailable until /user/progress is implemented.
           </div>
         </div>
