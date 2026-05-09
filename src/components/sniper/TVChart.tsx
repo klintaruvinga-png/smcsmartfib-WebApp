@@ -10,7 +10,20 @@ import {
 import { fmtPrice } from "@/lib/format";
 import type { Symbol } from "@/types/sniper";
 
-export type FibLevel = { family: string; label: string; price: number };
+export type FibLevel = {
+  family: string;
+  label: string;
+  price: number;
+  role?: "premium" | "equilibrium" | "discount" | "premium-extension" | "discount-extension";
+};
+
+function colorForRole(role: FibLevel["role"], label: string): string {
+  // 50% / equilibrium = neutral gray
+  if (role === "equilibrium" || /(^|\s)50(\.0+)?%?$/.test(label.trim())) return "#9aa6b2";
+  if (role === "discount" || role === "discount-extension") return "#3ecf8e"; // buy = green
+  if (role === "premium" || role === "premium-extension") return "#ef5b5b"; // sell = red
+  return "#9aa6b2";
+}
 
 export function TVChart({
   series,
