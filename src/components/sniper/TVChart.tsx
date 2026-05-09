@@ -95,14 +95,15 @@ export function TVChart({
     chartRef.current = chart;
     seriesRef.current = lineSeries;
 
-    chart.subscribeCrosshairMove(positionLabels);
-    chart.timeScale().subscribeVisibleTimeRangeChange(positionLabels);
-    const container = containerRef.current;
-    const onWheel = () => requestAnimationFrame(positionLabels);
-    container.addEventListener("wheel", onWheel, { passive: true });
+    let rafId = 0;
+    const tick = () => {
+      positionLabels();
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
 
     return () => {
-      container.removeEventListener("wheel", onWheel);
+      cancelAnimationFrame(rafId);
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
