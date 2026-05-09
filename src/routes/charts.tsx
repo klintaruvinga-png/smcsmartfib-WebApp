@@ -1,20 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useBackendReady, useSnapshot, usePollMs } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { fmtPrice, fmtPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+  createChart,
+  LineSeries,
+  type IChartApi,
+  type IPriceLine,
+  type ISeriesApi,
+  type UTCTimestamp,
+} from "lightweight-charts";
 import type { ChartSnapshot, Symbol } from "@/types/sniper";
 import { apiClient } from "@/lib/api/sniperClient";
 
@@ -70,7 +68,7 @@ function ChartsPage() {
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Charts</h1>
-          <p className="text-xs text-mute mt-0.5">Price + Fibonacci overlay</p>
+          <p className="mt-0.5 text-xs text-mute">Price + Fibonacci overlay</p>
         </div>
       </div>
 
@@ -83,7 +81,7 @@ function ChartsPage() {
               "rounded border px-2.5 py-1 text-xs font-mono transition-colors",
               p.symbol === activeSymbol
                 ? "border-accent/60 bg-accent/15 text-accent"
-                : "border-bd bg-bg2/40 text-mute hover:text-dim hover:border-bd2",
+                : "border-bd bg-bg2/40 text-mute hover:border-bd2 hover:text-dim",
             )}
           >
             {p.symbol}
@@ -145,116 +143,162 @@ function TVChart({
   fibs: FibLevel[];
   symbol: Symbol | string;
 }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const priceLinesRef = useRef<IPriceLine[]>([]);
+
   const precision = useMemo(() => {
     const sample = fmtPrice(1, symbol);
     const dot = sample.indexOf(".");
     return dot >= 0 ? sample.length - dot - 1 : 2;
   }, [symbol]);
-  const data = useMemo(() => {
-    const points = new Map<number, number>();
-    for (const pt of series) {
-      const sec = Math.floor(pt.t / 1000);
-      if (!Number.isFinite(sec) || !Number.isFinite(pt.p)) continue;
-      points.set(sec, pt.p);
-    }
-    return Array.from(points.entries())
-      .sort((a, b) => a[0] - b[0])
-      .map(([time, value]) => ({ time, value }));
-  }, [series]);
-  const yDomain = useMemo(() => {
-    const values = [...data.map((point) => point.value), ...fibs.map((fib) => fib.price)].filter(
-      (value) => Number.isFinite(value),
-    );
-    if (values.length === 0) return ["auto", "auto"] as const;
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const spread = max - min || Math.max(Math.abs(max) * 0.0025, Math.pow(10, -precision));
-    const padding = Math.max(spread * 0.12, Math.pow(10, -precision));
-    return [min - padding, max + padding] as const;
-  }, [data, fibs, precision]);
 
-  const formatAxisTime = (time: number) =>
-    new Date(time * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const formatTooltipTime = (time: number) =>
-    new Date(time * 1000).toLocaleString([], {
-      month: "short",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
+  function positionLabels() {
+    const seriesApi = seriesRef.current;
+    const overlay = overlayRef.current;
+    if (!seriesApi || !overlay) return;
+
+    for (const el of Array.from(overlay.children) as HTMLDivElement[]) {
+      const price = parseFloat(el.dataset.price ?? "0");
+      const y = seriesApi.priceToCoordinate(price);
+      if (y == null) {
+        el.style.display = "none";
+      } else {
+        el.style.display = "block";
+        el.style.top = `${y - 8}px`;
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const chart = createChart(containerRef.current, {
+      layout: {
+        background: { color: "transparent" },
+        textColor: "#9cb0c9",
+        fontFamily: "JetBrains Mono",
+        fontSize: 10,
+      },
+      grid: {
+        vertLines: { color: "rgba(164,191,223,0.08)" },
+        horzLines: { color: "rgba(164,191,223,0.08)" },
+      },
+      rightPriceScale: {
+        borderColor: "rgba(164,191,223,0.24)",
+        scaleMargins: { top: 0.1, bottom: 0.1 },
+      },
+      timeScale: {
+        borderColor: "rgba(164,191,223,0.24)",
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      crosshair: { mode: 1 },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: true,
+      },
+      handleScale: {
+        axisPressedMouseMove: { time: true, price: true },
+        mouseWheel: true,
+        pinch: true,
+      },
+      autoSize: true,
     });
+
+    const lineSeries = chart.addSeries(LineSeries, {
+      color: "#59a8ff",
+      lineWidth: 2,
+      priceFormat: { type: "price", precision, minMove: Math.pow(10, -precision) },
+    });
+
+    chartRef.current = chart;
+    seriesRef.current = lineSeries;
+
+    chart.subscribeCrosshairMove(positionLabels);
+    chart.timeScale().subscribeVisibleTimeRangeChange(positionLabels);
+    chart
+      .priceScale("right")
+      .subscribeVisiblePriceRangeChange(() => requestAnimationFrame(positionLabels));
+
+    const container = containerRef.current;
+    const onWheel = () => requestAnimationFrame(positionLabels);
+    container.addEventListener("wheel", onWheel, { passive: true });
+
+    return () => {
+      container.removeEventListener("wheel", onWheel);
+      chart.remove();
+      chartRef.current = null;
+      seriesRef.current = null;
+      priceLinesRef.current = [];
+    };
+  }, [precision]);
+
+  useEffect(() => {
+    const seriesApi = seriesRef.current;
+    if (!seriesApi) return;
+
+    const data = Array.from(
+      series.reduce((points, pt) => {
+        const sec = Math.floor(pt.t / 1000);
+        if (!Number.isFinite(sec) || !Number.isFinite(pt.p)) return points;
+        points.set(sec, pt.p);
+        return points;
+      }, new Map<number, number>()).entries(),
+    )
+      .sort((a, b) => a[0] - b[0])
+      .map(([time, value]) => ({ time: time as UTCTimestamp, value }));
+
+    seriesApi.setData(data);
+    requestAnimationFrame(positionLabels);
+  }, [series]);
+
+  useEffect(() => {
+    const seriesApi = seriesRef.current;
+    const overlay = overlayRef.current;
+    if (!seriesApi || !overlay) return;
+
+    for (const line of priceLinesRef.current) {
+      seriesApi.removePriceLine(line);
+    }
+
+    priceLinesRef.current = fibs.map((fib) =>
+      seriesApi.createPriceLine({
+        price: fib.price,
+        color: "#d8a35d",
+        lineWidth: 1,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        title: "",
+      }),
+    );
+
+    overlay.innerHTML = "";
+    for (const fib of fibs) {
+      const el = document.createElement("div");
+      el.dataset.price = String(fib.price);
+      el.style.cssText =
+        "position:absolute;left:4px;font-size:9px;font-family:'JetBrains Mono',monospace;" +
+        "color:#d8a35d;pointer-events:none;white-space:nowrap;line-height:16px;";
+      el.textContent = fib.label;
+      overlay.appendChild(el);
+    }
+
+    positionLabels();
+  }, [fibs]);
 
   return (
     <div className="-mx-2">
-      <div className="h-[360px] w-full px-2">
-        {data.length === 0 ? (
-          <div className="flex h-full items-center justify-center rounded border border-dashed border-bd text-sm text-mute">
-            No candle data returned for this symbol yet.
-          </div>
-        ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 8, right: 12, bottom: 8, left: 0 }}>
-              <CartesianGrid stroke="rgba(164,191,223,0.08)" vertical={false} />
-              <XAxis
-                dataKey="time"
-                minTickGap={32}
-                tick={{ fill: "#7f93ab", fontSize: 10, fontFamily: "JetBrains Mono" }}
-                tickFormatter={formatAxisTime}
-                tickLine={false}
-                axisLine={{ stroke: "rgba(164,191,223,0.18)" }}
-              />
-              <YAxis
-                domain={yDomain}
-                orientation="right"
-                width={82}
-                tick={{ fill: "#7f93ab", fontSize: 10, fontFamily: "JetBrains Mono" }}
-                tickFormatter={(value: number) => fmtPrice(value, symbol)}
-                tickLine={false}
-                axisLine={{ stroke: "rgba(164,191,223,0.18)" }}
-              />
-              <Tooltip
-                separator="  "
-                contentStyle={{
-                  backgroundColor: "rgba(11, 20, 32, 0.96)",
-                  border: "1px solid rgba(164,191,223,0.18)",
-                  borderRadius: "8px",
-                  color: "#d7e3f4",
-                  fontFamily: "JetBrains Mono",
-                  fontSize: "11px",
-                }}
-                formatter={(value: number) => [fmtPrice(value, symbol), "Price"]}
-                labelFormatter={(value: number) => formatTooltipTime(value)}
-              />
-              {fibs.map((fib) => (
-                <ReferenceLine
-                  key={`${fib.family}-${fib.label}`}
-                  y={fib.price}
-                  stroke="#d8a35d"
-                  strokeDasharray="4 4"
-                  strokeOpacity={0.75}
-                  ifOverflow="extendDomain"
-                  label={{
-                    value: fib.label,
-                    position: "insideTopLeft",
-                    fill: "#d8a35d",
-                    fontSize: 10,
-                    fontFamily: "JetBrains Mono",
-                  }}
-                />
-              ))}
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke="#59a8ff"
-                strokeWidth={2}
-                dot={false}
-                isAnimationActive={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        )}
+      <div className="relative h-[360px] w-full">
+        <div ref={containerRef} className="h-full w-full" />
+        <div ref={overlayRef} className="pointer-events-none absolute inset-0 overflow-hidden" />
       </div>
       <div className="mt-1 px-2 font-mono text-[10px] text-mute">
-        Backend-authoritative close series with live fib overlays
+        Drag to pan / Scroll to zoom / Drag axes to scale
       </div>
     </div>
   );
