@@ -22,7 +22,7 @@ Do NOT proceed without it.
 
 ## Step 2 — Create Workflow Lock
 
-Create `.smc-workflow-state.json` in the repository root with this exact content:
+Create `.smc-workflow-state.json` in the repository root:
 
 ```json
 {
@@ -34,58 +34,62 @@ Create `.smc-workflow-state.json` in the repository root with this exact content
 }
 ```
 
-Confirm creation to the user:
+Confirm to the user:
 
 ```
-🔒 Workflow locked.
-State: RESEARCHING
-All file edits are blocked until unlock.
+🔒 Workflow locked — State: RESEARCHING
+Copilot editing blocked. Claude Code will implement via Workflow 02.
 ```
 
-## Step 3 — Perform Research Only
+## Step 3 — Research
 
-- Analyze the codebase relevant to the stated issue
+Follow the research contract in `.github/prompts/copilot-research-prompt.md` exactly.
+
 - Read files, trace logic, identify root causes
-- DO NOT edit any files
-- DO NOT generate patches
-- DO NOT write implementation code
+- DO NOT edit any source files
+- DO NOT generate patches or implementation code
 
-## Step 4 — Output Research Artifact
+Save findings to `reports/copilot-research.md` (overwrite if exists).
 
-Create `copilot-research.md` in the repository root containing:
+Update `.smc-workflow-state.json` → `"state": "PLANNING"`.
 
-- Issue summary
-- Affected files and line ranges
-- Root cause analysis
-- Proposed fix approach (plain English, no code)
-- Open questions for Codex/Claude verification
+## Step 4 — Plan
 
-## Step 5 — Update State
+Follow the planning contract in `.github/prompts/codex-plan-prompt.md` exactly.
 
-Update `.smc-workflow-state.json`:
+Read `reports/copilot-research.md` as the only input.
+Produce a tight implementation contract.
 
-```json
-{
-  "workflow": "research-and-plan",
-  "state": "PLANNING",
-  "issue": "[same issue]",
-  "editing_locked": true,
-  "research_complete": true
-}
+Save output to `reports/codex-plan.md` (overwrite if exists).
+
+Update `.smc-workflow-state.json` → `"state": "READY_FOR_IMPLEMENTATION"`.
+
+## Step 5 — Autopush
+
+Run these shell commands in sequence. Do NOT skip any step. Do NOT ask for confirmation.
+
+```bash
+cd "${workspaceFolder}"
+git add reports/copilot-research.md reports/codex-plan.md .smc-workflow-state.json
+git commit -m "chore(pipeline): research and plan — [issue slug]"
+git push
 ```
 
-## Step 6 — Handoff
+Report the git output (commit hash + push confirmation).
 
-Respond:
+The push triggers **Workflow 02** automatically, which runs Claude Code to implement the plan and open a PR.
+
+## Step 6 — Confirm Handoff
 
 ```
-✅ Research complete.
-📄 copilot-research.md created.
-🔒 Editing remains locked.
+✅ Pipeline handed off.
+📄 reports/copilot-research.md — saved
+📄 reports/codex-plan.md — saved
+🔒 Copilot editing remains locked — Claude Code owns implementation
+🚀 Workflow 02 triggered — Claude will implement and open a PR
 
-Next: Hand copilot-research.md to Codex for verification.
-After Codex creates codex-plan.md, run:
-/unlock-implementation
+No further action required until merge.
 ```
 
-DO NOT perform any edits after this point.
+DO NOT perform any source code edits after this point.
+Copilot's role in this issue is complete.

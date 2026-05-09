@@ -1,4 +1,4 @@
-name: 02 - Implementation Artifact Transport
+name: 02 - Implementation
 
 on:
   push:
@@ -6,29 +6,50 @@ on:
       - reports/codex-plan.md
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
 concurrency:
-  group: implementation-transport-${{ github.ref }}
+  group: implementation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  transport:
+  implement:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
 
-      - name: Validate implementation artifact
-        run: test -f reports/codex-plan.md
+      - name: Validate artifacts
+        run: |
+          test -f reports/copilot-research.md || (echo "❌ Missing reports/copilot-research.md" && exit 1)
+          test -f reports/codex-plan.md       || (echo "❌ Missing reports/codex-plan.md"       && exit 1)
 
-      - name: Upload implementation artifact
+      - name: Upload plan artifact
         uses: actions/upload-artifact@v4
         with:
           name: codex-plan-${{ github.sha }}
           path: reports/codex-plan.md
           if-no-files-found: error
           retention-days: 14
+
+      - name: Load implementation prompt
+        id: prompt
+        run: |
+          {
+            echo 'prompt<<EOF'
+            cat .github/prompts/claude-implement-prompt.md
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run Claude implementation
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GH_PAT }}
+          prompt: ${{ steps.prompt.outputs.prompt }}
+          claude_args: "--max-turns 10"
