@@ -24,7 +24,7 @@ const CODEX_IMPLEMENT_PROMPT_FILE = path.join(
 );
 const CODEX_OUTPUT_FILE = path.join(REPO_ROOT, "reports", "codex-last-message.txt");
 const POLL_INTERVAL_MS = 5000;
-const CLAUDE_TIMEOUT_MS = 300000;
+const CLAUDE_TIMEOUT_MS = 900000; // 15 min — larger research reports need more time
 const CODEX_TIMEOUT_MS = 900000;
 const LOCK_STALE_MS = 30 * 60 * 1000;
 
@@ -257,7 +257,12 @@ function runCodexImplementation(state) {
         cwd: REPO_ROOT,
         shell: true,
         timeout: CODEX_TIMEOUT_MS,
-        stdio: ["pipe", "pipe", "pipe"],
+        // stdin: "ignore" — the shell handles stdin via the < redirect in cmd.
+        // stdout/stderr: "inherit" — Codex output streams directly to the
+        // watcher's inherited log file descriptors (set by start-pipeline-runner.js
+        // to logFd). This avoids buffering all output in memory, which would
+        // hit Node's default execSync maxBuffer limit on verbose Codex runs.
+        stdio: ["ignore", "inherit", "inherit"],
       });
     } finally {
       try { fs.unlinkSync(promptFile); } catch { /* ignore */ }
