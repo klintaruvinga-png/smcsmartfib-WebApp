@@ -2207,6 +2207,17 @@ final class SMC_SuperFib_Sniper_REST {
         return preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $symbol));
     }
 
+    private function map_symbol_aliases($symbol) {
+        static $aliases = array(
+            'NASDAQ' => 'NAS100',
+            'US TECH 100' => 'NAS100',
+            'USTECH100' => 'NAS100',
+            // Add more aliases as needed
+        );
+        $upper = strtoupper(trim((string) $symbol));
+        return isset($aliases[$upper]) ? $aliases[$upper] : $symbol;
+    }
+
     private function reference_mid_from_market($market_mids, $symbol) {
         $key = $this->normalize_symbol_token($symbol);
         return isset($market_mids[$key]) ? (float) $market_mids[$key] : 0.0;
@@ -3240,6 +3251,7 @@ final class SMC_SuperFib_Sniper_REST {
             // CRYPTO — contract sizes vary by broker; defaults use $1/point/lot
             'BTCUSD' => array('type' => 'crypto', 'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
             'ETHUSD' => array('type' => 'crypto', 'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
+            'SOLUSD' => array('type' => 'crypto', 'pip_size' => 0.01,   'contract_size' => 1, 'pip_val' => 1.0),
         );
         return $specs;
     }
@@ -3251,7 +3263,8 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function is_supported_symbol($symbol) {
-        $key = $this->normalize_symbol_token($symbol);
+        $mapped = $this->map_symbol_aliases($symbol);
+        $key = $this->normalize_symbol_token($mapped);
         $specs = $this->instrument_specs();
         return isset($specs[$key]);
     }
@@ -3282,7 +3295,8 @@ final class SMC_SuperFib_Sniper_REST {
         }
         $out = array();
         foreach ($symbols as $symbol) {
-            $clean = $this->normalize_symbol_token($symbol);
+            $mapped = $this->map_symbol_aliases($symbol);
+            $clean = $this->normalize_symbol_token($mapped);
             // Reject empty strings and suspiciously long tokens (longest real symbol is ~10 chars).
             if ($clean === '' || strlen($clean) > 12) {
                 continue;
