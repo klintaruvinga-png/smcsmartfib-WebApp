@@ -9,7 +9,6 @@ import {
   usePollMs,
   useCanonicalWatchlist,
   alignWatchlistItems,
-  filterItemsByWatchlist,
 } from "@/hooks/useSniperData";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { useStreamingTicks } from "@/hooks/useStreamingTicks";
