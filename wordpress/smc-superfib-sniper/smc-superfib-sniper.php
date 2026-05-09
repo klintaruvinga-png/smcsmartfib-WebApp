@@ -131,7 +131,9 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     public static function deactivate(): void {
+        // Clear any pending/recurrent prune events so deactivation does not leave orphaned cron jobs.
         wp_clear_scheduled_hook('smc_sf_prune_tables');
+        wp_unschedule_hook('smc_sf_prune_tables');
     }
 
     public static function activate() {
@@ -3502,4 +3504,3 @@ register_activation_hook(__FILE__, array('SMC_SuperFib_Sniper_REST', 'activate')
 register_deactivation_hook(__FILE__, array('SMC_SuperFib_Sniper_REST', 'deactivate'));
 
 add_action('plugins_loaded', array('SMC_SuperFib_Sniper_REST', 'boot'));
-
