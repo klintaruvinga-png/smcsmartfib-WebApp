@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ConvertFrom-Json *)",
+      "Bash(ConvertTo-Json *)",
+      "Bash(Set-Content *)",
+      "Bash(Get-Content *)",
+      "Bash(npm run pipeline:start)",
+      "Bash(npm run pipeline:start *)"
+    ]
+  }
+}

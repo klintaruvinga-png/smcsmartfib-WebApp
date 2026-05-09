@@ -51,7 +51,10 @@ function buildObservedKey() {
 }
 
 function readJson(filePath) {
-  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  // PowerShell's Set-Content -Encoding UTF8 writes a UTF-8 BOM on Windows.
+  // Strip it before parsing so the watcher never fails on Copilot-written files.
+  const raw = fs.readFileSync(filePath, "utf8").replace(/^﻿/, "");
+  return JSON.parse(raw);
 }
 
 function writeJson(filePath, value) {
