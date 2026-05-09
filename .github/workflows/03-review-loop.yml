@@ -1,7 +1,10 @@
 name: 03 - Autonomous Review Loop
 
 on:
-  workflow_dispatch:
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
 
 permissions:
   contents: write

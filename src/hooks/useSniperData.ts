@@ -4,7 +4,7 @@ import type { DashboardSettings, Symbol, SymbolDiagnostic, TradePlan } from "@/t
 
 const DEFAULT_POLL_MS = 2_000;
 
-function useBackendReady() {
+export function useBackendReady() {
   const { data } = useUserSettings();
   return Boolean(data?.backendUrl);
 }
