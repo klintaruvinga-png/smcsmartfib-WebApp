@@ -10,7 +10,20 @@ import {
 import { fmtPrice } from "@/lib/format";
 import type { Symbol } from "@/types/sniper";
 
-export type FibLevel = { family: string; label: string; price: number };
+export type FibLevel = {
+  family: string;
+  label: string;
+  price: number;
+  role?: "premium" | "equilibrium" | "discount" | "premium-extension" | "discount-extension";
+};
+
+function colorForRole(role: FibLevel["role"], label: string): string {
+  // 50% / equilibrium = neutral gray
+  if (role === "equilibrium" || /(^|\s)50(\.0+)?%?$/.test(label.trim())) return "#9aa6b2";
+  if (role === "discount" || role === "discount-extension") return "#3ecf8e"; // buy = green
+  if (role === "premium" || role === "premium-extension") return "#ef5b5b"; // sell = red
+  return "#9aa6b2";
+}
 
 export function TVChart({
   series,
@@ -44,7 +57,8 @@ export function TVChart({
         el.style.display = "none";
       } else {
         el.style.display = "block";
-        el.style.top = `${y - 8}px`;
+        // Place label fully above the price line so the dotted line never crosses the text
+        el.style.top = `${y - 18}px`;
       }
     }
   }
@@ -141,25 +155,28 @@ export function TVChart({
       seriesApi.removePriceLine(line);
     }
 
-    priceLinesRef.current = fibs.map((fib) =>
-      seriesApi.createPriceLine({
+    priceLinesRef.current = fibs.map((fib) => {
+      const color = colorForRole(fib.role, fib.label);
+      return seriesApi.createPriceLine({
         price: fib.price,
-        color: "#d8a35d",
+        color,
         lineWidth: 1,
         lineStyle: 2,
         axisLabelVisible: true,
         title: "",
-      }),
-    );
+      });
+    });
 
     overlay.innerHTML = "";
     for (const fib of fibs) {
+      const color = colorForRole(fib.role, fib.label);
       const el = document.createElement("div");
       el.dataset.price = String(fib.price);
       el.style.cssText =
-        "position:absolute;right:60px;font-size:10px;font-family:'JetBrains Mono',monospace;" +
-        "color:#d8a35d;pointer-events:none;white-space:nowrap;line-height:16px;" +
-        "background:rgba(15,20,28,0.75);padding:1px 4px;border-radius:2px;";
+        `position:absolute;right:60px;font-size:10px;font-family:'JetBrains Mono',monospace;` +
+        `color:${color};pointer-events:none;white-space:nowrap;line-height:14px;` +
+        `background:rgba(15,20,28,0.85);padding:1px 5px;border-radius:2px;` +
+        `border:1px solid ${color}55;`;
       el.textContent = `${fib.family} ${fib.label} @ ${fmtPrice(fib.price, symbol)}`;
       overlay.appendChild(el);
     }
