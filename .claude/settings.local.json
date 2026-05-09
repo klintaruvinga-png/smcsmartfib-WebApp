@@ -6,7 +6,10 @@
       "Bash(git restore *)",
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
-      "Bash(gh pr *)"
+      "Bash(gh pr *)",
+      "Bash(del \"C:\\\\Users\\\\LEONNA\\\\OneDrive\\\\All Final Softwares\\\\SMC SuperFib Dashboard\\\\smcsmartfib-WebApp\\\\reports\\\\.pipeline-running\")",
+      "PowerShell(if \\($env:ANTHROPIC_API_KEY\\) { \"Key is set \\(length: $\\($env:ANTHROPIC_API_KEY.Length\\)\\)\" } else { \"ANTHROPIC_API_KEY is NOT set in this shell\" })",
+      "Read(//mnt/c/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/**)"
     ]
   }
 }

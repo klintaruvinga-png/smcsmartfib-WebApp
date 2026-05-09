@@ -33,3 +33,15 @@ dist-ssr
 
 # Workflow state (runtime only)
 .smc-workflow-state.json
+
+# Pipeline runner runtime artifacts (never commit)
+reports/.pipeline-lock.json
+reports/.pipeline-lock.json.done
+reports/.pipeline-lock.json.old
+reports/.pipeline-running
+reports/.pipeline-runner.pid
+reports/pipeline-runner.log
+reports/codex-prompt.tmp.md
+reports/codex-last-message.txt
+reports/review-event.json
+reports/codex-review.json
