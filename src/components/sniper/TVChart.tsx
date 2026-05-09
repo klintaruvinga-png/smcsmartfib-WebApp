@@ -155,25 +155,28 @@ export function TVChart({
       seriesApi.removePriceLine(line);
     }
 
-    priceLinesRef.current = fibs.map((fib) =>
-      seriesApi.createPriceLine({
+    priceLinesRef.current = fibs.map((fib) => {
+      const color = colorForRole(fib.role, fib.label);
+      return seriesApi.createPriceLine({
         price: fib.price,
-        color: "#d8a35d",
+        color,
         lineWidth: 1,
         lineStyle: 2,
         axisLabelVisible: true,
         title: "",
-      }),
-    );
+      });
+    });
 
     overlay.innerHTML = "";
     for (const fib of fibs) {
+      const color = colorForRole(fib.role, fib.label);
       const el = document.createElement("div");
       el.dataset.price = String(fib.price);
       el.style.cssText =
-        "position:absolute;right:60px;font-size:10px;font-family:'JetBrains Mono',monospace;" +
-        "color:#d8a35d;pointer-events:none;white-space:nowrap;line-height:16px;" +
-        "background:rgba(15,20,28,0.75);padding:1px 4px;border-radius:2px;";
+        `position:absolute;right:60px;font-size:10px;font-family:'JetBrains Mono',monospace;` +
+        `color:${color};pointer-events:none;white-space:nowrap;line-height:14px;` +
+        `background:rgba(15,20,28,0.85);padding:1px 5px;border-radius:2px;` +
+        `border:1px solid ${color}55;`;
       el.textContent = `${fib.family} ${fib.label} @ ${fmtPrice(fib.price, symbol)}`;
       overlay.appendChild(el);
     }
