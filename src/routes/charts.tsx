@@ -237,6 +237,8 @@ function TVChart({
       .sort((a, b) => a[0] - b[0])
       .map(([t, p]) => ({ time: t as UTCTimestamp, value: p }));
     s.setData(data);
+    // Autoscale may shift price lines after data refresh; realign overlay labels
+    requestAnimationFrame(positionLabels);
   }, [series]);
 
   // update fib lines
