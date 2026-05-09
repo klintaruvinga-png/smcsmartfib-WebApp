@@ -4,7 +4,7 @@ import {
   useEngineBatch,
   usePollMs,
   useCanonicalWatchlist,
-  filterItemsByWatchlist,
+  alignWatchlistItems,
 } from "@/hooks/useSniperData";
 import { useStreamingTicks } from "@/hooks/useStreamingTicks";
 import { useTickFlash } from "@/hooks/useTickFlash";
