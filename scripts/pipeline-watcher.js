@@ -23,6 +23,9 @@ const CODEX_OUTPUT_FILE = path.join(REPO_ROOT, "reports", "codex-last-message.tx
 const POLL_INTERVAL_MS = 5000;
 const CLAUDE_TIMEOUT_MS = 300000;
 const CODEX_TIMEOUT_MS = 900000;
+const LOCK_RETRY_MS = 250;
+const LOCK_RETRY_COUNT = 8;
+const LOCK_STALE_MS = 30 * 60 * 1000;
 
 let lastObservedKey = null;
 
@@ -76,8 +79,54 @@ function slugifyIssue(issue) {
     .slice(0, 48);
 }
 
+function canSignalPid(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readLockState() {
+  if (!fs.existsSync(LOCK_FILE)) {
+    return null;
+  }
+
+  try {
+    return readJson(LOCK_FILE);
+  } catch {
+    return null;
+  }
+}
+
+function isLockStale(lockState) {
+  if (!lockState) {
+    return true;
+  }
+
+  const startedAt = Date.parse(lockState.started_at ?? "");
+  if (Number.isFinite(startedAt) && Date.now() - startedAt > LOCK_STALE_MS) {
+    return true;
+  }
+
+  if (typeof lockState.pid === "number" && !canSignalPid(lockState.pid)) {
+    return true;
+  }
+
+  return false;
+}
+
 function withPipelineLock(label, fn) {
   ensureReportsDir();
+
+  if (fs.existsSync(LOCK_FILE)) {
+    const lockState = readLockState();
+    if (isLockStale(lockState)) {
+      log("Removing stale pipeline lock");
+      clearLockFile();
+    }
+  }
 
   if (fs.existsSync(LOCK_FILE)) {
     log("Pipeline already running - skipping trigger");
@@ -85,14 +134,41 @@ function withPipelineLock(label, fn) {
   }
 
   try {
-    fs.writeFileSync(LOCK_FILE, `${label} ${new Date().toISOString()}\n`, "utf8");
+    writeJson(LOCK_FILE, {
+      label,
+      pid: process.pid,
+      started_at: new Date().toISOString(),
+    });
     fn();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     log(`${label} error: ${message}`);
   } finally {
-    if (fs.existsSync(LOCK_FILE)) {
+    clearLockFile();
+  }
+}
+
+function sleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function clearLockFile() {
+  for (let attempt = 1; attempt <= LOCK_RETRY_COUNT; attempt += 1) {
+    try {
+      if (!fs.existsSync(LOCK_FILE)) {
+        return;
+      }
+
       fs.unlinkSync(LOCK_FILE);
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (attempt === LOCK_RETRY_COUNT) {
+        log(`Unable to remove pipeline lock file after retries: ${message}`);
+        return;
+      }
+
+      sleep(LOCK_RETRY_MS);
     }
   }
 }
@@ -115,16 +191,18 @@ function runClaudePlanHardening(state) {
 
   withPipelineLock("claude-plan-hardening", () => {
     log("PLANNING detected - running Claude plan hardening");
-    execFileSync("claude", ["--print", prompt], {
+    const output = execFileSync("claude", ["--print", prompt], {
       cwd: REPO_ROOT,
-      stdio: "inherit",
+      encoding: "utf8",
       timeout: CLAUDE_TIMEOUT_MS,
     });
 
-    if (!fs.existsSync(PLAN_FILE)) {
-      throw new Error("Claude plan hardening finished without reports/codex-plan.md");
+    const planText = output.trim();
+    if (!planText) {
+      throw new Error("Claude plan hardening returned an empty plan");
     }
 
+    fs.writeFileSync(PLAN_FILE, `${planText}\n`, "utf8");
     writeJson(STATE_FILE, {
       ...state,
       state: "READY_FOR_IMPLEMENTATION",

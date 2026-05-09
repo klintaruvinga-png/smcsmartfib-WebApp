@@ -76,6 +76,12 @@ Do not write `reports/codex-plan.md`.
 Do not implement code.
 Do not stage or commit any files.
 
+Start or confirm the detached local pipeline runner:
+
+```bash
+npm run pipeline:start
+```
+
 ---
 
 ## STEP 4 - FINAL RESPONSE
@@ -87,6 +93,7 @@ Workflow locked - State: PLANNING
 Issue: [normalized SMC_ISSUE value]
 reports/copilot-research.md - saved
 Copilot intake complete
+Local pipeline runner started or already active
 Local pipeline runner now owns:
 1. Claude plan hardening -> reports/codex-plan.md
 2. Codex implementation -> branch + normal PR

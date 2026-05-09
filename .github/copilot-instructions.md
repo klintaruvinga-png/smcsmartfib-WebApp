@@ -21,10 +21,11 @@ If either marker is present:
    - `state: "PLANNING"` after `reports/copilot-research.md` is written
    - `editing_locked: true` for both states
 5. Produce `reports/copilot-research.md` only.
-6. Do NOT edit source files.
-7. Do NOT write `reports/codex-plan.md`.
-8. Do NOT implement the fix directly.
-9. Do NOT treat the absence of `.smc-workflow-state.json` as permission to patch the issue.
+6. Start or confirm the detached local runner with `npm run pipeline:start`.
+7. Do NOT edit source files.
+8. Do NOT write `reports/codex-plan.md`.
+9. Do NOT implement the fix directly.
+10. Do NOT treat the absence of `.smc-workflow-state.json` as permission to patch the issue.
 
 If validation fails, respond with:
 
