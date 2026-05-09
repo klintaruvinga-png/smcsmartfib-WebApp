@@ -210,6 +210,8 @@ function TVChart({
     // Reposition overlay labels whenever the visible range or crosshair changes
     chart.subscribeCrosshairMove(positionLabels);
     chart.timeScale().subscribeVisibleTimeRangeChange(positionLabels);
+    // Also reposition when the price axis is dragged (axisPressedMouseMove.price)
+    chart.priceScale("right").subscribeVisiblePriceRangeChange(() => requestAnimationFrame(positionLabels));
     const container = containerRef.current;
     const onWheel = () => requestAnimationFrame(positionLabels);
     container.addEventListener("wheel", onWheel, { passive: true });
