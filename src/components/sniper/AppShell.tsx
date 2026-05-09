@@ -7,7 +7,7 @@ import {
   useSession,
   useUserSettings,
   usePollMs,
-  useWatchlist,
+  useCanonicalWatchlist,
 } from "@/hooks/useSniperData";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { useStreamingTicks } from "@/hooks/useStreamingTicks";
@@ -112,8 +112,7 @@ function HeaderTickerItem({ price, pollMs }: { price: PairPrice; pollMs: number 
 function HeaderTicker() {
   const { data } = useSnapshot();
   const pollMs = usePollMs() ?? 2000;
-  const watchlist = useWatchlist();
-  const watchlistSet = useMemo(() => new Set<string>(watchlist), [watchlist]);
+  const { watchlistSet } = useCanonicalWatchlist();
   // Treat the header strip as authoritative live market data, not a generic cache view.
   // Hard-gate by canonical watchlist so add/remove in Account reflects immediately.
   const items = (data?.prices ?? []).filter(

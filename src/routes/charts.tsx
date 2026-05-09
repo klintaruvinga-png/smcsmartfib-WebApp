@@ -1,7 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useBackendReady, useSnapshot, usePollMs, useWatchlist } from "@/hooks/useSniperData";
+import {
+  useBackendReady,
+  useSnapshot,
+  usePollMs,
+  useCanonicalWatchlist,
+} from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { fmtPrice, fmtPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -25,11 +30,10 @@ function ChartsPage() {
   const { data } = useSnapshot();
   const backendReady = useBackendReady();
   const pollMs = usePollMs();
-  const watchlist = useWatchlist();
+  const { watchlist, watchlistSet } = useCanonicalWatchlist();
   const [selected, setSelected] = useState<Symbol | null>(null);
 
   const prices = useMemo(() => data?.prices ?? [], [data?.prices]);
-  const watchlistSet = useMemo(() => new Set<string>(watchlist), [watchlist]);
   const pricesBySymbol = useMemo(
     () => new Map(prices.map((price) => [price.symbol, price])),
     [prices],

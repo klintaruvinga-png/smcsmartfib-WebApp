@@ -3,7 +3,7 @@ import {
   useEngineHealth,
   useEngineBatch,
   useLiveSignals,
-  useWatchlist,
+  useCanonicalWatchlist,
 } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { VerdictBadge } from "@/components/sniper/VerdictBadge";
@@ -17,12 +17,15 @@ import type { EngineBlocker, FreshnessState } from "@/types/sniper";
 export const Route = createFileRoute("/signals")({
   head: () => ({
     meta: [
-      { title: "Signal Engine — SMC SuperFIB" },
+      { title: "Signal Engine \u2014 SMC SuperFIB" },
       {
         name: "description",
         content: "Engine readiness checklist and live signal candidates with backend confirmation.",
       },
-      { property: "og:title", content: "Signal Engine — SMC SuperFIB" },
+      {
+        property: "og:title",
+        content: "Signal Engine \u2014 SMC SuperFIB",
+      },
       { property: "og:description", content: "Engine health and live candidate signals." },
     ],
   }),
@@ -50,9 +53,8 @@ function SignalsPage() {
   const { data: signals } = useLiveSignals();
   const { data: h } = useEngineHealth();
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
-  const watchlist = useWatchlist();
+  const { watchlist, watchlistSet } = useCanonicalWatchlist();
   const [watchlistOnly, setWatchlistOnly] = useState(true);
-  const watchlistSet = new Set<string>(watchlist);
 
   // Deduplicate signals by ID and preserve backend unconfirmed candidates so the UI reflects
   // actual engine output, even when some candidates are still waiting on backend confirmation.
@@ -111,7 +113,7 @@ function SignalsPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Signal Engine</h1>
           <p className="text-xs text-mute mt-0.5">
-            Readiness · candidate flow · backend confirmation
+            {"Readiness \u00B7 candidate flow \u00B7 backend confirmation"}
           </p>
         </div>
         <button
@@ -120,7 +122,7 @@ function SignalsPage() {
           className="flex items-center gap-1.5 rounded border border-bd bg-bg2/60 px-3 py-1.5 text-[11px] font-mono text-dim hover:text-fg hover:border-info/40 disabled:opacity-50 transition-colors"
         >
           <RefreshCw className={cn("h-3 w-3", batchRunning && "animate-spin")} />
-          {batchRunning ? "Refreshing…" : "Force refresh"}
+          {batchRunning ? "Refreshing\u2026" : "Force refresh"}
         </button>
       </div>
 
@@ -246,11 +248,11 @@ function SignalsPage() {
                         className="inline-flex items-center gap-1 text-[10px] font-mono text-sell"
                         title="Backend has not confirmed"
                       >
-                        ⚠️
+                        {"\u26A0\uFE0F"}
                       </span>
                     ) : (
                       <span className="text-[10px] font-mono text-buy" title="Backend confirmed">
-                        ✓
+                        {"\u2713"}
                       </span>
                     )}
                   </div>

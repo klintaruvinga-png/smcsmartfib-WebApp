@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { apiClient, setBackendUrl } from "@/lib/api/sniperClient";
 import type { DashboardSettings, Symbol, SymbolDiagnostic, TradePlan } from "@/types/sniper";
 
@@ -77,7 +78,7 @@ export function useUserSettings() {
   return useQuery({
     queryKey: ["user-settings"],
     queryFn: async () => {
-      const s = await apiClient.getUserSettings();
+      const s = normalizeDashboardSettings(await apiClient.getUserSettings());
       if (s.backendUrl) setBackendUrl(s.backendUrl);
       return s;
     },
@@ -93,12 +94,12 @@ export function useSession() {
   });
 }
 
-/** Canonical watchlist derived from the user-settings cache — single source of truth. */
+/** Canonical watchlist derived from the user-settings cache â€” single source of truth. */
 function normalizeWatchlist(watchlist: readonly Symbol[] | undefined | null): Symbol[] {
   const canonical: Symbol[] = [];
   for (const symbol of watchlist ?? []) {
     if (typeof symbol !== "string") continue;
-    const normalized = symbol.trim() as Symbol;
+    const normalized = symbol.trim().toUpperCase() as Symbol;
     if (!normalized || canonical.includes(normalized)) continue;
     canonical.push(normalized);
     if (canonical.length === WATCHLIST_LIMIT) break;
@@ -106,9 +107,22 @@ function normalizeWatchlist(watchlist: readonly Symbol[] | undefined | null): Sy
   return canonical;
 }
 
+function normalizeDashboardSettings(settings: DashboardSettings): DashboardSettings {
+  return {
+    ...settings,
+    watchlist: normalizeWatchlist(settings.watchlist),
+  };
+}
+
 export function useWatchlist() {
   const { data } = useUserSettings();
   return normalizeWatchlist(data?.watchlist);
+}
+
+export function useCanonicalWatchlist() {
+  const watchlist = useWatchlist();
+  const watchlistSet = useMemo(() => new Set<string>(watchlist), [watchlist]);
+  return { watchlist, watchlistSet };
 }
 
 type WatchlistMutationContext = {
