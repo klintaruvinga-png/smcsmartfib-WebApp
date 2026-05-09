@@ -8,7 +8,7 @@ import {
   useUserSettings,
   usePollMs,
   useCanonicalWatchlist,
-  filterItemsByWatchlist,
+  alignWatchlistItems,
 } from "@/hooks/useSniperData";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { useStreamingTicks } from "@/hooks/useStreamingTicks";
@@ -114,19 +114,30 @@ function HeaderTicker() {
   const { data } = useSnapshot();
   const pollMs = usePollMs() ?? 2000;
   const { watchlist } = useCanonicalWatchlist();
-  // Treat the header strip as authoritative live market data, not a generic cache view.
-  // Hard-gate by canonical watchlist order so add/remove in Account reflects immediately.
-  const items = filterItemsByWatchlist(data?.prices, watchlist).filter(
-    (price) => price.mid > 0 && (price.state === "live" || price.state === "mock"),
-  );
+  // Render every watchlist symbol — keep a placeholder when backend snapshot
+  // hasn't emitted data yet so newly-added symbols persist visually instead of
+  // flickering off when sparse snapshots arrive.
+  const aligned = alignWatchlistItems(data?.prices, watchlist);
   // Duplicate for seamless loop
-  const loop = [...items, ...items];
+  const loop = [...aligned, ...aligned];
   return (
     <div className="relative flex-1 overflow-hidden border-y border-bd bg-bg2/40">
       <div className="ticker-track flex w-max items-center gap-6 py-2 px-4">
-        {loop.map((p, i) => (
-          <HeaderTickerItem key={`${p.symbol}-${i}`} price={p} pollMs={pollMs} />
-        ))}
+        {loop.map((entry, i) =>
+          entry.item && entry.item.mid > 0 && (entry.item.state === "live" || entry.item.state === "mock") ? (
+            <HeaderTickerItem key={`${entry.symbol}-${i}`} price={entry.item} pollMs={pollMs} />
+          ) : (
+            <div
+              key={`${entry.symbol}-${i}-pending`}
+              className="flex items-center gap-2 whitespace-nowrap font-mono text-xs opacity-60"
+            >
+              <span className="header-tick-dot" />
+              <span className="text-mute">{entry.symbol}</span>
+              <span className="text-dim tabular-nums">—</span>
+              <span className="text-mute text-[10px]">awaiting</span>
+            </div>
+          ),
+        )}
       </div>
       <div className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-bg to-transparent" />
       <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-bg to-transparent" />
