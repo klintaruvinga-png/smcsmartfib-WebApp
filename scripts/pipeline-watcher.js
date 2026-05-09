@@ -61,6 +61,52 @@ function writeJson(filePath, value) {
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
+function markReadyForImplementation(state, source) {
+  writeJson(STATE_FILE, {
+    ...state,
+    state: "READY_FOR_IMPLEMENTATION",
+    editing_locked: false,
+    plan_hardened_at: new Date().toISOString(),
+    plan_source: source,
+  });
+}
+
+function isPermissionStub(text) {
+  return /Waiting for permission to write/i.test(text)
+    || /Please approve the file write above/i.test(text);
+}
+
+function isUsablePlan(text) {
+  if (!text || isPermissionStub(text)) {
+    return false;
+  }
+
+  const requiredSections = [
+    "1. Issue validation",
+    "2. Implementation contract",
+    "3. Patch sequence",
+    "4. Regression guards",
+    "5. Non-goals",
+    "6. Risk assessment",
+    "7. Test requirements",
+    "8. Implementation handoff",
+  ];
+
+  return requiredSections.every((section) => text.includes(section));
+}
+
+function hasUsablePlanArtifact() {
+  if (!fs.existsSync(PLAN_FILE)) {
+    return false;
+  }
+
+  try {
+    return isUsablePlan(fs.readFileSync(PLAN_FILE, "utf8"));
+  } catch {
+    return false;
+  }
+}
+
 function readState() {
   if (!fs.existsSync(STATE_FILE)) {
     return null;
@@ -183,13 +229,20 @@ function runClaudePlanHardening(state) {
 - Issue: ${state.issue}
 - Input artifact: reports/copilot-research.md
 - Output artifact: reports/codex-plan.md
+- Return the plan as plain markdown on stdout only.
+- Do not attempt to edit files or use any tools.
 - Do not implement code.
 - Stop after the plan is written.
 `;
 
   withPipelineLock("claude-plan-hardening", () => {
     log("PLANNING detected - running Claude plan hardening");
-    const output = execFileSync("claude", ["--print", prompt], {
+    const output = execFileSync("claude", [
+      "--print",
+      "--output-format", "text",
+      "--tools", "",
+      prompt,
+    ], {
       cwd: REPO_ROOT,
       encoding: "utf8",
       timeout: CLAUDE_TIMEOUT_MS,
@@ -200,14 +253,12 @@ function runClaudePlanHardening(state) {
       throw new Error("Claude plan hardening returned an empty plan");
     }
 
-    fs.writeFileSync(PLAN_FILE, `${planText}\n`, "utf8");
-    writeJson(STATE_FILE, {
-      ...state,
-      state: "READY_FOR_IMPLEMENTATION",
-      editing_locked: false,
-      plan_hardened_at: new Date().toISOString(),
-    });
+    if (!isUsablePlan(planText)) {
+      throw new Error("Claude plan hardening returned invalid plan output");
+    }
 
+    fs.writeFileSync(PLAN_FILE, `${planText}\n`, "utf8");
+    markReadyForImplementation(state, "claude");
     log("Claude plan hardening complete - state READY_FOR_IMPLEMENTATION");
   });
 }
@@ -288,9 +339,14 @@ function evaluatePipeline() {
       return;
     }
 
-    if (!fs.existsSync(PLAN_FILE) || statMtime(RESEARCH_FILE) > statMtime(PLAN_FILE)) {
+    const hasUsablePlan = hasUsablePlanArtifact();
+    if (!hasUsablePlan || statMtime(RESEARCH_FILE) > statMtime(PLAN_FILE)) {
       runClaudePlanHardening(state);
+      return;
     }
+
+    markReadyForImplementation(state, "existing-plan-artifact");
+    log("Valid plan artifact detected - state READY_FOR_IMPLEMENTATION");
     return;
   }
 

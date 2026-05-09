@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useBackendReady, useSnapshot, usePollMs } from "@/hooks/useSniperData";
+import { useBackendReady, useSnapshot, usePollMs, useWatchlist } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { fmtPrice, fmtPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -25,16 +25,29 @@ function ChartsPage() {
   const { data } = useSnapshot();
   const backendReady = useBackendReady();
   const pollMs = usePollMs();
-  const [selected, setSelected] = useState<Symbol>("GBPUSD");
+  const watchlist = useWatchlist();
+  const [selected, setSelected] = useState<Symbol | null>(null);
 
-  const prices = data?.prices ?? [];
-  const price = prices.find((p) => p.symbol === selected) ?? prices[0];
-  const activeSymbol = price?.symbol ?? selected;
+  const prices = useMemo(() => data?.prices ?? [], [data?.prices]);
+  const watchlistSet = useMemo(() => new Set<string>(watchlist), [watchlist]);
+  const pricesBySymbol = useMemo(
+    () => new Map(prices.map((price) => [price.symbol, price])),
+    [prices],
+  );
+  const activeSymbol = selected && watchlistSet.has(selected) ? selected : (watchlist[0] ?? null);
+  const price = activeSymbol ? pricesBySymbol.get(activeSymbol) : undefined;
+
+  useEffect(() => {
+    const nextSelected = watchlist.length === 0 ? null : activeSymbol;
+    if (selected !== nextSelected) {
+      setSelected(nextSelected);
+    }
+  }, [activeSymbol, selected, watchlist.length]);
 
   const { data: chart } = useQuery<ChartSnapshot>({
     queryKey: ["chart", activeSymbol],
-    queryFn: () => apiClient.getChartSnapshot(activeSymbol),
-    enabled: backendReady && pollMs !== null,
+    queryFn: () => apiClient.getChartSnapshot(activeSymbol as Symbol),
+    enabled: backendReady && pollMs !== null && activeSymbol !== null,
     refetchInterval: backendReady ? (pollMs ?? false) : false,
   });
 
@@ -47,7 +60,7 @@ function ChartsPage() {
   }
 
   if (!data) return null;
-  if (!price) {
+  if (!activeSymbol) {
     return <div className="text-mute text-sm">Add symbols to your watchlist to view charts.</div>;
   }
 
@@ -65,18 +78,18 @@ function ChartsPage() {
       </div>
 
       <div className="flex flex-wrap gap-1.5">
-        {data.prices.map((p) => (
+        {watchlist.map((symbol) => (
           <button
-            key={p.symbol}
-            onClick={() => setSelected(p.symbol)}
+            key={symbol}
+            onClick={() => setSelected(symbol)}
             className={cn(
               "rounded border px-2.5 py-1 text-xs font-mono transition-colors",
-              p.symbol === activeSymbol
+              symbol === activeSymbol
                 ? "border-accent/60 bg-accent/15 text-accent"
                 : "border-bd bg-bg2/40 text-mute hover:border-bd2 hover:text-dim",
             )}
           >
-            {p.symbol}
+            {symbol}
           </button>
         ))}
       </div>
@@ -85,7 +98,7 @@ function ChartsPage() {
         <div className="mb-4 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xl font-semibold">{price.symbol}</span>
+              <span className="font-mono text-xl font-semibold">{activeSymbol}</span>
               {families.length > 0 && (
                 <span className="rounded border border-accent/40 bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-accent">
                   Fib {families.join(" / ")}
@@ -93,20 +106,28 @@ function ChartsPage() {
               )}
             </div>
             <div className="mt-1 flex items-center gap-3">
-              <span className="font-mono text-2xl text-tx">
-                {fmtPrice(price.mid, price.symbol)}
-              </span>
-              <span
-                className={cn(
-                  "font-mono text-sm",
-                  price.changePct1d >= 0 ? "text-buy" : "text-sell",
-                )}
-              >
-                {fmtPct(price.changePct1d)}
-              </span>
+              {price ? (
+                <>
+                  <span className="font-mono text-2xl text-tx">
+                    {fmtPrice(price.mid, price.symbol)}
+                  </span>
+                  <span
+                    className={cn(
+                      "font-mono text-sm",
+                      price.changePct1d >= 0 ? "text-buy" : "text-sell",
+                    )}
+                  >
+                    {fmtPct(price.changePct1d)}
+                  </span>
+                </>
+              ) : (
+                <span className="font-mono text-sm text-mute">
+                  Awaiting live snapshot for this watchlist symbol.
+                </span>
+              )}
             </div>
           </div>
-          <FreshnessBadge state={chart?.state ?? price.state} />
+          <FreshnessBadge state={chart?.state ?? price?.state ?? "offline"} />
         </div>
 
         <TVChart series={series} fibs={fibs} symbol={activeSymbol} />

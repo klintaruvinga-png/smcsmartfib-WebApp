@@ -60,7 +60,7 @@ function LivePage() {
   const mt5Prices = data.prices.filter((price) => {
     // Hard-gate by canonical watchlist so Account add/remove reflects immediately,
     // even before the next backend snapshot lands.
-    if (watchlistSet.size > 0 && !watchlistSet.has(price.symbol)) return false;
+    if (!watchlistSet.has(price.symbol)) return false;
     if (MOCK_MODE && price.source === "mock") return true;
     if (price.source !== "mt5") {
       console.debug("[live] skipped non-MT5 price", price.symbol, price.source);
@@ -93,7 +93,9 @@ function LivePage() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {mt5Prices.length === 0 && (
           <div className="col-span-full py-10 text-center text-sm text-mute">
-            No live MT5 prices - verify EA connection and symbol push.
+            {watchlist.length === 0
+              ? "No watchlist symbols. Add symbols in Account to populate Live Radar."
+              : "No live MT5 prices - verify EA connection and symbol push."}
           </div>
         )}
 

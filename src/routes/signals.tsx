@@ -52,14 +52,14 @@ function SignalsPage() {
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
   const watchlist = useWatchlist();
   const [watchlistOnly, setWatchlistOnly] = useState(true);
+  const watchlistSet = new Set<string>(watchlist);
 
   // Deduplicate signals by ID and preserve backend unconfirmed candidates so the UI reflects
   // actual engine output, even when some candidates are still waiting on backend confirmation.
   const allUnique = signals ? deduplicateById(signals) : [];
-  const uniqueSignals =
-    watchlistOnly && watchlist.length > 0
-      ? allUnique.filter((s) => watchlist.includes(s.symbol))
-      : allUnique;
+  const uniqueSignals = watchlistOnly
+    ? allUnique.filter((s) => watchlistSet.has(s.symbol))
+    : allUnique;
 
   const divergent = uniqueSignals.filter((s) => s.computedBy === "frontend" && !s.backendConfirmed);
 
@@ -180,6 +180,13 @@ function SignalsPage() {
           </div>
         </div>
         <div className="divide-y divide-bd">
+          {uniqueSignals.length === 0 && (
+            <div className="px-4 py-8 text-center text-sm text-mute">
+              {watchlistOnly && watchlist.length === 0
+                ? "No watchlist symbols. Add symbols in Account to populate Signal Engine."
+                : "No live candidates for the current filter."}
+            </div>
+          )}
           {(uniqueSignals ?? []).map((s) => {
             const divergent = s.computedBy === "frontend" && !s.backendConfirmed;
             return (

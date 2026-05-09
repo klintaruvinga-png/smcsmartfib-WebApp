@@ -72,7 +72,10 @@ function HeaderTickerItem({ price, pollMs }: { price: PairPrice; pollMs: number 
   });
 
   return (
-    <div style={motionStyle} className="flex items-center gap-2 whitespace-nowrap font-mono text-xs">
+    <div
+      style={motionStyle}
+      className="flex items-center gap-2 whitespace-nowrap font-mono text-xs"
+    >
       <span
         className={cn(
           "header-tick-dot",
@@ -114,10 +117,7 @@ function HeaderTicker() {
   // Treat the header strip as authoritative live market data, not a generic cache view.
   // Hard-gate by canonical watchlist so add/remove in Account reflects immediately.
   const items = (data?.prices ?? []).filter(
-    (p) =>
-      p.mid > 0 &&
-      (p.state === "live" || p.state === "mock") &&
-      (watchlistSet.size === 0 || watchlistSet.has(p.symbol)),
+    (p) => p.mid > 0 && (p.state === "live" || p.state === "mock") && watchlistSet.has(p.symbol),
   );
   // Duplicate for seamless loop
   const loop = [...items, ...items];

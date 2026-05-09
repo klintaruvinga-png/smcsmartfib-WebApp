@@ -3,6 +3,7 @@ import { apiClient, setBackendUrl } from "@/lib/api/sniperClient";
 import type { DashboardSettings, Symbol, SymbolDiagnostic, TradePlan } from "@/types/sniper";
 
 const DEFAULT_POLL_MS = 2_000;
+const WATCHLIST_LIMIT = 24;
 
 export function useBackendReady() {
   const { data } = useUserSettings();
@@ -93,9 +94,21 @@ export function useSession() {
 }
 
 /** Canonical watchlist derived from the user-settings cache — single source of truth. */
+function normalizeWatchlist(watchlist: readonly Symbol[] | undefined | null): Symbol[] {
+  const canonical: Symbol[] = [];
+  for (const symbol of watchlist ?? []) {
+    if (typeof symbol !== "string") continue;
+    const normalized = symbol.trim() as Symbol;
+    if (!normalized || canonical.includes(normalized)) continue;
+    canonical.push(normalized);
+    if (canonical.length === WATCHLIST_LIMIT) break;
+  }
+  return canonical;
+}
+
 export function useWatchlist() {
   const { data } = useUserSettings();
-  return data?.watchlist ?? [];
+  return normalizeWatchlist(data?.watchlist);
 }
 
 type WatchlistMutationContext = {
@@ -135,63 +148,75 @@ async function invalidateWatchlistQueries(queryClient: ReturnType<typeof useQuer
   ]);
 }
 
+function writeCanonicalWatchlist(
+  queryClient: ReturnType<typeof useQueryClient>,
+  watchlist: readonly Symbol[],
+) {
+  const canonicalWatchlist = normalizeWatchlist(watchlist);
+  queryClient.setQueryData<DashboardSettings>(["user-settings"], (old) =>
+    old ? { ...old, watchlist: canonicalWatchlist } : old,
+  );
+}
+
 export function useWatchlistAdd() {
   const queryClient = useQueryClient();
-  return useMutation<{ ok: boolean; watchlist: Symbol[] }, Error, string, WatchlistMutationContext>({
-    mutationFn: (symbol: string) => apiClient.postWatchlistAdd(symbol),
-    onMutate: async (symbol: string) => {
-      await cancelWatchlistQueries(queryClient);
-      const previousSettings = queryClient.getQueryData<DashboardSettings>(["user-settings"]);
-      queryClient.setQueryData<DashboardSettings>(["user-settings"], (old) => {
-        if (!old) return old;
-        const nextSymbol = symbol as Symbol;
-        if (old.watchlist.includes(nextSymbol)) return old;
-        return { ...old, watchlist: [...old.watchlist, nextSymbol].slice(0, 24) };
-      });
-      return { previousSettings };
+  return useMutation<{ ok: boolean; watchlist: Symbol[] }, Error, string, WatchlistMutationContext>(
+    {
+      mutationFn: (symbol: string) => apiClient.postWatchlistAdd(symbol),
+      onMutate: async (symbol: string) => {
+        await cancelWatchlistQueries(queryClient);
+        const previousSettings = queryClient.getQueryData<DashboardSettings>(["user-settings"]);
+        queryClient.setQueryData<DashboardSettings>(["user-settings"], (old) => {
+          if (!old) return old;
+          const nextSymbol = symbol as Symbol;
+          if (old.watchlist.includes(nextSymbol)) return old;
+          return { ...old, watchlist: normalizeWatchlist([...old.watchlist, nextSymbol]) };
+        });
+        return { previousSettings };
+      },
+      onSuccess: async (result) => {
+        writeCanonicalWatchlist(queryClient, result.watchlist);
+        await invalidateWatchlistQueries(queryClient);
+      },
+      onError: (_error, _symbol, context) => {
+        if (context?.previousSettings) {
+          queryClient.setQueryData(["user-settings"], context.previousSettings);
+        }
+      },
     },
-    onSuccess: async (result) => {
-      queryClient.setQueryData<DashboardSettings>(["user-settings"], (old) =>
-        old ? { ...old, watchlist: result.watchlist } : old,
-      );
-      await invalidateWatchlistQueries(queryClient);
-    },
-    onError: (_error, _symbol, context) => {
-      if (context?.previousSettings) {
-        queryClient.setQueryData(["user-settings"], context.previousSettings);
-      }
-    },
-  });
+  );
 }
 
 export function useWatchlistRemove() {
   const queryClient = useQueryClient();
-  return useMutation<{ ok: boolean; watchlist: Symbol[] }, Error, string, WatchlistMutationContext>({
-    mutationFn: (symbol: string) => apiClient.postWatchlistRemove(symbol),
-    onMutate: async (symbol: string) => {
-      await cancelWatchlistQueries(queryClient);
-      const previousSettings = queryClient.getQueryData<DashboardSettings>(["user-settings"]);
-      queryClient.setQueryData<DashboardSettings>(["user-settings"], (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          watchlist: old.watchlist.filter((entry) => entry !== (symbol as Symbol)),
-        };
-      });
-      return { previousSettings };
+  return useMutation<{ ok: boolean; watchlist: Symbol[] }, Error, string, WatchlistMutationContext>(
+    {
+      mutationFn: (symbol: string) => apiClient.postWatchlistRemove(symbol),
+      onMutate: async (symbol: string) => {
+        await cancelWatchlistQueries(queryClient);
+        const previousSettings = queryClient.getQueryData<DashboardSettings>(["user-settings"]);
+        queryClient.setQueryData<DashboardSettings>(["user-settings"], (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            watchlist: normalizeWatchlist(
+              old.watchlist.filter((entry) => entry !== (symbol as Symbol)),
+            ),
+          };
+        });
+        return { previousSettings };
+      },
+      onSuccess: async (result) => {
+        writeCanonicalWatchlist(queryClient, result.watchlist);
+        await invalidateWatchlistQueries(queryClient);
+      },
+      onError: (_error, _symbol, context) => {
+        if (context?.previousSettings) {
+          queryClient.setQueryData(["user-settings"], context.previousSettings);
+        }
+      },
     },
-    onSuccess: async (result) => {
-      queryClient.setQueryData<DashboardSettings>(["user-settings"], (old) =>
-        old ? { ...old, watchlist: result.watchlist } : old,
-      );
-      await invalidateWatchlistQueries(queryClient);
-    },
-    onError: (_error, _symbol, context) => {
-      if (context?.previousSettings) {
-        queryClient.setQueryData(["user-settings"], context.previousSettings);
-      }
-    },
-  });
+  );
 }
 
 export function useEngineHealth() {
