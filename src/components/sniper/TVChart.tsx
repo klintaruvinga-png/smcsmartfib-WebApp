@@ -57,7 +57,8 @@ export function TVChart({
         el.style.display = "none";
       } else {
         el.style.display = "block";
-        el.style.top = `${y - 8}px`;
+        // Place label fully above the price line so the dotted line never crosses the text
+        el.style.top = `${y - 18}px`;
       }
     }
   }
