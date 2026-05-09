@@ -26,8 +26,8 @@ jobs:
 
       - name: Validate artifacts
         run: |
-          test -f reports/copilot-research.md || (echo "❌ Missing reports/copilot-research.md" && exit 1)
-          test -f reports/codex-plan.md       || (echo "❌ Missing reports/codex-plan.md"       && exit 1)
+          test -f reports/copilot-research.md || (echo "Missing reports/copilot-research.md" && exit 1)
+          test -f reports/codex-plan.md || (echo "Missing reports/codex-plan.md" && exit 1)
 
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4
