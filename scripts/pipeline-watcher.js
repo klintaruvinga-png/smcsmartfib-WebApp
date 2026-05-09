@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -11,7 +11,10 @@ const RESEARCH_FILE = path.join(REPO_ROOT, "reports", "copilot-research.md");
 const PLAN_FILE = path.join(REPO_ROOT, "reports", "codex-plan.md");
 const IMPLEMENTATION_FILE = path.join(REPO_ROOT, "reports", "codex-implementation.md");
 const STATE_FILE = path.join(REPO_ROOT, ".smc-workflow-state.json");
-const LOCK_FILE = path.join(REPO_ROOT, "reports", ".pipeline-running");
+// Write-only JSON lock — status field ("running"|"done") determines liveness.
+// The file is NEVER deleted; it is overwritten on acquire and on release.
+// This avoids EPERM failures from OneDrive holding a sync lock on the file.
+const LOCK_FILE = path.join(REPO_ROOT, "reports", ".pipeline-lock.json");
 const CLAUDE_PLAN_PROMPT_FILE = path.join(REPO_ROOT, ".github", "prompts", "codex-plan-prompt.md");
 const CODEX_IMPLEMENT_PROMPT_FILE = path.join(
   REPO_ROOT,
@@ -23,8 +26,6 @@ const CODEX_OUTPUT_FILE = path.join(REPO_ROOT, "reports", "codex-last-message.tx
 const POLL_INTERVAL_MS = 5000;
 const CLAUDE_TIMEOUT_MS = 300000;
 const CODEX_TIMEOUT_MS = 900000;
-const LOCK_RETRY_MS = 250;
-const LOCK_RETRY_COUNT = 8;
 const LOCK_STALE_MS = 30 * 60 * 1000;
 
 let lastObservedKey = null;
@@ -88,11 +89,13 @@ function canSignalPid(pid) {
   }
 }
 
-function readLockState() {
-  if (!fs.existsSync(LOCK_FILE)) {
-    return null;
-  }
+// ── Write-only lock primitives ────────────────────────────────────────────────
+// The lock file is never deleted. Acquiring writes status:"running"; releasing
+// overwrites with status:"done". A lock is considered active only when:
+//   status === "running"  AND  owner process is alive  AND  not expired.
+// OneDrive can return EPERM on unlink but not on writeFileSync.
 
+function readLockState() {
   try {
     return readJson(LOCK_FILE);
   } catch {
@@ -100,78 +103,70 @@ function readLockState() {
   }
 }
 
-function isLockStale(lockState) {
-  if (!lockState) {
-    return true;
+function isActiveLock(lockState) {
+  if (!lockState || lockState.status !== "running") {
+    return false;
   }
 
   const startedAt = Date.parse(lockState.started_at ?? "");
   if (Number.isFinite(startedAt) && Date.now() - startedAt > LOCK_STALE_MS) {
-    return true;
+    return false;
   }
 
   if (typeof lockState.pid === "number" && !canSignalPid(lockState.pid)) {
-    return true;
+    return false;
   }
 
-  return false;
+  return true;
+}
+
+function acquireLock(label) {
+  ensureReportsDir();
+
+  const existing = readLockState();
+  if (isActiveLock(existing)) {
+    return false;
+  }
+
+  if (existing && existing.status === "running") {
+    log(`Overriding stale lock held by pid ${existing.pid} (${existing.label})`);
+  }
+
+  writeJson(LOCK_FILE, {
+    label,
+    pid: process.pid,
+    started_at: new Date().toISOString(),
+    status: "running",
+  });
+  return true;
+}
+
+function releaseLock() {
+  const existing = readLockState();
+  writeJson(LOCK_FILE, {
+    ...(existing ?? {}),
+    status: "done",
+    finished_at: new Date().toISOString(),
+  });
 }
 
 function withPipelineLock(label, fn) {
-  ensureReportsDir();
-
-  if (fs.existsSync(LOCK_FILE)) {
-    const lockState = readLockState();
-    if (isLockStale(lockState)) {
-      log("Removing stale pipeline lock");
-      clearLockFile();
-    }
-  }
-
-  if (fs.existsSync(LOCK_FILE)) {
+  if (!acquireLock(label)) {
     log("Pipeline already running - skipping trigger");
     return;
   }
 
   try {
-    writeJson(LOCK_FILE, {
-      label,
-      pid: process.pid,
-      started_at: new Date().toISOString(),
-    });
     fn();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     log(`${label} error: ${message}`);
   } finally {
-    clearLockFile();
+    releaseLock();
   }
 }
 
-function sleep(ms) {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-}
-
-function clearLockFile() {
-  for (let attempt = 1; attempt <= LOCK_RETRY_COUNT; attempt += 1) {
-    try {
-      if (!fs.existsSync(LOCK_FILE)) {
-        return;
-      }
-
-      fs.unlinkSync(LOCK_FILE);
-      return;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (attempt === LOCK_RETRY_COUNT) {
-        log(`Unable to remove pipeline lock file after retries: ${message}`);
-        return;
-      }
-
-      sleep(LOCK_RETRY_MS);
-    }
-  }
-}
+// ─────────────────────────────────────────────────────────────────────────────
 
 function runClaudePlanHardening(state) {
   if (!fs.existsSync(RESEARCH_FILE)) {
@@ -233,27 +228,37 @@ function runCodexImplementation(state) {
 
   withPipelineLock("codex-implementation", () => {
     log("READY_FOR_IMPLEMENTATION detected - running Codex implementation");
-    execFileSync(
-      "codex",
-      [
+    // Write the prompt to a temp file so we can feed it via stdin redirect
+    // without relying on execFileSync's `input` option, which triggers EINVAL
+    // on Windows when stdout/stderr are not inheritable (detached background process).
+    const promptFile = path.join(REPO_ROOT, "reports", "codex-prompt.tmp.md");
+    fs.writeFileSync(promptFile, prompt, "utf8");
+
+    try {
+      // execSync with shell:true lets Windows resolve codex.cmd and handle
+      // the stdin redirect operator (<) without needing inheritable file descriptors.
+      const codexBin = process.platform === "win32" ? "codex.cmd" : "codex";
+      // Wrap paths in quotes to handle spaces (OneDrive paths).
+      const cmd = [
+        `"${codexBin}"`,
         "exec",
-        "--sandbox",
-        "workspace-write",
-        "--ask-for-approval",
-        "never",
-        "--cd",
-        REPO_ROOT,
-        "--output-last-message",
-        CODEX_OUTPUT_FILE,
+        "--sandbox", "workspace-write",
+        "--dangerously-bypass-approvals-and-sandbox",
+        "-C", `"${REPO_ROOT}"`,
+        "-o", `"${CODEX_OUTPUT_FILE}"`,
         "-",
-      ],
-      {
+        "<", `"${promptFile}"`,
+      ].join(" ");
+
+      execSync(cmd, {
         cwd: REPO_ROOT,
-        input: prompt,
-        stdio: ["pipe", "inherit", "inherit"],
+        shell: true,
         timeout: CODEX_TIMEOUT_MS,
-      },
-    );
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+    } finally {
+      try { fs.unlinkSync(promptFile); } catch { /* ignore */ }
+    }
 
     if (!fs.existsSync(IMPLEMENTATION_FILE)) {
       throw new Error("Codex implementation finished without reports/codex-implementation.md");
