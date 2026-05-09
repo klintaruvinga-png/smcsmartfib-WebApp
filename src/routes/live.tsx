@@ -4,6 +4,7 @@ import {
   useEngineBatch,
   usePollMs,
   useCanonicalWatchlist,
+  filterItemsByWatchlist,
 } from "@/hooks/useSniperData";
 import { useStreamingTicks } from "@/hooks/useStreamingTicks";
 import { useTickFlash } from "@/hooks/useTickFlash";
@@ -58,13 +59,12 @@ function LivePage() {
   const { data, isLoading } = useSnapshot();
   const pollMs = usePollMs() ?? 2000;
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
-  const { watchlist, watchlistSet } = useCanonicalWatchlist();
+  const { watchlist } = useCanonicalWatchlist();
   if (isLoading || !data) return <div className="text-mute text-sm">Loading radarâ€¦</div>;
 
-  const mt5Prices = data.prices.filter((price) => {
-    // Hard-gate by canonical watchlist so Account add/remove reflects immediately,
+  const mt5Prices = filterItemsByWatchlist(data.prices, watchlist).filter((price) => {
+    // Hard-gate by canonical watchlist order so Account add/remove reflects immediately,
     // even before the next backend snapshot lands.
-    if (!watchlistSet.has(price.symbol)) return false;
     if (MOCK_MODE && price.source === "mock") return true;
     if (price.source !== "mt5") {
       console.debug("[live] skipped non-MT5 price", price.symbol, price.source);

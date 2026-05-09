@@ -6,6 +6,7 @@ import {
   useSnapshot,
   usePollMs,
   useCanonicalWatchlist,
+  clampSymbolToWatchlist,
 } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { fmtPrice, fmtPct } from "@/lib/format";
@@ -30,7 +31,7 @@ function ChartsPage() {
   const { data } = useSnapshot();
   const backendReady = useBackendReady();
   const pollMs = usePollMs();
-  const { watchlist, watchlistSet } = useCanonicalWatchlist();
+  const { watchlist } = useCanonicalWatchlist();
   const [selected, setSelected] = useState<Symbol | null>(null);
 
   const prices = useMemo(() => data?.prices ?? [], [data?.prices]);
@@ -38,15 +39,15 @@ function ChartsPage() {
     () => new Map(prices.map((price) => [price.symbol, price])),
     [prices],
   );
-  const activeSymbol = selected && watchlistSet.has(selected) ? selected : (watchlist[0] ?? null);
+  const activeSymbol = clampSymbolToWatchlist(selected, watchlist);
   const price = activeSymbol ? pricesBySymbol.get(activeSymbol) : undefined;
 
   useEffect(() => {
-    const nextSelected = watchlist.length === 0 ? null : activeSymbol;
+    const nextSelected = clampSymbolToWatchlist(selected, watchlist);
     if (selected !== nextSelected) {
       setSelected(nextSelected);
     }
-  }, [activeSymbol, selected, watchlist.length]);
+  }, [selected, watchlist]);
 
   const { data: chart } = useQuery<ChartSnapshot>({
     queryKey: ["chart", activeSymbol],

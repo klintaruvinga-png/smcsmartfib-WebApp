@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  useCanonicalWatchlist,
   useUserSettings,
   useUserRiskProfile,
   useEngineHealth,
@@ -18,6 +19,7 @@ import type {
   DashboardSettings,
   FreshnessState,
   RiskProfile,
+  Symbol,
   TwelveDataKeyStatus,
 } from "@/types/sniper";
 
@@ -108,6 +110,7 @@ function TabButton({
 function SettingsTab({ settings }: { settings: DashboardSettings }) {
   const qc = useQueryClient();
   const { data: health } = useEngineHealth();
+  const { watchlist, watchlistSet } = useCanonicalWatchlist();
   const [s, setS] = useState(settings);
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [newPair, setNewPair] = useState("");
@@ -159,9 +162,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
       .trim()
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, "");
-    const currentWatchlist =
-      qc.getQueryData<DashboardSettings>(["user-settings"])?.watchlist ?? settings.watchlist;
-    if (!sym || currentWatchlist.includes(sym as never)) return;
+    if (!sym || watchlistSet.has(sym as Symbol)) return;
     setNewPair("");
     try {
       const result = await addWatchlistMutation.mutateAsync(sym);
@@ -393,7 +394,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
 
       <Card title="Watchlist" className="lg:col-span-2">
         <div className="flex flex-wrap gap-1.5 mb-3">
-          {settings.watchlist.map((p) => (
+          {watchlist.map((p) => (
             <span
               key={p}
               className="inline-flex items-center gap-1.5 rounded border border-bd bg-bg2/60 px-2 py-1 font-mono text-xs text-dim"

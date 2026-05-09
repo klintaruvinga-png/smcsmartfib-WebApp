@@ -114,14 +114,45 @@ function normalizeDashboardSettings(settings: DashboardSettings): DashboardSetti
   };
 }
 
+export function clampSymbolToWatchlist(
+  symbol: Symbol | null | undefined,
+  watchlist: readonly Symbol[],
+): Symbol | null {
+  if (symbol && watchlist.includes(symbol)) {
+    return symbol;
+  }
+  return watchlist[0] ?? null;
+}
+
+export function filterItemsByWatchlist<T extends { symbol: string }>(
+  items: readonly T[] | undefined | null,
+  watchlist: readonly Symbol[],
+): T[] {
+  const itemsBySymbol = new Map<string, T>();
+  for (const item of items ?? []) {
+    if (!itemsBySymbol.has(item.symbol)) {
+      itemsBySymbol.set(item.symbol, item);
+    }
+  }
+
+  const ordered: T[] = [];
+  for (const symbol of watchlist) {
+    const item = itemsBySymbol.get(symbol);
+    if (item) {
+      ordered.push(item);
+    }
+  }
+  return ordered;
+}
+
 export function useWatchlist() {
   const { data } = useUserSettings();
-  return normalizeWatchlist(data?.watchlist);
+  return useMemo(() => normalizeWatchlist(data?.watchlist), [data?.watchlist]);
 }
 
 export function useCanonicalWatchlist() {
   const watchlist = useWatchlist();
-  const watchlistSet = useMemo(() => new Set<string>(watchlist), [watchlist]);
+  const watchlistSet = useMemo(() => new Set<Symbol>(watchlist), [watchlist]);
   return { watchlist, watchlistSet };
 }
 

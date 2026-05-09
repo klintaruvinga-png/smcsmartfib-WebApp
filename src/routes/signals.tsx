@@ -11,7 +11,7 @@ import { DivergenceBanner } from "@/components/sniper/Warnings";
 import { relTime } from "@/lib/format";
 import { cn, deduplicateById } from "@/lib/utils";
 import { CheckCircle2, AlertTriangle, XCircle, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { EngineBlocker, FreshnessState } from "@/types/sniper";
 
 export const Route = createFileRoute("/signals")({
@@ -58,10 +58,12 @@ function SignalsPage() {
 
   // Deduplicate signals by ID and preserve backend unconfirmed candidates so the UI reflects
   // actual engine output, even when some candidates are still waiting on backend confirmation.
-  const allUnique = signals ? deduplicateById(signals) : [];
-  const uniqueSignals = watchlistOnly
-    ? allUnique.filter((s) => watchlistSet.has(s.symbol))
-    : allUnique;
+  const allUnique = useMemo(() => (signals ? deduplicateById(signals) : []), [signals]);
+  const uniqueSignals = useMemo(
+    () =>
+      watchlistOnly ? allUnique.filter((signal) => watchlistSet.has(signal.symbol)) : allUnique,
+    [allUnique, watchlistOnly, watchlistSet],
+  );
 
   const divergent = uniqueSignals.filter((s) => s.computedBy === "frontend" && !s.backendConfirmed);
 
