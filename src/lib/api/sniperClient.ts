@@ -76,6 +76,8 @@ interface RequestOpts {
   cacheBust?: boolean;
 }
 
+export type AdminHealthResponse = EngineHealth;
+
 async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
   const headers: Record<string, string> = {};
   if (opts.body) headers["Content-Type"] = "application/json";
@@ -137,6 +139,10 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
     if (error instanceof Error) throw error;
     throw new Error(`API ${path} failed: ${String(error)}`);
   }
+}
+
+export async function fetchAdminHealth(): Promise<AdminHealthResponse> {
+  return call<AdminHealthResponse>("/admin/health", { cacheBust: true });
 }
 
 function toFiniteNumber(value: unknown, fallback = 0): number {
@@ -257,6 +263,9 @@ export const apiClient = {
   async getEngineHealth(mock = MOCK_MODE): Promise<EngineHealth> {
     if (mock) return mockEngineHealth;
     return call<EngineHealth>("/health");
+  },
+  async getAdminHealth(): Promise<AdminHealthResponse> {
+    return fetchAdminHealth();
   },
 
   // Authenticated user

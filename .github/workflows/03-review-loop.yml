@@ -21,13 +21,23 @@ jobs:
       (
         (
           github.event_name == 'pull_request_review_comment' &&
-          contains(github.event.comment.body, 'Severity:') &&
-          contains(github.event.comment.body, 'Source: Codex')
+          (
+            github.event.comment.user.login == 'chatgpt-codex-connector' ||
+            (
+              contains(github.event.comment.body, 'Severity:') &&
+              contains(github.event.comment.body, 'Source: Codex')
+            )
+          )
         ) ||
         (
           github.event_name == 'pull_request_review' &&
-          contains(github.event.review.body, 'Severity:') &&
-          contains(github.event.review.body, 'Source: Codex')
+          (
+            github.event.review.user.login == 'chatgpt-codex-connector' ||
+            (
+              contains(github.event.review.body, 'Severity:') &&
+              contains(github.event.review.body, 'Source: Codex')
+            )
+          )
         )
       )
     runs-on: ubuntu-latest
