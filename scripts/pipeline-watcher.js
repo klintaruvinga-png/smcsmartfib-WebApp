@@ -36,6 +36,54 @@ const CLAUDE_TIMEOUT_MS = 900000; // 15 min — larger research reports need mor
 const CODEX_TIMEOUT_MS = 900000;
 const LOCK_STALE_MS = 30 * 60 * 1000;
 
+// On Windows, execSync with shell:true spawns cmd.exe which is blocked with EPERM
+// in detached background processes (the job object created by start-pipeline-runner.js
+// restricts child process creation for cmd.exe). This function finds the native
+// claude.exe so it can be called directly via execFileSync — no shell required.
+function resolveClaudeExe() {
+  if (process.platform !== "win32") {
+    return null; // Non-Windows uses shell-based invocation
+  }
+
+  const npmRoot = process.env.APPDATA
+    ? path.join(process.env.APPDATA, "npm")
+    : null;
+
+  const candidates = [];
+
+  if (npmRoot) {
+    // Primary: the .exe bundled inside the npm global package (what claude.cmd delegates to)
+    candidates.push(
+      path.join(npmRoot, "node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe"),
+    );
+    // Also parse the claude.cmd shim — it embeds the delegated exe path on the last exec line.
+    const cmdShim = path.join(npmRoot, "claude.cmd");
+    if (fs.existsSync(cmdShim)) {
+      try {
+        const content = fs.readFileSync(cmdShim, "utf8");
+        // Shim line: "%dp0%\node_modules\...\claude.exe"   %*
+        // %dp0% is the batch file's own directory (the npm bin dir).
+        const match = content.match(/"(%dp0%[^"]+claude\.exe)"/i);
+        if (match) {
+          const resolved = match[1].replace(/%dp0%/gi, npmRoot + path.sep);
+          candidates.unshift(resolved);
+        }
+      } catch { /* ignore */ }
+    }
+  }
+
+  // Fallback: standalone installation under the user profile
+  if (process.env.USERPROFILE) {
+    candidates.push(path.join(process.env.USERPROFILE, ".local", "bin", "claude.exe"));
+  }
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+
+  return null;
+}
+
 let lastObservedKey = null;
 
 function log(message) {
@@ -591,18 +639,15 @@ function runClaudePlanHardening(state) {
   withPipelineLock("claude-plan-hardening", () => {
     log("PLANNING detected - running Claude plan hardening");
 
-    // Claude Code headless contract (code.claude.com/docs/en/headless):
-    //   claude -p "<explicit query>" [< stdin-context]
-    // The -p / --print flag requires an explicit prompt argument — the query.
-    // stdin carries supplementary context and is NOT a substitute for the query.
-    // Omitting the prompt argument causes an immediate CLI error.
-    //
-    // Use a short shell-safe string for --print so quoting in the shell cmd is trivial.
-    // The full template + runtime context + research go into a single context file
-    // piped via stdin, which also sidesteps the 8 191-char Windows CMD argv limit.
-    const PROMPT_ARG = "Produce a hardened implementation contract. Follow all instructions in the TEMPLATE section exactly. Return only the plan markdown — no preamble, no prose outside the numbered sections.";
-
-    const contextContent = [
+    // The entire input — instructions, runtime context, and research — is written
+    // to stdin as one stream. claude --print (boolean flag, no value) reads the
+    // prompt from stdin. This avoids the two failure modes seen with -p / --print:
+    //   1. Non-ASCII characters (em dashes) in the argument are mangled by cmd.exe.
+    //   2. When -p "value" is provided, the CLI does not read stdin as supplementary
+    //      context, so the template and research content never reach the model.
+    const stdinInput = [
+      "Produce a hardened implementation contract. Follow all instructions in the TEMPLATE section exactly. Return only the plan markdown - no preamble, no prose outside the numbered sections.",
+      "",
       "# TEMPLATE",
       "",
       fs.readFileSync(CLAUDE_PLAN_PROMPT_FILE, "utf8").trim(),
@@ -622,37 +667,51 @@ function runClaudePlanHardening(state) {
       fs.readFileSync(RESEARCH_FILE, "utf8").trim(),
     ].join("\n");
 
-    const contextFile = path.join(REPO_ROOT, "reports", "claude-plan-context.tmp.md");
-    fs.writeFileSync(contextFile, contextContent, "utf8");
+    // On Windows, execSync with shell:true spawns cmd.exe which fails with EPERM
+    // in the detached background process spawned by start-pipeline-runner.js.
+    // Fix: resolve the native claude.exe and call it directly via execFileSync —
+    // no shell required, full input piped via stdin.
+    const claudeExe = resolveClaudeExe();
 
     let planText;
     try {
-      // On Windows, execFileSync without shell cannot resolve .cmd shims in PATH.
-      // Use execSync with shell:true and the platform-specific binary name instead —
-      // exactly the same fix applied to the Codex invocation above.
-      const claudeBin = process.platform === "win32" ? "claude.cmd" : "claude";
-      const cmd = [
-        `"${claudeBin}"`,
-        "--print", `"${PROMPT_ARG}"`,
-        "--output-format", "text",
-        "--tools", '""',
-        "<", `"${contextFile}"`,
-      ].join(" ");
-
-      planText = execSync(cmd, {
-        cwd: REPO_ROOT,
-        shell: true,
-        timeout: CLAUDE_TIMEOUT_MS,
-        encoding: "utf8",
-        maxBuffer: 10 * 1024 * 1024,
-      });
+      if (claudeExe) {
+        log(`Claude CLI resolved to ${path.basename(path.dirname(claudeExe))}/${path.basename(claudeExe)} - using direct exe invocation`);
+        planText = execFileSync(
+          claudeExe,
+          ["--print", "--output-format", "text", "--tools", ""],
+          {
+            cwd: REPO_ROOT,
+            input: stdinInput,
+            timeout: CLAUDE_TIMEOUT_MS,
+            encoding: "utf8",
+            maxBuffer: 10 * 1024 * 1024,
+          },
+        );
+      } else {
+        // Non-Windows or exe not found: fall back to shell-based invocation.
+        // Write the full input to a temp file and redirect via < so the shell
+        // pipes everything (prompt + template + research) into claude's stdin.
+        const contextFile = path.join(REPO_ROOT, "reports", "claude-plan-context.tmp.md");
+        fs.writeFileSync(contextFile, stdinInput, "utf8");
+        try {
+          const cmd = ['"claude"', "--print", "--output-format", "text", "<", `"${contextFile}"`].join(" ");
+          planText = execSync(cmd, {
+            cwd: REPO_ROOT,
+            shell: true,
+            timeout: CLAUDE_TIMEOUT_MS,
+            encoding: "utf8",
+            maxBuffer: 10 * 1024 * 1024,
+          });
+        } finally {
+          try { fs.unlinkSync(contextFile); } catch { /* ignore */ }
+        }
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       writeHardeningBlockedState(state, message);
-      log(`Claude CLI invocation failed — blocked state written. Fix: see reports/.claude-hardening-blocked.json`);
+      log(`Claude CLI invocation failed - blocked state written. Fix: see reports/.claude-hardening-blocked.json`);
       throw err;
-    } finally {
-      try { fs.unlinkSync(contextFile); } catch { /* ignore */ }
     }
 
     planText = planText.trim();
@@ -896,18 +955,27 @@ function pollPipeline() {
 }
 
 function checkClaudeAvailability() {
+  const claudeExe = resolveClaudeExe();
   try {
-    const claudeBin = process.platform === "win32" ? "claude.cmd" : "claude";
-    execSync(`"${claudeBin}" --version`, {
-      shell: true,
-      timeout: 10000,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    log("Claude CLI health check passed");
+    if (claudeExe) {
+      execFileSync(claudeExe, ["--version"], {
+        timeout: 10000,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      log(`Claude CLI health check passed (${path.basename(claudeExe)})`);
+    } else {
+      execSync('"claude" --version', {
+        shell: true,
+        timeout: 10000,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      log("Claude CLI health check passed");
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    log(`WARNING: Claude CLI health check failed — plan hardening will be blocked on PLANNING state`);
+    log(`WARNING: Claude CLI health check failed - plan hardening will be blocked on PLANNING state`);
     log(`  Reason: ${message}`);
     log(`  Fix:    npm install -g @anthropic-ai/claude-code  then  claude auth`);
   }
