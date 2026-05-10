@@ -19,6 +19,7 @@ const STATE_FILE = path.join(REPO_ROOT, ".smc-workflow-state.json");
 // The file is NEVER deleted; it is overwritten on acquire and on release.
 // This avoids EPERM failures from OneDrive holding a sync lock on the file.
 const LOCK_FILE = path.join(REPO_ROOT, "reports", ".pipeline-lock.json");
+const ARCHIVE_DIR = path.join(REPO_ROOT, "reports", "archive");
 const CLAUDE_PLAN_PROMPT_FILE = path.join(REPO_ROOT, ".github", "prompts", "codex-plan-prompt.md");
 const CODEX_IMPLEMENT_PROMPT_FILE = path.join(
   REPO_ROOT,
@@ -54,6 +55,17 @@ function statMtime(filePath) {
 }
 
 function buildObservedKey() {
+  // For states that wait on an external GitHub event (PR merge), inject a
+  // minute-level time bucket so the poll loop re-evaluates every ~60 s even
+  // when no local file changes, without requiring a separate timer.
+  let timeBucket = 0;
+  try {
+    const s = readJson(STATE_FILE);
+    if (s?.state === "IMPLEMENTATION_COMPLETE" || s?.state === "IMPLEMENTATION_FAILED") {
+      timeBucket = Math.floor(Date.now() / 60000);
+    }
+  } catch { /* ignore */ }
+
   return [
     statMtime(RESEARCH_FILE),
     statMtime(PLAN_FILE),
@@ -62,6 +74,7 @@ function buildObservedKey() {
     statMtime(IMPLEMENTATION_FILE),
     statMtime(IMPLEMENTATION_FAILED_FILE),
     statMtime(CLAUDE_HARDENING_BLOCKED_FILE),
+    timeBucket,
   ].join(":");
 }
 
@@ -114,6 +127,62 @@ function markImplementationFailed(state, reason) {
     implementation_failure_reason: reason,
     implementation_completed_at: undefined,
   });
+}
+
+function markIdle(reason) {
+  writeJson(STATE_FILE, {
+    state: "IDLE",
+    idled_at: new Date().toISOString(),
+    idle_reason: reason,
+  });
+  log(`Pipeline reset to IDLE: ${reason}`);
+}
+
+// Returns { number, mergedAt } if a merged PR exists for the given branch, else null.
+function checkMergedPR(issueSlug) {
+  try {
+    const raw = execSync(
+      `gh pr list --head "codex/${issueSlug}" --state merged --json number,mergedAt --limit 1`,
+      {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        timeout: 15000,
+        shell: true,
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    const prs = JSON.parse(raw.trim() || "[]");
+    return prs.length > 0 ? prs[0] : null;
+  } catch {
+    return null;
+  }
+}
+
+// Copies completed cycle artifacts to reports/archive/<slug>-<ts>/ then removes
+// the originals so the next cycle starts with a clean slate.
+function archiveCycleArtifacts(issueSlug) {
+  const ts = new Date().toISOString().replace(/[:.]/g, "-");
+  const dest = path.join(ARCHIVE_DIR, `${issueSlug}-${ts}`);
+  fs.mkdirSync(dest, { recursive: true });
+
+  const artifacts = [
+    [RESEARCH_FILE, "copilot-research.md"],
+    [PLAN_FILE, "codex-plan.md"],
+    [PLAN_METADATA_FILE, "codex-plan.meta.json"],
+    [IMPLEMENTATION_FILE, "codex-implementation.md"],
+    [IMPLEMENTATION_METADATA_FILE, "codex-implementation.meta.json"],
+  ];
+
+  for (const [src, name] of artifacts) {
+    if (fs.existsSync(src)) {
+      try {
+        fs.copyFileSync(src, path.join(dest, name));
+        fs.unlinkSync(src);
+      } catch { /* ignore individual file errors */ }
+    }
+  }
+
+  log(`Cycle artifacts archived to reports/archive/${issueSlug}-${ts}/`);
 }
 
 function isPermissionStub(text) {
@@ -761,12 +830,37 @@ function evaluatePipeline() {
     return;
   }
 
+  if (state.state === "IDLE") {
+    log("Pipeline idle - waiting for new /research-and-plan issue");
+    return;
+  }
+
   if (state.state === "IMPLEMENTATION_COMPLETE") {
-    log("Pipeline cycle complete - waiting for next issue");
+    const issueSlug = slugifyIssue(state.issue || "pipeline-issue");
+    const merged = checkMergedPR(issueSlug);
+    if (merged) {
+      log(`PR #${merged.number} for codex/${issueSlug} merged at ${merged.mergedAt} - closing cycle`);
+      archiveCycleArtifacts(issueSlug);
+      clearImplementationFailedState();
+      markIdle(`PR #${merged.number} merged for: ${state.issue}`);
+    } else {
+      log(`Pipeline cycle complete - PR open for codex/${issueSlug}, waiting for merge`);
+    }
     return;
   }
 
   if (state.state === "IMPLEMENTATION_FAILED") {
+    const issueSlug = slugifyIssue(state.issue || "pipeline-issue");
+    // Allow a manually merged PR to close the loop even after a recorded failure.
+    const merged = checkMergedPR(issueSlug);
+    if (merged) {
+      log(`PR #${merged.number} for codex/${issueSlug} merged despite failure - closing cycle`);
+      archiveCycleArtifacts(issueSlug);
+      clearImplementationFailedState();
+      markIdle(`PR #${merged.number} merged for: ${state.issue}`);
+      return;
+    }
+
     log(
       "Pipeline implementation failed - waiting for corrected artifacts or a new issue"
       + (state.implementation_failure_reason ? ` (${state.implementation_failure_reason})` : ""),

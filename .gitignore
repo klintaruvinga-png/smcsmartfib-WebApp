@@ -35,6 +35,7 @@ dist-ssr
 .smc-workflow-state.json
 
 # Pipeline runner runtime artifacts (never commit)
+reports/archive/
 reports/.pipeline-lock.json
 reports/.pipeline-lock.json.done
 reports/.pipeline-lock.json.old
