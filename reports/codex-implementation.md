@@ -18,9 +18,10 @@ The stack release metadata had not been bumped after earlier patch work, and the
 
 # Tests run
 
-- `node -e "console.log(require('./package.json').version)"` -> `13.0.2`
-- `node -e "import('./src/lib/version.ts').then(m => console.log(m.APP_VERSION_LABEL))"` -> `v13.0.2`
-- `npx tsc --noEmit --pretty false`
+- `node -e "console.log(JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version)"` -> `13.0.2`
+- `node --input-type=module -e "import('./src/lib/version.ts').then((m) => console.log(m.APP_VERSION_LABEL))"` -> `v13.0.2`
+- Root lockfile verification for `package-lock.json` top-level and `packages[""].version` -> `13.0.2`
+- `npx --no-install tsc --noEmit --pretty false`
 - `npm run build`
 - `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
 
@@ -43,3 +44,4 @@ No parity audit was required because Pine and trading logic were intentionally l
 
 - The plan suggested branch `codex/version-consistency-bump-13-0-2`, but runtime context required `codex/version-inconsistency-pine-indicator-is-at-v13-1`. I used the runtime branch because it was the explicit execution requirement.
 - The plan suggested adding an npm/CI version-consistency check, but the `package.json` contract also restricted that file to changing only the top-level `version` field. I took the smallest safe interpretation and did not add the extra script.
+- The required branch already existed remotely, and unrelated local work in the primary checkout prevented an in-place branch switch. I used a separate git worktree on the required branch to avoid overwriting or stashing unrelated user changes.
