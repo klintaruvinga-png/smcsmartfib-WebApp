@@ -138,11 +138,11 @@ function markIdle(reason) {
   log(`Pipeline reset to IDLE: ${reason}`);
 }
 
-// Returns { number, mergedAt } if a merged PR exists for the given branch, else null.
-function checkMergedPR(issueSlug) {
+// Returns { number, mergedAt } if a merged PR for the current cycle exists, else null.
+function checkMergedPR(issueSlug, cycleStartedAt) {
   try {
     const raw = execSync(
-      `gh pr list --head "codex/${issueSlug}" --state merged --json number,mergedAt --limit 1`,
+      `gh pr list --head "codex/${issueSlug}" --state merged --json number,mergedAt --limit 20`,
       {
         cwd: REPO_ROOT,
         encoding: "utf8",
@@ -152,7 +152,18 @@ function checkMergedPR(issueSlug) {
       },
     );
     const prs = JSON.parse(raw.trim() || "[]");
-    return prs.length > 0 ? prs[0] : null;
+    if (!prs.length) return null;
+
+    if (!cycleStartedAt) {
+      return prs[0];
+    }
+
+    const cycleStartMs = Date.parse(cycleStartedAt);
+    if (!Number.isFinite(cycleStartMs)) {
+      return prs[0];
+    }
+
+    return prs.find((pr) => Number.isFinite(Date.parse(pr.mergedAt)) && Date.parse(pr.mergedAt) >= cycleStartMs) || null;
   } catch {
     return null;
   }
@@ -837,7 +848,7 @@ function evaluatePipeline() {
 
   if (state.state === "IMPLEMENTATION_COMPLETE") {
     const issueSlug = slugifyIssue(state.issue || "pipeline-issue");
-    const merged = checkMergedPR(issueSlug);
+    const merged = checkMergedPR(issueSlug, state.implementation_completed_at);
     if (merged) {
       log(`PR #${merged.number} for codex/${issueSlug} merged at ${merged.mergedAt} - closing cycle`);
       archiveCycleArtifacts(issueSlug);
@@ -852,7 +863,7 @@ function evaluatePipeline() {
   if (state.state === "IMPLEMENTATION_FAILED") {
     const issueSlug = slugifyIssue(state.issue || "pipeline-issue");
     // Allow a manually merged PR to close the loop even after a recorded failure.
-    const merged = checkMergedPR(issueSlug);
+    const merged = checkMergedPR(issueSlug, state.plan_hardened_at);
     if (merged) {
       log(`PR #${merged.number} for codex/${issueSlug} merged despite failure - closing cycle`);
       archiveCycleArtifacts(issueSlug);
