@@ -2,79 +2,80 @@
 - Severity: MEDIUM
 - Category: wiring
 - Layer(s) affected: PHP-backend / REST-API / Dashboard-JS / workflow
-- Phase impact: Phase 0 / Cross-phase
+- Phase impact: Phase 0
 
 ### 2. Confirmed evidence
-- `src/routes/__root.tsx` enforces dashboard authentication and redirects unauthenticated users to `/login`, but the existing route set does not include an `/admin` route.
-- `src/routes/*.tsx` currently defines routes for `/`, `/account`, `/analytics`, `/book`, `/charts`, `/live`, `/login`, `/orders`, `/plan`, `/progress`, and `/signals`; no `admin.tsx` or `/admin` route exists.
-- `src/lib/api/sniperClient.ts` uses either a WordPress REST nonce (`X-WP-Nonce`) or a Basic auth header from application password credentials; the default backend URL is `https://trader.stokvelsociety.co.za/wp-json`.
-- `src/routes/login.tsx` confirms the frontend supports WordPress username + application password authentication for dashboard access.
-- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` registers REST routes under `/wp-json/sniper/v1`, and uses `permission_user()` for authenticated endpoints; the current permission check is `is_user_logged_in()` + `current_user_can('read')`, which is not admin-specific.
-- `wordpress/smc-superfib-sniper/README.md` documents the runtime contract: auth is logged-in WordPress user + `X-WP-Nonce`, and the plugin exposes a backend health endpoint under `/wp-json/sniper/v1/health`.
-- `.github/migration/PHASE0_SOAK_TRACKER.md` explicitly documents the backend health endpoint `https://trader.stokvelsociety.co.za/wp-json/sniper/v1/health` and example fetch code using `credentials: 'include'` and `X-WP-Nonce`.
+- `src/routes/admin.tsx` implements `/admin` route with admin-only access via `fetchAdminHealth()` from `/wp-json/sniper/v1/admin/health`.
+- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` registers `/admin/health` endpoint with `permission_admin()` requiring `manage_options` capability.
+- `get_admin_health()` returns `build_health_payload()` which aggregates EngineHealth including per-symbol diagnostics, feed status, engine run state, and timestamps.
+- Database tables exist for `smc_sf_snapshots` (price data), `smc_sf_candles` (chart data), `smc_sf_engine_runs` (engine execution logs), `smc_sf_audit_events` (diagnostic traces).
+- `get_market_data_authority()` and `get_authority_diagnostics()` endpoints provide market data authority state per symbol.
+- `PHASE0_SOAK_TRACKER.md` documents Phase 0 soak requirements including 72h stability testing, manual evidence collection, and checkpoint reporting.
+- Current `/admin` page displays health cards and per-symbol diagnostics table but lacks comprehensive aggregation, manual inputs, persistence, or export functionality.
 
 ### 3. Root cause hypothesis
-- Confirmed: the repository currently has no frontend `/admin` route or admin-specific dashboard page, so the requested page cannot be reached through the current route map.
-- Hypothesis: the backend auth contract is too broad for an admin-only feature. Current REST permissions grant access to any logged-in WP user with `read` capability, so a new admin-only guard is likely required in the plugin.
-- Hypothesis: the requested admin health page must combine existing automated backend health metrics with a new manual observation form, which is not yet represented in the current data contract or UI route set.
+- Confirmed: Existing `/admin/health` endpoint provides basic EngineHealth but lacks aggregation of watchlist, snapshots, candles, engine_runs, and audit_events for comprehensive soak reporting.
+- Hypothesis: Phase 0 requires manual operator evidence fields and persisted checkpoint snapshots not present in current admin health contract.
+- Hypothesis: Export functionality (markdown/HTML/PDF) needs new UI components and backend generation logic.
+- Confirmed: Backend source-of-truth contracts for `/health` must remain unchanged per issue requirements.
 
 ### 4. Blast radius
 - Files likely affected:
-  - `src/routes/__root.tsx`
-  - `src/routes/admin.tsx` (new)
-  - `src/lib/api/sniperClient.ts`
-  - `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
-  - `wordpress/smc-superfib-sniper/README.md`
-  - `.github/migration/PHASE0_SOAK_TRACKER.md`
+  - `src/routes/admin.tsx` (extend UI for soak report builder)
+  - `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` (new admin endpoint for aggregated data)
+  - `src/lib/api/sniperClient.ts` (new API client function)
+  - Database: new table for manual evidence and checkpoint snapshots
+  - `src/types/sniper.ts` (new types for soak report data)
 - Systems affected:
-  - dashboard route engine and client-side auth gating
-  - WP REST authentication and capability checks
-  - backend health diagnostics and status endpoints
-  - API contract between frontend and WordPress backend
+  - Admin dashboard route and component rendering
+  - REST API with new admin-only aggregation endpoint
+  - Database schema for manual evidence persistence
+  - Frontend/backend data contracts for soak report
 - Parity surfaces at risk:
-  - backend health endpoint `<->` frontend diagnostic page
-  - admin authorization contract `<->` page visibility rules
+  - Admin authorization contract (must remain admin-only)
+  - Backend health endpoint stability (must not change)
 - Stale-state/caching risks:
-  - health fetches must bypass cache for live status values
-  - manual observation entries should not be conflated with backend auto-pulled diagnostics
-  - exposing diagnostic data via a new page could inadvertently weaken current auth safeguards if not admin-checked
+  - Manual evidence should persist independently of health data freshness
+  - Checkpoint snapshots need 12h TTL and should not interfere with live diagnostics
 
 ### 5. Regression surface
-- Existing auth redirect from `/login` must remain intact; new admin page should not bypass current dashboard access gating.
-- `src/lib/api/sniperClient.ts` must continue supporting both `X-WP-Nonce` and app-password Basic auth without soft-falling-back in ways that leak admin-only routes.
-- Phase 0 soak docs expect `/wp-json/sniper/v1/health` to remain stable; the new page should consume, not alter, that endpoint contract.
-- Current backend auth guard is generic `current_user_can('read')`; a misapplied change could expose diagnostics to non-admin users if the new page or endpoint is not properly scoped.
+- Existing `/wp-json/sniper/v1/admin/health` endpoint must return identical EngineHealth response.
+- Admin permission check (`manage_options`) must remain unchanged.
+- Current `/admin` page health display must continue working.
+- Backend source-of-truth contracts for health, snapshots, candles, engine_runs, audit_events must not be altered.
+- Phase 0 soak tracking in `PHASE0_SOAK_TRACKER.md` expects stable health endpoint.
 
 ### 6. Resolution path options
 - Path A: narrowest plausible correction surface
-  - Add a new frontend route `/admin` in `src/routes/admin.tsx`.
-  - Reuse existing backend health endpoints (`/health`, `/authority-diagnostics`) for auto-pulled metrics.
-  - Implement client-side admin gating by calling a new or existing endpoint that verifies the current WP user is admin before rendering the page.
+  - Add new `/wp-json/sniper/v1/admin/soak-report` endpoint aggregating existing data sources.
+  - Extend `src/routes/admin.tsx` with soak report UI including manual input fields and export buttons.
+  - Add database table for manual evidence and checkpoint persistence.
 - Path B: broader structural risk area if narrow path is unsafe
-  - Add a dedicated admin-only REST endpoint in `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` with `current_user_can('manage_options')` or explicit administrator role check.
-  - Centralize health, diagnostics, and manual observation payloads through that admin route.
-  - Build the `/admin` route against that endpoint so frontend permissions and backend data access remain aligned.
-- Recommended: Path B
-  - Because the current auth contract is too broad for an admin-only feature, explicit backend admin capability enforcement is safer than relying solely on frontend route gating.
+  - Extend existing `/admin/health` endpoint with optional `?include_soak=true` parameter for backwards compatibility.
+  - Implement export generation in frontend with server-side markdown/HTML rendering.
+  - Add soak report state management to admin page with local storage fallback.
+- Recommended: Path A
+  - Preserves existing `/health` contract unchanged, minimizes regression risk, allows independent soak report development.
 
 ### 7. Risk flags
-- High-risk system involved: Yes — backend auth + REST exposure is sensitive, and admin-only diagnostics require explicit privilege controls.
-- Requires parity re-validation: Yes — API contract between frontend `/admin` page and backend health/diagnostic endpoints.
-- Migration-blocking: No — this is Phase 0 stabilization and operator tooling, not MT5 migration logic.
-- Human review required before merge: Yes — to confirm admin-role guard, endpoint exposure, and whether manual observation data should persist or remain local.
+- High-risk system involved: Yes — admin-only backend aggregation requires careful auth scoping and data access controls.
+- Requires parity re-validation: Yes — new soak report aggregation must maintain consistency with existing health diagnostics.
+- Migration-blocking: No — Phase 0 stabilization enhancement, not MT5 migration logic.
+- Human review required before merge: Yes — admin data aggregation, manual evidence persistence, and export functionality need security and correctness review.
 
 ### 8. Handoff package
 - Epicentre files to inspect first:
-  - `src/routes/__root.tsx`
-  - `src/lib/api/sniperClient.ts`
-  - `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
-  - `.github/migration/PHASE0_SOAK_TRACKER.md`
+  - `src/routes/admin.tsx`
+  - `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` (around `get_admin_health` and `build_health_payload`)
+  - `PHASE0_SOAK_TRACKER.md`
+  - Database schema for `smc_sf_engine_runs` and `smc_sf_audit_events` tables
 - Inputs Codex must verify before planning:
-  - exact `/wp-json/sniper/v1/health` response contract and auth requirements
-  - whether an admin-only capability check exists or must be added in the plugin
-  - whether `/admin` should be implemented as a dashboard route or a WordPress admin page
-  - how manual observation entries should be modeled and stored
+  - Exact response contract of existing `/admin/health` endpoint
+  - Database schema and access patterns for snapshots, candles, engine_runs, audit_events
+  - Admin permission requirements and current user capability checks
+  - Whether manual evidence should be stored in new table or extended existing audit_events
+  - Export format requirements (markdown, HTML, PDF) and generation approach
 - Open unknowns:
-  - current backend health endpoint visibility for non-admin logged-in users
-  - whether the page should persist manual logs in backend storage or keep them purely frontend/manual
-  - whether additional diagnostic endpoints (e.g. `/authority-diagnostics`) should be surfaced on the same page
+  - Whether soak report should include real-time data or historical snapshots
+  - How 12h checkpoint persistence should interact with existing data retention (engine_runs prune at 7d, audit_events at 14d)
+  - Whether export should be client-side generation or server-side rendering

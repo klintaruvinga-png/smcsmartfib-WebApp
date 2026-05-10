@@ -1,255 +1,415 @@
-# SMC SuperFIB - `/admin` WordPress Hijack Patch Plan
+# SMC SuperFIB - Claude Plan Hardening Request
 
 ## 1. Issue validation
 
 **Confirmed**
 
-- `src/routes/admin.tsx` exports `createFileRoute("/admin")`, and `src/routeTree.gen.ts` registers `/admin`. The SPA already owns that route when it is served from its standalone app host.
-- `wrangler.jsonc` points the frontend at `@tanstack/react-start/server-entry`, which confirms the SPA is deployed as a standalone Cloudflare Workers app, not mounted inside WordPress.
-- `src/lib/api/sniperClient.ts` defaults to `https://trader.stokvelsociety.co.za/wp-json`, so the frontend depends on the WordPress REST backend but not on WordPress serving the SPA shell.
-- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` only registers REST routes under `/wp-json/sniper/v1/...`. There is no WordPress-side rewrite, proxy, shortcode, or template hook in this repo that would hand `/admin` to the SPA.
-- Live production verification on May 10, 2026 confirmed the host-layer intercept:
-  - `curl -I -L https://trader.stokvelsociety.co.za/admin`
-  - Response 1: `302 Found`, `x-redirect-by: WordPress`, `location: https://trader.stokvelsociety.co.za/wp-admin/`
-  - Response 2: `302 Found`, `x-redirect-by: WordPress`, `location: .../wp-login.php?redirect_to=.../wp-admin/`
-- Live production verification on May 10, 2026 also confirmed the backend is healthy and separately reachable:
-  - `curl -i https://trader.stokvelsociety.co.za/wp-json/sniper/v1/health`
-  - Response: `200 OK` JSON from the WordPress REST backend.
+- `src/routes/admin.tsx` exists and calls `/wp-json/sniper/v1/admin/health` via `fetchAdminHealth()`. The page renders health cards and a per-symbol diagnostics table. No aggregation of watchlist, snapshots, candles, engine_runs, or audit_events is present.
+- `get_admin_health()` in `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` returns `build_health_payload()` which covers EngineHealth state but not the Phase 0 evidence surfaces (candles row counts, engine_run success rates, audit_event error rates, manual operator entries).
+- `PHASE0_SOAK_TRACKER.md` requires 72h stability evidence, manual operator confirmation, and checkpoint snapshots. None of these are persisted or exportable from the current admin page.
+- The existing `/admin/health` endpoint contract must remain identical. The research report confirms this is a non-negotiable guard rail.
 
 **Likely**
 
-- The standalone app host works for `/admin` because the Workers app controls route resolution there, and the WordPress site is only acting as the backend API origin.
-- The safest fix is Path A: rename the SPA route away from bare `/admin` so the frontend stops colliding with a WordPress-reserved path on the root host.
-- `https://smcsuperfibwebapp.klintaruvinga.workers.dev` is the primary standalone Workers host in this repo, based on the allowed-origin list in `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`.
+- A new dedicated endpoint `/wp-json/sniper/v1/admin/soak-report` (Path A) is the correct isolation strategy. Extending the existing health endpoint with optional parameters risks contract drift and breaks the regression surface.
+- Client-side export (markdown string generation + `window.print()` for HTML/PDF) is sufficient and eliminates the need for a server-side PDF renderer. This is lower blast radius than server-side rendering.
+- Two new database tables are needed: one for persisted checkpoint snapshots (12h TTL, pruned at 72h), one for keyed manual operator evidence entries.
 
 **Unconfirmed**
 
-- Whether any CDN, proxy, or load-balancer rule outside this repo also references `/admin`.
-- Whether external docs, bookmarks, onboarding flows, or operator habits depend on the old `/admin` URL.
-- Whether `/dashboard-admin` is the final approved path token, or whether product wants a different non-conflicting name such as `/admin-health`.
+- The exact column schema of `smc_sf_snapshots`, `smc_sf_candles`, `smc_sf_engine_runs`, and `smc_sf_audit_events`. The aggregation queries in the new endpoint must be verified against the live schema before implementation. Do not assume column names not shown in the research report.
+- Whether `smc_sf_watchlist` table exists with that exact name or whether watchlist state is derived from another source. Implementation agent must grep for table registration before writing aggregation queries.
+- The exact WordPress `$wpdb->prefix` in use. All table references must use `$wpdb->prefix . 'smc_sf_*'` and must not hard-code the prefix.
 
-**Rejected**
+**Rejected hypothesis**
 
-- The failure is not a missing SPA route. The route exists and is generated correctly.
-- Path B, a WordPress rewrite or proxy mount for `/admin`, is not the safest fix. It would require host-layer behavior changes around a WordPress-owned admin namespace and increases the risk of collateral `wp-admin` breakage.
-- Path C, changing app entry hosting, is not justified for this patch. It is a broader deployment change than the failure requires.
+- The research report does not show evidence that the existing `/health` endpoint is broken or incorrect. The issue is additive scope, not a defect in the existing endpoint. No correction to existing endpoint logic is warranted.
 
-**Corrected root cause**
-
-WordPress on `trader.stokvelsociety.co.za` intercepts `/admin` before the SPA can load. The frontend route is valid only on the standalone Workers host that controls its own routing. The defect is a host-routing namespace collision, not an application-router defect.
+---
 
 ## 2. Implementation contract
 
-**Decision**
+### File 1: `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
 
-- Recommended fix: Path A.
-- Planned new SPA route: `/dashboard-admin`.
-- Backend REST path stays unchanged: `/wp-json/sniper/v1/admin/health`.
+**Section to modify:** The block where REST routes are registered via `register_rest_route`. Locate the call that registers `admin/health` and add a sibling registration immediately after it.
 
-### File: `src/routes/admin.tsx`
+**Exact change required:**
 
-- Exact section to modify: the file itself and the `createFileRoute()` declaration.
-- Exact change required:
-  - Rename the file to `src/routes/dashboard-admin.tsx`.
-  - Change `createFileRoute("/admin")` to `createFileRoute("/dashboard-admin")`.
-- Guard rails:
-  - Do not change the component render logic.
-  - Do not change auth behavior.
-  - Do not change any backend fetch path.
-  - Do not add a client-side alias or redirect from `/admin`.
-- Why in scope: this is the SPA route that collides with WordPress.
-- Acceptance criterion: the admin page is reachable at `/dashboard-admin` on the standalone app host, and `/admin` is no longer claimed by the SPA.
+Register one new endpoint:
 
-### File: `src/routeTree.gen.ts`
+```
+Route: /wp-json/sniper/v1/admin/soak-report
+Method: GET
+Permission callback: same permission_admin() function already used for admin/health — do not create a new auth function
+Handler: get_soak_report()
+```
 
-- Exact section to modify: generated route registry.
-- Exact change required: regenerate the file after the route rename.
-- Guard rails:
-  - Do not hand-edit the generated file.
-  - Do not remove unrelated routes.
-- Why in scope: the generated router map must reflect the renamed file-based route.
-- Acceptance criterion: `/dashboard-admin` appears in the generated route tree and `/admin` no longer appears as a registered SPA route.
+Register two new endpoints for manual evidence write:
 
-### File scope: `src/` SPA navigation references
+```
+Route: /wp-json/sniper/v1/admin/soak-evidence
+Method: POST
+Permission callback: permission_admin()
+Handler: upsert_soak_evidence()
+```
 
-- Exact section to modify: any in-app navigation target that points to `/admin`.
-- Exact change required: replace SPA navigation targets from `/admin` to `/dashboard-admin`.
-- Guard rails:
-  - Do not touch `/admin/health` backend REST strings.
-  - Do not touch `/wp-admin`.
-  - Do not rewrite historical markdown artifacts under `.github/` that describe earlier point-in-time behavior.
-- Why in scope: stale in-app links would silently preserve the broken path after the rename.
-- Acceptance criterion: a grep of `src/` shows no SPA navigation references to `/admin`.
+```
+Route: /wp-json/sniper/v1/admin/soak-checkpoint
+Method: POST
+Permission callback: permission_admin()
+Handler: create_soak_checkpoint()
+```
 
-### File: `reports/codex-implementation.md`
+Implement `get_soak_report()` to return a single JSON object containing:
+- `health`: the existing `build_health_payload()` output (call the existing function, do not duplicate it)
+- `watchlist_count`: integer row count from `$wpdb->prefix . 'smc_sf_watchlist'` (verify table exists; return null if absent)
+- `snapshots_24h`: integer row count from `smc_sf_snapshots` WHERE created_at >= NOW() - INTERVAL 24 HOUR
+- `candles_24h`: integer row count from `smc_sf_candles` WHERE created_at >= NOW() - INTERVAL 24 HOUR
+- `engine_runs_summary`: object with fields `total_24h`, `success_24h`, `error_24h`, `last_run_at` aggregated from `smc_sf_engine_runs` over the past 24h
+- `audit_events_summary`: object with fields `total_24h`, `error_count_24h`, `warning_count_24h` aggregated from `smc_sf_audit_events` over the past 24h
+- `manual_evidence`: array of all rows from new `smc_sf_soak_evidence` table, ordered by `updated_at DESC`
+- `checkpoints`: array of checkpoint rows from new `smc_sf_soak_checkpoints` table WHERE created_at >= NOW() - INTERVAL 72 HOUR, ordered by `created_at DESC`
+- `generated_at`: current UTC timestamp (ISO 8601)
 
-- Exact section to modify: the implementation summary artifact after the real code patch lands.
-- Exact change required: record the route rename, validations, and any rollout constraints that were resolved before merge.
-- Guard rails:
-  - Do not claim production verification that was not performed.
-  - Do not record WordPress rewrite work, because it is out of scope for the chosen fix.
-- Why in scope: required delivery artifact.
-- Acceptance criterion: summary reflects the actual code patch and rollout checks.
+Implement `upsert_soak_evidence($request)` to:
+- Accept JSON body with fields: `evidence_key` (string, required), `evidence_type` (enum: signal_parity_confirm | feed_stable_window | engine_run_observation | manual_note), `evidence_value` (string), `operator` (string)
+- Validate all fields server-side; reject with 400 on missing required fields
+- Upsert into `smc_sf_soak_evidence` on `evidence_key`
+- Return the saved row
 
-### Files explicitly not in scope
+Implement `create_soak_checkpoint($request)` to:
+- Accept JSON body with fields: `operator_notes` (string, optional)
+- Call `get_soak_report()` internally to capture a snapshot
+- Insert `snapshot_data` (JSON-encoded report) and `operator_notes` into `smc_sf_soak_checkpoints`
+- Prune rows older than 72h from `smc_sf_soak_checkpoints` in the same transaction
+- Return the new checkpoint row id and `created_at`
 
-- `src/lib/api/sniperClient.ts`
-  - Reason: `/admin/health` is a backend REST path and must remain unchanged.
-- `wrangler.jsonc`
-  - Reason: current standalone Workers entry is correct for the chosen fix.
-- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
-  - Reason: the chosen fix does not alter WordPress routing or backend contracts.
-- `.htaccess`, server rewrites, reverse proxies
-  - Reason: Path B is rejected for this patch.
+Register a `register_activation_hook` or inline `dbDelta` call (in the existing schema setup section if one exists, otherwise append after route registration) to create:
+
+```sql
+CREATE TABLE IF NOT EXISTS {prefix}smc_sf_soak_evidence (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  evidence_key VARCHAR(128) NOT NULL UNIQUE,
+  evidence_type VARCHAR(64) NOT NULL,
+  evidence_value TEXT NOT NULL,
+  operator VARCHAR(128) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS {prefix}smc_sf_soak_checkpoints (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  snapshot_data LONGTEXT NOT NULL,
+  operator_notes TEXT,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+Use `dbDelta()` via `require_once(ABSPATH . 'wp-admin/includes/upgrade.php')`.
+
+**Guard rails:**
+- Do not modify `get_admin_health()`, `build_health_payload()`, or the existing `admin/health` route registration in any way.
+- Do not alter `permission_admin()`.
+- Do not add columns to existing tables (`smc_sf_engine_runs`, `smc_sf_audit_events`, `smc_sf_snapshots`, `smc_sf_candles`).
+- All new SQL must use `$wpdb->prepare()` for any parameterized values. No raw string interpolation into queries.
+- `get_soak_report()` must not modify any data; it is read-only.
+
+**Why in scope:** This is the only file that registers REST endpoints and manages the WordPress DB schema for this plugin. Additive changes here are isolated and do not touch existing handlers.
+
+**Acceptance criterion:** `GET /wp-json/sniper/v1/admin/soak-report` returns HTTP 200 with a JSON body containing all seven top-level keys. `GET /wp-json/sniper/v1/admin/health` continues to return an identical response to its pre-patch state.
+
+---
+
+### File 2: `src/lib/api/sniperClient.ts`
+
+**Section to modify:** The block where `fetchAdminHealth` is defined. Add new sibling functions after it.
+
+**Exact change required:**
+
+Add three new exported async functions:
+
+```
+fetchSoakReport(): Promise<SoakReport>
+  — GET /wp-json/sniper/v1/admin/soak-report with same auth headers as fetchAdminHealth
+
+upsertSoakEvidence(payload: SoakEvidencePayload): Promise<SoakEvidenceRow>
+  — POST /wp-json/sniper/v1/admin/soak-evidence with JSON body
+
+createSoakCheckpoint(operatorNotes?: string): Promise<SoakCheckpointRow>
+  — POST /wp-json/sniper/v1/admin/soak-checkpoint with JSON body { operator_notes }
+```
+
+All three must use the same base URL and auth mechanism as `fetchAdminHealth`. Do not introduce a new HTTP client or auth pattern.
+
+**Guard rails:**
+- Do not modify `fetchAdminHealth` or any existing function.
+- Do not change the base URL construction or auth token retrieval logic.
+
+**Why in scope:** The frontend requires typed API client functions to consume the new endpoints.
+
+**Acceptance criterion:** All three functions resolve without TypeScript errors and match the backend endpoint signatures exactly.
+
+---
+
+### File 3: `src/types/sniper.ts`
+
+**Section to modify:** Append new type definitions after the last existing export.
+
+**Exact change required:**
+
+Add the following types (do not modify existing types):
+
+```typescript
+export type SoakEvidenceType =
+  | 'signal_parity_confirm'
+  | 'feed_stable_window'
+  | 'engine_run_observation'
+  | 'manual_note';
+
+export interface SoakEvidenceRow {
+  id: number;
+  evidence_key: string;
+  evidence_type: SoakEvidenceType;
+  evidence_value: string;
+  operator: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SoakEvidencePayload {
+  evidence_key: string;
+  evidence_type: SoakEvidenceType;
+  evidence_value: string;
+  operator: string;
+}
+
+export interface SoakCheckpointRow {
+  id: number;
+  snapshot_data: SoakReport;
+  operator_notes: string | null;
+  created_at: string;
+}
+
+export interface SoakReport {
+  health: AdminHealth; // existing AdminHealth type — do not redefine
+  watchlist_count: number | null;
+  snapshots_24h: number;
+  candles_24h: number;
+  engine_runs_summary: {
+    total_24h: number;
+    success_24h: number;
+    error_24h: number;
+    last_run_at: string | null;
+  };
+  audit_events_summary: {
+    total_24h: number;
+    error_count_24h: number;
+    warning_count_24h: number;
+  };
+  manual_evidence: SoakEvidenceRow[];
+  checkpoints: SoakCheckpointRow[];
+  generated_at: string;
+}
+```
+
+**Guard rails:**
+- Do not rename or alter `AdminHealth` or any existing type.
+- `SoakReport.health` must reference the existing `AdminHealth` type exactly, not a copy.
+
+**Why in scope:** New API response shapes require TypeScript contracts before the UI can safely consume them.
+
+**Acceptance criterion:** `tsc --noEmit` passes with zero new errors after these types are added.
+
+---
+
+### File 4: `src/routes/admin.tsx`
+
+**Section to modify:** The component body of the existing admin route component. Extend it; do not replace it.
+
+**Exact change required:**
+
+Below the existing health display section, add a collapsible "Phase 0 Soak Report" panel containing:
+
+**A. Aggregated data display (read from `fetchSoakReport`):**
+- Summary row: watchlist symbols count, snapshots 24h, candles 24h
+- Engine runs table: total / success / error counts over 24h, last run timestamp
+- Audit events table: total / error / warning counts over 24h
+- Separate fetch lifecycle from the existing `fetchAdminHealth` call — do not merge them into a single call or replace the existing health fetch
+
+**B. Manual evidence form:**
+- Fields: `evidence_key` (text), `evidence_type` (select from enum values), `evidence_value` (textarea), `operator` (text, pre-filled with logged-in user identifier if available)
+- Submit button calls `upsertSoakEvidence` and refreshes the soak report
+- Display existing manual evidence rows in a table below the form
+
+**C. Checkpoint controls:**
+- "Save 12h Checkpoint" button with an optional notes textarea
+- Calls `createSoakCheckpoint` and refreshes the checkpoint list
+- Display last 5 checkpoints with `created_at` and `operator_notes`
+
+**D. Export controls:**
+- "Export Markdown" button: generates a markdown string from current `SoakReport` state (client-side, no API call) and triggers a browser download of `soak-report-{ISO-date}.md`
+- "Print / Save PDF" button: calls `window.print()` — the print stylesheet must hide the nav and sidebar so only the soak report section prints
+
+Add a CSS class `soak-report-print-section` to the soak report container and add a `@media print` rule to the component's stylesheet (or inline style block) that sets `display: none` on everything except `.soak-report-print-section`.
+
+**Guard rails:**
+- The existing health cards and per-symbol diagnostics table must remain visually and functionally unchanged above the new panel.
+- Do not remove or alter the `fetchAdminHealth` call or its result rendering.
+- Do not introduce a global state manager or context for soak report state; use local component state only.
+- The soak report panel must render only for users who can already see the admin page (the existing admin gate is sufficient — do not add a second auth check in the component).
+- Do not add routing changes; the panel lives on the same `/admin` route.
+
+**Why in scope:** This is the only frontend file for the admin route; the new panel must live here.
+
+**Acceptance criterion:** Admin page loads without console errors. Existing health cards render correctly. Soak report panel loads its data independently. Export download triggers on button click. Print stylesheet hides navigation.
+
+---
 
 ## 3. Patch sequence
 
-1. Confirm the final replacement path token with human review.
-   - Default recommendation: `/dashboard-admin`.
-   - This is the only unresolved product-level naming decision.
+1. **Verify DB schema** — Before writing any PHP, the implementation agent must run `SHOW CREATE TABLE` or grep for `smc_sf_engine_runs`, `smc_sf_audit_events`, `smc_sf_snapshots`, `smc_sf_candles`, `smc_sf_watchlist` in the plugin PHP to confirm exact column names used in aggregation queries. If `smc_sf_watchlist` does not exist, `watchlist_count` must be hardcoded to `null` in the response.
 
-2. Rename the SPA route module.
-   - `src/routes/admin.tsx` -> `src/routes/dashboard-admin.tsx`
-   - Update `createFileRoute("/admin")` -> `createFileRoute("/dashboard-admin")`
+2. **PHP — new table registration** (`wordpress/smc-superfib-sniper/smc-superfib-sniper.php`) — Add `dbDelta` calls for the two new tables. This must be applied first because the route handlers depend on the tables existing.
 
-3. Search `src/` for any SPA links or route targets that still reference `/admin`.
-   - Update only client-side navigation references.
-   - Leave backend REST strings untouched.
+3. **PHP — new endpoint registrations and handlers** (`wordpress/smc-superfib-sniper/smc-superfib-sniper.php`) — Add route registrations and implement `get_soak_report()`, `upsert_soak_evidence()`, `create_soak_checkpoint()`. No other file changes are needed on the PHP side.
 
-4. Regenerate `src/routeTree.gen.ts`.
+4. **TypeScript types** (`src/types/sniper.ts`) — Add new types. Must precede API client changes.
 
-5. Run verification.
-   - `npx tsc --noEmit`
-   - `npm run build`
-   - grep for stale `/admin` SPA references in `src/`
+5. **TypeScript API client** (`src/lib/api/sniperClient.ts`) — Add three new functions. Must follow type additions.
 
-6. Deploy the frontend build to the standalone app host.
-   - No WordPress plugin deploy is required for the chosen fix.
+6. **Frontend UI** (`src/routes/admin.tsx`) — Add the soak report panel. Must follow API client changes so imports resolve.
 
-7. Run live smoke checks after deploy.
-   - Standalone app host: `/dashboard-admin` works.
-   - WordPress host: `/admin` still resolves to WordPress and no longer represents a broken SPA expectation.
+**Dependencies:** Steps 2 and 3 are both in the same PHP file; apply them in a single commit to avoid an intermediate state where routes are registered but tables do not exist. Steps 4 → 5 → 6 are strictly ordered by TypeScript import resolution.
 
-**Dependencies**
+**State/migration sequencing risk:** The `dbDelta` call is idempotent and safe to run on an already-installed WordPress instance. No data migration is required. The new tables start empty; manual evidence and checkpoint data populate on first operator use.
 
-- Step 4 depends on steps 2 and 3.
-- Step 5 depends on step 4.
-- Step 7 depends on step 6.
-
-**Sequencing risks**
-
-- Adding any `/admin` alias back into the SPA would recreate the host collision.
-- Deploying before the route tree is regenerated risks a broken client bundle.
-- Updating backend or WordPress code in the same patch widens the blast radius without solving the underlying namespace collision more safely.
+---
 
 ## 4. Regression guards
 
-**Required checks**
+**After patching, the implementation agent must verify:**
 
-- `rg -n 'createFileRoute\\(\"/admin\"\\)|to:\\s*\"/admin\"|href=\"/admin\"|navigate\\(\\{\\s*to:\\s*\"/admin\"' src`
-  - Expected: zero matches after the implementation.
-- `rg -n '"/dashboard-admin"|/dashboard-admin' src/routeTree.gen.ts`
-  - Expected: the new route is registered.
-- `npx tsc --noEmit`
-  - Expected: zero TypeScript errors.
-- `npm run build`
-  - Expected: clean production build.
+- `curl -H "Authorization: Bearer {admin_token}" /wp-json/sniper/v1/admin/health` returns HTTP 200 with the identical JSON shape as pre-patch (no new keys, no removed keys, no type changes).
+- `curl -H "Authorization: Bearer {admin_token}" /wp-json/sniper/v1/admin/soak-report` returns HTTP 200 with all seven top-level keys present.
+- A non-admin request to `/wp-json/sniper/v1/admin/soak-report` returns HTTP 401 or 403.
+- A non-admin POST to `/wp-json/sniper/v1/admin/soak-evidence` returns HTTP 401 or 403.
+- The `/admin` frontend page loads without JavaScript errors in the browser console.
+- The existing health cards section is visually unchanged.
+- `tsc --noEmit` exits 0.
+- `POST /wp-json/sniper/v1/admin/soak-evidence` with a missing `evidence_key` returns HTTP 400.
+- `POST /wp-json/sniper/v1/admin/soak-checkpoint` inserts a row and the GET soak-report response contains that row in `checkpoints`.
+- After inserting a checkpoint, rows older than 72h are pruned from `smc_sf_soak_checkpoints`.
 
-**Protections that must still hold**
+**Existing protections that must still hold:**
 
-- `GET /wp-json/sniper/v1/admin/health` remains the backend-owned admin endpoint.
-- `src/lib/api/sniperClient.ts` remains unchanged.
-- No stale-data guard, auth boundary, or backend authority rule is weakened.
+- `permission_admin()` function unmodified.
+- `manage_options` capability check unmodified.
+- `build_health_payload()` output unmodified.
+- Phase 0 soak tracker document unmodified.
 
-**Manual verification**
+**Parity re-validation required:**
 
-- Standalone Workers host:
-  - authenticated user opens `/dashboard-admin` and the admin page renders
-  - unauthenticated user opens `/dashboard-admin` and is redirected to `/login`
-- WordPress host:
-  - `https://trader.stokvelsociety.co.za/admin` still resolves to WordPress admin/login behavior
-  - no operator-facing docs or app links still instruct users to use `/admin` for the SPA
+- Verify that aggregation queries against `smc_sf_engine_runs` and `smc_sf_audit_events` use read-only SELECT statements and do not write or alter those tables.
+- Verify that `snapshot_data` stored in checkpoints is a JSON copy (not a reference) so future health changes do not retroactively alter historical checkpoints.
 
-**Diagnostics**
+**Logging/diagnostics that must exist after the patch:**
 
-- Keep the `curl -I -L https://trader.stokvelsociety.co.za/admin` trace in the PR discussion or implementation summary as evidence of the original collision.
-- No parity audit is required unless someone expands the patch beyond frontend route renaming.
+- `get_soak_report()` must not silently swallow DB errors. If a table query fails, the corresponding field in the response should return `null` with an optional `_error` sibling key (e.g., `engine_runs_summary: null, engine_runs_summary_error: "table not found"`).
+- `upsert_soak_evidence()` must log WordPress `error_log()` on DB failure.
+
+---
 
 ## 5. Non-goals
 
-- Do not add WordPress rewrite rules, proxy rules, or plugin hooks for `/admin`.
-- Do not change `wrangler.jsonc`, Workers routing, or frontend hosting topology.
-- Do not rename the backend REST path `/wp-json/sniper/v1/admin/health`.
-- Do not add a compatibility redirect from `/admin` inside the SPA.
-- Do not rewrite historical audit files solely to rename past references to `/admin`.
-- Do not widen this into a broader "dashboard subdomain migration" project.
+**Out of scope for this patch:**
+
+- Any changes to `get_admin_health()`, `build_health_payload()`, or the `/admin/health` route.
+- Changes to `smc_sf_engine_runs`, `smc_sf_audit_events`, `smc_sf_snapshots`, or `smc_sf_candles` table schemas.
+- Server-side PDF generation (no headless browser, no wkhtmltopdf, no PHP PDF library).
+- Server-side markdown rendering.
+- Changes to any non-admin REST endpoints (`/health`, `/market-data-authority`, `/authority-diagnostics`).
+- Changes to the Pine script or MT5 EA.
+- Changes to any route other than `/admin`.
+- Automated checkpoint scheduling (cron jobs, WordPress scheduled events). Checkpoints are operator-initiated only.
+- Role management beyond the existing `manage_options` capability gate.
+- Data retention policy changes for existing tables.
+- A dedicated soak report route (e.g., `/admin/soak-report`). The panel lives on `/admin`.
+
+**Attractive but unsafe follow-on changes to avoid in this patch:**
+
+- Merging `fetchSoakReport` and `fetchAdminHealth` into a single combined call. This would couple two independently managed data concerns and risk breaking the health display if the new aggregation queries are slow or fail.
+- Adding a `?include_soak=true` parameter to the existing `/admin/health` endpoint (Path B from the research report). Rejected: contaminates the existing contract.
+- Storing manual evidence in `smc_sf_audit_events` instead of a dedicated table. Rejected: audit_events is a backend source-of-truth table; operator manual entries must not pollute it.
+- Auto-generating and emailing soak reports. Out of scope for Phase 0.
+
+---
 
 ## 6. Risk assessment
 
-**Worst-case failure mode if patched incorrectly**
+**Worst-case failure mode if patched incorrectly:**
 
-- The frontend is renamed, but stale navigation or documentation still points users to `/admin`, which silently lands them in WordPress instead of the dashboard.
-- Hand-editing `src/routeTree.gen.ts` instead of regenerating it could break route matching in the SPA bundle.
+An SQL injection vulnerability in `upsert_soak_evidence()` or `create_soak_checkpoint()` if `$wpdb->prepare()` is omitted. Attacker with admin credentials could execute arbitrary SQL against the WordPress database. All parameterized values must use `$wpdb->prepare()` without exception.
 
-**User-visible failure mode**
+**User-visible failure mode:**
 
-- Admin users continue opening `/admin` from habit or old links and see the WordPress login/admin flow instead of the dashboard page.
+If the `smc_sf_watchlist` table does not exist and the PHP handler throws an uncaught exception rather than returning `null`, the entire `/admin` page could blank out for admin users. The implementation must catch DB errors per field and degrade gracefully.
 
-**Backend authority and stale-state risk**
+**Backend authority or stale-state risks:**
 
-- None from the recommended patch, provided the backend endpoint and auth rules remain untouched.
+`get_soak_report()` embeds a live call to `build_health_payload()`. If health payload generation is slow (e.g., external feed timeout), the soak report response will be slow. The frontend must manage the soak report fetch with its own loading state and must not block the existing health card render on it.
 
-**Human approval before merge**
+Checkpoint `snapshot_data` is a JSON copy of the report at point-in-time. If the checkpoint is created during a degraded health state, it will accurately record that degraded state. This is correct behavior, not a bug.
 
-- Required.
-- Approvals needed:
-  - final path token
-  - confirmation that `/admin` does not need backwards compatibility
-  - confirmation that no external proxy or runbook outside this repo also needs updating
+**Whether human approval should be required before merge:**
+
+**Yes.** New admin-only backend aggregation, new database tables, and a new write endpoint (`upsert_soak_evidence`) require security review before merge. Specifically: SQL injection surface of all new `$wpdb` calls, and correctness of the auth gate on all three new endpoints.
+
+---
 
 ## 7. Test requirements
 
-**Automated checks required**
+**Tests to add:**
 
-- `npx tsc --noEmit`
-- `npm run build`
-- repo grep for stale SPA references to `/admin`
+- PHP unit or integration test for `get_soak_report()`: assert all seven top-level keys are present; assert `health` key matches the output of `build_health_payload()`.
+- PHP test for `upsert_soak_evidence()`: assert missing `evidence_key` returns WP_Error with 400 status; assert valid payload upserts and returns the row.
+- PHP test for `create_soak_checkpoint()`: assert a row is inserted; assert rows older than 72h are pruned after insertion.
+- PHP test for auth gate: assert all three new endpoints return 401/403 without `manage_options`.
+- TypeScript: if the project has existing API client tests, add corresponding tests for the three new functions that mock the fetch response and assert return types.
+- TypeScript: `tsc --noEmit` must pass — this is a required gate, not optional.
 
-**Manual checks required**
+**Existing tests or manual checks that must still pass:**
 
-- Standalone host smoke test for `/dashboard-admin` with and without authentication.
-- WordPress host smoke test for `/admin` to confirm the collision is no longer part of the expected SPA path.
+- Any existing test covering `get_admin_health()` or `build_health_payload()` must pass unchanged.
+- The `/admin` frontend route must load in the browser without errors (manual check if no E2E tests exist).
+- The existing per-symbol diagnostics table must render correctly on the admin page.
 
-**Existing checks that must remain true**
+**Soak, replay, or live-environment verification needed:**
 
-- Public health endpoint on the WordPress backend remains reachable.
-- Admin backend endpoint remains backend-owned and auth-protected.
+- After deploy to the WordPress instance, an operator must manually create one soak evidence entry and one checkpoint via the UI, then export the markdown and verify the output contains the evidence entry and the checkpoint.
+- Verify the `smc_sf_soak_checkpoints` row is present in the database with correct JSON in `snapshot_data`.
+- Verify that a re-fetch of `GET /wp-json/sniper/v1/admin/health` after these operations returns an identical response to its pre-patch state.
 
-**Testing limitation**
-
-- This repo does not currently expose a frontend route-test harness or `npm test` script for route-level assertions. Manual route verification is part of the required rollout.
+---
 
 ## 8. Implementation handoff
 
-**Recommended path**
+**Branch naming recommendation:**
 
-- Proceed with Path A: rename the SPA route from `/admin` to `/dashboard-admin`.
+`feature/phase0-soak-report-builder`
 
-**Current research branch**
+**Suggested commit grouping:**
 
-- `codex/research-this-repo-and-deployment-shape-confirm-`
+1. `feat(php): register smc_sf_soak_evidence and smc_sf_soak_checkpoints tables via dbDelta`
+2. `feat(php): add /admin/soak-report GET, /admin/soak-evidence POST, /admin/soak-checkpoint POST endpoints`
+3. `feat(types): add SoakReport, SoakEvidenceRow, SoakCheckpointRow, SoakEvidencePayload types`
+4. `feat(api): add fetchSoakReport, upsertSoakEvidence, createSoakCheckpoint to sniperClient`
+5. `feat(admin): add Phase 0 soak report panel with manual evidence form, checkpoint controls, and export`
 
-**Suggested future implementation commit grouping**
+**Required reports or artifacts to generate after implementation:**
 
-1. `fix(routing): rename admin SPA route to dashboard-admin to avoid WordPress collision`
-2. `chore(routing): regenerate TanStack route tree after admin route rename`
+- One manually created checkpoint snapshot exported as `soak-report-{date}.md` and attached to the PR as evidence that the export flow works end-to-end.
+- PR body must include: confirmation that `/admin/health` response is byte-identical pre/post patch, list of new DB tables created, confirmation that all three new endpoints reject non-admin requests, and confirmation that `tsc --noEmit` exits 0.
 
-**Required artifacts**
+**State transition:**
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-10_admin-route-wordpress-hijack.md`
-- `reports/codex-implementation.md`
-
-**State transition**
-
-- `READY_FOR_IMPLEMENTATION`
-- `editing_locked=false`
+`READY_FOR_IMPLEMENTATION` | `editing_locked=false`

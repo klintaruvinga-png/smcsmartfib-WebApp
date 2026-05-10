@@ -270,6 +270,48 @@ final class SMC_SuperFib_Sniper_REST {
         foreach ($tables as $sql) {
             dbDelta($sql);
         }
+
+        self::ensure_soak_tables();
+    }
+
+    private static function ensure_soak_tables() {
+        global $wpdb;
+
+        if (file_exists(ABSPATH . 'wp-admin/includes/upgrade.php')) {
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        }
+
+        if (!function_exists('dbDelta')) {
+            return;
+        }
+
+        $charset = $wpdb->get_charset_collate();
+        $tables = array();
+
+        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_soak_evidence (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            evidence_key VARCHAR(128) NOT NULL,
+            evidence_type VARCHAR(64) NOT NULL,
+            evidence_value TEXT NOT NULL,
+            operator VARCHAR(128) NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            UNIQUE KEY evidence_key (evidence_key)
+        ) $charset;";
+
+        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_soak_checkpoints (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            snapshot_data LONGTEXT NOT NULL,
+            operator_notes TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            KEY created_at (created_at)
+        ) $charset;";
+
+        foreach ($tables as $sql) {
+            dbDelta($sql);
+        }
     }
 
     public function register_routes() {
@@ -277,6 +319,21 @@ final class SMC_SuperFib_Sniper_REST {
         register_rest_route(self::NAMESPACE, '/admin/health', array(
             'methods' => WP_REST_Server::READABLE,
             'callback' => array($this, 'get_admin_health'),
+            'permission_callback' => array($this, 'permission_admin'),
+        ));
+        register_rest_route(self::NAMESPACE, '/admin/soak-report', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => array($this, 'get_soak_report'),
+            'permission_callback' => array($this, 'permission_admin'),
+        ));
+        register_rest_route(self::NAMESPACE, '/admin/soak-evidence', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($this, 'upsert_soak_evidence'),
+            'permission_callback' => array($this, 'permission_admin'),
+        ));
+        register_rest_route(self::NAMESPACE, '/admin/soak-checkpoint', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($this, 'create_soak_checkpoint'),
             'permission_callback' => array($this, 'permission_admin'),
         ));
         $this->route('/session', WP_REST_Server::READABLE, 'get_session', false);
@@ -595,6 +652,274 @@ final class SMC_SuperFib_Sniper_REST {
 
     public function get_admin_health() {
         return rest_ensure_response($this->build_health_payload(get_current_user_id()));
+    }
+
+    public function get_soak_report() {
+        self::ensure_soak_tables();
+        global $wpdb;
+
+        $user_id = get_current_user_id();
+        $since_24h = gmdate('Y-m-d H:i:s', strtotime('-24 hours'));
+        $report = array(
+            'health' => $this->build_health_payload($user_id),
+            'watchlist_count' => null,
+            'snapshots_24h' => 0,
+            'candles_24h' => 0,
+            'engine_runs_summary' => array(
+                'total_24h' => 0,
+                'success_24h' => 0,
+                'error_24h' => 0,
+                'last_run_at' => null,
+            ),
+            'audit_events_summary' => array(
+                'total_24h' => 0,
+                'error_count_24h' => 0,
+                'warning_count_24h' => 0,
+            ),
+            'manual_evidence' => array(),
+            'checkpoints' => array(),
+            'generated_at' => gmdate('c'),
+        );
+
+        $snapshots_count = $this->soak_get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$this->table('snapshots')} WHERE user_id = %d AND updated_at >= %s",
+            $user_id,
+            $since_24h
+        ));
+        if ($snapshots_count['error'] !== null) {
+            $report['snapshots_24h'] = null;
+            $report['snapshots_24h_error'] = $snapshots_count['error'];
+        } else {
+            $report['snapshots_24h'] = (int) $snapshots_count['value'];
+        }
+
+        $candles_count = $this->soak_get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$this->table('candles')} WHERE user_id = %d AND created_at >= %s",
+            $user_id,
+            $since_24h
+        ));
+        if ($candles_count['error'] !== null) {
+            $report['candles_24h'] = null;
+            $report['candles_24h_error'] = $candles_count['error'];
+        } else {
+            $report['candles_24h'] = (int) $candles_count['value'];
+        }
+
+        $engine_runs_summary = $this->soak_get_row($wpdb->prepare(
+            "SELECT COUNT(*) AS total_24h,
+                SUM(CASE WHEN status = 'complete' THEN 1 ELSE 0 END) AS success_24h,
+                SUM(CASE WHEN status NOT IN ('complete', 'heartbeat') THEN 1 ELSE 0 END) AS error_24h,
+                MAX(created_at) AS last_run_at
+             FROM {$this->table('engine_runs')}
+             WHERE user_id = %d AND created_at >= %s",
+            $user_id,
+            $since_24h
+        ));
+        if ($engine_runs_summary['error'] !== null) {
+            $report['engine_runs_summary'] = null;
+            $report['engine_runs_summary_error'] = $engine_runs_summary['error'];
+        } else {
+            $row = is_array($engine_runs_summary['value']) ? $engine_runs_summary['value'] : array();
+            $report['engine_runs_summary'] = array(
+                'total_24h' => (int) ($row['total_24h'] ?? 0),
+                'success_24h' => (int) ($row['success_24h'] ?? 0),
+                'error_24h' => (int) ($row['error_24h'] ?? 0),
+                'last_run_at' => $this->to_iso($row['last_run_at'] ?? null),
+            );
+        }
+
+        $audit_events_summary = $this->soak_get_row($wpdb->prepare(
+            "SELECT COUNT(*) AS total_24h,
+                SUM(CASE
+                    WHEN event_type LIKE '%%error%%'
+                      OR event_type LIKE '%%invalid%%'
+                      OR event_type LIKE '%%failed%%'
+                      OR event_type LIKE '%%rejected%%'
+                    THEN 1 ELSE 0 END) AS error_count_24h,
+                SUM(CASE
+                    WHEN event_type LIKE '%%warning%%'
+                      OR event_type LIKE '%%stale%%'
+                      OR event_type LIKE '%%rate_limit%%'
+                      OR event_type LIKE '%%blocked%%'
+                    THEN 1 ELSE 0 END) AS warning_count_24h
+             FROM {$this->table('audit_events')}
+             WHERE user_id = %d AND created_at >= %s",
+            $user_id,
+            $since_24h
+        ));
+        if ($audit_events_summary['error'] !== null) {
+            $report['audit_events_summary'] = null;
+            $report['audit_events_summary_error'] = $audit_events_summary['error'];
+        } else {
+            $row = is_array($audit_events_summary['value']) ? $audit_events_summary['value'] : array();
+            $report['audit_events_summary'] = array(
+                'total_24h' => (int) ($row['total_24h'] ?? 0),
+                'error_count_24h' => (int) ($row['error_count_24h'] ?? 0),
+                'warning_count_24h' => (int) ($row['warning_count_24h'] ?? 0),
+            );
+        }
+
+        $manual_evidence_rows = $this->soak_get_results(
+            "SELECT * FROM {$this->table('soak_evidence')} ORDER BY updated_at DESC"
+        );
+        if ($manual_evidence_rows['error'] !== null) {
+            $report['manual_evidence_error'] = $manual_evidence_rows['error'];
+        } else {
+            $report['manual_evidence'] = array_map(array($this, 'map_soak_evidence_row'), $manual_evidence_rows['value']);
+        }
+
+        $checkpoints_rows = $this->soak_get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table('soak_checkpoints')} WHERE created_at >= %s ORDER BY created_at DESC",
+            gmdate('Y-m-d H:i:s', strtotime('-72 hours'))
+        ));
+        if ($checkpoints_rows['error'] !== null) {
+            $report['checkpoints_error'] = $checkpoints_rows['error'];
+        } else {
+            $report['checkpoints'] = array_map(array($this, 'map_soak_checkpoint_row'), $checkpoints_rows['value']);
+        }
+
+        return rest_ensure_response($report);
+    }
+
+    public function upsert_soak_evidence(WP_REST_Request $request) {
+        self::ensure_soak_tables();
+        global $wpdb;
+
+        $payload = $request->get_json_params();
+        if (!is_array($payload)) {
+            $payload = array();
+        }
+
+        $evidence_key = sanitize_text_field($payload['evidence_key'] ?? '');
+        $evidence_type = sanitize_text_field($payload['evidence_type'] ?? '');
+        $evidence_value = function_exists('sanitize_textarea_field')
+            ? sanitize_textarea_field($payload['evidence_value'] ?? '')
+            : trim((string) ($payload['evidence_value'] ?? ''));
+        $operator = sanitize_text_field($payload['operator'] ?? '');
+        $allowed_types = array('signal_parity_confirm', 'feed_stable_window', 'engine_run_observation', 'manual_note');
+
+        if ($evidence_key === '') {
+            return new WP_Error('smc_sf_soak_evidence_key_required', 'evidence_key is required.', array('status' => 400));
+        }
+        if (!in_array($evidence_type, $allowed_types, true)) {
+            return new WP_Error('smc_sf_soak_evidence_type_invalid', 'evidence_type is invalid.', array('status' => 400));
+        }
+        if ($evidence_value === '') {
+            return new WP_Error('smc_sf_soak_evidence_value_required', 'evidence_value is required.', array('status' => 400));
+        }
+        if ($operator === '') {
+            return new WP_Error('smc_sf_soak_operator_required', 'operator is required.', array('status' => 400));
+        }
+
+        $existing = $this->soak_get_row($wpdb->prepare(
+            "SELECT * FROM {$this->table('soak_evidence')} WHERE evidence_key = %s",
+            $evidence_key
+        ));
+        if ($existing['error'] !== null) {
+            error_log('[PHASE0_SOAK] soak evidence lookup failed: ' . $existing['error']);
+            return new WP_Error('smc_sf_soak_evidence_lookup_failed', 'Could not read soak evidence.', array('status' => 500));
+        }
+
+        $now = $this->now_mysql();
+        $saved = false;
+        if (is_array($existing['value'])) {
+            $saved = $wpdb->update(
+                $this->table('soak_evidence'),
+                array(
+                    'evidence_type' => $evidence_type,
+                    'evidence_value' => $evidence_value,
+                    'operator' => $operator,
+                    'updated_at' => $now,
+                ),
+                array('evidence_key' => $evidence_key),
+                array('%s', '%s', '%s', '%s'),
+                array('%s')
+            );
+        } else {
+            $saved = $wpdb->insert(
+                $this->table('soak_evidence'),
+                array(
+                    'evidence_key' => $evidence_key,
+                    'evidence_type' => $evidence_type,
+                    'evidence_value' => $evidence_value,
+                    'operator' => $operator,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ),
+                array('%s', '%s', '%s', '%s', '%s', '%s')
+            );
+        }
+
+        if ($saved === false) {
+            error_log('[PHASE0_SOAK] soak evidence write failed: ' . $this->wpdb_last_error());
+            return new WP_Error('smc_sf_soak_evidence_write_failed', 'Could not save soak evidence.', array('status' => 500));
+        }
+
+        $stored = $this->soak_get_row($wpdb->prepare(
+            "SELECT * FROM {$this->table('soak_evidence')} WHERE evidence_key = %s",
+            $evidence_key
+        ));
+        if ($stored['error'] !== null || !is_array($stored['value'])) {
+            error_log('[PHASE0_SOAK] soak evidence reload failed: ' . ($stored['error'] ?? 'missing row'));
+            return new WP_Error('smc_sf_soak_evidence_reload_failed', 'Soak evidence saved but could not be reloaded.', array('status' => 500));
+        }
+
+        return rest_ensure_response($this->map_soak_evidence_row($stored['value']));
+    }
+
+    public function create_soak_checkpoint(WP_REST_Request $request) {
+        self::ensure_soak_tables();
+        global $wpdb;
+
+        $payload = $request->get_json_params();
+        if (!is_array($payload)) {
+            $payload = array();
+        }
+
+        $operator_notes = function_exists('sanitize_textarea_field')
+            ? sanitize_textarea_field($payload['operator_notes'] ?? '')
+            : trim((string) ($payload['operator_notes'] ?? ''));
+        $report = $this->get_soak_report();
+        if ($report instanceof WP_Error) {
+            return $report;
+        }
+
+        $created_at = $this->now_mysql();
+        $snapshot_data = wp_json_encode($report);
+        $cutoff = gmdate('Y-m-d H:i:s', strtotime('-72 hours'));
+
+        $wpdb->query('START TRANSACTION');
+        $inserted = $wpdb->insert(
+            $this->table('soak_checkpoints'),
+            array(
+                'snapshot_data' => $snapshot_data,
+                'operator_notes' => $operator_notes !== '' ? $operator_notes : null,
+                'created_at' => $created_at,
+            ),
+            array('%s', '%s', '%s')
+        );
+        if ($inserted === false) {
+            $wpdb->query('ROLLBACK');
+            return new WP_Error('smc_sf_soak_checkpoint_insert_failed', 'Could not create soak checkpoint.', array('status' => 500));
+        }
+
+        $pruned = $wpdb->query($wpdb->prepare(
+            "DELETE FROM {$this->table('soak_checkpoints')} WHERE created_at < %s",
+            $cutoff
+        ));
+        if ($pruned === false) {
+            $wpdb->query('ROLLBACK');
+            return new WP_Error('smc_sf_soak_checkpoint_prune_failed', 'Could not prune old soak checkpoints.', array('status' => 500));
+        }
+
+        $wpdb->query('COMMIT');
+
+        return rest_ensure_response(array(
+            'id' => isset($wpdb->insert_id) ? (int) $wpdb->insert_id : 0,
+            'snapshot_data' => $report,
+            'operator_notes' => $operator_notes !== '' ? $operator_notes : null,
+            'created_at' => $this->to_iso($created_at),
+        ));
     }
 
     private function build_health_payload($user_id) {
@@ -3554,6 +3879,71 @@ final class SMC_SuperFib_Sniper_REST {
             default:
                 return 'offline';
         }
+    }
+
+    private function soak_get_var($query) {
+        global $wpdb;
+        $this->reset_wpdb_error();
+        $value = $wpdb->get_var($query);
+        return array(
+            'value' => $value,
+            'error' => $this->wpdb_last_error(),
+        );
+    }
+
+    private function soak_get_row($query) {
+        global $wpdb;
+        $this->reset_wpdb_error();
+        $value = $wpdb->get_row($query, ARRAY_A);
+        return array(
+            'value' => $value,
+            'error' => $this->wpdb_last_error(),
+        );
+    }
+
+    private function soak_get_results($query) {
+        global $wpdb;
+        $this->reset_wpdb_error();
+        $value = $wpdb->get_results($query, ARRAY_A);
+        return array(
+            'value' => is_array($value) ? $value : array(),
+            'error' => $this->wpdb_last_error(),
+        );
+    }
+
+    private function map_soak_evidence_row($row) {
+        return array(
+            'id' => isset($row['id']) ? (int) $row['id'] : 0,
+            'evidence_key' => (string) ($row['evidence_key'] ?? ''),
+            'evidence_type' => (string) ($row['evidence_type'] ?? ''),
+            'evidence_value' => (string) ($row['evidence_value'] ?? ''),
+            'operator' => (string) ($row['operator'] ?? ''),
+            'created_at' => $this->to_iso($row['created_at'] ?? null),
+            'updated_at' => $this->to_iso($row['updated_at'] ?? null),
+        );
+    }
+
+    private function map_soak_checkpoint_row($row) {
+        $snapshot = json_decode((string) ($row['snapshot_data'] ?? ''), true);
+
+        return array(
+            'id' => isset($row['id']) ? (int) $row['id'] : 0,
+            'snapshot_data' => is_array($snapshot) ? $snapshot : array(),
+            'operator_notes' => isset($row['operator_notes']) && $row['operator_notes'] !== '' ? (string) $row['operator_notes'] : null,
+            'created_at' => $this->to_iso($row['created_at'] ?? null),
+        );
+    }
+
+    private function reset_wpdb_error() {
+        global $wpdb;
+        if (isset($wpdb->last_error)) {
+            $wpdb->last_error = '';
+        }
+    }
+
+    private function wpdb_last_error() {
+        global $wpdb;
+        return isset($wpdb->last_error) && $wpdb->last_error !== '' ? $wpdb->last_error : null;
     }
 
     private function table($name) {

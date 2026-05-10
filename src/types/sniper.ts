@@ -272,3 +272,54 @@ export interface AccountState {
   todayPnlPct: number;
   state: FreshnessState;
 }
+
+export type SoakEvidenceType =
+  | "signal_parity_confirm"
+  | "feed_stable_window"
+  | "engine_run_observation"
+  | "manual_note";
+
+export interface SoakEvidenceRow {
+  id: number;
+  evidence_key: string;
+  evidence_type: SoakEvidenceType;
+  evidence_value: string;
+  operator: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SoakEvidencePayload {
+  evidence_key: string;
+  evidence_type: SoakEvidenceType;
+  evidence_value: string;
+  operator: string;
+}
+
+export interface SoakCheckpointRow {
+  id: number;
+  snapshot_data: SoakReport;
+  operator_notes: string | null;
+  created_at: string;
+}
+
+export interface SoakReport {
+  health: AdminHealth;
+  watchlist_count: number | null;
+  snapshots_24h: number;
+  candles_24h: number;
+  engine_runs_summary: {
+    total_24h: number;
+    success_24h: number;
+    error_24h: number;
+    last_run_at: string | null;
+  };
+  audit_events_summary: {
+    total_24h: number;
+    error_count_24h: number;
+    warning_count_24h: number;
+  };
+  manual_evidence: SoakEvidenceRow[];
+  checkpoints: SoakCheckpointRow[];
+  generated_at: string;
+}

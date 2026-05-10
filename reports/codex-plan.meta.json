@@ -1,5 +1,5 @@
-﻿{
-    "issue":  "Dashboard admin route: no /admin route exists and backend health endpoint lacks admin-only capability guard",
-    "written_at":  "2026-05-10T11:24:02.5614513+02:00",
-    "research_hash":  "6f1b03dac2c265fc7ba827472a543bfe88f650d724095a1a5ef8de6353db1be4"
+{
+  "issue": "Extend /admin into a Phase 0 soak report builder by adding admin-only backend aggregation over health + watchlist + snapshots + candles + engine_runs + audit_events, explicit manual-input fields for operator-only evidence, persisted 12h checkpoint report snapshots, and markdown plus print-ready HTML/PDF export without changing existing /health or backend source-of-truth contracts.",
+  "research_hash": "4d57abdd1cdb4d234b69d81b406d1e36894bc8e18f7683c2c0f97c669e4bb1ae",
+  "written_at": "2026-05-10T15:02:06.967Z"
 }
