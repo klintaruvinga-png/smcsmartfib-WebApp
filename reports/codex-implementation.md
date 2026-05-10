@@ -1,37 +1,45 @@
 # Issue summary
 
-The symbol-normalization contract targeted backend watchlist acceptance for index aliases (`NASDAQ`, `US Tech 100`) and the requested crypto set (`BTCUSD`, `ETHUSD`, `XRPUSD`, `BNBUSD`, `SOLUSD`) while preserving backend authority and watchlist snapshot invalidation.
+The repository had version drift across the dashboard stack metadata: `package.json`, `package-lock.json`, `src/lib/version.ts`, the WordPress plugin header/constant, and the WordPress plugin README were still on `13.0.1` while Pine had already advanced independently to `v13.1.3`. The root `README.md` was also missing.
 
 # Root cause implemented
 
-Repository verification showed the required backend production logic was already present on the required branch history and on `main`: symbol aliases already collapse to `NAS100`, the crypto registry already includes `SOLUSD`, and watchlist mutation paths already invalidate `smc_sf_engine_snapshot`. The remaining implementation gap was regression protection. I extended the PHP watchlist regression harness so the authoritative alias path, supported-crypto path, and snapshot invalidation path are now exercised directly.
+The stack release metadata had not been bumped after earlier patch work, and there was no root-level project overview documenting that the stack and Pine move on separate version tracks. I updated the stack metadata to `13.0.2`, preserved Pine at `v13.1.3`, and added a concise root README that documents that separation explicitly.
 
 # Exact files changed
 
-- `wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-10_normalize-symbols.md`
-- `.github/migration/audits/phase-0-deriv-symbol-parity-2026-05-10.md`
+- `package.json`
+- `package-lock.json`
+- `src/lib/version.ts`
+- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+- `wordpress/smc-superfib-sniper/README.md`
+- `README.md`
 - `reports/codex-implementation.md`
 
 # Tests run
 
-- `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`
-- `php wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php`
-  - Fails in the existing harness before parity assertions because `register_deactivation_hook()` is not stubbed there. This was not changed in this patch.
+- `node -e "console.log(require('./package.json').version)"` -> `13.0.2`
+- `node -e "import('./src/lib/version.ts').then(m => console.log(m.APP_VERSION_LABEL))"` -> `v13.0.2`
+- `npx tsc --noEmit --pretty false`
+- `npm run build`
+- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+
+No existing PHP test suite or Composer manifest was present in the repository paths searched, so `composer test` / `phpunit` could not be run from an established harness.
 
 # Reports generated
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-10_normalize-symbols.md`
-- `.github/migration/audits/phase-0-deriv-symbol-parity-2026-05-10.md`
 - `reports/codex-implementation.md`
+
+No bug sweep report was required because this patch does not affect runtime integrity, stale-data paths, wiring, or backend/dashboard truth.
+
+No parity audit was required because Pine and trading logic were intentionally left unchanged.
 
 # Remaining risks
 
-- Live manual verification against an authenticated Deriv-backed environment is still required for final runtime confirmation of quote availability after watchlist add/remove.
-- Deriv public indexed sources clearly confirm `US Tech 100` as the Nasdaq 100 label and show `BTCUSD`, `ETHUSD`, `XRPUSD`, `BNBUSD`, and `SOLUSD` naming across current public materials, but this turn did not query a live authenticated broker symbol list.
-- The standalone pip-parity harness currently has a pre-existing bootstrap gap unrelated to this symbol patch.
+- Manual browser verification of the dashboard footer version label was not run in this implementation pass.
+- There is still no automated repository-level guard enforcing future stack-version consistency; the contract’s suggested script check conflicted with the `package.json` guard rails for this patch.
 
 # Any contract ambiguities resolved during implementation
 
-- `reports/codex-plan.md` contains two unrelated plans. I treated the symbol-normalization contract as authoritative and only used the watchlist-snapshot language where it directly guarded backend truth for this issue.
-- The required branch already contained the production fix history and had previously been merged into `main`. I fast-forwarded the branch to current `main` and limited this turn to missing regression coverage and required artifacts so the PR contains only net-new work.
+- The plan suggested branch `codex/version-consistency-bump-13-0-2`, but runtime context required `codex/version-inconsistency-pine-indicator-is-at-v13-1`. I used the runtime branch because it was the explicit execution requirement.
+- The plan suggested adding an npm/CI version-consistency check, but the `package.json` contract also restricted that file to changing only the top-level `version` field. I took the smallest safe interpretation and did not add the extra script.
