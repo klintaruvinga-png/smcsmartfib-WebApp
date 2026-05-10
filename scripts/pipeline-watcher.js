@@ -26,6 +26,9 @@ const CODEX_IMPLEMENT_PROMPT_FILE = path.join(
   "codex-implement-prompt.md",
 );
 const CODEX_OUTPUT_FILE = path.join(REPO_ROOT, "reports", "codex-last-message.txt");
+// Written when the Claude CLI invocation fails so the watcher stops retrying until
+// the research/issue changes or the file is manually deleted.
+const CLAUDE_HARDENING_BLOCKED_FILE = path.join(REPO_ROOT, "reports", ".claude-hardening-blocked.json");
 const POLL_INTERVAL_MS = 5000;
 const CLAUDE_TIMEOUT_MS = 900000; // 15 min — larger research reports need more time
 const CODEX_TIMEOUT_MS = 900000;
@@ -56,6 +59,7 @@ function buildObservedKey() {
     statMtime(PLAN_METADATA_FILE),
     statMtime(STATE_FILE),
     statMtime(IMPLEMENTATION_FILE),
+    statMtime(CLAUDE_HARDENING_BLOCKED_FILE),
   ].join(":");
 }
 
@@ -134,6 +138,52 @@ function writePlanMetadata(state) {
     research_hash: hashFile(RESEARCH_FILE),
     written_at: new Date().toISOString(),
   });
+}
+
+function writeHardeningBlockedState(state, reason) {
+  writeJson(CLAUDE_HARDENING_BLOCKED_FILE, {
+    blocked_at: new Date().toISOString(),
+    reason,
+    issue: state.issue ?? "",
+    research_hash: (() => { try { return hashFile(RESEARCH_FILE); } catch { return null; } })(),
+    resolution: [
+      "Option A (automatic): ensure 'claude' CLI is installed and authenticated",
+      "  — install:        npm install -g @anthropic-ai/claude-code",
+      "  — authenticate:   claude auth",
+      "  — then delete this file and the pipeline will retry automatically.",
+      "Option B (manual): open Claude Code, ask it to harden the plan from",
+      "  reports/copilot-research.md following .github/prompts/codex-plan-prompt.md,",
+      "  save output to reports/codex-plan.md, write reports/codex-plan.meta.json,",
+      "  and set .smc-workflow-state.json state to READY_FOR_IMPLEMENTATION.",
+    ],
+  });
+}
+
+function clearHardeningBlockedState() {
+  try { fs.unlinkSync(CLAUDE_HARDENING_BLOCKED_FILE); } catch { /* ignore */ }
+}
+
+function isHardeningBlockedForCurrentState(state) {
+  let blocked;
+  try {
+    blocked = readJson(CLAUDE_HARDENING_BLOCKED_FILE);
+  } catch {
+    return false;
+  }
+
+  if (blocked.issue !== (state.issue ?? "")) {
+    return false;
+  }
+
+  try {
+    if (blocked.research_hash !== hashFile(RESEARCH_FILE)) {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+
+  return true;
 }
 
 function readImplementationMetadata() {
@@ -297,6 +347,11 @@ function runClaudePlanHardening(state) {
     return;
   }
 
+  if (isHardeningBlockedForCurrentState(state)) {
+    log("Claude plan hardening blocked - see reports/.claude-hardening-blocked.json for resolution steps");
+    return;
+  }
+
   const prompt = `${fs.readFileSync(CLAUDE_PLAN_PROMPT_FILE, "utf8")}
 
 ## Runtime context
@@ -311,26 +366,54 @@ function runClaudePlanHardening(state) {
 
   withPipelineLock("claude-plan-hardening", () => {
     log("PLANNING detected - running Claude plan hardening");
-    const output = execFileSync("claude", [
-      "--print",
-      "--output-format", "text",
-      "--tools", "",
-      prompt,
-    ], {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-      timeout: CLAUDE_TIMEOUT_MS,
-    });
 
-    const planText = output.trim();
+    // Write prompt to a temp file to avoid Windows argv length limits (8 191-char CMD cap).
+    // Mirrors the pattern used for Codex: pass content via stdin redirect, not via argv.
+    const promptFile = path.join(REPO_ROOT, "reports", "claude-plan-prompt.tmp.md");
+    fs.writeFileSync(promptFile, prompt, "utf8");
+
+    let planText;
+    try {
+      // On Windows, execFileSync without shell cannot resolve .cmd shims in PATH.
+      // Use execSync with shell:true and the platform-specific binary name instead —
+      // exactly the same fix applied to the Codex invocation above.
+      const claudeBin = process.platform === "win32" ? "claude.cmd" : "claude";
+      const cmd = [
+        `"${claudeBin}"`,
+        "--print",
+        "--output-format", "text",
+        "--tools", '""',
+        "<", `"${promptFile}"`,
+      ].join(" ");
+
+      planText = execSync(cmd, {
+        cwd: REPO_ROOT,
+        shell: true,
+        timeout: CLAUDE_TIMEOUT_MS,
+        encoding: "utf8",
+        maxBuffer: 10 * 1024 * 1024,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      writeHardeningBlockedState(state, message);
+      log(`Claude CLI invocation failed — blocked state written. Fix: see reports/.claude-hardening-blocked.json`);
+      throw err;
+    } finally {
+      try { fs.unlinkSync(promptFile); } catch { /* ignore */ }
+    }
+
+    planText = planText.trim();
     if (!planText) {
+      writeHardeningBlockedState(state, "Claude returned an empty response");
       throw new Error("Claude plan hardening returned an empty plan");
     }
 
     if (!isUsablePlan(planText)) {
+      writeHardeningBlockedState(state, "Claude returned a response missing required plan sections");
       throw new Error("Claude plan hardening returned invalid plan output");
     }
 
+    clearHardeningBlockedState();
     fs.writeFileSync(PLAN_FILE, `${planText}\n`, "utf8");
     writePlanMetadata(state);
     markReadyForImplementation(state, "claude");
@@ -458,6 +541,13 @@ function evaluatePipeline() {
       return;
     }
 
+    // If a blocked state exists for a different issue or stale research hash, clear it
+    // automatically so a new issue cycle is not forced into manual intervention.
+    if (!isHardeningBlockedForCurrentState(state) && fs.existsSync(CLAUDE_HARDENING_BLOCKED_FILE)) {
+      clearHardeningBlockedState();
+      log("Stale blocked state cleared - new issue or research detected");
+    }
+
     if (!hasUsablePlanArtifactForState(state)) {
       runClaudePlanHardening(state);
       return;
@@ -500,5 +590,24 @@ function pollPipeline() {
   }
 }
 
+function checkClaudeAvailability() {
+  try {
+    const claudeBin = process.platform === "win32" ? "claude.cmd" : "claude";
+    execSync(`"${claudeBin}" --version`, {
+      shell: true,
+      timeout: 10000,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    log("Claude CLI health check passed");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log(`WARNING: Claude CLI health check failed — plan hardening will be blocked on PLANNING state`);
+    log(`  Reason: ${message}`);
+    log(`  Fix:    npm install -g @anthropic-ai/claude-code  then  claude auth`);
+  }
+}
+
 log("Pipeline watcher started");
+checkClaudeAvailability();
 setInterval(pollPipeline, POLL_INTERVAL_MS);
