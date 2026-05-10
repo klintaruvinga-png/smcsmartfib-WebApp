@@ -8,7 +8,10 @@ $GLOBALS['test_transients'] = array();
 $GLOBALS['test_user_meta'] = array();
 $GLOBALS['test_current_user_id'] = 0;
 $GLOBALS['test_is_logged_in'] = false;
-$GLOBALS['test_can_read'] = false;
+$GLOBALS['test_capabilities'] = array(
+    'read' => false,
+    'manage_options' => false,
+);
 
 if (!class_exists('WP_REST_Server')) {
     class WP_REST_Server {
@@ -356,7 +359,7 @@ if (!function_exists('is_user_logged_in')) {
 }
 if (!function_exists('current_user_can')) {
     function current_user_can($cap) {
-        return $GLOBALS['test_can_read'];
+        return !empty($GLOBALS['test_capabilities'][$cap]);
     }
 }
 if (!function_exists('get_user_meta')) {
@@ -405,19 +408,26 @@ $instance = new SMC_SuperFib_Sniper_REST();
 $instance->register_routes();
 
 $snapshotPostRoute = null;
+$adminHealthRoute = null;
 foreach ($GLOBALS['test_registered_routes'] as $route) {
     if ($route['namespace'] === 'sniper/v1' && $route['route'] === '/snapshot' && $route['args']['methods'] === WP_REST_Server::CREATABLE) {
         $snapshotPostRoute = $route;
-        break;
+    }
+    if ($route['namespace'] === 'sniper/v1' && $route['route'] === '/admin/health' && $route['args']['methods'] === WP_REST_Server::READABLE) {
+        $adminHealthRoute = $route;
     }
 }
 
 assert_true(is_array($snapshotPostRoute), 'POST /snapshot route was not registered');
 assert_true(is_array($snapshotPostRoute['args']['permission_callback']), 'POST /snapshot must use authenticated permission callback');
 assert_same('permission_user', $snapshotPostRoute['args']['permission_callback'][1], 'POST /snapshot permission callback mismatch');
+assert_true(is_array($adminHealthRoute), 'GET /admin/health route was not registered');
+assert_true(is_array($adminHealthRoute['args']['permission_callback']), 'GET /admin/health must use admin permission callback');
+assert_same('permission_admin', $adminHealthRoute['args']['permission_callback'][1], 'GET /admin/health permission callback mismatch');
 
 $GLOBALS['test_is_logged_in'] = false;
-$GLOBALS['test_can_read'] = false;
+$GLOBALS['test_capabilities']['read'] = false;
+$GLOBALS['test_capabilities']['manage_options'] = false;
 $GLOBALS['test_current_user_id'] = 0;
 
 $unauthorized = $instance->post_snapshot(new WP_REST_Request(array(
@@ -434,9 +444,17 @@ assert_true($unauthorized instanceof WP_Error, 'Unauthenticated MT5 snapshot sho
 assert_same(401, $unauthorized->data['status'], 'Unauthenticated MT5 snapshot should return 401');
 assert_true(empty($wpdb->tables[$wpdb->prefix . 'smc_sf_snapshots'] ?? array()), 'Unauthenticated MT5 snapshot must not persist data');
 
+$unauthenticatedAdminDenied = $instance->permission_admin();
+assert_true($unauthenticatedAdminDenied instanceof WP_Error, 'Unauthenticated user should be rejected from /admin/health');
+assert_same(401, $unauthenticatedAdminDenied->data['status'], 'Unauthenticated user should receive 401 from /admin/health');
+
 $GLOBALS['test_is_logged_in'] = true;
-$GLOBALS['test_can_read'] = true;
+$GLOBALS['test_capabilities']['read'] = true;
 $GLOBALS['test_current_user_id'] = 7;
+
+$nonAdminDenied = $instance->permission_admin();
+assert_true($nonAdminDenied instanceof WP_Error, 'Authenticated non-admin user should be rejected from /admin/health');
+assert_same(403, $nonAdminDenied->data['status'], 'Authenticated non-admin user should receive 403 from /admin/health');
 
 $authorized = $instance->post_snapshot(new WP_REST_Request(array(
     'symbol' => 'EURUSD',
@@ -565,6 +583,11 @@ $health = $instance->get_health();
 assert_true(is_array($health), 'Health endpoint should return an array in the test harness');
 assert_same('missing', $health['twelveDataKeyStatus'], 'Test setup should have no Twelve Data key');
 assert_same('live', $health['feedStatus'], 'Fresh MT5 price plus aggregated M1 candles must make feedStatus live without a Twelve Data key');
+
+$GLOBALS['test_capabilities']['manage_options'] = true;
+$adminHealth = $instance->get_admin_health();
+assert_true(is_array($adminHealth), 'Admin health endpoint should return an array in the test harness');
+assert_same($health, $adminHealth, 'Admin health endpoint must proxy the same payload as /health');
 
 $fetchQuote = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'fetch_quote');
 $fetchQuote->setAccessible(true);

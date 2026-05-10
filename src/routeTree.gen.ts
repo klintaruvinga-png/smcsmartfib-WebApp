@@ -18,6 +18,7 @@ import { Route as LiveRouteImport } from './routes/live'
 import { Route as ChartsRouteImport } from './routes/charts'
 import { Route as BookRouteImport } from './routes/book'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -66,6 +67,11 @@ const AnalyticsRoute = AnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AccountRoute = AccountRouteImport.update({
   id: '/account',
   path: '/account',
@@ -80,6 +86,7 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/admin': typeof AdminRoute
   '/analytics': typeof AnalyticsRoute
   '/book': typeof BookRoute
   '/charts': typeof ChartsRoute
@@ -93,6 +100,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/admin': typeof AdminRoute
   '/analytics': typeof AnalyticsRoute
   '/book': typeof BookRoute
   '/charts': typeof ChartsRoute
@@ -107,6 +115,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/admin': typeof AdminRoute
   '/analytics': typeof AnalyticsRoute
   '/book': typeof BookRoute
   '/charts': typeof ChartsRoute
@@ -122,6 +131,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/account'
+    | '/admin'
     | '/analytics'
     | '/book'
     | '/charts'
@@ -135,6 +145,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/account'
+    | '/admin'
     | '/analytics'
     | '/book'
     | '/charts'
@@ -148,6 +159,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/account'
+    | '/admin'
     | '/analytics'
     | '/book'
     | '/charts'
@@ -162,6 +174,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
+  AdminRoute: typeof AdminRoute
   AnalyticsRoute: typeof AnalyticsRoute
   BookRoute: typeof BookRoute
   ChartsRoute: typeof ChartsRoute
@@ -238,6 +251,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/account': {
       id: '/account'
       path: '/account'
@@ -258,6 +278,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
+  AdminRoute: AdminRoute,
   AnalyticsRoute: AnalyticsRoute,
   BookRoute: BookRoute,
   ChartsRoute: ChartsRoute,
