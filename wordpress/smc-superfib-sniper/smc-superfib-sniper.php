@@ -355,7 +355,21 @@ final class SMC_SuperFib_Sniper_REST {
         $can_manage = current_user_can('manage_options');
         $user_id = get_current_user_id();
 
-        if (!$logged_in || !$can_manage) {
+        if (!$logged_in) {
+            error_log(sprintf(
+                'SMC SuperFIB admin auth failed: user_id=%s logged_in=%s can_manage_options=%s request_uri=%s method=%s remote_addr=%s',
+                $user_id,
+                $logged_in ? 'true' : 'false',
+                $can_manage ? 'true' : 'false',
+                isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : 'unknown',
+                isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'unknown',
+                isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'unknown'
+            ));
+
+            return new WP_Error('smc_sf_auth_required', 'Authentication required.', array('status' => 401));
+        }
+
+        if (!$can_manage) {
             error_log(sprintf(
                 'SMC SuperFIB admin auth failed: user_id=%s logged_in=%s can_manage_options=%s request_uri=%s method=%s remote_addr=%s',
                 $user_id,
