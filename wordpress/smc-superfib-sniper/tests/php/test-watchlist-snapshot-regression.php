@@ -248,7 +248,7 @@ $wpdb->replace($userSettingsTable, array(
         'backendUrl' => 'https://example.com/wp-json',
         'refreshIntervalSec' => 2,
         'staleThresholdSec' => 60,
-        'watchlist' => array(' eurusd ', 'EURUSD', 'usdjpy', 'XAU/USD', 'SYMBOL_TOO_LONG_123'),
+        'watchlist' => array(' eurusd ', 'EURUSD', 'usdjpy', 'XAU/USD', 'FOOBAR', 'SYMBOL_TOO_LONG_123'),
         'riskAllocation' => array('perTradePct' => 0.5, 'dailyMaxPct' => 2.0, 'ddCapPct' => 6.0),
     )),
     'updated_at' => '2026-05-09 12:00:00',
@@ -261,7 +261,7 @@ assert_same(
     'get_settings must normalize mixed-case persisted watchlists before downstream snapshot reads'
 );
 
-$saveWatchlist->invoke($instance, 7, array(' gbpusd ', 'GBPUSD', 'usdjpy', 'SYMBOL_TOO_LONG_123'));
+$saveWatchlist->invoke($instance, 7, array(' gbpusd ', 'GBPUSD', 'usdjpy', 'FOOBAR', 'SYMBOL_TOO_LONG_123'));
 $savedSettingsRow = $wpdb->tables[$userSettingsTable]['7'] ?? null;
 assert_true(is_array($savedSettingsRow), 'save_watchlist must persist user settings');
 $savedSettings = json_decode($savedSettingsRow['settings'], true);
@@ -276,10 +276,18 @@ $response = $instance->post_user_settings(new WP_REST_Request(array(
     'backendUrl' => 'https://example.com/wp-json',
     'refreshIntervalSec' => 5,
     'staleThresholdSec' => 60,
-    'watchlist' => array('EURUSD', 'GBPUSD'),
+    'watchlist' => array('EURUSD', 'FOOBAR', 'GBPUSD'),
     'riskAllocation' => array('perTradePct' => 0.5, 'dailyMaxPct' => 2.0, 'ddCapPct' => 6.0),
 )));
 assert_same(array('ok' => true), $response, 'post_user_settings must return success in the test harness');
+$savedSettingsRow = $wpdb->tables[$userSettingsTable]['7'] ?? null;
+assert_true(is_array($savedSettingsRow), 'post_user_settings must persist user settings');
+$savedSettings = json_decode($savedSettingsRow['settings'], true);
+assert_same(
+    array('EURUSD', 'GBPUSD'),
+    $savedSettings['watchlist'] ?? null,
+    'post_user_settings must persist only supported watchlist symbols'
+);
 assert_same(
     array(
         array(

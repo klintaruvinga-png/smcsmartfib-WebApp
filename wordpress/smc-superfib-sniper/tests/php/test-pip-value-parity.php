@@ -11,6 +11,9 @@ if (!function_exists('add_filter')) {
 if (!function_exists('register_activation_hook')) {
     function register_activation_hook(...$args) {}
 }
+if (!function_exists('register_deactivation_hook')) {
+    function register_deactivation_hook(...$args) {}
+}
 if (!function_exists('plugin_dir_path')) {
     function plugin_dir_path($file) {
         return dirname($file) . DIRECTORY_SEPARATOR;

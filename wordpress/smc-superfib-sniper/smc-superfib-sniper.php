@@ -700,7 +700,7 @@ final class SMC_SuperFib_Sniper_REST {
             'backendUrl' => isset($payload['backendUrl']) ? esc_url_raw($payload['backendUrl']) : $current['backendUrl'],
             'refreshIntervalSec' => $this->int_between($payload, 'refreshIntervalSec', 2, 60, $current['refreshIntervalSec']),
             'staleThresholdSec' => $this->int_between($payload, 'staleThresholdSec', 10, 120, $current['staleThresholdSec']),
-            'watchlist' => $this->sanitize_symbols(isset($payload['watchlist']) ? $payload['watchlist'] : $current['watchlist']),
+            'watchlist' => $this->validate_watchlist_symbols(isset($payload['watchlist']) ? $payload['watchlist'] : $current['watchlist']),
             'riskAllocation' => $this->sanitize_risk_allocation(isset($payload['riskAllocation']) ? $payload['riskAllocation'] : $current['riskAllocation'], $current['riskAllocation']),
         ));
         $watchlist_changed = $current['watchlist'] !== $settings['watchlist'];
@@ -2653,7 +2653,7 @@ final class SMC_SuperFib_Sniper_REST {
             }
         }
         $default['apiKeyStatus'] = $this->get_twelve_key_status($user_id);
-        $default['watchlist'] = $this->sanitize_symbols($default['watchlist']);
+        $default['watchlist'] = $this->validate_watchlist_symbols($default['watchlist']);
 
         return $default;
     }
@@ -3283,7 +3283,7 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function save_watchlist($user_id, $watchlist) {
         $current = $this->get_settings($user_id);
-        $current['watchlist'] = $this->sanitize_symbols($watchlist);
+        $current['watchlist'] = $this->validate_watchlist_symbols($watchlist);
         $this->replace_json('user_settings', array(
             'user_id' => $user_id,
             'settings' => $current,

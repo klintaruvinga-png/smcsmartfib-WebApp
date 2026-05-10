@@ -250,6 +250,11 @@ if (!function_exists('register_activation_hook')) {
         // Mock function
     }
 }
+if (!function_exists('register_deactivation_hook')) {
+    function register_deactivation_hook(...$args) {
+        // Mock function
+    }
+}
 
 if (!function_exists('add_action')) {
     function add_action($hook, $function) {

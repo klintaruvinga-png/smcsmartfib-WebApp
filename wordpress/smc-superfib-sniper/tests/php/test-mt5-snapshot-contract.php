@@ -255,6 +255,9 @@ if (!function_exists('add_filter')) {
 if (!function_exists('register_activation_hook')) {
     function register_activation_hook(...$args) {}
 }
+if (!function_exists('register_deactivation_hook')) {
+    function register_deactivation_hook(...$args) {}
+}
 if (!function_exists('register_rest_route')) {
     function register_rest_route($namespace, $route, $args) {
         $GLOBALS['test_registered_routes'][] = array(
