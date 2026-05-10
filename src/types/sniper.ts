@@ -242,6 +242,8 @@ export interface EngineHealth {
   perSymbolDiagnostics?: SymbolDiagnostic[];
 }
 
+export type AdminHealth = EngineHealth;
+
 export interface DashboardSettings {
   backendUrl: string;
   apiKeyStatus: TwelveDataKeyStatus;

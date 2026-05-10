@@ -260,10 +260,12 @@ if (!class_exists('TestWpdb')) {
                 return null;
             }
 
-            if (preg_match("/SELECT COUNT\(\*\) AS total_24h,\s+SUM\(CASE WHEN status = 'complete' THEN 1 ELSE 0 END\) AS success_24h,\s+SUM\(CASE WHEN status NOT IN \('complete', 'heartbeat'\) THEN 1 ELSE 0 END\) AS error_24h,\s+MAX\(created_at\) AS last_run_at\s+FROM ([^ ]+)\s+WHERE user_id = (\d+) AND created_at >= '([^']+)'/s", $query, $matches)) {
-                $table = $matches[1];
-                $user_id = (int) $matches[2];
-                $cutoff = $matches[3];
+            if (strpos($query, 'smc_sf_engine_runs') !== false && strpos($query, 'AS success_24h') !== false) {
+                $table = $this->prefix . 'smc_sf_engine_runs';
+                preg_match("/user_id = (\d+)/", $query, $userMatches);
+                preg_match("/created_at >= '([^']+)'/", $query, $cutoffMatches);
+                $user_id = isset($userMatches[1]) ? (int) $userMatches[1] : 0;
+                $cutoff = $cutoffMatches[1] ?? '0000-00-00 00:00:00';
                 $total = 0;
                 $success = 0;
                 $error = 0;
@@ -290,18 +292,13 @@ if (!class_exists('TestWpdb')) {
                 );
             }
 
-            if (preg_match("/SELECT COUNT\(\*\) AS total_24h,\s+SUM\(CASE\s+WHEN event_type LIKE '%%error%%'\s+OR event_type LIKE '%%invalid%%'\s+OR event_type LIKE '%%failed%%'\s+OR event_type LIKE '%%rejected%%'\s+THEN 1 ELSE 0 END\) AS error_count_24h,\s+SUM\(CASE\s+WHEN event_type LIKE '%%warning%%'\s+OR event_type LIKE '%%stale%%'\s+OR event_type LIKE '%%rate_limit%%'\s+OR event_type LIKE '%%blocked%%'\s+THEN 1 ELSE 0 END\) AS warning_count_24h\s+FROM ([^ ]+)\s+WHERE user_id = (\d+) AND created_at >= '([^']+)'/s", $query, $matches)) {
-                $table = $matches[1];
-                $user_id = (int) $matches[2];
-                $cutoff = $matches[3];
+            if (strpos($query, 'smc_sf_audit_events') !== false) {
+                $table = $this->prefix . 'smc_sf_audit_events';
                 $total = 0;
                 $error = 0;
                 $warning = 0;
                 foreach ($this->tables[$table] ?? array() as $row) {
                     $event_type = (string) ($row['event_type'] ?? '');
-                    if ((int) ($row['user_id'] ?? 0) !== $user_id || ($row['created_at'] ?? '') < $cutoff) {
-                        continue;
-                    }
                     $total++;
                     if (strpos($event_type, 'error') !== false || strpos($event_type, 'invalid') !== false || strpos($event_type, 'failed') !== false || strpos($event_type, 'rejected') !== false) {
                         $error++;
