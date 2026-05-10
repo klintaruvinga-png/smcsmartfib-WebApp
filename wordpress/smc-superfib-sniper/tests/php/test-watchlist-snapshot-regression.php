@@ -209,6 +209,10 @@ $getSettings = $ref->getMethod('get_settings');
 $getSettings->setAccessible(true);
 $saveWatchlist = $ref->getMethod('save_watchlist');
 $saveWatchlist->setAccessible(true);
+$sanitizeSymbols = $ref->getMethod('sanitize_symbols');
+$sanitizeSymbols->setAccessible(true);
+$isSupportedSymbol = $ref->getMethod('is_supported_symbol');
+$isSupportedSymbol->setAccessible(true);
 
 $freshSnapshot = array(
     'prices' => array(
@@ -271,6 +275,31 @@ assert_same(
     'save_watchlist must persist a canonical uppercase de-duplicated watchlist'
 );
 
+assert_same(
+    array('NAS100', 'SOLUSD', 'BTCUSD', 'ETHUSD', 'XRPUSD', 'BNBUSD'),
+    $sanitizeSymbols->invoke(
+        $instance,
+        array('NASDAQ', 'US Tech 100', 'nas100', 'sol/usd', 'BTCUSD', 'ethusd', 'xrpusd', 'bnbusd')
+    ),
+    'sanitize_symbols must collapse supported index aliases and crypto symbols to canonical watchlist tokens'
+);
+assert_true(
+    $isSupportedSymbol->invoke($instance, 'NASDAQ'),
+    'is_supported_symbol must accept NASDAQ as an alias for NAS100'
+);
+assert_true(
+    $isSupportedSymbol->invoke($instance, 'US Tech 100'),
+    'is_supported_symbol must accept US Tech 100 as an alias for NAS100'
+);
+assert_true(
+    $isSupportedSymbol->invoke($instance, 'SOLUSD'),
+    'is_supported_symbol must accept SOLUSD once it is present in the authoritative instrument registry'
+);
+assert_true(
+    !$isSupportedSymbol->invoke($instance, 'ADAUSD'),
+    'is_supported_symbol must remain fail-closed for unsupported crypto symbols'
+);
+
 $GLOBALS['smc_watchlist_deleted_meta'] = array();
 $response = $instance->post_user_settings(new WP_REST_Request(array(
     'backendUrl' => 'https://example.com/wp-json',
@@ -297,6 +326,96 @@ assert_same(
     ),
     $GLOBALS['smc_watchlist_deleted_meta'],
     'post_user_settings must invalidate the cached engine snapshot when the saved watchlist changes'
+);
+
+$GLOBALS['smc_watchlist_deleted_meta'] = array();
+$response = $instance->post_user_watchlist(new WP_REST_Request(array(
+    'watchlist' => array('NASDAQ', 'US Tech 100', 'SOLUSD', 'ETHUSD', 'XRPUSD', 'BNBUSD'),
+)));
+assert_same(
+    array(
+        'ok' => true,
+        'watchlist' => array('NAS100', 'SOLUSD', 'ETHUSD', 'XRPUSD', 'BNBUSD'),
+    ),
+    $response,
+    'post_user_watchlist must persist and return the authoritative canonical watchlist for index aliases and supported cryptos'
+);
+assert_same(
+    array(
+        array(
+            'user_id' => 7,
+            'meta_key' => 'smc_sf_engine_snapshot',
+        ),
+    ),
+    $GLOBALS['smc_watchlist_deleted_meta'],
+    'post_user_watchlist must invalidate the cached engine snapshot after canonical alias persistence'
+);
+
+$GLOBALS['smc_watchlist_deleted_meta'] = array();
+$response = $instance->post_watchlist_add(new WP_REST_Request(array('symbol' => 'nasdaq')));
+assert_same(
+    array(
+        'ok' => true,
+        'watchlist' => array('NAS100', 'SOLUSD', 'ETHUSD', 'XRPUSD', 'BNBUSD'),
+    ),
+    $response,
+    'post_watchlist_add must no-op when an alias resolves to an already-persisted canonical symbol'
+);
+assert_same(
+    array(),
+    $GLOBALS['smc_watchlist_deleted_meta'],
+    'post_watchlist_add must not invalidate the cached engine snapshot when the canonical watchlist is unchanged'
+);
+
+$GLOBALS['smc_watchlist_deleted_meta'] = array();
+$response = $instance->post_watchlist_add(new WP_REST_Request(array('symbol' => 'btcusd')));
+assert_same(
+    array(
+        'ok' => true,
+        'watchlist' => array('NAS100', 'SOLUSD', 'ETHUSD', 'XRPUSD', 'BNBUSD', 'BTCUSD'),
+    ),
+    $response,
+    'post_watchlist_add must accept newly-supported crypto symbols through the canonical mutation path'
+);
+assert_same(
+    array(
+        array(
+            'user_id' => 7,
+            'meta_key' => 'smc_sf_engine_snapshot',
+        ),
+    ),
+    $GLOBALS['smc_watchlist_deleted_meta'],
+    'post_watchlist_add must invalidate the cached engine snapshot when the persisted canonical watchlist changes'
+);
+
+$snapshotTable = $wpdb->prefix . 'smc_sf_snapshots';
+$wpdb->tables[$snapshotTable] = array(
+    'nas100' => array('user_id' => 7, 'symbol' => 'NAS100'),
+);
+$GLOBALS['smc_watchlist_deleted_meta'] = array();
+$response = $instance->post_watchlist_remove(new WP_REST_Request(array('symbol' => 'US Tech 100')));
+assert_same(
+    array(
+        'ok' => true,
+        'watchlist' => array('SOLUSD', 'ETHUSD', 'XRPUSD', 'BNBUSD', 'BTCUSD'),
+    ),
+    $response,
+    'post_watchlist_remove must remove canonical symbols even when the request uses a supported alias'
+);
+assert_same(
+    array(
+        array(
+            'user_id' => 7,
+            'meta_key' => 'smc_sf_engine_snapshot',
+        ),
+    ),
+    $GLOBALS['smc_watchlist_deleted_meta'],
+    'post_watchlist_remove must invalidate the cached engine snapshot after alias-based removal'
+);
+assert_same(
+    array(),
+    array_values($wpdb->tables[$snapshotTable] ?? array()),
+    'post_watchlist_remove must clear the stale snapshot row for the removed canonical symbol'
 );
 
 fwrite(STDOUT, 'watchlist snapshot regression checks passed' . PHP_EOL);
