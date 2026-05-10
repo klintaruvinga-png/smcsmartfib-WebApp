@@ -444,6 +444,10 @@ assert_true($unauthorized instanceof WP_Error, 'Unauthenticated MT5 snapshot sho
 assert_same(401, $unauthorized->data['status'], 'Unauthenticated MT5 snapshot should return 401');
 assert_true(empty($wpdb->tables[$wpdb->prefix . 'smc_sf_snapshots'] ?? array()), 'Unauthenticated MT5 snapshot must not persist data');
 
+$unauthenticatedAdminDenied = $instance->permission_admin();
+assert_true($unauthenticatedAdminDenied instanceof WP_Error, 'Unauthenticated user should be rejected from /admin/health');
+assert_same(401, $unauthenticatedAdminDenied->data['status'], 'Unauthenticated user should receive 401 from /admin/health');
+
 $GLOBALS['test_is_logged_in'] = true;
 $GLOBALS['test_capabilities']['read'] = true;
 $GLOBALS['test_current_user_id'] = 7;
