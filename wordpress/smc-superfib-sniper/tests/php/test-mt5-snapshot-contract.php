@@ -709,4 +709,35 @@ $fetchCandlesSmall = $fetchCandles->invoke($instance, 7, 'EURUSD', '1min', 5);
 assert_true(count($fetchCandlesSmall) <= 5, 'fetch_candles with outputsize=5 must return at most 5 candles');
 assert_true(count($fetchCandlesSmall) > 0, 'fetch_candles with outputsize=5 must return at least one candle');
 
+// ─────────────────────────────────────────────────────────────────────────────
+// REGRESSION TEST: fetch_aggregated_mt5_m1_candles — bounded by DESC LIMIT
+// Verifies PATCH: The aggregation helper now fetches M1 rows DESC LIMIT instead
+// of scanning the entire table. With 450 M1 rows seeded, requesting 30 15-min
+// aggregated buckets must complete in finite time and produce ≤ 30 buckets.
+// This guards against the unbounded full-table scan that caused memory exhaustion
+// and timeout degradation during Phase 0 soak (EA pushes ~6 M1 rows/min/symbol).
+// ─────────────────────────────────────────────────────────────────────────────
+$fetchAggregated = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'fetch_aggregated_mt5_m1_candles');
+$fetchAggregated->setAccessible(true);
+
+// 450 M1 rows → requesting 30 15-min buckets must return a bounded result
+$agg15m = $fetchAggregated->invoke($instance, 7, 'EURUSD', '15min', 30);
+assert_true(is_array($agg15m), 'fetch_aggregated_mt5_m1_candles must return an array');
+assert_true(count($agg15m) <= 30, 'fetch_aggregated_mt5_m1_candles must cap output at outputsize (LIMIT regression guard)');
+// With 450 M1 rows spanning 30 × 15-min buckets, the aggregation must produce at least 1 bucket
+assert_true(count($agg15m) > 0, 'fetch_aggregated_mt5_m1_candles must produce at least one 15-min bucket from 450 M1 rows');
+
+// Verify each returned element has the required candle fields
+$firstBucket = reset($agg15m);
+assert_true(is_array($firstBucket), 'Each aggregated bucket must be an array');
+assert_true(isset($firstBucket['time']),  'Aggregated bucket must have time field');
+assert_true(isset($firstBucket['open']),  'Aggregated bucket must have open field');
+assert_true(isset($firstBucket['high']),  'Aggregated bucket must have high field');
+assert_true(isset($firstBucket['low']),   'Aggregated bucket must have low field');
+assert_true(isset($firstBucket['close']), 'Aggregated bucket must have close field');
+
+// Non-MT5 symbol must return empty (no source='mt5' M1 rows)
+$aggEmpty = $fetchAggregated->invoke($instance, 7, 'NZDCAD', '15min', 30);
+assert_true(count($aggEmpty) === 0, 'fetch_aggregated_mt5_m1_candles must return empty for symbol with no MT5 M1 rows');
+
 fwrite(STDOUT, 'mt5 snapshot contract checks passed' . PHP_EOL);

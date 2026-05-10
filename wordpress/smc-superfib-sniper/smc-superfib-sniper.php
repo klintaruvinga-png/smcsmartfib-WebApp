@@ -975,6 +975,7 @@ final class SMC_SuperFib_Sniper_REST {
     public function post_snapshot(WP_REST_Request $request) {
         global $wpdb;
 
+        // Defense-in-depth: enforce auth even when called outside WP REST routing.
         $permission = $this->permission_user();
         if ($permission !== true) {
             return $permission;
@@ -2601,17 +2602,36 @@ final class SMC_SuperFib_Sniper_REST {
             return array();
         }
 
+        // REGRESSION GUARD: Bound the M1 scan to the minimum rows needed.
+        // Without LIMIT this query fetches ALL historical M1 bars on every engine
+        // cycle. EA pushes ~6 M1 bars/min/symbol; after 7 days that is ~60 480 rows
+        // per symbol, causing a full-table scan that produces memory exhaustion and
+        // query-timeout degradation during Phase 0 soak (mirroring the LIMIT fix
+        // already applied to fetch_candles()).
+        //
+        // Each higher-TF bucket needs (tf_seconds / 60) M1 bars. Multiply outputsize
+        // by that ratio, add 20% headroom for incomplete boundary buckets and
+        // in-progress bars, floor at 200 to ensure cold-start coverage.
+        $m1_per_bucket = (int) ceil($tf_seconds / 60);
+        $m1_limit      = max(200, (int) ceil($outputsize * $m1_per_bucket * 1.2));
+
+        // Fetch most-recent M1 bars DESC (index-efficient on the composite key),
+        // then reverse to ASC for the bucket aggregation loop below.
         $m1_rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT candle_time, open, high, low, close, volume FROM {$this->table('candles')} WHERE user_id = %d AND symbol = %s AND timeframe = %s AND source = %s ORDER BY candle_time ASC",
+            "SELECT candle_time, open, high, low, close, volume FROM {$this->table('candles')} WHERE user_id = %d AND symbol = %s AND timeframe = %s AND source = %s ORDER BY candle_time DESC LIMIT %d",
             $user_id,
             $symbol,
             '1min',
-            'mt5'
+            'mt5',
+            $m1_limit
         ), ARRAY_A);
 
         if (empty($m1_rows)) {
             return array();
         }
+
+        // Reverse to chronological order (oldest → newest) for bucket aggregation.
+        $m1_rows = array_reverse($m1_rows);
 
         $buckets = array();
         $now = time();

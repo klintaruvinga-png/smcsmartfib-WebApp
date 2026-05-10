@@ -114,6 +114,13 @@ public:
     // Aggregate account freshness
     ENUM_FRESHNESS_STATE GetAccountFreshness()
     {
+        // HARDENING: Return DISCONNECTED when no symbols have been registered yet.
+        // Previously returned FRESHNESS_LIVE (enum value 0, the initial value of worst),
+        // which created a false-live account state during cold start before any symbol
+        // was tracked — a fake-live condition that could mislead EA-side diagnostics.
+        if (symbolCount == 0)
+            return FRESHNESS_DISCONNECTED;
+
         ENUM_FRESHNESS_STATE worst = FRESHNESS_LIVE;
         for (int i = 0; i < symbolCount; i++)
         {
