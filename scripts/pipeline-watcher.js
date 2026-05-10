@@ -352,7 +352,10 @@ function isImplementationAlreadyDone(state) {
 
   const metadata = readImplementationMetadata();
   if (!metadata) {
-    return false;
+    // Backward compatibility: older/in-flight cycles may have a valid implementation
+    // artifact without metadata. Fall back to mtime-only behavior to avoid duplicate
+    // Codex runs and duplicate PR creation on watcher restart.
+    return true;
   }
 
   if (metadata.issue !== (state.issue ?? "")) {
