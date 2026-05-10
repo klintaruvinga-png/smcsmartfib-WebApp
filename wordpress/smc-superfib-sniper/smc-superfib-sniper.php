@@ -879,13 +879,23 @@ final class SMC_SuperFib_Sniper_REST {
         $operator_notes = function_exists('sanitize_textarea_field')
             ? sanitize_textarea_field($payload['operator_notes'] ?? '')
             : trim((string) ($payload['operator_notes'] ?? ''));
-        $report = $this->get_soak_report();
-        if ($report instanceof WP_Error) {
-            return $report;
+        $report_response = $this->get_soak_report();
+        if ($report_response instanceof WP_Error) {
+            return $report_response;
         }
+        // get_soak_report() returns WP_REST_Response; extract the plain array.
+        $report = ($report_response instanceof WP_REST_Response)
+            ? (array) $report_response->get_data()
+            : array();
+
+        // Strip the checkpoints list before persisting. Each checkpoint row
+        // already exists individually in the DB; embedding them inside the new
+        // snapshot would cause recursive payload growth across the 72h window.
+        $snapshot_report = $report;
+        unset($snapshot_report['checkpoints']);
 
         $created_at = $this->now_mysql();
-        $snapshot_data = wp_json_encode($report);
+        $snapshot_data = wp_json_encode($snapshot_report);
         $cutoff = gmdate('Y-m-d H:i:s', strtotime('-72 hours'));
 
         $wpdb->query('START TRANSACTION');
@@ -916,7 +926,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         return rest_ensure_response(array(
             'id' => isset($wpdb->insert_id) ? (int) $wpdb->insert_id : 0,
-            'snapshot_data' => $report,
+            'snapshot_data' => $snapshot_report,
             'operator_notes' => $operator_notes !== '' ? $operator_notes : null,
             'created_at' => $this->to_iso($created_at),
         ));
