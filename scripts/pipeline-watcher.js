@@ -13,6 +13,7 @@ const PLAN_FILE = path.join(REPO_ROOT, "reports", "codex-plan.md");
 const PLAN_METADATA_FILE = path.join(REPO_ROOT, "reports", "codex-plan.meta.json");
 const IMPLEMENTATION_FILE = path.join(REPO_ROOT, "reports", "codex-implementation.md");
 const IMPLEMENTATION_METADATA_FILE = path.join(REPO_ROOT, "reports", "codex-implementation.meta.json");
+const IMPLEMENTATION_FAILED_FILE = path.join(REPO_ROOT, "reports", ".codex-implementation-failed.json");
 const STATE_FILE = path.join(REPO_ROOT, ".smc-workflow-state.json");
 // Write-only JSON lock — status field ("running"|"done") determines liveness.
 // The file is NEVER deleted; it is overwritten on acquire and on release.
@@ -59,8 +60,13 @@ function buildObservedKey() {
     statMtime(PLAN_METADATA_FILE),
     statMtime(STATE_FILE),
     statMtime(IMPLEMENTATION_FILE),
+    statMtime(IMPLEMENTATION_FAILED_FILE),
     statMtime(CLAUDE_HARDENING_BLOCKED_FILE),
   ].join(":");
+}
+
+function readTextFile(filePath) {
+  return fs.readFileSync(filePath, "utf8").replace(/^ï»¿/, "");
 }
 
 function readJson(filePath) {
@@ -75,20 +81,38 @@ function writeJson(filePath, value) {
 }
 
 function markReadyForImplementation(state, source) {
+  clearImplementationFailedState();
   writeJson(STATE_FILE, {
     ...state,
     state: "READY_FOR_IMPLEMENTATION",
     editing_locked: false,
     plan_hardened_at: new Date().toISOString(),
     plan_source: source,
+    implementation_completed_at: undefined,
+    implementation_failed_at: undefined,
+    implementation_failure_reason: undefined,
   });
 }
 
 function markImplementationComplete(state) {
+  clearImplementationFailedState();
   writeJson(STATE_FILE, {
     ...state,
     state: "IMPLEMENTATION_COMPLETE",
     implementation_completed_at: new Date().toISOString(),
+    implementation_failed_at: undefined,
+    implementation_failure_reason: undefined,
+  });
+}
+
+function markImplementationFailed(state, reason) {
+  writeJson(STATE_FILE, {
+    ...state,
+    state: "IMPLEMENTATION_FAILED",
+    editing_locked: false,
+    implementation_failed_at: new Date().toISOString(),
+    implementation_failure_reason: reason,
+    implementation_completed_at: undefined,
   });
 }
 
@@ -111,6 +135,24 @@ function isUsablePlan(text) {
     "6. Risk assessment",
     "7. Test requirements",
     "8. Implementation handoff",
+  ];
+
+  return requiredSections.every((section) => text.includes(section));
+}
+
+function isUsableImplementation(text) {
+  if (!text || isPermissionStub(text)) {
+    return false;
+  }
+
+  const requiredSections = [
+    "Issue summary",
+    "Root cause implemented",
+    "Exact files changed",
+    "Tests run",
+    "Reports generated",
+    "Remaining risks",
+    "Any contract ambiguities resolved during implementation",
   ];
 
   return requiredSections.every((section) => text.includes(section));
@@ -206,6 +248,26 @@ function writeImplementationMetadata(state) {
   });
 }
 
+function writeImplementationFailedState(state, reason, details = {}) {
+  writeJson(IMPLEMENTATION_FAILED_FILE, {
+    failed_at: new Date().toISOString(),
+    issue: state.issue ?? "",
+    plan_hash: (() => {
+      try {
+        return hashFile(PLAN_FILE);
+      } catch {
+        return null;
+      }
+    })(),
+    reason,
+    ...details,
+  });
+}
+
+function clearImplementationFailedState() {
+  try { fs.unlinkSync(IMPLEMENTATION_FAILED_FILE); } catch { /* ignore */ }
+}
+
 function hasUsablePlanArtifactForState(state) {
   if (!fs.existsSync(RESEARCH_FILE) || !fs.existsSync(PLAN_FILE)) {
     return false;
@@ -225,10 +287,104 @@ function hasUsablePlanArtifactForState(state) {
       return false;
     }
 
-    return isUsablePlan(fs.readFileSync(PLAN_FILE, "utf8"));
+    return isUsablePlan(readTextFile(PLAN_FILE));
   } catch {
     return false;
   }
+}
+
+function summarizeCodexStopReason(text) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (const line of lines) {
+    if (/^\*\*Stopped\*\*$/i.test(line) || /^Stopped$/i.test(line)) {
+      continue;
+    }
+    if (/^\*\*[^*]+\*\*$/.test(line)) {
+      continue;
+    }
+    return line.replace(/\*\*/g, "");
+  }
+
+  return "Codex stopped without applying the patch";
+}
+
+function detectCodexStopReason(text) {
+  const normalized = text.trim();
+  if (!normalized) {
+    return "Codex exited without writing a final status message";
+  }
+
+  if (/^\*\*Stopped\*\*$/im.test(normalized) || /^Stopped$/im.test(normalized)) {
+    return summarizeCodexStopReason(normalized);
+  }
+
+  if (/did not patch, switch branches, commit, or open a PR/i.test(normalized)) {
+    return "Codex stopped before patching, branching, committing, or opening a PR";
+  }
+
+  return null;
+}
+
+function validateImplementationRun(previousImplementationMtime, previousOutputMtime) {
+  const outputMtime = statMtime(CODEX_OUTPUT_FILE);
+  if (outputMtime <= previousOutputMtime) {
+    return {
+      reason: "Codex run finished without refreshing reports/codex-last-message.txt",
+    };
+  }
+
+  const outputText = readTextFile(CODEX_OUTPUT_FILE).trim();
+  const stopReason = detectCodexStopReason(outputText);
+  if (stopReason) {
+    return {
+      reason: stopReason,
+      details: {
+        codex_output_excerpt: outputText.slice(0, 4000),
+      },
+    };
+  }
+
+  if (!fs.existsSync(IMPLEMENTATION_FILE)) {
+    return {
+      reason: "Codex implementation finished without reports/codex-implementation.md",
+    };
+  }
+
+  const implementationMtime = statMtime(IMPLEMENTATION_FILE);
+  if (implementationMtime <= previousImplementationMtime) {
+    return {
+      reason: "Codex run finished without updating reports/codex-implementation.md",
+    };
+  }
+
+  const implementationText = readTextFile(IMPLEMENTATION_FILE).trim();
+  if (!implementationText) {
+    return {
+      reason: "Codex implementation wrote an empty reports/codex-implementation.md",
+    };
+  }
+
+  if (!isUsableImplementation(implementationText)) {
+    return {
+      reason: "Codex implementation wrote an invalid reports/codex-implementation.md",
+      details: {
+        implementation_excerpt: implementationText.slice(0, 4000),
+      },
+    };
+  }
+
+  return null;
+}
+
+function failImplementation(state, reason, details = {}) {
+  writeImplementationFailedState(state, reason, details);
+  markImplementationFailed(state, reason);
+  log("Codex implementation failed - state IMPLEMENTATION_FAILED");
+  log(`  Reason: ${reason}`);
 }
 
 function readState() {
@@ -491,6 +647,8 @@ function runCodexImplementation(state) {
 - Open a normal PR, not a draft PR.
 - The existing Codex PR review automation starts after PR creation.
 `;
+  const previousImplementationMtime = statMtime(IMPLEMENTATION_FILE);
+  const previousOutputMtime = statMtime(CODEX_OUTPUT_FILE);
 
   withPipelineLock("codex-implementation", () => {
     log("READY_FOR_IMPLEMENTATION detected - running Codex implementation");
@@ -531,12 +689,30 @@ function runCodexImplementation(state) {
         // hit Node's default execSync maxBuffer limit on verbose Codex runs.
         stdio: ["ignore", "inherit", "inherit"],
       });
+    } catch (error) {
+      const outputText = fs.existsSync(CODEX_OUTPUT_FILE)
+        ? readTextFile(CODEX_OUTPUT_FILE).trim()
+        : "";
+      const stopReason = outputText ? detectCodexStopReason(outputText) : null;
+      const reason = stopReason
+        ?? (error instanceof Error
+          ? `Codex CLI invocation failed: ${error.message}`
+          : `Codex CLI invocation failed: ${String(error)}`);
+      failImplementation(state, reason, {
+        codex_output_excerpt: outputText.slice(0, 4000),
+      });
+      return;
     } finally {
       try { fs.unlinkSync(promptFile); } catch { /* ignore */ }
     }
 
-    if (!fs.existsSync(IMPLEMENTATION_FILE)) {
-      throw new Error("Codex implementation finished without reports/codex-implementation.md");
+    const validationFailure = validateImplementationRun(
+      previousImplementationMtime,
+      previousOutputMtime,
+    );
+    if (validationFailure) {
+      failImplementation(state, validationFailure.reason, validationFailure.details);
+      return;
     }
 
     writeImplementationMetadata(state);
@@ -588,6 +764,13 @@ function evaluatePipeline() {
   if (state.state === "IMPLEMENTATION_COMPLETE") {
     log("Pipeline cycle complete - waiting for next issue");
     return;
+  }
+
+  if (state.state === "IMPLEMENTATION_FAILED") {
+    log(
+      "Pipeline implementation failed - waiting for corrected artifacts or a new issue"
+      + (state.implementation_failure_reason ? ` (${state.implementation_failure_reason})` : ""),
+    );
   }
 }
 

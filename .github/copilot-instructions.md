@@ -65,6 +65,7 @@ Before performing ANY file edit, code generation, apply_patch, or write operatio
   - `reports/copilot-research.md`
   - `reports/codex-plan.md`
 - `.smc-workflow-state.json` is a local runtime file. Never stage or commit it.
+- If `state` is `IMPLEMENTATION_FAILED`, inspect `reports/.codex-implementation-failed.json` and `reports/codex-last-message.txt` before starting a new cycle.
 - Once `IMPLEMENTATION_COMPLETE`, old artifacts may be replaced by a new research cycle.
 
 ## Workflow States Reference
@@ -75,4 +76,5 @@ Before performing ANY file edit, code generation, apply_patch, or write operatio
 | RESEARCHING              | No              |
 | PLANNING                 | No (locked)     |
 | READY_FOR_IMPLEMENTATION | Yes             |
+| IMPLEMENTATION_FAILED    | No              |
 | IMPLEMENTATION_COMPLETE  | Yes             |
