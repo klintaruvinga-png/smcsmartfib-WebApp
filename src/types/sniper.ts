@@ -66,7 +66,10 @@ export type KnownSymbol =
   | "US30"
   | "NAS100"
   | "BTCUSD"
-  | "ETHUSD";
+  | "ETHUSD"
+  | "XRPUSD"
+  | "BNBUSD"
+  | "SOLUSD";
 
 export type Symbol = KnownSymbol | (string & {});
 export type TwelveDataKeyStatus =

@@ -32,6 +32,19 @@ if (!class_exists('WP_REST_Request')) {
         }
     }
 }
+if (!class_exists('WP_Error')) {
+    class WP_Error {
+        public $code;
+        public $message;
+        public $data;
+
+        public function __construct($code = '', $message = '', $data = null) {
+            $this->code = $code;
+            $this->message = $message;
+            $this->data = $data;
+        }
+    }
+}
 if (!class_exists('TestWpdb')) {
     class TestWpdb {
         public $prefix = 'wp_';
@@ -101,6 +114,27 @@ if (!class_exists('TestWpdb')) {
             }
             $this->tables[$table][] = $data;
             return 1;
+        }
+
+        public function delete($table, $where, $where_format = array()) {
+            if (!isset($this->tables[$table])) {
+                return 0;
+            }
+            $deleted = 0;
+            foreach ($this->tables[$table] as $key => $row) {
+                $matches = true;
+                foreach ($where as $field => $value) {
+                    if (!array_key_exists($field, $row) || (string) $row[$field] !== (string) $value) {
+                        $matches = false;
+                        break;
+                    }
+                }
+                if ($matches) {
+                    unset($this->tables[$table][$key]);
+                    $deleted++;
+                }
+            }
+            return $deleted;
         }
     }
 }

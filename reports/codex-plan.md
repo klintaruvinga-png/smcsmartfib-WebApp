@@ -1,53 +1,68 @@
-## 1. Issue validation
+### 1. Issue validation
 
-- Confirmed:
-  - `src/hooks/useSniperData.ts` is the canonical frontend watchlist source through `useWatchlist()`, and multiple dashboard routes consume that shared state.
-  - `src/routes/account.tsx` already treats backend watchlist mutation responses as authoritative and performs optimistic cache update, rollback, and refetch protection.
-  - `src/routes/live.tsx` and `src/routes/signals.tsx` both gate visible symbols through the watchlist, so any stale watchlist state becomes user-visible across sections.
-  - Backend watchlist persistence already has a known snapshot invalidation surface around `smc_sf_engine_snapshot`.
-- Likely:
-  - The remaining production defect is cross-section consistency, not one isolated page bug. The patch should verify every watchlist consumer clamps to the same canonical symbol set and that removed symbols cannot survive in local route state or cached backend snapshots.
-  - `src/routes/charts.tsx` is a high-probability gap because chart selection often persists its own local symbol state and can drift after watchlist edits if not re-clamped.
-- Unconfirmed:
-  - The research does not yet prove a specific backend persistence path is still failing today.
-  - The research does not yet prove a specific frontend route other than the known watchlist consumers is currently rendering ghost symbols.
+- **Confirmed**: The backend's `normalize_symbol_token()` function only performs basic uppercase and alphanumeric stripping, without mapping aliases like `NASDAQ` to `NAS100` or supporting additional crypto symbols like `SOLUSD`.
+- **Confirmed**: The `instrument_specs()` registry is limited to `US30`, `NAS100`, `BTCUSD`, and `ETHUSD`, rejecting `SOLUSD` and aliases for indices.
+- **Likely**: Deriv broker may use alternative naming conventions that require alias resolution before validation.
+- **Unconfirmed**: Exact Deriv symbol names for top-5 cryptos beyond BTCUSD and ETHUSD.
 
-## 2. Implementation contract
+### 2. Implementation contract
 
-- File: `src/hooks/useSniperData.ts`
-  - Modify: watchlist-related selectors and mutation hooks only.
-  - Exact change required: confirm every exported watchlist reader returns a normalized canonical symbol list/set shape that downstream routes can consume consistently; preserve existing optimistic update, rollback, and post-success authoritative refresh behavior.
-  - Guard rails: do not weaken mutation rollback, do not widen API contracts, do not change backend authority rules.
-  - Why in scope: this file is the frontend source of truth for watchlist state.
-  - Acceptance criterion: after add/remove succeeds, all downstream consumers read the same canonical updated watchlist without requiring a hard refresh.
+- **File**: `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+  - **Section**: Add alias mapping function before `normalize_symbol_token()` in the symbol processing chain.
+  - **Exact change**: Introduce `map_symbol_aliases()` function that maps known aliases (e.g., `NASDAQ` → `NAS100`, `US TECH 100` → `NAS100`) and returns the input if no alias exists.
+  - **Guard rails**: Do not modify `normalize_symbol_token()`; apply alias mapping first in `is_supported_symbol()` and `sanitize_symbols()`.
+  - **Why in scope**: This file contains the authoritative symbol validation logic.
+  - **Acceptance criterion**: `NASDAQ` and `US TECH 100` are accepted and mapped to `NAS100`; watchlist persistence works for aliases.
 
-- File: `src/routes/account.tsx`
-  - Modify: watchlist mutation handlers and any cache invalidation sequencing tied to add/remove.
-  - Exact change required: keep current authoritative mutation flow, and add any missing dependent invalidations only if required to update downstream watchlist consumers deterministically.
-  - Guard rails: do not replace authoritative backend responses with UI-derived state, do not remove optimistic UX protections.
-  - Why in scope: this route is the write path for watchlist changes.
-  - Acceptance criterion: add/remove from Account updates canonical watchlist state once and does not reintroduce removed symbols during refetch.
+- **File**: `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+  - **Section**: Update `instrument_specs()` to include `SOLUSD` if Deriv supports it.
+  - **Exact change**: Add `SOLUSD` entry with appropriate pip sizing (assume 0.01 like other cryptos).
+  - **Guard rails**: Only add if confirmed Deriv/MT5 support exists; do not add speculative symbols.
+  - **Why in scope**: Expands the registry for top-5 cryptos as requested.
+  - **Acceptance criterion**: `SOLUSD` passes `is_supported_symbol()` validation.
 
-- File: `src/routes/live.tsx`
-  - Modify: symbol filtering / watchlist gating logic.
-  - Exact change required: verify live cards are derived from the current canonical watchlist only, and hard-clamp any locally held symbol collections against the latest watchlist snapshot before render.
-  - Guard rails: do not alter live pricing contracts or freshness handling.
-  - Why in scope: this route already depends on watchlist filtering and exposes ghost-symbol regressions immediately.
-  - Acceptance criterion: removed symbols disappear from Live without refresh; newly added symbols become eligible immediately once backend state returns them.
+### 3. Patch sequence
 
-- File: `src/routes/signals.tsx`
-  - Modify: `watchlistOnly` filtering path and any derived unique signal symbol list.
-  - Exact change required: ensure signal candidates are always recomputed from the current canonical watchlist and do not retain stale symbols in memoized or route-local state.
-  - Guard rails: do not change signal ranking, signal truth, or backend signal sourcing.
-  - Why in scope: this route is a direct downstream consumer of watchlist state.
-  - Acceptance criterion: `watchlistOnly` never shows a removed symbol after a successful mutation.
+1. Add `map_symbol_aliases()` function in `smc-superfib-sniper.php`.
+2. Modify `is_supported_symbol()` to call `map_symbol_aliases()` before `normalize_symbol_token()`.
+3. Modify `sanitize_symbols()` to apply alias mapping before normalization.
+4. Update `instrument_specs()` to include `SOLUSD` if supported.
+5. No dependencies; changes are sequential and isolated to symbol processing.
 
-- File: `src/routes/charts.tsx`
-  - Modify: selected symbol state, fallback symbol selection, and watchlist reconciliation logic.
-  - Exact change required: if the currently selected chart symbol is removed from the watchlist, deterministically re-clamp to the next valid watchlist symbol or a safe empty state instead of rendering stale selection.
-  - Guard rails: do not change chart calculation logic, fib math, or indicator contracts.
-  - Why in scope: chart selection is the most likely place for stale local symbol state to survive a watchlist mutation.
-  - Acceptance criterion: Charts cannot remain pinned to a removed symbol after the canonical watchlist changes.
+### 4. Regression guards
+
+- Run existing watchlist normalization tests to ensure deduplication and basic validation still work.
+- Verify that canonical symbols (e.g., `NAS100`) still pass without alias mapping.
+- Check parity: backend watchlist state matches dashboard display after alias submission.
+- Ensure no unsupported symbols are accepted by broadening the registry without verification.
+
+### 5. Non-goals
+
+- Do not implement Deriv-specific API calls for symbol search.
+- Do not modify Pine indicator or MT5 EA symbol handling.
+- Do not add more than the requested top-5 cryptos without confirmation.
+- Do not change Twelve Data formatting or quote ingestion logic.
+
+### 6. Risk assessment
+
+- **Worst-case failure**: Invalid aliases accepted, causing pricing failures or watchlist corruption.
+- **User-visible failure**: Symbols like `NASDAQ` fail to add to watchlist or display incorrectly.
+- **Backend authority risks**: If aliases are mapped incorrectly, stale data or mismatched feeds could occur.
+- **Human approval required**: Yes, to verify Deriv symbol conventions and top-5 crypto availability.
+
+### 7. Test requirements
+
+- Add unit tests for `map_symbol_aliases()` covering known aliases.
+- Update watchlist tests to include alias submission scenarios.
+- Manual check: Add `NASDAQ` and `SOLUSD` via dashboard and verify backend acceptance.
+- Soak test: Ensure watchlist persistence and price refresh work with aliases.
+
+### 8. Implementation handoff
+
+- **Branch naming**: `feature/symbol-alias-normalization`
+- **Commit grouping**: One commit for alias mapping, one for registry expansion.
+- **Artifacts**: Generate test results and parity verification logs.
+- **State transition**: `READY_FOR_IMPLEMENTATION` with `editing_locked=false`
 
 - File: `src/lib/api/sniperClient.ts`
   - Modify: watchlist mutation response handling only if the current typing or parsing can hide malformed responses.

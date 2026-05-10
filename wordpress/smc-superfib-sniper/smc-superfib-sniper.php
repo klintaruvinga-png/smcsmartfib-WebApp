@@ -822,7 +822,8 @@ final class SMC_SuperFib_Sniper_REST {
     public function post_watchlist_add(WP_REST_Request $request) {
         $user_id = get_current_user_id();
         $payload = $request->get_json_params();
-        $symbol = $this->normalize_symbol_token($payload['symbol'] ?? '');
+        $symbols = $this->sanitize_symbols(array($payload['symbol'] ?? ''));
+        $symbol = isset($symbols[0]) ? $symbols[0] : '';
         if ($symbol === '') {
             return new WP_Error('smc_sf_watchlist_symbol_missing', 'Symbol is required.', array('status' => 400));
         }
@@ -845,7 +846,8 @@ final class SMC_SuperFib_Sniper_REST {
         global $wpdb;
         $user_id = get_current_user_id();
         $payload = $request->get_json_params();
-        $symbol = $this->normalize_symbol_token($payload['symbol'] ?? '');
+        $symbols = $this->sanitize_symbols(array($payload['symbol'] ?? ''));
+        $symbol = isset($symbols[0]) ? $symbols[0] : '';
         if ($symbol === '') {
             return new WP_Error('smc_sf_watchlist_symbol_missing', 'Symbol is required.', array('status' => 400));
         }
@@ -2207,13 +2209,23 @@ final class SMC_SuperFib_Sniper_REST {
         return preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $symbol));
     }
 
+    private function map_symbol_aliases($symbol) {
+        static $aliases = array(
+            'NASDAQ' => 'NAS100',
+            'NASDAQ100' => 'NAS100',
+            'USTECH100' => 'NAS100',
+        );
+        $normalized = $this->normalize_symbol_token($symbol);
+        return isset($aliases[$normalized]) ? $aliases[$normalized] : $normalized;
+    }
+
     private function reference_mid_from_market($market_mids, $symbol) {
-        $key = $this->normalize_symbol_token($symbol);
+        $key = $this->map_symbol_aliases($symbol);
         return isset($market_mids[$key]) ? (float) $market_mids[$key] : 0.0;
     }
 
     private function split_symbol_pair($symbol) {
-        $key = $this->normalize_symbol_token($symbol);
+        $key = $this->map_symbol_aliases($symbol);
         if (!preg_match('/^[A-Z]{6}$/', $key)) {
             return null;
         }
@@ -3240,18 +3252,21 @@ final class SMC_SuperFib_Sniper_REST {
             // CRYPTO — contract sizes vary by broker; defaults use $1/point/lot
             'BTCUSD' => array('type' => 'crypto', 'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
             'ETHUSD' => array('type' => 'crypto', 'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
+            'XRPUSD' => array('type' => 'crypto', 'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
+            'BNBUSD' => array('type' => 'crypto', 'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
+            'SOLUSD' => array('type' => 'crypto', 'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
         );
         return $specs;
     }
 
     private function get_instrument_spec($symbol) {
-        $key = $this->normalize_symbol_token($symbol);
+        $key = $this->map_symbol_aliases($symbol);
         $specs = $this->instrument_specs();
         return isset($specs[$key]) ? $specs[$key] : null;
     }
 
     private function is_supported_symbol($symbol) {
-        $key = $this->normalize_symbol_token($symbol);
+        $key = $this->map_symbol_aliases($symbol);
         $specs = $this->instrument_specs();
         return isset($specs[$key]);
     }
@@ -3282,7 +3297,7 @@ final class SMC_SuperFib_Sniper_REST {
         }
         $out = array();
         foreach ($symbols as $symbol) {
-            $clean = $this->normalize_symbol_token($symbol);
+            $clean = $this->map_symbol_aliases($symbol);
             // Reject empty strings and suspiciously long tokens (longest real symbol is ~10 chars).
             if ($clean === '' || strlen($clean) > 12) {
                 continue;
@@ -3320,7 +3335,7 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function twelve_symbol($symbol) {
-        $key = $this->normalize_symbol_token($symbol);
+        $key = $this->map_symbol_aliases($symbol);
         // All-alpha 6-letter tokens (forex pairs, metals, crypto like BTC/USD) are
         // slash-formatted by Twelve Data. Symbols with digits (US30, NAS100) pass through.
         // This covers both registry-known pairs and any legacy user-watchlist entries.
