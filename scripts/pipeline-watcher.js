@@ -12,6 +12,7 @@ const RESEARCH_FILE = path.join(REPO_ROOT, "reports", "copilot-research.md");
 const PLAN_FILE = path.join(REPO_ROOT, "reports", "codex-plan.md");
 const PLAN_METADATA_FILE = path.join(REPO_ROOT, "reports", "codex-plan.meta.json");
 const IMPLEMENTATION_FILE = path.join(REPO_ROOT, "reports", "codex-implementation.md");
+const IMPLEMENTATION_METADATA_FILE = path.join(REPO_ROOT, "reports", "codex-implementation.meta.json");
 const STATE_FILE = path.join(REPO_ROOT, ".smc-workflow-state.json");
 // Write-only JSON lock — status field ("running"|"done") determines liveness.
 // The file is NEVER deleted; it is overwritten on acquire and on release.
@@ -54,6 +55,7 @@ function buildObservedKey() {
     statMtime(PLAN_FILE),
     statMtime(PLAN_METADATA_FILE),
     statMtime(STATE_FILE),
+    statMtime(IMPLEMENTATION_FILE),
   ].join(":");
 }
 
@@ -75,6 +77,14 @@ function markReadyForImplementation(state, source) {
     editing_locked: false,
     plan_hardened_at: new Date().toISOString(),
     plan_source: source,
+  });
+}
+
+function markImplementationComplete(state) {
+  writeJson(STATE_FILE, {
+    ...state,
+    state: "IMPLEMENTATION_COMPLETE",
+    implementation_completed_at: new Date().toISOString(),
   });
 }
 
@@ -122,6 +132,26 @@ function writePlanMetadata(state) {
   writeJson(PLAN_METADATA_FILE, {
     issue: state.issue ?? "",
     research_hash: hashFile(RESEARCH_FILE),
+    written_at: new Date().toISOString(),
+  });
+}
+
+function readImplementationMetadata() {
+  if (!fs.existsSync(IMPLEMENTATION_METADATA_FILE)) {
+    return null;
+  }
+
+  try {
+    return readJson(IMPLEMENTATION_METADATA_FILE);
+  } catch {
+    return null;
+  }
+}
+
+function writeImplementationMetadata(state) {
+  writeJson(IMPLEMENTATION_METADATA_FILE, {
+    issue: state.issue ?? "",
+    plan_hash: hashFile(PLAN_FILE),
     written_at: new Date().toISOString(),
   });
 }
@@ -308,9 +338,46 @@ function runClaudePlanHardening(state) {
   });
 }
 
+function isImplementationAlreadyDone(state) {
+  if (!fs.existsSync(IMPLEMENTATION_FILE)) {
+    return false;
+  }
+  // If the implementation file is newer than when the plan was hardened, Codex already
+  // completed this cycle. Protect against re-runs on every watcher restart.
+  const implMtime = statMtime(IMPLEMENTATION_FILE);
+  const hardened = Date.parse(state.plan_hardened_at ?? "");
+  if (!Number.isFinite(hardened) || implMtime <= hardened) {
+    return false;
+  }
+
+  const metadata = readImplementationMetadata();
+  if (!metadata) {
+    // Backward compatibility: older/in-flight cycles may have a valid implementation
+    // artifact without metadata. Fall back to mtime-only behavior to avoid duplicate
+    // Codex runs and duplicate PR creation on watcher restart.
+    return true;
+  }
+
+  if (metadata.issue !== (state.issue ?? "")) {
+    return false;
+  }
+
+  try {
+    return metadata.plan_hash === hashFile(PLAN_FILE);
+  } catch {
+    return false;
+  }
+}
+
 function runCodexImplementation(state) {
   if (!fs.existsSync(RESEARCH_FILE) || !fs.existsSync(PLAN_FILE)) {
     log("READY_FOR_IMPLEMENTATION requires both research and plan artifacts");
+    return;
+  }
+
+  if (isImplementationAlreadyDone(state)) {
+    log("Codex implementation already complete for this cycle - marking IMPLEMENTATION_COMPLETE");
+    markImplementationComplete(state);
     return;
   }
 
@@ -368,7 +435,10 @@ function runCodexImplementation(state) {
       throw new Error("Codex implementation finished without reports/codex-implementation.md");
     }
 
-    log("Codex implementation run complete");
+    writeImplementationMetadata(state);
+
+    markImplementationComplete(state);
+    log("Codex implementation run complete - state IMPLEMENTATION_COMPLETE");
   });
 }
 
@@ -401,6 +471,12 @@ function evaluatePipeline() {
     }
 
     runCodexImplementation(state);
+    return;
+  }
+
+  if (state.state === "IMPLEMENTATION_COMPLETE") {
+    log("Pipeline cycle complete - waiting for next issue");
+    return;
   }
 }
 
