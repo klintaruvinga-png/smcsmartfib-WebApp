@@ -352,25 +352,42 @@ function runClaudePlanHardening(state) {
     return;
   }
 
-  const prompt = `${fs.readFileSync(CLAUDE_PLAN_PROMPT_FILE, "utf8")}
-
-## Runtime context
-- Issue: ${state.issue}
-- Input artifact: reports/copilot-research.md
-- Output artifact: reports/codex-plan.md
-- Return the plan as plain markdown on stdout only.
-- Do not attempt to edit files or use any tools.
-- Do not implement code.
-- Stop after the plan is written.
-`;
-
   withPipelineLock("claude-plan-hardening", () => {
     log("PLANNING detected - running Claude plan hardening");
 
-    // Write prompt to a temp file to avoid Windows argv length limits (8 191-char CMD cap).
-    // Mirrors the pattern used for Codex: pass content via stdin redirect, not via argv.
-    const promptFile = path.join(REPO_ROOT, "reports", "claude-plan-prompt.tmp.md");
-    fs.writeFileSync(promptFile, prompt, "utf8");
+    // Claude Code headless contract (code.claude.com/docs/en/headless):
+    //   claude -p "<explicit query>" [< stdin-context]
+    // The -p / --print flag requires an explicit prompt argument — the query.
+    // stdin carries supplementary context and is NOT a substitute for the query.
+    // Omitting the prompt argument causes an immediate CLI error.
+    //
+    // Use a short shell-safe string for --print so quoting in the shell cmd is trivial.
+    // The full template + runtime context + research go into a single context file
+    // piped via stdin, which also sidesteps the 8 191-char Windows CMD argv limit.
+    const PROMPT_ARG = "Produce a hardened implementation contract. Follow all instructions in the TEMPLATE section exactly. Return only the plan markdown — no preamble, no prose outside the numbered sections.";
+
+    const contextContent = [
+      "# TEMPLATE",
+      "",
+      fs.readFileSync(CLAUDE_PLAN_PROMPT_FILE, "utf8").trim(),
+      "",
+      "# RUNTIME CONTEXT",
+      "",
+      `Issue: ${state.issue}`,
+      "Input artifact: reports/copilot-research.md",
+      "Output artifact: reports/codex-plan.md",
+      "Return the plan as plain markdown on stdout only.",
+      "Do not attempt to edit files or use any tools.",
+      "Do not implement code.",
+      "Stop after the plan is written.",
+      "",
+      "# RESEARCH REPORT",
+      "",
+      fs.readFileSync(RESEARCH_FILE, "utf8").trim(),
+    ].join("\n");
+
+    const contextFile = path.join(REPO_ROOT, "reports", "claude-plan-context.tmp.md");
+    fs.writeFileSync(contextFile, contextContent, "utf8");
 
     let planText;
     try {
@@ -380,10 +397,10 @@ function runClaudePlanHardening(state) {
       const claudeBin = process.platform === "win32" ? "claude.cmd" : "claude";
       const cmd = [
         `"${claudeBin}"`,
-        "--print",
+        "--print", `"${PROMPT_ARG}"`,
         "--output-format", "text",
         "--tools", '""',
-        "<", `"${promptFile}"`,
+        "<", `"${contextFile}"`,
       ].join(" ");
 
       planText = execSync(cmd, {
@@ -399,7 +416,7 @@ function runClaudePlanHardening(state) {
       log(`Claude CLI invocation failed — blocked state written. Fix: see reports/.claude-hardening-blocked.json`);
       throw err;
     } finally {
-      try { fs.unlinkSync(promptFile); } catch { /* ignore */ }
+      try { fs.unlinkSync(contextFile); } catch { /* ignore */ }
     }
 
     planText = planText.trim();
