@@ -12,6 +12,7 @@ const RESEARCH_FILE = path.join(REPO_ROOT, "reports", "copilot-research.md");
 const PLAN_FILE = path.join(REPO_ROOT, "reports", "codex-plan.md");
 const PLAN_METADATA_FILE = path.join(REPO_ROOT, "reports", "codex-plan.meta.json");
 const IMPLEMENTATION_FILE = path.join(REPO_ROOT, "reports", "codex-implementation.md");
+const IMPLEMENTATION_METADATA_FILE = path.join(REPO_ROOT, "reports", "codex-implementation.meta.json");
 const STATE_FILE = path.join(REPO_ROOT, ".smc-workflow-state.json");
 // Write-only JSON lock — status field ("running"|"done") determines liveness.
 // The file is NEVER deleted; it is overwritten on acquire and on release.
@@ -131,6 +132,26 @@ function writePlanMetadata(state) {
   writeJson(PLAN_METADATA_FILE, {
     issue: state.issue ?? "",
     research_hash: hashFile(RESEARCH_FILE),
+    written_at: new Date().toISOString(),
+  });
+}
+
+function readImplementationMetadata() {
+  if (!fs.existsSync(IMPLEMENTATION_METADATA_FILE)) {
+    return null;
+  }
+
+  try {
+    return readJson(IMPLEMENTATION_METADATA_FILE);
+  } catch {
+    return null;
+  }
+}
+
+function writeImplementationMetadata(state) {
+  writeJson(IMPLEMENTATION_METADATA_FILE, {
+    issue: state.issue ?? "",
+    plan_hash: hashFile(PLAN_FILE),
     written_at: new Date().toISOString(),
   });
 }
@@ -325,7 +346,27 @@ function isImplementationAlreadyDone(state) {
   // completed this cycle. Protect against re-runs on every watcher restart.
   const implMtime = statMtime(IMPLEMENTATION_FILE);
   const hardened = Date.parse(state.plan_hardened_at ?? "");
-  return Number.isFinite(hardened) && implMtime > hardened;
+  if (!Number.isFinite(hardened) || implMtime <= hardened) {
+    return false;
+  }
+
+  const metadata = readImplementationMetadata();
+  if (!metadata) {
+    // Backward compatibility: older/in-flight cycles may have a valid implementation
+    // artifact without metadata. Fall back to mtime-only behavior to avoid duplicate
+    // Codex runs and duplicate PR creation on watcher restart.
+    return true;
+  }
+
+  if (metadata.issue !== (state.issue ?? "")) {
+    return false;
+  }
+
+  try {
+    return metadata.plan_hash === hashFile(PLAN_FILE);
+  } catch {
+    return false;
+  }
 }
 
 function runCodexImplementation(state) {
@@ -393,6 +434,8 @@ function runCodexImplementation(state) {
     if (!fs.existsSync(IMPLEMENTATION_FILE)) {
       throw new Error("Codex implementation finished without reports/codex-implementation.md");
     }
+
+    writeImplementationMetadata(state);
 
     markImplementationComplete(state);
     log("Codex implementation run complete - state IMPLEMENTATION_COMPLETE");
