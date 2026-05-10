@@ -274,6 +274,11 @@ final class SMC_SuperFib_Sniper_REST {
 
     public function register_routes() {
         $this->route('/health', WP_REST_Server::READABLE, 'get_health', false);
+        register_rest_route(self::NAMESPACE, '/admin/health', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => array($this, 'get_admin_health'),
+            'permission_callback' => array($this, 'permission_admin'),
+        ));
         $this->route('/session', WP_REST_Server::READABLE, 'get_session', false);
         $this->route('/snapshot', WP_REST_Server::READABLE, 'get_snapshot', true);
         $this->route('/snapshot', WP_REST_Server::CREATABLE, 'post_snapshot', true);
@@ -340,6 +345,28 @@ final class SMC_SuperFib_Sniper_REST {
             ));
 
             return new WP_Error('smc_sf_auth_required', 'Authentication required.', array('status' => 401));
+        }
+
+        return true;
+    }
+
+    public function permission_admin() {
+        $logged_in = is_user_logged_in();
+        $can_manage = current_user_can('manage_options');
+        $user_id = get_current_user_id();
+
+        if (!$logged_in || !$can_manage) {
+            error_log(sprintf(
+                'SMC SuperFIB admin auth failed: user_id=%s logged_in=%s can_manage_options=%s request_uri=%s method=%s remote_addr=%s',
+                $user_id,
+                $logged_in ? 'true' : 'false',
+                $can_manage ? 'true' : 'false',
+                isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : 'unknown',
+                isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'unknown',
+                isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'unknown'
+            ));
+
+            return new WP_Error('smc_sf_admin_required', 'Administrator access required.', array('status' => 403));
         }
 
         return true;
@@ -549,6 +576,14 @@ final class SMC_SuperFib_Sniper_REST {
             ));
         }
 
+        return rest_ensure_response($this->build_health_payload($user_id));
+    }
+
+    public function get_admin_health() {
+        return rest_ensure_response($this->build_health_payload(get_current_user_id()));
+    }
+
+    private function build_health_payload($user_id) {
         $key_status = $this->get_twelve_key_status($user_id);
         $last_batch = $this->latest_timestamp('snapshots', $user_id, 'updated_at');
         $last_run = $this->latest_timestamp('engine_runs', $user_id, 'created_at');
@@ -669,7 +704,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         $snapshot = $this->get_engine_snapshot($user_id);
 
-        return rest_ensure_response(array(
+        return array(
             'backendSync' => $backend_sync,
             'priceFeed' => $price_feed,
             'feedStatus' => $feed_status,
@@ -679,7 +714,7 @@ final class SMC_SuperFib_Sniper_REST {
             'lastBatchAt' => $this->to_iso($last_batch),
             'lastEngineRunAt' => $this->to_iso($last_run),
             'perSymbolDiagnostics' => is_array($snapshot) ? ($snapshot['diagnostics'] ?? array()) : array(),
-        ));
+        );
     }
 
     public function get_user_settings() {
