@@ -1,45 +1,39 @@
-# Issue summary
+# Codex Implementation Summary
 
-The dashboard had no `/admin` route, and backend health diagnostics had no admin-only REST surface. The implemented fix adds an admin-scoped health endpoint, a frontend `/admin` route that consumes it, and regression coverage proving non-admin users receive 403 while `/health` remains unchanged.
+## Issue summary
 
-# Root cause implemented
+The current issue was researched as a deployment and routing collision, not implemented as an app-code patch. The repo already contains a valid SPA `/admin` route, but the production WordPress host owns `/admin` first and redirects it into `wp-admin`, so the dashboard route only works on the standalone Workers host.
 
-The repo lacked both halves of the contract: no TanStack route module for `/admin`, and no backend `manage_options` guard for an admin diagnostics path. The fix extracts the existing health payload into a shared helper, exposes it through a new admin-only `/admin/health` endpoint, and adds a route that fails closed on denied or unavailable responses.
+## Root cause implemented
 
-# Exact files changed
+No runtime code was changed in this pass. The deliverable implemented here is the decision-complete patch plan and bug-sweep artifact for the safest fix: rename the SPA route away from `/admin` and keep WordPress routing and backend contracts unchanged.
 
-- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
-- `wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
-- `src/lib/api/sniperClient.ts`
-- `src/routes/admin.tsx`
-- `src/routeTree.gen.ts`
+## Exact files changed
 
-# Tests run
-
-- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
-- `php wordpress/smc-superfib-sniper/tests/php/test-cors-regression.php`
-- `php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php`
-- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
-- `php wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php`
-- `php wordpress/smc-superfib-sniper/tests/php/test-rest-bootstrap-settings.php`
-- `php wordpress/smc-superfib-sniper/tests/php/test-settings-risk-fallbacks.php`
-- `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`
-- `npm run build`
-
-# Reports generated
-
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-10_admin-health-route.md`
-- `.github/migration/audits/phase-0-admin-health-parity-2026-05-10.md`
+- `reports/codex-plan.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-10_admin-route-wordpress-hijack.md`
 - `reports/codex-implementation.md`
 
-# Remaining risks
+## Tests run
 
-- `manage_options` is assumed to be the correct administrator gate for this WordPress install and should be confirmed in production.
-- The frontend intentionally renders a generic denied state for `403`, `404`, and network failures so diagnostics are never leaked during rollout.
-- No dashboard navigation item was added for `/admin`; the patch only restores route reachability and backend authority.
+- Repo evidence grep for `/admin`, `wp-json`, and Workers hosting references
+- Live verification on 2026-05-10:
+  - `curl -I -L https://trader.stokvelsociety.co.za/admin`
+  - `curl -i https://trader.stokvelsociety.co.za/wp-json/sniper/v1/health`
 
-# Any contract ambiguities resolved during implementation
+## Reports generated
 
-- Branch naming conflict: `reports/codex-plan.md` suggested `codex/admin-health-route`, but runtime context required `codex/dashboard-admin-route-no-admin-route-exists-and-`. The runtime-context branch was used.
-- Route registration conflict: the contract referenced manual `__root.tsx` registration, but this repo uses TanStack file-based route generation. The safe implementation added `src/routes/admin.tsx` and regenerated `src/routeTree.gen.ts` instead of widening router architecture.
-- Health field mismatch: the contract mentioned fields such as system uptime and last signal timestamp that are not present in the repo’s existing `/health` payload. The admin page renders the real backend-owned health fields already exposed by `/health` to preserve API truth and avoid inventing new contract fields.
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-10_admin-route-wordpress-hijack.md`
+- `reports/codex-plan.md`
+- `reports/codex-implementation.md`
+
+## Remaining risks
+
+- External bookmarks, docs, or onboarding flows may still depend on `/admin`
+- External proxy or CDN rules are not visible from this repo and must be checked before a real code patch is merged
+- The final replacement path token still needs human approval, even though `/dashboard-admin` is the recommended default
+
+## Any contract ambiguities resolved during implementation
+
+- `reports/codex-plan.md` had been hardened as if the route rename should be implemented immediately, but the runtime issue for this turn asked for repo and deployment research plus a decision-complete patch plan. I treated this turn as a research-and-planning delivery and did not modify app runtime code.
+- The live host verification resolved the biggest repo-only unknown: as of May 10, 2026, `https://trader.stokvelsociety.co.za/admin` is currently redirected by WordPress to `/wp-admin/`, so the collision is confirmed from production evidence rather than inferred only from local code.
