@@ -404,11 +404,15 @@ function runCodexImplementation(state) {
       // execSync with shell:true lets Windows resolve codex.cmd and handle
       // the stdin redirect operator (<) without needing inheritable file descriptors.
       const codexBin = process.platform === "win32" ? "codex.cmd" : "codex";
-      // Wrap paths in quotes to handle spaces (OneDrive paths).
+      // --json disables the interactive TUI so codex can run in a detached
+      // background process (no console attached). Without it, codex crashes
+      // immediately with STATUS_CONTROL_C_EXIT (0xC000013A) on Windows.
+      // --dangerously-bypass-approvals-and-sandbox already disables the sandbox,
+      // so --sandbox workspace-write is redundant and removed to avoid conflict.
       const cmd = [
         `"${codexBin}"`,
         "exec",
-        "--sandbox", "workspace-write",
+        "--json",
         "--dangerously-bypass-approvals-and-sandbox",
         "-C", `"${REPO_ROOT}"`,
         "-o", `"${CODEX_OUTPUT_FILE}"`,
