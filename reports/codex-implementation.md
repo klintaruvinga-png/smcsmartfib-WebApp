@@ -1,45 +1,37 @@
 # Issue summary
 
-Watchlist state could drift across dashboard sections because the frontend did not use one shared clamp/order path everywhere, and the backend settings-save path persisted `watchlist` changes without invalidating the cached engine snapshot.
+The symbol-normalization contract targeted backend watchlist acceptance for index aliases (`NASDAQ`, `US Tech 100`) and the requested crypto set (`BTCUSD`, `ETHUSD`, `XRPUSD`, `BNBUSD`, `SOLUSD`) while preserving backend authority and watchlist snapshot invalidation.
 
 # Root cause implemented
 
-I fixed the confirmed backend defect in `post_user_settings()` by invalidating `smc_sf_engine_snapshot` whenever the saved watchlist changes. On the frontend, I centralized watchlist clamping and ordering in `src/hooks/useSniperData.ts`, then rewired Account, Live, Signals, Charts, and the header ticker to consume that canonical state instead of route-specific filtering or selection logic.
+Repository verification showed the required backend production logic was already present on the required branch history and on `main`: symbol aliases already collapse to `NAS100`, the crypto registry already includes `SOLUSD`, and watchlist mutation paths already invalidate `smc_sf_engine_snapshot`. The remaining implementation gap was regression protection. I extended the PHP watchlist regression harness so the authoritative alias path, supported-crypto path, and snapshot invalidation path are now exercised directly.
 
 # Exact files changed
 
-- `src/hooks/useSniperData.ts`
-- `src/routes/account.tsx`
-- `src/routes/live.tsx`
-- `src/routes/signals.tsx`
-- `src/routes/charts.tsx`
-- `src/components/sniper/AppShell.tsx`
-- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
 - `wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-09_watchlist-consistency.md`
-- `.github/migration/audits/phase-0-watchlist-parity-2026-05-09.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-10_normalize-symbols.md`
+- `.github/migration/audits/phase-0-deriv-symbol-parity-2026-05-10.md`
 - `reports/codex-implementation.md`
 
 # Tests run
 
 - `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`
-- `npx eslint src/hooks/useSniperData.ts src/routes/account.tsx src/routes/live.tsx src/routes/signals.tsx src/routes/charts.tsx src/components/sniper/AppShell.tsx`
-- `npm run build`
-- `npm run lint`
-  - Fails on unrelated pre-existing repo issues, including `scripts/pipeline-watcher.js`
+- `php wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php`
+  - Fails in the existing harness before parity assertions because `register_deactivation_hook()` is not stubbed there. This was not changed in this patch.
 
 # Reports generated
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-09_watchlist-consistency.md`
-- `.github/migration/audits/phase-0-watchlist-parity-2026-05-09.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-10_normalize-symbols.md`
+- `.github/migration/audits/phase-0-deriv-symbol-parity-2026-05-10.md`
 - `reports/codex-implementation.md`
 
 # Remaining risks
 
-- Manual verification against a live authenticated backend session is still required for final runtime confirmation.
-- Full repository lint remains noisy outside this patch, so only the touched watchlist files were lint-cleaned and rechecked directly.
+- Live manual verification against an authenticated Deriv-backed environment is still required for final runtime confirmation of quote availability after watchlist add/remove.
+- Deriv public indexed sources clearly confirm `US Tech 100` as the Nasdaq 100 label and show `BTCUSD`, `ETHUSD`, `XRPUSD`, `BNBUSD`, and `SOLUSD` naming across current public materials, but this turn did not query a live authenticated broker symbol list.
+- The standalone pip-parity harness currently has a pre-existing bootstrap gap unrelated to this symbol patch.
 
 # Any contract ambiguities resolved during implementation
 
-- The contract file list did not name the header ticker component, but the runtime issue explicitly included it. I treated `src/components/sniper/AppShell.tsx` as in-scope because it is the header watchlist consumer.
-- The backend changes were initially conditional, but repository verification confirmed that the settings-save path was a real snapshot invalidation gap, so I patched that exact path and extended the existing regression harness.
+- `reports/codex-plan.md` contains two unrelated plans. I treated the symbol-normalization contract as authoritative and only used the watchlist-snapshot language where it directly guarded backend truth for this issue.
+- The required branch already contained the production fix history and had previously been merged into `main`. I fast-forwarded the branch to current `main` and limited this turn to missing regression coverage and required artifacts so the PR contains only net-new work.
