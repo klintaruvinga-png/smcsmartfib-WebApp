@@ -10,7 +10,11 @@
       "Bash(del \"C:\\\\Users\\\\LEONNA\\\\OneDrive\\\\All Final Softwares\\\\SMC SuperFib Dashboard\\\\smcsmartfib-WebApp\\\\reports\\\\.pipeline-running\")",
       "PowerShell(if \\($env:ANTHROPIC_API_KEY\\) { \"Key is set \\(length: $\\($env:ANTHROPIC_API_KEY.Length\\)\\)\" } else { \"ANTHROPIC_API_KEY is NOT set in this shell\" })",
       "Read(//mnt/c/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/**)",
-      "Bash(dir \"C:\\\\Users\\\\LEONNA\\\\OneDrive\\\\All Final Softwares\\\\SMC SuperFib Dashboard\\\\smcsmartfib-WebApp\" /b)"
+      "Bash(dir \"C:\\\\Users\\\\LEONNA\\\\OneDrive\\\\All Final Softwares\\\\SMC SuperFib Dashboard\\\\smcsmartfib-WebApp\" /b)",
+      "Bash(ls reports/codex-implementation.md)",
+      "Bash(ls reports/codex-last-message.txt)",
+      "Bash(node -e \"const d=JSON.parse\\(require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\)\\); console.log\\('Decision:', d.reviewDecision\\); console.log\\('Checks:', d.statusCheckRollup?.map\\(c=>c.name+': '+c.conclusion\\).join\\(', '\\)\\)\")",
+      "Bash(git cherry-pick *)"
     ]
   }
 }

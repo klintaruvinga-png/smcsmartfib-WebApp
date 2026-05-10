@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { apiClient, setBackendUrl } from "@/lib/api/sniperClient";
+import { apiClient, normalizeBackendUrl, setBackendUrl } from "@/lib/api/sniperClient";
 import type { DashboardSettings, Symbol, SymbolDiagnostic, TradePlan } from "@/types/sniper";
 
 const DEFAULT_POLL_MS = 2_000;
@@ -8,7 +8,7 @@ const WATCHLIST_LIMIT = 24;
 
 export function useBackendReady() {
   const { data } = useUserSettings();
-  return Boolean(data?.backendUrl);
+  return normalizeBackendUrl(data?.backendUrl).length > 0;
 }
 
 export function usePollMs() {
@@ -79,7 +79,7 @@ export function useUserSettings() {
     queryKey: ["user-settings"],
     queryFn: async () => {
       const s = normalizeDashboardSettings(await apiClient.getUserSettings());
-      if (s.backendUrl) setBackendUrl(s.backendUrl);
+      setBackendUrl(s.backendUrl);
       return s;
     },
     staleTime: 30_000,
@@ -94,7 +94,7 @@ export function useSession() {
   });
 }
 
-/** Canonical watchlist derived from the user-settings cache â€” single source of truth. */
+/** Canonical watchlist derived from the user-settings cache - single source of truth. */
 function normalizeWatchlist(watchlist: readonly Symbol[] | undefined | null): Symbol[] {
   const canonical: Symbol[] = [];
   for (const symbol of watchlist ?? []) {
@@ -110,6 +110,7 @@ function normalizeWatchlist(watchlist: readonly Symbol[] | undefined | null): Sy
 function normalizeDashboardSettings(settings: DashboardSettings): DashboardSettings {
   return {
     ...settings,
+    backendUrl: normalizeBackendUrl(settings.backendUrl),
     watchlist: normalizeWatchlist(settings.watchlist),
   };
 }
@@ -147,7 +148,7 @@ export function filterItemsByWatchlist<T extends { symbol: string }>(
 
 /**
  * Align the canonical watchlist with backend items. Returns an entry per watchlist
- * symbol — `item` is undefined when the backend snapshot has not yet emitted data
+ * symbol - `item` is undefined when the backend snapshot has not yet emitted data
  * for that symbol. This keeps newly-added symbols visible (as "awaiting data")
  * instead of disappearing on the next sparse snapshot.
  */

@@ -13,7 +13,7 @@ import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { WarningLine } from "@/components/sniper/Warnings";
 import { cn } from "@/lib/utils";
 import { Settings as SettingsIcon, Shield, KeyRound, Trash2, X } from "lucide-react";
-import { apiClient, MOCK_MODE, setBackendUrl } from "@/lib/api/sniperClient";
+import { apiClient, MOCK_MODE, normalizeBackendUrl, setBackendUrl } from "@/lib/api/sniperClient";
 import { toast } from "sonner";
 import type {
   DashboardSettings,
@@ -26,12 +26,12 @@ import type {
 export const Route = createFileRoute("/account")({
   head: () => ({
     meta: [
-      { title: "Account & Settings â€” SMC SuperFIB" },
+      { title: "Account & Settings - SMC SuperFIB" },
       {
         name: "description",
         content: "Backend URL, API key status, refresh interval, watchlist and risk profile.",
       },
-      { property: "og:title", content: "Account & Settings â€” SMC SuperFIB" },
+      { property: "og:title", content: "Account & Settings - SMC SuperFIB" },
       { property: "og:description", content: "Configure your dashboard and risk profile." },
     ],
   }),
@@ -45,7 +45,7 @@ function AccountPage() {
   const { data: settings } = useUserSettings();
   const { data: risk } = useUserRiskProfile();
 
-  if (!settings || !risk) return <div className="text-mute text-sm">Loading settingsâ€¦</div>;
+  if (!settings || !risk) return <div className="text-mute text-sm">Loading settings...</div>;
 
   return (
     <div className="space-y-4">
@@ -56,7 +56,7 @@ function AccountPage() {
 
       {MOCK_MODE && (
         <WarningLine level="warn">
-          App running in MOCK_MODE. Real REST calls disabled â€” all data is synthetic.
+          App running in MOCK_MODE. Real REST calls disabled - all data is synthetic.
         </WarningLine>
       )}
 
@@ -179,17 +179,28 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
 
   async function saveSettings(nextSettings?: DashboardSettings) {
     const submittedVersion = settingsEditVersion.current;
-    const settingsToSave = nextSettings ?? s;
+    const settingsToSave = {
+      ...(nextSettings ?? s),
+      backendUrl: normalizeBackendUrl((nextSettings ?? s).backendUrl),
+    };
+    const backendUrlChanged =
+      settingsToSave.backendUrl !== normalizeBackendUrl(settings.backendUrl);
     setBusy("settings");
     try {
-      setBackendUrl(settingsToSave.backendUrl);
       await apiClient.postUserSettings(settingsToSave);
-      await qc.refetchQueries({ queryKey: ["user-settings"], type: "active" });
+      // Persist the setting to the current backend before switching live reads.
+      // Otherwise a migration target URL can hijack the save request and orphan the config.
+      qc.setQueryData<DashboardSettings>(["user-settings"], settingsToSave);
+      setBackendUrl(settingsToSave.backendUrl);
+      if (!backendUrlChanged) {
+        await qc.refetchQueries({ queryKey: ["user-settings"], type: "active" });
+      }
       await Promise.all([
         qc.refetchQueries({ queryKey: ["engine-health"], type: "active" }),
         qc.refetchQueries({ queryKey: ["snapshot"], type: "active" }),
         qc.refetchQueries({ queryKey: ["live-signals"], type: "active" }),
       ]);
+      setS(settingsToSave);
       if (settingsEditVersion.current === submittedVersion) {
         setSettingsDirty(false);
       }

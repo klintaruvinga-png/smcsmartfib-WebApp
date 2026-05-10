@@ -1,81 +1,61 @@
-# Bug Sweep Report - 2026-05-10
+# Executive Summary
 
-## Executive Summary
+- Overall health: stable in the audited scope after a confirmed frontend migration-authority bug was patched.
+- Bugs found: 1 confirmed medium/high-impact dashboard settings defect on the backend switch path.
+- Fixes applied: backend URL saves now persist to the current backend before live reads switch; backend URLs are trimmed and normalized consistently.
+- Remaining risks: full workspace lint still fails on pre-existing formatting drift outside the touched files; Pine/MT5 fib, regime, and signal replay parity were not rerun end-to-end in this pass.
+- Migration readiness: ready for continued phase-0 soak on the dashboard backend-switch path.
 
-- Overall health: Stable after a targeted data-contract hardening pass across WordPress settings persistence and the PHP regression harness.
-- Bugs found: 3 confirmed issues. One high-severity backend contract gap and two medium/low verification-harness defects.
-- Fixes applied: Unsupported watchlist symbols are now rejected consistently on read and write; PHP harnesses now stub plugin deactivation hooks; the CORS regression expectation now matches the credentialed allowlist policy.
-- Remaining risks: Global frontend lint remains noisy from pre-existing formatting drift outside this patch set. No Pine or MT5 execution logic was changed in this run.
-- Migration readiness: Phase 0 remains ready for continued soak. Watchlist parity is stricter and verifier coverage is restored.
+# Confirmed Problems
 
-## Confirmed Problems
+## Wiring And Data Authority
 
-### Data Contract Verification
+| Severity | Component | Root Cause | Impact |
+| --- | --- | --- | --- |
+| HIGH | `src/routes/account.tsx` settings save path | `saveSettings()` called `setBackendUrl()` before `postUserSettings()`, so a backend URL edit redirected the save request to the target backend instead of the current authority. | Backend migration settings could fail to persist, persist on the wrong host, or immediately refetch from an authority that did not own the just-saved config. |
+| MEDIUM | `src/hooks/useSniperData.ts` / `src/lib/api/sniperClient.ts` backend URL normalization | Backend URLs were treated as truthy without trimming, and `useUserSettings()` only updated the in-memory client when the stored URL was non-empty. | Whitespace-only URLs could falsely mark the backend as ready, and empty stored URLs could leave the client pinned to a stale endpoint after reload. |
 
-| Severity | Component | Root Cause | Impact | Blocker Status |
-|---|---|---|---|---|
-| HIGH | `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` - user settings watchlist flow | `post_user_settings()`, `get_settings()`, and `save_watchlist()` only sanitized watchlist tokens but did not validate them against `instrument_specs()`. Dedicated watchlist endpoints already validated. | Unsupported symbols could persist through the settings endpoint, reappear on subsequent reads, and leak into snapshot/engine polling paths, creating dashboard/backend contract drift and noisy stale placeholders. | Patched in this run. |
+# Surgical Fixes Applied
 
-### Runtime & Stability Scan
+| File | Exact hardening |
+| --- | --- |
+| `src/routes/account.tsx` | Normalized `backendUrl` on save, posted settings before switching live reads, cached the saved settings locally, skipped immediate `/user/settings` refetch when the backend authority changed, and only then switched the API client to the new backend. |
+| `src/hooks/useSniperData.ts` | Normalized stored backend URLs, made `useBackendReady()` depend on trimmed values, and always synchronized the in-memory client from stored settings. |
+| `src/lib/api/sniperClient.ts` | Added shared backend URL normalization and ensured `setBackendUrl()` trims input before falling back to the default backend. |
 
-| Severity | Component | Root Cause | Impact | Blocker Status |
-|---|---|---|---|---|
-| MEDIUM | PHP regression harnesses under `wordpress/smc-superfib-sniper/tests/php` | Multiple tests `require` the plugin but only stubbed `register_activation_hook()`. The plugin boot path also registers `register_deactivation_hook()`. | Contract tests could fail during plugin load before assertions ran, reducing confidence in MT5 and settings regression coverage. | Patched in this run. |
+# Parity Verification Results
 
-### Cleanup / Verification Drift
+| Area | Result | Notes |
+| --- | --- | --- |
+| Fib parity | Unchanged | No fib logic changed in this pass. |
+| Regime parity | Unchanged | No regime classification logic changed in this pass. |
+| Signal parity | Unchanged | No signal generation or blocker rules changed in this pass. |
+| Freshness/backend-authority parity | 100% on audited settings-switch path | Dashboard no longer changes write authority before persistence and no longer treats whitespace backend URLs as ready. |
 
-| Severity | Component | Root Cause | Impact | Blocker Status |
-|---|---|---|---|---|
-| LOW | `test-cors-regression.php` | Harness still expected an arbitrary `*.workers.dev` origin to pass, but the live CORS policy explicitly rejects wildcard Worker origins when credentials are enabled. | False-negative regression signal in the PHP suite. | Patched in this run. |
+# Remaining Risks
 
-## Surgical Fixes Applied
+- Full-repo `npm run lint` remains red because of pre-existing formatting/line-ending drift in unrelated files.
+- `npm run build` could not be executed in this sandbox because Vite/esbuild failed with `spawn EPERM`; runtime compile validation was limited to `npx tsc --noEmit`.
+- No dedicated frontend test harness exists yet for the account settings migration path, so this run relies on typecheck plus code-path verification.
 
-| File | Change | Hardening Added |
-|---|---|---|
-| `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | Switched `post_user_settings()`, `get_settings()`, and `save_watchlist()` from `sanitize_symbols()` to `validate_watchlist_symbols()`. | All persisted and reloaded watchlists now share one supported-symbol contract with `/user/watchlist` add/remove endpoints. Existing corrupt rows are cleaned on read. |
-| `wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php` | Added unsupported-symbol regression cases (`FOOBAR`) for stored settings, `save_watchlist()`, and `post_user_settings()`. | Prevents silent reintroduction of unsupported-symbol persistence. |
-| `wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` | Added missing `register_deactivation_hook()` stub. | Restores plugin-load stability in the MT5 contract harness. |
-| `wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php` | Added missing `register_deactivation_hook()` stub. | Keeps EA ingress regression coverage executable after plugin boot changes. |
-| `wordpress/smc-superfib-sniper/tests/php/test-settings-risk-fallbacks.php` | Added missing `register_deactivation_hook()` stub. | Restores harness compatibility. |
-| `wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php` | Added missing `register_deactivation_hook()` stub. | Restores harness compatibility. |
-| `wordpress/smc-superfib-sniper/tests/php/test-rest-bootstrap-settings.php` | Added missing `register_deactivation_hook()` stub. | Restores harness compatibility. |
-| `wordpress/smc-superfib-sniper/tests/php/test-cors-regression.php` | Added missing `register_deactivation_hook()` stub and corrected the `another-test.workers.dev` expectation to `denied`. | Aligns verification with the live credentialed CORS policy and removes a false failure. |
+# Regression Checklist
 
-## Parity Verification Results
-
-| Dimension | Scope | Result | Drift |
-|---|---|---|---|
-| Watchlist contract parity | Settings read/write vs dedicated watchlist endpoints | Supported-symbol validation now consistent across all paths | Drift removed |
-| Freshness parity | MT5 snapshot + engine contract harness | PASS via `test-mt5-snapshot-contract.php` | No new drift |
-| Signal / regime parity | Backend engine logic | Unchanged in this sweep | No drift introduced |
-| CORS policy parity | Test expectation vs live allowlist | Test now matches explicit allowlist behavior | Drift removed |
-
-## Remaining Risks
-
-- Full `npm run lint` remains blocked by pre-existing formatting drift in unrelated frontend files.
-- This pass hardens symbol support contracts but does not yet add frontend transport anti-cache coverage to all polled GET endpoints.
-- Existing persisted unsupported symbols will disappear from the watchlist on next read; that is the intended correction, but users with legacy custom symbols may notice the cleanup.
-
-## Regression Checklist
-
-- [x] `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`
+- [x] Backend URL is trimmed before readiness checks and client switching.
+- [x] Settings writes remain on the current backend authority during migration changes.
+- [x] Immediate `/user/settings` refetch is suppressed when the backend URL changes, preventing wrong-authority overwrite.
+- [x] `npx eslint src/lib/api/sniperClient.ts src/hooks/useSniperData.ts src/routes/account.tsx`
+- [x] `npx tsc --noEmit`
 - [x] `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
-- [x] `php wordpress/smc-superfib-sniper/tests/php/test-settings-risk-fallbacks.php`
-- [x] `php wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php`
-- [x] `php wordpress/smc-superfib-sniper/tests/php/test-rest-bootstrap-settings.php`
-- [x] `php wordpress/smc-superfib-sniper/tests/php/test-cors-regression.php`
-- [x] `php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php`
-- [x] `node .\\node_modules\\typescript\\bin\\tsc --noEmit`
 
-## Safe Deployment Order
+# Safe Deployment Order
 
-1. Deploy the updated WordPress plugin file.
-2. Run the PHP regression bundle in the target environment.
-3. Verify Account -> watchlist saves drop unsupported symbols and retain supported aliases like `XAU/USD` -> `XAUUSD`.
-4. Monitor snapshot/engine logs for any residual references to removed legacy symbols.
+1. Deploy the frontend patch.
+2. Open Account settings and save a backend URL change against a known current backend.
+3. Confirm subsequent health/snapshot/signal reads switch to the target backend without losing the saved setting.
+4. Continue normal MT5 phase-0 soak.
 
-## Do Not Touch List
+# Do Not Touch List
 
-- Pine fib formulas and MT5 execution logic: unchanged and out of scope for this contract fix.
-- Backend stale-state authority rules: unchanged and still backend-owned.
-- CORS wildcard policy for Worker origins: intentionally strict because credentialed requests are enabled.
+- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` freshness and engine-blocker authority rules without a dedicated replay/parity run.
+- `SMC_SuperFib_v13.1.3.pine` trading formulas without proof of parity corruption.
+- MT5 freshness and candle timing modules without migration-specific regression coverage.

@@ -57,8 +57,11 @@ export const MOCK_MODE =
   String(import.meta.env.VITE_SNIPER_MOCK_MODE ?? "false").toLowerCase() === "true";
 
 let backendUrl = DEFAULT_BACKEND_URL;
-export function setBackendUrl(url: string) {
-  backendUrl = url || DEFAULT_BACKEND_URL;
+export function normalizeBackendUrl(url: string | null | undefined): string {
+  return typeof url === "string" ? url.trim() : "";
+}
+export function setBackendUrl(url: string | null | undefined) {
+  backendUrl = normalizeBackendUrl(url) || DEFAULT_BACKEND_URL;
 }
 export function getBackendUrl() {
   return backendUrl;
@@ -174,7 +177,9 @@ function normalizeSnapshot(snapshot: {
       mid: toFiniteNumber(price.mid),
       changePct1d: toFiniteNumber(price.changePct1d),
       age_sec:
-        price.age_sec === undefined ? undefined : toFiniteNumber(price.age_sec, Number(price.age_sec)),
+        price.age_sec === undefined
+          ? undefined
+          : toFiniteNumber(price.age_sec, Number(price.age_sec)),
     })),
     regimes: (snapshot.regimes ?? []).map((regime) => ({
       ...regime,
@@ -189,7 +194,7 @@ function normalizeSnapshot(snapshot: {
   };
 }
 
-// ──────────────── Public / shared ────────────────
+// Public / shared
 export const apiClient = {
   async getSnapshot(mock = MOCK_MODE) {
     if (mock) {
@@ -333,7 +338,7 @@ export const apiClient = {
     return call("/user/engine-batch", { method: "POST", body: symbols ? { symbols } : {} });
   },
 
-  // Dedicated watchlist endpoints — changes persist immediately without a full settings save.
+  // Dedicated watchlist endpoints - changes persist immediately without a full settings save.
   async postWatchlistAdd(
     symbol: string,
     mock = MOCK_MODE,
