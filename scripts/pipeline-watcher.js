@@ -33,7 +33,7 @@ const CODEX_OUTPUT_FILE = path.join(REPO_ROOT, "reports", "codex-last-message.tx
 const CLAUDE_HARDENING_BLOCKED_FILE = path.join(REPO_ROOT, "reports", ".claude-hardening-blocked.json");
 const POLL_INTERVAL_MS = 5000;
 const CLAUDE_TIMEOUT_MS = 900000; // 15 min — larger research reports need more time
-const CODEX_TIMEOUT_MS = 900000;
+const CODEX_TIMEOUT_MS = 1800000; // 30 min — complex implementations regularly exceed 15 min
 const LOCK_STALE_MS = 30 * 60 * 1000;
 
 // On Windows, execSync with shell:true spawns cmd.exe which is blocked with EPERM
@@ -184,6 +184,28 @@ function markIdle(reason) {
     idle_reason: reason,
   });
   log(`Pipeline reset to IDLE: ${reason}`);
+}
+
+// Returns { number } if an open (not yet merged) PR for the branch exists, else null.
+// Used to detect when Codex created a PR but the execSync wrapper timed out before
+// the watcher could record IMPLEMENTATION_COMPLETE.
+function checkOpenPR(issueSlug) {
+  try {
+    const raw = execSync(
+      `gh pr list --head "codex/${issueSlug}" --state open --json number --limit 1`,
+      {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        timeout: 15000,
+        shell: true,
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    const prs = JSON.parse(raw.trim() || "[]");
+    return prs.length ? prs[0] : null;
+  } catch {
+    return null;
+  }
 }
 
 // Returns { number, mergedAt } if a merged PR for the current cycle exists, else null.
@@ -837,6 +859,20 @@ function runCodexImplementation(state) {
         ?? (error instanceof Error
           ? `Codex CLI invocation failed: ${error.message}`
           : `Codex CLI invocation failed: ${String(error)}`);
+
+      // Before recording failure, check whether Codex already created an open PR.
+      // When execSync hits the timeout (ETIMEDOUT), Codex may have finished all
+      // work — branch, commit, push, PR — but the wrapper expired before the
+      // watcher could validate. Treat an existing open PR as success so the
+      // pipeline advances to IMPLEMENTATION_COMPLETE rather than going dead-end.
+      const openPr = checkOpenPR(issueSlug);
+      if (openPr) {
+        log(`Codex execSync timed out but open PR #${openPr.number} exists for codex/${issueSlug} - treating as IMPLEMENTATION_COMPLETE`);
+        writeImplementationMetadata(state);
+        markImplementationComplete(state);
+        return;
+      }
+
       failImplementation(state, reason, {
         codex_output_excerpt: outputText.slice(0, 4000),
       });
@@ -921,6 +957,7 @@ function evaluatePipeline() {
 
   if (state.state === "IMPLEMENTATION_FAILED") {
     const issueSlug = slugifyIssue(state.issue || "pipeline-issue");
+
     // Allow a manually merged PR to close the loop even after a recorded failure.
     const merged = checkMergedPR(issueSlug, state.plan_hardened_at);
     if (merged) {
@@ -928,6 +965,17 @@ function evaluatePipeline() {
       archiveCycleArtifacts(issueSlug);
       clearImplementationFailedState();
       markIdle(`PR #${merged.number} merged for: ${state.issue}`);
+      return;
+    }
+
+    // Self-heal: if an open PR exists for this issue, Codex finished its work
+    // before the execSync wrapper timed out. Advance to IMPLEMENTATION_COMPLETE
+    // so the watcher can wait for the PR to be merged normally.
+    const openPr = checkOpenPR(issueSlug);
+    if (openPr) {
+      log(`Open PR #${openPr.number} found for codex/${issueSlug} despite recorded failure - advancing to IMPLEMENTATION_COMPLETE`);
+      clearImplementationFailedState();
+      markImplementationComplete(state);
       return;
     }
 
