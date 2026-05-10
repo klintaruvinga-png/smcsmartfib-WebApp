@@ -848,7 +848,7 @@ function evaluatePipeline() {
 
   if (state.state === "IMPLEMENTATION_COMPLETE") {
     const issueSlug = slugifyIssue(state.issue || "pipeline-issue");
-    const merged = checkMergedPR(issueSlug, state.implementation_completed_at);
+    const merged = checkMergedPR(issueSlug, state.plan_hardened_at);
     if (merged) {
       log(`PR #${merged.number} for codex/${issueSlug} merged at ${merged.mergedAt} - closing cycle`);
       archiveCycleArtifacts(issueSlug);
