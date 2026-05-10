@@ -13,11 +13,13 @@ const PLAN_FILE = path.join(REPO_ROOT, "reports", "codex-plan.md");
 const PLAN_METADATA_FILE = path.join(REPO_ROOT, "reports", "codex-plan.meta.json");
 const IMPLEMENTATION_FILE = path.join(REPO_ROOT, "reports", "codex-implementation.md");
 const IMPLEMENTATION_METADATA_FILE = path.join(REPO_ROOT, "reports", "codex-implementation.meta.json");
+const IMPLEMENTATION_FAILED_FILE = path.join(REPO_ROOT, "reports", ".codex-implementation-failed.json");
 const STATE_FILE = path.join(REPO_ROOT, ".smc-workflow-state.json");
 // Write-only JSON lock — status field ("running"|"done") determines liveness.
 // The file is NEVER deleted; it is overwritten on acquire and on release.
 // This avoids EPERM failures from OneDrive holding a sync lock on the file.
 const LOCK_FILE = path.join(REPO_ROOT, "reports", ".pipeline-lock.json");
+const ARCHIVE_DIR = path.join(REPO_ROOT, "reports", "archive");
 const CLAUDE_PLAN_PROMPT_FILE = path.join(REPO_ROOT, ".github", "prompts", "codex-plan-prompt.md");
 const CODEX_IMPLEMENT_PROMPT_FILE = path.join(
   REPO_ROOT,
@@ -53,14 +55,31 @@ function statMtime(filePath) {
 }
 
 function buildObservedKey() {
+  // For states that wait on an external GitHub event (PR merge), inject a
+  // minute-level time bucket so the poll loop re-evaluates every ~60 s even
+  // when no local file changes, without requiring a separate timer.
+  let timeBucket = 0;
+  try {
+    const s = readJson(STATE_FILE);
+    if (s?.state === "IMPLEMENTATION_COMPLETE" || s?.state === "IMPLEMENTATION_FAILED") {
+      timeBucket = Math.floor(Date.now() / 60000);
+    }
+  } catch { /* ignore */ }
+
   return [
     statMtime(RESEARCH_FILE),
     statMtime(PLAN_FILE),
     statMtime(PLAN_METADATA_FILE),
     statMtime(STATE_FILE),
     statMtime(IMPLEMENTATION_FILE),
+    statMtime(IMPLEMENTATION_FAILED_FILE),
     statMtime(CLAUDE_HARDENING_BLOCKED_FILE),
+    timeBucket,
   ].join(":");
+}
+
+function readTextFile(filePath) {
+  return fs.readFileSync(filePath, "utf8").replace(/^ï»¿/, "");
 }
 
 function readJson(filePath) {
@@ -75,21 +94,106 @@ function writeJson(filePath, value) {
 }
 
 function markReadyForImplementation(state, source) {
+  clearImplementationFailedState();
   writeJson(STATE_FILE, {
     ...state,
     state: "READY_FOR_IMPLEMENTATION",
     editing_locked: false,
     plan_hardened_at: new Date().toISOString(),
     plan_source: source,
+    implementation_completed_at: undefined,
+    implementation_failed_at: undefined,
+    implementation_failure_reason: undefined,
   });
 }
 
 function markImplementationComplete(state) {
+  clearImplementationFailedState();
   writeJson(STATE_FILE, {
     ...state,
     state: "IMPLEMENTATION_COMPLETE",
     implementation_completed_at: new Date().toISOString(),
+    implementation_failed_at: undefined,
+    implementation_failure_reason: undefined,
   });
+}
+
+function markImplementationFailed(state, reason) {
+  writeJson(STATE_FILE, {
+    ...state,
+    state: "IMPLEMENTATION_FAILED",
+    editing_locked: false,
+    implementation_failed_at: new Date().toISOString(),
+    implementation_failure_reason: reason,
+    implementation_completed_at: undefined,
+  });
+}
+
+function markIdle(reason) {
+  writeJson(STATE_FILE, {
+    state: "IDLE",
+    idled_at: new Date().toISOString(),
+    idle_reason: reason,
+  });
+  log(`Pipeline reset to IDLE: ${reason}`);
+}
+
+// Returns { number, mergedAt } if a merged PR for the current cycle exists, else null.
+function checkMergedPR(issueSlug, cycleStartedAt) {
+  try {
+    const raw = execSync(
+      `gh pr list --head "codex/${issueSlug}" --state merged --json number,mergedAt --limit 20`,
+      {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        timeout: 15000,
+        shell: true,
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    const prs = JSON.parse(raw.trim() || "[]");
+    if (!prs.length) return null;
+
+    if (!cycleStartedAt) {
+      return prs[0];
+    }
+
+    const cycleStartMs = Date.parse(cycleStartedAt);
+    if (!Number.isFinite(cycleStartMs)) {
+      return prs[0];
+    }
+
+    return prs.find((pr) => Number.isFinite(Date.parse(pr.mergedAt)) && Date.parse(pr.mergedAt) >= cycleStartMs) || null;
+  } catch {
+    return null;
+  }
+}
+
+// Copies completed cycle artifacts to reports/archive/<slug>-<ts>/ then removes
+// the originals so the next cycle starts with a clean slate.
+function archiveCycleArtifacts(issueSlug) {
+  const ts = new Date().toISOString().replace(/[:.]/g, "-");
+  const dest = path.join(ARCHIVE_DIR, `${issueSlug}-${ts}`);
+  fs.mkdirSync(dest, { recursive: true });
+
+  const artifacts = [
+    [RESEARCH_FILE, "copilot-research.md"],
+    [PLAN_FILE, "codex-plan.md"],
+    [PLAN_METADATA_FILE, "codex-plan.meta.json"],
+    [IMPLEMENTATION_FILE, "codex-implementation.md"],
+    [IMPLEMENTATION_METADATA_FILE, "codex-implementation.meta.json"],
+  ];
+
+  for (const [src, name] of artifacts) {
+    if (fs.existsSync(src)) {
+      try {
+        fs.copyFileSync(src, path.join(dest, name));
+        fs.unlinkSync(src);
+      } catch { /* ignore individual file errors */ }
+    }
+  }
+
+  log(`Cycle artifacts archived to reports/archive/${issueSlug}-${ts}/`);
 }
 
 function isPermissionStub(text) {
@@ -111,6 +215,24 @@ function isUsablePlan(text) {
     "6. Risk assessment",
     "7. Test requirements",
     "8. Implementation handoff",
+  ];
+
+  return requiredSections.every((section) => text.includes(section));
+}
+
+function isUsableImplementation(text) {
+  if (!text || isPermissionStub(text)) {
+    return false;
+  }
+
+  const requiredSections = [
+    "Issue summary",
+    "Root cause implemented",
+    "Exact files changed",
+    "Tests run",
+    "Reports generated",
+    "Remaining risks",
+    "Any contract ambiguities resolved during implementation",
   ];
 
   return requiredSections.every((section) => text.includes(section));
@@ -206,6 +328,26 @@ function writeImplementationMetadata(state) {
   });
 }
 
+function writeImplementationFailedState(state, reason, details = {}) {
+  writeJson(IMPLEMENTATION_FAILED_FILE, {
+    failed_at: new Date().toISOString(),
+    issue: state.issue ?? "",
+    plan_hash: (() => {
+      try {
+        return hashFile(PLAN_FILE);
+      } catch {
+        return null;
+      }
+    })(),
+    reason,
+    ...details,
+  });
+}
+
+function clearImplementationFailedState() {
+  try { fs.unlinkSync(IMPLEMENTATION_FAILED_FILE); } catch { /* ignore */ }
+}
+
 function hasUsablePlanArtifactForState(state) {
   if (!fs.existsSync(RESEARCH_FILE) || !fs.existsSync(PLAN_FILE)) {
     return false;
@@ -225,10 +367,104 @@ function hasUsablePlanArtifactForState(state) {
       return false;
     }
 
-    return isUsablePlan(fs.readFileSync(PLAN_FILE, "utf8"));
+    return isUsablePlan(readTextFile(PLAN_FILE));
   } catch {
     return false;
   }
+}
+
+function summarizeCodexStopReason(text) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (const line of lines) {
+    if (/^\*\*Stopped\*\*$/i.test(line) || /^Stopped$/i.test(line)) {
+      continue;
+    }
+    if (/^\*\*[^*]+\*\*$/.test(line)) {
+      continue;
+    }
+    return line.replace(/\*\*/g, "");
+  }
+
+  return "Codex stopped without applying the patch";
+}
+
+function detectCodexStopReason(text) {
+  const normalized = text.trim();
+  if (!normalized) {
+    return "Codex exited without writing a final status message";
+  }
+
+  if (/^\*\*Stopped\*\*$/im.test(normalized) || /^Stopped$/im.test(normalized)) {
+    return summarizeCodexStopReason(normalized);
+  }
+
+  if (/did not patch, switch branches, commit, or open a PR/i.test(normalized)) {
+    return "Codex stopped before patching, branching, committing, or opening a PR";
+  }
+
+  return null;
+}
+
+function validateImplementationRun(previousImplementationMtime, previousOutputMtime) {
+  const outputMtime = statMtime(CODEX_OUTPUT_FILE);
+  if (outputMtime <= previousOutputMtime) {
+    return {
+      reason: "Codex run finished without refreshing reports/codex-last-message.txt",
+    };
+  }
+
+  const outputText = readTextFile(CODEX_OUTPUT_FILE).trim();
+  const stopReason = detectCodexStopReason(outputText);
+  if (stopReason) {
+    return {
+      reason: stopReason,
+      details: {
+        codex_output_excerpt: outputText.slice(0, 4000),
+      },
+    };
+  }
+
+  if (!fs.existsSync(IMPLEMENTATION_FILE)) {
+    return {
+      reason: "Codex implementation finished without reports/codex-implementation.md",
+    };
+  }
+
+  const implementationMtime = statMtime(IMPLEMENTATION_FILE);
+  if (implementationMtime <= previousImplementationMtime) {
+    return {
+      reason: "Codex run finished without updating reports/codex-implementation.md",
+    };
+  }
+
+  const implementationText = readTextFile(IMPLEMENTATION_FILE).trim();
+  if (!implementationText) {
+    return {
+      reason: "Codex implementation wrote an empty reports/codex-implementation.md",
+    };
+  }
+
+  if (!isUsableImplementation(implementationText)) {
+    return {
+      reason: "Codex implementation wrote an invalid reports/codex-implementation.md",
+      details: {
+        implementation_excerpt: implementationText.slice(0, 4000),
+      },
+    };
+  }
+
+  return null;
+}
+
+function failImplementation(state, reason, details = {}) {
+  writeImplementationFailedState(state, reason, details);
+  markImplementationFailed(state, reason);
+  log("Codex implementation failed - state IMPLEMENTATION_FAILED");
+  log(`  Reason: ${reason}`);
 }
 
 function readState() {
@@ -491,6 +727,8 @@ function runCodexImplementation(state) {
 - Open a normal PR, not a draft PR.
 - The existing Codex PR review automation starts after PR creation.
 `;
+  const previousImplementationMtime = statMtime(IMPLEMENTATION_FILE);
+  const previousOutputMtime = statMtime(CODEX_OUTPUT_FILE);
 
   withPipelineLock("codex-implementation", () => {
     log("READY_FOR_IMPLEMENTATION detected - running Codex implementation");
@@ -531,12 +769,30 @@ function runCodexImplementation(state) {
         // hit Node's default execSync maxBuffer limit on verbose Codex runs.
         stdio: ["ignore", "inherit", "inherit"],
       });
+    } catch (error) {
+      const outputText = fs.existsSync(CODEX_OUTPUT_FILE)
+        ? readTextFile(CODEX_OUTPUT_FILE).trim()
+        : "";
+      const stopReason = outputText ? detectCodexStopReason(outputText) : null;
+      const reason = stopReason
+        ?? (error instanceof Error
+          ? `Codex CLI invocation failed: ${error.message}`
+          : `Codex CLI invocation failed: ${String(error)}`);
+      failImplementation(state, reason, {
+        codex_output_excerpt: outputText.slice(0, 4000),
+      });
+      return;
     } finally {
       try { fs.unlinkSync(promptFile); } catch { /* ignore */ }
     }
 
-    if (!fs.existsSync(IMPLEMENTATION_FILE)) {
-      throw new Error("Codex implementation finished without reports/codex-implementation.md");
+    const validationFailure = validateImplementationRun(
+      previousImplementationMtime,
+      previousOutputMtime,
+    );
+    if (validationFailure) {
+      failImplementation(state, validationFailure.reason, validationFailure.details);
+      return;
     }
 
     writeImplementationMetadata(state);
@@ -585,9 +841,41 @@ function evaluatePipeline() {
     return;
   }
 
-  if (state.state === "IMPLEMENTATION_COMPLETE") {
-    log("Pipeline cycle complete - waiting for next issue");
+  if (state.state === "IDLE") {
+    log("Pipeline idle - waiting for new /research-and-plan issue");
     return;
+  }
+
+  if (state.state === "IMPLEMENTATION_COMPLETE") {
+    const issueSlug = slugifyIssue(state.issue || "pipeline-issue");
+    const merged = checkMergedPR(issueSlug, state.plan_hardened_at);
+    if (merged) {
+      log(`PR #${merged.number} for codex/${issueSlug} merged at ${merged.mergedAt} - closing cycle`);
+      archiveCycleArtifacts(issueSlug);
+      clearImplementationFailedState();
+      markIdle(`PR #${merged.number} merged for: ${state.issue}`);
+    } else {
+      log(`Pipeline cycle complete - PR open for codex/${issueSlug}, waiting for merge`);
+    }
+    return;
+  }
+
+  if (state.state === "IMPLEMENTATION_FAILED") {
+    const issueSlug = slugifyIssue(state.issue || "pipeline-issue");
+    // Allow a manually merged PR to close the loop even after a recorded failure.
+    const merged = checkMergedPR(issueSlug, state.plan_hardened_at);
+    if (merged) {
+      log(`PR #${merged.number} for codex/${issueSlug} merged despite failure - closing cycle`);
+      archiveCycleArtifacts(issueSlug);
+      clearImplementationFailedState();
+      markIdle(`PR #${merged.number} merged for: ${state.issue}`);
+      return;
+    }
+
+    log(
+      "Pipeline implementation failed - waiting for corrected artifacts or a new issue"
+      + (state.implementation_failure_reason ? ` (${state.implementation_failure_reason})` : ""),
+    );
   }
 }
 

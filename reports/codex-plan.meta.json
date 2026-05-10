@@ -1,0 +1,5 @@
+﻿{
+    "issue":  "Dashboard admin route: no /admin route exists and backend health endpoint lacks admin-only capability guard",
+    "written_at":  "2026-05-10T11:24:02.5614513+02:00",
+    "research_hash":  "6f1b03dac2c265fc7ba827472a543bfe88f650d724095a1a5ef8de6353db1be4"
+}
