@@ -26,7 +26,8 @@ jobs:
             (
               contains(github.event.comment.body, 'Severity:') &&
               contains(github.event.comment.body, 'Source: Codex')
-            )
+            ) ||
+            startsWith(github.event.pull_request.head.ref, 'codex/')
           )
         ) ||
         (
@@ -36,6 +37,10 @@ jobs:
             (
               contains(github.event.review.body, 'Severity:') &&
               contains(github.event.review.body, 'Source: Codex')
+            ) ||
+            (
+              startsWith(github.event.pull_request.head.ref, 'codex/') &&
+              github.event.review.state != 'approved'
             )
           )
         )

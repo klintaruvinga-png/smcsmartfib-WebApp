@@ -547,6 +547,27 @@ function readState() {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     log(`Invalid workflow state file: ${message}`);
+
+    // Self-repair: strip trailing garbage after the last closing brace.
+    // Known corruption pattern: tool-call XML or editor artefacts (e.g.
+    // "</content><parameter ...>") written after the valid JSON object —
+    // causes SyntaxError at position N and stalls the watcher indefinitely.
+    try {
+      const raw = fs.readFileSync(STATE_FILE, "utf8").replace(/^﻿/, "");
+      const lastBrace = raw.lastIndexOf("}");
+      if (lastBrace !== -1) {
+        const trimmed = raw.slice(0, lastBrace + 1);
+        const recovered = JSON.parse(trimmed);
+        const trailingBytes = raw.length - lastBrace - 1;
+        log(`Workflow state self-repaired: removed ${trailingBytes} bytes of trailing garbage — rewriting clean JSON`);
+        writeJson(STATE_FILE, recovered);
+        return recovered;
+      }
+    } catch {
+      // Recovery failed — original error already logged above
+    }
+
+    log("Workflow state file is unrecoverable — manual intervention required");
     return null;
   }
 }

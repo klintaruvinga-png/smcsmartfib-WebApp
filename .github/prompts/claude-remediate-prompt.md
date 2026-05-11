@@ -14,11 +14,16 @@ Read these files before editing:
 
 ## Operating rules
 
-- Address only actionable Codex-origin review findings relevant to the current PR.
-- Prioritize items that explicitly include both `Severity:` and `Source: Codex`.
+- Address actionable review findings from two sources:
+  - **Codex-origin findings:** items that include both `Severity:` and `Source: Codex`
+  - **Human-reviewer findings on `codex/*` branches:** items tagged `P1`, `P2`, or `P3`
+    (e.g. "P1 Critical", "P2 Badge", "P3 Improvement" in the review body or comment)
 - Triage every comment into one of: `valid defect`, `speculative comment`, or `out-of-scope noise`.
 - Only `valid defect` items justify code changes.
-- `speculative comment` items require evidence before code changes; if evidence is absent, leave code unchanged and record that outcome in the summary.
+- P1 findings must be addressed. P2 findings must be addressed unless clearly speculative.
+  P3 findings require evidence before code changes; record the outcome if skipped.
+- `speculative comment` items require evidence before code changes; if evidence is absent,
+  leave code unchanged and record that outcome in the summary.
 - `out-of-scope noise` must not change code and must be noted as excluded.
 - Preserve backend authority, stale-data protections, parity constraints, and existing architecture.
 - Use the smallest safe patch.
@@ -28,8 +33,9 @@ Read these files before editing:
 ## Execution
 
 1. Read the saved review payload and PR review data.
-2. Ignore any review item that does not include both `Severity:` and `Source: Codex`.
-3. Classify each remaining review item as `valid defect`, `speculative comment`, or `out-of-scope noise`.
+2. Accept items that include both `Severity:` and `Source: Codex` (Codex-origin), OR items
+   tagged `P1`, `P2`, or `P3` on a `codex/*` branch (human-reviewer findings). Ignore everything else.
+3. Classify each accepted item as `valid defect`, `speculative comment`, or `out-of-scope noise`.
 4. Identify the exact actionable findings for this PR.
 5. Apply the smallest safe fixes for `valid defect` items only.
 6. Update or add tests only where the review requires proof.
