@@ -977,6 +977,20 @@ final class SMC_SuperFib_Sniper_REST {
         if ($report_response instanceof WP_Error) {
             return $report_response;
         }
+        if ($report_response instanceof WP_REST_Response) {
+            $status_code = (int) $report_response->get_status();
+            if ($status_code < 200 || $status_code >= 300) {
+                return new WP_Error(
+                    'smc_sf_soak_checkpoint_report_failed',
+                    'Could not generate soak report snapshot.',
+                    array(
+                        'status' => 500,
+                        'report_error' => $report_response->get_data(),
+                        'report_status' => $status_code,
+                    )
+                );
+            }
+        }
 
         $report = ($report_response instanceof WP_REST_Response)
             ? (array) $report_response->get_data()
