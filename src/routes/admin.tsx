@@ -8,6 +8,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import {
+  apiClient,
   createSoakCheckpoint,
   fetchAdminHealth,
   fetchSoakReport,
@@ -20,11 +21,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type {
+  DashboardSettings,
+  PairPrice,
   SoakCheckpointRow,
   SoakEvidencePayload,
   SoakEvidenceRow,
   SoakEvidenceType,
   SoakReport,
+  SymbolDiagnostic,
 } from "@/types/sniper";
 
 export const Route = createFileRoute("/admin")({
@@ -49,6 +53,12 @@ type SoakLoadState =
   | { kind: "loading" }
   | { kind: "error"; message: string }
   | { kind: "ready"; report: SoakReport };
+
+type AutoBaselineFields = {
+  frontendWatchlist: string;
+  watchlistLiveSymbols: string;
+  notes: string;
+};
 
 type BaselineForm = {
   startedBy: string;
@@ -76,9 +86,10 @@ function AdminPage() {
   const router = useRouter();
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [soakState, setSoakState] = useState<SoakLoadState>({ kind: "loading" });
+  const [pageAccessedAt] = useState(() => defaultDateTimeLocalValue());
   const [baselineForm, setBaselineForm] = useState<BaselineForm>(() => ({
     startedBy: resolveOperatorIdentifier(),
-    startedAt: defaultDateTimeLocalValue(),
+    startedAt: pageAccessedAt,
     eaSymbols: "",
     frontendWatchlist: "",
     mt5TerminalStatus: "Online",
@@ -101,6 +112,11 @@ function AdminPage() {
   const [checkpointSaving, setCheckpointSaving] = useState(false);
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
+  const [autoBaselineFields, setAutoBaselineFields] = useState<AutoBaselineFields>({
+    frontendWatchlist: "",
+    watchlistLiveSymbols: "",
+    notes: "",
+  });
 
   useEffect(() => {
     if (!hasCredentials() && !hasWordPressNonce()) {
@@ -161,6 +177,49 @@ function AdminPage() {
       cancelled = true;
     };
   }, [router]);
+
+  useEffect(() => {
+    if (!hasCredentials() && !hasWordPressNonce()) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const [settings, snapshot] = await Promise.all([
+          apiClient.getUserSettings(),
+          apiClient.getSnapshot(),
+        ]);
+        if (cancelled) return;
+
+        const derived = deriveAutoBaselineFields(
+          settings,
+          snapshot.prices ?? [],
+          snapshot.diagnostics ?? [],
+        );
+        setAutoBaselineFields(derived);
+        setBaselineForm((current) => ({
+          ...current,
+          frontendWatchlist:
+            current.frontendWatchlist !== ""
+              ? current.frontendWatchlist
+              : derived.frontendWatchlist,
+          watchlistLiveSymbols:
+            current.watchlistLiveSymbols !== ""
+              ? current.watchlistLiveSymbols
+              : derived.watchlistLiveSymbols,
+          notes: current.notes !== "" ? current.notes : derived.notes,
+        }));
+      } catch {
+        if (cancelled) return;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (state.kind !== "ready") return;
@@ -604,6 +663,10 @@ function AdminPage() {
                         exists yet, the first snapshot saved here is automatically marked{" "}
                         <span className="font-mono">baseline</span>.
                       </p>
+                      <p className="mt-1 text-[11px] text-dim">
+                        Auto-prefilled where current data already exists: page access start time,
+                        frontend watchlist, live watchlist symbols, and baseline notes summary.
+                      </p>
                     </div>
                   </div>
 
@@ -705,6 +768,7 @@ function AdminPage() {
                         setBaselineForm((current) => ({ ...current, frontendWatchlist: value }))
                       }
                       placeholder="USDJPY, NZDUSD, USDCHF..."
+                      hint={autoBaselineFields.frontendWatchlist}
                     />
                     <TextField
                       label="Watchlist live symbols at T+0"
@@ -716,6 +780,7 @@ function AdminPage() {
                         }))
                       }
                       placeholder="7 currency pairs plus BTCUSD live"
+                      hint={autoBaselineFields.watchlistLiveSymbols}
                     />
                     <TextField
                       label="Baseline notes"
@@ -724,6 +789,7 @@ function AdminPage() {
                         setBaselineForm((current) => ({ ...current, notes: value }))
                       }
                       placeholder="Lowest candle count observed was 33..."
+                      hint={autoBaselineFields.notes}
                     />
 
                     <Button type="submit" disabled={baselineSaving}>
@@ -978,11 +1044,13 @@ function TextField({
   value,
   onChange,
   placeholder,
+  hint,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  hint?: string;
 }) {
   return (
     <div className="space-y-1.5">
@@ -992,6 +1060,9 @@ function TextField({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
       />
+      {hint && value === hint && (
+        <div className="text-[11px] text-dim">Auto-filled from current app/backend state.</div>
+      )}
     </div>
   );
 }
@@ -1093,6 +1164,70 @@ function resolveOperatorIdentifier(): string {
   } catch {
     return "";
   }
+}
+
+function deriveAutoBaselineFields(
+  settings: DashboardSettings,
+  prices: PairPrice[],
+  diagnostics: SymbolDiagnostic[],
+): AutoBaselineFields {
+  const watchlist = settings.watchlist ?? [];
+  const frontendWatchlist = watchlist.join(", ");
+
+  const priceBySymbol = new Map(prices.map((price) => [price.symbol, price]));
+  const diagnosticBySymbol = new Map(diagnostics.map((diagnostic) => [diagnostic.symbol, diagnostic]));
+
+  const liveSymbols = watchlist.filter((symbol) => {
+    const price = priceBySymbol.get(symbol);
+    const diagnostic = diagnosticBySymbol.get(symbol);
+    return price?.state === "live" || diagnostic?.priceState === "live";
+  });
+  const nonLiveSymbols = watchlist.filter((symbol) => !liveSymbols.includes(symbol));
+
+  const watchlistLiveSymbols =
+    watchlist.length === 0
+      ? "No watchlist configured."
+      : nonLiveSymbols.length === 0
+        ? `${liveSymbols.length}/${watchlist.length} live: ${liveSymbols.join(", ")}`
+        : `${liveSymbols.length}/${watchlist.length} live: ${liveSymbols.join(", ")} | not live: ${nonLiveSymbols.join(", ")}`;
+
+  const lowestCandleDiagnostic = diagnostics.reduce<SymbolDiagnostic | null>((lowest, diagnostic) => {
+    if (!lowest) return diagnostic;
+    return diagnostic.candleCount < lowest.candleCount ? diagnostic : lowest;
+  }, null);
+  const symbolsBelow30 = diagnostics.filter((diagnostic) => diagnostic.candleCount < 30);
+  const blockers = diagnostics.filter((diagnostic) => diagnostic.engineBlocker !== "OK");
+
+  const notesParts: string[] = [];
+  notesParts.push(`Watchlist symbols: ${watchlist.length}.`);
+  if (watchlist.length > 0) {
+    notesParts.push(`Live watchlist symbols now: ${liveSymbols.length}/${watchlist.length}.`);
+  } else {
+    notesParts.push("No watchlist symbols are configured yet.");
+  }
+  if (lowestCandleDiagnostic) {
+    notesParts.push(
+      `Lowest candle count currently observed: ${lowestCandleDiagnostic.candleCount} on ${lowestCandleDiagnostic.symbol}.`,
+    );
+  }
+  if (symbolsBelow30.length > 0) {
+    notesParts.push(
+      `Symbols under 30 candles: ${symbolsBelow30.map((diagnostic) => `${diagnostic.symbol}=${diagnostic.candleCount}`).join(", ")}.`,
+    );
+  } else if (diagnostics.length > 0) {
+    notesParts.push("No watchlist symbols are currently under 30 candles.");
+  }
+  if (blockers.length > 0) {
+    notesParts.push(
+      `Active blockers: ${blockers.map((diagnostic) => `${diagnostic.symbol}=${diagnostic.engineBlocker}`).join(", ")}.`,
+    );
+  }
+
+  return {
+    frontendWatchlist,
+    watchlistLiveSymbols,
+    notes: notesParts.join(" "),
+  };
 }
 
 function buildBaselineEvidenceEntries(
