@@ -282,7 +282,11 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         if (!function_exists('dbDelta')) {
-            return;
+            return false;
+        }
+
+        if (is_object($wpdb) && property_exists($wpdb, 'last_error')) {
+            $wpdb->last_error = '';
         }
 
         $charset = $wpdb->get_charset_collate();
@@ -312,7 +316,12 @@ final class SMC_SuperFib_Sniper_REST {
 
         foreach ($tables as $sql) {
             dbDelta($sql);
+            if (is_object($wpdb) && property_exists($wpdb, 'last_error') && $wpdb->last_error !== '') {
+                return false;
+            }
         }
+
+        return true;
     }
 
     public function register_routes() {
@@ -656,138 +665,191 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     public function get_soak_report() {
-        self::ensure_soak_tables();
         global $wpdb;
+        try {
+            if (!self::ensure_soak_tables()) {
+                $detail = $this->wpdb_last_error();
+                if ($detail === null) {
+                    $detail = 'dbDelta unavailable';
+                }
+                error_log('soak_tables_init_failed wpdb_error=' . $detail);
+                return new WP_REST_Response(array(
+                    'error' => 'table_init_failed',
+                    'detail' => $detail,
+                ), 500);
+            }
 
-        $user_id = get_current_user_id();
-        $since_24h = gmdate('Y-m-d H:i:s', strtotime('-24 hours'));
-        $since_72h = gmdate('Y-m-d H:i:s', strtotime('-72 hours'));
-        $settings = $this->get_settings($user_id);
+            $user_id = get_current_user_id();
+            $since_24h = gmdate('Y-m-d H:i:s', strtotime('-24 hours'));
+            $since_72h = gmdate('Y-m-d H:i:s', strtotime('-72 hours'));
+            $settings = $this->get_settings($user_id);
 
-        $report = array(
-            'health' => $this->build_health_payload($user_id),
-            'watchlist_count' => is_array($settings['watchlist'] ?? null) ? count($settings['watchlist']) : 0,
-            'snapshots_24h' => 0,
-            'candles_24h' => 0,
-            'engine_runs_summary' => array(
-                'total_24h' => 0,
-                'success_24h' => 0,
-                'error_24h' => 0,
-                'last_run_at' => null,
-            ),
-            'audit_events_summary' => array(
-                'total_24h' => 0,
-                'error_count_24h' => 0,
-                'warning_count_24h' => 0,
-            ),
-            'manual_evidence' => array(),
-            'baseline_checkpoint' => null,
-            'checkpoints' => array(),
-            'generated_at' => gmdate('c'),
-        );
-
-        $snapshots_count = $this->soak_get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$this->table('snapshots')} WHERE user_id = %d AND updated_at >= %s",
-            $user_id,
-            $since_24h
-        ));
-        if ($snapshots_count['error'] !== null) {
-            $report['snapshots_24h'] = null;
-            $report['snapshots_24h_error'] = $snapshots_count['error'];
-        } else {
-            $report['snapshots_24h'] = (int) $snapshots_count['value'];
-        }
-
-        $candles_count = $this->soak_get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$this->table('candles')} WHERE user_id = %d AND created_at >= %s",
-            $user_id,
-            $since_24h
-        ));
-        if ($candles_count['error'] !== null) {
-            $report['candles_24h'] = null;
-            $report['candles_24h_error'] = $candles_count['error'];
-        } else {
-            $report['candles_24h'] = (int) $candles_count['value'];
-        }
-
-        $engine_runs_summary = $this->soak_get_row($wpdb->prepare(
-            "SELECT COUNT(*) AS total_24h,
-                SUM(CASE WHEN status = 'complete' THEN 1 ELSE 0 END) AS success_24h,
-                SUM(CASE WHEN status NOT IN ('complete', 'heartbeat') THEN 1 ELSE 0 END) AS error_24h,
-                MAX(created_at) AS last_run_at
-             FROM {$this->table('engine_runs')}
-             WHERE user_id = %d AND created_at >= %s",
-            $user_id,
-            $since_24h
-        ));
-        if ($engine_runs_summary['error'] !== null) {
-            $report['engine_runs_summary_error'] = $engine_runs_summary['error'];
-        } elseif (is_array($engine_runs_summary['value'])) {
-            $report['engine_runs_summary'] = array(
-                'total_24h' => (int) ($engine_runs_summary['value']['total_24h'] ?? 0),
-                'success_24h' => (int) ($engine_runs_summary['value']['success_24h'] ?? 0),
-                'error_24h' => (int) ($engine_runs_summary['value']['error_24h'] ?? 0),
-                'last_run_at' => $this->to_iso($engine_runs_summary['value']['last_run_at'] ?? null),
+            $report = array(
+                'health' => $this->build_health_payload($user_id),
+                'watchlist_count' => is_array($settings['watchlist'] ?? null) ? count($settings['watchlist']) : 0,
+                'snapshots_24h' => 0,
+                'candles_24h' => 0,
+                'engine_runs_summary' => array(
+                    'total_24h' => 0,
+                    'success_24h' => 0,
+                    'error_24h' => 0,
+                    'last_run_at' => null,
+                ),
+                'audit_events_summary' => array(
+                    'total_24h' => 0,
+                    'error_count_24h' => 0,
+                    'warning_count_24h' => 0,
+                ),
+                'manual_evidence' => array(),
+                'baseline_checkpoint' => null,
+                'checkpoints' => array(),
+                'generated_at' => gmdate('c'),
+                'seeded' => false,
             );
-        }
 
-        $audit_events_summary = $this->soak_get_row($wpdb->prepare(
-            "SELECT COUNT(*) AS total_24h,
-                SUM(CASE
-                    WHEN event_type LIKE '%%error%%'
-                      OR event_type LIKE '%%invalid%%'
-                      OR event_type LIKE '%%failed%%'
-                      OR event_type LIKE '%%rejected%%'
-                    THEN 1 ELSE 0 END) AS error_count_24h,
-                SUM(CASE
-                    WHEN event_type LIKE '%%warn%%'
-                      OR event_type LIKE '%%stale%%'
-                      OR event_type LIKE '%%rate_limit%%'
-                    THEN 1 ELSE 0 END) AS warning_count_24h
-             FROM {$this->table('audit_events')}
-             WHERE user_id = %d AND created_at >= %s",
-            $user_id,
-            $since_24h
-        ));
-        if ($audit_events_summary['error'] !== null) {
-            $report['audit_events_summary_error'] = $audit_events_summary['error'];
-        } elseif (is_array($audit_events_summary['value'])) {
-            $report['audit_events_summary'] = array(
-                'total_24h' => (int) ($audit_events_summary['value']['total_24h'] ?? 0),
-                'error_count_24h' => (int) ($audit_events_summary['value']['error_count_24h'] ?? 0),
-                'warning_count_24h' => (int) ($audit_events_summary['value']['warning_count_24h'] ?? 0),
+            $snapshots_count = $this->soak_get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$this->table('snapshots')} WHERE user_id = %d AND updated_at >= %s",
+                $user_id,
+                $since_24h
+            ));
+            if ($snapshots_count['error'] !== null) {
+                $report['snapshots_24h'] = null;
+                $report['snapshots_24h_error'] = $snapshots_count['error'];
+            } else {
+                $report['snapshots_24h'] = (int) $snapshots_count['value'];
+            }
+
+            $candles_count = $this->soak_get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$this->table('candles')} WHERE user_id = %d AND created_at >= %s",
+                $user_id,
+                $since_24h
+            ));
+            if ($candles_count['error'] !== null) {
+                $report['candles_24h'] = null;
+                $report['candles_24h_error'] = $candles_count['error'];
+            } else {
+                $report['candles_24h'] = (int) $candles_count['value'];
+            }
+
+            $engine_runs_summary = $this->soak_get_row($wpdb->prepare(
+                "SELECT COUNT(*) AS total_24h,
+                    SUM(CASE WHEN status = 'complete' THEN 1 ELSE 0 END) AS success_24h,
+                    SUM(CASE WHEN status NOT IN ('complete', 'heartbeat') THEN 1 ELSE 0 END) AS error_24h,
+                    MAX(created_at) AS last_run_at
+                 FROM {$this->table('engine_runs')}
+                 WHERE user_id = %d AND created_at >= %s",
+                $user_id,
+                $since_24h
+            ));
+            if ($engine_runs_summary['error'] !== null) {
+                $report['engine_runs_summary_error'] = $engine_runs_summary['error'];
+            } elseif (is_array($engine_runs_summary['value'])) {
+                $report['engine_runs_summary'] = array(
+                    'total_24h' => (int) ($engine_runs_summary['value']['total_24h'] ?? 0),
+                    'success_24h' => (int) ($engine_runs_summary['value']['success_24h'] ?? 0),
+                    'error_24h' => (int) ($engine_runs_summary['value']['error_24h'] ?? 0),
+                    'last_run_at' => $this->to_iso($engine_runs_summary['value']['last_run_at'] ?? null),
+                );
+            }
+
+            $audit_events_summary = $this->soak_get_row($wpdb->prepare(
+                "SELECT COUNT(*) AS total_24h,
+                    SUM(CASE
+                        WHEN event_type LIKE '%%error%%'
+                          OR event_type LIKE '%%invalid%%'
+                          OR event_type LIKE '%%failed%%'
+                          OR event_type LIKE '%%rejected%%'
+                        THEN 1 ELSE 0 END) AS error_count_24h,
+                    SUM(CASE
+                        WHEN event_type LIKE '%%warn%%'
+                          OR event_type LIKE '%%stale%%'
+                          OR event_type LIKE '%%rate_limit%%'
+                        THEN 1 ELSE 0 END) AS warning_count_24h
+                 FROM {$this->table('audit_events')}
+                 WHERE user_id = %d AND created_at >= %s",
+                $user_id,
+                $since_24h
+            ));
+            if ($audit_events_summary['error'] !== null) {
+                $report['audit_events_summary_error'] = $audit_events_summary['error'];
+            } elseif (is_array($audit_events_summary['value'])) {
+                $report['audit_events_summary'] = array(
+                    'total_24h' => (int) ($audit_events_summary['value']['total_24h'] ?? 0),
+                    'error_count_24h' => (int) ($audit_events_summary['value']['error_count_24h'] ?? 0),
+                    'warning_count_24h' => (int) ($audit_events_summary['value']['warning_count_24h'] ?? 0),
+                );
+            }
+
+            $manual_evidence_rows = $this->soak_get_results(
+                "SELECT * FROM {$this->table('soak_evidence')} ORDER BY updated_at DESC"
             );
-        }
+            if ($manual_evidence_rows['error'] !== null) {
+                $report['manual_evidence_error'] = $manual_evidence_rows['error'];
+            } else {
+                $report['manual_evidence'] = array_map(array($this, 'map_soak_evidence_row'), $manual_evidence_rows['value']);
+            }
 
-        $manual_evidence_rows = $this->soak_get_results(
-            "SELECT * FROM {$this->table('soak_evidence')} ORDER BY updated_at DESC"
-        );
-        if ($manual_evidence_rows['error'] !== null) {
-            $report['manual_evidence_error'] = $manual_evidence_rows['error'];
-        } else {
-            $report['manual_evidence'] = array_map(array($this, 'map_soak_evidence_row'), $manual_evidence_rows['value']);
-        }
+            $baseline_checkpoint_query = "SELECT * FROM {$this->table('soak_checkpoints')} WHERE checkpoint_type = 'baseline' ORDER BY created_at ASC LIMIT 1";
+            $baseline_checkpoint_row = $this->soak_get_row($baseline_checkpoint_query);
+            if ($baseline_checkpoint_row['error'] !== null) {
+                return new WP_REST_Response(array(
+                    'error' => 'baseline_checkpoint_lookup_failed',
+                    'detail' => $baseline_checkpoint_row['error'],
+                ), 500);
+            }
 
-        $baseline_checkpoint_row = $this->soak_get_row(
-            "SELECT * FROM {$this->table('soak_checkpoints')} WHERE checkpoint_type = 'baseline' ORDER BY created_at ASC LIMIT 1"
-        );
-        if ($baseline_checkpoint_row['error'] !== null) {
-            $report['baseline_checkpoint_error'] = $baseline_checkpoint_row['error'];
-        } elseif (is_array($baseline_checkpoint_row['value'])) {
+            if (!is_array($baseline_checkpoint_row['value'])) {
+                $seed_result = $this->seed_baseline_checkpoint();
+                if ($seed_result['error'] !== null) {
+                    return new WP_REST_Response(array(
+                        'error' => 'baseline_checkpoint_seed_failed',
+                        'detail' => $seed_result['error'],
+                    ), 500);
+                }
+                $report['seeded'] = (bool) $seed_result['seeded'];
+
+                $baseline_checkpoint_row = $this->soak_get_row($baseline_checkpoint_query);
+                if ($baseline_checkpoint_row['error'] !== null) {
+                    return new WP_REST_Response(array(
+                        'error' => 'baseline_checkpoint_lookup_failed',
+                        'detail' => $baseline_checkpoint_row['error'],
+                    ), 500);
+                }
+            }
+
+            if (!is_array($baseline_checkpoint_row['value'])) {
+                return new WP_REST_Response(array(
+                    'error' => 'baseline_checkpoint_missing',
+                    'detail' => 'Could not load or seed the baseline checkpoint.',
+                ), 500);
+            }
+
             $report['baseline_checkpoint'] = $this->map_soak_checkpoint_row($baseline_checkpoint_row['value']);
-        }
 
-        $checkpoints_rows = $this->soak_get_results($wpdb->prepare(
-            "SELECT * FROM {$this->table('soak_checkpoints')} WHERE checkpoint_type <> 'baseline' AND created_at >= %s ORDER BY created_at DESC",
-            $since_72h
-        ));
-        if ($checkpoints_rows['error'] !== null) {
-            $report['checkpoints_error'] = $checkpoints_rows['error'];
-        } else {
-            $report['checkpoints'] = array_map(array($this, 'map_soak_checkpoint_row'), $checkpoints_rows['value']);
-        }
+            $checkpoints_rows = $this->soak_get_results($wpdb->prepare(
+                "SELECT * FROM {$this->table('soak_checkpoints')} WHERE checkpoint_type <> 'baseline' AND created_at >= %s ORDER BY created_at DESC",
+                $since_72h
+            ));
+            if ($checkpoints_rows['error'] !== null) {
+                $report['checkpoints_error'] = $checkpoints_rows['error'];
+            } else {
+                $report['checkpoints'] = array_map(array($this, 'map_soak_checkpoint_row'), $checkpoints_rows['value']);
+            }
 
-        return rest_ensure_response($report);
+            error_log(sprintf(
+                'soak_report_served baseline_checkpoint_id=%d seeded=%s',
+                isset($report['baseline_checkpoint']['id']) ? (int) $report['baseline_checkpoint']['id'] : 0,
+                $report['seeded'] ? 'true' : 'false'
+            ));
+
+            return new WP_REST_Response($report, 200);
+        } catch (Throwable $throwable) {
+            error_log('soak_report_handler_exception message=' . $throwable->getMessage());
+            return new WP_REST_Response(array(
+                'error' => 'soak_report_handler_exception',
+                'detail' => $throwable->getMessage(),
+            ), 500);
+        }
     }
 
     public function upsert_soak_evidence(WP_REST_Request $request) {
@@ -3994,6 +4056,39 @@ final class SMC_SuperFib_Sniper_REST {
         return array(
             'value' => is_array($value) ? $value : array(),
             'error' => $this->wpdb_last_error(),
+        );
+    }
+
+    private function seed_baseline_checkpoint() {
+        global $wpdb;
+
+        $created_at = $this->now_mysql();
+        $snapshot_data = wp_json_encode(array());
+        $this->reset_wpdb_error();
+        $inserted = $wpdb->query($wpdb->prepare(
+            "INSERT INTO {$this->table('soak_checkpoints')} (checkpoint_type, snapshot_data, operator_notes, created_at)
+             SELECT %s, %s, %s, %s
+             FROM DUAL
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM {$this->table('soak_checkpoints')} WHERE checkpoint_type = %s
+             )",
+            'baseline',
+            $snapshot_data,
+            '',
+            $created_at,
+            'baseline'
+        ));
+        $error = $this->wpdb_last_error();
+        if ($inserted === false || $error !== null) {
+            return array(
+                'seeded' => false,
+                'error' => $error !== null ? $error : 'Could not seed baseline checkpoint.',
+            );
+        }
+
+        return array(
+            'seeded' => ((int) $inserted) > 0,
+            'error' => null,
         );
     }
 
