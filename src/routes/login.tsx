@@ -25,6 +25,8 @@ function LoginPage() {
 
     try {
       await apiClient.getUserSettings(false);
+      // Brief pause so the success state is perceptible before transitioning.
+      await new Promise((r) => setTimeout(r, 400));
       router.navigate({ to: "/plan" });
     } catch (err) {
       if (err instanceof AuthError) {
