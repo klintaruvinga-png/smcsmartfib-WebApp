@@ -1,12 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { type FormEvent, useEffect, useState } from "react";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  ClipboardList,
-  Flag,
-  ShieldCheck,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList, Flag, ShieldCheck } from "lucide-react";
 import {
   apiClient,
   createSoakCheckpoint,
@@ -82,7 +76,7 @@ const SOAK_EVIDENCE_TYPES: SoakEvidenceType[] = [
   "manual_note",
 ];
 
-function AdminPage() {
+export function AdminPage() {
   const router = useRouter();
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [soakState, setSoakState] = useState<SoakLoadState>({ kind: "loading" });
@@ -166,10 +160,12 @@ function AdminPage() {
           void router.navigate({ to: "/login" });
           return;
         }
+        const message = error instanceof Error ? error.message : "Failed to load soak report.";
         setSoakState({
           kind: "error",
-          message: error instanceof Error ? error.message : "Failed to load soak report.",
+          message,
         });
+        setPanelError(message);
       }
     })();
 
@@ -236,7 +232,7 @@ function AdminPage() {
       twelveDataKeyStatus:
         current.twelveDataKeyStatus !== ""
           ? current.twelveDataKeyStatus
-          : state.health.twelveDataKeyStatus ?? state.health.twelveDataKey,
+          : (state.health.twelveDataKeyStatus ?? state.health.twelveDataKey),
     }));
   }, [state]);
 
@@ -248,14 +244,11 @@ function AdminPage() {
       startedBy: evidenceMap["baseline.started_by"] ?? current.startedBy,
       startedAt: evidenceMap["baseline.started_at"] ?? current.startedAt,
       eaSymbols: evidenceMap["baseline.ea_symbols"] ?? current.eaSymbols,
-      frontendWatchlist:
-        evidenceMap["baseline.frontend_watchlist"] ?? current.frontendWatchlist,
-      mt5TerminalStatus:
-        evidenceMap["baseline.mt5_terminal_status"] ?? current.mt5TerminalStatus,
+      frontendWatchlist: evidenceMap["baseline.frontend_watchlist"] ?? current.frontendWatchlist,
+      mt5TerminalStatus: evidenceMap["baseline.mt5_terminal_status"] ?? current.mt5TerminalStatus,
       backendHealthEndpoint:
         evidenceMap["baseline.backend_health_endpoint"] ?? current.backendHealthEndpoint,
-      t0HealthSummary:
-        evidenceMap["baseline.t0_health_summary"] ?? current.t0HealthSummary,
+      t0HealthSummary: evidenceMap["baseline.t0_health_summary"] ?? current.t0HealthSummary,
       authConfirmed: evidenceMap["baseline.auth_confirmed"] ?? current.authConfirmed,
       twelveDataKeyStatus:
         evidenceMap["baseline.twelve_data_key_status"] ?? current.twelveDataKeyStatus,
@@ -538,8 +531,12 @@ function AdminPage() {
                     <td className="px-2 py-2 text-dim">{diagnostic.priceState}</td>
                     <td className="px-2 py-2 text-dim">{diagnostic.candleState}</td>
                     <td className="px-2 py-2 text-dim">{String(diagnostic.candleCount)}</td>
-                    <td className="px-2 py-2 text-dim">{formatTimestamp(diagnostic.lastPriceAt)}</td>
-                    <td className="px-2 py-2 text-dim">{formatTimestamp(diagnostic.lastCandleAt)}</td>
+                    <td className="px-2 py-2 text-dim">
+                      {formatTimestamp(diagnostic.lastPriceAt)}
+                    </td>
+                    <td className="px-2 py-2 text-dim">
+                      {formatTimestamp(diagnostic.lastCandleAt)}
+                    </td>
                     <td className="px-2 py-2 text-dim">{diagnostic.engineBlocker}</td>
                   </tr>
                 ))}
@@ -600,8 +597,19 @@ function AdminPage() {
           )}
 
           {soakState.kind === "error" && (
-            <div className="rounded-md border border-sell/30 bg-sell/10 px-3 py-2 text-xs text-sell">
-              {soakState.message}
+            <div className="space-y-3 rounded-md border border-sell/30 bg-sell/10 px-3 py-3 text-xs text-sell">
+              <div className="space-y-1">
+                <div className="font-semibold">Soak report failed to load.</div>
+                <p className="text-[11px] text-dim">{soakState.message}</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void refreshSoakReport()}
+              >
+                Retry soak report
+              </Button>
             </div>
           )}
 
@@ -995,13 +1003,15 @@ function AdminPage() {
                         No non-baseline checkpoints saved yet.
                       </div>
                     ) : (
-                      soakState.report.checkpoints.slice(0, 6).map((checkpoint) => (
-                        <CheckpointCard
-                          key={checkpoint.id}
-                          checkpoint={checkpoint}
-                          title="Checkpoint"
-                        />
-                      ))
+                      soakState.report.checkpoints
+                        .slice(0, 6)
+                        .map((checkpoint) => (
+                          <CheckpointCard
+                            key={checkpoint.id}
+                            checkpoint={checkpoint}
+                            title="Checkpoint"
+                          />
+                        ))
                     )}
                   </div>
                 </div>
@@ -1089,7 +1099,9 @@ function HealthCard({
   return (
     <div className="rounded-lg border border-bd bg-bg1/60 p-4 space-y-2">
       <div className="text-[10px] font-mono uppercase tracking-wider text-mute">{label}</div>
-      <div className={`inline-flex rounded border px-2 py-1 font-mono text-sm uppercase ${toneClass}`}>
+      <div
+        className={`inline-flex rounded border px-2 py-1 font-mono text-sm uppercase ${toneClass}`}
+      >
         {value}
       </div>
     </div>
@@ -1105,13 +1117,7 @@ function TimestampCard({ label, value }: { label: string; value: string | null }
   );
 }
 
-function CheckpointCard({
-  checkpoint,
-  title,
-}: {
-  checkpoint: SoakCheckpointRow;
-  title: string;
-}) {
+function CheckpointCard({ checkpoint, title }: { checkpoint: SoakCheckpointRow; title: string }) {
   const aggregate = checkpoint.snapshot_data;
   return (
     <div className="rounded-md border border-bd bg-bg1/60 px-3 py-3 space-y-1.5">
@@ -1176,7 +1182,9 @@ function deriveAutoBaselineFields(
   const frontendWatchlist = watchlist.join(", ");
 
   const priceBySymbol = new Map(prices.map((price) => [price.symbol, price]));
-  const diagnosticBySymbol = new Map(diagnostics.map((diagnostic) => [diagnostic.symbol, diagnostic]));
+  const diagnosticBySymbol = new Map(
+    diagnostics.map((diagnostic) => [diagnostic.symbol, diagnostic]),
+  );
 
   const liveSymbols = watchlist.filter((symbol) => {
     const price = priceBySymbol.get(symbol);
@@ -1192,10 +1200,13 @@ function deriveAutoBaselineFields(
         ? `${liveSymbols.length}/${watchlist.length} live: ${liveSymbols.join(", ")}`
         : `${liveSymbols.length}/${watchlist.length} live: ${liveSymbols.join(", ")} | not live: ${nonLiveSymbols.join(", ")}`;
 
-  const lowestCandleDiagnostic = diagnostics.reduce<SymbolDiagnostic | null>((lowest, diagnostic) => {
-    if (!lowest) return diagnostic;
-    return diagnostic.candleCount < lowest.candleCount ? diagnostic : lowest;
-  }, null);
+  const lowestCandleDiagnostic = diagnostics.reduce<SymbolDiagnostic | null>(
+    (lowest, diagnostic) => {
+      if (!lowest) return diagnostic;
+      return diagnostic.candleCount < lowest.candleCount ? diagnostic : lowest;
+    },
+    null,
+  );
   const symbolsBelow30 = diagnostics.filter((diagnostic) => diagnostic.candleCount < 30);
   const blockers = diagnostics.filter((diagnostic) => diagnostic.engineBlocker !== "OK");
 
@@ -1231,10 +1242,7 @@ function deriveAutoBaselineFields(
   };
 }
 
-function buildBaselineEvidenceEntries(
-  form: BaselineForm,
-  operator: string,
-): SoakEvidencePayload[] {
+function buildBaselineEvidenceEntries(form: BaselineForm, operator: string): SoakEvidencePayload[] {
   return [
     evidenceEntry("baseline.started_by", "baseline_metadata", form.startedBy, operator),
     evidenceEntry("baseline.started_at", "baseline_metadata", form.startedAt, operator),
@@ -1263,12 +1271,7 @@ function buildBaselineEvidenceEntries(
       form.t0HealthSummary,
       operator,
     ),
-    evidenceEntry(
-      "baseline.auth_confirmed",
-      "baseline_metadata",
-      form.authConfirmed,
-      operator,
-    ),
+    evidenceEntry("baseline.auth_confirmed", "baseline_metadata", form.authConfirmed, operator),
     evidenceEntry(
       "baseline.twelve_data_key_status",
       "baseline_metadata",
