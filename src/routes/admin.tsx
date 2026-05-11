@@ -333,6 +333,7 @@ function AdminPage() {
     try {
       const operator = baselineForm.startedBy.trim() || resolveOperatorIdentifier();
       const baselineEntries = buildBaselineEvidenceEntries(baselineForm, operator);
+      console.debug("[PHASE0_SOAK] Baseline evidence entries", baselineEntries);
       await saveEvidenceEntries(baselineEntries);
 
       if (!baselineCheckpoint) {

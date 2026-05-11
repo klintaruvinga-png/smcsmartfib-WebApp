@@ -807,6 +807,13 @@ final class SMC_SuperFib_Sniper_REST {
         $operator = sanitize_text_field($payload['operator'] ?? '');
         $allowed_types = array('baseline_metadata', 'signal_parity_confirm', 'feed_stable_window', 'engine_run_observation', 'manual_note');
 
+        error_log('[PHASE0_SOAK] upsert_soak_evidence payload: ' . wp_json_encode(array(
+            'evidence_key' => $evidence_key,
+            'evidence_type' => $evidence_type,
+            'evidence_value' => $evidence_value,
+            'operator' => $operator,
+        )));
+
         if ($evidence_key === '') {
             return new WP_Error('smc_sf_soak_evidence_key_required', 'evidence_key is required.', array('status' => 400));
         }

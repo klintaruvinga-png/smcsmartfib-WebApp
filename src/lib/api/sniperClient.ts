@@ -5,6 +5,7 @@
  */
 
 import { getAuthHeader, clearCredentials, getWordPressNonce } from "@/lib/auth";
+import { assertValidSoakEvidencePayload } from "./soakEvidence";
 
 export class AuthError extends Error {
   constructor() {
@@ -159,6 +160,8 @@ export async function fetchSoakReport(): Promise<SoakReport> {
 export async function upsertSoakEvidence(
   payload: SoakEvidencePayload,
 ): Promise<SoakEvidenceRow> {
+  assertValidSoakEvidencePayload(payload);
+
   return call<SoakEvidenceRow>("/admin/soak-evidence", {
     method: "POST",
     body: payload,
