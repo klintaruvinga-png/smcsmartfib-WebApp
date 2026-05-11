@@ -59,19 +59,19 @@ function LandingLoader() {
             : "opacity-0 translate-y-3 scale-95 blur-[2px]",
         ].join(" ")}
       >
-        <div className="brand-mark flex h-14 w-14 items-center justify-center rounded-xl animate-pulse">
-          <Activity className="h-7 w-7 text-[#1a1208]" strokeWidth={2.5} />
+        <div className="brand-mark flex h-28 w-28 items-center justify-center rounded-2xl animate-pulse">
+          <Activity className="h-14 w-14 text-[#1a1208]" strokeWidth={2.5} />
         </div>
         <div className="text-center">
-          <h1 className="text-lg font-semibold tracking-tight text-tx">SMC SuperFIB</h1>
-          <p className="mt-1 text-[10px] font-mono uppercase tracking-[0.2em] text-mute">
+          <h1 className="text-3xl font-semibold tracking-tight text-tx">SMC SuperFIB</h1>
+          <p className="mt-2 text-xs font-mono uppercase tracking-[0.2em] text-mute">
             Trading Dashboard
           </p>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-accent animate-bounce [animation-delay:-0.3s]" />
-          <span className="h-1.5 w-1.5 rounded-full bg-accent animate-bounce [animation-delay:-0.15s]" />
-          <span className="h-1.5 w-1.5 rounded-full bg-accent animate-bounce" />
+        <div className="flex items-center gap-3">
+          <span className="h-3 w-3 rounded-full bg-accent animate-bounce [animation-delay:-0.3s]" />
+          <span className="h-3 w-3 rounded-full bg-accent animate-bounce [animation-delay:-0.15s]" />
+          <span className="h-3 w-3 rounded-full bg-accent animate-bounce" />
         </div>
       </div>
     </div>
