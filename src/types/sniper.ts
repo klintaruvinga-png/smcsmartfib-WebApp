@@ -347,4 +347,5 @@ export interface SoakReport {
   baseline_checkpoint: SoakCheckpointRow | null;
   checkpoints: SoakCheckpointRow[];
   generated_at: string;
+  seeded?: boolean;
 }

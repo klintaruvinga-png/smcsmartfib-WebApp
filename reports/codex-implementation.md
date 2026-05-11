@@ -1,44 +1,41 @@
 # Issue summary
 
-Baseline soak save is failing with `API /admin/soak-evidence failed: 400 - {"code":"smc_sf_soak_evidence_type_invalid"...}`. Repository inspection confirmed that the current source-level dashboard and backend contract already agree on the allowed `evidence_type` values, so the remaining defect is runtime-only and could not be fully verified from repository evidence alone.
+`/wp-json/sniper/v1/admin/soak-report` was failing in Phase 0 soak validation even though the route registration already existed. The backend read path was not guaranteeing a structured REST response when soak-table bootstrap or baseline checkpoint lookup failed, and it did not self-heal a missing baseline checkpoint row.
 
 ## Root cause implemented
 
-No source-visible contract mismatch was found in the baseline save path. `SoakEvidenceType`, `buildBaselineEvidenceEntries()`, and the backend whitelist already use the same five values, including `baseline_metadata`. The implemented fix is a diagnostic hardening patch: a client-side preflight validator now rejects and logs unsupported `evidence_type` values before the network call, the baseline builder logs the full evidence array before save, and the backend logs the sanitized request payload before enforcing the whitelist. This isolates the real runtime source of the bad value without weakening backend authority.
+The fix keeps backend authority in PHP. `get_soak_report()` now validates soak-table bootstrap success, wraps the handler in a guarded `try/catch`, seeds exactly one baseline checkpoint when none exists, and always returns `WP_REST_Response`. The baseline seed uses the repository’s real checkpoint schema (`checkpoint_type`, `snapshot_data`) rather than the contract’s generic `type`/`payload` wording.
 
 ## Exact files changed
 
-- `src/lib/api/soakEvidence.ts` - added the shared runtime whitelist and `assertValidSoakEvidencePayload()` helper used to reject unsupported `evidence_type` values before the request leaves the browser.
-- `src/lib/api/sniperClient.ts` - added the client preflight guard at the `/admin/soak-evidence` network boundary.
-- `src/lib/api/soakEvidence.test.ts` - added a targeted runtime test covering invalid and valid `evidence_type` handling.
-- `src/types/soakEvidenceType.compile-test.ts` - added a compile-time `@ts-expect-error` guard proving unlisted evidence types fail TypeScript compilation.
-- `src/routes/admin.tsx` - added a baseline payload `console.debug` line immediately after `buildBaselineEvidenceEntries()` returns.
-- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` - added sanitized payload logging immediately before backend whitelist validation.
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-11_soak-evidence-type-invalid.md` - added the required bug sweep report for the runtime-integrity issue.
-- `.github/migration/audits/phase-0-dashboard-backend-soak-evidence-parity-2026-05-11.md` - added the required parity audit for the dashboard/backend soak evidence contract.
-- `reports/codex-implementation.md` - updated the implementation summary for this run.
+- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` - `ensure_soak_tables()` now returns success/failure; `get_soak_report()` now returns structured `200/500` REST responses, seeds a missing baseline checkpoint, and logs success/failure; added `seed_baseline_checkpoint()`.
+- `src/types/sniper.ts` - added optional `seeded` on `SoakReport` to reflect the backend response contract.
+- `wordpress/smc-superfib-sniper/tests/php/test-get-soak-report.php` - added regression coverage for missing baseline seeding, existing baseline reuse, structured `500` lookup failure, and preserved `401` admin auth rejection.
+- `src/lib/api/sniperClient.test.ts` - added a frontend API regression covering soak-report `200` success and surfaced `500` failure.
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-11_admin-soak-report-route.md` - added the required bug sweep report.
+- `reports/codex-implementation.md` - updated implementation summary for this run.
 
 ## Tests run
 
-- `npx tsc --noEmit`
-- `node --test --experimental-strip-types src/lib/api/soakEvidence.test.ts`
 - `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
-- `npm run build`
+- `php -l wordpress/smc-superfib-sniper/tests/php/test-get-soak-report.php`
+- All PHP tests under `wordpress/smc-superfib-sniper/tests/php`
+- `node --test src/lib/api/soakEvidence.test.ts`
+- `npx vitest run src/lib/api/sniperClient.test.ts`
 
 ## Reports generated
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-11_soak-evidence-type-invalid.md`
-- `.github/migration/audits/phase-0-dashboard-backend-soak-evidence-parity-2026-05-11.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-11_admin-soak-report-route.md`
 - `reports/codex-implementation.md`
 
 ## Remaining risks
 
-- The exact live failing `evidence_type` value is still unverified in this workspace because no authenticated live baseline save replay was available.
-- If the production environment is serving a stale bundle or stale deploy artifact, this source patch alone will not fix the live incident until the environment is redeployed and cache-busted.
-- The current worktree contains pre-existing untracked input artifacts (`reports/copilot-research.md`, `reports/codex-plan.md`, `reports/codex-plan.meta.json`) that were left untouched and are not part of this patch.
+- The contract’s live `curl` checks and PHP error-log inspection could not be run in this workspace because no authenticated WordPress staging target was available.
+- Baseline seeding is validated in the local harness only; staging still needs a first-hit/second-hit check to confirm no duplicate baseline rows under the deployed database engine.
+- The worktree contains unrelated pre-existing changes and untracked artifacts outside this patch (`.claude/settings.local.json`, `scripts/pipeline-watcher.js`, existing docs/reports inputs, and `.github/migration/phase-updates/`), which were left untouched.
 
 ## Any contract ambiguities resolved during implementation
 
-- The contract asked for `src/types/sniper.ts` to be narrowed only if `SoakEvidenceType` was a bare `string`; repository inspection showed it was already a strict literal union, so I preserved the type and added a compile-time contract test instead of changing the type definition.
-- The contract described `upsertSoakEvidence()` as validating a payload array, but the real function accepts a single `SoakEvidencePayload`; I resolved this by adding the guard at the actual request boundary while keeping the validator array-aware for direct test coverage.
-- Because the live failing value could not be reproduced from repository evidence, I applied the smallest safe interpretation of the contract: add diagnostics and preflight protection rather than widening the whitelist or guessing at a transport-layer fix.
+- The contract described the issue as a missing backend route, but repository evidence showed the route was already registered. I applied the smallest safe interpretation: fix the runtime handler path instead of touching route registration.
+- The contract referenced a baseline row shape using `type` and `payload`; the repository schema actually uses `checkpoint_type` and `snapshot_data`. I seeded the existing schema to avoid schema drift.
+- The contract allowed a `src/lib/api/sniperClient.ts` change only if the client swallowed backend failures. Inspection showed the shared `call()` helper already throws on non-2xx responses, so I preserved production client logic and added a regression test instead.
