@@ -27,6 +27,10 @@ import type {
   SignalCandidate,
   Symbol,
   SymbolDiagnostic,
+  SoakCheckpointRow,
+  SoakEvidencePayload,
+  SoakEvidenceRow,
+  SoakReport,
   TwelveDataKeyStatus,
   TradePlan,
 } from "@/types/sniper";
@@ -146,6 +150,32 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
 
 export async function fetchAdminHealth(): Promise<AdminHealthResponse> {
   return call<AdminHealthResponse>("/admin/health", { cacheBust: true });
+}
+
+export async function fetchSoakReport(): Promise<SoakReport> {
+  return call<SoakReport>("/admin/soak-report", { cacheBust: true });
+}
+
+export async function upsertSoakEvidence(
+  payload: SoakEvidencePayload,
+): Promise<SoakEvidenceRow> {
+  return call<SoakEvidenceRow>("/admin/soak-evidence", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function createSoakCheckpoint(opts?: {
+  operatorNotes?: string;
+  checkpointType?: "baseline" | "checkpoint";
+}): Promise<SoakCheckpointRow> {
+  return call<SoakCheckpointRow>("/admin/soak-checkpoint", {
+    method: "POST",
+    body: {
+      operator_notes: opts?.operatorNotes ?? "",
+      checkpoint_type: opts?.checkpointType ?? "checkpoint",
+    },
+  });
 }
 
 function toFiniteNumber(value: unknown, fallback = 0): number {
