@@ -4062,34 +4062,52 @@ final class SMC_SuperFib_Sniper_REST {
     private function seed_baseline_checkpoint() {
         global $wpdb;
 
-        $created_at = $this->now_mysql();
-        $snapshot_data = wp_json_encode(array());
-        $this->reset_wpdb_error();
-        $inserted = $wpdb->query($wpdb->prepare(
-            "INSERT INTO {$this->table('soak_checkpoints')} (checkpoint_type, snapshot_data, operator_notes, created_at)
-             SELECT %s, %s, %s, %s
-             FROM DUAL
-             WHERE NOT EXISTS (
-                 SELECT 1 FROM {$this->table('soak_checkpoints')} WHERE checkpoint_type = %s
-             )",
-            'baseline',
-            $snapshot_data,
-            '',
-            $created_at,
-            'baseline'
-        ));
-        $error = $this->wpdb_last_error();
-        if ($inserted === false || $error !== null) {
+        // checkpoint_type has no UNIQUE constraint (multiple non-baseline checkpoints
+        // are valid). The WHERE NOT EXISTS check is not atomic on its own — two
+        // concurrent /admin/soak-report requests can both observe "no baseline" and
+        // both insert, violating the single-baseline invariant.
+        // Advisory lock serializes concurrent seeders at the database level without
+        // requiring a schema change.
+        $lock_acquired = $wpdb->get_var("SELECT GET_LOCK('smc_sf_baseline_seed', 10)");
+        if ($lock_acquired != 1) {
             return array(
                 'seeded' => false,
-                'error' => $error !== null ? $error : 'Could not seed baseline checkpoint.',
+                'error'  => 'Could not acquire baseline seed lock — try again.',
             );
         }
 
-        return array(
-            'seeded' => ((int) $inserted) > 0,
-            'error' => null,
-        );
+        try {
+            $created_at    = $this->now_mysql();
+            $snapshot_data = wp_json_encode(array());
+            $this->reset_wpdb_error();
+            $inserted = $wpdb->query($wpdb->prepare(
+                "INSERT INTO {$this->table('soak_checkpoints')} (checkpoint_type, snapshot_data, operator_notes, created_at)
+                 SELECT %s, %s, %s, %s
+                 FROM DUAL
+                 WHERE NOT EXISTS (
+                     SELECT 1 FROM {$this->table('soak_checkpoints')} WHERE checkpoint_type = %s
+                 )",
+                'baseline',
+                $snapshot_data,
+                '',
+                $created_at,
+                'baseline'
+            ));
+            $error = $this->wpdb_last_error();
+            if ($inserted === false || $error !== null) {
+                return array(
+                    'seeded' => false,
+                    'error'  => $error !== null ? $error : 'Could not seed baseline checkpoint.',
+                );
+            }
+
+            return array(
+                'seeded' => ((int) $inserted) > 0,
+                'error'  => null,
+            );
+        } finally {
+            $wpdb->query("SELECT RELEASE_LOCK('smc_sf_baseline_seed')");
+        }
     }
 
     private function map_soak_evidence_row($row) {
