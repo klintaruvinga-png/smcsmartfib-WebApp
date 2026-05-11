@@ -153,6 +153,10 @@ if (!class_exists('TestWpdb')) {
         public function get_var($query) {
             $this->last_error = '';
 
+            if (preg_match("/SELECT GET_LOCK\\('smc_sf_baseline_seed',\\s*\\d+\\)/", $query)) {
+                return 1;
+            }
+
             if (preg_match("/SELECT settings FROM ([^ ]+) WHERE user_id = (\\d+)/", $query, $matches)) {
                 $table = $matches[1];
                 $user_id = (int) $matches[2];
