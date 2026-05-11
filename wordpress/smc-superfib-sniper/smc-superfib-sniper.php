@@ -978,7 +978,7 @@ final class SMC_SuperFib_Sniper_REST {
             return $report_response;
         }
         if ($report_response instanceof WP_REST_Response) {
-            $status_code = (int) $report_response->get_status();
+            $status_code = $this->rest_response_status_code($report_response);
             if ($status_code < 200 || $status_code >= 300) {
                 return new WP_Error(
                     'smc_sf_soak_checkpoint_report_failed',
@@ -4161,6 +4161,22 @@ final class SMC_SuperFib_Sniper_REST {
             return (string) $wpdb->last_error;
         }
         return null;
+    }
+
+    private function rest_response_status_code($response) {
+        if (!($response instanceof WP_REST_Response)) {
+            return 200;
+        }
+
+        if (method_exists($response, 'get_status')) {
+            return (int) $response->get_status();
+        }
+
+        if (property_exists($response, 'status')) {
+            return (int) $response->status;
+        }
+
+        return 200;
     }
 
     private function to_iso($mysql_time) {

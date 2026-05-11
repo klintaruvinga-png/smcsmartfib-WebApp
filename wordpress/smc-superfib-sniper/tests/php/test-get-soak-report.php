@@ -48,6 +48,10 @@ if (!class_exists('WP_REST_Response')) {
         public function get_data() {
             return $this->data;
         }
+
+        public function get_status() {
+            return $this->status;
+        }
     }
 }
 
@@ -146,6 +150,42 @@ if (!class_exists('TestWpdb')) {
 
                 return 1;
             }
+
+            if (preg_match("/^DELETE FROM ([^ ]+) WHERE checkpoint_type <> 'baseline' AND created_at < '([^']+)'/", $sql, $matches)) {
+                $table = $matches[1];
+                $cutoff = $matches[2];
+                $deleted = 0;
+                $remaining = array();
+                foreach ($this->tables[$table] ?? array() as $row) {
+                    $is_prunable = ($row['checkpoint_type'] ?? '') !== 'baseline'
+                        && isset($row['created_at'])
+                        && strcmp((string) $row['created_at'], $cutoff) < 0;
+                    if ($is_prunable) {
+                        $deleted++;
+                        continue;
+                    }
+                    $remaining[] = $row;
+                }
+                $this->tables[$table] = $remaining;
+                return $deleted;
+            }
+
+            return 1;
+        }
+
+        public function insert($table, $data, $format = null) {
+            $this->last_error = '';
+
+            if (!isset($this->tables[$table])) {
+                $this->tables[$table] = array();
+            }
+
+            $row = $data;
+            if (!isset($row['id'])) {
+                $row['id'] = $this->next_id($table);
+            }
+            $this->tables[$table][] = $row;
+            $this->insert_id = (int) $row['id'];
 
             return 1;
         }
@@ -615,6 +655,71 @@ class Test_Get_Soak_Report {
         assert_same('baseline_checkpoint_lookup_failed', $data['error'] ?? null, 'Lookup failure must return structured error');
     }
 
+    public function case_create_checkpoint_aborts_on_soak_report_lookup_failure() {
+        global $wpdb;
+
+        $this->reset_environment();
+        $wpdb->tables[$wpdb->prefix . 'smc_sf_soak_checkpoints'] = array(
+            array(
+                'id' => 7,
+                'checkpoint_type' => 'baseline',
+                'snapshot_data' => json_encode(array('status' => 'existing')),
+                'operator_notes' => 'Operator baseline',
+                'created_at' => '2026-05-11 08:00:00',
+            ),
+        );
+        $wpdb->fail_baseline_lookup = true;
+
+        $instance = new SMC_SuperFib_Sniper_REST();
+        $response = $instance->create_soak_checkpoint(new WP_REST_Request(array(
+            'operator_notes' => 'should not persist',
+            'checkpoint_type' => 'checkpoint',
+        )));
+
+        assert_true($response instanceof WP_Error, 'Checkpoint creation should fail when soak report lookup fails');
+        assert_same('smc_sf_soak_checkpoint_report_failed', $response->code, 'Checkpoint failure should expose soak report failure code');
+        assert_same(500, $response->data['status'] ?? null, 'Checkpoint failure should return 500');
+        assert_same(500, $response->data['report_status'] ?? null, 'Checkpoint failure should preserve soak report status');
+        assert_same(
+            'baseline_checkpoint_lookup_failed',
+            $response->data['report_error']['error'] ?? null,
+            'Checkpoint failure should preserve soak report error payload'
+        );
+
+        assert_same(
+            1,
+            count($wpdb->tables[$wpdb->prefix . 'smc_sf_soak_checkpoints'] ?? array()),
+            'Checkpoint creation must not persist any new row on soak report failure'
+        );
+    }
+
+    public function case_create_checkpoint_aborts_on_soak_report_table_init_failure() {
+        global $wpdb;
+
+        $this->reset_environment();
+        $wpdb->fail_dbdelta = true;
+
+        $instance = new SMC_SuperFib_Sniper_REST();
+        $response = $instance->create_soak_checkpoint(new WP_REST_Request(array(
+            'operator_notes' => 'should not persist',
+        )));
+
+        assert_true($response instanceof WP_Error, 'Checkpoint creation should fail when soak tables cannot initialize');
+        assert_same('smc_sf_soak_checkpoint_report_failed', $response->code, 'Table init failure should be surfaced as soak report failure');
+        assert_same(500, $response->data['status'] ?? null, 'Table init checkpoint failure should return 500');
+        assert_same(500, $response->data['report_status'] ?? null, 'Table init failure should preserve soak report status');
+        assert_same(
+            'table_init_failed',
+            $response->data['report_error']['error'] ?? null,
+            'Table init failure should preserve soak report error payload'
+        );
+        assert_same(
+            0,
+            count($wpdb->tables[$wpdb->prefix . 'smc_sf_soak_checkpoints'] ?? array()),
+            'Checkpoint creation must not persist any row when soak tables fail to initialize'
+        );
+    }
+
     public function case_permission_admin_still_returns_401_for_unauthenticated_requests() {
         $this->reset_environment();
         $GLOBALS['test_is_logged_in'] = false;
@@ -632,6 +737,8 @@ class Test_Get_Soak_Report {
         $this->case_seeds_baseline_when_missing();
         $this->case_returns_existing_baseline_without_seeding();
         $this->case_returns_structured_500_on_lookup_failure();
+        $this->case_create_checkpoint_aborts_on_soak_report_lookup_failure();
+        $this->case_create_checkpoint_aborts_on_soak_report_table_init_failure();
         $this->case_permission_admin_still_returns_401_for_unauthenticated_requests();
     }
 }
