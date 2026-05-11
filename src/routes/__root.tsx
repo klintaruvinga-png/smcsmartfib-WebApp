@@ -88,9 +88,10 @@ function RootComponent() {
   const router = useRouter();
   const { location } = useRouterState();
   const isLogin = location.pathname === "/login";
+  const isLanding = location.pathname === "/";
 
   useEffect(() => {
-    if (!isLogin && !hasCredentials() && !hasWordPressNonce()) {
+    if (!isLogin && !isLanding && !hasCredentials() && !hasWordPressNonce()) {
       router.navigate({ to: "/login" });
     }
 
@@ -107,7 +108,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {isLogin ? (
+      {isLogin || isLanding ? (
         <>
           <Outlet />
           <Toaster
