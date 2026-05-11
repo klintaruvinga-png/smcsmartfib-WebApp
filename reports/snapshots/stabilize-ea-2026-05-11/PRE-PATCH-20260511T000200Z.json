@@ -1,0 +1,18 @@
+{
+  "snapshot_type": "PRE-PATCH",
+  "workflow_id": "stabilize-ea-2026-05-11",
+  "timestamp": "2026-05-11T00:02:00Z",
+  "git": {
+    "branch": "claude/serene-hopper-KWRcX",
+    "commit_hash": "98ceaecf455506c4ae17d1a3914267d4ae306370",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-11-before-patches"
+  },
+  "patches_planned": [
+    {
+      "id": "PATCH-001",
+      "targets": ["BUG-001"],
+      "file": "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "description": "Add OHLC consistency validation guard in candle pre-validation block. Reject candles where high < max(open,close) or low > min(open,close) with structured 400 error and audit trail."
+    }
+  ]
+}
