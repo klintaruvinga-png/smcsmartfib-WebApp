@@ -508,6 +508,38 @@ function test_ea_market_stream() {
         var_dump($snapshot_response);
     }
 
+    echo "\n";
+
+    // Test 6: OHLC validation guard (BUG-001 regression)
+    echo "Test 6: Invalid OHLC candle silently rejected (snapshot still inserted)\n";
+    $invalid_ohlc_payload = array(
+        'user_id' => 7,
+        'symbol' => 'EURUSD',
+        'timestamp' => gmdate('c', time() - 5),
+        'bid' => 1.08521,
+        'ask' => 1.08534,
+        'candle' => array(
+            'time' => gmdate('c', time() - 65),
+            'open' => 1.0850,
+            'high' => 1.0848, // INVALID: high < open
+            'low'  => 1.0843,
+            'close' => 1.0851,
+            'volume' => 100
+        )
+    );
+
+    $invalid_ohlc_response = dispatch_ea_market_stream($plugin, $invalid_ohlc_payload);
+
+    if ($invalid_ohlc_response instanceof WP_REST_Response
+        && $invalid_ohlc_response->data['ok'] === true
+        && $invalid_ohlc_response->data['candles_inserted'] === 0
+        && $invalid_ohlc_response->data['snapshots_inserted'] === 1) {
+        echo "✓ SUCCESS: Invalid OHLC candle rejected; snapshot still stored\n";
+    } else {
+        echo "✗ FAILED: Invalid OHLC candle not correctly handled\n";
+        var_dump($invalid_ohlc_response);
+    }
+
     echo "\nTest completed.\n";
 }
 

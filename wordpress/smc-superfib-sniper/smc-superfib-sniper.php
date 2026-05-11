@@ -1654,6 +1654,18 @@ final class SMC_SuperFib_Sniper_REST {
                         'candle_time' => $candle['time'],
                         'parsed_timestamp' => $candle_ts
                     ));
+                } elseif (!$this->validate_ohlc($candle)) {
+                    // HARDENING (BUG-001): Reject candles with logically invalid OHLC ordering.
+                    // high must be >= max(open,close); low must be <= min(open,close).
+                    $this->audit($user_id, 'ea.market_stream.invalid_ohlc', array(
+                        'symbol' => $symbol,
+                        'timeframe' => $timeframe,
+                        'open' => $candle['open'],
+                        'high' => $candle['high'],
+                        'low' => $candle['low'],
+                        'close' => $candle['close'],
+                    ));
+                    error_log("OHLC GUARD: Rejecting M1 candle with invalid OHLC for {$symbol} | O={$candle['open']} H={$candle['high']} L={$candle['low']} C={$candle['close']}");
                 } else {
                     $result = $this->insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $payload['timestamp'] ?? null);
                     if ($result) {
@@ -1689,6 +1701,17 @@ final class SMC_SuperFib_Sniper_REST {
                         'candle_time' => $candle_m15['time'],
                         'parsed_timestamp' => $candle_m15_ts
                     ));
+                } elseif (!$this->validate_ohlc($candle_m15)) {
+                    // HARDENING (BUG-001): Reject M15 candles with logically invalid OHLC ordering.
+                    $this->audit($user_id, 'ea.market_stream.invalid_ohlc', array(
+                        'symbol' => $symbol,
+                        'timeframe' => '15min',
+                        'open' => $candle_m15['open'],
+                        'high' => $candle_m15['high'],
+                        'low' => $candle_m15['low'],
+                        'close' => $candle_m15['close'],
+                    ));
+                    error_log("OHLC GUARD: Rejecting M15 candle with invalid OHLC for {$symbol} | O={$candle_m15['open']} H={$candle_m15['high']} L={$candle_m15['low']} C={$candle_m15['close']}");
                 } else {
                     $result = $this->insert_mt5_candle($user_id, $symbol, '15min', $candle_m15, $payload['timestamp'] ?? null, 1800);
                     if ($result) {
@@ -1872,6 +1895,18 @@ final class SMC_SuperFib_Sniper_REST {
         );
 
         return $result !== false;
+    }
+
+    /**
+     * Validate OHLC ordering: high >= max(open,close), low <= min(open,close).
+     * Returns false if the candle is logically inconsistent and should be rejected.
+     */
+    private function validate_ohlc(array $candle): bool {
+        $open  = (float) $candle['open'];
+        $high  = (float) $candle['high'];
+        $low   = (float) $candle['low'];
+        $close = (float) $candle['close'];
+        return $high >= max($open, $close) && $low <= min($open, $close);
     }
 
     public function get_regimes() {
