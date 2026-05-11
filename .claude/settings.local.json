@@ -14,7 +14,8 @@
       "Bash(ls reports/codex-implementation.md)",
       "Bash(ls reports/codex-last-message.txt)",
       "Bash(node -e \"const d=JSON.parse\\(require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\)\\); console.log\\('Decision:', d.reviewDecision\\); console.log\\('Checks:', d.statusCheckRollup?.map\\(c=>c.name+': '+c.conclusion\\).join\\(', '\\)\\)\")",
-      "Bash(git cherry-pick *)"
+      "Bash(git cherry-pick *)",
+      "Bash(git check-ignore *)"
     ]
   }
 }
