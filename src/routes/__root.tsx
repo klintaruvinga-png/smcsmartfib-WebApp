@@ -108,7 +108,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {isLogin ? (
+      {isLogin || isLanding ? (
         <>
           <Outlet />
           <Toaster
