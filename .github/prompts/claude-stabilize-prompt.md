@@ -49,7 +49,11 @@ The project is in the **MT5-native migration / Phase 0 soak** phase.
   `.mqh` include files.
 - Plugin PHP regression tests are in
   `wordpress/smc-superfib-sniper/tests/php/`.
-- Workflow state is tracked in `.smc-workflow-state.json`.
+- Workflow state is written at runtime to `.smc-workflow-state.json`.
+  **This file is local-only.** It is listed in `.gitignore` and
+  `.github/workflows/02-implementation.yml` fails CI with a hard error if it
+  is ever found in a commit (`test ! -f .smc-workflow-state.json`). Never
+  `git add` this file. Read it; do not stage or commit it.
 
 ### EA route — already implemented
 
@@ -131,7 +135,7 @@ Inspect and maintain the existing implementation across:
 - `src/mocks/sniperData.ts`
 - `mt5/SMC_MarketDataEA.mq5` and companion `.mqh` files
 - `scripts/`
-- `.smc-workflow-state.json`
+- `.smc-workflow-state.json` (**read-only — never commit; see warning above**)
 - `.github/migration/` (parity audits, soak tracker)
 - `.github/docs/` (bug sweep reports)
 - `reports/` (snapshots, pipeline artifacts)
