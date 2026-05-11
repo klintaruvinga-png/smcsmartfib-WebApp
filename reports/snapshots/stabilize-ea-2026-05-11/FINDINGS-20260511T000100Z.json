@@ -1,0 +1,60 @@
+{
+  "snapshot_type": "FINDINGS",
+  "workflow_id": "stabilize-ea-2026-05-11",
+  "timestamp": "2026-05-11T00:01:00Z",
+  "confirmed_issues": [
+    {
+      "id": "BUG-001",
+      "severity": "MEDIUM",
+      "system": "EA Market Stream / Candle Ingestion",
+      "description": "OHLC validation is missing on candle ingestion. The PHP handler stores candles with any non-zero OHLCV fields without verifying that high >= max(open,close) and low <= min(open,close). A logically invalid candle (e.g. low > close, or high < open) could be stored and used in signal engine calculations.",
+      "root_cause": "insert_mt5_candle() and the candle pre-validation block in post_ea_market_stream() only check that the four OHLC keys exist, not that their relative ordering is valid.",
+      "impact_zones": ["REST API", "Signal Engine", "Fib Level Calculation"],
+      "proposed_fix": "Add OHLC consistency guard in the candle pre-validation block: reject if high < max(open,close) or low > min(open,close), with structured 400 error and audit trail."
+    },
+    {
+      "id": "BUG-002",
+      "severity": "LOW",
+      "system": "Frontend Build / Code Quality",
+      "description": "npm run lint fails with 90 prettier formatting errors across src/ routes. All errors are whitespace/formatting only (prettier/prettier rule), not logic errors. The build succeeds. This is a pre-existing cosmetic issue.",
+      "root_cause": "Prettier formatting not enforced on some route files (src/routes/admin.tsx, src/routes/index.tsx, src/routes/plan.tsx, etc.).",
+      "impact_zones": ["CI/CD pipeline", "Code review"],
+      "proposed_fix": "Run npx prettier --write src/ to auto-fix all formatting. No logic changes required."
+    },
+    {
+      "id": "INFO-001",
+      "severity": "INFO",
+      "system": "EA Payload Contract Documentation",
+      "description": "The workflow specification describes a payload contract using fields quote_time, server_time, and candles[] (array). The actual EA (MarketDataEngine.mqh) sends timestamp, candle (singular object), and candle_m15 (singular object). The PHP handler is aligned with what the EA actually sends. No code bug — documentation divergence only.",
+      "root_cause": "Spec was written describing a proposed API shape; the actual implementation evolved to use singular candle objects.",
+      "impact_zones": ["Documentation"],
+      "proposed_fix": "Update parity audit documentation to reflect actual payload contract."
+    }
+  ],
+  "confirmed_correct": [
+    "permission_ea_market_stream: X-EA-API-Key validated via hash_equals, all 4 header aliases handled, 401/503/403/400/403 error codes correct",
+    "wp_set_current_user() called before returning true from permission callback",
+    "stale data rejection at >300s returns error code stale_data with HTTP 400",
+    "warn-only drift logging at 120-300s",
+    "candle staleness enforced separately at 180s in insert_mt5_candle()",
+    "signal engine gates on price_source=mt5 AND price_state=live AND price_age<=staleThresholdSec",
+    "backendConfirmed only set when status=READY && data_live",
+    "post_execute_signals rejects signals where backend_confirmed!=1 or status!=READY",
+    "FreshnessBadge uses state from backend, not self-computed age",
+    "get_cached_price() computes age_sec from stored updated_at (broker timestamp), not fetch time",
+    "authority-diagnostics requires WP session login (401 for unauthenticated) — correct and intentional",
+    "admin routes require manage_options capability",
+    "build passes (npm run build)",
+    "check:mql passes",
+    "all PHP syntax checks pass",
+    "all 6 PHP regression test suites pass"
+  ],
+  "statistics": {
+    "total_issues": 3,
+    "critical": 0,
+    "high": 0,
+    "medium": 1,
+    "low": 1,
+    "info": 1
+  }
+}

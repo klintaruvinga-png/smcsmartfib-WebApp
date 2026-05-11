@@ -1,0 +1,106 @@
+{
+  "snapshot_type": "INITIAL",
+  "workflow_id": "stabilize-ea-2026-05-11",
+  "timestamp": "2026-05-11T00:00:00Z",
+  "git": {
+    "branch": "claude/serene-hopper-KWRcX",
+    "commit_hash": "98ceaecf455506c4ae17d1a3914267d4ae306370",
+    "remote": "origin",
+    "uncommitted_changes_count": 0
+  },
+  "repo_structure": {
+    "plugin_root": "wordpress/smc-superfib-sniper",
+    "plugin_files": [
+      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "wordpress/smc-superfib-sniper/class-market-data-service.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-cors-regression.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-rest-bootstrap-settings.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-settings-risk-fallbacks.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php"
+    ],
+    "rest_route_files": [
+      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php"
+    ],
+    "frontend_api_client": "src/lib/api/sniperClient.ts",
+    "mt5_ea_files": [
+      "mt5/SMC_MarketDataEA.mq5",
+      "mt5/MarketDataEngine.mqh",
+      "mt5/TickProcessor.mqh",
+      "mt5/CandleBuilder.mqh",
+      "mt5/SessionManager.mqh",
+      "mt5/FreshnessEngine.mqh",
+      "mt5/SymbolNormalizer.mqh"
+    ],
+    "migration_files": [
+      ".github/migration/audits/phase-0-ea-authority-rate-limit-parity-2026-05-06.md",
+      ".github/migration/audits/phase-0-mt5-authority-parity-2026-05-03.md",
+      ".github/migration/audits/phase-0-freshness-authority-parity-2026-05-04.md"
+    ]
+  },
+  "app_state": {
+    "workflow_state_file_exists": false,
+    "workflow_state": {}
+  },
+  "rest_routes_confirmed": {
+    "namespace": "sniper/v1",
+    "public_routes": [
+      "GET /sniper/v1/health",
+      "GET /sniper/v1/session"
+    ],
+    "authenticated_user_routes": [
+      "GET /sniper/v1/snapshot",
+      "POST /sniper/v1/snapshot",
+      "GET /sniper/v1/charts",
+      "GET /sniper/v1/regimes",
+      "POST /sniper/v1/regime",
+      "GET /sniper/v1/live-signals",
+      "POST /sniper/v1/signal",
+      "GET /sniper/v1/ladders",
+      "POST /sniper/v1/user/engine-batch",
+      "POST /sniper/v1/user/market-data",
+      "GET /sniper/v1/user/trades",
+      "POST /sniper/v1/user/trades",
+      "GET /sniper/v1/user/account",
+      "POST /sniper/v1/user/account",
+      "GET /sniper/v1/user/settings",
+      "POST /sniper/v1/user/settings",
+      "GET /sniper/v1/user/risk-profile",
+      "POST /sniper/v1/user/risk-profile",
+      "GET /sniper/v1/user/trade-queue",
+      "POST /sniper/v1/user/trade-queue",
+      "POST /sniper/v1/user/execute-signals",
+      "POST /sniper/v1/user/twelve-data-key",
+      "DELETE /sniper/v1/user/twelve-data-key",
+      "GET /sniper/v1/user/watchlist",
+      "POST /sniper/v1/user/watchlist",
+      "POST /sniper/v1/user/watchlist/add",
+      "POST /sniper/v1/user/watchlist/remove",
+      "GET /sniper/v1/instruments",
+      "GET /sniper/v1/market-data-authority",
+      "GET /sniper/v1/authority-diagnostics"
+    ],
+    "admin_routes": [
+      "GET /sniper/v1/admin/health",
+      "GET /sniper/v1/admin/soak-report",
+      "POST /sniper/v1/admin/soak-evidence",
+      "POST /sniper/v1/admin/soak-checkpoint"
+    ],
+    "ea_routes": [
+      "POST /sniper/v1/ea/market-stream"
+    ]
+  },
+  "known_dev_status": {
+    "authority_diagnostics_requires_wp_session": true,
+    "ea_market_stream_route_exists": true,
+    "ea_auth_header": "X-EA-API-Key",
+    "ea_auth_secret_env": "SMC_SF_EA_API_KEY",
+    "ea_payload_requires_user_id": true,
+    "migration_phase": "MT5-native migration / Phase 0 soak",
+    "plugin_version": "13.0.2",
+    "actual_ea_payload_fields": ["user_id", "symbol", "normalized_symbol", "timeframe", "timestamp", "bid", "ask", "freshness", "session", "candle", "candle_m15"],
+    "note_candle_is_singular_object_not_array": true
+  }
+}
