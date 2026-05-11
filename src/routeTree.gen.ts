@@ -21,6 +21,7 @@ import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminSoakReportRouteImport } from './routes/admin.soak-report'
 
 const SignalsRoute = SignalsRouteImport.update({
   id: '/signals',
@@ -82,11 +83,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminSoakReportRoute = AdminSoakReportRouteImport.update({
+  id: '/soak-report',
+  path: '/soak-report',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/analytics': typeof AnalyticsRoute
   '/book': typeof BookRoute
   '/charts': typeof ChartsRoute
@@ -96,11 +102,12 @@ export interface FileRoutesByFullPath {
   '/plan': typeof PlanRoute
   '/progress': typeof ProgressRoute
   '/signals': typeof SignalsRoute
+  '/admin/soak-report': typeof AdminSoakReportRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/analytics': typeof AnalyticsRoute
   '/book': typeof BookRoute
   '/charts': typeof ChartsRoute
@@ -110,12 +117,13 @@ export interface FileRoutesByTo {
   '/plan': typeof PlanRoute
   '/progress': typeof ProgressRoute
   '/signals': typeof SignalsRoute
+  '/admin/soak-report': typeof AdminSoakReportRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/analytics': typeof AnalyticsRoute
   '/book': typeof BookRoute
   '/charts': typeof ChartsRoute
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   '/plan': typeof PlanRoute
   '/progress': typeof ProgressRoute
   '/signals': typeof SignalsRoute
+  '/admin/soak-report': typeof AdminSoakReportRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -141,6 +150,7 @@ export interface FileRouteTypes {
     | '/plan'
     | '/progress'
     | '/signals'
+    | '/admin/soak-report'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -155,6 +165,7 @@ export interface FileRouteTypes {
     | '/plan'
     | '/progress'
     | '/signals'
+    | '/admin/soak-report'
   id:
     | '__root__'
     | '/'
@@ -169,12 +180,13 @@ export interface FileRouteTypes {
     | '/plan'
     | '/progress'
     | '/signals'
+    | '/admin/soak-report'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
-  AdminRoute: typeof AdminRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AnalyticsRoute: typeof AnalyticsRoute
   BookRoute: typeof BookRoute
   ChartsRoute: typeof ChartsRoute
@@ -272,13 +284,30 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/soak-report': {
+      id: '/admin/soak-report'
+      path: '/soak-report'
+      fullPath: '/admin/soak-report'
+      preLoaderRoute: typeof AdminSoakReportRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
+
+interface AdminRouteChildren {
+  AdminSoakReportRoute: typeof AdminSoakReportRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminSoakReportRoute: AdminSoakReportRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
-  AdminRoute: AdminRoute,
+  AdminRoute: AdminRouteWithChildren,
   AnalyticsRoute: AnalyticsRoute,
   BookRoute: BookRoute,
   ChartsRoute: ChartsRoute,
