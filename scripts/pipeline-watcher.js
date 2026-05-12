@@ -35,6 +35,11 @@ const POLL_INTERVAL_MS = 5000;
 const CLAUDE_TIMEOUT_MS = 900000; // 15 min — larger research reports need more time
 const CODEX_TIMEOUT_MS = 1800000; // 30 min — complex implementations regularly exceed 15 min
 const LOCK_STALE_MS = 30 * 60 * 1000;
+// Plan hardening retry policy: up to 3 attempts, 5 min between each.
+// After MAX_HARDENING_RETRIES failures the block becomes permanent and a
+// GitHub issue is filed so the human is notified without manual log review.
+const MAX_HARDENING_RETRIES = 3;
+const HARDENING_RETRY_INTERVAL_MS = 5 * 60 * 1000; // 5 min
 
 // On Windows, execSync with shell:true spawns cmd.exe which is blocked with EPERM
 // in detached background processes (the job object created by start-pipeline-runner.js
@@ -332,22 +337,36 @@ function writePlanMetadata(state) {
   });
 }
 
-function writeHardeningBlockedState(state, reason) {
+function writeHardeningBlockedState(state, reason, retryCount = 0) {
+  const permanent = retryCount >= MAX_HARDENING_RETRIES;
+  const nextRetryAt = permanent
+    ? null
+    : new Date(Date.now() + HARDENING_RETRY_INTERVAL_MS).toISOString();
+
   writeJson(CLAUDE_HARDENING_BLOCKED_FILE, {
     blocked_at: new Date().toISOString(),
     reason,
     issue: state.issue ?? "",
     research_hash: (() => { try { return hashFile(RESEARCH_FILE); } catch { return null; } })(),
-    resolution: [
-      "Option A (automatic): ensure 'claude' CLI is installed and authenticated",
-      "  — install:        npm install -g @anthropic-ai/claude-code",
-      "  — authenticate:   claude auth",
-      "  — then delete this file and the pipeline will retry automatically.",
-      "Option B (manual): open Claude Code, ask it to harden the plan from",
-      "  reports/copilot-research.md following .github/prompts/codex-plan-prompt.md,",
-      "  save output to reports/codex-plan.md, write reports/codex-plan.meta.json,",
-      "  and set .smc-workflow-state.json state to READY_FOR_IMPLEMENTATION.",
-    ],
+    retry_count: retryCount,
+    ...(permanent ? { permanent: true } : { next_retry_at: nextRetryAt }),
+    resolution: permanent
+      ? [
+          "All automatic retries exhausted. Manual intervention required.",
+          "Option A: open Claude Code and harden the plan manually:",
+          "  reports/copilot-research.md -> .github/prompts/codex-plan-prompt.md",
+          "  save output to reports/codex-plan.md, write reports/codex-plan.meta.json,",
+          "  and set .smc-workflow-state.json state to READY_FOR_IMPLEMENTATION.",
+          "Option B: fix the Claude CLI (npm install -g @anthropic-ai/claude-code && claude auth)",
+          "  then delete this file — the pipeline will restart automatically.",
+        ]
+      : [
+          `Retry ${retryCount}/${MAX_HARDENING_RETRIES} scheduled at ${nextRetryAt}.`,
+          "Option A (automatic): the pipeline will retry automatically — no action needed.",
+          "Option B (fix now): ensure 'claude' CLI is installed and authenticated:",
+          "  npm install -g @anthropic-ai/claude-code && claude auth",
+          "  then delete this file to skip the wait.",
+        ],
   });
 }
 
@@ -375,7 +394,60 @@ function isHardeningBlockedForCurrentState(state) {
     return false;
   }
 
+  // Permanent block (all retries exhausted) — stay blocked until manual fix.
+  if (blocked.permanent) {
+    return true;
+  }
+
+  // Timed retry: unblock once the scheduled window has passed.
+  if (blocked.next_retry_at) {
+    const due = Date.parse(blocked.next_retry_at);
+    if (Number.isFinite(due) && Date.now() >= due) {
+      return false; // retry window reached — allow the run
+    }
+    const secsRemaining = Math.max(0, Math.round((due - Date.now()) / 1000));
+    log(`Claude plan hardening retry in ${secsRemaining}s (attempt ${(blocked.retry_count ?? 0) + 1}/${MAX_HARDENING_RETRIES})`);
+    return true;
+  }
+
+  // Legacy block file with no retry metadata — treat as blocked.
   return true;
+}
+
+function readHardeningRetryCount() {
+  try {
+    const blocked = readJson(CLAUDE_HARDENING_BLOCKED_FILE);
+    return typeof blocked.retry_count === "number" ? blocked.retry_count : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function sendHardeningFailureNotification(state, reason) {
+  const title = `[pipeline-watcher] Claude plan hardening permanently blocked`;
+  const body = [
+    `All ${MAX_HARDENING_RETRIES} automatic retries for the plan-hardening step have failed.`,
+    "",
+    `**Issue:** ${state.issue ?? "(unknown)"}`,
+    `**Last failure reason:** ${reason}`,
+    "",
+    "**To unblock:**",
+    "1. Fix the Claude CLI: `npm install -g @anthropic-ai/claude-code && claude auth`",
+    "2. Delete `reports/.claude-hardening-blocked.json` — the pipeline restarts automatically.",
+    "   OR manually write `reports/codex-plan.md` and set workflow state to `READY_FOR_IMPLEMENTATION`.",
+  ].join("\n");
+
+  try {
+    execSync(
+      `gh issue create --title "${title.replace(/"/g, '\\"')}" --body "${body.replace(/"/g, '\\"').replace(/\n/g, "\\n")}" --label "pipeline-blocked"`,
+      { cwd: REPO_ROOT, shell: true, timeout: 20000, stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" },
+    );
+    log("Hardening failure notification: GitHub issue created successfully");
+  } catch (err) {
+    // Notification failure must not crash the watcher — log and continue.
+    const msg = err instanceof Error ? err.message : String(err);
+    log(`Hardening failure notification: GitHub issue creation failed (${msg}) — check manually`);
+  }
 }
 
 function readImplementationMetadata() {
@@ -716,13 +788,22 @@ function runClaudePlanHardening(state) {
     // no shell required, full input piped via stdin.
     const claudeExe = resolveClaudeExe();
 
+    const currentRetryCount = readHardeningRetryCount();
+    const nextRetryCount = currentRetryCount + 1;
+
     let planText;
     try {
       if (claudeExe) {
         log(`Claude CLI resolved to ${path.basename(path.dirname(claudeExe))}/${path.basename(claudeExe)} - using direct exe invocation`);
+        // NOTE: do NOT add --tools with an empty string ("") here.
+        // Passing --tools "" causes the Claude CLI to fail with a non-zero exit code
+        // because an empty string is not a valid tool-name list. Omit the flag entirely —
+        // --print mode already prevents interactive tool use; the prompt instructs Claude
+        // not to call any tools. Regression: if you add --tools back, add a non-empty value
+        // (e.g. "--tools", "Bash") or remove it — never pass an empty string.
         planText = execFileSync(
           claudeExe,
-          ["--print", "--output-format", "text", "--tools", ""],
+          ["--print", "--output-format", "text"],
           {
             cwd: REPO_ROOT,
             input: stdinInput,
@@ -752,19 +833,30 @@ function runClaudePlanHardening(state) {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      writeHardeningBlockedState(state, message);
-      log(`Claude CLI invocation failed - blocked state written. Fix: see reports/.claude-hardening-blocked.json`);
+      writeHardeningBlockedState(state, message, nextRetryCount);
+      if (nextRetryCount >= MAX_HARDENING_RETRIES) {
+        log(`Claude CLI invocation failed after ${MAX_HARDENING_RETRIES} attempts - permanent block. Sending notification.`);
+        sendHardeningFailureNotification(state, message);
+      } else {
+        log(`Claude CLI invocation failed (attempt ${nextRetryCount}/${MAX_HARDENING_RETRIES}) - retry in 5 min. See reports/.claude-hardening-blocked.json`);
+      }
       throw err;
     }
 
     planText = planText.trim();
     if (!planText) {
-      writeHardeningBlockedState(state, "Claude returned an empty response");
+      writeHardeningBlockedState(state, "Claude returned an empty response", nextRetryCount);
+      if (nextRetryCount >= MAX_HARDENING_RETRIES) {
+        sendHardeningFailureNotification(state, "Claude returned an empty response");
+      }
       throw new Error("Claude plan hardening returned an empty plan");
     }
 
     if (!isUsablePlan(planText)) {
-      writeHardeningBlockedState(state, "Claude returned a response missing required plan sections");
+      writeHardeningBlockedState(state, "Claude returned a response missing required plan sections", nextRetryCount);
+      if (nextRetryCount >= MAX_HARDENING_RETRIES) {
+        sendHardeningFailureNotification(state, "Claude returned a response missing required plan sections");
+      }
       throw new Error("Claude plan hardening returned invalid plan output");
     }
 
@@ -1025,6 +1117,18 @@ function pollPipeline() {
 
 function checkClaudeAvailability() {
   const claudeExe = resolveClaudeExe();
+
+  // Regression guard: assert the production invocation args are sane before the
+  // watcher ever tries a real run. Specifically: --tools must never be an empty
+  // string — passing ["--tools", ""] causes the CLI to exit non-zero.
+  // This check catches any future edit that accidentally reintroduces that pattern.
+  const PROD_ARGS = ["--print", "--output-format", "text"];
+  const badToolsArg = PROD_ARGS.findIndex((a, i) => a === "--tools" && PROD_ARGS[i + 1] === "");
+  if (badToolsArg !== -1) {
+    log("STARTUP ERROR: PROD_ARGS contains --tools with an empty string value — this will always fail. Fix scripts/pipeline-watcher.js immediately.");
+    process.exit(1);
+  }
+
   try {
     if (claudeExe) {
       execFileSync(claudeExe, ["--version"], {

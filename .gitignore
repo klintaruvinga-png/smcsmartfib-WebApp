@@ -46,3 +46,4 @@ reports/codex-prompt.tmp.md
 reports/codex-last-message.txt
 reports/review-event.json
 reports/codex-review.json
+reports/.claude-hardening-blocked.json
