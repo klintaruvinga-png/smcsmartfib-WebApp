@@ -95,6 +95,39 @@ function buildSoakReport(): SoakReport {
   };
 }
 
+function buildCheckpoint(
+  id: number,
+  checkpointType: "baseline" | "checkpoint",
+  createdAt: string,
+  operatorNotes: string,
+) {
+  return {
+    id,
+    checkpoint_type: checkpointType,
+    snapshot_data: {
+      health: buildHealth(),
+      watchlist_count: 2,
+      snapshots_24h: 4,
+      candles_24h: 96,
+      engine_runs_summary: {
+        total_24h: 8,
+        success_24h: 8,
+        error_24h: 0,
+        last_run_at: "2026-05-12T08:01:00Z",
+      },
+      audit_events_summary: {
+        total_24h: 3,
+        error_count_24h: 0,
+        warning_count_24h: 1,
+      },
+      manual_evidence: [],
+      generated_at: "2026-05-12T08:05:00Z",
+    },
+    operator_notes: operatorNotes,
+    created_at: createdAt,
+  };
+}
+
 describe("AdminPage", () => {
   beforeEach(() => {
     routerMocks.instance.navigate.mockReset();
@@ -209,5 +242,30 @@ describe("AdminPage", () => {
 
     expect(screen.queryByText("Soak report failed to load.")).toBeNull();
     expect(screen.queryByText("Authentication required")).toBeNull();
+  });
+
+  it("renders distinct baseline and checkpoint snapshot sections", async () => {
+    const report = buildSoakReport();
+    report.baseline_checkpoint = buildCheckpoint(
+      1,
+      "baseline",
+      "2026-05-12T08:05:00Z",
+      "Initial soak capture.",
+    );
+    report.checkpoints = [
+      buildCheckpoint(2, "checkpoint", "2026-05-12T20:05:00Z", "T+12h checkpoint."),
+    ];
+    apiMocks.fetchSoakReport.mockResolvedValue(report);
+
+    render(<AdminPage />);
+
+    const baselineSection = await screen.findByRole("region", { name: "Baseline Snapshot" });
+    const checkpointSection = screen.getByRole("region", { name: "Checkpoint History" });
+
+    expect(within(baselineSection).getByText("BASELINE")).toBeTruthy();
+    expect(within(baselineSection).getByText("Locked reference")).toBeTruthy();
+    expect(within(checkpointSection).getByText("CHECKPOINT")).toBeTruthy();
+    expect(screen.getByText("Baseline Snapshot")).toBeTruthy();
+    expect(screen.getByText("Checkpoint History")).toBeTruthy();
   });
 });

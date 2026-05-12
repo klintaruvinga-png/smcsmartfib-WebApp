@@ -1,6 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { type FormEvent, useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, ClipboardList, Flag, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList, Flag, Lock, ShieldCheck } from "lucide-react";
 import {
   apiClient,
   createSoakCheckpoint,
@@ -1025,26 +1025,63 @@ export function AdminPage() {
                     )}
                   </div>
 
-                  <div className="space-y-3">
-                    {baselineCheckpoint && (
-                      <CheckpointCard checkpoint={baselineCheckpoint} title="Baseline" />
-                    )}
-
-                    {soakState.report.checkpoints.length === 0 ? (
-                      <div className="rounded-md border border-dashed border-bd px-3 py-4 text-xs text-dim">
-                        No non-baseline checkpoints saved yet.
+                  <div className="space-y-4">
+                    <section
+                      aria-labelledby="baseline-snapshot-heading"
+                      className="space-y-3 rounded-md border border-bd/70 bg-bg1/30 p-3"
+                    >
+                      <div className="border-b border-bd/70 pb-2">
+                        <h4
+                          id="baseline-snapshot-heading"
+                          className="text-[11px] font-mono uppercase tracking-[0.24em] text-mute"
+                        >
+                          Baseline Snapshot
+                        </h4>
+                        <p className="mt-1 text-xs text-dim">
+                          Immutable reference point for the soak. Saved once, then preserved.
+                        </p>
                       </div>
-                    ) : (
-                      soakState.report.checkpoints
-                        .slice(0, 6)
-                        .map((checkpoint) => (
-                          <CheckpointCard
-                            key={checkpoint.id}
-                            checkpoint={checkpoint}
-                            title="Checkpoint"
-                          />
-                        ))
-                    )}
+                      {baselineCheckpoint ? (
+                        <CheckpointCard checkpoint={baselineCheckpoint} title="Baseline" />
+                      ) : (
+                        <div className="rounded-md border border-dashed border-bd px-3 py-4 text-xs text-dim">
+                          Baseline not captured yet.
+                        </div>
+                      )}
+                    </section>
+
+                    <section
+                      aria-labelledby="checkpoint-history-heading"
+                      className="space-y-3 rounded-md border border-bd/70 bg-bg1/30 p-3"
+                    >
+                      <div className="border-b border-bd/70 pb-2">
+                        <h4
+                          id="checkpoint-history-heading"
+                          className="text-[11px] font-mono uppercase tracking-[0.24em] text-mute"
+                        >
+                          Checkpoint History
+                        </h4>
+                        <p className="mt-1 text-xs text-dim">
+                          Additive snapshots captured at later soak intervals.
+                        </p>
+                      </div>
+
+                      {soakState.report.checkpoints.length === 0 ? (
+                        <div className="rounded-md border border-dashed border-bd px-3 py-4 text-xs text-dim">
+                          No non-baseline checkpoints saved yet.
+                        </div>
+                      ) : (
+                        soakState.report.checkpoints
+                          .slice(0, 6)
+                          .map((checkpoint) => (
+                            <CheckpointCard
+                              key={checkpoint.id}
+                              checkpoint={checkpoint}
+                              title="Checkpoint"
+                            />
+                          ))
+                      )}
+                    </section>
                   </div>
                 </div>
               </div>
@@ -1151,11 +1188,35 @@ function TimestampCard({ label, value }: { label: string; value: string | null }
 
 function CheckpointCard({ checkpoint, title }: { checkpoint: SoakCheckpointRow; title: string }) {
   const aggregate = checkpoint.snapshot_data;
+  const isBaseline = checkpoint.checkpoint_type === "baseline";
   return (
-    <div className="rounded-md border border-bd bg-bg1/60 px-3 py-3 space-y-1.5">
+    <div
+      className={`space-y-2 rounded-md border px-3 py-3 ${
+        isBaseline
+          ? "border-sky-400/50 bg-sky-400/8 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.12)]"
+          : "border-slate-400/35 bg-slate-400/5"
+      }`}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-xs font-mono text-tx">
-          {title} {checkpoint.checkpoint_type === "baseline" ? "baseline" : "snapshot"}
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-mono uppercase tracking-[0.24em] ${
+              isBaseline
+                ? "border-sky-400/50 bg-sky-400/12 text-sky-200"
+                : "border-slate-300/30 bg-slate-300/10 text-slate-200"
+            }`}
+          >
+            {isBaseline ? "BASELINE" : "CHECKPOINT"}
+          </span>
+          <div className="text-xs font-mono text-tx">
+            {title} {isBaseline ? "reference snapshot" : "snapshot"}
+          </div>
+          {isBaseline && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-sky-100/90">
+              <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Locked reference</span>
+            </span>
+          )}
         </div>
         <div className="text-[11px] text-dim">{formatTimestamp(checkpoint.created_at)}</div>
       </div>

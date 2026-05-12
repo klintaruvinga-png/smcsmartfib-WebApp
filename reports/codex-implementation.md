@@ -1,19 +1,16 @@
 # Issue summary
 
-The admin dashboard already rendered backend-fetched health correctly, but the UI did not clearly separate backend-owned diagnostics from the editable soak workspace. This patch makes the health surface explicitly read-only and backend-driven without changing fetch wiring, backend contracts, or soak form behavior.
+The `/admin` soak workspace already preserved baseline and checkpoint snapshots correctly, but the saved snapshot display did not make the baseline-versus-checkpoint distinction clear enough during quick operator scans.
 
 ## Root cause implemented
 
-`src/routes/admin.tsx` mixed backend health cards and operator-entry forms in the same visual flow without an explicit read-only wrapper, backend-ownership copy, or a stable section marker. The implemented fix adds that boundary and leaves backend authority unchanged.
+`src/routes/admin.tsx` rendered baseline and checkpoint snapshots through the same visual card pattern with only light title text differences and no strong section split. The implemented fix keeps the existing save logic intact and only strengthens presentation with explicit grouping, neutral badges, and a baseline lock indicator.
 
 ## Exact files changed
 
 - `src/routes/admin.tsx`
 - `src/routes/-admin.test.tsx`
-- `.github/migration/phase-updates/phase-0-next-72h-checklist-2026-05-11.md`
-- `.github/migration/audits/phase-0-admin-health-parity-2026-05-10.md`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-12_admin-health-readonly-ui.md`
-- `.github/migration/audits/phase-0-dashboard-admin-health-parity-2026-05-12.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-12_admin-baseline-checkpoint-clarity.md`
 - `reports/codex-implementation.md`
 
 ## Tests run
@@ -24,16 +21,14 @@ The admin dashboard already rendered backend-fetched health correctly, but the U
 
 ## Reports generated
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-12_admin-health-readonly-ui.md`
-- `.github/migration/audits/phase-0-dashboard-admin-health-parity-2026-05-12.md`
-- Updated standing audit: `.github/migration/audits/phase-0-admin-health-parity-2026-05-10.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-12_admin-baseline-checkpoint-clarity.md`
+- No parity audit required by the contract for this render-only patch.
 
 ## Remaining risks
 
-- Live authenticated browser verification against `/admin` remains manual because the browser runtime tool was not exposed in this session.
-- The patch is intentionally scoped to the confirmed `AdminPage` surface and does not claim a repo-wide audit for hypothetical secondary admin-health displays.
+- Manual in-browser `/admin` visual verification could not be executed from this session because the required browser runtime tool was not exposed.
+- Operator soak-environment confirmation of final scanability remains pending after deployment.
 
 ## Any contract ambiguities resolved during implementation
 
-- The runtime instructions required a new parity audit artifact when parity re-validation was needed, while the implementation plan only required updating the standing audit file. Smallest safe resolution: do both.
-- The checklist and audit files needed a real PR reference, but the PR number did not exist until after the first push. Smallest safe resolution: open PR #140 first, then add the reference in a follow-up commit without widening the code patch scope.
+- The contract required stronger baseline/checkpoint distinction but forbade prop-contract churn. Smallest safe resolution: keep the existing shared `CheckpointCard` API and derive the visual treatment from `checkpoint.checkpoint_type` while adding section boundaries at the render site.
