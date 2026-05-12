@@ -40,3 +40,9 @@ PASS
 - The implementation contract referenced manual `__root.tsx` registration and health fields that do not exist in this repo. The safe parity-preserving resolution was:
   - use the generated TanStack route tree instead of manual root registration
   - render the real backend health fields already emitted by `/health`
+
+## 2026-05-12 UI Verification Addendum (PR #140)
+
+- Frontend `/admin` now wraps backend diagnostics in `data-section="backend-health-readonly"` with visible `Backend Health Status` and `Read-only - values are owned and updated by the backend.` copy.
+- Operator-entry forms are now preceded by `Operator Evidence - enter metadata only`, making the boundary between backend-owned diagnostics and editable soak metadata explicit.
+- No backend/API parity assertion changed in this patch. `fetchAdminHealth()` remains the sole health source for the audited admin surface.
