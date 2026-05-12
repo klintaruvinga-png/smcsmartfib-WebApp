@@ -294,7 +294,7 @@ export function AdminPage() {
   const baselineCheckpoint =
     soakState.kind === "ready" ? soakState.report.baseline_checkpoint : null;
   const latestCheckpoint =
-    soakState.kind === "ready" ? (soakState.report.checkpoints.at(-1) ?? null) : null;
+    soakState.kind === "ready" ? (soakState.report.checkpoints[0] ?? null) : null;
   const baselineCaptureLocked = baselineCheckpoint !== null;
   const evidenceRows = soakState.kind === "ready" ? soakState.report.manual_evidence : [];
   const baselineAge = formatSoakAge(baselineCheckpoint?.created_at ?? null);
