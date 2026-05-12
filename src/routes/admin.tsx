@@ -1,5 +1,5 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, ClipboardList, Flag, Lock, ShieldCheck } from "lucide-react";
 import {
   apiClient,
@@ -293,10 +293,14 @@ export function AdminPage() {
   const health = state.health;
   const baselineCheckpoint =
     soakState.kind === "ready" ? soakState.report.baseline_checkpoint : null;
+  const latestCheckpoint =
+    soakState.kind === "ready" ? (soakState.report.checkpoints[0] ?? null) : null;
   const baselineCaptureLocked = baselineCheckpoint !== null;
   const evidenceRows = soakState.kind === "ready" ? soakState.report.manual_evidence : [];
   const baselineAge = formatSoakAge(baselineCheckpoint?.created_at ?? null);
-  const checkpointAge = formatSoakAge(baselineCheckpoint?.created_at ?? null);
+  const checkpointAge = formatSoakAge(
+    latestCheckpoint?.created_at ?? baselineCheckpoint?.created_at ?? null,
+  );
 
   async function refreshSoakReport() {
     if (soakRefreshInFlight.current) {
@@ -483,6 +487,16 @@ export function AdminPage() {
             padding: 0;
           }
 
+          .soak-report-print-block,
+          .soak-report-print-card,
+          .soak-report-print-table {
+            display: block !important;
+          }
+
+          .soak-report-print-grid {
+            display: grid !important;
+          }
+
           .soak-report-print-section summary {
             display: none;
           }
@@ -505,6 +519,14 @@ export function AdminPage() {
             background: #ffffff !important;
             color: #111827 !important;
             box-shadow: none !important;
+          }
+
+          .soak-report-print-section h2,
+          .soak-report-print-section h3,
+          .soak-report-print-section h4 {
+            break-inside: avoid;
+            page-break-after: avoid;
+            page-break-inside: avoid;
           }
 
           .soak-report-print-section table {
@@ -724,31 +746,65 @@ export function AdminPage() {
                   label="Baseline"
                   value={baselineCheckpoint ? "captured" : "pending"}
                   tone={baselineCheckpoint ? "positive" : "warning"}
+                  badge="BASELINE"
+                  badgeTone={baselineCheckpoint ? "positive" : "warning"}
+                  icon={
+                    baselineCheckpoint ? (
+                      <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : (
+                      <Flag className="h-3.5 w-3.5" aria-hidden="true" />
+                    )
+                  }
+                  headerDetail={
+                    baselineCheckpoint
+                      ? `Captured ${baselineAge} ago`
+                      : "Waiting for baseline capture."
+                  }
                   className="soak-report-print-card"
                 />
                 <HealthCard
                   label="Baseline age"
                   value={baselineAge}
-                  detail={
+                  badge="BASELINE"
+                  badgeTone={baselineCheckpoint ? "positive" : "warning"}
+                  icon={<Flag className="h-3.5 w-3.5" aria-hidden="true" />}
+                  headerDetail={
                     baselineCheckpoint
-                      ? `Captured ${formatTimestamp(baselineCheckpoint.created_at)}`
-                      : "Waiting for baseline capture."
+                      ? `Captured at ${formatTimestamp(baselineCheckpoint.created_at)}`
+                      : "Baseline timestamp unavailable."
                   }
                   className="soak-report-print-card"
                 />
                 <HealthCard
                   label="Checkpoint age"
                   value={checkpointAge}
-                  detail={
-                    baselineCheckpoint
-                      ? "Using baseline snapshot timestamp until backend exposes checkpoint-age data."
-                      : "No checkpoint source available yet."
+                  badge="CHECKPOINT"
+                  badgeTone={
+                    latestCheckpoint ? "positive" : baselineCheckpoint ? "warning" : "neutral"
+                  }
+                  icon={<ClipboardList className="h-3.5 w-3.5" aria-hidden="true" />}
+                  headerDetail={
+                    latestCheckpoint
+                      ? `Latest checkpoint at ${formatTimestamp(latestCheckpoint.created_at)}`
+                      : baselineCheckpoint
+                        ? "Using baseline timestamp until the first checkpoint is saved."
+                        : "No checkpoint source available yet."
                   }
                   className="soak-report-print-card"
                 />
                 <HealthCard
                   label="Checkpoints"
                   value={String(soakState.report.checkpoints.length)}
+                  badge="CHECKPOINT"
+                  badgeTone={soakState.report.checkpoints.length > 0 ? "positive" : "neutral"}
+                  icon={<CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
+                  headerDetail={
+                    latestCheckpoint
+                      ? `Latest checkpoint ${checkpointAge} ago`
+                      : baselineCheckpoint
+                        ? "Checkpoint history has not started yet."
+                        : "Capture baseline before saving checkpoints."
+                  }
                   className="soak-report-print-card"
                 />
                 <HealthCard
@@ -1291,12 +1347,20 @@ function HealthCard({
   tone = "neutral",
   detail,
   className,
+  icon,
+  badge,
+  badgeTone,
+  headerDetail,
 }: {
   label: string;
   value: string;
   tone?: "positive" | "warning" | "critical" | "neutral";
   detail?: string;
   className?: string;
+  icon?: ReactNode;
+  badge?: string;
+  badgeTone?: "positive" | "warning" | "critical" | "neutral";
+  headerDetail?: string;
 }) {
   const toneClass =
     tone === "positive"
@@ -1306,10 +1370,33 @@ function HealthCard({
         : tone === "critical"
           ? "border-sell/30 bg-sell/10 text-sell"
           : "border-bd bg-bg2/50 text-tx";
+  const badgeClass =
+    (badgeTone ?? tone) === "positive"
+      ? "border-buy/30 bg-buy/10 text-buy"
+      : (badgeTone ?? tone) === "warning"
+        ? "border-warn/30 bg-warn/10 text-warn"
+        : (badgeTone ?? tone) === "critical"
+          ? "border-sell/30 bg-sell/10 text-sell"
+          : "border-bd bg-bg2/50 text-mute";
 
   return (
     <div className={`rounded-lg border border-bd bg-bg1/60 p-4 space-y-2 ${className ?? ""}`}>
-      <div className="text-[10px] font-mono uppercase tracking-wider text-mute">{label}</div>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-mute">
+            {icon ? <span className="shrink-0">{icon}</span> : null}
+            <span>{label}</span>
+          </div>
+          {headerDetail ? <div className="mt-1 text-[11px] text-dim">{headerDetail}</div> : null}
+        </div>
+        {badge ? (
+          <span
+            className={`inline-flex shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] ${badgeClass}`}
+          >
+            {badge}
+          </span>
+        ) : null}
+      </div>
       <div
         className={`inline-flex rounded border px-2 py-1 font-mono text-sm uppercase ${toneClass}`}
       >
@@ -1571,14 +1658,61 @@ function formatSoakAge(value: string | null): string {
 }
 
 function formatSoakReportError(error: unknown, action: "load" | "refresh"): string {
-  if (error instanceof Error) {
-    if (error.name !== "Error" && !error.message.includes(error.name)) {
-      return `${error.name}: ${error.message}`;
-    }
-    return error.message;
+  const statusCode = resolveErrorStatusCode(error);
+  const errorCode = resolveErrorCode(error);
+  const actionLabel = action === "load" ? "initial load" : "refresh";
+  const parts = [`Soak report data source failed during ${actionLabel}.`];
+
+  if (statusCode !== null) {
+    parts.push(`HTTP ${statusCode}.`);
   }
 
-  return `Failed to ${action} soak report.`;
+  if (errorCode) {
+    parts.push(`Error code: ${errorCode}.`);
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    parts.push(`Detail: ${error.message}.`);
+  }
+
+  parts.push("Retry the soak report. Contact backend on-call if this persists.");
+  return parts.join(" ");
+}
+
+function resolveErrorStatusCode(error: unknown): number | null {
+  if (typeof error === "object" && error !== null && "status" in error) {
+    const status = (error as { status?: unknown }).status;
+    if (typeof status === "number" && Number.isFinite(status)) {
+      return status;
+    }
+  }
+
+  if (error instanceof Error) {
+    const match = error.message.match(/failed:\s*(\d{3})\b/i);
+    if (match) {
+      return Number.parseInt(match[1], 10);
+    }
+  }
+
+  return null;
+}
+
+function resolveErrorCode(error: unknown): string | null {
+  if (typeof error === "object" && error !== null) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === "string" && code.trim()) {
+      return code.trim();
+    }
+  }
+
+  if (error instanceof Error) {
+    const match = error.message.match(/"(?:error|code)":"([^"]+)"/i);
+    if (match) {
+      return match[1];
+    }
+  }
+
+  return null;
 }
 
 function renderTimelineRow(label: string, checkpoint: SoakCheckpointRow | null) {

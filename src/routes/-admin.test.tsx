@@ -234,7 +234,10 @@ describe("AdminPage", () => {
 
     expect(await screen.findByText("Soak report failed to load.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Retry soak report" })).toBeTruthy();
-    expect(screen.getByText(loadError.message)).toBeTruthy();
+    expect(screen.getByText(/Soak report data source failed during initial load\./)).toBeTruthy();
+    expect(screen.getByText(/HTTP 500\./)).toBeTruthy();
+    expect(screen.getByText(/Error code: table_init_failed\./)).toBeTruthy();
+    expect(screen.getByText(/Contact backend on-call if this persists\./)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Retry soak report" }));
 
@@ -244,7 +247,7 @@ describe("AdminPage", () => {
     await waitFor(() => {
       expect(screen.queryByText("Soak report failed to load.")).toBeNull();
     });
-    expect(screen.queryByText(loadError.message)).toBeNull();
+    expect(screen.queryByText(/Soak report data source failed during initial load\./)).toBeNull();
     expect(screen.getByText("Baseline")).toBeTruthy();
   });
 
@@ -257,7 +260,9 @@ describe("AdminPage", () => {
     render(<AdminPage />);
 
     expect(await screen.findByText("Soak report failed to load.")).toBeTruthy();
-    expect(screen.getByText(loadError.message)).toBeTruthy();
+    expect(screen.getByText(/HTTP 503\./)).toBeTruthy();
+    expect(screen.getByText(/Error code: service_unavailable\./)).toBeTruthy();
+    expect(screen.getByText(/Detail: API \/admin\/soak-report failed: 503/)).toBeTruthy();
   });
 
   it("redirects to login on soak report AuthError without surfacing panelError", async () => {
@@ -315,7 +320,9 @@ describe("AdminPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Capture Baseline & Start Soak" }));
 
     expect(await screen.findByText("Soak report failed to load.")).toBeTruthy();
-    expect(screen.getByText(refreshError.message)).toBeTruthy();
+    expect(screen.getByText(/Soak report data source failed during refresh\./)).toBeTruthy();
+    expect(screen.getByText(/HTTP 500\./)).toBeTruthy();
+    expect(screen.getByText(/Error code: retry_failed\./)).toBeTruthy();
     expect(screen.queryByText("Baseline age")).toBeNull();
   });
 
@@ -343,7 +350,7 @@ describe("AdminPage", () => {
     expect(await screen.findByText("Baseline")).toBeTruthy();
   });
 
-  it("renders the baseline age label when soak report data is present", async () => {
+  it("renders baseline status cards with baseline badges, icon shells, and promoted age copy", async () => {
     const report = buildSoakReport();
     report.baseline_checkpoint = buildCheckpoint(
       1,
@@ -355,10 +362,24 @@ describe("AdminPage", () => {
 
     render(<AdminPage />);
 
-    expect(await screen.findByText("Baseline age")).toBeTruthy();
+    const baselineCard = (await screen.findByText("Baseline")).closest(
+      ".soak-report-print-card",
+    ) as HTMLElement | null;
+    const baselineAgeCard = screen
+      .getByText("Baseline age")
+      .closest(".soak-report-print-card") as HTMLElement | null;
+
+    expect(baselineCard).toBeTruthy();
+    expect(baselineAgeCard).toBeTruthy();
+    expect(within(baselineCard as HTMLElement).getByText("BASELINE")).toBeTruthy();
+    expect(within(baselineCard as HTMLElement).getByText(/Captured .* ago/)).toBeTruthy();
+    expect((baselineCard as HTMLElement).querySelector("svg")).toBeTruthy();
+    expect(within(baselineAgeCard as HTMLElement).getByText("BASELINE")).toBeTruthy();
+    expect(within(baselineAgeCard as HTMLElement).getByText(/Captured at /)).toBeTruthy();
+    expect((baselineAgeCard as HTMLElement).querySelector("svg")).toBeTruthy();
   });
 
-  it("renders the checkpoint age label when soak report data is present", async () => {
+  it("renders checkpoint status cards with checkpoint badges and fallback age guidance", async () => {
     const report = buildSoakReport();
     report.baseline_checkpoint = buildCheckpoint(
       1,
@@ -370,12 +391,23 @@ describe("AdminPage", () => {
 
     render(<AdminPage />);
 
-    expect(await screen.findByText("Checkpoint age")).toBeTruthy();
+    const checkpointAgeCard = (await screen.findByText("Checkpoint age")).closest(
+      ".soak-report-print-card",
+    ) as HTMLElement | null;
+    const checkpointsCard = screen
+      .getByText("Checkpoints")
+      .closest(".soak-report-print-card") as HTMLElement | null;
+
+    expect(checkpointAgeCard).toBeTruthy();
+    expect(checkpointsCard).toBeTruthy();
+    expect(within(checkpointAgeCard as HTMLElement).getByText("CHECKPOINT")).toBeTruthy();
     expect(
-      screen.getByText(
-        "Using baseline snapshot timestamp until backend exposes checkpoint-age data.",
+      within(checkpointAgeCard as HTMLElement).getByText(
+        "Using baseline timestamp until the first checkpoint is saved.",
       ),
     ).toBeTruthy();
+    expect((checkpointAgeCard as HTMLElement).querySelector("svg")).toBeTruthy();
+    expect(within(checkpointsCard as HTMLElement).getByText("CHECKPOINT")).toBeTruthy();
   });
 
   it("shows a baseline-exists warning and locks baseline capture when a baseline is present", async () => {
