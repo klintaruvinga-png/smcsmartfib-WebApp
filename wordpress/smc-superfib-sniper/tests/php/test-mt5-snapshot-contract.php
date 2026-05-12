@@ -702,6 +702,7 @@ foreach (array('EURUSD' => 1.1000, 'USDJPY' => 156.0000) as $symbol => $base) {
 
 $ensureEngineSnapshot = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'ensure_engine_snapshot');
 $ensureEngineSnapshot->setAccessible(true);
+unset($GLOBALS['test_user_meta'][7]['smc_sf_engine_snapshot']);
 $wpdb->replace($wpdb->prefix . 'smc_sf_user_settings', array(
     'user_id' => 7,
     'settings' => json_encode(array(

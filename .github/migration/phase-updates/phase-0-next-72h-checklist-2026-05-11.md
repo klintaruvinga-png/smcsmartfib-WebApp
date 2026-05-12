@@ -100,11 +100,11 @@ These items are safe to run during the soak because they harden presentation, co
 
 | Status | Task | Acceptance Target | Completed At (SAST) | Comments |
 |---|---|---|---|---|
-| [ ] | Audit MT5 snapshot persistence. | `wp_smc_sf_snapshots` writes use `source='mt5'` consistently. |  |  |
-| [ ] | Verify MT5 snapshot timestamp authority. | `updated_at` tracks MT5 quote timestamp, not receipt time. |  |  |
-| [ ] | Verify backend health parity. | `GET /wp-json/sniper/v1/health` and `GET /wp-json/sniper/v1/admin/health` use the same payload builder. |  |  |
-| [ ] | Expand snapshot contract coverage. | Tests cover `post_snapshot()` auth, `state='live'`, and timestamp handling. |  |  |
-| [ ] | Audit `smc_sf_engine_snapshot` invalidation. | Watchlist changes invalidate stale engine snapshots cleanly. |  |  |
+| [x] | Audit MT5 snapshot persistence. | `wp_smc_sf_snapshots` writes use `source='mt5'` consistently. | 2026-05-12 | Verified on both `/snapshot` and EA ingest paths; `/snapshot` now audits and skips explicit non-`mt5` source attempts. |
+| [x] | Verify MT5 snapshot timestamp authority. | `updated_at` tracks MT5 quote timestamp, not receipt time. | 2026-05-12 | Verified by PHP regression harness for tick-bearing vs freshness-only `/snapshot` writes and existing EA stream coverage. |
+| [x] | Verify backend health parity. | `GET /wp-json/sniper/v1/health` and `GET /wp-json/sniper/v1/admin/health` use the same payload builder. | 2026-05-12 | Revalidated through shared `build_health_payload()` path plus PHP and frontend admin-route regressions. |
+| [x] | Expand snapshot contract coverage. | Tests cover `post_snapshot()` auth, `state='live'`, and timestamp handling. | 2026-05-12 | Expanded `test-mt5-snapshot-contract.php` and added service-level non-MT5 source filtering coverage. |
+| [x] | Audit `smc_sf_engine_snapshot` invalidation. | Watchlist changes invalidate stale engine snapshots cleanly. | 2026-05-12 | Revalidated watchlist mutation invalidation and added targeted `/snapshot` live/non-live transition invalidation plus cache-currentness coverage. |
 
 ## 6. Regression Checks For Every Parallel Patch
 

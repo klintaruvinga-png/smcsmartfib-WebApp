@@ -16,6 +16,7 @@ final class SMC_SuperFib_Sniper_REST {
     const VERSION = '13.0.2';
     const NAMESPACE = 'sniper/v1';
     const TWELVE_PROVIDER = 'twelve_data';
+    const ENGINE_SNAPSHOT_MIN_REFRESH_INTERVAL_SEC = 2;
 
     private $ratios = array(-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300);
 
@@ -1434,6 +1435,23 @@ final class SMC_SuperFib_Sniper_REST {
         $normalized_symbol = isset($payload['normalized_symbol']) ? strtoupper(sanitize_text_field($payload['normalized_symbol'])) : $symbol;
         $freshness_raw = isset($payload['freshness']) ? sanitize_text_field($payload['freshness']) : '';
         $snapshot_state = $this->mt5_freshness_to_snapshot_state($freshness_raw);
+        $requested_source = array_key_exists('source', $payload) ? strtolower(trim((string) $payload['source'])) : 'mt5';
+
+        if ($requested_source !== 'mt5') {
+            $this->audit($user_id, 'mt5_snapshot.invalid_source', array(
+                'level' => 'ERROR',
+                'symbol' => $normalized_symbol,
+                'requested_source' => $requested_source,
+            ));
+            return rest_ensure_response(array('ok' => true));
+        }
+
+        $existing_snapshot = $this->get_snapshot_row($user_id, $normalized_symbol, 'mt5');
+        $previous_snapshot_state = is_array($existing_snapshot) && isset($existing_snapshot['state'])
+            ? (string) $existing_snapshot['state']
+            : null;
+        $persisted_snapshot_state = null;
+        $snapshot_write_applied = false;
 
         // Store tick data as price snapshot
         if (isset($payload['tick'])) {
@@ -1442,12 +1460,13 @@ final class SMC_SuperFib_Sniper_REST {
             $ask = isset($tick['ask']) ? (float) $tick['ask'] : 0;
             $spread = isset($tick['spread']) ? (int) $tick['spread'] : 0;
             $timestamp_mysql = $this->normalize_market_timestamp(isset($tick['timestamp']) ? $tick['timestamp'] : null, $this->now_mysql());
-            $tick_snapshot_state = $freshness_raw !== '' ? $snapshot_state : 'live';
+            $tick_source = 'mt5';
+            $tick_snapshot_state = 'live';
 
             $mid = ($bid + $ask) / 2;
             $changePct1d = 0; // Placeholder, could be calculated from historical data
 
-            $wpdb->replace(
+            $snapshot_write_applied = $wpdb->replace(
                 $this->table('snapshots'),
                 array(
                     'user_id' => $user_id,
@@ -1457,16 +1476,17 @@ final class SMC_SuperFib_Sniper_REST {
                     'mid' => $mid,
                     'spread' => $spread,
                     'change_pct_1d' => $changePct1d,
-                    'source' => 'mt5',
+                    'source' => $tick_source,
                     'state' => $tick_snapshot_state,
                     'updated_at' => $timestamp_mysql,
                 ),
                 array('%d', '%s', '%f', '%f', '%f', '%d', '%f', '%s', '%s', '%s')
-            );
+            ) !== false;
+            $persisted_snapshot_state = $tick_snapshot_state;
         } elseif ($freshness_raw !== '') {
             // Preserve the last authoritative quote timestamp when MT5 is only reporting a
             // freshness/session transition. Bumping updated_at here would fake a live quote.
-            $wpdb->update(
+            $freshness_rows_updated = $wpdb->update(
                 $this->table('snapshots'),
                 array(
                     'state' => $snapshot_state,
@@ -1479,6 +1499,19 @@ final class SMC_SuperFib_Sniper_REST {
                 array('%s', '%s'),
                 array('%d', '%s')
             );
+            $snapshot_write_applied = $freshness_rows_updated > 0;
+            $persisted_snapshot_state = $snapshot_state;
+        }
+
+        if ($snapshot_write_applied && $persisted_snapshot_state !== null) {
+            $was_live = $previous_snapshot_state === 'live';
+            $is_live = $persisted_snapshot_state === 'live';
+            if ($was_live !== $is_live) {
+                $watchlist = $this->get_settings($user_id)['watchlist'];
+                if (in_array($normalized_symbol, $watchlist, true)) {
+                    $this->delete_engine_snapshot($user_id);
+                }
+            }
         }
 
         // Store M1 candle
@@ -3314,7 +3347,7 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function delete_engine_snapshot($user_id) {
         delete_user_meta($user_id, 'smc_sf_engine_snapshot');
-        error_log("SMC_SF: engine snapshot invalidated for user {$user_id} after watchlist change");
+        error_log("SMC_SF: engine snapshot invalidated for user {$user_id}");
     }
 
     private function is_engine_snapshot_current($snapshot, $expected_symbols, $refresh_interval_sec) {
@@ -3338,20 +3371,28 @@ final class SMC_SuperFib_Sniper_REST {
         if (!$computed_at) {
             return false;
         }
-        if ((time() - $computed_at) > max(2, (int) $refresh_interval_sec)) {
+        if ((time() - $computed_at) > max(self::ENGINE_SNAPSHOT_MIN_REFRESH_INTERVAL_SEC, (int) $refresh_interval_sec)) {
             return false;
         }
 
         return true;
     }
 
-    private function get_cached_price($user_id, $symbol, $stale_threshold_sec = null) {
+    private function get_snapshot_row($user_id, $symbol, $source = 'mt5') {
         global $wpdb;
-        $row = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM {$this->table('snapshots')} WHERE user_id = %d AND symbol = %s",
-            $user_id,
-            $symbol
-        ), ARRAY_A);
+
+        $query = "SELECT * FROM {$this->table('snapshots')} WHERE user_id = %d AND symbol = %s";
+        $params = array($user_id, $symbol);
+        if ($source !== null) {
+            $query .= " AND source = %s";
+            $params[] = $source;
+        }
+
+        return $wpdb->get_row($wpdb->prepare($query, $params), ARRAY_A);
+    }
+
+    private function get_cached_price($user_id, $symbol, $stale_threshold_sec = null) {
+        $row = $this->get_snapshot_row($user_id, $symbol, 'mt5');
         if (!$row) {
             return null;
         }
@@ -3882,6 +3923,13 @@ final class SMC_SuperFib_Sniper_REST {
             return null;
         }
         $col = $column === 'updated_at' ? 'updated_at' : 'created_at';
+        if ($table === 'snapshots') {
+            return $wpdb->get_var($wpdb->prepare(
+                "SELECT MAX({$col}) FROM {$this->table($table)} WHERE user_id = %d AND source = %s",
+                $user_id,
+                'mt5'
+            ));
+        }
         return $wpdb->get_var($wpdb->prepare(
             "SELECT MAX({$col}) FROM {$this->table($table)} WHERE user_id = %d",
             $user_id
