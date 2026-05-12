@@ -1,0 +1,91 @@
+{
+  "snapshot_type": "FINAL",
+  "workflow_id": "stabilize-ea-2026-05-12",
+  "timestamp": "2026-05-12T00:04:00Z",
+  "git": {
+    "branch": "claude/serene-hopper-UEHWy",
+    "commit_hash": "7a477736a21185b99dd9866fe8b5017cd281e21d",
+    "tags_created": [
+      "snapshot/stabilize-ea-2026-05-12-start-20260512T000000Z",
+      "rollback/stabilize-ea-2026-05-12-before-patches",
+      "rollback/stabilize-ea-2026-05-12-after-patch-1"
+    ]
+  },
+  "patches_applied": [
+    {
+      "id": "PATCH-001",
+      "bug_id": "BUG-001",
+      "severity": "MEDIUM",
+      "description": "is_finite() guard added for bid/ask in post_ea_market_stream(). Prevents IEEE 754 INF/NaN from corrupting the snapshot database. Regression test added (Test 7 in test-ea-market-stream.php).",
+      "files_changed": [
+        "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+        "wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php"
+      ]
+    },
+    {
+      "id": "PATCH-002",
+      "bug_id": "BUG-002",
+      "severity": "LOW",
+      "description": "Silenced noisy error_log for absent candle key. Tick-only EA pushes are normal; only logs when candle key is present but malformed.",
+      "files_changed": [
+        "wordpress/smc-superfib-sniper/smc-superfib-sniper.php"
+      ]
+    }
+  ],
+  "tests": {
+    "commands_run": [
+      "php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "php -l wordpress/smc-superfib-sniper/class-market-data-service.php",
+      "php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php",
+      "php wordpress/smc-superfib-sniper/tests/php/test-cors-regression.php",
+      "php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php",
+      "php wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php",
+      "php wordpress/smc-superfib-sniper/tests/php/test-rest-bootstrap-settings.php",
+      "php wordpress/smc-superfib-sniper/tests/php/test-settings-risk-fallbacks.php",
+      "php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php",
+      "bun run build",
+      "npm run check:mql"
+    ],
+    "passing": true,
+    "failures": [
+      {
+        "command": "npm run lint",
+        "result": "70 prettier/prettier formatting errors (pre-existing, all whitespace-only, no logic errors — same count as 2026-05-11 workflow)",
+        "blocking": false
+      }
+    ]
+  },
+  "ea_integration_status": {
+    "market_stream_route": "POST /wp-json/sniper/v1/ea/market-stream",
+    "auth_required": true,
+    "auth_header": "X-EA-API-Key",
+    "auth_header_aliases": ["x-ea-api-key", "x_ea_api_key", "x-api-key", "x_api_key"],
+    "secret_env": "SMC_SF_EA_API_KEY",
+    "user_id_required": true,
+    "payload_validation": true,
+    "ohlc_validation": true,
+    "is_finite_validation": true,
+    "stale_rejection": true,
+    "stale_hard_reject_threshold_sec": 300,
+    "stale_warn_threshold_sec": 120,
+    "candle_stale_threshold_sec": 180,
+    "actual_ea_payload_contract": {
+      "fields": ["user_id", "symbol", "normalized_symbol", "timeframe", "timestamp", "bid", "ask", "freshness", "session"],
+      "optional_candle": "candle (singular object with time/open/high/low/close/volume)",
+      "optional_candle_m15": "candle_m15 (singular object with same fields)"
+    }
+  },
+  "signal_engine_guards": {
+    "requires_mt5_source": true,
+    "requires_live_state": true,
+    "requires_price_within_stale_threshold": true,
+    "requires_candles_within_7200s": true,
+    "requires_min_30_candles": true,
+    "chop_gate_blocks_at_0_7": true,
+    "backend_confirmed_only_when_ready_and_live": true
+  },
+  "rollback": {
+    "manifest": "ROLLBACK-MANIFEST.json",
+    "rollback_points_count": 3
+  }
+}
