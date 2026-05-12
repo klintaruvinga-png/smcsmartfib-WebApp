@@ -465,86 +465,105 @@ export function AdminPage() {
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <HealthCard
-          label="System status"
-          value={health.feedStatus ?? health.priceFeed}
-          tone={toneForStatus(health.feedStatus ?? health.priceFeed)}
-        />
-        <HealthCard
-          label="Backend sync"
-          value={health.backendSync}
-          tone={toneForStatus(health.backendSync)}
-        />
-        <HealthCard
-          label="Engine run"
-          value={health.engineRunState ?? "unknown"}
-          tone={toneForStatus(health.engineRunState)}
-        />
-        <HealthCard
-          label="Price feed"
-          value={health.priceFeed}
-          tone={toneForStatus(health.priceFeed)}
-        />
-        <HealthCard
-          label="Twelve Data key"
-          value={health.twelveDataKeyStatus ?? health.twelveDataKey}
-          tone={toneForStatus(health.twelveDataKeyStatus ?? health.twelveDataKey)}
-        />
-        <HealthCard
-          label="Per-symbol diagnostics"
-          value={String(health.perSymbolDiagnostics?.length ?? 0)}
-        />
-      </div>
-
-      <div className="grid gap-3 lg:grid-cols-2">
-        <TimestampCard label="Last batch" value={health.lastBatchAt} />
-        <TimestampCard label="Last engine run" value={health.lastEngineRunAt} />
-      </div>
-
-      {health.perSymbolDiagnostics && health.perSymbolDiagnostics.length > 0 && (
-        <div className="rounded-lg border border-bd bg-bg1/60 p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-accent" />
-            <div className="text-[11px] font-mono uppercase tracking-wider text-mute">
-              Per-symbol diagnostics
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-xs">
-              <thead className="text-mute">
-                <tr className="border-b border-bd">
-                  <th className="px-2 py-2 font-mono uppercase tracking-wider">Symbol</th>
-                  <th className="px-2 py-2 font-mono uppercase tracking-wider">Price</th>
-                  <th className="px-2 py-2 font-mono uppercase tracking-wider">Candle</th>
-                  <th className="px-2 py-2 font-mono uppercase tracking-wider">Count</th>
-                  <th className="px-2 py-2 font-mono uppercase tracking-wider">Last Price</th>
-                  <th className="px-2 py-2 font-mono uppercase tracking-wider">Last Candle</th>
-                  <th className="px-2 py-2 font-mono uppercase tracking-wider">Blocker</th>
-                </tr>
-              </thead>
-              <tbody>
-                {health.perSymbolDiagnostics.map((diagnostic) => (
-                  <tr key={diagnostic.symbol} className="border-b border-bd/50 last:border-b-0">
-                    <td className="px-2 py-2 font-mono text-tx">{diagnostic.symbol}</td>
-                    <td className="px-2 py-2 text-dim">{diagnostic.priceState}</td>
-                    <td className="px-2 py-2 text-dim">{diagnostic.candleState}</td>
-                    <td className="px-2 py-2 text-dim">{String(diagnostic.candleCount)}</td>
-                    <td className="px-2 py-2 text-dim">
-                      {formatTimestamp(diagnostic.lastPriceAt)}
-                    </td>
-                    <td className="px-2 py-2 text-dim">
-                      {formatTimestamp(diagnostic.lastCandleAt)}
-                    </td>
-                    <td className="px-2 py-2 text-dim">{diagnostic.engineBlocker}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <section
+        data-section="backend-health-readonly"
+        className="space-y-4 rounded-lg border border-accent/30 bg-accent/5 p-4"
+      >
+        <div className="flex items-start gap-3">
+          <ShieldCheck className="mt-0.5 h-4 w-4 text-accent" />
+          <div>
+            <h2 className="text-sm font-semibold tracking-tight">Backend Health Status</h2>
+            <p className="mt-0.5 text-xs text-mute">
+              Read-only - values are owned and updated by the backend.
+            </p>
+            <p className="mt-1 text-[11px] text-dim">
+              This section mirrors <span className="font-mono">/admin/health</span> and does not
+              accept local edits or form submissions.
+            </p>
           </div>
         </div>
-      )}
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <HealthCard
+            label="System status"
+            value={health.feedStatus ?? health.priceFeed}
+            tone={toneForStatus(health.feedStatus ?? health.priceFeed)}
+          />
+          <HealthCard
+            label="Backend sync"
+            value={health.backendSync}
+            tone={toneForStatus(health.backendSync)}
+          />
+          <HealthCard
+            label="Engine run"
+            value={health.engineRunState ?? "unknown"}
+            tone={toneForStatus(health.engineRunState)}
+          />
+          <HealthCard
+            label="Price feed"
+            value={health.priceFeed}
+            tone={toneForStatus(health.priceFeed)}
+          />
+          <HealthCard
+            label="Twelve Data key"
+            value={health.twelveDataKeyStatus ?? health.twelveDataKey}
+            tone={toneForStatus(health.twelveDataKeyStatus ?? health.twelveDataKey)}
+          />
+          <HealthCard
+            label="Per-symbol diagnostics"
+            value={String(health.perSymbolDiagnostics?.length ?? 0)}
+          />
+        </div>
+
+        <div className="grid gap-3 lg:grid-cols-2">
+          <TimestampCard label="Last batch" value={health.lastBatchAt} />
+          <TimestampCard label="Last engine run" value={health.lastEngineRunAt} />
+        </div>
+
+        {health.perSymbolDiagnostics && health.perSymbolDiagnostics.length > 0 && (
+          <div className="rounded-lg border border-bd bg-bg1/60 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-accent" />
+              <div className="text-[11px] font-mono uppercase tracking-wider text-mute">
+                Per-symbol diagnostics
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-xs">
+                <thead className="text-mute">
+                  <tr className="border-b border-bd">
+                    <th className="px-2 py-2 font-mono uppercase tracking-wider">Symbol</th>
+                    <th className="px-2 py-2 font-mono uppercase tracking-wider">Price</th>
+                    <th className="px-2 py-2 font-mono uppercase tracking-wider">Candle</th>
+                    <th className="px-2 py-2 font-mono uppercase tracking-wider">Count</th>
+                    <th className="px-2 py-2 font-mono uppercase tracking-wider">Last Price</th>
+                    <th className="px-2 py-2 font-mono uppercase tracking-wider">Last Candle</th>
+                    <th className="px-2 py-2 font-mono uppercase tracking-wider">Blocker</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {health.perSymbolDiagnostics.map((diagnostic) => (
+                    <tr key={diagnostic.symbol} className="border-b border-bd/50 last:border-b-0">
+                      <td className="px-2 py-2 font-mono text-tx">{diagnostic.symbol}</td>
+                      <td className="px-2 py-2 text-dim">{diagnostic.priceState}</td>
+                      <td className="px-2 py-2 text-dim">{diagnostic.candleState}</td>
+                      <td className="px-2 py-2 text-dim">{String(diagnostic.candleCount)}</td>
+                      <td className="px-2 py-2 text-dim">
+                        {formatTimestamp(diagnostic.lastPriceAt)}
+                      </td>
+                      <td className="px-2 py-2 text-dim">
+                        {formatTimestamp(diagnostic.lastCandleAt)}
+                      </td>
+                      <td className="px-2 py-2 text-dim">{diagnostic.engineBlocker}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </section>
 
       <details open className="soak-report-print-section rounded-lg border border-bd bg-bg1/60">
         <summary className="cursor-pointer list-none border-b border-bd px-4 py-3">
@@ -657,6 +676,19 @@ export function AdminPage() {
                   label="Audit events 24h"
                   value={String(soakState.report.audit_events_summary.total_24h)}
                 />
+              </div>
+
+              <div
+                data-section="operator-evidence-entry"
+                className="rounded-lg border border-bd bg-bg2/40 px-4 py-3"
+              >
+                <h3 className="text-sm font-semibold tracking-tight">
+                  Operator Evidence - enter metadata only
+                </h3>
+                <p className="mt-0.5 text-xs text-mute">
+                  Use the forms below to record soak metadata, evidence, and checkpoints. These
+                  entries do not edit backend health state.
+                </p>
               </div>
 
               <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { EngineHealth, SoakReport } from "@/types/sniper";
 
 const routerMocks = vi.hoisted(() => ({
@@ -95,7 +95,7 @@ function buildSoakReport(): SoakReport {
   };
 }
 
-describe("AdminPage soak report error handling", () => {
+describe("AdminPage", () => {
   beforeEach(() => {
     routerMocks.instance.navigate.mockReset();
     authMocks.getAuthHeader.mockReturnValue("Basic dGVzdDp0ZXN0");
@@ -125,6 +125,50 @@ describe("AdminPage soak report error handling", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+  });
+
+  it("renders backend health inside a read-only backend-owned section", async () => {
+    apiMocks.fetchSoakReport.mockResolvedValue(buildSoakReport());
+
+    render(<AdminPage />);
+
+    expect(await screen.findByText("Backend Health Status")).toBeTruthy();
+    expect(
+      screen.getByText("Read-only - values are owned and updated by the backend."),
+    ).toBeTruthy();
+    expect(apiMocks.fetchAdminHealth).toHaveBeenCalledTimes(1);
+
+    const healthSection = document.querySelector(
+      '[data-section="backend-health-readonly"]',
+    ) as HTMLElement | null;
+    expect(healthSection).toBeTruthy();
+    expect(healthSection?.querySelectorAll("input, textarea, select, button")).toHaveLength(0);
+
+    const scoped = within(healthSection as HTMLElement);
+    expect(scoped.getByText("System status")).toBeTruthy();
+    expect(scoped.getByText("Backend sync")).toBeTruthy();
+    expect(scoped.getByText("Engine run")).toBeTruthy();
+    expect(scoped.getByText("Price feed")).toBeTruthy();
+    expect(scoped.getByText("Twelve Data key")).toBeTruthy();
+    expect(scoped.getByText("Per-symbol diagnostics")).toBeTruthy();
+    expect(scoped.getByText("Last batch")).toBeTruthy();
+    expect(scoped.getByText("Last engine run")).toBeTruthy();
+  });
+
+  it("renders the existing access denied surface when admin health fails to load", async () => {
+    apiMocks.fetchAdminHealth.mockRejectedValueOnce(new Error("admin health unavailable"));
+    apiMocks.fetchSoakReport.mockResolvedValue(buildSoakReport());
+
+    render(<AdminPage />);
+
+    expect(await screen.findByText("Access denied")).toBeTruthy();
+    expect(screen.getByText("Administrator capability required")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "This route is restricted to WordPress administrators. No backend diagnostics were exposed.",
+      ),
+    ).toBeTruthy();
+    expect(apiMocks.fetchAdminHealth).toHaveBeenCalledTimes(1);
   });
 
   it("surfaces initial soak report load failures and recovers on retry", async () => {

@@ -94,7 +94,7 @@ These items are safe to run during the soak because they harden presentation, co
 | [ ] | Surface baseline and checkpoint age more prominently. | Age is visible without opening secondary details. |  |  |
 | [ ] | Improve print/export formatting for the soak report. | Printed or exported report is readable and keeps evidence sections intact. |  |  |
 | [ ] | Harden `admin.tsx` error handling around `/admin/soak-report`. | Failures show explicit operator-facing status instead of silent breakage. |  |  |
-| [ ] | Make dashboard admin health display clearly read-only and backend-driven. | UI does not imply local editability or frontend authority. |  |  |
+| [x] | Make dashboard admin health display clearly read-only and backend-driven. | UI does not imply local editability or frontend authority. | 2026-05-12 | Closed by PR #140. |
 
 ### 5.3 Backend And EA Parity Hardening
 
@@ -134,3 +134,4 @@ These items are safe to run during the soak because they harden presentation, co
 |  |  |
 |  |  |
 |  |  |
+
