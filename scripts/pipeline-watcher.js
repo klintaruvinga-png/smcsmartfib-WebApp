@@ -213,6 +213,7 @@ function checkOpenPR(issueSlug) {
         encoding: "utf8",
         timeout: 15000,
         shell: true,
+        windowsHide: true,
         stdio: ["ignore", "pipe", "pipe"],
       },
     );
@@ -233,6 +234,7 @@ function checkMergedPR(issueSlug, cycleStartedAt) {
         encoding: "utf8",
         timeout: 15000,
         shell: true,
+        windowsHide: true,
         stdio: ["ignore", "pipe", "pipe"],
       },
     );
@@ -451,7 +453,7 @@ function sendHardeningFailureNotification(state, reason) {
     execFileSync(
       "gh",
       ["issue", "create", "--title", title, "--body", body, "--label", "pipeline-blocked"],
-      { cwd: REPO_ROOT, timeout: 20000, stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" },
+      { cwd: REPO_ROOT, timeout: 20000, windowsHide: true, stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" },
     );
     log("Hardening failure notification: GitHub issue created successfully");
   } catch (err) {
@@ -821,6 +823,7 @@ function runClaudePlanHardening(state) {
             timeout: CLAUDE_TIMEOUT_MS,
             encoding: "utf8",
             maxBuffer: 10 * 1024 * 1024,
+            windowsHide: true,
           },
         );
       } else {
@@ -834,6 +837,7 @@ function runClaudePlanHardening(state) {
           planText = execSync(cmd, {
             cwd: REPO_ROOT,
             shell: true,
+            windowsHide: true,
             timeout: CLAUDE_TIMEOUT_MS,
             encoding: "utf8",
             maxBuffer: 10 * 1024 * 1024,
@@ -966,6 +970,7 @@ function runCodexImplementation(state) {
       execSync(cmd, {
         cwd: REPO_ROOT,
         shell: true,
+        windowsHide: true,
         timeout: CODEX_TIMEOUT_MS,
         // stdin: "ignore" — the shell handles stdin via the < redirect in cmd.
         // stdout/stderr: "inherit" — Codex output streams directly to the
@@ -1166,12 +1171,14 @@ function checkClaudeAvailability() {
       execFileSync(claudeExe, ["--version"], {
         timeout: 10000,
         encoding: "utf8",
+        windowsHide: true,
         stdio: ["ignore", "pipe", "pipe"],
       });
       log(`Claude CLI health check passed (${path.basename(claudeExe)})`);
     } else {
       execSync('"claude" --version', {
         shell: true,
+        windowsHide: true,
         timeout: 10000,
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],

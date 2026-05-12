@@ -59,6 +59,7 @@ function main() {
   const child = spawn(process.execPath, [WATCHER_FILE], {
     cwd: REPO_ROOT,
     detached: true,
+    windowsHide: true,
     stdio: ["ignore", logFd, logFd],
   });
 
