@@ -1,0 +1,32 @@
+{
+  "workflow_id": "stabilize-ea-2026-05-12",
+  "created_at": "2026-05-12T00:00:00Z",
+  "branch": "claude/serene-hopper-UEHWy",
+  "initial_commit": "7a477736a21185b99dd9866fe8b5017cd281e21d",
+  "rollback_points": [
+    {
+      "name": "Initial state",
+      "tag": "snapshot/stabilize-ea-2026-05-12-start-20260512T000000Z",
+      "commit_hash": "7a477736a21185b99dd9866fe8b5017cd281e21d",
+      "snapshot_file": "INITIAL-20260512T000000Z.json",
+      "command": "git reset --hard 7a477736a21185b99dd9866fe8b5017cd281e21d"
+    },
+    {
+      "name": "Before patches",
+      "tag": "rollback/stabilize-ea-2026-05-12-before-patches",
+      "commit_hash": "7a477736a21185b99dd9866fe8b5017cd281e21d",
+      "snapshot_file": "PRE-PATCH-20260512T000200Z.json",
+      "command": "git reset --hard 7a477736a21185b99dd9866fe8b5017cd281e21d"
+    },
+    {
+      "name": "After patch cluster 1 (BUG-001 + BUG-002)",
+      "tag": "rollback/stabilize-ea-2026-05-12-after-patch-1",
+      "commit_hash": "7a477736a21185b99dd9866fe8b5017cd281e21d",
+      "snapshot_file": "AFTER-PATCH-1-20260512T000300Z.json",
+      "command": "git reset --hard rollback/stabilize-ea-2026-05-12-after-patch-1"
+    }
+  ],
+  "emergency_rollback": {
+    "command": "git checkout main && git reset --hard origin/main"
+  }
+}

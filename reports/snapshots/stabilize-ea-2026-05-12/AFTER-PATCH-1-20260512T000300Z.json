@@ -1,0 +1,39 @@
+{
+  "snapshot_type": "AFTER-PATCH-1",
+  "workflow_id": "stabilize-ea-2026-05-12",
+  "timestamp": "2026-05-12T00:03:00Z",
+  "patches_applied": [
+    {
+      "id": "PATCH-001",
+      "bug_id": "BUG-001",
+      "severity": "MEDIUM",
+      "description": "Added is_finite($bid) && is_finite($ask) guard in post_ea_market_stream() before writing to snapshot DB. Prevents IEEE 754 INF/NaN values from being stored.",
+      "file": "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "change": "Line ~1698: changed '$bid > 0 && $ask > 0 && $bid <= $ask' to 'is_finite($bid) && is_finite($ask) && $bid > 0 && $ask > 0 && $bid <= $ask'",
+      "regression_test": "wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php Test 7: INF bid rejected by is_finite() guard"
+    },
+    {
+      "id": "PATCH-002",
+      "bug_id": "BUG-002",
+      "severity": "LOW",
+      "description": "Fixed noisy error_log in post_ea_market_stream() for absent candle field. Tick-only payloads (no candle key) are expected behavior — no longer logged. Only logs when candle key is present but not an array.",
+      "file": "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "change": "Changed else branch to elseif (isset($payload['candle'])) with correct log message, added comment explaining absent candle is normal.",
+      "regression_test": "Covered by Test 5 (Snapshot-only payload) which still passes"
+    }
+  ],
+  "tests": {
+    "php_syntax": "PASS",
+    "test_ea_market_stream": "PASS (7/7 tests)",
+    "test_cors_regression": "PASS",
+    "test_mt5_snapshot_contract": "PASS",
+    "test_pip_value_parity": "PASS",
+    "test_rest_bootstrap_settings": "PASS",
+    "test_settings_risk_fallbacks": "PASS",
+    "test_watchlist_snapshot_regression": "PASS",
+    "build": "PASS (bun run build)",
+    "check_mql": "PASS",
+    "lint": "70 pre-existing prettier/whitespace errors (no logic errors, unchanged from prior workflow)"
+  },
+  "git_tag": "rollback/stabilize-ea-2026-05-12-after-patch-1"
+}

@@ -1,0 +1,72 @@
+{
+  "snapshot_type": "INITIAL",
+  "workflow_id": "stabilize-ea-2026-05-12",
+  "timestamp": "2026-05-12T00:00:00Z",
+  "git": {
+    "branch": "claude/serene-hopper-UEHWy",
+    "commit_hash": "7a477736a21185b99dd9866fe8b5017cd281e21d",
+    "remote": "origin",
+    "uncommitted_changes_count": 0
+  },
+  "repo_structure": {
+    "plugin_root": "wordpress/smc-superfib-sniper",
+    "plugin_files": [
+      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "wordpress/smc-superfib-sniper/class-market-data-service.php",
+      "wordpress/smc-superfib-sniper/README.md"
+    ],
+    "rest_route_files": [
+      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php"
+    ],
+    "test_files": [
+      "wordpress/smc-superfib-sniper/tests/php/test-cors-regression.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-get-soak-report.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-rest-bootstrap-settings.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-settings-risk-fallbacks.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php"
+    ],
+    "frontend_api_client": "src/lib/api/sniperClient.ts",
+    "mt5_ea_files": [
+      "mt5/SMC_MarketDataEA.mq5",
+      "mt5/MarketDataEngine.mqh",
+      "mt5/TickProcessor.mqh",
+      "mt5/CandleBuilder.mqh",
+      "mt5/SessionManager.mqh",
+      "mt5/FreshnessEngine.mqh",
+      "mt5/SymbolNormalizer.mqh",
+      "mt5/check-mql-includes.mjs"
+    ],
+    "migration_files": [
+      ".github/migration/audits/phase-0-ea-authority-rate-limit-parity-2026-05-06.md",
+      ".github/migration/audits/phase-0-mt5-authority-parity-2026-05-03.md",
+      ".github/migration/audits/phase-0-freshness-authority-parity-2026-05-04.md",
+      ".github/migration/audits/phase-0-mt5-ea-market-stream-parity-2026-05-11.md"
+    ]
+  },
+  "app_state": {
+    "workflow_state_file_exists": false,
+    "workflow_state": {}
+  },
+  "known_dev_status": {
+    "authority_diagnostics_requires_wp_session": true,
+    "ea_market_stream_route_exists": true,
+    "ea_auth_header": "X-EA-API-Key",
+    "ea_auth_header_aliases": ["x-ea-api-key", "x_ea_api_key", "x-api-key", "x_api_key"],
+    "ea_auth_secret_env": "SMC_SF_EA_API_KEY",
+    "ea_payload_requires_user_id": true,
+    "migration_phase": "MT5-native migration / Phase 0 soak",
+    "plugin_version": "13.0.2",
+    "previous_patches": [
+      "PATCH-001 (2026-05-11): OHLC consistency guard for M1 and M15 candle ingestion in post_ea_market_stream(). Added validate_ohlc() method and regression test."
+    ],
+    "actual_ea_payload_contract": {
+      "fields": ["user_id", "symbol", "normalized_symbol", "timeframe", "timestamp", "bid", "ask", "freshness", "session"],
+      "optional_candle": "candle (singular OHLC object with time/open/high/low/close/volume)",
+      "optional_candle_m15": "candle_m15 (singular OHLC object with same fields)",
+      "note": "Contract uses timestamp (singular), candle/candle_m15 (singular objects). Workflow-spec example uses quote_time/server_time/candles-array — documented divergence."
+    }
+  }
+}

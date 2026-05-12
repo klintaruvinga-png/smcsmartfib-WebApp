@@ -1,0 +1,26 @@
+{
+  "snapshot_type": "PRE-PATCH",
+  "workflow_id": "stabilize-ea-2026-05-12",
+  "timestamp": "2026-05-12T00:02:00Z",
+  "git": {
+    "branch": "claude/serene-hopper-UEHWy",
+    "commit_hash": "7a477736a21185b99dd9866fe8b5017cd281e21d",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-12-before-patches"
+  },
+  "patches_planned": [
+    {
+      "id": "PATCH-001",
+      "bug_id": "BUG-001",
+      "description": "Add is_finite() guard for bid/ask in post_ea_market_stream() to reject IEEE 754 INF/NaN values",
+      "file": "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "line": 1698
+    },
+    {
+      "id": "PATCH-002",
+      "bug_id": "BUG-002",
+      "description": "Downgrade candle-absent log from error_log to silent (omit when candle key not in payload at all)",
+      "file": "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "line": 1761
+    }
+  ]
+}
