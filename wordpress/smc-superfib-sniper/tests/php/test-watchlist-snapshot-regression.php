@@ -232,6 +232,17 @@ assert_true(
     !$isCurrent->invoke($instance, $freshSnapshot, array('EURUSD'), 30),
     'symbol-set mismatch must invalidate a fresh snapshot before timestamp freshness is considered'
 );
+assert_true(
+    !$isCurrent->invoke($instance, array(
+        'prices' => array(
+            array('symbol' => 'EURUSD'),
+        ),
+        'meta' => array(
+            'computedAt' => gmdate('c'),
+        ),
+    ), array('EURUSD', 'USDJPY'), 30),
+    'symbol additions must also invalidate a fresh snapshot before timestamp freshness is considered'
+);
 
 $deleteSnapshot->invoke($instance, 42);
 assert_same(

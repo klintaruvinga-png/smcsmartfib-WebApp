@@ -6,6 +6,7 @@ define('ARRAY_A', 'ARRAY_A');
 $GLOBALS['test_registered_routes'] = array();
 $GLOBALS['test_transients'] = array();
 $GLOBALS['test_user_meta'] = array();
+$GLOBALS['test_deleted_user_meta'] = array();
 $GLOBALS['test_current_user_id'] = 0;
 $GLOBALS['test_is_logged_in'] = false;
 $GLOBALS['test_capabilities'] = array(
@@ -174,6 +175,27 @@ if (!class_exists('TestWpdb')) {
                     }
                 }
                 return $count;
+            }
+
+            if (preg_match("/SELECT MAX\\((updated_at|created_at)\\) FROM ([^ ]+) WHERE user_id = (\\d+)(?: AND source = '([^']+)')?/", $query, $m)) {
+                $column = $m[1];
+                $table = $m[2];
+                $user_id = (int) $m[3];
+                $source = isset($m[4]) ? $m[4] : null;
+                $max = null;
+                foreach ($this->tables[$table] ?? array() as $row) {
+                    if ((int) ($row['user_id'] ?? 0) !== $user_id) {
+                        continue;
+                    }
+                    if ($source !== null && ($row['source'] ?? '') !== $source) {
+                        continue;
+                    }
+                    $value = $row[$column] ?? null;
+                    if ($value !== null && ($max === null || strcmp($value, $max) > 0)) {
+                        $max = $value;
+                    }
+                }
+                return $max;
             }
 
             return null;
@@ -376,6 +398,16 @@ if (!function_exists('update_user_meta')) {
         return true;
     }
 }
+if (!function_exists('delete_user_meta')) {
+    function delete_user_meta($user_id, $key) {
+        $GLOBALS['test_deleted_user_meta'][] = array(
+            'user_id' => $user_id,
+            'meta_key' => $key,
+        );
+        unset($GLOBALS['test_user_meta'][$user_id][$key]);
+        return true;
+    }
+}
 if (!function_exists('is_wp_error')) {
     function is_wp_error($value) {
         return $value instanceof WP_Error;
@@ -515,6 +547,27 @@ $snapshotRow = $wpdb->tables[$snapshotTable]['7|EURUSD'] ?? null;
 assert_same('live', $snapshotRow['state'], 'Tick-only MT5 update must default to live when freshness is omitted');
 assert_same('2026-05-03 08:16:30', $snapshotRow['updated_at'], 'Tick-only MT5 update must persist the new quote timestamp');
 
+$snapshotCountBeforeInvalidSource = count($wpdb->tables[$snapshotTable] ?? array());
+$invalidSource = $instance->post_snapshot(new WP_REST_Request(array(
+    'symbol' => 'GBPUSD',
+    'normalized_symbol' => 'GBPUSD',
+    'source' => 'legacy_ea',
+    'tick' => array(
+        'bid' => 1.2500,
+        'ask' => 1.2502,
+        'spread' => 2,
+        'timestamp' => '2026-05-03T08:17:30Z',
+    ),
+)));
+
+assert_true(is_array($invalidSource) && !empty($invalidSource['ok']), 'Invalid-source MT5 payload should short-circuit without throwing');
+assert_same($snapshotCountBeforeInvalidSource, count($wpdb->tables[$snapshotTable] ?? array()), 'Invalid-source MT5 payload must not persist a snapshot row');
+$auditEvents = $wpdb->tables[$wpdb->prefix . 'smc_sf_audit_events'] ?? array();
+$invalidSourceAudit = end($auditEvents);
+assert_true(is_array($invalidSourceAudit), 'Invalid-source MT5 payload must create an audit event');
+assert_same('mt5_snapshot.invalid_source', $invalidSourceAudit['event_type'] ?? null, 'Invalid-source MT5 payload must audit the rejected source');
+assert_true(strpos((string) ($invalidSourceAudit['payload'] ?? ''), '"level":"ERROR"') !== false, 'Invalid-source MT5 payload audit must be tagged at ERROR level');
+
 $wpdb->replace($snapshotTable, array(
     'user_id' => 7,
     'symbol' => 'USDJPY',
@@ -538,6 +591,74 @@ $wpdb->replace($wpdb->prefix . 'smc_sf_user_settings', array(
     )),
     'updated_at' => '2026-05-03 08:16:05',
 ));
+
+$GLOBALS['test_deleted_user_meta'] = array();
+update_user_meta(7, 'smc_sf_engine_snapshot', array(
+    'prices' => array(array('symbol' => 'EURUSD')),
+    'meta' => array('computedAt' => gmdate('c')),
+));
+$stateOnlyWatched = $instance->post_snapshot(new WP_REST_Request(array(
+    'symbol' => 'EURUSD',
+    'normalized_symbol' => 'EURUSD',
+    'freshness' => 'DISCONNECTED',
+    'session' => 'Closed',
+)));
+assert_true(is_array($stateOnlyWatched) && !empty($stateOnlyWatched['ok']), 'Watched state-only MT5 update should succeed');
+assert_same(
+    array(
+        array(
+            'user_id' => 7,
+            'meta_key' => 'smc_sf_engine_snapshot',
+        ),
+    ),
+    $GLOBALS['test_deleted_user_meta'],
+    'State-only live-to-offline MT5 transitions must invalidate the cached engine snapshot for watched symbols'
+);
+
+$GLOBALS['test_deleted_user_meta'] = array();
+update_user_meta(7, 'smc_sf_engine_snapshot', array(
+    'prices' => array(array('symbol' => 'EURUSD')),
+    'meta' => array('computedAt' => gmdate('c')),
+));
+$tickRecoverLive = $instance->post_snapshot(new WP_REST_Request(array(
+    'symbol' => 'EURUSD',
+    'normalized_symbol' => 'EURUSD',
+    'tick' => array(
+        'bid' => 1.1030,
+        'ask' => 1.1032,
+        'spread' => 2,
+        'timestamp' => '2026-05-03T08:18:30Z',
+    ),
+)));
+assert_true(is_array($tickRecoverLive) && !empty($tickRecoverLive['ok']), 'Watched offline-to-live MT5 recovery should succeed');
+assert_same(
+    array(
+        array(
+            'user_id' => 7,
+            'meta_key' => 'smc_sf_engine_snapshot',
+        ),
+    ),
+    $GLOBALS['test_deleted_user_meta'],
+    'Offline-to-live MT5 transitions must invalidate the cached engine snapshot for watched symbols'
+);
+
+$GLOBALS['test_deleted_user_meta'] = array();
+update_user_meta(7, 'smc_sf_engine_snapshot', array(
+    'prices' => array(array('symbol' => 'EURUSD')),
+    'meta' => array('computedAt' => gmdate('c')),
+));
+$steadyLive = $instance->post_snapshot(new WP_REST_Request(array(
+    'symbol' => 'EURUSD',
+    'normalized_symbol' => 'EURUSD',
+    'tick' => array(
+        'bid' => 1.1035,
+        'ask' => 1.1037,
+        'spread' => 2,
+        'timestamp' => '2026-05-03T08:19:30Z',
+    ),
+)));
+assert_true(is_array($steadyLive) && !empty($steadyLive['ok']), 'Steady live MT5 update should succeed');
+assert_same(array(), $GLOBALS['test_deleted_user_meta'], 'Live-to-live MT5 updates must not invalidate the cached engine snapshot');
 
 $authority = $instance->get_market_data_authority(new WP_REST_Request());
 assert_true(is_array($authority), 'Authority endpoint should return an array');
@@ -579,6 +700,64 @@ foreach (array('EURUSD' => 1.1000, 'USDJPY' => 156.0000) as $symbol => $base) {
     }
 }
 
+$ensureEngineSnapshot = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'ensure_engine_snapshot');
+$ensureEngineSnapshot->setAccessible(true);
+$wpdb->replace($wpdb->prefix . 'smc_sf_user_settings', array(
+    'user_id' => 7,
+    'settings' => json_encode(array(
+        'backendUrl' => 'https://example.com/wp-json',
+        'refreshIntervalSec' => 30,
+        'staleThresholdSec' => 10,
+        'watchlist' => array('EURUSD'),
+        'riskAllocation' => array('perTradePct' => 0.5, 'dailyMaxPct' => 2.0, 'ddCapPct' => 6.0),
+    )),
+    'updated_at' => '2026-05-03 08:20:00',
+));
+$singleSymbolSnapshot = $ensureEngineSnapshot->invoke($instance, 7);
+assert_same(array('EURUSD'), $singleSymbolSnapshot['meta']['watchlist'] ?? null, 'ensure_engine_snapshot must compute a single-symbol snapshot for the initial watchlist');
+
+$wpdb->replace($wpdb->prefix . 'smc_sf_user_settings', array(
+    'user_id' => 7,
+    'settings' => json_encode(array(
+        'backendUrl' => 'https://example.com/wp-json',
+        'refreshIntervalSec' => 30,
+        'staleThresholdSec' => 10,
+        'watchlist' => array('EURUSD', 'USDJPY'),
+        'riskAllocation' => array('perTradePct' => 0.5, 'dailyMaxPct' => 2.0, 'ddCapPct' => 6.0),
+    )),
+    'updated_at' => '2026-05-03 08:20:05',
+));
+$expandedWatchlistSnapshot = $ensureEngineSnapshot->invoke($instance, 7);
+assert_same(array('EURUSD', 'USDJPY'), $expandedWatchlistSnapshot['meta']['watchlist'] ?? null, 'Adding a watchlist symbol must bypass the cached engine snapshot and recompute');
+
+$wpdb->replace($wpdb->prefix . 'smc_sf_user_settings', array(
+    'user_id' => 7,
+    'settings' => json_encode(array(
+        'backendUrl' => 'https://example.com/wp-json',
+        'refreshIntervalSec' => 30,
+        'staleThresholdSec' => 10,
+        'watchlist' => array('EURUSD'),
+        'riskAllocation' => array('perTradePct' => 0.5, 'dailyMaxPct' => 2.0, 'ddCapPct' => 6.0),
+    )),
+    'updated_at' => '2026-05-03 08:20:10',
+));
+$reducedWatchlistSnapshot = $ensureEngineSnapshot->invoke($instance, 7);
+assert_same(array('EURUSD'), $reducedWatchlistSnapshot['meta']['watchlist'] ?? null, 'Removing a watchlist symbol must bypass the cached engine snapshot and recompute');
+$cachedReplay = $ensureEngineSnapshot->invoke($instance, 7);
+assert_same($reducedWatchlistSnapshot, $cachedReplay, 'Unchanged watchlists must keep the cached engine snapshot current');
+
+$wpdb->replace($wpdb->prefix . 'smc_sf_user_settings', array(
+    'user_id' => 7,
+    'settings' => json_encode(array(
+        'backendUrl' => 'https://example.com/wp-json',
+        'refreshIntervalSec' => 2,
+        'staleThresholdSec' => 10,
+        'watchlist' => array('EURUSD', 'USDJPY'),
+        'riskAllocation' => array('perTradePct' => 0.5, 'dailyMaxPct' => 2.0, 'ddCapPct' => 6.0),
+    )),
+    'updated_at' => '2026-05-03 08:20:15',
+));
+
 $health = $instance->get_health();
 assert_true(is_array($health), 'Health endpoint should return an array in the test harness');
 assert_same('missing', $health['twelveDataKeyStatus'], 'Test setup should have no Twelve Data key');
@@ -597,6 +776,11 @@ assert_same('EURUSD', $quote['symbol'], 'fetch_quote MT5 guard returned the wron
 assert_same('live', $quote['state'], 'fetch_quote MT5 guard must preserve live state');
 assert_same('mt5', $quote['source'], 'fetch_quote MT5 guard must preserve source authority');
 assert_true(isset($quote['age_sec']) && $quote['age_sec'] <= 10, 'fetch_quote MT5 guard must expose fresh age_sec');
+
+$getCachedPrice = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'get_cached_price');
+$getCachedPrice->setAccessible(true);
+$latestTimestamp = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'latest_timestamp');
+$latestTimestamp->setAccessible(true);
 
 $GLOBALS['test_transients']['smc_sf_rl_7_eurusd'] = time();
 $wpdb->replace($snapshotTable, array(
@@ -643,6 +827,10 @@ $wpdb->replace($snapshotTable, array(
 ));
 $tdQuote = $fetchQuote->invoke($instance, 7, 'XAUUSD');
 assert_same(null, $tdQuote, 'fetch_quote must not return Twelve Data rows after MT5-only decommission');
+$legacyCachedPrice = $getCachedPrice->invoke($instance, 7, 'XAUUSD', 60);
+assert_same(null, $legacyCachedPrice, 'get_cached_price must ignore non-MT5 snapshot rows');
+$expectedLatestMt5Timestamp = $wpdb->tables[$snapshotTable]['7|USDJPY']['updated_at'] ?? null;
+assert_same($expectedLatestMt5Timestamp, $latestTimestamp->invoke($instance, 'snapshots', 7, 'updated_at'), 'latest_timestamp must ignore non-MT5 snapshot rows when computing snapshot freshness');
 
 $runEngine = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'run_engine_for_symbols');
 $runEngine->setAccessible(true);
