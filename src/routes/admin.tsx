@@ -289,6 +289,7 @@ export function AdminPage() {
   const health = state.health;
   const baselineCheckpoint =
     soakState.kind === "ready" ? soakState.report.baseline_checkpoint : null;
+  const baselineCaptureLocked = baselineCheckpoint !== null;
   const evidenceRows = soakState.kind === "ready" ? soakState.report.manual_evidence : [];
   const soakAge = formatSoakAge(baselineCheckpoint?.created_at ?? null);
 
@@ -712,15 +713,28 @@ export function AdminPage() {
                   </div>
 
                   {baselineCheckpoint && (
-                    <div className="rounded-md border border-buy/30 bg-buy/10 px-3 py-3 text-xs text-buy">
-                      <div className="flex items-center gap-2 font-semibold">
-                        <CheckCircle2 className="h-4 w-4" />
-                        Baseline captured
+                    <div className="space-y-3">
+                      <div className="rounded-md border border-buy/30 bg-buy/10 px-3 py-3 text-xs text-buy">
+                        <div className="flex items-center gap-2 font-semibold">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Baseline captured
+                        </div>
+                        <div className="mt-1 text-dim">
+                          Saved at {formatTimestamp(baselineCheckpoint.created_at)}. Additional
+                          edits here update the operator baseline evidence but do not create a
+                          second baseline snapshot.
+                        </div>
                       </div>
-                      <div className="mt-1 text-dim">
-                        Saved at {formatTimestamp(baselineCheckpoint.created_at)}. Additional edits
-                        here update the operator baseline evidence but do not create a second
-                        baseline snapshot.
+
+                      <div className="rounded-md border border-warn/40 bg-warn/10 px-3 py-3 text-xs text-warn">
+                        <div className="flex items-center gap-2 font-semibold">
+                          <AlertTriangle className="h-4 w-4" />
+                          Baseline already captured - do not replace
+                        </div>
+                        <div className="mt-1 text-dim">
+                          The preserved baseline snapshot remains the soak reference point. A new
+                          baseline capture is locked on this admin session.
+                        </div>
                       </div>
                     </div>
                   )}
@@ -833,13 +847,26 @@ export function AdminPage() {
                       hint={autoBaselineFields.notes}
                     />
 
-                    <Button type="submit" disabled={baselineSaving}>
-                      {baselineSaving
-                        ? "Saving..."
-                        : baselineCheckpoint
-                          ? "Update Baseline Evidence"
-                          : "Capture Baseline & Start Soak"}
-                    </Button>
+                    {baselineCaptureLocked ? (
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          disabled
+                          variant="outline"
+                          title="Baseline already captured. Saving a new baseline is not permitted."
+                          aria-label="Baseline already captured. Saving a new baseline is not permitted."
+                        >
+                          Capture Baseline & Start Soak
+                        </Button>
+                        <Button type="submit" disabled={baselineSaving}>
+                          {baselineSaving ? "Saving..." : "Update Baseline Evidence"}
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button type="submit" disabled={baselineSaving}>
+                        {baselineSaving ? "Saving..." : "Capture Baseline & Start Soak"}
+                      </Button>
+                    )}
                   </form>
                 </div>
 
