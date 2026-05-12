@@ -116,6 +116,16 @@ function buildObservedKey() {
     const s = readJson(STATE_FILE);
     if (s?.state === "IMPLEMENTATION_COMPLETE" || s?.state === "IMPLEMENTATION_FAILED") {
       timeBucket = Math.floor(Date.now() / 60000);
+    } else if (s?.state === "PLANNING") {
+      // Timed hardening retry gates depend on wall-clock time. Re-check every
+      // minute while a non-permanent retry block exists so retries fire without
+      // requiring unrelated file changes.
+      try {
+        const blocked = readJson(CLAUDE_HARDENING_BLOCKED_FILE);
+        if (!blocked?.permanent && blocked?.next_retry_at) {
+          timeBucket = Math.floor(Date.now() / 60000);
+        }
+      } catch { /* ignore */ }
     }
   } catch { /* ignore */ }
 
@@ -438,9 +448,10 @@ function sendHardeningFailureNotification(state, reason) {
   ].join("\n");
 
   try {
-    execSync(
-      `gh issue create --title "${title.replace(/"/g, '\\"')}" --body "${body.replace(/"/g, '\\"').replace(/\n/g, "\\n")}" --label "pipeline-blocked"`,
-      { cwd: REPO_ROOT, shell: true, timeout: 20000, stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" },
+    execFileSync(
+      "gh",
+      ["issue", "create", "--title", title, "--body", body, "--label", "pipeline-blocked"],
+      { cwd: REPO_ROOT, timeout: 20000, stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" },
     );
     log("Hardening failure notification: GitHub issue created successfully");
   } catch (err) {
@@ -1022,11 +1033,32 @@ function evaluatePipeline() {
       return;
     }
 
-    // If a blocked state exists for a different issue or stale research hash, clear it
-    // automatically so a new issue cycle is not forced into manual intervention.
-    if (!isHardeningBlockedForCurrentState(state) && fs.existsSync(CLAUDE_HARDENING_BLOCKED_FILE)) {
-      clearHardeningBlockedState();
-      log("Stale blocked state cleared - new issue or research detected");
+    // If a blocked state exists for a different issue/research snapshot, clear
+    // it automatically so a new issue cycle is not forced into manual intervention.
+    // IMPORTANT: do not delete a matching timed retry block when its retry window
+    // elapses; preserving retry_count allows failures to accumulate to permanent
+    // block and notification after MAX_HARDENING_RETRIES.
+    if (fs.existsSync(CLAUDE_HARDENING_BLOCKED_FILE)) {
+      let shouldClearStaleBlock = false;
+      try {
+        const blocked = readJson(CLAUDE_HARDENING_BLOCKED_FILE);
+        if (blocked.issue !== (state.issue ?? "")) {
+          shouldClearStaleBlock = true;
+        } else {
+          try {
+            shouldClearStaleBlock = blocked.research_hash !== hashFile(RESEARCH_FILE);
+          } catch {
+            shouldClearStaleBlock = true;
+          }
+        }
+      } catch {
+        shouldClearStaleBlock = true;
+      }
+
+      if (shouldClearStaleBlock) {
+        clearHardeningBlockedState();
+        log("Stale blocked state cleared - new issue or research detected");
+      }
     }
 
     if (!hasUsablePlanArtifactForState(state)) {
