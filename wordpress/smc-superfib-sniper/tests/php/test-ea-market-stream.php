@@ -540,6 +540,29 @@ function test_ea_market_stream() {
         var_dump($invalid_ohlc_response);
     }
 
+    echo "\n";
+
+    // Test 7: is_finite() guard — INF bid/ask rejected (BUG-001 regression)
+    echo "Test 7: INF bid rejected by is_finite() guard (snapshot NOT inserted)\n";
+    $inf_bid_payload = array(
+        'user_id' => 7,
+        'symbol' => 'GBPUSD',
+        'timestamp' => gmdate('c', time() - 5),
+        'bid' => INF,
+        'ask' => 1.27515
+    );
+
+    $inf_bid_response = dispatch_ea_market_stream($plugin, $inf_bid_payload);
+
+    if ($inf_bid_response instanceof WP_REST_Response
+        && $inf_bid_response->data['ok'] === true
+        && $inf_bid_response->data['snapshots_inserted'] === 0) {
+        echo "✓ SUCCESS: INF bid correctly rejected by is_finite() guard\n";
+    } else {
+        echo "✗ FAILED: INF bid was not rejected\n";
+        var_dump($inf_bid_response);
+    }
+
     echo "\nTest completed.\n";
 }
 

@@ -1,0 +1,116 @@
+{
+  "snapshot_type": "FINDINGS",
+  "workflow_id": "stabilize-ea-2026-05-12",
+  "timestamp": "2026-05-12T00:01:00Z",
+  "audit_stages_completed": [
+    "Stage 2: REST API and Authentication Audit",
+    "Stage 3: EA Market Stream Contract Verification",
+    "Stage 4: EA Authentication Verification",
+    "Stage 5: Runtime, Wiring, and Data Flow Audit",
+    "Stage 6: Refresh and Stale-State Audit",
+    "Stage 7: Signal Engine Integrity Audit",
+    "Stage 8: Migration Parity Validation"
+  ],
+  "confirmed_issues": [
+    {
+      "id": "BUG-001",
+      "severity": "MEDIUM",
+      "system": "EA Market Stream - Payload Validation",
+      "description": "Missing is_finite() guard on bid/ask in post_ea_market_stream(). PHP casts NaN and INF to float; the existing guard ($bid > 0 && $ask > 0 && $bid <= $ask) is insufficient because PHP float INF satisfies all three conditions and would be stored in the database.",
+      "root_cause": "PHP (float) cast silently converts non-finite IEEE 754 values. The validation at line 1698 only checks sign and ordering, not finiteness.",
+      "impact_zones": ["EA Market Stream", "Snapshot DB", "Signal Engine", "Dashboard"],
+      "proposed_fix": "Add is_finite($bid) && is_finite($ask) to the bid/ask guard at line 1698.",
+      "affected_file": "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "affected_line": 1698
+    },
+    {
+      "id": "BUG-002",
+      "severity": "LOW",
+      "system": "EA Market Stream - Logging",
+      "description": "post_ea_market_stream() emits error_log('MT5 CANDLE PAYLOAD MISSING OR INVALID FOR SYMBOL: ...') at line 1761 for every tick-only push where no candle field is included. This floods PHP error logs unnecessarily since tick-only payloads (no new M1 bar closed yet) are expected and valid behavior.",
+      "root_cause": "The else branch of the candle check logs at error_log level even when candle is intentionally absent. The EA legitimately omits candle when no new M1 bar has closed.",
+      "impact_zones": ["PHP Error Log"],
+      "proposed_fix": "Downgrade the log from error_log to a silent no-op (or debug-level log) when candle key is entirely absent from payload.",
+      "affected_file": "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "affected_line": 1761
+    }
+  ],
+  "confirmed_correct": [
+    {
+      "area": "REST route registration",
+      "detail": "All 28 routes correctly registered under sniper/v1. No duplicates, no missing routes."
+    },
+    {
+      "area": "permission_ea_market_stream",
+      "detail": "Complete: reads all 4 header aliases, uses hash_equals(), validates configured secret, requires user_id, validates user via get_userdata()+user_can('read'), calls wp_set_current_user(). Returns 401/503/403/400/403 for all rejection paths."
+    },
+    {
+      "area": "EA payload staleness rejection",
+      "detail": "Hard reject at >300s (age > 300s → 400), drift warning at 120-300s, candle stale rejection at >180s inside insert_mt5_candle()."
+    },
+    {
+      "area": "OHLC validation",
+      "detail": "validate_ohlc() guards both M1 and M15 candles. Added in PATCH-001 (2026-05-11). Applied correctly in both candle ingestion paths."
+    },
+    {
+      "area": "Freshness age computation",
+      "detail": "get_cached_price() uses iso_age_sec() on updated_at (broker timestamp, not server fetch time). upsert_mt5_snapshot() writes broker timestamp to updated_at column."
+    },
+    {
+      "area": "Signal backendConfirmed gate",
+      "detail": "backendConfirmed is set only when status === 'READY' && $data_live. data_live requires price_is_live (state='live' within staleThresholdSec) AND candles_fresh (last candle age <= 7200s). Stale data can never produce a READY backend-confirmed signal."
+    },
+    {
+      "area": "determine_engine_blocker guards",
+      "detail": "Checks MT5 authority, Twelve Data key status, rate limiting, price state, candle count (>=30 required), candle age (<=7200s), chop gate (>=0.7 blocks). Returns specific blocker codes for each condition."
+    },
+    {
+      "area": "authority-diagnostics protection",
+      "detail": "permission_user() correctly returns 401 for unauthenticated requests. authority-diagnostics is NOT public."
+    },
+    {
+      "area": "admin route protection",
+      "detail": "permission_admin() requires manage_options capability. All admin routes (/admin/health, /admin/soak-report, /admin/soak-evidence, /admin/soak-checkpoint) correctly use this gate."
+    },
+    {
+      "area": "Frontend auth",
+      "detail": "sniperClient.ts call() attaches Authorization or X-WP-Nonce headers. credentials: include. EA token is never exposed in frontend JS. MockMode only active when VITE_SNIPER_MOCK_MODE=true."
+    },
+    {
+      "area": "Dashboard is_live truth",
+      "detail": "FreshnessBadge renders state from backend price.state, not computed locally. VerdictBadge renders verdict from backend signal. No local is_live derivation from fetch time."
+    },
+    {
+      "area": "useSniperData polling",
+      "detail": "Polling is disabled until backendReady && pollMs !== null. No orphaned query race conditions. Default poll interval: 2000ms. Snapshot poll uses cacheBust=true."
+    },
+    {
+      "area": "Broker timestamp UTC conversion (MT5 EA)",
+      "detail": "TimeToIso8601() in MarketDataEngine.mqh correctly converts broker-local datetime to UTC using TimeCurrent()-TimeGMT() offset before appending Z suffix."
+    },
+    {
+      "area": "EA payload field parity",
+      "detail": "MQL5 BuildWebhookPayload() sends: user_id, symbol, normalized_symbol, timeframe=M1, timestamp (UTC ISO), bid, ask, freshness, session, candle{} (if available), candle_m15{} (if available). PHP handler correctly consumes all these fields."
+    }
+  ],
+  "parity_findings": [
+    {
+      "type": "DOCUMENTED_DIVERGENCE",
+      "area": "EA payload contract naming",
+      "detail": "Workflow specification example uses quote_time/server_time/candles-array. Actual EA and PHP handler use timestamp (singular) and candle/candle_m15 (singular objects). This is a consistent implemented contract — the spec example is illustrative, not normative. Documented in phase-0-mt5-ea-market-stream-parity-2026-05-11.md."
+    },
+    {
+      "type": "DOCUMENTED_DIVERGENCE",
+      "area": "Session display vs market-open detection",
+      "detail": "get_session() returns SMC killzone windows (London 07-11, NY 12-16) for display only. SessionManager.mqh uses full session hours (London 07-15, NY 12-20) for freshness state transitions. Intentional; tracked in migration audit."
+    }
+  ],
+  "statistics": {
+    "total_issues": 2,
+    "critical": 0,
+    "high": 0,
+    "medium": 1,
+    "low": 1,
+    "info": 2
+  }
+}

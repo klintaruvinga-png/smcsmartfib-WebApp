@@ -1727,7 +1727,7 @@ final class SMC_SuperFib_Sniper_REST {
             $bid = (float) $payload['bid'];
             $ask = (float) $payload['ask'];
             
-            if ($bid > 0 && $ask > 0 && $bid <= $ask) {
+            if (is_finite($bid) && is_finite($ask) && $bid > 0 && $ask > 0 && $bid <= $ask) {
                 $result = $this->upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $snapshot_updated_at);
                 if ($result) {
                     $inserted_snapshots = 1;
@@ -1789,9 +1789,11 @@ final class SMC_SuperFib_Sniper_REST {
                     'candle' => $candle
                 ));
             }
-        } else {
-            error_log("MT5 CANDLE PAYLOAD MISSING OR INVALID FOR SYMBOL: {$symbol}");
+        } elseif (isset($payload['candle'])) {
+            // candle key is present but not a valid array — log as a real anomaly.
+            error_log("MT5 CANDLE PAYLOAD INVALID (non-array) FOR SYMBOL: {$symbol}");
         }
+        // else: candle key absent — normal tick-only push; no log needed.
 
         // Insert M15 candle if provided (separate from M1).
         // This is critical: the engine requires at least 30 closed M15 bars to run.
