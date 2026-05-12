@@ -1,42 +1,38 @@
-# Bug Sweep Report: admin UI polish soak report
+# Bug Sweep Report
 
-## Date
+## Scope
 
-- 2026-05-12
+- Issue: Admin UI polish for baseline/checkpoint distinction, header age visibility, print/export evidence preservation, and operator-facing soak report failure messaging.
+- Route: `src/routes/admin.tsx`
+- Date: 2026-05-12
 
-## Issue
+## Runtime integrity sweep
 
-- `/admin` only surfaced one soak age card, had no print-focused layout guards for the soak workspace export, and allowed soak-report refresh attempts to re-enter without an explicit in-flight guard.
+- Confirmed the soak workspace still treats backend health and soak report payloads as read-only backend-owned inputs.
+- Confirmed `AuthError` redirect handling remains unchanged on initial load and refresh paths.
+- Confirmed baseline capture locking logic remains intact when a baseline snapshot already exists.
+- Confirmed checkpoint snapshot creation still routes through the existing backend checkpoint API and refresh path.
 
-## Confirmed root cause
+## Changes reviewed
 
-- `src/routes/admin.tsx` rendered a single `Soak age` card from `baseline_checkpoint.created_at`, so baseline/checkpoint age visibility was compressed into one summary value.
-- The print stylesheet isolated `.soak-report-print-section` correctly, but it did not add print-specific block handling for the summary cards, evidence sections, or checkpoint sections.
-- `refreshSoakReport()` did not guard against concurrent invocation, and the submit handlers for evidence/checkpoint actions still advanced their success path even when the follow-up soak-report refresh failed.
-- `src/types/sniper.ts` does not expose a dedicated checkpoint-age field, so the dashboard cannot truthfully invent a separate backend-owned checkpoint-age source.
+- Strengthened baseline/checkpoint status cards with existing Lucide icons and inline badges while preserving the existing 6-card grid.
+- Promoted age/capture timing into `HealthCard` header metadata for baseline and checkpoint-related cards.
+- Hardened `@media print` rules so `soak-report-print-*` evidence blocks render as explicit block/grid containers and keep headings attached to content.
+- Replaced generic soak report failure copy with structured operator-facing messaging that surfaces the failure source, HTTP status, parsed error code when available, and next action guidance.
 
-## Files reviewed
-
-- `src/routes/admin.tsx`
-- `src/routes/-admin.test.tsx`
-- `src/types/sniper.ts`
-- `src/lib/api/sniperClient.ts`
-
-## Patch applied
-
-- Replaced the single soak-age summary with explicit `Baseline age` and `Checkpoint age` cards in `src/routes/admin.tsx`.
-- Kept backend authority intact by deriving both age displays from the existing baseline timestamp and labeling the checkpoint-age fallback explicitly until a backend checkpoint-age field exists.
-- Hardened `refreshSoakReport()` with an in-flight guard and retry-loading transition, while preserving non-auth failure promotion into the soak error state.
-- Blocked post-submit success messaging when the follow-up soak-report refresh fails.
-- Added print-specific block classes and page-break protection for soak summary cards, operator evidence, manual evidence, and checkpoint sections.
-- Extended `src/routes/-admin.test.tsx` to cover retry recovery, status-detail rendering, refresh-failure error promotion, concurrent retry blocking, and the new age labels.
-
-## Validation run
+## Regression checks completed
 
 - `npx vitest run --environment jsdom src/routes/-admin.test.tsx`
+- `npx eslint src/routes/admin.tsx src/routes/-admin.test.tsx`
 - `npm run build`
 
-## Residual risk
+## Residual risks
 
-- Browser print preview was not executed in-session because the local browser automation surface required for `/admin` verification was unavailable here.
-- `Checkpoint age` still reuses the baseline timestamp by contract because the current backend schema does not expose a distinct checkpoint-age field.
+- Browser print preview was not visually verified in-session because the browser automation runtime required by the bundled browser plugin is not exposed here.
+- Forced live `/admin/soak-report` network failure was validated through unit coverage rather than an interactive browser session for the same reason.
+
+## Recommended manual follow-up
+
+- Open `/admin/soak-report` and confirm baseline/checkpoint cards remain aligned in the 6-column grid at desktop width.
+- Open browser print preview and confirm soak summary, baseline snapshot, checkpoint history, and manual evidence sections remain visible with attached headings.
+- Force a `/admin/soak-report` API failure in the browser and confirm the operator-facing message shows source, HTTP status/error code, and retry guidance.
