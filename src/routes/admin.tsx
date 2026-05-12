@@ -1,5 +1,5 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, ClipboardList, Flag, Lock, ShieldCheck } from "lucide-react";
 import {
   apiClient,
@@ -106,11 +106,13 @@ export function AdminPage() {
   const [checkpointSaving, setCheckpointSaving] = useState(false);
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
+  const [soakRefreshing, setSoakRefreshing] = useState(false);
   const [autoBaselineFields, setAutoBaselineFields] = useState<AutoBaselineFields>({
     frontendWatchlist: "",
     watchlistLiveSymbols: "",
     notes: "",
   });
+  const soakRefreshInFlight = useRef<Promise<SoakReport | null> | null>(null);
 
   useEffect(() => {
     if (!hasCredentials() && !hasWordPressNonce()) {
@@ -153,6 +155,7 @@ export function AdminPage() {
         const report = await fetchSoakReport();
         if (!cancelled) {
           setSoakState({ kind: "ready", report });
+          setPanelError(null);
         }
       } catch (error) {
         if (cancelled) return;
@@ -160,12 +163,13 @@ export function AdminPage() {
           void router.navigate({ to: "/login" });
           return;
         }
-        const message = error instanceof Error ? error.message : "Failed to load soak report.";
+        const message = formatSoakReportError(error, "load");
+        console.error("[PHASE0_SOAK] Failed to load soak report", error);
         setSoakState({
           kind: "error",
           message,
         });
-        setPanelError(message);
+        setPanelError(null);
       }
     })();
 
@@ -291,24 +295,40 @@ export function AdminPage() {
     soakState.kind === "ready" ? soakState.report.baseline_checkpoint : null;
   const baselineCaptureLocked = baselineCheckpoint !== null;
   const evidenceRows = soakState.kind === "ready" ? soakState.report.manual_evidence : [];
-  const soakAge = formatSoakAge(baselineCheckpoint?.created_at ?? null);
+  const baselineAge = formatSoakAge(baselineCheckpoint?.created_at ?? null);
+  const checkpointAge = formatSoakAge(baselineCheckpoint?.created_at ?? null);
 
   async function refreshSoakReport() {
-    try {
-      const report = await fetchSoakReport();
-      setSoakState({ kind: "ready", report });
-      setPanelError(null);
-      return report;
-    } catch (error) {
-      if (error instanceof AuthError) {
-        void router.navigate({ to: "/login" });
-        return null;
-      }
-      const message = error instanceof Error ? error.message : "Failed to refresh soak report.";
-      setSoakState({ kind: "error", message });
-      setPanelError(message);
-      return null;
+    if (soakRefreshInFlight.current) {
+      return soakRefreshInFlight.current;
     }
+
+    setSoakRefreshing(true);
+    setSoakState({ kind: "loading" });
+    const refreshPromise = (async () => {
+      try {
+        const report = await fetchSoakReport();
+        setSoakState({ kind: "ready", report });
+        setPanelError(null);
+        return report;
+      } catch (error) {
+        if (error instanceof AuthError) {
+          void router.navigate({ to: "/login" });
+          return null;
+        }
+        const message = formatSoakReportError(error, "refresh");
+        console.error("[PHASE0_SOAK] Failed to refresh soak report", error);
+        setSoakState({ kind: "error", message });
+        setPanelError(null);
+        return null;
+      } finally {
+        soakRefreshInFlight.current = null;
+        setSoakRefreshing(false);
+      }
+    })();
+
+    soakRefreshInFlight.current = refreshPromise;
+    return refreshPromise;
   }
 
   async function saveEvidenceEntries(entries: SoakEvidencePayload[]) {
@@ -363,7 +383,8 @@ export function AdminPage() {
 
     try {
       await upsertSoakEvidence(evidenceForm);
-      await refreshSoakReport();
+      const refreshed = await refreshSoakReport();
+      if (!refreshed) return;
       setPanelMessage(`Saved evidence key "${evidenceForm.evidence_key}".`);
       setEvidenceForm((current) => ({
         ...current,
@@ -392,7 +413,8 @@ export function AdminPage() {
         checkpointType: "checkpoint",
         operatorNotes: checkpointNotes,
       });
-      await refreshSoakReport();
+      const refreshed = await refreshSoakReport();
+      if (!refreshed) return;
       setPanelMessage("Saved soak checkpoint snapshot.");
       setCheckpointNotes("");
     } catch (error) {
@@ -430,7 +452,15 @@ export function AdminPage() {
   return (
     <div className="space-y-4">
       <style>{`
+        @page {
+          margin: 12mm;
+        }
+
         @media print {
+          body {
+            background: #ffffff;
+          }
+
           body * {
             visibility: hidden;
           }
@@ -447,6 +477,7 @@ export function AdminPage() {
             width: 100%;
             margin: 0;
             border: 0;
+            box-shadow: none;
             background: #ffffff;
             color: #000000;
             padding: 0;
@@ -454,6 +485,47 @@ export function AdminPage() {
 
           .soak-report-print-section summary {
             display: none;
+          }
+
+          .soak-report-print-section [data-print-hide="true"] {
+            display: none !important;
+          }
+
+          .soak-report-print-card,
+          .soak-report-print-block,
+          .soak-report-print-grid,
+          .soak-report-print-table {
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+
+          .soak-report-print-card,
+          .soak-report-print-block {
+            border: 1px solid #d1d5db !important;
+            background: #ffffff !important;
+            color: #111827 !important;
+            box-shadow: none !important;
+          }
+
+          .soak-report-print-section table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+
+          .soak-report-print-section th,
+          .soak-report-print-section td {
+            border-color: #d1d5db !important;
+            color: #111827 !important;
+          }
+
+          .soak-report-print-section .text-dim,
+          .soak-report-print-section .text-mute,
+          .soak-report-print-section .text-tx,
+          .soak-report-print-section .text-buy,
+          .soak-report-print-section .text-warn,
+          .soak-report-print-section .text-sell,
+          .soak-report-print-section .text-accent {
+            color: #111827 !important;
           }
         }
       `}</style>
@@ -576,7 +648,7 @@ export function AdminPage() {
                 the live soak.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2 print:hidden">
+            <div className="flex flex-wrap gap-2 print:hidden" data-print-hide="true">
               <Button
                 type="button"
                 variant="outline"
@@ -600,6 +672,17 @@ export function AdminPage() {
         </summary>
 
         <div className="space-y-4 p-4">
+          {soakState.kind === "ready" && (
+            <div className="hidden print:block soak-report-print-block">
+              <h3 className="text-base font-semibold tracking-tight text-tx">
+                Phase 0 Soak Report
+              </h3>
+              <p className="mt-1 text-xs text-dim">
+                Generated {formatTimestamp(soakState.report.generated_at)}
+              </p>
+            </div>
+          )}
+
           {panelMessage && (
             <div className="rounded-md border border-buy/30 bg-buy/10 px-3 py-2 text-xs text-buy">
               {panelMessage}
@@ -627,28 +710,51 @@ export function AdminPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => void refreshSoakReport()}
+                disabled={soakRefreshing}
               >
-                Retry soak report
+                {soakRefreshing ? "Retrying soak report..." : "Retry soak report"}
               </Button>
             </div>
           )}
 
           {soakState.kind === "ready" && (
             <>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="soak-report-print-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
                 <HealthCard
                   label="Baseline"
                   value={baselineCheckpoint ? "captured" : "pending"}
                   tone={baselineCheckpoint ? "positive" : "warning"}
+                  className="soak-report-print-card"
                 />
-                <HealthCard label="Soak age" value={soakAge} />
+                <HealthCard
+                  label="Baseline age"
+                  value={baselineAge}
+                  detail={
+                    baselineCheckpoint
+                      ? `Captured ${formatTimestamp(baselineCheckpoint.created_at)}`
+                      : "Waiting for baseline capture."
+                  }
+                  className="soak-report-print-card"
+                />
+                <HealthCard
+                  label="Checkpoint age"
+                  value={checkpointAge}
+                  detail={
+                    baselineCheckpoint
+                      ? "Using baseline snapshot timestamp until backend exposes checkpoint-age data."
+                      : "No checkpoint source available yet."
+                  }
+                  className="soak-report-print-card"
+                />
                 <HealthCard
                   label="Checkpoints"
                   value={String(soakState.report.checkpoints.length)}
+                  className="soak-report-print-card"
                 />
                 <HealthCard
                   label="Manual evidence"
                   value={String(soakState.report.manual_evidence.length)}
+                  className="soak-report-print-card"
                 />
                 <HealthCard
                   label="Watchlist symbols"
@@ -657,31 +763,36 @@ export function AdminPage() {
                       ? "Unavailable"
                       : String(soakState.report.watchlist_count)
                   }
+                  className="soak-report-print-card"
                 />
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="soak-report-print-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <HealthCard
                   label="Snapshots 24h"
                   value={stringOrUnavailable(soakState.report.snapshots_24h)}
+                  className="soak-report-print-card"
                 />
                 <HealthCard
                   label="Candles 24h"
                   value={stringOrUnavailable(soakState.report.candles_24h)}
+                  className="soak-report-print-card"
                 />
                 <HealthCard
                   label="Engine runs 24h"
                   value={String(soakState.report.engine_runs_summary.total_24h)}
+                  className="soak-report-print-card"
                 />
                 <HealthCard
                   label="Audit events 24h"
                   value={String(soakState.report.audit_events_summary.total_24h)}
+                  className="soak-report-print-card"
                 />
               </div>
 
               <div
                 data-section="operator-evidence-entry"
-                className="rounded-lg border border-bd bg-bg2/40 px-4 py-3"
+                className="soak-report-print-block rounded-lg border border-bd bg-bg2/40 px-4 py-3"
               >
                 <h3 className="text-sm font-semibold tracking-tight">
                   Operator Evidence - enter metadata only
@@ -692,8 +803,8 @@ export function AdminPage() {
                 </p>
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-                <div className="rounded-lg border border-bd bg-bg2/40 p-4 space-y-4">
+              <div className="soak-report-print-grid grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+                <div className="soak-report-print-block rounded-lg border border-bd bg-bg2/40 p-4 space-y-4">
                   <div className="flex items-start gap-3">
                     <Flag className="mt-0.5 h-4 w-4 text-accent" />
                     <div>
@@ -714,7 +825,7 @@ export function AdminPage() {
 
                   {baselineCheckpoint && (
                     <div className="space-y-3">
-                      <div className="rounded-md border border-buy/30 bg-buy/10 px-3 py-3 text-xs text-buy">
+                      <div className="soak-report-print-block rounded-md border border-buy/30 bg-buy/10 px-3 py-3 text-xs text-buy">
                         <div className="flex items-center gap-2 font-semibold">
                           <CheckCircle2 className="h-4 w-4" />
                           Baseline captured
@@ -726,7 +837,7 @@ export function AdminPage() {
                         </div>
                       </div>
 
-                      <div className="rounded-md border border-warn/40 bg-warn/10 px-3 py-3 text-xs text-warn">
+                      <div className="soak-report-print-block rounded-md border border-warn/40 bg-warn/10 px-3 py-3 text-xs text-warn">
                         <div className="flex items-center gap-2 font-semibold">
                           <AlertTriangle className="h-4 w-4" />
                           Baseline already captured - do not replace
@@ -870,7 +981,7 @@ export function AdminPage() {
                   </form>
                 </div>
 
-                <div className="rounded-lg border border-bd bg-bg2/40 p-4 space-y-4">
+                <div className="soak-report-print-block rounded-lg border border-bd bg-bg2/40 p-4 space-y-4">
                   <div className="flex items-start gap-3">
                     <ClipboardList className="mt-0.5 h-4 w-4 text-accent" />
                     <div>
@@ -890,7 +1001,7 @@ export function AdminPage() {
                     {renderTimelineRow("T+72h", soakState.report.checkpoints[3] ?? null)}
                   </div>
 
-                  <div className="rounded-md border border-bd bg-bg1/60 px-3 py-3">
+                  <div className="soak-report-print-block rounded-md border border-bd bg-bg1/60 px-3 py-3">
                     <div className="text-[11px] font-mono uppercase tracking-wider text-mute">
                       Latest engine summary
                     </div>
@@ -913,8 +1024,8 @@ export function AdminPage() {
                 </div>
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-                <div className="rounded-lg border border-bd bg-bg2/40 p-4 space-y-4">
+              <div className="soak-report-print-grid grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+                <div className="soak-report-print-block rounded-lg border border-bd bg-bg2/40 p-4 space-y-4">
                   <div>
                     <h3 className="text-sm font-semibold tracking-tight">Manual Evidence</h3>
                     <p className="mt-0.5 text-xs text-mute">
@@ -982,7 +1093,7 @@ export function AdminPage() {
                     </div>
                   </form>
 
-                  <div className="overflow-x-auto">
+                  <div className="soak-report-print-table overflow-x-auto">
                     <table className="min-w-full text-left text-xs">
                       <thead className="text-mute">
                         <tr className="border-b border-bd">
@@ -1021,7 +1132,7 @@ export function AdminPage() {
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-bd bg-bg2/40 p-4 space-y-4">
+                <div className="soak-report-print-block rounded-lg border border-bd bg-bg2/40 p-4 space-y-4">
                   <div>
                     <h3 className="text-sm font-semibold tracking-tight">Checkpoint Snapshots</h3>
                     <p className="mt-0.5 text-xs text-mute">
@@ -1055,7 +1166,7 @@ export function AdminPage() {
                   <div className="space-y-4">
                     <section
                       aria-labelledby="baseline-snapshot-heading"
-                      className="space-y-3 rounded-md border border-bd/70 bg-bg1/30 p-3"
+                      className="soak-report-print-block space-y-3 rounded-md border border-bd/70 bg-bg1/30 p-3"
                     >
                       <div className="border-b border-bd/70 pb-2">
                         <h4
@@ -1079,7 +1190,7 @@ export function AdminPage() {
 
                     <section
                       aria-labelledby="checkpoint-history-heading"
-                      className="space-y-3 rounded-md border border-bd/70 bg-bg1/30 p-3"
+                      className="soak-report-print-block space-y-3 rounded-md border border-bd/70 bg-bg1/30 p-3"
                     >
                       <div className="border-b border-bd/70 pb-2">
                         <h4
@@ -1178,10 +1289,14 @@ function HealthCard({
   label,
   value,
   tone = "neutral",
+  detail,
+  className,
 }: {
   label: string;
   value: string;
   tone?: "positive" | "warning" | "critical" | "neutral";
+  detail?: string;
+  className?: string;
 }) {
   const toneClass =
     tone === "positive"
@@ -1193,13 +1308,14 @@ function HealthCard({
           : "border-bd bg-bg2/50 text-tx";
 
   return (
-    <div className="rounded-lg border border-bd bg-bg1/60 p-4 space-y-2">
+    <div className={`rounded-lg border border-bd bg-bg1/60 p-4 space-y-2 ${className ?? ""}`}>
       <div className="text-[10px] font-mono uppercase tracking-wider text-mute">{label}</div>
       <div
         className={`inline-flex rounded border px-2 py-1 font-mono text-sm uppercase ${toneClass}`}
       >
         {value}
       </div>
+      {detail ? <div className="text-[11px] text-dim">{detail}</div> : null}
     </div>
   );
 }
@@ -1218,7 +1334,7 @@ function CheckpointCard({ checkpoint, title }: { checkpoint: SoakCheckpointRow; 
   const isBaseline = checkpoint.checkpoint_type === "baseline";
   return (
     <div
-      className={`space-y-2 rounded-md border px-3 py-3 ${
+      className={`soak-report-print-block space-y-2 rounded-md border px-3 py-3 ${
         isBaseline
           ? "border-sky-400/50 bg-sky-400/8 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.12)]"
           : "border-slate-400/35 bg-slate-400/5"
@@ -1452,6 +1568,17 @@ function formatSoakAge(value: string | null): string {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   return `${hours}h ${minutes}m`;
+}
+
+function formatSoakReportError(error: unknown, action: "load" | "refresh"): string {
+  if (error instanceof Error) {
+    if (error.name !== "Error" && !error.message.includes(error.name)) {
+      return `${error.name}: ${error.message}`;
+    }
+    return error.message;
+  }
+
+  return `Failed to ${action} soak report.`;
 }
 
 function renderTimelineRow(label: string, checkpoint: SoakCheckpointRow | null) {

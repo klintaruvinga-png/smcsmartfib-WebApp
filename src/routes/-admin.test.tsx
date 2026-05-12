@@ -59,6 +59,7 @@ import { AdminPage } from "./admin";
 const BASELINE_EXISTS_WARNING = "Baseline already captured - do not replace";
 const BASELINE_CAPTURE_LOCK_MESSAGE =
   "Baseline already captured. Saving a new baseline is not permitted.";
+let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 function buildHealth(): EngineHealth {
   return {
@@ -132,8 +133,19 @@ function buildCheckpoint(
   };
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 describe("AdminPage", () => {
   beforeEach(() => {
+    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     routerMocks.instance.navigate.mockReset();
     authMocks.getAuthHeader.mockReturnValue("Basic dGVzdDp0ZXN0");
     authMocks.hasCredentials.mockReturnValue(true);
@@ -162,6 +174,7 @@ describe("AdminPage", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    consoleErrorSpy.mockRestore();
   });
 
   it("renders backend health inside a read-only backend-owned section", async () => {
@@ -221,7 +234,7 @@ describe("AdminPage", () => {
 
     expect(await screen.findByText("Soak report failed to load.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Retry soak report" })).toBeTruthy();
-    expect(screen.getAllByText(loadError.message)).toHaveLength(2);
+    expect(screen.getByText(loadError.message)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Retry soak report" }));
 
@@ -233,6 +246,18 @@ describe("AdminPage", () => {
     });
     expect(screen.queryByText(loadError.message)).toBeNull();
     expect(screen.getByText("Baseline")).toBeTruthy();
+  });
+
+  it("shows the soak report fetch status detail in the error panel", async () => {
+    const loadError = new Error(
+      'API /admin/soak-report failed: 503 - {"error":"service_unavailable"}',
+    );
+    apiMocks.fetchSoakReport.mockRejectedValueOnce(loadError);
+
+    render(<AdminPage />);
+
+    expect(await screen.findByText("Soak report failed to load.")).toBeTruthy();
+    expect(screen.getByText(loadError.message)).toBeTruthy();
   });
 
   it("redirects to login on soak report AuthError without surfacing panelError", async () => {
@@ -271,6 +296,86 @@ describe("AdminPage", () => {
     expect(within(checkpointSection).getByText("CHECKPOINT")).toBeTruthy();
     expect(screen.getByText("Baseline Snapshot")).toBeTruthy();
     expect(screen.getByText("Checkpoint History")).toBeTruthy();
+  });
+
+  it("promotes a ready soak report back to error state when refresh fails", async () => {
+    const report = buildSoakReport();
+    const refreshError = new Error('API /admin/soak-report failed: 500 - {"error":"retry_failed"}');
+    apiMocks.fetchSoakReport.mockResolvedValueOnce(report).mockRejectedValueOnce(refreshError);
+    apiMocks.createSoakCheckpoint.mockResolvedValue(
+      buildCheckpoint(1, "baseline", "2026-05-12T08:05:00Z", "Initial soak capture."),
+    );
+
+    render(<AdminPage />);
+
+    expect(
+      await screen.findByRole("button", { name: "Capture Baseline & Start Soak" }),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Capture Baseline & Start Soak" }));
+
+    expect(await screen.findByText("Soak report failed to load.")).toBeTruthy();
+    expect(screen.getByText(refreshError.message)).toBeTruthy();
+    expect(screen.queryByText("Baseline age")).toBeNull();
+  });
+
+  it("blocks concurrent retry clicks while a soak report refresh is in flight", async () => {
+    const loadError = new Error(
+      'API /admin/soak-report failed: 500 - {"error":"table_init_failed"}',
+    );
+    const deferred = createDeferred<SoakReport>();
+    apiMocks.fetchSoakReport
+      .mockRejectedValueOnce(loadError)
+      .mockImplementationOnce(() => deferred.promise);
+
+    render(<AdminPage />);
+
+    const retryButton = await screen.findByRole("button", { name: "Retry soak report" });
+    fireEvent.click(retryButton);
+    fireEvent.click(retryButton);
+
+    await waitFor(() => {
+      expect(apiMocks.fetchSoakReport).toHaveBeenCalledTimes(2);
+    });
+
+    deferred.resolve(buildSoakReport());
+
+    expect(await screen.findByText("Baseline")).toBeTruthy();
+  });
+
+  it("renders the baseline age label when soak report data is present", async () => {
+    const report = buildSoakReport();
+    report.baseline_checkpoint = buildCheckpoint(
+      1,
+      "baseline",
+      "2026-05-12T08:05:00Z",
+      "Initial soak capture.",
+    );
+    apiMocks.fetchSoakReport.mockResolvedValue(report);
+
+    render(<AdminPage />);
+
+    expect(await screen.findByText("Baseline age")).toBeTruthy();
+  });
+
+  it("renders the checkpoint age label when soak report data is present", async () => {
+    const report = buildSoakReport();
+    report.baseline_checkpoint = buildCheckpoint(
+      1,
+      "baseline",
+      "2026-05-12T08:05:00Z",
+      "Initial soak capture.",
+    );
+    apiMocks.fetchSoakReport.mockResolvedValue(report);
+
+    render(<AdminPage />);
+
+    expect(await screen.findByText("Checkpoint age")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Using baseline snapshot timestamp until backend exposes checkpoint-age data.",
+      ),
+    ).toBeTruthy();
   });
 
   it("shows a baseline-exists warning and locks baseline capture when a baseline is present", async () => {
