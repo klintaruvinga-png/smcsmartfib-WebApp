@@ -1,51 +1,36 @@
 # Issue summary
 
-Completed the Phase 0 backend/EA parity hardening contract for MT5 snapshot persistence, timestamp authority, backend health parity re-validation, snapshot coverage expansion, and engine snapshot invalidation audit. The patch stayed inside the WordPress backend and existing test harnesses.
+The repo was missing the restart-baseline documentation artifacts for the active Phase 0 soak window that began on `2026-05-11 08:57 SAST`. The live checklist claimed the admin-health baseline snapshot had already been saved to git, but the file was absent. The migration status board also did not reflect that the baseline documentation lane could be completed before the final `T+72h` closeout.
 
 # Root cause implemented
 
-The active gap was not route divergence. It was incomplete contract enforcement around snapshot ingest and freshness reads: `post_snapshot()` trusted payload source attempts, allowed tick-bearing writes to inherit non-live freshness state, and did not invalidate the engine snapshot cache on watched-symbol live/non-live transitions. In repository reality, the non-MT5 source read risk also existed in `smc-superfib-sniper.php` helper reads, not in `class-market-data-service.php`, so the source-filter hardening was applied there.
+The missing work was documentation consolidation, not runtime logic. I created the restart-baseline soak summary, created the missing admin-health baseline artifact from recorded backend-owned evidence, updated the live checklist to reflect those deliverables, and clarified the Phase 0 blocker text so it stays truthful: restart-baseline artifacts are now written, but final Phase 0 completion still depends on the scheduled `T+72h` checkpoint.
 
 # Exact files changed
 
-- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
-- `wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
-- `wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`
-- `wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php`
+- `.github/migration/phase-updates/phase-0-soak-summary-2026-05-11.md`
+- `.github/migration/audits/phase-0-admin-health-baseline-2026-05-11.md`
 - `.github/migration/phase-updates/phase-0-next-72h-checklist-2026-05-11.md`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-12_backend-ea-parity-hardening.md`
-- `.github/migration/audits/phase-0-mt5-backend-parity-2026-05-12.md`
+- `.github/migration-status.md`
+- `reports/codex-implementation.md`
 
 # Tests run
 
-- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
-- `php -l wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
-- `php -l wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`
-- `php -l wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php`
 - `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
-- `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`
-- `php wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php`
-- `php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php`
 - `php wordpress/smc-superfib-sniper/tests/php/test-get-soak-report.php`
-- `php wordpress/smc-superfib-sniper/tests/php/test-rest-bootstrap-settings.php`
-- `php wordpress/smc-superfib-sniper/tests/php/test-settings-risk-fallbacks.php`
-- `php wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php`
-- `php wordpress/smc-superfib-sniper/tests/php/test-cors-regression.php`
-- `npx vitest run --environment jsdom src/routes/-admin.test.tsx src/lib/api/sniperClient.test.ts`
 
 # Reports generated
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-12_backend-ea-parity-hardening.md`
-- `.github/migration/audits/phase-0-mt5-backend-parity-2026-05-12.md`
+- `.github/migration/phase-updates/phase-0-soak-summary-2026-05-11.md`
+- `.github/migration/audits/phase-0-admin-health-baseline-2026-05-11.md`
+- `reports/codex-implementation.md`
 
 # Remaining risks
 
-- The contract’s 30-minute live MT5 connected/disconnected observation was not executable in this local harness and remains manual.
-- No live row inspection against a real WordPress database was possible here; verification is via the existing PHP harnesses.
-- `class-market-data-service.php::store_tick_snapshot()` still uses server time, but that helper was outside the accepted write-path scope and was not changed.
+- The final Phase 0 completion log and final parity audit cannot be truthfully written until the `T+72h` checkpoint due on `2026-05-14 08:57 SAST`.
+- The raw Day 1 soak export referenced by the checklist is not checked into git, so the new soak summary can only record the verified checklist result (`no anomalies`) rather than reproduce the full export payload.
+- The exact raw `admin/health` JSON payload captured on `2026-05-11` was not present in git; the baseline artifact is reconstructed from the exported soak report plus existing `/health` and `/admin/health` parity audits.
 
 # Any contract ambiguities resolved during implementation
 
-- The contract requested a `wp_smc_sf_audit_log` error entry. Repository reality uses `smc_sf_audit_events` via `audit()`, so the non-MT5 source guard writes there instead of creating a new logging surface.
-- The contract targeted source-filter auditing in `class-market-data-service.php`, but the active health/freshness read gap in this repo lives in `smc-superfib-sniper.php`. `class-market-data-service.php` was verified unchanged, and the equivalent live-path fix was applied in the plugin helpers instead.
-- The required branch in runtime context (`codex/complete-backend-and-ea-parity-hardening-audit-m`) was used instead of the contract’s recommendation branch example.
+- `reports/codex-plan.md` described a final closeout path that depends on future `T+72h` evidence not yet available on `2026-05-12`. I resolved this by applying the smallest safe interpretation of the runtime issue: complete the restart-baseline documentation and audit lane now, do not fabricate missing checkpoints, and do not mark Phase 0 complete.

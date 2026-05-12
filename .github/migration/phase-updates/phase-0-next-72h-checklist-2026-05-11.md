@@ -43,7 +43,7 @@ Update each checkpoint with the exact fetch time, observed health values, and an
 | [X] | T+0 | 2026-05-11 08:57 | Baseline confirmation, baseline export, `feedStatus`, `backendSync`, `engineRunState`, watchlist live count, blockers |  |  |
 | [X] | T+6h | 2026-05-11 14:57 | Same fields plus snapshot/candle/engine-run growth vs baseline |  |  |
 | [x] | T+12h | 2026-05-11 20:57 | Same fields plus any stale/live transition anomalies | Saved as 24h checkpoint  |  |
-| [ ] | T+24h | 2026-05-12 08:57 | Day 1 summary, export fresh soak report, compare against tracker |  |  |
+| [x] | T+24h | 2026-05-12 08:57 | Day 1 summary, export fresh soak report, compare against tracker | 2026-05-12 | Day 1 soak report exported and compared against tracker - no anomalies. |
 | [ ] | T+36h | 2026-05-12 20:57 | Same fields plus admin health parity spot-check |  |  |
 | [ ] | T+48h | 2026-05-13 08:57 | Day 2 summary, export fresh soak report, compare against tracker |  |  |
 | [ ] | T+60h | 2026-05-13 20:57 | Same fields plus unresolved blocker review |  |  |
@@ -81,9 +81,9 @@ These items are safe to run during the soak because they harden presentation, co
 
 | Status | Task | Deliverable | Completed At (SAST) | Comments |
 |---|---|---|---|---|
-| [ ] | Create the current Phase 0 soak summary from the 2026-05-11 baseline. | `.github/migration/phase-0-soak-summary-2026-05-11.md` |  |  |
-| [ ] | Capture the current admin-health baseline as markdown evidence. | `.github/migration/audits/phase-0-admin-health-baseline-2026-05-11.md` |  |  |
-| [ ] | Cross-check baseline data against `PHASE0_SOAK_TRACKER.md` and log any mismatches. | Tracker update or audit note |  |  |
+| [x] | Create the current Phase 0 soak summary from the 2026-05-11 baseline. | `.github/migration/phase-updates/phase-0-soak-summary-2026-05-11.md` | 2026-05-12 | Restart-baseline summary added without claiming T+72h closeout before the soak completes. |
+| [x] | Capture the current admin-health baseline as markdown evidence. | `.github/migration/audits/phase-0-admin-health-baseline-2026-05-11.md` | 2026-05-12 | Repo artifact created from the exported baseline soak report plus established `/health` and `/admin/health` parity evidence. |
+| [x] | Cross-check baseline data against `PHASE0_SOAK_TRACKER.md` and log any mismatches. | Soak summary note | 2026-05-12 | Logged restart-baseline drift vs the original 2026-05-06 tracker baseline; no backend truth conflict found. |
 
 ### 5.2 UI Polish
 
@@ -131,6 +131,7 @@ These items are safe to run during the soak because they harden presentation, co
 | Date / Time (SAST) | Note |
 |---|---|
 |  |  |
+| 2026-05-12 | Documentation lane completed for the 2026-05-11 restart baseline. Final Phase 0 closeout remains blocked on T+72h evidence scheduled for 2026-05-14 08:57 SAST. |
 |  |  |
 |  |  |
 |  |  |

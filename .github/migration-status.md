@@ -1,6 +1,6 @@
 # SMC SuperFIB → MT5 Migration Status Board
 
-**Last Updated**: 2026-05-10  
+**Last Updated**: 2026-05-12  
 **Current Phase**: 0 (Stabilization)  
 **Overall Progress**: 38%
 **Status**: In Progress
@@ -79,7 +79,7 @@ Freshness Logic: [PENDING]
 ### Blockers
 - Live 24h/72h soak evidence not complete
 - MT5 M1 -> 15min candle-history aggregation path still needs focused verification
-- Phase 0 completion log and final parity audit are not yet written to `.github/migration/phase-updates/` and `.github/migration/audits/`
+- Restart-baseline artifacts are now written to `.github/migration/phase-updates/phase-0-soak-summary-2026-05-11.md` and `.github/migration/audits/phase-0-admin-health-baseline-2026-05-11.md`, but the Phase 0 completion log and final parity audit remain pending the scheduled `T+72h` closeout.
 
 ---
 
