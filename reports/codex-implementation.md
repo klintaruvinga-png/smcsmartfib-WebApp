@@ -1,36 +1,41 @@
 # Issue summary
 
-The repo was missing the restart-baseline documentation artifacts for the active Phase 0 soak window that began on `2026-05-11 08:57 SAST`. The live checklist claimed the admin-health baseline snapshot had already been saved to git, but the file was absent. The migration status board also did not reflect that the baseline documentation lane could be completed before the final `T+72h` closeout.
+This task was a verification-only regression pass for the parallel admin/soak/snapshot patches. No product code changes were required or made. I executed the runnable build and test checks, validated live route registration and auth protection against the configured WordPress backend, and documented the remaining runtime checks that cannot be honestly closed from this workspace.
 
 # Root cause implemented
 
-The missing work was documentation consolidation, not runtime logic. I created the restart-baseline soak summary, created the missing admin-health baseline artifact from recorded backend-owned evidence, updated the live checklist to reflect those deliverables, and clarified the Phase 0 blocker text so it stays truthful: restart-baseline artifacts are now written, but final Phase 0 completion still depends on the scheduled `T+72h` checkpoint.
+No product regression was confirmed. The only discrepancy found during execution was in the validation harness: `npx vitest run` is not a valid whole-repo signal here because it picks up `node:test` files and runs DOM tests without `jsdom` unless explicitly configured. I resolved that by running the repo’s actual runnable subsets with the correct runner/environment instead of broadening scope or modifying code.
 
 # Exact files changed
 
-- `.github/migration/phase-updates/phase-0-soak-summary-2026-05-11.md`
-- `.github/migration/audits/phase-0-admin-health-baseline-2026-05-11.md`
-- `.github/migration/phase-updates/phase-0-next-72h-checklist-2026-05-11.md`
-- `.github/migration-status.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-12_parallel-regression-checks.md`
 - `reports/codex-implementation.md`
 
 # Tests run
 
-- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
-- `php wordpress/smc-superfib-sniper/tests/php/test-get-soak-report.php`
+- `npm run build`
+- `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`
+- `npx vitest run --environment jsdom src/routes/-admin.test.tsx`
+- `node --test src/lib/api/soakEvidence.test.ts`
+- `npx vitest run --environment jsdom src/lib/api/sniperClient.test.ts`
+- Live REST route registration spot checks against `https://trader.stokvelsociety.co.za/wp-json`
+- Live unauthenticated protection checks against:
+  - `/wp-json/sniper/v1/admin/health`
+  - `/wp-json/sniper/v1/admin/soak-report`
+  - `/wp-json/sniper/v1/snapshot`
 
 # Reports generated
 
-- `.github/migration/phase-updates/phase-0-soak-summary-2026-05-11.md`
-- `.github/migration/audits/phase-0-admin-health-baseline-2026-05-11.md`
-- `reports/codex-implementation.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-12_parallel-regression-checks.md`
 
 # Remaining risks
 
-- The final Phase 0 completion log and final parity audit cannot be truthfully written until the `T+72h` checkpoint due on `2026-05-14 08:57 SAST`.
-- The raw Day 1 soak export referenced by the checklist is not checked into git, so the new soak summary can only record the verified checklist result (`no anomalies`) rather than reproduce the full export payload.
-- The exact raw `admin/health` JSON payload captured on `2026-05-11` was not present in git; the baseline artifact is reconstructed from the exported soak report plus existing `/health` and `/admin/health` parity audits.
+- Live DB-level soak-evidence row preservation could not be verified because this workspace has no database access or pre-patch evidence snapshot.
+- WordPress object-cache flush/re-prime could not be verified because no WP-CLI or live admin shell access was available.
+- Authenticated `/admin` load, export, print, and live watchlist-driven snapshot invalidation could not be verified because no authenticated browser session or WordPress nonce/app-password credentials were available here.
 
 # Any contract ambiguities resolved during implementation
 
-- `reports/codex-plan.md` described a final closeout path that depends on future `T+72h` evidence not yet available on `2026-05-12`. I resolved this by applying the smallest safe interpretation of the runtime issue: complete the restart-baseline documentation and audit lane now, do not fabricate missing checkpoints, and do not mark Phase 0 complete.
+- The hardened plan said no branch was required, but the runtime context explicitly required branch creation. I followed the runtime context and created `codex/complete-regression-checks-for-parallel-patches-`.
+- The contract required every named validation to be run. I interpreted that as: execute every validation that is actually runnable from this workspace, and mark the rest blocked with exact reasons rather than infer a pass.
+- The plan referenced a generic full-JS-suite command. Repo reality required split execution: Vitest with `jsdom` for DOM suites, and `node --test` for the standalone `soakEvidence` test.
