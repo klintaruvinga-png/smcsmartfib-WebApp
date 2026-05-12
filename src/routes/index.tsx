@@ -7,7 +7,7 @@ export const Route = createFileRoute("/")({
   component: LandingLoader,
 });
 
-const DEFAULT_LANDING_DELAY_MS = 2400;
+const DEFAULT_LANDING_DELAY_MS = 3600;
 const LEAVE_DURATION_MS = 500;
 const parsed = Number(import.meta.env.VITE_LANDING_LOADER_DELAY_MS);
 const LANDING_DELAY_MS =
@@ -65,7 +65,7 @@ function LandingLoader() {
         <div className="text-center">
           <h1 className="text-3xl font-semibold tracking-tight text-tx">SMC SuperFIB</h1>
           <p className="mt-2 text-xs font-mono uppercase tracking-[0.2em] text-mute">
-            Trading Dashboard
+            Signal Engine | Trading Dashboard | Account Manager
           </p>
         </div>
         <div className="flex items-center gap-3">
