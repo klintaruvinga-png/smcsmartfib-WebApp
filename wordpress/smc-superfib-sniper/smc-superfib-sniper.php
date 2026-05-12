@@ -1486,7 +1486,7 @@ final class SMC_SuperFib_Sniper_REST {
         } elseif ($freshness_raw !== '') {
             // Preserve the last authoritative quote timestamp when MT5 is only reporting a
             // freshness/session transition. Bumping updated_at here would fake a live quote.
-            $snapshot_write_applied = $wpdb->update(
+            $freshness_rows_updated = $wpdb->update(
                 $this->table('snapshots'),
                 array(
                     'state' => $snapshot_state,
@@ -1498,7 +1498,8 @@ final class SMC_SuperFib_Sniper_REST {
                 ),
                 array('%s', '%s'),
                 array('%d', '%s')
-            ) !== false;
+            );
+            $snapshot_write_applied = $freshness_rows_updated > 0;
             $persisted_snapshot_state = $snapshot_state;
         }
 
