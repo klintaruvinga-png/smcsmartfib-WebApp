@@ -56,6 +56,10 @@ vi.mock("@/lib/api/sniperClient", () => ({
 
 import { AdminPage } from "./admin";
 
+const BASELINE_EXISTS_WARNING = "Baseline already captured - do not replace";
+const BASELINE_CAPTURE_LOCK_MESSAGE =
+  "Baseline already captured. Saving a new baseline is not permitted.";
+
 function buildHealth(): EngineHealth {
   return {
     backendSync: "fresh",
@@ -267,5 +271,41 @@ describe("AdminPage", () => {
     expect(within(checkpointSection).getByText("CHECKPOINT")).toBeTruthy();
     expect(screen.getByText("Baseline Snapshot")).toBeTruthy();
     expect(screen.getByText("Checkpoint History")).toBeTruthy();
+  });
+
+  it("shows a baseline-exists warning and locks baseline capture when a baseline is present", async () => {
+    const report = buildSoakReport();
+    report.baseline_checkpoint = buildCheckpoint(
+      1,
+      "baseline",
+      "2026-05-12T08:05:00Z",
+      "Initial soak capture.",
+    );
+    apiMocks.fetchSoakReport.mockResolvedValue(report);
+
+    render(<AdminPage />);
+
+    expect(await screen.findByText(BASELINE_EXISTS_WARNING)).toBeTruthy();
+
+    const captureButton = screen.getByRole("button", { name: BASELINE_CAPTURE_LOCK_MESSAGE });
+    expect((captureButton as HTMLButtonElement).disabled).toBe(true);
+    expect(captureButton.getAttribute("title")).toBe(BASELINE_CAPTURE_LOCK_MESSAGE);
+    expect(captureButton.getAttribute("aria-label")).toBe(BASELINE_CAPTURE_LOCK_MESSAGE);
+    expect(screen.getByRole("button", { name: "Update Baseline Evidence" })).toBeTruthy();
+  });
+
+  it("does not show the baseline-exists warning before the first baseline is captured", async () => {
+    apiMocks.fetchSoakReport.mockResolvedValue(buildSoakReport());
+
+    render(<AdminPage />);
+
+    expect(await screen.findByText("Operator Gathered Baseline")).toBeTruthy();
+    expect(screen.queryByText(BASELINE_EXISTS_WARNING)).toBeNull();
+
+    const captureButton = screen.getByRole("button", { name: "Capture Baseline & Start Soak" });
+    expect((captureButton as HTMLButtonElement).disabled).toBe(false);
+    expect(captureButton.getAttribute("title")).toBeNull();
+    expect(captureButton.getAttribute("aria-label")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Update Baseline Evidence" })).toBeNull();
   });
 });

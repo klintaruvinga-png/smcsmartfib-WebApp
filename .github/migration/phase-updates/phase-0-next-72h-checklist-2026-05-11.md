@@ -90,7 +90,7 @@ These items are safe to run during the soak because they harden presentation, co
 | Status | Task | Acceptance Target | Completed At (SAST) | Comments |
 |---|---|---|---|---|
 | [ ] | Make baseline vs checkpoint distinction clearer on `/admin`. | Baseline and checkpoint states are visually and textually distinct. |  |  |
-| [ ] | Add explicit baseline-exists warning or status on `/admin`. | Operator can immediately see that a baseline already exists and should not be replaced. |  |  |
+| [x] | Add explicit baseline-exists warning or status on `/admin`. | Operator can immediately see that a baseline already exists and should not be replaced. | 2026-05-12 | Closed by admin baseline warning lock patch. |
 | [ ] | Surface baseline and checkpoint age more prominently. | Age is visible without opening secondary details. |  |  |
 | [ ] | Improve print/export formatting for the soak report. | Printed or exported report is readable and keeps evidence sections intact. |  |  |
 | [ ] | Harden `admin.tsx` error handling around `/admin/soak-report`. | Failures show explicit operator-facing status instead of silent breakage. |  |  |
