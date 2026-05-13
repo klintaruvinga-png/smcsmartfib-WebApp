@@ -1,0 +1,77 @@
+{
+  "snapshot_type": "FINAL",
+  "workflow_id": "stabilize-ea-2026-05-13",
+  "timestamp": "2026-05-13T00:04:00Z",
+  "git": {
+    "branch": "claude/serene-hopper-J1uQy",
+    "commit_hash": "5631caeea712f9c3490d1ea020c0891937bcc500",
+    "tags_created": [
+      "snapshot/stabilize-ea-2026-05-13-start-20260513T000000Z",
+      "rollback/stabilize-ea-2026-05-13-before-patches",
+      "rollback/stabilize-ea-2026-05-13-after-patch-1"
+    ]
+  },
+  "patches_applied": [
+    "PATCH-1: guard_tick_volume() added to insert_mt5_candle() — negative tick_volume clamped to 0 with audit",
+    "PATCH-2: Regression test for negative tick_volume added (Test 8 in test-ea-market-stream.php)",
+    "PATCH-3: npx prettier --write auto-fixed pre-existing formatting violations in src/ and scripts/"
+  ],
+  "tests": {
+    "commands_run": [
+      "npm run lint",
+      "npm run build",
+      "npm run check:mql",
+      "php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "php -l wordpress/smc-superfib-sniper/class-market-data-service.php",
+      "php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php (8 tests)",
+      "php wordpress/smc-superfib-sniper/tests/php/test-cors-regression.php",
+      "php wordpress/smc-superfib-sniper/tests/php/test-get-soak-report.php",
+      "php wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php",
+      "php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php",
+      "php wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php",
+      "php wordpress/smc-superfib-sniper/tests/php/test-rest-bootstrap-settings.php",
+      "php wordpress/smc-superfib-sniper/tests/php/test-settings-risk-fallbacks.php",
+      "php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php"
+    ],
+    "passing": true,
+    "failures": [],
+    "warnings": [
+      "8 pre-existing react-hooks/exhaustive-deps warnings in ESLint (intentional, not fixable without logic changes)"
+    ]
+  },
+  "ea_integration_status": {
+    "market_stream_route": "POST /wp-json/sniper/v1/ea/market-stream",
+    "auth_required": true,
+    "auth_header": "X-EA-API-Key",
+    "auth_aliases": ["X-EA-API-Key", "X-API-KEY", "x_ea_api_key", "x_api_key"],
+    "secret_env": "SMC_SF_EA_API_KEY",
+    "user_id_required": true,
+    "payload_validation": true,
+    "stale_rejection": true,
+    "validation_guards_present": {
+      "symbol_required": true,
+      "timestamp_staleness_300s_hard_reject": true,
+      "timestamp_staleness_120s_warn": true,
+      "bid_ask_isfinite_positive": true,
+      "bid_lte_ask": true,
+      "ohlc_high_gte_max_open_close": true,
+      "ohlc_low_lte_min_open_close": true,
+      "candle_epoch_guard_pre2000_rejected": true,
+      "candle_m1_staleness_180s": true,
+      "candle_m15_staleness_1800s": true,
+      "tick_volume_negative_clamped_to_0": true
+    }
+  },
+  "authority_status": {
+    "authority_diagnostics_requires_wp_session": true,
+    "ea_route_does_not_use_browser_session": true,
+    "signal_engine_gated_on_mt5_live_price": true,
+    "age_sec_from_broker_timestamp_not_fetch_time": true,
+    "frontend_does_not_fake_live_state": true,
+    "backend_is_signal_truth": true
+  },
+  "rollback": {
+    "manifest": "ROLLBACK-MANIFEST.json",
+    "rollback_points_count": 3
+  }
+}

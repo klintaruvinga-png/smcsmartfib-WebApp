@@ -10,8 +10,7 @@ export const Route = createFileRoute("/")({
 const DEFAULT_LANDING_DELAY_MS = 3600;
 const LEAVE_DURATION_MS = 500;
 const parsed = Number(import.meta.env.VITE_LANDING_LOADER_DELAY_MS);
-const LANDING_DELAY_MS =
-  Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_LANDING_DELAY_MS;
+const LANDING_DELAY_MS = Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_LANDING_DELAY_MS;
 
 function LandingLoader() {
   const router = useRouter();
@@ -55,8 +54,8 @@ function LandingLoader() {
           visible
             ? "opacity-100 translate-y-0 scale-100 blur-0"
             : leaving
-            ? "opacity-0 -translate-y-1 scale-[1.02] blur-[2px]"
-            : "opacity-0 translate-y-3 scale-95 blur-[2px]",
+              ? "opacity-0 -translate-y-1 scale-[1.02] blur-[2px]"
+              : "opacity-0 translate-y-3 scale-95 blur-[2px]",
         ].join(" ")}
       >
         <div className="brand-mark flex h-28 w-28 items-center justify-center rounded-2xl animate-pulse">

@@ -70,8 +70,7 @@ export function tickMotionHoldMs(
     motionEvent ? clamp01(motionEvent.motionImpulse ?? 0) : 1,
   );
   const flashTotal = timings.durationBase + timings.durationSpread + timings.delaySpread;
-  const dotTotal =
-    timings.dotDurationBase + timings.dotDurationSpread + timings.dotDelaySpread;
+  const dotTotal = timings.dotDurationBase + timings.dotDurationSpread + timings.dotDelaySpread;
   // Leave one frame of slack so the class survives until the CSS animation completes.
   return Math.max(flashTotal, dotTotal) + 16;
 }

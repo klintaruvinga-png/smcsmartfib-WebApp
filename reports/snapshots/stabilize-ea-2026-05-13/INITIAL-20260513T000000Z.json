@@ -1,0 +1,88 @@
+{
+  "snapshot_type": "INITIAL",
+  "workflow_id": "stabilize-ea-2026-05-13",
+  "timestamp": "2026-05-13T00:00:00Z",
+  "git": {
+    "branch": "claude/serene-hopper-J1uQy",
+    "commit_hash": "5631caeea712f9c3490d1ea020c0891937bcc500",
+    "remote": "origin",
+    "uncommitted_changes_count": 0
+  },
+  "repo_structure": {
+    "plugin_root": "wordpress/smc-superfib-sniper",
+    "plugin_files": [
+      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "wordpress/smc-superfib-sniper/class-market-data-service.php",
+      "wordpress/smc-superfib-sniper/README.md",
+      "wordpress/smc-superfib-sniper/tests/php/test-cors-regression.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-get-soak-report.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-rest-bootstrap-settings.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-settings-risk-fallbacks.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php"
+    ],
+    "rest_route_files": [
+      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php"
+    ],
+    "frontend_api_client": "src/lib/api/sniperClient.ts",
+    "mt5_ea_files": [
+      "mt5/SMC_MarketDataEA.mq5",
+      "mt5/MarketDataEngine.mqh",
+      "mt5/CandleBuilder.mqh",
+      "mt5/FreshnessEngine.mqh",
+      "mt5/SessionManager.mqh",
+      "mt5/SymbolNormalizer.mqh",
+      "mt5/TickProcessor.mqh",
+      "mt5/check-mql-includes.mjs"
+    ],
+    "migration_files": [
+      ".github/migration/audits/phase-0-ea-authority-rate-limit-parity-2026-05-06.md",
+      ".github/migration/audits/phase-0-mt5-authority-parity-2026-05-03.md",
+      ".github/migration/audits/phase-0-freshness-authority-parity-2026-05-04.md",
+      ".github/migration/audits/phase-0-mt5-ea-market-stream-parity-2026-05-11.md",
+      ".github/migration/audits/phase-0-mt5-ea-market-stream-parity-2026-05-12.md",
+      ".github/migration/audits/phase-0-mt5-backend-parity-2026-05-12.md"
+    ]
+  },
+  "app_state": {
+    "workflow_state_file_exists": false,
+    "workflow_state": {}
+  },
+  "known_dev_status": {
+    "authority_diagnostics_requires_wp_session": true,
+    "ea_market_stream_route_exists": true,
+    "ea_auth_header": "X-EA-API-Key",
+    "ea_auth_aliases": ["X-EA-API-Key", "X-API-KEY", "x_ea_api_key", "x_api_key"],
+    "ea_auth_secret_env": "SMC_SF_EA_API_KEY",
+    "ea_payload_requires_user_id": true,
+    "migration_phase": "MT5-native migration / Phase 0 soak",
+    "actual_ea_payload_fields": {
+      "note": "LIVE implementation uses timestamp+candle+candle_m15 NOT quote_time+server_time+candles[]",
+      "user_id": "required",
+      "symbol": "required",
+      "normalized_symbol": "optional",
+      "timeframe": "optional (M1 default)",
+      "timestamp": "ISO8601 tick time from broker",
+      "bid": "required",
+      "ask": "required",
+      "freshness": "optional (LIVE/DELAYED/STALE/CLOSED/DISCONNECTED)",
+      "session": "optional",
+      "candle": "optional M1 closed bar object",
+      "candle_m15": "optional M15 closed bar object"
+    },
+    "plugin_version": "13.0.2",
+    "rest_namespace": "sniper/v1",
+    "backend_url": "https://trader.stokvelsociety.co.za/wp-json"
+  },
+  "pre_scan_test_results": {
+    "php_syntax_smc_superfib_sniper_php": "PASS",
+    "php_syntax_class_market_data_service_php": "PASS",
+    "all_php_regression_tests": "ALL PASS (9 test files)",
+    "npm_build": "PASS (vite build succeeded)",
+    "npm_lint": "PRE-EXISTING: 85 Prettier formatting issues (not introduced by this session)",
+    "npm_check_mql": "PASS"
+  }
+}

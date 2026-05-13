@@ -563,6 +563,91 @@ function test_ea_market_stream() {
         var_dump($inf_bid_response);
     }
 
+    echo "\n";
+
+    // Test 8: Non-numeric tick_volume (array) is clamped to 0 (Codex P2 regression)
+    echo "Test 8: Non-numeric tick_volume (array) clamped to 0 (Codex P2 guard)\n";
+    $nonnumeric_volume_payload = array(
+        'user_id' => 7,
+        'symbol' => 'EURUSD',
+        'timestamp' => gmdate('c', time() - 5),
+        'bid' => 1.08521,
+        'ask' => 1.08534,
+        'candle' => array(
+            'time' => gmdate('c', time() - 65),
+            'open' => 1.0850,
+            'high' => 1.0855,
+            'low'  => 1.0848,
+            'close' => 1.0852,
+            'volume' => array('nested' => 'object'), // non-numeric — would cast to 1 without guard
+        )
+    );
+
+    $nonnumeric_volume_response = dispatch_ea_market_stream($plugin, $nonnumeric_volume_payload);
+
+    if ($nonnumeric_volume_response instanceof WP_REST_Response
+        && $nonnumeric_volume_response->data['ok'] === true
+        && $nonnumeric_volume_response->data['candles_inserted'] === 1) {
+        $candles_table = 'wp_smc_sf_candles';
+        $stored_vol2 = null;
+        foreach ($wpdb->tables[$candles_table] ?? array() as $row) {
+            if ($row['symbol'] === 'EURUSD' && $row['timeframe'] === '15min') {
+                $stored_vol2 = (int) $row['volume'];
+            }
+        }
+        if ($stored_vol2 === 0) {
+            echo "✓ SUCCESS: Non-numeric tick_volume (array) clamped to 0 (not silently 1)\n";
+        } else {
+            echo "✗ FAILED: Expected stored volume=0, got volume=" . var_export($stored_vol2, true) . "\n";
+        }
+    } else {
+        echo "✗ FAILED: Candle with non-numeric volume was not accepted\n";
+        var_dump($nonnumeric_volume_response);
+    }
+
+    echo "\n";
+
+    // Test 9: Negative tick_volume is clamped to 0 (BUG-001 regression)
+    echo "Test 9: Negative tick_volume clamped to 0 (BUG-001 regression guard)\n";
+    $neg_volume_payload = array(
+        'user_id' => 7,
+        'symbol' => 'EURUSD',
+        'timestamp' => gmdate('c', time() - 5),
+        'bid' => 1.08521,
+        'ask' => 1.08534,
+        'candle' => array(
+            'time' => gmdate('c', time() - 65),
+            'open' => 1.0850,
+            'high' => 1.0855,
+            'low'  => 1.0848,
+            'close' => 1.0852,
+            'volume' => -999,
+        )
+    );
+
+    $neg_volume_response = dispatch_ea_market_stream($plugin, $neg_volume_payload);
+
+    if ($neg_volume_response instanceof WP_REST_Response
+        && $neg_volume_response->data['ok'] === true
+        && $neg_volume_response->data['candles_inserted'] === 1) {
+        // Check that the stored candle volume is 0 (clamped), not -999
+        $candles_table = 'wp_smc_sf_candles';
+        $stored_volume = null;
+        foreach ($wpdb->tables[$candles_table] ?? array() as $row) {
+            if ($row['symbol'] === 'EURUSD' && $row['timeframe'] === '15min') {
+                $stored_volume = (int) $row['volume'];
+            }
+        }
+        if ($stored_volume === 0) {
+            echo "✓ SUCCESS: Negative tick_volume clamped to 0 (stored as 0, not -999)\n";
+        } else {
+            echo "✗ FAILED: Expected stored volume=0, got volume=" . var_export($stored_volume, true) . "\n";
+        }
+    } else {
+        echo "✗ FAILED: Candle with negative volume was not accepted (expected 1 candle inserted)\n";
+        var_dump($neg_volume_response);
+    }
+
     echo "\nTest completed.\n";
 }
 

@@ -6,7 +6,8 @@ export function fmtPrice(value: number, symbol?: Symbol | string): string {
   if (symbol === "XAGUSD") return value.toFixed(3);
   if (symbol.endsWith("JPY")) return value.toFixed(3);
   if (symbol === "XRPUSD") return value.toFixed(4);
-  if (symbol === "BTCUSD" || symbol === "ETHUSD" || symbol === "BNBUSD" || symbol === "SOLUSD") return value.toFixed(2);
+  if (symbol === "BTCUSD" || symbol === "ETHUSD" || symbol === "BNBUSD" || symbol === "SOLUSD")
+    return value.toFixed(2);
   if (symbol === "US30" || symbol === "NAS100") return value.toFixed(2);
   return value.toFixed(5);
 }

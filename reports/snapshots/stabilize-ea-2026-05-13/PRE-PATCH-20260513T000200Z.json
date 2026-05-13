@@ -1,0 +1,32 @@
+{
+  "snapshot_type": "PRE-PATCH",
+  "workflow_id": "stabilize-ea-2026-05-13",
+  "timestamp": "2026-05-13T00:02:00Z",
+  "git": {
+    "branch": "claude/serene-hopper-J1uQy",
+    "commit_hash": "5631caeea712f9c3490d1ea020c0891937bcc500",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-13-before-patches"
+  },
+  "planned_patches": [
+    {
+      "id": "PATCH-1",
+      "addresses": "BUG-001",
+      "file": "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "function": "insert_mt5_candle()",
+      "description": "Add max(0, (int)) guard on tick_volume before DB insert. Audit event when negative volume received."
+    },
+    {
+      "id": "PATCH-2",
+      "addresses": "BUG-001 regression protection",
+      "file": "wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php",
+      "description": "Add regression test: negative tick_volume is clamped to 0, snapshot still stored."
+    },
+    {
+      "id": "PATCH-3",
+      "addresses": "BUG-002 pre-existing lint",
+      "file": "src/routes/plan.tsx and other src/ files",
+      "description": "Run prettier auto-fix to clear pre-existing 77 Prettier formatting errors."
+    }
+  ],
+  "rollback_command": "git reset --hard rollback/stabilize-ea-2026-05-13-before-patches"
+}

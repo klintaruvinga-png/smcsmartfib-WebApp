@@ -34,9 +34,7 @@ export function assertValidSoakEvidencePayload<T extends SoakEvidencePayloadLike
     payload,
   });
 
-  const invalidValues = invalidEntries
-    .map((entry) => String(entry.evidence_type))
-    .join(", ");
+  const invalidValues = invalidEntries.map((entry) => String(entry.evidence_type)).join(", ");
 
   throw new Error(
     `Invalid soak evidence payload: unsupported evidence_type value(s): ${invalidValues}`,

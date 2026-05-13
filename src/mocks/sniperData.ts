@@ -440,7 +440,9 @@ export function mockPriceSeries(symbol: Symbol, points = 80) {
 }
 
 // Must match backend's 16-ratio set exactly (ratio_label / fib_role PHP functions)
-const ALL_FIB_RATIOS = [-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300] as const;
+const ALL_FIB_RATIOS = [
+  -200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300,
+] as const;
 
 function fibLabel(ratio: number): string {
   return Number.isInteger(ratio) ? `${ratio}%` : `${ratio}%`;
