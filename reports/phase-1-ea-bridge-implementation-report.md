@@ -1,0 +1,77 @@
+# Phase 1 EA Bridge Implementation Report
+
+## Summary
+- Implemented four additive EA bridge routes under the existing `/wp-json/sniper/v1/ea/*` namespace.
+- Preserved the existing `POST /wp-json/sniper/v1/ea/market-stream` route, handler contract, auth gate, persistence, and regression coverage.
+- Reused `smc_sf_account_snapshots` for account-sync by storing EA bridge state inside the existing JSON blob.
+- Added dedicated `smc_sf_symbol_sync` persistence for broker symbol metadata and upserts.
+- Implemented `GET /ea/license-check` as a soft operational gate only. No Stripe, subscription, billing, or commercial licensing logic was added.
+
+## Files changed
+- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-bridge-bootstrap.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php`
+- `.github/migration-status.md`
+- `reports/phase-1-ea-bridge-implementation-report.md`
+
+## Routes added
+- `POST /wp-json/sniper/v1/ea/heartbeat`
+- `POST /wp-json/sniper/v1/ea/account-sync`
+- `POST /wp-json/sniper/v1/ea/symbol-sync`
+- `GET /wp-json/sniper/v1/ea/license-check`
+
+## Schema changes
+- Added dedicated table `smc_sf_symbol_sync` through the plugin database creation pattern and bridge-table migration helper.
+- Table fields:
+  `id`, `user_id`, `account_id`, `terminal_id`, `broker`, `broker_server`, `broker_symbol`, `normalized_symbol`, `base_symbol`, `visible`, `selected`, `digits`, `point`, `contract_size`, `trade_mode`, `min_lot`, `max_lot`, `lot_step`, `spread`, `currency_profit`, `currency_margin`, `last_seen_at`, `created_at`, `updated_at`, `raw_json`
+- Unique key:
+  `user_id + account_id + terminal_id + broker_symbol`
+
+## Persistence decisions applied
+- Heartbeat:
+  explicit EA heartbeats append `engine_runs` rows with `status=heartbeat` and `summary.source=explicit_heartbeat`.
+- Account-sync:
+  reused `smc_sf_account_snapshots`; persisted EA bridge account state under `data.eaBridge.accounts[account_id|terminal_id]` and preserved the raw payload in `raw_json`.
+- Symbol-sync:
+  wrote broker symbol metadata into the dedicated `smc_sf_symbol_sync` table and preserved both `broker_symbol` and `normalized_symbol` exactly as provided.
+- License-check:
+  used the existing EA API-key + `user_id` auth convention as the operational gate and supported optional future block metadata from the account snapshot blob.
+
+## Tests added
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-bridge-bootstrap.php`
+
+## Tests run
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-rest-bootstrap-settings.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`
+
+## Pass/fail result
+- PASS: all eight PHP test scripts above completed successfully in the local workspace.
+
+## Known limitations
+- No MT5 EA file changes were made in this patch. Backend routes are live, but EA callers still need staging verification against the new endpoints.
+- No live soak or staging terminal verification was run from this workspace.
+- `GET /ea/license-check` is intentionally limited to operational access validation and optional stored disable flags. It is not a commercial licensing system.
+- Symbol-sync table creation is available through plugin activation and the bridge-table migration helper used by the symbol-sync path.
+
+## Rollback notes
+- Revert `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` to remove the routes and handlers.
+- Drop or ignore the `smc_sf_symbol_sync` table if rolling back the dedicated symbol-sync persistence.
+- Remove the new Phase 1 PHP test scripts if the backend routes are reverted.
+- Revert the migration-status checklist entry if the backend route implementation is rolled back.
+
+## Next recommended step
+- Run staging Phase 1 bridge verification with a real MT5 terminal against:
+  `/ea/license-check`, `/ea/heartbeat`, `/ea/account-sync`, `/ea/symbol-sync`, and the unchanged `/ea/market-stream` path, then perform the planned soak validation for heartbeat continuity and account/symbol parity.

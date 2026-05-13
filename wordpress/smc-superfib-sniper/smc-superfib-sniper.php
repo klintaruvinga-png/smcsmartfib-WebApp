@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SMC SuperFIB Signal Engine & Account Manager
  * Description: WordPress REST backend for the SMC SuperFIB Dashboard.
- * Version: 13.0.2
+ * Version: 13.0.3
  * Author: Kudzanai Lloyd Taruvinga For Munhumukapa Holdings Group
  */
 
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
 require_once __DIR__ . '/class-market-data-service.php';
 
 final class SMC_SuperFib_Sniper_REST {
-    const VERSION = '13.0.2';
+    const VERSION = '13.0.3';
     const NAMESPACE = 'sniper/v1';
     const TWELVE_PROVIDER = 'twelve_data';
     const ENGINE_SNAPSHOT_MIN_REFRESH_INTERVAL_SEC = 2;
@@ -247,6 +247,38 @@ final class SMC_SuperFib_Sniper_REST {
             PRIMARY KEY  (user_id)
         ) $charset;";
 
+        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_symbol_sync (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT UNSIGNED NOT NULL,
+            account_id VARCHAR(64) NOT NULL DEFAULT '',
+            terminal_id VARCHAR(96) NOT NULL DEFAULT '',
+            broker VARCHAR(96) NOT NULL DEFAULT '',
+            broker_server VARCHAR(128) NOT NULL DEFAULT '',
+            broker_symbol VARCHAR(96) NOT NULL,
+            normalized_symbol VARCHAR(64) NOT NULL DEFAULT '',
+            base_symbol VARCHAR(64) NOT NULL DEFAULT '',
+            visible TINYINT(1) NOT NULL DEFAULT 0,
+            selected TINYINT(1) NOT NULL DEFAULT 0,
+            digits INT NOT NULL DEFAULT 0,
+            point DECIMAL(20,10) NOT NULL DEFAULT 0,
+            contract_size DECIMAL(20,8) NOT NULL DEFAULT 0,
+            trade_mode VARCHAR(64) NOT NULL DEFAULT '',
+            min_lot DECIMAL(20,4) NOT NULL DEFAULT 0,
+            max_lot DECIMAL(20,4) NOT NULL DEFAULT 0,
+            lot_step DECIMAL(20,4) NOT NULL DEFAULT 0,
+            spread DECIMAL(20,8) NOT NULL DEFAULT 0,
+            currency_profit VARCHAR(32) NOT NULL DEFAULT '',
+            currency_margin VARCHAR(32) NOT NULL DEFAULT '',
+            last_seen_at DATETIME NOT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            raw_json LONGTEXT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY user_account_terminal_symbol (user_id, account_id, terminal_id, broker_symbol),
+            KEY user_account_terminal (user_id, account_id, terminal_id),
+            KEY normalized_symbol (normalized_symbol)
+        ) $charset;";
+
         $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_trades (
             id VARCHAR(64) NOT NULL,
             user_id BIGINT UNSIGNED NOT NULL,
@@ -273,6 +305,66 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         self::ensure_soak_tables();
+    }
+
+    private static function ensure_bridge_tables() {
+        global $wpdb;
+
+        if (file_exists(ABSPATH . 'wp-admin/includes/upgrade.php')) {
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        }
+
+        if (!function_exists('dbDelta')) {
+            return false;
+        }
+
+        if (is_object($wpdb) && property_exists($wpdb, 'last_error')) {
+            $wpdb->last_error = '';
+        }
+
+        $charset = $wpdb->get_charset_collate();
+        $tables = array();
+
+        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_symbol_sync (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT UNSIGNED NOT NULL,
+            account_id VARCHAR(64) NOT NULL DEFAULT '',
+            terminal_id VARCHAR(96) NOT NULL DEFAULT '',
+            broker VARCHAR(96) NOT NULL DEFAULT '',
+            broker_server VARCHAR(128) NOT NULL DEFAULT '',
+            broker_symbol VARCHAR(96) NOT NULL,
+            normalized_symbol VARCHAR(64) NOT NULL DEFAULT '',
+            base_symbol VARCHAR(64) NOT NULL DEFAULT '',
+            visible TINYINT(1) NOT NULL DEFAULT 0,
+            selected TINYINT(1) NOT NULL DEFAULT 0,
+            digits INT NOT NULL DEFAULT 0,
+            point DECIMAL(20,10) NOT NULL DEFAULT 0,
+            contract_size DECIMAL(20,8) NOT NULL DEFAULT 0,
+            trade_mode VARCHAR(64) NOT NULL DEFAULT '',
+            min_lot DECIMAL(20,4) NOT NULL DEFAULT 0,
+            max_lot DECIMAL(20,4) NOT NULL DEFAULT 0,
+            lot_step DECIMAL(20,4) NOT NULL DEFAULT 0,
+            spread DECIMAL(20,8) NOT NULL DEFAULT 0,
+            currency_profit VARCHAR(32) NOT NULL DEFAULT '',
+            currency_margin VARCHAR(32) NOT NULL DEFAULT '',
+            last_seen_at DATETIME NOT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            raw_json LONGTEXT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY user_account_terminal_symbol (user_id, account_id, terminal_id, broker_symbol),
+            KEY user_account_terminal (user_id, account_id, terminal_id),
+            KEY normalized_symbol (normalized_symbol)
+        ) $charset;";
+
+        foreach ($tables as $sql) {
+            dbDelta($sql);
+            if (is_object($wpdb) && property_exists($wpdb, 'last_error') && $wpdb->last_error !== '') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static function ensure_soak_tables() {
@@ -386,6 +478,26 @@ final class SMC_SuperFib_Sniper_REST {
             'callback' => array($this, 'post_ea_market_stream'),
             'permission_callback' => array($this, 'permission_ea_market_stream'),
         ));
+        register_rest_route(self::NAMESPACE, '/ea/heartbeat', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($this, 'post_ea_heartbeat'),
+            'permission_callback' => array($this, 'permission_ea_bridge'),
+        ));
+        register_rest_route(self::NAMESPACE, '/ea/account-sync', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($this, 'post_ea_account_sync'),
+            'permission_callback' => array($this, 'permission_ea_bridge'),
+        ));
+        register_rest_route(self::NAMESPACE, '/ea/symbol-sync', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($this, 'post_ea_symbol_sync'),
+            'permission_callback' => array($this, 'permission_ea_bridge'),
+        ));
+        register_rest_route(self::NAMESPACE, '/ea/license-check', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => array($this, 'get_ea_license_check'),
+            'permission_callback' => array($this, 'permission_ea_bridge'),
+        ));
     }
 
     private function route($path, $methods, $callback, $auth_required) {
@@ -455,29 +567,41 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     public function permission_ea_market_stream(WP_REST_Request $request) {
+        return $this->permission_ea_bridge($request);
+    }
+
+    public function permission_ea_bridge(WP_REST_Request $request) {
         $provided = trim((string) $this->get_ea_api_key($request));
         if ($provided === '') {
+            error_log('SMC SuperFIB EA bridge auth failed: missing API key.');
             return new WP_Error('smc_sf_api_key_missing', 'X-EA-API-Key or X-API-KEY header required.', array('status' => 401));
         }
 
         $configured = trim((string) (defined('SMC_SF_EA_API_KEY') ? SMC_SF_EA_API_KEY : getenv('SMC_SF_EA_API_KEY')));
         if ($configured === '') {
-            error_log('SMC SuperFIB: SMC_SF_EA_API_KEY is not configured.');
+            error_log('SMC SuperFIB EA bridge auth failed: SMC_SF_EA_API_KEY is not configured.');
             return new WP_Error('smc_sf_api_key_unconfigured', 'EA ingest key not configured.', array('status' => 503));
         }
 
         if (!hash_equals($configured, $provided)) {
+            error_log('SMC SuperFIB EA bridge auth failed: invalid API key.');
             return new WP_Error('smc_sf_api_key_invalid', 'Invalid API key.', array('status' => 403));
         }
 
-        $payload = (array) $request->get_json_params();
-        $ea_user_id = isset($payload['user_id']) ? (int) $payload['user_id'] : 0;
+        $payload = $request->get_json_params();
+        if (!is_array($payload)) {
+            $payload = array();
+        }
+
+        $ea_user_id = (int) $this->ea_request_value($request, $payload, 'user_id', 0);
         if ($ea_user_id <= 0) {
+            error_log('SMC SuperFIB EA bridge auth failed: missing user_id.');
             return new WP_Error('smc_sf_user_required', 'user_id is required for EA ingest.', array('status' => 400));
         }
 
         $user = get_userdata($ea_user_id);
         if (!$user || !user_can($user, 'read')) {
+            error_log('SMC SuperFIB EA bridge auth failed: invalid readable user_id=' . $ea_user_id);
             return new WP_Error('smc_sf_user_invalid', 'user_id must reference a valid readable user.', array('status' => 403));
         }
 
@@ -504,6 +628,15 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         return '';
+    }
+
+    private function ea_request_value(WP_REST_Request $request, array $payload, $key, $default = null) {
+        if (array_key_exists($key, $payload)) {
+            return $payload[$key];
+        }
+
+        $value = $request->get_param($key);
+        return $value !== null ? $value : $default;
     }
 
     private function resolve_ea_user_id(): int
@@ -1850,16 +1983,7 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         if ($inserted_snapshots > 0) {
-            $wpdb->insert(
-                $this->table('engine_runs'),
-                array(
-                    'user_id' => $user_id,
-                    'status' => 'heartbeat',
-                    'summary' => wp_json_encode(array('source' => 'ea_push', 'symbol' => $symbol)),
-                    'created_at' => $this->now_mysql(),
-                ),
-                array('%d', '%s', '%s', '%s')
-            );
+            $this->insert_engine_heartbeat($user_id, array('source' => 'ea_push', 'symbol' => $symbol));
         }
 
         // Audit successful ingestion
@@ -1879,6 +2003,409 @@ final class SMC_SuperFib_Sniper_REST {
             'candles_inserted' => $inserted_candles,
             'server_time' => gmdate('c')
         ));
+    }
+
+    public function post_ea_heartbeat(WP_REST_Request $request) {
+        $payload = $request->get_json_params();
+        if (!is_array($payload)) {
+            $payload = array();
+        }
+
+        $user_id = get_current_user_id();
+        $account_id = $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'account_id', ''), 64);
+        $terminal_id = $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'terminal_id', ''), 96);
+        $broker = $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'broker', ''), 96);
+        $broker_server = $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'broker_server', ''), 128);
+        $ea_version = $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'ea_version', ''), 64);
+        $terminal_build = $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'terminal_build', ''), 64);
+        $connected = $this->sanitize_ea_bool($this->ea_request_value($request, $payload, 'connected', true));
+        $timestamp = $this->normalize_market_timestamp($this->ea_request_value($request, $payload, 'timestamp', ''), $this->now_mysql());
+
+        $this->insert_engine_heartbeat($user_id, array(
+            'source' => 'explicit_heartbeat',
+            'account_id' => $account_id,
+            'terminal_id' => $terminal_id,
+            'broker' => $broker,
+            'broker_server' => $broker_server,
+            'ea_version' => $ea_version,
+            'terminal_build' => $terminal_build,
+            'connected' => $connected,
+            'timestamp' => $timestamp,
+        ));
+
+        error_log(sprintf(
+            'SMC SuperFIB EA heartbeat received: user_id=%d account_id=%s terminal_id=%s connected=%s',
+            $user_id,
+            $account_id !== '' ? $account_id : 'unknown',
+            $terminal_id !== '' ? $terminal_id : 'unknown',
+            $connected ? 'true' : 'false'
+        ));
+
+        return rest_ensure_response(array(
+            'ok' => true,
+            'received' => true,
+            'status' => 'live',
+            'server_time' => gmdate('c'),
+        ));
+    }
+
+    public function post_ea_account_sync(WP_REST_Request $request) {
+        $payload = $request->get_json_params();
+        if (!is_array($payload)) {
+            $payload = array();
+        }
+
+        $user_id = get_current_user_id();
+        $server_time = gmdate('c');
+        $seen_at = $this->normalize_market_timestamp($this->ea_request_value($request, $payload, 'timestamp', $server_time), $this->now_mysql());
+        $account_id = $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'account_id', ''), 64);
+        $terminal_id = $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'terminal_id', ''), 96);
+        $account_key = $this->ea_identity_key($account_id, $terminal_id);
+
+        $existing = $this->get_account_blob($user_id);
+        $bridge = isset($existing['eaBridge']) && is_array($existing['eaBridge']) ? $existing['eaBridge'] : array();
+        $accounts = isset($bridge['accounts']) && is_array($bridge['accounts']) ? $bridge['accounts'] : array();
+        $prior = isset($accounts[$account_key]) && is_array($accounts[$account_key]) ? $accounts[$account_key] : array();
+
+        $record = array_merge($prior, array(
+            'user_id' => $user_id,
+            'account_id' => $account_id,
+            'terminal_id' => $terminal_id,
+            'broker' => $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'broker', ''), 96),
+            'broker_server' => $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'broker_server', ''), 128),
+            'currency' => $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'currency', ''), 16),
+            'balance' => $this->sanitize_ea_number($this->ea_request_value($request, $payload, 'balance', 0)),
+            'equity' => $this->sanitize_ea_number($this->ea_request_value($request, $payload, 'equity', 0)),
+            'margin' => $this->sanitize_ea_number($this->ea_request_value($request, $payload, 'margin', 0)),
+            'free_margin' => $this->sanitize_ea_number($this->ea_request_value($request, $payload, 'free_margin', 0)),
+            'leverage' => $this->sanitize_ea_int($this->ea_request_value($request, $payload, 'leverage', 0)),
+            'trade_allowed' => $this->sanitize_ea_bool($this->ea_request_value($request, $payload, 'trade_allowed', false)),
+            'connected' => $this->sanitize_ea_bool($this->ea_request_value($request, $payload, 'connected', false)),
+            'ea_version' => $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'ea_version', ''), 64),
+            'terminal_build' => $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'terminal_build', ''), 64),
+            'last_seen_at' => gmdate('c', strtotime($seen_at . ' UTC')),
+            'raw_json' => $payload,
+        ));
+
+        $accounts[$account_key] = $record;
+        $bridge['accounts'] = $accounts;
+        $bridge['last_account_sync_at'] = $server_time;
+        $existing['eaBridge'] = $bridge;
+
+        $this->replace_json('account_snapshots', array(
+            'user_id' => $user_id,
+            'data' => $existing,
+            'updated_at' => $this->now_mysql(),
+        ));
+
+        error_log(sprintf(
+            'SMC SuperFIB EA account sync saved: user_id=%d account_id=%s terminal_id=%s',
+            $user_id,
+            $account_id !== '' ? $account_id : 'unknown',
+            $terminal_id !== '' ? $terminal_id : 'unknown'
+        ));
+
+        return rest_ensure_response(array(
+            'ok' => true,
+            'synced' => true,
+            'account_id' => $account_id,
+            'terminal_id' => $terminal_id,
+            'server_time' => $server_time,
+        ));
+    }
+
+    public function post_ea_symbol_sync(WP_REST_Request $request) {
+        global $wpdb;
+
+        if (!self::ensure_bridge_tables()) {
+            $detail = $this->wpdb_last_error();
+            error_log('SMC SuperFIB EA symbol sync failed: symbol_sync table init error ' . ($detail !== null ? $detail : 'dbDelta unavailable'));
+            return new WP_Error('smc_sf_symbol_sync_table_init_failed', 'Could not initialize symbol sync storage.', array('status' => 500));
+        }
+
+        $payload = $request->get_json_params();
+        if (!is_array($payload)) {
+            $payload = array();
+        }
+
+        $user_id = get_current_user_id();
+        $server_time = gmdate('c');
+        $seen_at = $this->normalize_market_timestamp($this->ea_request_value($request, $payload, 'timestamp', $server_time), $this->now_mysql());
+        $symbols = $this->normalize_symbol_sync_payload($request, $payload);
+        if (empty($symbols)) {
+            return new WP_Error('smc_sf_symbol_sync_symbols_required', 'symbols payload is required.', array('status' => 400));
+        }
+
+        $upserted = 0;
+        foreach ($symbols as $symbol_payload) {
+            $record = $this->build_symbol_sync_record($request, $payload, $symbol_payload, $user_id, $seen_at);
+            if (is_wp_error($record)) {
+                return $record;
+            }
+
+            $saved = $wpdb->replace(
+                $this->table('symbol_sync'),
+                $record,
+                array('%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%f', '%f', '%s', '%f', '%f', '%f', '%f', '%s', '%s', '%s', '%s', '%s', '%s')
+            );
+
+            if ($saved === false) {
+                error_log(sprintf(
+                    'SMC SuperFIB EA symbol sync failed: user_id=%d broker_symbol=%s wpdb_error=%s',
+                    $user_id,
+                    $record['broker_symbol'],
+                    $this->wpdb_last_error() ?: 'unknown'
+                ));
+                return new WP_Error('smc_sf_symbol_sync_write_failed', 'Could not persist symbol sync payload.', array('status' => 500));
+            }
+
+            $upserted++;
+        }
+
+        error_log(sprintf(
+            'SMC SuperFIB EA symbol sync saved: user_id=%d received=%d upserted=%d',
+            $user_id,
+            count($symbols),
+            $upserted
+        ));
+
+        return rest_ensure_response(array(
+            'ok' => true,
+            'synced' => true,
+            'symbols_received' => count($symbols),
+            'symbols_upserted' => $upserted,
+            'server_time' => $server_time,
+        ));
+    }
+
+    public function get_ea_license_check(WP_REST_Request $request) {
+        $payload = $request->get_json_params();
+        if (!is_array($payload)) {
+            $payload = array();
+        }
+
+        $user_id = get_current_user_id();
+        $server_time = gmdate('c');
+        $account_id = $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'account_id', ''), 64);
+        $terminal_id = $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'terminal_id', ''), 96);
+        $ea_version = $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'ea_version', ''), 64);
+        $blob = $this->get_account_blob($user_id);
+        $license = $this->resolve_ea_license_status($blob, $account_id, $terminal_id);
+
+        if (!$license['allowed']) {
+            error_log(sprintf(
+                'SMC SuperFIB EA license blocked: user_id=%d account_id=%s terminal_id=%s reason=%s',
+                $user_id,
+                $account_id !== '' ? $account_id : 'unknown',
+                $terminal_id !== '' ? $terminal_id : 'unknown',
+                $license['reason'] !== null ? $license['reason'] : 'unspecified'
+            ));
+
+            return rest_ensure_response(array(
+                'ok' => true,
+                'allowed' => false,
+                'status' => $license['status'],
+                'reason' => $license['reason'],
+                'server_time' => $server_time,
+            ));
+        }
+
+        error_log(sprintf(
+            'SMC SuperFIB EA license allowed: user_id=%d account_id=%s terminal_id=%s ea_version=%s',
+            $user_id,
+            $account_id !== '' ? $account_id : 'unknown',
+            $terminal_id !== '' ? $terminal_id : 'unknown',
+            $ea_version !== '' ? $ea_version : 'unknown'
+        ));
+
+        return rest_ensure_response(array(
+            'ok' => true,
+            'allowed' => true,
+            'status' => $license['status'],
+            'user_id' => $user_id,
+            'account_id' => $account_id,
+            'terminal_id' => $terminal_id,
+            'plan' => $license['plan'],
+            'reason' => null,
+            'server_time' => $server_time,
+        ));
+    }
+
+    private function insert_engine_heartbeat($user_id, array $summary) {
+        global $wpdb;
+
+        $wpdb->insert(
+            $this->table('engine_runs'),
+            array(
+                'user_id' => $user_id,
+                'status' => 'heartbeat',
+                'summary' => wp_json_encode($summary),
+                'created_at' => $this->now_mysql(),
+            ),
+            array('%d', '%s', '%s', '%s')
+        );
+    }
+
+    private function ea_identity_key($account_id, $terminal_id) {
+        $account_fragment = $account_id !== '' ? $account_id : 'unknown-account';
+        $terminal_fragment = $terminal_id !== '' ? $terminal_id : 'unknown-terminal';
+        return $account_fragment . '|' . $terminal_fragment;
+    }
+
+    private function sanitize_ea_text($value, $max_length = 128) {
+        $clean = sanitize_text_field((string) $value);
+        return substr($clean, 0, $max_length);
+    }
+
+    private function sanitize_ea_number($value, $fallback = 0.0) {
+        return is_numeric($value) ? (float) $value : (float) $fallback;
+    }
+
+    private function sanitize_ea_int($value, $fallback = 0) {
+        return is_numeric($value) ? (int) $value : (int) $fallback;
+    }
+
+    private function sanitize_ea_bool($value) {
+        if (is_bool($value)) {
+            return $value;
+        }
+        if (is_numeric($value)) {
+            return ((int) $value) === 1;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+        return in_array($normalized, array('1', 'true', 'yes', 'on', 'connected', 'live'), true);
+    }
+
+    private function normalize_symbol_sync_payload(WP_REST_Request $request, array $payload) {
+        $symbols = $this->ea_request_value($request, $payload, 'symbols', array());
+        if (is_array($symbols) && isset($symbols['broker_symbol'])) {
+            return array($symbols);
+        }
+        if (is_array($symbols)) {
+            return array_values(array_filter($symbols, 'is_array'));
+        }
+
+        if (isset($payload['broker_symbol']) || $request->get_param('broker_symbol') !== null) {
+            return array(array(
+                'broker_symbol' => $this->ea_request_value($request, $payload, 'broker_symbol', ''),
+                'normalized_symbol' => $this->ea_request_value($request, $payload, 'normalized_symbol', ''),
+                'base_symbol' => $this->ea_request_value($request, $payload, 'base_symbol', ''),
+                'visible' => $this->ea_request_value($request, $payload, 'visible', 0),
+                'selected' => $this->ea_request_value($request, $payload, 'selected', 0),
+                'digits' => $this->ea_request_value($request, $payload, 'digits', 0),
+                'point' => $this->ea_request_value($request, $payload, 'point', 0),
+                'contract_size' => $this->ea_request_value($request, $payload, 'contract_size', 0),
+                'trade_mode' => $this->ea_request_value($request, $payload, 'trade_mode', ''),
+                'min_lot' => $this->ea_request_value($request, $payload, 'min_lot', 0),
+                'max_lot' => $this->ea_request_value($request, $payload, 'max_lot', 0),
+                'lot_step' => $this->ea_request_value($request, $payload, 'lot_step', 0),
+                'spread' => $this->ea_request_value($request, $payload, 'spread', 0),
+                'currency_profit' => $this->ea_request_value($request, $payload, 'currency_profit', ''),
+                'currency_margin' => $this->ea_request_value($request, $payload, 'currency_margin', ''),
+            ));
+        }
+
+        return array();
+    }
+
+    private function build_symbol_sync_record(WP_REST_Request $request, array $payload, array $symbol_payload, $user_id, $seen_at) {
+        $account_id = $this->sanitize_ea_text(
+            array_key_exists('account_id', $symbol_payload) ? $symbol_payload['account_id'] : $this->ea_request_value($request, $payload, 'account_id', ''),
+            64
+        );
+        $terminal_id = $this->sanitize_ea_text(
+            array_key_exists('terminal_id', $symbol_payload) ? $symbol_payload['terminal_id'] : $this->ea_request_value($request, $payload, 'terminal_id', ''),
+            96
+        );
+        $broker_symbol = $this->sanitize_ea_text($symbol_payload['broker_symbol'] ?? '', 96);
+        $normalized_symbol = $this->sanitize_ea_text($symbol_payload['normalized_symbol'] ?? '', 64);
+
+        if ($broker_symbol === '' || $normalized_symbol === '') {
+            return new WP_Error('smc_sf_symbol_sync_symbol_invalid', 'broker_symbol and normalized_symbol are required for symbol sync.', array('status' => 400));
+        }
+
+        return array(
+            'user_id' => $user_id,
+            'account_id' => $account_id,
+            'terminal_id' => $terminal_id,
+            'broker' => $this->sanitize_ea_text(
+                array_key_exists('broker', $symbol_payload) ? $symbol_payload['broker'] : $this->ea_request_value($request, $payload, 'broker', ''),
+                96
+            ),
+            'broker_server' => $this->sanitize_ea_text(
+                array_key_exists('broker_server', $symbol_payload) ? $symbol_payload['broker_server'] : $this->ea_request_value($request, $payload, 'broker_server', ''),
+                128
+            ),
+            'broker_symbol' => $broker_symbol,
+            'normalized_symbol' => $normalized_symbol,
+            'base_symbol' => $this->sanitize_ea_text($symbol_payload['base_symbol'] ?? $normalized_symbol, 64),
+            'visible' => $this->sanitize_ea_bool($symbol_payload['visible'] ?? false) ? 1 : 0,
+            'selected' => $this->sanitize_ea_bool($symbol_payload['selected'] ?? false) ? 1 : 0,
+            'digits' => $this->sanitize_ea_int($symbol_payload['digits'] ?? 0),
+            'point' => $this->sanitize_ea_number($symbol_payload['point'] ?? 0),
+            'contract_size' => $this->sanitize_ea_number($symbol_payload['contract_size'] ?? 0),
+            'trade_mode' => $this->sanitize_ea_text($symbol_payload['trade_mode'] ?? '', 64),
+            'min_lot' => $this->sanitize_ea_number($symbol_payload['min_lot'] ?? 0),
+            'max_lot' => $this->sanitize_ea_number($symbol_payload['max_lot'] ?? 0),
+            'lot_step' => $this->sanitize_ea_number($symbol_payload['lot_step'] ?? 0),
+            'spread' => $this->sanitize_ea_number($symbol_payload['spread'] ?? 0),
+            'currency_profit' => $this->sanitize_ea_text($symbol_payload['currency_profit'] ?? '', 32),
+            'currency_margin' => $this->sanitize_ea_text($symbol_payload['currency_margin'] ?? '', 32),
+            'last_seen_at' => $seen_at,
+            'created_at' => $this->now_mysql(),
+            'updated_at' => $this->now_mysql(),
+            'raw_json' => wp_json_encode($symbol_payload),
+        );
+    }
+
+    private function resolve_ea_license_status(array $blob, $account_id, $terminal_id) {
+        $allowed = true;
+        $status = 'active';
+        $reason = null;
+        $plan = 'internal';
+
+        $bridge = isset($blob['eaBridge']) && is_array($blob['eaBridge']) ? $blob['eaBridge'] : array();
+        $account_key = $this->ea_identity_key($account_id, $terminal_id);
+        $account_record = isset($bridge['accounts'][$account_key]) && is_array($bridge['accounts'][$account_key]) ? $bridge['accounts'][$account_key] : array();
+        $license = isset($bridge['license']) && is_array($bridge['license']) ? $bridge['license'] : array();
+
+        if (array_key_exists('plan', $license) && $license['plan'] !== '') {
+            $plan = $this->sanitize_ea_text($license['plan'], 64);
+        }
+        if (array_key_exists('plan', $account_record) && $account_record['plan'] !== '') {
+            $plan = $this->sanitize_ea_text($account_record['plan'], 64);
+        }
+
+        if ((array_key_exists('allowed', $license) && !$this->sanitize_ea_bool($license['allowed']))
+            || (array_key_exists('allowed', $account_record) && !$this->sanitize_ea_bool($account_record['allowed']))) {
+            $allowed = false;
+            $status = 'disabled';
+        }
+
+        if (isset($license['status']) && $license['status'] !== '') {
+            $status = $this->sanitize_ea_text($license['status'], 32);
+        }
+        if (isset($account_record['status']) && $account_record['status'] !== '') {
+            $status = $this->sanitize_ea_text($account_record['status'], 32);
+        }
+
+        if (!$allowed) {
+            if (!empty($account_record['reason'])) {
+                $reason = $this->sanitize_ea_text($account_record['reason'], 191);
+            } elseif (!empty($license['reason'])) {
+                $reason = $this->sanitize_ea_text($license['reason'], 191);
+            } else {
+                $reason = 'EA access disabled for this account';
+            }
+        }
+
+        return array(
+            'allowed' => $allowed,
+            'status' => $status,
+            'reason' => $reason,
+            'plan' => $plan,
+        );
     }
 
     /**
