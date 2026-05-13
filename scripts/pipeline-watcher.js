@@ -289,6 +289,7 @@ function archiveCycleArtifacts(issueSlug) {
     [PLAN_METADATA_FILE, "codex-plan.meta.json"],
     [IMPLEMENTATION_FILE, "codex-implementation.md"],
     [IMPLEMENTATION_METADATA_FILE, "codex-implementation.meta.json"],
+    [CODEX_OUTPUT_FILE, "codex-last-message.txt"],
   ];
 
   for (const [src, name] of artifacts) {
@@ -541,12 +542,23 @@ function writeImplementationFailedState(state, reason, details = {}) {
   });
 }
 
-function clearImplementationFailedState() {
+function removeFileIfExists(filePath) {
   try {
-    fs.unlinkSync(IMPLEMENTATION_FAILED_FILE);
+    fs.unlinkSync(filePath);
   } catch {
     /* ignore */
   }
+}
+
+function clearImplementationFailedState() {
+  removeFileIfExists(IMPLEMENTATION_FAILED_FILE);
+}
+
+function clearImplementationRunArtifacts() {
+  // Each run must prove it produced fresh artifacts for the current issue.
+  removeFileIfExists(IMPLEMENTATION_FILE);
+  removeFileIfExists(IMPLEMENTATION_METADATA_FILE);
+  removeFileIfExists(CODEX_OUTPUT_FILE);
 }
 
 function hasUsablePlanArtifactForState(state) {
@@ -1011,6 +1023,7 @@ function runCodexImplementation(state) {
 
   withPipelineLock("codex-implementation", () => {
     log("READY_FOR_IMPLEMENTATION detected - running Codex implementation");
+    clearImplementationRunArtifacts();
     // Write the prompt to a temp file so we can feed it via stdin redirect
     // without relying on execFileSync's `input` option, which triggers EINVAL
     // on Windows when stdout/stderr are not inheritable (detached background process).
@@ -1053,9 +1066,10 @@ function runCodexImplementation(state) {
         stdio: ["ignore", "inherit", "inherit"],
       });
     } catch (error) {
-      const outputText = fs.existsSync(CODEX_OUTPUT_FILE)
-        ? readTextFile(CODEX_OUTPUT_FILE).trim()
-        : "";
+      const outputText =
+        statMtime(CODEX_OUTPUT_FILE) > previousOutputMtime && fs.existsSync(CODEX_OUTPUT_FILE)
+          ? readTextFile(CODEX_OUTPUT_FILE).trim()
+          : "";
       const stopReason = outputText ? detectCodexStopReason(outputText) : null;
       const reason =
         stopReason ??
