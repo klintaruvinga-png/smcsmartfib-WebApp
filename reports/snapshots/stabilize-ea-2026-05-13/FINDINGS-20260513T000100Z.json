@@ -1,0 +1,94 @@
+{
+  "snapshot_type": "FINDINGS",
+  "workflow_id": "stabilize-ea-2026-05-13",
+  "timestamp": "2026-05-13T00:01:00Z",
+  "confirmed_issues": [
+    {
+      "id": "BUG-001",
+      "severity": "MEDIUM",
+      "system": "EA Market Stream — Payload Validation",
+      "description": "tick_volume field in candle objects is not validated for non-negative constraint. The plugin stores (string) $candle['volume'] or '0', but a malformed payload with a negative integer volume would be stored as-is in the database.",
+      "root_cause": "No min(0) guard or rejection on candle volume before DB insert in insert_mt5_candle(). Volume is display-only but should satisfy data integrity constraints.",
+      "impact_zones": ["EA Market Stream", "Candle DB Table"],
+      "proposed_fix": "Add max(0, (int) $candle['volume']) guard with an audit event when negative volume is detected. Clamp to 0 rather than reject (volume is display-only and does not affect signal computation).",
+      "files_affected": ["wordpress/smc-superfib-sniper/smc-superfib-sniper.php — insert_mt5_candle()"]
+    },
+    {
+      "id": "BUG-002",
+      "severity": "MEDIUM",
+      "system": "Frontend Build / Developer Tooling",
+      "description": "npm run lint reports 85 pre-existing Prettier formatting violations (77 errors, 8 warnings) across TypeScript/JSX source files. These exist before this session and are not regression-introduced.",
+      "root_cause": "Prettier formatting was never auto-applied to all src/ files after prettier rules were tightened. The main file with violations is src/routes/plan.tsx.",
+      "impact_zones": ["Developer Tooling — no runtime impact"],
+      "proposed_fix": "Run npx prettier --write src/ to auto-fix formatting without any logic changes. No functional code changes.",
+      "files_affected": ["src/routes/plan.tsx and other src/ files (formatting only)"],
+      "pre_existing": true
+    },
+    {
+      "id": "BUG-003",
+      "severity": "INFO",
+      "system": "Documentation / Spec Alignment",
+      "description": "The workflow spec documents EA payload using quote_time, server_time, and candles[] (array). The LIVE implementation uses timestamp (singular), candle{} (singular M1 object), and candle_m15{} (singular M15 object). Both the EA sender (MQL5) and PHP handler are consistent — only the spec document diverges.",
+      "root_cause": "The spec payload example is illustrative and predates the actual implementation contract. Already documented in phase-0-mt5-ea-market-stream-parity-2026-05-12.md.",
+      "impact_zones": ["Documentation only — no runtime impact"],
+      "proposed_fix": "Update new parity audit to clearly note this divergence as DOCUMENTED and INTENTIONAL.",
+      "pre_existing": true
+    },
+    {
+      "id": "BUG-004",
+      "severity": "LOW",
+      "system": "EA Market Stream — Spread Storage",
+      "description": "Spread is computed as (ask - bid) / pip_size (float, e.g. 1.3 pips) but the DB column is INT and the format specifier is %d, so fractional pips are truncated (1.3 → 1).",
+      "root_cause": "Schema design choice: spread column is INT, spread is display-only. Fractional pip loss is accepted.",
+      "impact_zones": ["Display only — no signal generation impact"],
+      "proposed_fix": "KNOWN LIMITATION — no code change required. Schema uses INT by design for simplicity.",
+      "pre_existing": true
+    }
+  ],
+  "audited_systems": {
+    "ea_auth_permission_callback": {
+      "status": "PASS",
+      "findings": "X-EA-API-Key header aliases all correct, hash_equals() used, missing/invalid/unconfigured all handled, user_id validated, wp_set_current_user() called before returning true."
+    },
+    "ea_payload_validation": {
+      "status": "MOSTLY PASS — BUG-001 identified",
+      "findings": "symbol required and validated, timestamp staleness hard-reject at 300s, bid/ask isfinite+positive+bid<=ask, OHLC high>=max(open,close) and low<=min(open,close), candle epoch guard (pre-2000 rejected), candle staleness guard (180s M1, 1800s M15). Missing: volume non-negative guard."
+    },
+    "signal_engine_gating": {
+      "status": "PASS",
+      "findings": "Engine gates on: source=mt5, state=live, age<=staleThresholdSec. Chop >= 0.7 blocks gate. Minimum 30 M15 candles required. Signal persisted with ON DUPLICATE KEY UPDATE deduplication."
+    },
+    "freshness_computation": {
+      "status": "PASS",
+      "findings": "age_sec computed from broker-supplied updated_at timestamp via iso_age_sec(). NOT from fetch time. FreshnessBadge reads backend state field — does not derive live status client-side."
+    },
+    "authority_diagnostics_protection": {
+      "status": "PASS",
+      "findings": "Route uses permission_user() which requires WP login + read capability. Returns 401 for unauthenticated requests as expected."
+    },
+    "admin_routes_protection": {
+      "status": "PASS",
+      "findings": "All /admin/* routes use permission_admin() requiring manage_options capability."
+    },
+    "frontend_api_client": {
+      "status": "PASS",
+      "findings": "call() function attaches Authorization or X-WP-Nonce headers. cacheBust parameter adds timestamp for GET snapshot. Never fakes live state. Errors are rethrown not swallowed."
+    },
+    "streaming_ticks": {
+      "status": "PASS",
+      "findings": "useStreamingTicks() is purely cosmetic animation between backend ticks. Final sub-tick always snaps to exact backend target value. No live-state is derived from frontend."
+    },
+    "parity_mql5_vs_php": {
+      "status": "PASS — documented in phase-0-mt5-ea-market-stream-parity-2026-05-12.md",
+      "findings": "All payload fields match between MQL5 sender and PHP receiver. Timestamp UTC handling correct. OHLC validated by both sides. Fib computation is backend-authoritative. No MQL5 fib logic to compare against."
+    }
+  },
+  "statistics": {
+    "total_issues": 4,
+    "critical": 0,
+    "high": 0,
+    "medium": 2,
+    "low": 1,
+    "info": 1
+  }
+}

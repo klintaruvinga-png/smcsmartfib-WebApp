@@ -157,9 +157,7 @@ export async function fetchSoakReport(): Promise<SoakReport> {
   return call<SoakReport>("/admin/soak-report", { cacheBust: true });
 }
 
-export async function upsertSoakEvidence(
-  payload: SoakEvidencePayload,
-): Promise<SoakEvidenceRow> {
+export async function upsertSoakEvidence(payload: SoakEvidencePayload): Promise<SoakEvidenceRow> {
   assertValidSoakEvidencePayload(payload);
 
   return call<SoakEvidenceRow>("/admin/soak-evidence", {

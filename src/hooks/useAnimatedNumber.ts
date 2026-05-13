@@ -33,7 +33,13 @@ function sampleNormal(random: () => number): number {
   return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
 }
 
-function hermiteInterpolate(start: number, end: number, startSlope: number, endSlope: number, t: number) {
+function hermiteInterpolate(
+  start: number,
+  end: number,
+  startSlope: number,
+  endSlope: number,
+  t: number,
+) {
   const tt = t * t;
   const ttt = tt * t;
   const h00 = 2 * ttt - 3 * tt + 1;
@@ -122,7 +128,9 @@ function createMotionProfile({
     (space === "log" ? 0.00018 : Math.max(Math.abs(to - from) * 0.055, 0.008));
   const shapedSlope = clamp(driftMovement, -slopeLimit, slopeLimit);
   const realizedScale =
-    space === "log" ? Math.abs(realizedMovement) : Math.abs(realizedMovement) / Math.max(Math.abs(from), 1);
+    space === "log"
+      ? Math.abs(realizedMovement)
+      : Math.abs(realizedMovement) / Math.max(Math.abs(from), 1);
   const amplitudeCap =
     space === "log"
       ? Math.abs(realizedMovement) * 0.42 + 0.00075
@@ -170,7 +178,8 @@ function createMotionProfile({
     const bridgeEnvelope = Math.pow(Math.sin(Math.PI * t), 1.35);
     const trendArc = driftBias * bridgeEnvelope;
     const bridgeShock = sampleBridge(t) * bridgeEnvelope * 0.78;
-    const movement = hermiteInterpolate(0, realizedMovement, shapedSlope, shapedSlope, t) + trendArc + bridgeShock;
+    const movement =
+      hermiteInterpolate(0, realizedMovement, shapedSlope, shapedSlope, t) + trendArc + bridgeShock;
 
     if (space === "log") {
       return from * Math.exp(movement);
@@ -275,8 +284,7 @@ export function useAnimatedNumber(
       fromRef.current = numericValue;
       toRef.current = numericValue;
       currentRef.current = numericValue;
-      lastUpdateAtRef.current =
-        typeof performance !== "undefined" ? performance.now() : Date.now();
+      lastUpdateAtRef.current = typeof performance !== "undefined" ? performance.now() : Date.now();
       setAnimated(numericValue);
       setDirection(null);
       setHeldDirection(null);

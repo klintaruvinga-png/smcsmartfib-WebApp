@@ -60,11 +60,12 @@ describe("fetchSoakReport", () => {
 
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(JSON.stringify(payload), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify(payload), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
       ),
     );
 
@@ -80,11 +81,15 @@ describe("fetchSoakReport", () => {
   it("rejects with a surfaced backend error on HTTP 500", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(JSON.stringify({ error: "table_init_failed", detail: "dbDelta unavailable" }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        }),
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ error: "table_init_failed", detail: "dbDelta unavailable" }),
+            {
+              status: 500,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
       ),
     );
 

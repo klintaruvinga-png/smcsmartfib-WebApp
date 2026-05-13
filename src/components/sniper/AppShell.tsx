@@ -124,7 +124,9 @@ function HeaderTicker() {
     <div className="relative flex-1 overflow-hidden border-y border-bd bg-bg2/40">
       <div className="ticker-track flex w-max items-center gap-6 py-2 px-4">
         {loop.map((entry, i) =>
-          entry.item && entry.item.mid > 0 && (entry.item.state === "live" || entry.item.state === "mock") ? (
+          entry.item &&
+          entry.item.mid > 0 &&
+          (entry.item.state === "live" || entry.item.state === "mock") ? (
             <HeaderTickerItem key={`${entry.symbol}-${i}`} price={entry.item} pollMs={pollMs} />
           ) : (
             <div

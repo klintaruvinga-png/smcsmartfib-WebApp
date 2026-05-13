@@ -1997,7 +1997,7 @@ final class SMC_SuperFib_Sniper_REST {
                 'high' => (float) $candle['high'],
                 'low' => (float) $candle['low'],
                 'close' => (float) $candle['close'],
-                'volume' => isset($candle['volume']) ? (string) $candle['volume'] : '0',
+                'volume' => (string) $this->guard_tick_volume($user_id, $symbol, $candle['volume'] ?? 0),
                 'source' => 'mt5',
                 'created_at' => $this->now_mysql()
             ),
@@ -2005,6 +2005,24 @@ final class SMC_SuperFib_Sniper_REST {
         );
 
         return $result !== false;
+    }
+
+    /**
+     * Clamp tick_volume to a non-negative integer.
+     * Negative volume values from malformed EA payloads are audited and clamped to 0.
+     * Volume is display-only and does not affect signal computation.
+     */
+    private function guard_tick_volume($user_id, $symbol, $raw_volume): int {
+        $volume = (int) $raw_volume;
+        if ($volume < 0) {
+            $this->audit($user_id, 'ea.market_stream.invalid_tick_volume', array(
+                'symbol'     => $symbol,
+                'raw_volume' => $raw_volume,
+                'clamped_to' => 0,
+            ));
+            return 0;
+        }
+        return $volume;
     }
 
     /**

@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  SOAK_EVIDENCE_TYPES,
-  assertValidSoakEvidencePayload,
-} from "./soakEvidence.ts";
+import { SOAK_EVIDENCE_TYPES, assertValidSoakEvidencePayload } from "./soakEvidence.ts";
 
 test("assertValidSoakEvidencePayload throws before any network call for invalid evidence_type", () => {
   let loggedPayload: unknown = null;

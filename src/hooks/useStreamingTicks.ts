@@ -120,15 +120,17 @@ export function useStreamingTicks(
     if (numericTarget === prevTarget) return;
 
     const now = performance.now();
-    const elapsedSec = clamp(((now - (lastUpdateAtRef.current ?? now)) || pollMsHint) / 1000, 0.2, 10);
+    const elapsedSec = clamp(
+      (now - (lastUpdateAtRef.current ?? now) || pollMsHint) / 1000,
+      0.2,
+      10,
+    );
     lastUpdateAtRef.current = now;
     lastTargetRef.current = numericTarget;
 
     const space: "log" | "linear" = prevTarget > 0 && numericTarget > 0 ? "log" : "linear";
     const realizedMove =
-      space === "log"
-        ? Math.log(numericTarget / prevTarget)
-        : numericTarget - prevTarget;
+      space === "log" ? Math.log(numericTarget / prevTarget) : numericTarget - prevTarget;
 
     // Push sample for drift/vol estimation.
     samplesRef.current = [
@@ -206,7 +208,8 @@ export function useStreamingTicks(
 
     function bridgeAt(progress: number): number {
       // Interpolate base path
-      const driftedMove = realizedMove * progress + driftPerSec * (1 - progress) * progress * elapsedSec * 0.15;
+      const driftedMove =
+        realizedMove * progress + driftPerSec * (1 - progress) * progress * elapsedSec * 0.15;
       // Add overshoot/undershoot noise from knots
       let noise = 0;
       for (let i = 0; i < knotShocks.length; i += 1) {

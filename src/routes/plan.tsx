@@ -71,10 +71,14 @@ function PlanPage() {
     motionKey: topMotionKey,
     motionImpulse: topMotionImpulse,
   } = useAnimatedNumber(topPrice?.mid, 300, topFlashHoldMs, top?.symbol ?? null);
-  const topPriceStyle = tickMotionStyle(`${top?.symbol ?? "plan"}:hero-mid`, PLAN_HERO_TICK_MOTION, {
-    motionKey: topMotionKey,
-    motionImpulse: topMotionImpulse,
-  });
+  const topPriceStyle = tickMotionStyle(
+    `${top?.symbol ?? "plan"}:hero-mid`,
+    PLAN_HERO_TICK_MOTION,
+    {
+      motionKey: topMotionKey,
+      motionImpulse: topMotionImpulse,
+    },
+  );
   const topPriceLive = Boolean(
     topPrice && topPrice.mid > 0 && (topPrice.state === "live" || topPrice.state === "mock"),
   );

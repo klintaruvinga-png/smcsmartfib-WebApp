@@ -1,0 +1,39 @@
+{
+  "snapshot_type": "AFTER-PATCH-1",
+  "workflow_id": "stabilize-ea-2026-05-13",
+  "timestamp": "2026-05-13T00:03:00Z",
+  "git": {
+    "branch": "claude/serene-hopper-J1uQy",
+    "commit_hash": "5631caeea712f9c3490d1ea020c0891937bcc500",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-13-after-patch-1"
+  },
+  "patches_applied": [
+    {
+      "id": "PATCH-1",
+      "addresses": "BUG-001",
+      "description": "Added guard_tick_volume() helper in smc-superfib-sniper.php. Clamps negative tick_volume to 0 with audit event. Volume is display-only and safe to clamp.",
+      "file": "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "change": "insert_mt5_candle(): volume field now uses guard_tick_volume() instead of raw (int) cast. New private method guard_tick_volume() added."
+    },
+    {
+      "id": "PATCH-2",
+      "addresses": "BUG-001 regression protection",
+      "description": "Added Test 8 to test-ea-market-stream.php: negative tick_volume clamped to 0, candle still stored.",
+      "file": "wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php"
+    },
+    {
+      "id": "PATCH-3",
+      "addresses": "BUG-002 pre-existing lint",
+      "description": "Ran npx prettier --write src/ scripts/ to auto-fix 77 pre-existing Prettier formatting errors. Zero logic changes. npm run lint now shows 0 errors (8 pre-existing react-hooks warnings remain — intentional, not fixable without logic changes).",
+      "files": ["src/routes/plan.tsx", "src/routes/index.tsx", "src/styles.css", "src/lib/api/sniperClient.ts", "src/hooks/useStreamingTicks.ts", "scripts/pipeline-watcher.js"]
+    }
+  ],
+  "test_results": {
+    "php_syntax_smc_superfib_sniper_php": "PASS",
+    "php_syntax_class_market_data_service_php": "PASS",
+    "all_php_regression_tests": "ALL PASS (9 test files, 15 assertions in EA test)",
+    "npm_build": "PASS",
+    "npm_lint": "PASS — 0 errors (8 pre-existing react-hooks warnings)",
+    "npm_check_mql": "PASS"
+  }
+}

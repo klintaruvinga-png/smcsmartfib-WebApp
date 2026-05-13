@@ -12,8 +12,16 @@ const RESEARCH_FILE = path.join(REPO_ROOT, "reports", "copilot-research.md");
 const PLAN_FILE = path.join(REPO_ROOT, "reports", "codex-plan.md");
 const PLAN_METADATA_FILE = path.join(REPO_ROOT, "reports", "codex-plan.meta.json");
 const IMPLEMENTATION_FILE = path.join(REPO_ROOT, "reports", "codex-implementation.md");
-const IMPLEMENTATION_METADATA_FILE = path.join(REPO_ROOT, "reports", "codex-implementation.meta.json");
-const IMPLEMENTATION_FAILED_FILE = path.join(REPO_ROOT, "reports", ".codex-implementation-failed.json");
+const IMPLEMENTATION_METADATA_FILE = path.join(
+  REPO_ROOT,
+  "reports",
+  "codex-implementation.meta.json",
+);
+const IMPLEMENTATION_FAILED_FILE = path.join(
+  REPO_ROOT,
+  "reports",
+  ".codex-implementation-failed.json",
+);
 const STATE_FILE = path.join(REPO_ROOT, ".smc-workflow-state.json");
 // Write-only JSON lock — status field ("running"|"done") determines liveness.
 // The file is NEVER deleted; it is overwritten on acquire and on release.
@@ -30,7 +38,11 @@ const CODEX_IMPLEMENT_PROMPT_FILE = path.join(
 const CODEX_OUTPUT_FILE = path.join(REPO_ROOT, "reports", "codex-last-message.txt");
 // Written when the Claude CLI invocation fails so the watcher stops retrying until
 // the research/issue changes or the file is manually deleted.
-const CLAUDE_HARDENING_BLOCKED_FILE = path.join(REPO_ROOT, "reports", ".claude-hardening-blocked.json");
+const CLAUDE_HARDENING_BLOCKED_FILE = path.join(
+  REPO_ROOT,
+  "reports",
+  ".claude-hardening-blocked.json",
+);
 const POLL_INTERVAL_MS = 5000;
 const CLAUDE_TIMEOUT_MS = 900000; // 15 min — larger research reports need more time
 const CODEX_TIMEOUT_MS = 1800000; // 30 min — complex implementations regularly exceed 15 min
@@ -50,9 +62,7 @@ function resolveClaudeExe() {
     return null; // Non-Windows uses shell-based invocation
   }
 
-  const npmRoot = process.env.APPDATA
-    ? path.join(process.env.APPDATA, "npm")
-    : null;
+  const npmRoot = process.env.APPDATA ? path.join(process.env.APPDATA, "npm") : null;
 
   const candidates = [];
 
@@ -73,7 +83,9 @@ function resolveClaudeExe() {
           const resolved = match[1].replace(/%dp0%/gi, npmRoot + path.sep);
           candidates.unshift(resolved);
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
   }
 
@@ -125,9 +137,13 @@ function buildObservedKey() {
         if (!blocked?.permanent && blocked?.next_retry_at) {
           timeBucket = Math.floor(Date.now() / 60000);
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   return [
     statMtime(RESEARCH_FILE),
@@ -250,7 +266,11 @@ function checkMergedPR(issueSlug, cycleStartedAt) {
       return prs[0];
     }
 
-    return prs.find((pr) => Number.isFinite(Date.parse(pr.mergedAt)) && Date.parse(pr.mergedAt) >= cycleStartMs) || null;
+    return (
+      prs.find(
+        (pr) => Number.isFinite(Date.parse(pr.mergedAt)) && Date.parse(pr.mergedAt) >= cycleStartMs,
+      ) || null
+    );
   } catch {
     return null;
   }
@@ -276,7 +296,9 @@ function archiveCycleArtifacts(issueSlug) {
       try {
         fs.copyFileSync(src, path.join(dest, name));
         fs.unlinkSync(src);
-      } catch { /* ignore individual file errors */ }
+      } catch {
+        /* ignore individual file errors */
+      }
     }
   }
 
@@ -284,8 +306,10 @@ function archiveCycleArtifacts(issueSlug) {
 }
 
 function isPermissionStub(text) {
-  return /Waiting for permission to write/i.test(text)
-    || /Please approve the file write above/i.test(text);
+  return (
+    /Waiting for permission to write/i.test(text) ||
+    /Please approve the file write above/i.test(text)
+  );
 }
 
 function isUsablePlan(text) {
@@ -359,7 +383,13 @@ function writeHardeningBlockedState(state, reason, retryCount = 0) {
     blocked_at: new Date().toISOString(),
     reason,
     issue: state.issue ?? "",
-    research_hash: (() => { try { return hashFile(RESEARCH_FILE); } catch { return null; } })(),
+    research_hash: (() => {
+      try {
+        return hashFile(RESEARCH_FILE);
+      } catch {
+        return null;
+      }
+    })(),
     retry_count: retryCount,
     ...(permanent ? { permanent: true } : { next_retry_at: nextRetryAt }),
     resolution: permanent
@@ -383,7 +413,11 @@ function writeHardeningBlockedState(state, reason, retryCount = 0) {
 }
 
 function clearHardeningBlockedState() {
-  try { fs.unlinkSync(CLAUDE_HARDENING_BLOCKED_FILE); } catch { /* ignore */ }
+  try {
+    fs.unlinkSync(CLAUDE_HARDENING_BLOCKED_FILE);
+  } catch {
+    /* ignore */
+  }
 }
 
 function isHardeningBlockedForCurrentState(state) {
@@ -418,7 +452,9 @@ function isHardeningBlockedForCurrentState(state) {
       return false; // retry window reached — allow the run
     }
     const secsRemaining = Math.max(0, Math.round((due - Date.now()) / 1000));
-    log(`Claude plan hardening retry in ${secsRemaining}s (attempt ${(blocked.retry_count ?? 0) + 1}/${MAX_HARDENING_RETRIES})`);
+    log(
+      `Claude plan hardening retry in ${secsRemaining}s (attempt ${(blocked.retry_count ?? 0) + 1}/${MAX_HARDENING_RETRIES})`,
+    );
     return true;
   }
 
@@ -453,7 +489,13 @@ function sendHardeningFailureNotification(state, reason) {
     execFileSync(
       "gh",
       ["issue", "create", "--title", title, "--body", body, "--label", "pipeline-blocked"],
-      { cwd: REPO_ROOT, timeout: 20000, windowsHide: true, stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" },
+      {
+        cwd: REPO_ROOT,
+        timeout: 20000,
+        windowsHide: true,
+        stdio: ["ignore", "pipe", "pipe"],
+        encoding: "utf8",
+      },
     );
     log("Hardening failure notification: GitHub issue created successfully");
   } catch (err) {
@@ -500,7 +542,11 @@ function writeImplementationFailedState(state, reason, details = {}) {
 }
 
 function clearImplementationFailedState() {
-  try { fs.unlinkSync(IMPLEMENTATION_FAILED_FILE); } catch { /* ignore */ }
+  try {
+    fs.unlinkSync(IMPLEMENTATION_FAILED_FILE);
+  } catch {
+    /* ignore */
+  }
 }
 
 function hasUsablePlanArtifactForState(state) {
@@ -644,7 +690,9 @@ function readState() {
         const trimmed = raw.slice(0, lastBrace + 1);
         const recovered = JSON.parse(trimmed);
         const trailingBytes = raw.length - lastBrace - 1;
-        log(`Workflow state self-repaired: removed ${trailingBytes} bytes of trailing garbage — rewriting clean JSON`);
+        log(
+          `Workflow state self-repaired: removed ${trailingBytes} bytes of trailing garbage — rewriting clean JSON`,
+        );
         writeJson(STATE_FILE, recovered);
         return recovered;
       }
@@ -760,7 +808,9 @@ function runClaudePlanHardening(state) {
   }
 
   if (isHardeningBlockedForCurrentState(state)) {
-    log("Claude plan hardening blocked - see reports/.claude-hardening-blocked.json for resolution steps");
+    log(
+      "Claude plan hardening blocked - see reports/.claude-hardening-blocked.json for resolution steps",
+    );
     return;
   }
 
@@ -807,25 +857,23 @@ function runClaudePlanHardening(state) {
     let planText;
     try {
       if (claudeExe) {
-        log(`Claude CLI resolved to ${path.basename(path.dirname(claudeExe))}/${path.basename(claudeExe)} - using direct exe invocation`);
+        log(
+          `Claude CLI resolved to ${path.basename(path.dirname(claudeExe))}/${path.basename(claudeExe)} - using direct exe invocation`,
+        );
         // NOTE: do NOT add --tools with an empty string ("") here.
         // Passing --tools "" causes the Claude CLI to fail with a non-zero exit code
         // because an empty string is not a valid tool-name list. Omit the flag entirely —
         // --print mode already prevents interactive tool use; the prompt instructs Claude
         // not to call any tools. Regression: if you add --tools back, add a non-empty value
         // (e.g. "--tools", "Bash") or remove it — never pass an empty string.
-        planText = execFileSync(
-          claudeExe,
-          ["--print", "--output-format", "text"],
-          {
-            cwd: REPO_ROOT,
-            input: stdinInput,
-            timeout: CLAUDE_TIMEOUT_MS,
-            encoding: "utf8",
-            maxBuffer: 10 * 1024 * 1024,
-            windowsHide: true,
-          },
-        );
+        planText = execFileSync(claudeExe, ["--print", "--output-format", "text"], {
+          cwd: REPO_ROOT,
+          input: stdinInput,
+          timeout: CLAUDE_TIMEOUT_MS,
+          encoding: "utf8",
+          maxBuffer: 10 * 1024 * 1024,
+          windowsHide: true,
+        });
       } else {
         // Non-Windows or exe not found: fall back to shell-based invocation.
         // Write the full input to a temp file and redirect via < so the shell
@@ -833,7 +881,14 @@ function runClaudePlanHardening(state) {
         const contextFile = path.join(REPO_ROOT, "reports", "claude-plan-context.tmp.md");
         fs.writeFileSync(contextFile, stdinInput, "utf8");
         try {
-          const cmd = ['"claude"', "--print", "--output-format", "text", "<", `"${contextFile}"`].join(" ");
+          const cmd = [
+            '"claude"',
+            "--print",
+            "--output-format",
+            "text",
+            "<",
+            `"${contextFile}"`,
+          ].join(" ");
           planText = execSync(cmd, {
             cwd: REPO_ROOT,
             shell: true,
@@ -843,17 +898,25 @@ function runClaudePlanHardening(state) {
             maxBuffer: 10 * 1024 * 1024,
           });
         } finally {
-          try { fs.unlinkSync(contextFile); } catch { /* ignore */ }
+          try {
+            fs.unlinkSync(contextFile);
+          } catch {
+            /* ignore */
+          }
         }
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       writeHardeningBlockedState(state, message, nextRetryCount);
       if (nextRetryCount >= MAX_HARDENING_RETRIES) {
-        log(`Claude CLI invocation failed after ${MAX_HARDENING_RETRIES} attempts - permanent block. Sending notification.`);
+        log(
+          `Claude CLI invocation failed after ${MAX_HARDENING_RETRIES} attempts - permanent block. Sending notification.`,
+        );
         sendHardeningFailureNotification(state, message);
       } else {
-        log(`Claude CLI invocation failed (attempt ${nextRetryCount}/${MAX_HARDENING_RETRIES}) - retry in 5 min. See reports/.claude-hardening-blocked.json`);
+        log(
+          `Claude CLI invocation failed (attempt ${nextRetryCount}/${MAX_HARDENING_RETRIES}) - retry in 5 min. See reports/.claude-hardening-blocked.json`,
+        );
       }
       throw err;
     }
@@ -868,9 +931,16 @@ function runClaudePlanHardening(state) {
     }
 
     if (!isUsablePlan(planText)) {
-      writeHardeningBlockedState(state, "Claude returned a response missing required plan sections", nextRetryCount);
+      writeHardeningBlockedState(
+        state,
+        "Claude returned a response missing required plan sections",
+        nextRetryCount,
+      );
       if (nextRetryCount >= MAX_HARDENING_RETRIES) {
-        sendHardeningFailureNotification(state, "Claude returned a response missing required plan sections");
+        sendHardeningFailureNotification(
+          state,
+          "Claude returned a response missing required plan sections",
+        );
       }
       throw new Error("Claude plan hardening returned invalid plan output");
     }
@@ -961,10 +1031,13 @@ function runCodexImplementation(state) {
         "exec",
         "--json",
         "--dangerously-bypass-approvals-and-sandbox",
-        "-C", `"${REPO_ROOT}"`,
-        "-o", `"${CODEX_OUTPUT_FILE}"`,
+        "-C",
+        `"${REPO_ROOT}"`,
+        "-o",
+        `"${CODEX_OUTPUT_FILE}"`,
         "-",
-        "<", `"${promptFile}"`,
+        "<",
+        `"${promptFile}"`,
       ].join(" ");
 
       execSync(cmd, {
@@ -984,8 +1057,9 @@ function runCodexImplementation(state) {
         ? readTextFile(CODEX_OUTPUT_FILE).trim()
         : "";
       const stopReason = outputText ? detectCodexStopReason(outputText) : null;
-      const reason = stopReason
-        ?? (error instanceof Error
+      const reason =
+        stopReason ??
+        (error instanceof Error
           ? `Codex CLI invocation failed: ${error.message}`
           : `Codex CLI invocation failed: ${String(error)}`);
 
@@ -996,7 +1070,9 @@ function runCodexImplementation(state) {
       // pipeline advances to IMPLEMENTATION_COMPLETE rather than going dead-end.
       const openPr = checkOpenPR(issueSlug);
       if (openPr) {
-        log(`Codex execSync timed out but open PR #${openPr.number} exists for codex/${issueSlug} - treating as IMPLEMENTATION_COMPLETE`);
+        log(
+          `Codex execSync timed out but open PR #${openPr.number} exists for codex/${issueSlug} - treating as IMPLEMENTATION_COMPLETE`,
+        );
         writeImplementationMetadata(state);
         markImplementationComplete(state);
         return;
@@ -1007,7 +1083,11 @@ function runCodexImplementation(state) {
       });
       return;
     } finally {
-      try { fs.unlinkSync(promptFile); } catch { /* ignore */ }
+      try {
+        fs.unlinkSync(promptFile);
+      } catch {
+        /* ignore */
+      }
     }
 
     const validationFailure = validateImplementationRun(
@@ -1095,7 +1175,9 @@ function evaluatePipeline() {
     const issueSlug = slugifyIssue(state.issue || "pipeline-issue");
     const merged = checkMergedPR(issueSlug, state.plan_hardened_at);
     if (merged) {
-      log(`PR #${merged.number} for codex/${issueSlug} merged at ${merged.mergedAt} - closing cycle`);
+      log(
+        `PR #${merged.number} for codex/${issueSlug} merged at ${merged.mergedAt} - closing cycle`,
+      );
       archiveCycleArtifacts(issueSlug);
       clearImplementationFailedState();
       markIdle(`PR #${merged.number} merged for: ${state.issue}`);
@@ -1123,15 +1205,17 @@ function evaluatePipeline() {
     // so the watcher can wait for the PR to be merged normally.
     const openPr = checkOpenPR(issueSlug);
     if (openPr) {
-      log(`Open PR #${openPr.number} found for codex/${issueSlug} despite recorded failure - advancing to IMPLEMENTATION_COMPLETE`);
+      log(
+        `Open PR #${openPr.number} found for codex/${issueSlug} despite recorded failure - advancing to IMPLEMENTATION_COMPLETE`,
+      );
       clearImplementationFailedState();
       markImplementationComplete(state);
       return;
     }
 
     log(
-      "Pipeline implementation failed - waiting for corrected artifacts or a new issue"
-      + (state.implementation_failure_reason ? ` (${state.implementation_failure_reason})` : ""),
+      "Pipeline implementation failed - waiting for corrected artifacts or a new issue" +
+        (state.implementation_failure_reason ? ` (${state.implementation_failure_reason})` : ""),
     );
   }
 }
@@ -1162,7 +1246,9 @@ function checkClaudeAvailability() {
   const PROD_ARGS = ["--print", "--output-format", "text"];
   const badToolsArg = PROD_ARGS.findIndex((a, i) => a === "--tools" && PROD_ARGS[i + 1] === "");
   if (badToolsArg !== -1) {
-    log("STARTUP ERROR: PROD_ARGS contains --tools with an empty string value — this will always fail. Fix scripts/pipeline-watcher.js immediately.");
+    log(
+      "STARTUP ERROR: PROD_ARGS contains --tools with an empty string value — this will always fail. Fix scripts/pipeline-watcher.js immediately.",
+    );
     process.exit(1);
   }
 
@@ -1187,7 +1273,9 @@ function checkClaudeAvailability() {
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    log(`WARNING: Claude CLI health check failed - plan hardening will be blocked on PLANNING state`);
+    log(
+      `WARNING: Claude CLI health check failed - plan hardening will be blocked on PLANNING state`,
+    );
     log(`  Reason: ${message}`);
     log(`  Fix:    npm install -g @anthropic-ai/claude-code  then  claude auth`);
   }
