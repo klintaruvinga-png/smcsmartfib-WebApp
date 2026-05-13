@@ -196,13 +196,13 @@ function HeaderChips() {
   );
 }
 
-function BrandMark() {
+function BrandMark({ compactUntilLg = false }: { compactUntilLg?: boolean }) {
   return (
     <Link to="/plan" className="flex items-center gap-2.5 shrink-0">
       <div className="brand-mark flex h-8 w-8 items-center justify-center rounded-md">
         <Activity className="h-4 w-4 text-[#1a1208]" strokeWidth={2.5} />
       </div>
-      <div className="flex flex-col leading-tight">
+      <div className={cn("flex flex-col leading-tight", compactUntilLg && "hidden lg:flex")}>
         <span className="text-sm font-semibold tracking-tight text-tx">SMC SuperFIB</span>
         <span className="text-[10px] tracking-[0.18em] text-mute font-mono">
           {APP_VERSION_LABEL}
@@ -223,38 +223,41 @@ function LeftRail() {
   }
 
   return (
-    <aside className="hidden lg:flex w-52 shrink-0 flex-col border-r border-bd bg-bg1/40 sticky top-0 h-screen">
-      <div className="px-4 pt-4 pb-3 border-b border-bd">
-        <BrandMark />
+    <aside className="hidden md:flex w-16 lg:w-52 shrink-0 flex-col border-r border-bd bg-bg1/40 sticky top-0 h-screen">
+      <div className="flex justify-center lg:justify-start px-2 lg:px-4 pt-4 pb-3 border-b border-bd">
+        <BrandMark compactUntilLg />
       </div>
-      <nav className="flex flex-col gap-0.5 p-2 overflow-y-auto">
+      <nav className="flex flex-col gap-1 px-2 py-3 overflow-y-auto">
         {NAV.map((item) => (
           <Link
             key={item.to}
             to={item.to}
-            className="group flex items-center gap-3 rounded-md px-3 py-2 text-sm text-dim hover:bg-bg2/60 hover:text-tx transition-colors"
+            title={item.label}
+            aria-label={item.label}
+            className="group flex items-center justify-center gap-3 rounded-xl text-sm text-dim transition-colors hover:bg-bg2/70 hover:text-tx md:mx-auto md:size-11 lg:mx-0 lg:h-auto lg:w-full lg:justify-start lg:px-3 lg:py-2"
             activeProps={{
               className:
-                "bg-bg2 text-tx border-l-2 border-accent shadow-[inset_0_0_0_1px_rgba(216,163,93,0.1)]",
+                "bg-bg2/90 text-tx md:shadow-[inset_0_0_0_1px_rgba(216,163,93,0.18),0_8px_18px_-14px_rgba(216,163,93,0.7)] md:[&>svg]:text-accent lg:border-l-2 lg:border-accent lg:shadow-[inset_0_0_0_1px_rgba(216,163,93,0.1)]",
             }}
           >
             <item.icon className="h-4 w-4 text-mute group-hover:text-tx" />
-            <span>{item.label}</span>
+            <span className="hidden lg:inline">{item.label}</span>
           </Link>
         ))}
       </nav>
-      <div className="mt-auto p-3 border-t border-bd space-y-2">
-        <div className="text-[10px] font-mono text-mute leading-relaxed">
+      <div className="mt-auto p-2 lg:p-3 border-t border-bd space-y-2">
+        <div className="hidden lg:block text-[10px] font-mono text-mute leading-relaxed">
           SMC SuperFIB {APP_VERSION_LABEL}
           <br />
           Backend = source of truth
         </div>
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-mute hover:text-sell hover:bg-sell/10 transition-colors"
+          className="flex w-full items-center justify-center lg:justify-start gap-2 rounded-xl px-2 py-1.5 text-xs text-mute hover:text-sell hover:bg-sell/10 transition-colors md:mx-auto md:size-10 lg:mx-0 lg:h-auto lg:w-full"
+          aria-label="Sign out"
         >
           <LogOut className="h-3.5 w-3.5" />
-          Sign out
+          <span className="hidden lg:inline">Sign out</span>
         </button>
       </div>
     </aside>
@@ -264,7 +267,7 @@ function LeftRail() {
 function BottomNav() {
   const { location } = useRouterState();
   return (
-    <nav className="lg:hidden sticky bottom-0 z-30 grid grid-cols-9 border-t border-bd bg-bg/95 backdrop-blur">
+    <nav className="md:hidden fixed inset-x-0 bottom-0 z-30 grid grid-cols-9 border-t border-bd bg-bg/95 backdrop-blur">
       {NAV.map((item) => {
         const active = location.pathname.startsWith(item.to);
         return (
@@ -289,7 +292,7 @@ function Header() {
   return (
     <header className="sticky top-0 z-30 border-b border-bd bg-bg/85 backdrop-blur">
       <div className="flex items-stretch gap-3 px-3 py-2 lg:px-4">
-        <div className="lg:hidden">
+        <div className="md:hidden">
           <BrandMark />
         </div>
         <HeaderTicker />
@@ -312,7 +315,7 @@ export function AppShell() {
       <LeftRail />
       <div className="flex min-w-0 flex-1 flex-col">
         <Header />
-        <main className="flex-1 px-3 py-4 lg:px-6 lg:py-6 max-w-[1400px] w-full mx-auto">
+        <main className="flex-1 px-3 py-4 pb-20 md:pb-4 lg:px-6 lg:py-6 max-w-[1400px] w-full mx-auto">
           <Outlet />
         </main>
         <BottomNav />

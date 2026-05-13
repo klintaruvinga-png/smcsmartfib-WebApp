@@ -89,11 +89,11 @@ These items are safe to run during the soak because they harden presentation, co
 
 | Status | Task | Acceptance Target | Completed At (SAST) | Comments |
 |---|---|---|---|---|
-| [ ] | Make baseline vs checkpoint distinction clearer on `/admin`. | Baseline and checkpoint states are visually and textually distinct. |  |  |
+| [x] | Make baseline vs checkpoint distinction clearer on `/admin`. | Baseline and checkpoint states are visually and textually distinct. | 2026-05-12 | Closed by PR #154 (commit 4a99d43); added Lucide icons + inline badges to cards. |
 | [x] | Add explicit baseline-exists warning or status on `/admin`. | Operator can immediately see that a baseline already exists and should not be replaced. | 2026-05-12 | Closed by admin baseline warning lock patch. |
-| [ ] | Surface baseline and checkpoint age more prominently. | Age is visible without opening secondary details. |  |  |
-| [ ] | Improve print/export formatting for the soak report. | Printed or exported report is readable and keeps evidence sections intact. |  |  |
-| [ ] | Harden `admin.tsx` error handling around `/admin/soak-report`. | Failures show explicit operator-facing status instead of silent breakage. |  |  |
+| [x] | Surface baseline and checkpoint age more prominently. | Age is visible without opening secondary details. | 2026-05-12 | Closed by PR #154 (commit 4a99d43); promoted age into card headers. |
+| [x] | Improve print/export formatting for the soak report. | Printed or exported report is readable and keeps evidence sections intact. | 2026-05-12 | Closed by PR #154 (commit 4a99d43); hardened @media print rules. |
+| [x] | Harden `admin.tsx` error handling around `/admin/soak-report`. | Failures show explicit operator-facing status instead of silent breakage. | 2026-05-12 | Closed by PR #154 (commit 4a99d43); added structured error messaging. |
 | [x] | Make dashboard admin health display clearly read-only and backend-driven. | UI does not imply local editability or frontend authority. | 2026-05-12 | Closed by PR #140. |
 
 ### 5.3 Backend And EA Parity Hardening
