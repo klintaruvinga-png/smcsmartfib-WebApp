@@ -2009,16 +2009,28 @@ final class SMC_SuperFib_Sniper_REST {
 
     /**
      * Clamp tick_volume to a non-negative integer.
-     * Negative volume values from malformed EA payloads are audited and clamped to 0.
+     * Non-numeric types (arrays, objects) are rejected: PHP's (int) cast silently
+     * coerces non-empty arrays/objects to 1, bypassing the negative-volume guard.
+     * Negative or non-numeric values are audited and clamped to 0.
      * Volume is display-only and does not affect signal computation.
      */
     private function guard_tick_volume($user_id, $symbol, $raw_volume): int {
+        if (!is_numeric($raw_volume)) {
+            $this->audit($user_id, 'ea.market_stream.invalid_tick_volume', array(
+                'symbol'     => $symbol,
+                'raw_volume' => $raw_volume,
+                'clamped_to' => 0,
+                'reason'     => 'non_numeric_type',
+            ));
+            return 0;
+        }
         $volume = (int) $raw_volume;
         if ($volume < 0) {
             $this->audit($user_id, 'ea.market_stream.invalid_tick_volume', array(
                 'symbol'     => $symbol,
                 'raw_volume' => $raw_volume,
                 'clamped_to' => 0,
+                'reason'     => 'negative_volume',
             ));
             return 0;
         }
