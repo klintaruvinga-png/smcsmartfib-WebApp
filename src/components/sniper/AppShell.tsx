@@ -221,19 +221,21 @@ function LeftRail() {
   }
 
   return (
-    <aside className="hidden md:flex w-18 lg:w-52 shrink-0 flex-col border-r border-bd bg-bg1/40 sticky top-0 h-screen">
-      <div className="flex justify-center lg:justify-start px-3 lg:px-4 pt-4 pb-3 border-b border-bd">
+    <aside className="hidden md:flex w-16 lg:w-52 shrink-0 flex-col border-r border-bd bg-bg1/40 sticky top-0 h-screen">
+      <div className="flex justify-center lg:justify-start px-2 lg:px-4 pt-4 pb-3 border-b border-bd">
         <BrandMark compactUntilLg />
       </div>
-      <nav className="flex flex-col gap-0.5 p-2 overflow-y-auto">
+      <nav className="flex flex-col gap-1 px-2 py-3 overflow-y-auto">
         {NAV.map((item) => (
           <Link
             key={item.to}
             to={item.to}
-            className="group flex items-center justify-center lg:justify-start gap-3 rounded-md px-3 py-2 text-sm text-dim hover:bg-bg2/60 hover:text-tx transition-colors"
+            title={item.label}
+            aria-label={item.label}
+            className="group flex items-center justify-center gap-3 rounded-xl text-sm text-dim transition-colors hover:bg-bg2/70 hover:text-tx md:mx-auto md:size-11 lg:mx-0 lg:h-auto lg:w-full lg:justify-start lg:px-3 lg:py-2"
             activeProps={{
               className:
-                "bg-bg2 text-tx border-l-2 border-accent shadow-[inset_0_0_0_1px_rgba(216,163,93,0.1)]",
+                "bg-bg2/90 text-tx md:shadow-[inset_0_0_0_1px_rgba(216,163,93,0.18),0_8px_18px_-14px_rgba(216,163,93,0.7)] md:[&>svg]:text-accent lg:border-l-2 lg:border-accent lg:shadow-[inset_0_0_0_1px_rgba(216,163,93,0.1)]",
             }}
           >
             <item.icon className="h-4 w-4 text-mute group-hover:text-tx" />
@@ -241,7 +243,7 @@ function LeftRail() {
           </Link>
         ))}
       </nav>
-      <div className="mt-auto p-3 border-t border-bd space-y-2">
+      <div className="mt-auto p-2 lg:p-3 border-t border-bd space-y-2">
         <div className="hidden lg:block text-[10px] font-mono text-mute leading-relaxed">
           SMC SuperFIB {APP_VERSION_LABEL}
           <br />
@@ -249,7 +251,7 @@ function LeftRail() {
         </div>
         <button
           onClick={handleLogout}
-          className="flex w-full items-center justify-center lg:justify-start gap-2 rounded-md px-2 py-1.5 text-xs text-mute hover:text-sell hover:bg-sell/10 transition-colors"
+          className="flex w-full items-center justify-center lg:justify-start gap-2 rounded-xl px-2 py-1.5 text-xs text-mute hover:text-sell hover:bg-sell/10 transition-colors md:mx-auto md:size-10 lg:mx-0 lg:h-auto lg:w-full"
           aria-label="Sign out"
         >
           <LogOut className="h-3.5 w-3.5" />
