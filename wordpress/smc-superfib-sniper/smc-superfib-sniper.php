@@ -1824,6 +1824,12 @@ final class SMC_SuperFib_Sniper_REST {
         if (!empty($payload['normalized_symbol'])) {
             $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper(sanitize_text_field($payload['normalized_symbol'])));
         }
+        // Remap broker-specific stripped names to canonical SMC SuperFib symbols.
+        // Needed because multi-word broker names (e.g. "Wall Street 30") lose their
+        // spaces and digits after stripping, producing "WALLSTREET" instead of "US30".
+        // Also maps USTECH100 (from "US Tech 100") and GOLD/SILVER for metal tickers.
+        // Defence-in-depth alongside the MT5 SymbolNormalizer alias map.
+        $symbol = $this->map_symbol_aliases($symbol);
         $timeframe = $this->normalize_mt5_timeframe($payload['timeframe'] ?? 'M15');
         $snapshot_updated_at = $this->normalize_market_timestamp($payload['timestamp'] ?? null, $this->now_mysql());
 
@@ -3367,9 +3373,19 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function map_symbol_aliases($symbol) {
         static $aliases = array(
-            'NASDAQ' => 'NAS100',
-            'NASDAQ100' => 'NAS100',
-            'USTECH100' => 'NAS100',
+            // NAS100 / NASDAQ broker aliases
+            'NASDAQ'      => 'NAS100',
+            'NASDAQ100'   => 'NAS100',
+            'USTECH100'   => 'NAS100',  // "US Tech 100" after space-strip
+            'USTECH'      => 'NAS100',
+            // US30 / Dow Jones broker aliases
+            'WALLSTREET'  => 'US30',    // "Wall Street 30" truncated+stripped
+            'WALLSTREET30'=> 'US30',    // "Wall Street 30" full stripped
+            'DOW30'       => 'US30',
+            'DJ30'        => 'US30',
+            // Metals
+            'GOLD'        => 'XAUUSD',
+            'SILVER'      => 'XAGUSD',
         );
         $normalized = $this->normalize_symbol_token($symbol);
         return isset($aliases[$normalized]) ? $aliases[$normalized] : $normalized;
