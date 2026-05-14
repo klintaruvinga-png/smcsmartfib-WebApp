@@ -135,6 +135,16 @@ describe("isTradePlanComplete", () => {
       ),
     ).toBe(false);
   });
+
+  it("returns false when TP/RR keys are absent from the backend payload", () => {
+    expect(
+      isTradePlanComplete({
+        ...buildPlan(),
+        tps: { tp1: 1.2705 } as TradePlan["tps"],
+        rr: { tp1: 1.2 } as TradePlan["rr"],
+      }),
+    ).toBe(false);
+  });
 });
 
 describe("PlanPage execution guard", () => {
@@ -177,6 +187,35 @@ describe("PlanPage execution guard", () => {
     ).toBe(true);
   });
 
+  it("treats absent TP/RR keys as incomplete and keeps the page rendered", () => {
+    hookMocks.useLiveSignals.mockReturnValue({
+      data: [buildSignal()],
+      isLoading: false,
+    });
+    hookMocks.useLadders.mockReturnValue({
+      data: [
+        {
+          ...buildPlan(),
+          tps: { tp1: 1.2705 } as TradePlan["tps"],
+          rr: { tp1: 1.2 } as TradePlan["rr"],
+        },
+      ],
+      isLoading: false,
+    });
+
+    render(<PlanPage />);
+
+    expect(
+      screen.getByText(
+        /Backend plan is missing TP2\/TP3 or R:R values\. Full 3-stage ladder is not confirmed\./,
+      ),
+    ).toBeTruthy();
+    expect(screen.getAllByText("--")).toHaveLength(2);
+    expect(
+      (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
   it("keeps execution available for a complete backend-confirmed plan", () => {
     hookMocks.useLiveSignals.mockReturnValue({
       data: [buildSignal()],
@@ -189,6 +228,42 @@ describe("PlanPage execution guard", () => {
 
     render(<PlanPage />);
 
+    expect(screen.queryByText(/Backend plan is missing TP2\/TP3 or R:R values\./)).toBeNull();
+    expect(
+      (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
+    ).toBe(false);
+  });
+
+  it("falls back to the next complete backend-confirmed READY ladder before blocking execution", () => {
+    hookMocks.useLiveSignals.mockReturnValue({
+      data: [
+        buildSignal({ id: "sig-001", symbol: "GBPUSD", verdict: "A+" }),
+        buildSignal({
+          id: "sig-002",
+          symbol: "USDJPY",
+          verdict: "A",
+          createdAt: "2026-05-14T08:01:00.000Z",
+        }),
+      ],
+      isLoading: false,
+    });
+    hookMocks.useLadders.mockReturnValue({
+      data: [
+        buildPlan({
+          signalId: "sig-001",
+          rr: { tp1: 1.2, tp2: 0, tp3: 3.6 },
+        }),
+        buildPlan({
+          signalId: "sig-002",
+          symbol: "USDJPY",
+        }),
+      ],
+      isLoading: false,
+    });
+
+    render(<PlanPage />);
+
+    expect(screen.getByText(/sig-002/)).toBeTruthy();
     expect(screen.queryByText(/Backend plan is missing TP2\/TP3 or R:R values\./)).toBeNull();
     expect(
       (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,

@@ -51,18 +51,34 @@ export function PlanPage() {
         (a, b) => (VERDICT_RANK[b.verdict] ?? 0) - (VERDICT_RANK[a.verdict] ?? 0),
       )
     : undefined;
+  const laddersBySignalId = new Map((ladders ?? []).map((ladder) => [ladder.signalId, ladder]));
+  const rankedCandidates = uniqueSignals?.map((signal) => {
+    const candidatePlan = laddersBySignalId.get(signal.id) ?? null;
+    return {
+      signal,
+      plan: candidatePlan,
+      hasPlan: candidatePlan !== null,
+      planComplete: Boolean(candidatePlan && isTradePlanComplete(candidatePlan)),
+    };
+  });
+  const topCandidate =
+    rankedCandidates?.find(
+      ({ signal, planComplete }) =>
+        signal.backendConfirmed && signal.status === "READY" && planComplete,
+    ) ??
+    rankedCandidates?.find(({ signal, planComplete }) => signal.status === "READY" && planComplete) ??
+    rankedCandidates?.find(
+      ({ signal, hasPlan }) => signal.backendConfirmed && signal.status === "READY" && hasPlan,
+    ) ??
+    rankedCandidates?.find(({ signal, hasPlan }) => signal.status === "READY" && hasPlan) ??
+    rankedCandidates?.find(({ signal, hasPlan }) => signal.backendConfirmed && hasPlan) ??
+    rankedCandidates?.find(({ hasPlan }) => hasPlan);
 
   const top =
-    uniqueSignals?.find(
-      (s) =>
-        s.backendConfirmed && s.status === "READY" && ladders?.some((l) => l.signalId === s.id),
-    ) ??
-    uniqueSignals?.find((s) => s.status === "READY" && ladders?.some((l) => l.signalId === s.id)) ??
-    uniqueSignals?.find((s) => s.backendConfirmed && ladders?.some((l) => l.signalId === s.id)) ??
-    uniqueSignals?.find((s) => ladders?.some((l) => l.signalId === s.id)) ??
+    topCandidate?.signal ??
     uniqueSignals?.find((s) => s.status === "READY") ??
     uniqueSignals?.[0];
-  const plan = top ? (ladders?.find((l) => l.signalId === top.id) ?? null) : null;
+  const plan = topCandidate?.plan ?? (top ? (laddersBySignalId.get(top.id) ?? null) : null);
   const topPrice = top ? snapshot?.prices.find((price) => price.symbol === top.symbol) : undefined;
   const topFlashHoldMs = tickMotionHoldMs(PLAN_HERO_TICK_MOTION);
   const {
@@ -284,20 +300,20 @@ export function PlanPage() {
         <PlanCard title="Targets" tone="buy">
           <Row
             label="TP1"
-            value={fmtPrice(plan.tps.tp1, top.symbol)}
-            sub={`R ${plan.rr.tp1.toFixed(2)}`}
+            value={formatOptionalPrice(plan.tps?.tp1, top.symbol)}
+            sub={formatOptionalRatio(plan.rr?.tp1)}
             valueClass="text-buy"
           />
           <Row
             label="TP2"
-            value={fmtPrice(plan.tps.tp2, top.symbol)}
-            sub={`R ${plan.rr.tp2.toFixed(2)}`}
+            value={formatOptionalPrice(plan.tps?.tp2, top.symbol)}
+            sub={formatOptionalRatio(plan.rr?.tp2)}
             valueClass="text-buy"
           />
           <Row
             label="TP3"
-            value={fmtPrice(plan.tps.tp3, top.symbol)}
-            sub={`R ${plan.rr.tp3.toFixed(2)}`}
+            value={formatOptionalPrice(plan.tps?.tp3, top.symbol)}
+            sub={formatOptionalRatio(plan.rr?.tp3)}
             valueClass="text-buy"
           />
         </PlanCard>
@@ -443,4 +459,12 @@ function Row({
       </div>
     </div>
   );
+}
+
+function formatOptionalPrice(value: number | undefined, symbol?: string) {
+  return Number.isFinite(value) ? fmtPrice(value, symbol) : "--";
+}
+
+function formatOptionalRatio(value: number | undefined) {
+  return Number.isFinite(value) ? `R ${value.toFixed(2)}` : "R --";
 }
