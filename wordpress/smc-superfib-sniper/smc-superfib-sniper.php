@@ -4735,25 +4735,51 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     // Returns true when $symbol is an equity index instrument (NAS100 or US30) and the
-    // current UTC wall-clock time is outside its active trading session (Mon-Fri 13:30-20:00 UTC).
-    // Used in the feedStatus health check to exclude these symbols from the stale-symbol count
-    // during documented market-close windows so a weekend or overnight gap does not force
-    // feedStatus=stale while all FX/metals symbols are live.
+    // current UTC wall-clock time is outside its active trading session.
+    // NYSE/NASDAQ regular session: 09:30-16:00 ET.
+    //   EDT (UTC-4, 2nd Sun March → 1st Sun November): 13:30-20:00 UTC
+    //   EST (UTC-5, otherwise):                         14:30-21:00 UTC
     private function is_equity_index_off_session($symbol) {
         static $equity_symbols = array('NAS100', 'US30');
         if (!in_array(strtoupper((string) $symbol), $equity_symbols, true)) {
             return false;
         }
-        $utc_hour       = (int) gmdate('G');
-        $utc_min        = (int) gmdate('i');
         $dow            = (int) gmdate('w'); // 0=Sunday, 6=Saturday
-        $utc_min_of_day = $utc_hour * 60 + $utc_min;
-        // Weekend: always off-session
         if ($dow === 0 || $dow === 6) {
             return true;
         }
-        // US equity session open: 13:30 UTC (810 min) to 20:00 UTC (1200 min)
-        return $utc_min_of_day < 810 || $utc_min_of_day >= 1200;
+        $utc_hour       = (int) gmdate('G');
+        $utc_min        = (int) gmdate('i');
+        $utc_min_of_day = $utc_hour * 60 + $utc_min;
+        if ($this->is_us_dst_active()) {
+            // EDT: session open 13:30-20:00 UTC
+            return $utc_min_of_day < 810 || $utc_min_of_day >= 1200;
+        } else {
+            // EST: session open 14:30-21:00 UTC
+            return $utc_min_of_day < 870 || $utc_min_of_day >= 1260;
+        }
+    }
+
+    // Returns true when US DST (EDT, UTC-4) is currently active.
+    // Post-2007 rules: starts 2nd Sunday March at 02:00 ET (07:00 UTC),
+    // ends 1st Sunday November at 02:00 ET (06:00 UTC while still EDT).
+    private function is_us_dst_active() {
+        $month = (int) gmdate('n');
+        $day   = (int) gmdate('j');
+        $hour  = (int) gmdate('G');
+        if ($month < 3 || $month > 11) return false;
+        if ($month > 3 && $month < 11) return true;
+        $year         = (int) gmdate('Y');
+        $first_of_mon = mktime(0, 0, 0, $month, 1, $year);
+        $dow_first    = (int) gmdate('w', $first_of_mon); // 0=Sun
+        // Day number of the first Sunday of the month (1-based)
+        $first_sunday_day = ($dow_first === 0) ? 1 : (1 + 7 - $dow_first);
+        if ($month === 3) {
+            $second_sunday_day = $first_sunday_day + 7;
+            return $day > $second_sunday_day || ($day === $second_sunday_day && $hour >= 7);
+        }
+        // November: DST ends on 1st Sunday at 06:00 UTC
+        return $day < $first_sunday_day || ($day === $first_sunday_day && $hour < 6);
     }
 
     private function is_chart_candle_fresh($candle_time, $timeframe) {

@@ -226,9 +226,12 @@ public:
         string freshnessStr  = (indexEquity && !equityOpen)
                                    ? "CLOSED"
                                    : FreshnessStateName(GetFreshnessState(symbol));
-        // Use current time as payload timestamp when session is closed so PHP does not reject
-        // the push on the >300s stale-data guard.
-        datetime pushTime    = (indexEquity && !equityOpen) ? TimeGMT() : tick.timestamp;
+        // Use current broker-local time as payload timestamp when session is closed so PHP does
+        // not reject the push on the >300s stale-data guard. TimeCurrent() is broker-local;
+        // TimeToIso8601() converts it to UTC by subtracting the broker offset. Passing TimeGMT()
+        // here would cause a double-shift on non-UTC brokers (TimeToIso8601 subtracts the offset
+        // again, producing a timestamp hours in the past).
+        datetime pushTime    = (indexEquity && !equityOpen) ? TimeCurrent() : tick.timestamp;
 
         string json = "{";
 
@@ -424,8 +427,10 @@ private:
         return norm == "NAS100" || norm == "US30";
     }
 
-    // Returns true when the US equity session is currently open (Mon-Fri 13:30-20:00 UTC).
-    // NAS100 (NASDAQ) and US30 (Dow Jones) follow NYSE/NASDAQ regular session hours.
+    // Returns true when the US equity regular session is currently open.
+    // NYSE/NASDAQ hours are 09:30-16:00 ET (Eastern Time):
+    //   EDT (UTC-4, 2nd Sun March 07:00 UTC → 1st Sun November 06:00 UTC): 13:30-20:00 UTC
+    //   EST (UTC-5, otherwise):                                              14:30-21:00 UTC
     bool IsEquitySessionOpen()
     {
         MqlDateTime dt;
@@ -434,8 +439,42 @@ private:
         if (dow == 0 || dow == 6)
             return false;
         int minutesUtc = dt.hour * 60 + dt.min;
-        // 13:30 UTC = 810 min, 20:00 UTC = 1200 min
-        return minutesUtc >= 810 && minutesUtc < 1200;
+        if (IsUsDstActive(dt))
+            return minutesUtc >= 810 && minutesUtc < 1200;  // EDT: 13:30-20:00 UTC
+        else
+            return minutesUtc >= 870 && minutesUtc < 1260;  // EST: 14:30-21:00 UTC
+    }
+
+    // Returns true when US Daylight Saving Time is in effect.
+    // DST rules (post-2007): starts 2nd Sunday of March at 02:00 ET (07:00 UTC),
+    // ends 1st Sunday of November at 02:00 ET (06:00 UTC while still in EDT).
+    bool IsUsDstActive(MqlDateTime& now)
+    {
+        int month = now.mon;
+        int day   = now.day;
+        int hour  = now.hour;
+
+        if (month < 3 || month > 11) return false;
+        if (month > 3 && month < 11) return true;
+
+        // Determine day-of-week for the 1st of the month to find the Nth Sunday.
+        MqlDateTime first;
+        first.year = now.year; first.mon = month; first.day = 1;
+        first.hour = 0; first.min = 0; first.sec = 0;
+        datetime dt_first = StructToTime(first);
+        MqlDateTime dt_first_s;
+        TimeToStruct(dt_first, dt_first_s);
+        int dow1 = dt_first_s.day_of_week; // 0=Sunday
+        // Day of the first Sunday of the month (1-based)
+        int first_sunday = (dow1 == 0) ? 1 : (1 + 7 - dow1);
+
+        if (month == 3)
+        {
+            int second_sunday = first_sunday + 7;
+            return day > second_sunday || (day == second_sunday && hour >= 7);
+        }
+        // November: DST ends on 1st Sunday at 06:00 UTC
+        return day < first_sunday || (day == first_sunday && hour < 6);
     }
 };
 
