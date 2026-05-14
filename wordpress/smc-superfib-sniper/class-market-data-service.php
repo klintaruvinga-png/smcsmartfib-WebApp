@@ -350,6 +350,7 @@ class SMC_MarketData_Service
             $month = (int) gmdate('n', $timestamp);
             $quarter = (int) floor(($month - 1) / 3) + 1;
             $week = (int) gmdate('W', $timestamp);
+            $iso_week_year = (int) gmdate('o', $timestamp);
             $day = (int) gmdate('j', $timestamp);
 
             if ($session_tf === 'Yearly') {
@@ -359,7 +360,7 @@ class SMC_MarketData_Service
             } elseif ($session_tf === 'Monthly') {
                 $session_key = ($year * 100) + $month;
             } elseif ($session_tf === 'Weekly') {
-                $session_key = ($year * 100) + $week;
+                $session_key = ($iso_week_year * 100) + $week;
             } else {
                 $session_key = ($year * 10000) + ($month * 100) + $day;
             }
@@ -433,6 +434,7 @@ class SMC_MarketData_Service
             $month = (int) gmdate('n', $timestamp);
             $quarter = (int) floor(($month - 1) / 3) + 1;
             $week = (int) gmdate('W', $timestamp);
+            $iso_week_year = (int) gmdate('o', $timestamp);
 
             if ($authority_tf === 'Yearly') {
                 $session_key = $year;
@@ -441,7 +443,7 @@ class SMC_MarketData_Service
             } elseif ($authority_tf === 'Monthly') {
                 $session_key = ($year * 100) + $month;
             } else {
-                $session_key = ($year * 100) + $week;
+                $session_key = ($iso_week_year * 100) + $week;
             }
 
             if (!isset($sessions[$session_key])) {
