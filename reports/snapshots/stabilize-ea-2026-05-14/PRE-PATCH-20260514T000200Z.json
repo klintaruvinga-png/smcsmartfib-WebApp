@@ -1,0 +1,15 @@
+{
+  "snapshot_type": "PRE-PATCH",
+  "workflow_id": "stabilize-ea-2026-05-14",
+  "timestamp": "2026-05-14T00:02:00Z",
+  "git": {
+    "branch": "claude/serene-hopper-VFRyT",
+    "commit_hash": "da4720ebac830eb4757ebe04501f75a3c131ee18",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-14-before-patches"
+  },
+  "pending_patches": [
+    "BUG-001: Add server-time fallback for $stream_timestamp when null but candle is present",
+    "BUG-002: Change stale_data HTTP status from 400 to 422",
+    "INFO-001: Fix test label typo in test-ea-market-stream.php"
+  ]
+}

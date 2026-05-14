@@ -1,0 +1,10 @@
+{
+  "workflow_id": "stabilize-ea-2026-05-14",
+  "created_at": "2026-05-14T00:00:00Z",
+  "branch": "claude/serene-hopper-VFRyT",
+  "initial_commit": "da4720ebac830eb4757ebe04501f75a3c131ee18",
+  "rollback_points": [],
+  "emergency_rollback": {
+    "command": "git checkout main && git reset --hard origin/main"
+  }
+}

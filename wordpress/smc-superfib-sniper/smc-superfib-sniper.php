@@ -1695,7 +1695,7 @@ final class SMC_SuperFib_Sniper_REST {
                     'reason' => 'unparseable_timestamp',
                     'rejection_level' => 'payload',
                 ));
-                return new WP_Error('stale_data', 'Rejected market data with unparseable timestamp', array('status' => 400));
+                return new WP_Error('stale_data', 'Rejected market data with unparseable timestamp', array('status' => 422));
             }
 
             $now_timestamp = time();
@@ -1709,7 +1709,7 @@ final class SMC_SuperFib_Sniper_REST {
                     'age_seconds' => $age_seconds,
                     'rejection_level' => 'payload',
                 ));
-                return new WP_Error('stale_data', 'Rejected market data older than 300 seconds', array('status' => 400));
+                return new WP_Error('stale_data', 'Rejected market data older than 300 seconds', array('status' => 422));
             }
 
             // Warn (but don't reject) between 120–300s so the log shows drift without losing the snapshot.
@@ -1778,11 +1778,16 @@ final class SMC_SuperFib_Sniper_REST {
                     ));
                     error_log("OHLC GUARD: Rejecting M1 candle with invalid OHLC for {$symbol} | O={$candle['open']} H={$candle['high']} L={$candle['low']} C={$candle['close']}");
                 } else {
-                    $result = $this->insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $payload['timestamp'] ?? null);
+                    // HARDENING (BUG-001 2026-05-14): When timestamp is absent, fall back to server
+                    // time so the future-candle guard and age staleness guard in insert_mt5_candle()
+                    // are never bypassed. The EA always sends timestamp; this only protects against
+                    // non-standard callers that omit it.
+                    $m1_stream_ts = !empty($payload['timestamp']) ? $payload['timestamp'] : gmdate('c');
+                    $result = $this->insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $m1_stream_ts);
                     if ($result) {
                         $inserted_candles = 1;
                     } else {
-                        error_log("MT5 CANDLE INSERT FAILED: {$symbol} | tf={$timeframe} | time={$candle['time']} | stream_timestamp=" . ($payload['timestamp'] ?? 'null'));
+                        error_log("MT5 CANDLE INSERT FAILED: {$symbol} | tf={$timeframe} | time={$candle['time']} | stream_timestamp={$m1_stream_ts}");
                     }
                 }
             } else {
@@ -1826,11 +1831,13 @@ final class SMC_SuperFib_Sniper_REST {
                     ));
                     error_log("OHLC GUARD: Rejecting M15 candle with invalid OHLC for {$symbol} | O={$candle_m15['open']} H={$candle_m15['high']} L={$candle_m15['low']} C={$candle_m15['close']}");
                 } else {
-                    $result = $this->insert_mt5_candle($user_id, $symbol, '15min', $candle_m15, $payload['timestamp'] ?? null, 1800);
+                    // HARDENING (BUG-001 2026-05-14): Same server-time fallback as M1 block.
+                    $m15_stream_ts = !empty($payload['timestamp']) ? $payload['timestamp'] : gmdate('c');
+                    $result = $this->insert_mt5_candle($user_id, $symbol, '15min', $candle_m15, $m15_stream_ts, 1800);
                     if ($result) {
-                        $inserted_candles++;  // ← ADD THIS LINE: count M15 inserts in API response
+                        $inserted_candles++;
                     } else {
-                        error_log("MT5 M15 CANDLE INSERT FAILED: {$symbol} | timeframe=15min | time={$candle_m15['time']} | stream_timestamp=" . ($payload['timestamp'] ?? 'null'));
+                        error_log("MT5 M15 CANDLE INSERT FAILED: {$symbol} | timeframe=15min | time={$candle_m15['time']} | stream_timestamp={$m15_stream_ts}");
                     }
                 }
             } else {
