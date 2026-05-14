@@ -15,6 +15,43 @@ import { TVChart } from "@/components/sniper/TVChart";
 import type { ChartSnapshot, Symbol } from "@/types/sniper";
 import { apiClient } from "@/lib/api/sniperClient";
 
+export type ChartSeriesPoint = {
+  t: number;
+  p: number;
+};
+
+export function buildLiveChartSeries({
+  candles,
+  liveMid,
+  pollMs,
+  now = Date.now(),
+}: {
+  candles: ChartSnapshot["candles"] | undefined;
+  liveMid: number | null | undefined;
+  pollMs: number | null;
+  now?: number;
+}): ChartSeriesPoint[] {
+  const series = (candles ?? []).map((c) => ({ t: new Date(c.time).getTime(), p: c.close }));
+  const livePrice = typeof liveMid === "number" && Number.isFinite(liveMid) ? liveMid : null;
+  if (series.length === 0 || livePrice === null) {
+    return series;
+  }
+
+  const lastCandleTime = series.at(-1)?.t;
+  const livePoint: ChartSeriesPoint = { t: now, p: livePrice };
+  const shouldReplaceLastPoint =
+    Number.isFinite(lastCandleTime) &&
+    pollMs !== null &&
+    pollMs > 0 &&
+    now - (lastCandleTime as number) < pollMs * 1.5;
+
+  if (!shouldReplaceLastPoint) {
+    return [...series, livePoint];
+  }
+
+  return [...series.slice(0, -1), livePoint];
+}
+
 export const Route = createFileRoute("/charts")({
   head: () => ({
     meta: [
@@ -69,7 +106,11 @@ function ChartsPage() {
     return <div className="text-mute text-sm">Add symbols to your watchlist to view charts.</div>;
   }
 
-  const series = (chart?.candles ?? []).map((c) => ({ t: new Date(c.time).getTime(), p: c.close }));
+  const series = buildLiveChartSeries({
+    candles: chart?.candles,
+    liveMid: price?.mid,
+    pollMs,
+  });
   const fibs = chart?.fibLevels ?? [];
   const families = Array.from(new Set(fibs.map((f) => f.family))).filter(Boolean);
 
