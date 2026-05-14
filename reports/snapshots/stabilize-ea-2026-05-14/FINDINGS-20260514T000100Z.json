@@ -1,0 +1,92 @@
+{
+  "snapshot_type": "FINDINGS",
+  "workflow_id": "stabilize-ea-2026-05-14",
+  "timestamp": "2026-05-14T00:01:00Z",
+  "audit_scope": [
+    "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+    "wordpress/smc-superfib-sniper/class-market-data-service.php",
+    "wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php",
+    "src/lib/api/sniperClient.ts",
+    "src/lib/auth.ts",
+    "src/hooks/useSniperData.ts",
+    "src/hooks/useStreamingTicks.ts",
+    "src/hooks/useTickFlash.ts",
+    "src/components/sniper/FreshnessBadge.tsx",
+    "src/components/sniper/VerdictBadge.tsx",
+    "mt5/SMC_MarketDataEA.mq5",
+    "mt5/MarketDataEngine.mqh"
+  ],
+  "confirmed_ok": [
+    "REST namespace sniper/v1 correct",
+    "EA route POST /ea/market-stream registered with permission_ea_market_stream",
+    "permission_ea_market_stream: reads all 4 header aliases (x-ea-api-key, x_ea_api_key, x-api-key, x_api_key)",
+    "permission_ea_market_stream: hash_equals() used — no == or === comparison",
+    "permission_ea_market_stream: missing token → 401",
+    "permission_ea_market_stream: unconfigured secret → 503 + error_log",
+    "permission_ea_market_stream: invalid token → 403",
+    "permission_ea_market_stream: missing user_id → 400",
+    "permission_ea_market_stream: invalid user_id → 403",
+    "permission_ea_market_stream: wp_set_current_user() called before returning true",
+    "authority-diagnostics uses permission_user → 401 unauthenticated (correct, not a bug)",
+    "admin/* routes use permission_admin → requires manage_options",
+    "bid/ask validation: is_finite() + > 0 + bid <= ask",
+    "validate_ohlc(): high >= max(open, close) && low <= min(open, close)",
+    "guard_tick_volume(): negative values clamped to 0 with audit",
+    "Candle epoch guard: timestamps pre-2000 rejected",
+    "M1 candle staleness: 180s max_age_sec",
+    "M15 candle staleness: 1800s max_age_sec",
+    "Snapshot broker timestamp preserved (not server time)",
+    "Signal engine gates on: price_state=live, candle count >= 30, candle age <= 7200s, chop < 0.7",
+    "FreshnessBadge.tsx: state from backend price.state — not computed from page-load time",
+    "VerdictBadge.tsx: verdict from backend signal — no frontend override",
+    "useSniperData.ts: polling gated on backendReady && pollMs !== null",
+    "sniperClient.ts call(): throws on 401, never swallows errors",
+    "EA payload contract consistent: EA sends timestamp, PHP reads timestamp",
+    "EA payload contract consistent: EA sends candle{} + candle_m15{}, PHP reads them as objects",
+    "MT5 EA TimeToIso8601: UTC conversion via broker offset — consistent with PHP strtotime()"
+  ],
+  "confirmed_issues": [
+    {
+      "id": "BUG-001",
+      "severity": "MEDIUM",
+      "system": "EA Market Stream Handler",
+      "description": "When timestamp is absent from the EA payload but candles are present, $stream_timestamp becomes null. The open/future candle guard (if ($stream_timestamp && strtotime(candle.time) >= strtotime($stream_timestamp))) is skipped, allowing a forming/open candle (not yet closed) to be stored. The staleness age check (age_seconds > max_age_sec) is also bypassed entirely.",
+      "root_cause": "insert_mt5_candle() receives $stream_timestamp = $payload['timestamp'] ?? null. Both the future-candle guard and the age staleness guard are wrapped in if ($stream_timestamp) blocks. When null, both checks are skipped.",
+      "impact_zones": ["EA Market Stream Ingestion", "Signal Engine (stale candle data)", "Dashboard (incorrect candle history)"],
+      "proposed_fix": "When $stream_timestamp is null and a candle is present, fall back to time() (server clock) as $stream_timestamp. This ensures the future-candle and staleness guards are always applied. The EA always sends timestamp, so this only affects non-standard callers."
+    },
+    {
+      "id": "BUG-002",
+      "severity": "LOW",
+      "system": "EA Market Stream Handler — HTTP response semantics",
+      "description": "Stale payload rejection returns HTTP 400 (Bad Request) instead of HTTP 422 (Unprocessable Entity). Per the workflow spec and REST semantics, a stale quote_time is a business logic / data validity failure, not a malformed request. The error code 'stale_data' is correct but the HTTP status is wrong.",
+      "root_cause": "post_ea_market_stream() calls new WP_Error('stale_data', ..., array('status' => 400)) for both the unparseable-timestamp and age-exceeded rejection paths.",
+      "impact_zones": ["EA Market Stream REST API", "EA retry logic (semantic clarity only — EA does not branch on 400 vs 422)"],
+      "proposed_fix": "Change status from 400 to 422 for both stale_data rejections. Update regression test to assert code 422."
+    },
+    {
+      "id": "INFO-001",
+      "severity": "LOW",
+      "system": "Regression Test Suite",
+      "description": "Test 3 (missing user_id) in test-ea-market-stream.php is labeled 'Test 2' due to a copy-paste mistake at line 433. This is a cosmetic test documentation error.",
+      "root_cause": "Copy-paste typo in test label string.",
+      "impact_zones": ["Test output readability"],
+      "proposed_fix": "Fix label to 'Test 3: Missing user_id rejected by EA permission gate'."
+    }
+  ],
+  "statistics": {
+    "total_issues": 3,
+    "critical": 0,
+    "high": 0,
+    "medium": 1,
+    "low": 2
+  },
+  "parity_status": {
+    "ea_php_payload_contract": "ALIGNED",
+    "php_dashboard_contract": "ALIGNED",
+    "backend_signal_authority": "CONFIRMED",
+    "frontend_live_state_sourcing": "BACKEND_AUTHORITATIVE",
+    "stale_data_rejection_active": true,
+    "known_spec_divergence": "Spec uses quote_time/candles[] but actual contract uses timestamp/candle{}. Both EA and PHP are aligned to the actual contract — spec is aspirational."
+  }
+}

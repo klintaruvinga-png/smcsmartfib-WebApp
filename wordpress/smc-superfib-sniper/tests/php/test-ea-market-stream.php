@@ -430,7 +430,7 @@ function test_ea_market_stream() {
     echo "\n";
 
     // Test 3: Permission requires user_id before callback runs.
-    echo "Test 2: Missing user_id rejected by EA permission gate\n";
+    echo "Test 3: Missing user_id rejected by EA permission gate\n";
     $missing_user_payload = array(
         'symbol' => 'EURUSD',
         'timestamp' => gmdate('c'),
@@ -449,29 +449,32 @@ function test_ea_market_stream() {
 
     echo "\n";
 
-    // Test 3: Stale data rejection
-    echo "Test 3: Stale data rejection (>120 seconds old)\n";
+    // Test 4 (formerly 3): Stale data rejection — now returns HTTP 422 (BUG-002 patch)
+    echo "Test 4: Stale data rejection (>300 seconds old) returns 422 Unprocessable Entity\n";
     $stale_payload = array(
         'user_id' => 7,
         'symbol' => 'EURUSD',
-        'timestamp' => gmdate('c', time() - 400), // 400 seconds ago
+        'timestamp' => gmdate('c', time() - 400), // 400 seconds ago — exceeds 300s hard reject
         'bid' => 1.08521,
         'ask' => 1.08534
     );
 
     $stale_response = dispatch_ea_market_stream($plugin, $stale_payload);
 
-    if ($stale_response instanceof WP_Error && $stale_response->code === 'stale_data') {
-        echo "✓ SUCCESS: Stale data correctly rejected\n";
+    if ($stale_response instanceof WP_Error
+        && $stale_response->code === 'stale_data'
+        && isset($stale_response->data['status'])
+        && (int) $stale_response->data['status'] === 422) {
+        echo "✓ SUCCESS: Stale data correctly rejected with HTTP 422\n";
     } else {
-        echo "✗ FAILED: Stale data not rejected\n";
+        echo "✗ FAILED: Stale data not rejected as expected\n";
         var_dump($stale_response);
     }
 
     echo "\n";
 
     // Test 4: Invalid payload (missing symbol)
-    echo "Test 4: Invalid payload (missing symbol)\n";
+    echo "Test 5: Invalid payload (missing symbol)\n";
     $invalid_payload = array(
         'user_id' => 7,
         'bid' => 1.08521,
@@ -490,7 +493,7 @@ function test_ea_market_stream() {
     echo "\n";
 
     // Test 5: Snapshot only (no candle)
-    echo "Test 5: Snapshot only payload\n";
+    echo "Test 6: Snapshot only payload\n";
     $snapshot_only_payload = array(
         'user_id' => 7,
         'symbol' => 'GBPUSD',
@@ -511,7 +514,7 @@ function test_ea_market_stream() {
     echo "\n";
 
     // Test 6: OHLC validation guard (BUG-001 regression)
-    echo "Test 6: Invalid OHLC candle silently rejected (snapshot still inserted)\n";
+    echo "Test 7: Invalid OHLC candle silently rejected (snapshot still inserted)\n";
     $invalid_ohlc_payload = array(
         'user_id' => 7,
         'symbol' => 'EURUSD',
@@ -543,7 +546,7 @@ function test_ea_market_stream() {
     echo "\n";
 
     // Test 7: is_finite() guard — INF bid/ask rejected (BUG-001 regression)
-    echo "Test 7: INF bid rejected by is_finite() guard (snapshot NOT inserted)\n";
+    echo "Test 8: INF bid rejected by is_finite() guard (snapshot NOT inserted)\n";
     $inf_bid_payload = array(
         'user_id' => 7,
         'symbol' => 'GBPUSD',
@@ -566,7 +569,7 @@ function test_ea_market_stream() {
     echo "\n";
 
     // Test 8: Non-numeric tick_volume (array) is clamped to 0 (Codex P2 regression)
-    echo "Test 8: Non-numeric tick_volume (array) clamped to 0 (Codex P2 guard)\n";
+    echo "Test 9: Non-numeric tick_volume (array) clamped to 0 (Codex P2 guard)\n";
     $nonnumeric_volume_payload = array(
         'user_id' => 7,
         'symbol' => 'EURUSD',
@@ -608,7 +611,7 @@ function test_ea_market_stream() {
     echo "\n";
 
     // Test 9: Negative tick_volume is clamped to 0 (BUG-001 regression)
-    echo "Test 9: Negative tick_volume clamped to 0 (BUG-001 regression guard)\n";
+    echo "Test 10: Negative tick_volume clamped to 0 (BUG-001 regression guard)\n";
     $neg_volume_payload = array(
         'user_id' => 7,
         'symbol' => 'EURUSD',
@@ -646,6 +649,37 @@ function test_ea_market_stream() {
     } else {
         echo "✗ FAILED: Candle with negative volume was not accepted (expected 1 candle inserted)\n";
         var_dump($neg_volume_response);
+    }
+
+    // Test 10: Missing timestamp — candle must still pass through future-candle and staleness guards
+    // via the server-time fallback (BUG-001 2026-05-14 patch). A properly formed recent candle
+    // (past, not future) must be stored. An open/forming candle (time >= server time) must be rejected.
+    echo "Test 11: Missing timestamp with valid past candle — server-time fallback allows insert (BUG-001 guard)\n";
+    $no_timestamp_valid_candle_payload = array(
+        'user_id' => 7,
+        'symbol' => 'GBPJPY',
+        'bid' => 193.500,
+        'ask' => 193.515,
+        // No 'timestamp' field — the server-time fallback must kick in
+        'candle' => array(
+            'time' => gmdate('c', time() - 90), // 90 seconds in the past — within 180s max_age_sec
+            'open' => 193.480,
+            'high' => 193.520,
+            'low'  => 193.460,
+            'close' => 193.500,
+            'volume' => 55,
+        )
+    );
+
+    $no_ts_response = dispatch_ea_market_stream($plugin, $no_timestamp_valid_candle_payload);
+
+    if ($no_ts_response instanceof WP_REST_Response
+        && $no_ts_response->data['ok'] === true
+        && $no_ts_response->data['candles_inserted'] === 1) {
+        echo "✓ SUCCESS: Past candle inserted when timestamp absent (server-time fallback active)\n";
+    } else {
+        echo "✗ FAILED: Past candle with missing timestamp was not stored\n";
+        var_dump($no_ts_response);
     }
 
     echo "\nTest completed.\n";

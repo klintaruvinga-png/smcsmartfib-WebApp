@@ -1,0 +1,38 @@
+{
+  "snapshot_type": "AFTER-PATCH-1",
+  "workflow_id": "stabilize-ea-2026-05-14",
+  "timestamp": "2026-05-14T00:03:00Z",
+  "patches_applied": [
+    {
+      "id": "PATCH-1",
+      "bug_id": "BUG-001",
+      "severity": "MEDIUM",
+      "description": "Server-time fallback for $stream_timestamp in M1 and M15 candle insertion blocks. When timestamp is absent from payload, both the future-candle guard and age staleness guard now always execute using server clock instead of being silently skipped.",
+      "files_changed": ["wordpress/smc-superfib-sniper/smc-superfib-sniper.php"],
+      "lines_changed": "M1 block: $m1_stream_ts fallback (lines ~1781-1786); M15 block: $m15_stream_ts fallback (lines ~1834-1839)"
+    },
+    {
+      "id": "PATCH-2",
+      "bug_id": "BUG-002",
+      "severity": "LOW",
+      "description": "Stale data rejection HTTP status changed from 400 to 422 (Unprocessable Entity). Stale quote time is a business-logic validity failure, not a malformed request. Both rejection paths (unparseable timestamp and age > 300s) updated.",
+      "files_changed": ["wordpress/smc-superfib-sniper/smc-superfib-sniper.php"],
+      "lines_changed": "Two WP_Error calls: status 400 → 422"
+    },
+    {
+      "id": "PATCH-3",
+      "bug_id": "INFO-001",
+      "severity": "LOW",
+      "description": "Fixed test label numbering in test-ea-market-stream.php. Tests now correctly numbered 1-11 with no duplicates. Stale test updated to assert HTTP 422. New Test 11 added for missing-timestamp-with-candle (BUG-001 regression guard).",
+      "files_changed": ["wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php"],
+      "lines_changed": "Multiple echo label lines; added Test 11 block at end of test function"
+    }
+  ],
+  "tests_after_patch": {
+    "test_ea_market_stream_php": "11/11 PASS",
+    "all_regression_suites": "12/12 PASS",
+    "php_syntax_plugin": "PASS",
+    "php_syntax_test_file": "PASS",
+    "npm_run_check_mql": "PASS"
+  }
+}
