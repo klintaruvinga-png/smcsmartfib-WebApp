@@ -1,44 +1,38 @@
 # Issue summary
 
-The chart route already had live quote input and live-series replacement, but it never surfaced the existing poll-flash system on the chart itself and it had no candle-close countdown. The patch adds a chart-local live pulse and an intraday candle countdown without changing backend authority, chart data fetch behavior, or Pine/backend math.
+The plan page was still built around a single fallback-selected hero candidate. This patch converts it to a canonical-watchlist-scoped top-3 plan surface, rendered as compact unified cards and ranked by the existing verdict metric without changing backend authority, ladder math, or execution wiring.
 
 # Root cause implemented
 
-The chart path was missing the last-mile bridge from existing quote freshness/tick-flash primitives into `TVChart`. I wired the chart route to derive a backend-authoritative `tickFlash` signal from the existing `useTickFlash` hook and added a display-only countdown hook driven from confirmed chart snapshot candle timestamps and confirmed timeframe keys.
+The route resolved one winner through successive `find()` calls after the initial verdict sort, so it could not support a stable ranked multi-card layout. I replaced that winner-only selection with a stable ranked candidate array over the existing deduplicated signal set, then filtered to canonical watchlist members and renderable ladder-backed plans only.
 
 # Exact files changed
 
-- `src/routes/charts.tsx`
-- `src/components/sniper/TVChart.tsx`
-- `src/lib/chartCountdown.ts`
-- `src/styles.css`
-- `src/routes/-charts.test.ts`
-- `src/lib/chartCountdown.test.tsx`
-- `src/components/sniper/TVChart.test.tsx`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-14_chart-poll-flash-countdown.md`
-- `.github/migration/audits/phase-0-dashboard-parity-2026-05-14.md`
+- `src/routes/plan.tsx`
+- `src/components/PlanCard.tsx`
+- `src/routes/-plan.test.tsx`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-14_plan-card-top3-watchlist.md`
 - `reports/codex-implementation.md`
 
 # Tests run
 
-- `npx vitest run "src/routes/-charts.test.ts" "src/lib/chartCountdown.test.tsx" "src/components/sniper/TVChart.test.tsx"`
-- `npx eslint "src/routes/charts.tsx" "src/components/sniper/TVChart.tsx" "src/lib/chartCountdown.ts" "src/lib/chartCountdown.test.tsx" "src/routes/-charts.test.ts" "src/components/sniper/TVChart.test.tsx"`
+- `npx vitest run src/routes/-plan.test.tsx`
+- `npx eslint src/routes/plan.tsx src/components/PlanCard.tsx src/routes/-plan.test.tsx`
 - `npm run build`
 
 # Reports generated
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-14_chart-poll-flash-countdown.md`
-- `.github/migration/audits/phase-0-dashboard-parity-2026-05-14.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-14_plan-card-top3-watchlist.md`
 - `reports/codex-implementation.md`
+- Parity audit not generated. The contract marked this change as dashboard render-layer only with no Pine or backend parity re-validation required.
 
 # Remaining risks
 
-- Live-session verification is still required for exact pulse-event alignment with the header ticker and for countdown-to-rollover tolerance.
-- Repository-wide `npm run lint` still fails on unrelated pre-existing prettier/CRLF issues outside this patch.
-- Repository-wide `npx vitest run` still picks up unrelated legacy/no-suite files outside this patch.
+- I could not complete an in-app browser visual pass in this session because the browser automation path was not exposed through the available tools.
+- The route test harness still depends on exporting `PlanPage` from the route file, which causes a TanStack Router test-time code-splitting warning only. Production build validation passed.
 
 # Any contract ambiguities resolved during implementation
 
-- The contract listed `1m/15m/1d` style keys, but the current repo/backend contract uses `1min/15min/1day`; the implementation used the confirmed repo values only.
-- The contract mentioned optional `nextCandleAt`, but the current chart snapshot response does not expose that field, so `ChartSnapshot` was left unchanged.
-- The contract also conflicted on daily countdown support versus daily/weekly countdown absence checks. I chose the smallest safe interpretation: countdown support is limited to confirmed intraday timeframes up to `4h`, and daily/weekly frames remain unsupported.
+- `useCanonicalWatchlist()` was not already wired in `plan.tsx`; I imported the existing hook and mirrored the semantics already used in `signals.tsx`.
+- The card markup exceeded the contract's inline threshold, so I extracted it to `src/components/PlanCard.tsx`.
+- The available data shape did not expose a separate dedicated "family pill" field, so the header uses existing `executionSource` and `ladder.e1.family` values when present, with no fabricated fallback values.
