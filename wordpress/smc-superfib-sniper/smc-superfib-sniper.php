@@ -1783,7 +1783,10 @@ final class SMC_SuperFib_Sniper_REST {
         global $wpdb;
 
         $payload = $request->get_json_params();
-        $user_id = isset($payload['user_id']) ? (int) $payload['user_id'] : 0;
+        if (!is_array($payload)) {
+            $payload = array();
+        }
+        $user_id = (int) $this->ea_request_value($request, $payload, 'user_id', 0);
         if ($user_id <= 0) {
             $user_id = $this->resolve_ea_user_id();
         }
