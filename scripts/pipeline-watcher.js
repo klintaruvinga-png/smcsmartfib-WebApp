@@ -59,7 +59,7 @@ const HARDENING_RETRY_INTERVAL_MS = 5 * 60 * 1000; // 5 min
 // claude.exe so it can be called directly via execFileSync — no shell required.
 function resolveClaudeExe() {
   if (process.platform !== "win32") {
-    return null; // Non-Windows uses shell-based invocation
+    return null; // Non-Windows uses normal PATH lookup via execFileSync.
   }
 
   const npmRoot = process.env.APPDATA ? path.join(process.env.APPDATA, "npm") : null;
@@ -99,6 +99,37 @@ function resolveClaudeExe() {
   }
 
   return null;
+}
+
+function formatClaudeDisplayName(claudeExe) {
+  return claudeExe
+    ? `${path.basename(path.dirname(claudeExe))}/${path.basename(claudeExe)}`
+    : "claude";
+}
+
+function buildClaudeShellCommand(args) {
+  // Only static CLI flags are passed through this helper. Keep the executable name
+  // unresolved so cmd.exe can discover claude.cmd on PATH when no native
+  // claude.exe could be located.
+  return ["claude", ...args].join(" ");
+}
+
+function shouldUseClaudeShellFallback(claudeExe) {
+  return process.platform === "win32" && !claudeExe;
+}
+
+function execClaudeSync(args, options, claudeExe) {
+  if (shouldUseClaudeShellFallback(claudeExe)) {
+    // Windows .cmd/.bat shims cannot be launched with execFileSync. If the
+    // hardened native claude.exe resolution fails, intentionally preserve the
+    // legacy shell fallback so PATH-only claude.cmd installs still work.
+    return execSync(buildClaudeShellCommand(args), {
+      ...options,
+      shell: true,
+    });
+  }
+
+  return execFileSync(claudeExe ?? "claude", args, options);
 }
 
 let lastObservedKey = null;
@@ -885,20 +916,24 @@ function runClaudePlanHardening(state) {
     let stdinFd = -1;
     try {
       stdinFd = fs.openSync(contextFile, "r");
-      const claudeBin = claudeExe ?? "claude";
-      if (claudeExe) {
-        log(
-          `Claude CLI resolved to ${path.basename(path.dirname(claudeExe))}/${path.basename(claudeExe)} - using file-based stdin invocation`,
-        );
+      log(
+        `Claude CLI resolved to ${formatClaudeDisplayName(claudeExe)} - using file-based stdin invocation`,
+      );
+      if (process.platform === "win32" && !claudeExe) {
+        log("Claude native exe was not found - using shell fallback for PATH claude.cmd");
       }
-      planText = execFileSync(claudeBin, ["--print", "--output-format", "text"], {
-        cwd: REPO_ROOT,
-        stdio: [stdinFd, "pipe", "pipe"],
-        timeout: CLAUDE_TIMEOUT_MS,
-        encoding: "utf8",
-        maxBuffer: 10 * 1024 * 1024,
-        windowsHide: true,
-      });
+      planText = execClaudeSync(
+        ["--print", "--output-format", "text"],
+        {
+          cwd: REPO_ROOT,
+          stdio: [stdinFd, "pipe", "pipe"],
+          timeout: CLAUDE_TIMEOUT_MS,
+          encoding: "utf8",
+          maxBuffer: 10 * 1024 * 1024,
+          windowsHide: true,
+        },
+        claudeExe,
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       writeHardeningBlockedState(state, message, nextRetryCount);
@@ -1265,15 +1300,18 @@ function checkClaudeAvailability() {
   try {
     fs.writeFileSync(testFile, "", "utf8");
     testFd = fs.openSync(testFile, "r");
-    const claudeBin = claudeExe ?? "claude";
-    execFileSync(claudeBin, ["--version"], {
-      stdio: [testFd, "pipe", "pipe"],
-      timeout: 10000,
-      encoding: "utf8",
-      windowsHide: true,
-    });
+    execClaudeSync(
+      ["--version"],
+      {
+        stdio: [testFd, "pipe", "pipe"],
+        timeout: 10000,
+        encoding: "utf8",
+        windowsHide: true,
+      },
+      claudeExe,
+    );
     log(
-      `Claude CLI health check passed (file-based stdio verified, ${claudeExe ? path.basename(claudeExe) : "claude"})`,
+      `Claude CLI health check passed (file-based stdio verified, ${formatClaudeDisplayName(claudeExe)})`,
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -1294,6 +1332,14 @@ function checkClaudeAvailability() {
   }
 }
 
-log("Pipeline watcher started");
-checkClaudeAvailability();
-setInterval(pollPipeline, POLL_INTERVAL_MS);
+function startPipelineWatcher() {
+  log("Pipeline watcher started");
+  checkClaudeAvailability();
+  setInterval(pollPipeline, POLL_INTERVAL_MS);
+}
+
+export { buildClaudeShellCommand, execClaudeSync, shouldUseClaudeShellFallback };
+
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  startPipelineWatcher();
+}
