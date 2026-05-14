@@ -484,6 +484,13 @@ auth_raw_open  = request.security(syminfo.tickerid, auth_data_tf, open[1],  look
 auth_raw_close = request.security(syminfo.tickerid, auth_data_tf, close[1], lookahead=barmerge.lookahead_off)
 auth_raw_time  = request.security(syminfo.tickerid, auth_data_tf, time[1],  lookahead=barmerge.lookahead_off)
 
+iso_week_year(t) =>
+    // ISO week-year is determined by the week's Thursday.
+    _dow = dayofweek(t)
+    _thursday_shift_days = 5 - _dow
+    _thursday_ts = t + _thursday_shift_days * 24 * 60 * 60 * 1000
+    year(_thursday_ts)
+
 get_period_key(t, stf) =>
     _mo = month(t)
     _qtr = _mo <= 3 ? 1 : _mo <= 6 ? 2 : _mo <= 9 ? 3 : 4
@@ -491,7 +498,7 @@ get_period_key(t, stf) =>
     stf == "Yearly"    ? year(t) :
      stf == "Quarterly" ? year(t) * 10 + _qtr :
      stf == "Monthly"   ? year(t) * 100 + month(t) :
-     stf == "Weekly"    ? year(t) * 100 + weekofyear(t) :
+     stf == "Weekly"    ? iso_week_year(t) * 100 + weekofyear(t) :
      stf == "D"         ? year(t) * 10000 + month(t) * 100 + dayofmonth(t) :
      stf == "240"       ? year(t) * 1000000 + month(t) * 10000 + dayofmonth(t) * 100 + math.floor(_hr / 4) :
      year(t) * 1000000 + month(t) * 10000 + dayofmonth(t) * 100 + _hr
