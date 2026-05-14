@@ -84,9 +84,7 @@ function ChartsPage() {
   );
   const activeSymbol = clampSymbolToWatchlist(selected, watchlist);
   const price = activeSymbol ? pricesBySymbol.get(activeSymbol) : undefined;
-  const chartQuoteFresh =
-    backendReady && (price?.state === "live" || price?.state === "mock") ? price.mid : undefined;
-  const tickDirection = useTickFlash(chartQuoteFresh);
+  const tickDirection = useTickFlash(price?.mid);
   const tickFlash = isChartTickFlashActive(backendReady, price?.state, tickDirection);
   const lastTickFlash = useRef(false);
 
