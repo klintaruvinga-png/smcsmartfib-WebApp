@@ -94,7 +94,7 @@ Freshness Logic: [PENDING]
 
 ### Deliverables
 - [ ] MT5 Bridge EA: heartbeat, account sync, symbol sync, terminal telemetry
-- [ ] Backend APIs: `POST /heartbeat`, `POST /account-sync`, `POST /symbol-sync`, `GET /license-check`
+- [x] Backend APIs: `POST /ea/heartbeat`, `POST /ea/account-sync`, `POST /ea/symbol-sync`, `GET /ea/license-check`
 
 ### Success Criteria
 - [ ] Heartbeat stable for 48h+
