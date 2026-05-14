@@ -28,6 +28,7 @@ describe("buildLiveChartSeries", () => {
       candles: buildCandles(["2026-05-14T12:00:00.000Z"]),
       liveMid: 1.2345,
       pollMs: 2_000,
+      quoteState: "live",
       now,
     });
 
@@ -44,6 +45,7 @@ describe("buildLiveChartSeries", () => {
       ]),
       liveMid: 1.3456,
       pollMs: 2_000,
+      quoteState: "live",
       now,
     });
 
@@ -57,6 +59,26 @@ describe("buildLiveChartSeries", () => {
       candles: buildCandles(["2026-05-14T12:00:00.000Z"]),
       liveMid: undefined,
       pollMs: 2_000,
+      quoteState: "unavailable",
+      now: Date.parse("2026-05-14T12:00:05.000Z"),
+    });
+
+    expect(series).toEqual([
+      {
+        t: Date.parse("2026-05-14T12:00:00.000Z"),
+        p: 1.1,
+      },
+    ]);
+  });
+
+
+
+  it("does not augment the series when the quote state is stale", () => {
+    const series = buildLiveChartSeries({
+      candles: buildCandles(["2026-05-14T12:00:00.000Z"]),
+      liveMid: 1.7777,
+      pollMs: 2_000,
+      quoteState: "stale",
       now: Date.parse("2026-05-14T12:00:05.000Z"),
     });
 
@@ -77,6 +99,7 @@ describe("buildLiveChartSeries", () => {
       ]),
       liveMid: 1.4567,
       pollMs: 2_000,
+      quoteState: "live",
       now,
     });
 

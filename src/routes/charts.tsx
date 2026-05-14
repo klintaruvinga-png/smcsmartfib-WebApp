@@ -12,7 +12,7 @@ import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { fmtPrice, fmtPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { TVChart } from "@/components/sniper/TVChart";
-import type { ChartSnapshot, Symbol } from "@/types/sniper";
+import type { ChartSnapshot, FreshnessState, Symbol } from "@/types/sniper";
 import { apiClient } from "@/lib/api/sniperClient";
 
 export type ChartSeriesPoint = {
@@ -24,15 +24,19 @@ export function buildLiveChartSeries({
   candles,
   liveMid,
   pollMs,
+  quoteState,
   now = Date.now(),
 }: {
   candles: ChartSnapshot["candles"] | undefined;
   liveMid: number | null | undefined;
   pollMs: number | null;
+  quoteState?: FreshnessState | null;
   now?: number;
 }): ChartSeriesPoint[] {
   const series = (candles ?? []).map((c) => ({ t: new Date(c.time).getTime(), p: c.close }));
-  const livePrice = typeof liveMid === "number" && Number.isFinite(liveMid) ? liveMid : null;
+  const hasFreshQuote = quoteState === "live" || quoteState === "mock";
+  const livePrice =
+    hasFreshQuote && typeof liveMid === "number" && Number.isFinite(liveMid) ? liveMid : null;
   if (series.length === 0 || livePrice === null) {
     return series;
   }
@@ -110,6 +114,7 @@ function ChartsPage() {
     candles: chart?.candles,
     liveMid: price?.mid,
     pollMs,
+    quoteState: price?.state,
   });
   const fibs = chart?.fibLevels ?? [];
   const families = Array.from(new Set(fibs.map((f) => f.family))).filter(Boolean);
