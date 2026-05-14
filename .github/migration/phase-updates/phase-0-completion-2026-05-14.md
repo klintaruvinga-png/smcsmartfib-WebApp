@@ -27,15 +27,22 @@
 ## Root Cause Insights
 - The backend is stable, but the feed is still reporting stale status for two major indices.
 - XAUUSD still has insufficient candle coverage, suggesting the aggregation/MT5 symbol mapping path requires review.
-- AUDUSD and ETHUSD remain blocked by chop-gate state, which is an independent locked-state issue.
+- AUDUSD and ETHUSD remain blocked by chop-gate state; this has been audited as genuine live chop engine behavior, not cache drift.
+- The raw final soak export is stored in repo at `.github/migration/phase-updates/phase0-soak-Final-2026-05-14.md`.
 
 ## Next Actions
-1. Investigate the MT5 freshness path for NAS100 and US30 in the backend and EA feed ingestion.
-2. Verify XAUUSD candle aggregation from M1 → 15m and ensure the symbol is not being filtered or delayed by missing MT5 history.
-3. Capture a parity audit of dashboard/backend health and watchlist state immediately after the final soak.
-4. Preserve the current soak baseline and do not reset or overwrite the evidence rows while debugging.
+1. [ ] PENDING — NAS100/US30 freshness fix merged, but live validation has not yet confirmed `feedStatus=live` during the next active session.
+2. [ ] PENDING — XAUUSD alias fix merged, but EA restart and 7.5h candle accumulation have not yet confirmed candle-history readiness.
+3. [x] VERIFIED — Phase 0 parity audit captured at `.github/migration/audits/phase-0-full-parity-2026-05-14.md`.
+4. [x] VERIFIED — Current soak baseline preserved; raw final export stored at `.github/migration/phase-updates/phase0-soak-Final-2026-05-14.md`.
+
+## Fix Deployment Status
+- NAS100/US30 freshness fix: Merged in PR #170 and PR #171 — EA reload and live validation soak required.
+- XAUUSD alias fix: Merged in PR #170 — EA restart and 7.5h candle accumulation required.
+- AUDUSD/ETHUSD chop blocks: No fix; classified as live engine behavior — observation only.
 
 ## Conclusion
 - 72h soak: complete
 - Phase 0 closeout: blocked by unresolved freshness/candle-history defects
 - Ready for Phase 1: NO
+- Code patches merged 2026-05-14. Post-fix live validation soak not yet started. Superseding closeout artifact blocked pending validation.
