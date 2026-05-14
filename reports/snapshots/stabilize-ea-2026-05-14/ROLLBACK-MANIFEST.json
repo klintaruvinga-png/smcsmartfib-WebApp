@@ -3,7 +3,29 @@
   "created_at": "2026-05-14T00:00:00Z",
   "branch": "claude/serene-hopper-VFRyT",
   "initial_commit": "da4720ebac830eb4757ebe04501f75a3c131ee18",
-  "rollback_points": [],
+  "rollback_points": [
+    {
+      "name": "Initial state",
+      "tag": "snapshot/stabilize-ea-2026-05-14-start-20260514T000000Z",
+      "commit_hash": "da4720ebac830eb4757ebe04501f75a3c131ee18",
+      "snapshot_file": "INITIAL-20260514T000000Z.json",
+      "command": "git reset --hard da4720ebac830eb4757ebe04501f75a3c131ee18"
+    },
+    {
+      "name": "Before patches",
+      "tag": "rollback/stabilize-ea-2026-05-14-before-patches",
+      "commit_hash": "da4720ebac830eb4757ebe04501f75a3c131ee18",
+      "snapshot_file": "PRE-PATCH-20260514T000200Z.json",
+      "command": "git reset --hard da4720ebac830eb4757ebe04501f75a3c131ee18"
+    },
+    {
+      "name": "After patch cluster 1 (BUG-001, BUG-002, INFO-001)",
+      "tag": "rollback/stabilize-ea-2026-05-14-after-patch-1",
+      "commit_hash": "1da5b02c9c290d873b807226ff0bdedff897fc5c",
+      "snapshot_file": "AFTER-PATCH-1-20260514T000300Z.json",
+      "command": "git reset --hard 1da5b02c9c290d873b807226ff0bdedff897fc5c"
+    }
+  ],
   "emergency_rollback": {
     "command": "git checkout main && git reset --hard origin/main"
   }
