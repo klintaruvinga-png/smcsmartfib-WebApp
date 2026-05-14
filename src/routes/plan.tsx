@@ -11,6 +11,7 @@ import { cn, deduplicateById } from "@/lib/utils";
 import { apiClient } from "@/lib/api/sniperClient";
 import { toast } from "sonner";
 import { WalletOverview } from "@/components/sniper/WalletOverview";
+import { isTradePlanComplete } from "./-plan.utils";
 
 export const Route = createFileRoute("/plan")({
   head: () => ({
@@ -36,7 +37,7 @@ const PLAN_HERO_TICK_MOTION: TickMotionOptions = {
   delayMaxMs: 100,
 };
 
-function PlanPage() {
+export function PlanPage() {
   const { data: signals, isLoading: signalsLoading } = useLiveSignals();
   const { data: ladders, isLoading: laddersLoading } = useLadders();
   const { data: snapshot } = useSnapshot();
@@ -134,6 +135,7 @@ function PlanPage() {
   }
 
   const divergence = top.computedBy === "frontend" && !top.backendConfirmed;
+  const planIncomplete = Boolean(plan && !isTradePlanComplete(plan));
   const dirIcon =
     top.direction === "LONG" ? (
       <ArrowUpRight className="h-5 w-5" />
@@ -158,6 +160,12 @@ function PlanPage() {
           Frontend computed this signal but the backend has not confirmed it. Do not execute until
           backend confirmation.
         </DivergenceBanner>
+      )}
+      {planIncomplete && (
+        <WarningLine level="warn">
+          Backend plan is missing TP2/TP3 or R:R values. Full 3-stage ladder is not confirmed.
+          Execution blocked until the backend publishes a complete plan.
+        </WarningLine>
       )}
 
       {/* Hero candidate */}
@@ -366,10 +374,10 @@ function PlanPage() {
               toast.error(err instanceof Error ? err.message : "Execution failed");
             }
           }}
-          disabled={!top.backendConfirmed}
+          disabled={!top.backendConfirmed || planIncomplete}
           className={cn(
             "inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors",
-            top.backendConfirmed
+            top.backendConfirmed && !planIncomplete
               ? "bg-buy/15 border border-buy/50 text-buy hover:bg-buy/25"
               : "bg-bg2 border border-bd text-mute cursor-not-allowed",
           )}

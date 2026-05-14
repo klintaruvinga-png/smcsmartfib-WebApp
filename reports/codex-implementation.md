@@ -1,37 +1,42 @@
 # Issue summary
 
-Charts on `/charts` were lagging the live price poll because the rendered line series was rebuilt only from `getChartSnapshot()` candle data. The live snapshot poll updated the price label, but not the chart's rightmost point.
+Backend-confirmed plans could still reach the execution button even when the published ladder was missing TP2/TP3 or R:R stages. The frontend already rendered three-stage ladders correctly; the missing safeguard was that partial backend ladders were treated as executable truth.
 
 # Root cause implemented
 
-I added a route-local series augmentation helper that merges the current `price.mid` into the chart series on every snapshot poll. When the backend's last candle is recent enough to represent the in-progress bar, the helper replaces that last point; otherwise it appends a new transient point. I kept `TVChart` unchanged because its existing `[series]` effect already replays `setData()` for each new series reference.
+I added a frontend completeness guard for backend ladder payloads and kept backend authority intact. The route now detects incomplete `TradePlan` target/R:R fields, shows a warning, and blocks execution without deriving any missing values on the client.
 
 # Exact files changed
 
-- `src/routes/charts.tsx`
-- `src/routes/-charts.test.ts`
-- `src/routes/-admin.test.tsx`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-14_live-chart-polling.md`
+- `src/routes/plan.tsx`
+- `src/routes/-plan.utils.ts`
+- `src/routes/-plan.test.tsx`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-14_tp-rr-ladder-guard.md`
+- `.github/migration/audits/phase-0-ladders-parity-2026-05-14.md`
 - `reports/codex-implementation.md`
 
 # Tests run
 
-- `npx vitest run src/routes/-charts.test.ts`
-- `npx tsc --noEmit`
-- `npm run build`
+- `npx vitest run src/routes/-plan.test.tsx`
+- `npx eslint src/routes/plan.tsx src/routes/-plan.test.tsx src/routes/-plan.utils.ts`
+- `npx vitest run`
+  - failed for pre-existing repo issues outside this patch
+- `npm run lint`
+  - failed for pre-existing repo issues outside this patch
 
 # Reports generated
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-14_live-chart-polling.md`
-- No parity audit required by contract.
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-14_tp-rr-ladder-guard.md`
+- `.github/migration/audits/phase-0-ladders-parity-2026-05-14.md`
 - `reports/codex-implementation.md`
 
 # Remaining risks
 
-- I could not run the in-app browser or inspect the network tab in this session, so route-level manual checks for `/charts`, `/live`, `/plan`, Fibonacci overlay positioning, and unchanged poll cadence remain manual follow-up items.
-- The backend does not expose an explicit incomplete-bar flag, so the replace-vs-append branch relies on the contract-approved recency window.
+- The backend `/ladders` producer is out of repo and still needs the authoritative fix.
+- Repo-wide Vitest and lint runs are not clean before this patch because of unrelated legacy discovery and formatting issues.
+- Screenshot artifacts requested by the contract were not captured because the required in-app browser automation tool surface was not available in this session.
 
 # Any contract ambiguities resolved during implementation
 
-- Backend incomplete-bar detection was not explicit in the payload, so I used the contract's smallest safe interpretation: treat a last candle within `pollMs * 1.5` of `Date.now()` as the current bar and replace it with the live point.
-- The contract did not define behavior when live price exists but candle history is empty. I chose not to emit a live-only chart point so the frontend does not fabricate chart history without backend candle authority.
+- `reports/codex-plan.md` suggested branch `codex/plan-incomplete-tp-guard`, but runtime context required `codex/plan-the-tp-rr-lot-sizing-as-described-below`; I used the runtime branch as authoritative.
+- The contract both prescribed an inline route change and requested unit-testable completeness logic. I resolved that by extracting the boolean rule into `src/routes/-plan.utils.ts` while keeping the route behavior identical to the contract.
