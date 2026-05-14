@@ -1,104 +1,107 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useLiveSignals, useLadders, useSnapshot } from "@/hooks/useSniperData";
-import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
+import {
+  useCanonicalWatchlist,
+  useLiveSignals,
+  useLadders,
+  useSnapshot,
+} from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
-import { VerdictBadge } from "@/components/sniper/VerdictBadge";
-import { WarningLine, DivergenceBanner } from "@/components/sniper/Warnings";
-import { fmtPrice, fmtPct, fmtUSC, fmtZAR, relTime } from "@/lib/format";
-import { tickMotionHoldMs, tickMotionStyle, type TickMotionOptions } from "@/lib/tickMotion";
-import { ArrowUpRight, ArrowDownRight, Send, Loader2, AlertTriangle, Search } from "lucide-react";
-import { cn, deduplicateById } from "@/lib/utils";
-import { apiClient } from "@/lib/api/sniperClient";
-import { toast } from "sonner";
+import { DivergenceBanner } from "@/components/sniper/Warnings";
+import { AlertTriangle, Loader2, Search } from "lucide-react";
+import { deduplicateById } from "@/lib/utils";
 import { WalletOverview } from "@/components/sniper/WalletOverview";
 import { isTradePlanComplete } from "./-plan.utils";
+import type { SignalCandidate, TradePlan } from "@/types/sniper";
+import { PlanCandidateCard } from "@/components/PlanCard";
 
 export const Route = createFileRoute("/plan")({
   head: () => ({
     meta: [
-      { title: "Signal Plan — SMC SuperFIB" },
+      { title: "Signal Plans - SMC SuperFIB" },
       {
         name: "description",
-        content: "Top-rated signal with full ladder blueprint, risk and drawdown impact.",
+        content:
+          "Top ranked watchlist execution plans with backend blueprints, risk, and ladder status.",
       },
-      { property: "og:title", content: "Signal Plan — SMC SuperFIB" },
+      { property: "og:title", content: "Signal Plans - SMC SuperFIB" },
       {
         property: "og:description",
-        content: "Backend-confirmed entry ladder, SL, TP and risk allocation.",
+        content:
+          "Backend-confirmed entry ladders, SL, TP, and risk allocation for the top watchlist candidates.",
       },
     ],
   }),
   component: PlanPage,
 });
 
-const PLAN_HERO_TICK_MOTION: TickMotionOptions = {
-  baseDurationMs: 280,
-  durationSpreadMs: 120,
-  delayMaxMs: 100,
+const VERDICT_RANK: Record<string, number> = { "A+": 4, A: 3, B: 2, C: 1 };
+
+type RankedCandidate = {
+  signal: SignalCandidate;
+  plan: TradePlan | null;
+  hasPlan: boolean;
+  planComplete: boolean;
+  originalIndex: number;
 };
+
+type RenderableCandidate = RankedCandidate & {
+  plan: TradePlan;
+  hasPlan: true;
+};
+
+function compareRankedCandidates(a: RankedCandidate, b: RankedCandidate) {
+  const verdictDelta =
+    (VERDICT_RANK[b.signal.verdict] ?? 0) - (VERDICT_RANK[a.signal.verdict] ?? 0);
+  if (verdictDelta !== 0) return verdictDelta;
+
+  if (a.signal.backendConfirmed !== b.signal.backendConfirmed) {
+    return a.signal.backendConfirmed ? -1 : 1;
+  }
+
+  const aReady = a.signal.status === "READY";
+  const bReady = b.signal.status === "READY";
+  if (aReady !== bReady) return aReady ? -1 : 1;
+
+  if (a.hasPlan !== b.hasPlan) return a.hasPlan ? -1 : 1;
+
+  return a.originalIndex - b.originalIndex;
+}
+
+function hasRenderablePlan(candidate: RankedCandidate): candidate is RenderableCandidate {
+  return candidate.hasPlan && candidate.plan !== null;
+}
 
 export function PlanPage() {
   const { data: signals, isLoading: signalsLoading } = useLiveSignals();
   const { data: ladders, isLoading: laddersLoading } = useLadders();
   const { data: snapshot } = useSnapshot();
+  const { watchlist, watchlistSet } = useCanonicalWatchlist();
 
-  const VERDICT_RANK: Record<string, number> = { "A+": 4, A: 3, B: 2, C: 1 };
-  // CRITICAL: Deduplicate signals by ID and keep all candidates.
-  // The plan section must still render frontend-computed signals with a divergence warning,
-  // while backend-confirmed signals remain the preferred execution source of truth.
   const uniqueSignals = signals
     ? deduplicateById(signals).sort(
         (a, b) => (VERDICT_RANK[b.verdict] ?? 0) - (VERDICT_RANK[a.verdict] ?? 0),
       )
-    : undefined;
+    : [];
+
   const laddersBySignalId = new Map((ladders ?? []).map((ladder) => [ladder.signalId, ladder]));
-  const rankedCandidates = uniqueSignals?.map((signal) => {
+  const candidatePool: RankedCandidate[] = uniqueSignals.map((signal, originalIndex) => {
     const candidatePlan = laddersBySignalId.get(signal.id) ?? null;
     return {
       signal,
       plan: candidatePlan,
       hasPlan: candidatePlan !== null,
       planComplete: Boolean(candidatePlan && isTradePlanComplete(candidatePlan)),
+      originalIndex,
     };
   });
-  const topCandidate =
-    rankedCandidates?.find(
-      ({ signal, planComplete }) =>
-        signal.backendConfirmed && signal.status === "READY" && planComplete,
-    ) ??
-    rankedCandidates?.find(({ signal, planComplete }) => signal.status === "READY" && planComplete) ??
-    rankedCandidates?.find(
-      ({ signal, hasPlan }) => signal.backendConfirmed && signal.status === "READY" && hasPlan,
-    ) ??
-    rankedCandidates?.find(({ signal, hasPlan }) => signal.status === "READY" && hasPlan) ??
-    rankedCandidates?.find(({ signal, hasPlan }) => signal.backendConfirmed && hasPlan) ??
-    rankedCandidates?.find(({ hasPlan }) => hasPlan);
 
-  const top =
-    topCandidate?.signal ??
-    uniqueSignals?.find((s) => s.status === "READY") ??
-    uniqueSignals?.[0];
-  const plan = topCandidate?.plan ?? (top ? (laddersBySignalId.get(top.id) ?? null) : null);
-  const topPrice = top ? snapshot?.prices.find((price) => price.symbol === top.symbol) : undefined;
-  const topFlashHoldMs = tickMotionHoldMs(PLAN_HERO_TICK_MOTION);
-  const {
-    value: animatedTopMid,
-    direction: topMidDir,
-    heldDirection: heldTopMidDir,
-    motionKey: topMotionKey,
-    motionImpulse: topMotionImpulse,
-  } = useAnimatedNumber(topPrice?.mid, 300, topFlashHoldMs, top?.symbol ?? null);
-  const topPriceStyle = tickMotionStyle(
-    `${top?.symbol ?? "plan"}:hero-mid`,
-    PLAN_HERO_TICK_MOTION,
-    {
-      motionKey: topMotionKey,
-      motionImpulse: topMotionImpulse,
-    },
-  );
-  const topPriceLive = Boolean(
-    topPrice && topPrice.mid > 0 && (topPrice.state === "live" || topPrice.state === "mock"),
-  );
+  const watchlistCandidates = candidatePool.filter(({ signal }) => watchlistSet.has(signal.symbol));
+  const rankedWatchlistCandidates = [...watchlistCandidates].sort(compareRankedCandidates);
+  const topCandidates = rankedWatchlistCandidates.filter(hasRenderablePlan).slice(0, 3);
+  const divergentCount = topCandidates.filter(
+    ({ signal }) => signal.computedBy === "frontend" && !signal.backendConfirmed,
+  ).length;
+  const firstWatchlistCandidate = rankedWatchlistCandidates[0];
 
   if (signalsLoading || laddersLoading) {
     return (
@@ -109,14 +112,15 @@ export function PlanPage() {
     );
   }
 
-  if (!top || !plan) {
+  if (topCandidates.length === 0) {
     const diagnostics = {
-      signalCount: uniqueSignals?.length ?? 0,
-      readyCount: uniqueSignals?.filter((s) => s.status === "READY").length ?? 0,
-      topSignal: top?.id,
-      topSymbol: top?.symbol,
+      signalCount: uniqueSignals.length,
+      watchlistCount: watchlist.length,
+      watchlistCandidateCount: watchlistCandidates.length,
+      topSignal: firstWatchlistCandidate?.signal.id,
+      topSymbol: firstWatchlistCandidate?.signal.symbol,
       blueprintCount: ladders?.length ?? 0,
-      blueprintIds: ladders?.map((l) => l.signalId) ?? [],
+      blueprintIds: ladders?.map((ladder) => ladder.signalId) ?? [],
     };
 
     return (
@@ -125,39 +129,38 @@ export function PlanPage() {
         <div className="space-y-3 text-sm">
           <div className="flex items-center gap-2 text-mute">
             <AlertTriangle className="h-4 w-4 text-warn shrink-0" />
-            {top ? "No matching blueprint for this signal." : "No active signals found."}
+            {watchlist.length === 0
+              ? "No watchlist symbols configured for signal plans."
+              : firstWatchlistCandidate
+                ? "No matching blueprint for current watchlist candidates."
+                : "No active watchlist candidates found."}
           </div>
-          {top && (
-            <div className="text-xs text-dim bg-bg1/40 rounded px-3 py-2 max-w-lg space-y-1">
+          <div className="text-xs text-dim bg-bg1/40 rounded px-3 py-2 max-w-xl space-y-1">
+            <div>Signals loaded: {diagnostics.signalCount}</div>
+            <div>Watchlist symbols: {diagnostics.watchlistCount}</div>
+            <div>Watchlist candidates: {diagnostics.watchlistCandidateCount}</div>
+            {firstWatchlistCandidate && (
               <div>
-                Signal: <span className="text-info font-mono">{top.id}</span> ({top.symbol}{" "}
-                {top.direction})
+                Top watchlist candidate:{" "}
+                <span className="text-info font-mono">{diagnostics.topSignal}</span> (
+                {diagnostics.topSymbol} {firstWatchlistCandidate.signal.direction})
               </div>
-              <div>Found {diagnostics.blueprintCount} total blueprints</div>
-              {diagnostics.blueprintCount === 0 && (
-                <div className="flex items-center gap-1.5 text-warn">
-                  <Search className="h-3.5 w-3.5 shrink-0" />
-                  Ladders endpoint returned no data — check backend connectivity
-                </div>
-              )}
-              {diagnostics.blueprintCount > 0 && (
-                <div>Ladder IDs available: {diagnostics.blueprintIds.join(", ") || "none"}</div>
-              )}
-            </div>
-          )}
+            )}
+            <div>Found {diagnostics.blueprintCount} total blueprints</div>
+            {diagnostics.blueprintCount === 0 && (
+              <div className="flex items-center gap-1.5 text-warn">
+                <Search className="h-3.5 w-3.5 shrink-0" />
+                Ladders endpoint returned no data - check backend connectivity
+              </div>
+            )}
+            {diagnostics.blueprintCount > 0 && (
+              <div>Ladder IDs available: {diagnostics.blueprintIds.join(", ") || "none"}</div>
+            )}
+          </div>
         </div>
       </div>
     );
   }
-
-  const divergence = top.computedBy === "frontend" && !top.backendConfirmed;
-  const planIncomplete = Boolean(plan && !isTradePlanComplete(plan));
-  const dirIcon =
-    top.direction === "LONG" ? (
-      <ArrowUpRight className="h-5 w-5" />
-    ) : (
-      <ArrowDownRight className="h-5 w-5" />
-    );
 
   return (
     <div className="space-y-5">
@@ -165,306 +168,33 @@ export function PlanPage() {
 
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Signal Plan</h1>
-          <p className="text-xs text-mute mt-0.5">Best-rated READY candidate · backend blueprint</p>
+          <h1 className="text-xl font-semibold tracking-tight">Signal Plans</h1>
+          <p className="text-xs text-mute mt-0.5">
+            Top {topCandidates.length} watchlist candidate{topCandidates.length > 1 ? "s" : ""} by
+            verdict
+          </p>
         </div>
-        <FreshnessBadge state={plan.source === "backend-blueprint" ? "live" : "pending-sync"} />
+        <FreshnessBadge state={divergentCount > 0 ? "pending-sync" : "live"} />
       </div>
 
-      {divergence && (
+      {divergentCount > 0 && (
         <DivergenceBanner>
-          Frontend computed this signal but the backend has not confirmed it. Do not execute until
-          backend confirmation.
+          {divergentCount} candidate{divergentCount > 1 ? "s are" : " is"} frontend computed and
+          waiting on backend confirmation. Do not execute until the backend confirms the blueprint.
         </DivergenceBanner>
       )}
-      {planIncomplete && (
-        <WarningLine level="warn">
-          Backend plan is missing TP2/TP3 or R:R values. Full 3-stage ladder is not confirmed.
-          Execution blocked until the backend publishes a complete plan.
-        </WarningLine>
-      )}
 
-      {/* Hero candidate */}
-      <div
-        className={cn(
-          "rounded-lg border border-bd bg-bg1/60 p-4 lg:p-5 transition-colors",
-          topPriceLive && heldTopMidDir === "up" && "tick-surface-hold-up",
-          topPriceLive && heldTopMidDir === "down" && "tick-surface-hold-down",
-        )}
-      >
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3">
-            <VerdictBadge verdict={top.verdict} large />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-lg font-semibold">{top.symbol}</span>
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider font-mono",
-                    top.direction === "LONG"
-                      ? "border-buy/40 text-buy bg-buy/10"
-                      : "border-sell/40 text-sell bg-sell/10",
-                  )}
-                >
-                  {dirIcon}
-                  {top.direction}
-                </span>
-                <span
-                  className={cn(
-                    "inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider font-mono",
-                    top.status === "READY"
-                      ? "border-buy/40 text-buy bg-buy/10"
-                      : top.status === "ARMED"
-                        ? "border-warn/40 text-warn bg-warn/10"
-                        : "border-info/40 text-info bg-info/10",
-                  )}
-                >
-                  {top.status}
-                </span>
-              </div>
-              <div className="text-xs text-mute mt-1 font-mono">
-                {top.id} · {relTime(top.createdAt)}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {topPriceLive && topPrice && (
-              <span
-                style={topPriceStyle}
-                className={cn(
-                  "rounded border border-bd px-2 py-1 text-xs font-mono font-semibold tabular-nums price-smooth",
-                  heldTopMidDir === "up" && "tick-hold-up",
-                  heldTopMidDir === "down" && "tick-hold-down",
-                  topMidDir === "up" && "tick-flash-up-fast",
-                  topMidDir === "down" && "tick-flash-down-fast",
-                )}
-              >
-                {fmtPrice(animatedTopMid ?? topPrice.mid, top.symbol)}
-              </span>
-            )}
-            <span
-              className={cn(
-                "inline-flex items-center rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider font-mono",
-                plan.source === "backend-blueprint"
-                  ? "border-buy/40 text-buy bg-buy/10"
-                  : "border-violet/40 text-violet bg-violet/10",
-              )}
-            >
-              {plan.source}
-            </span>
-            <span
-              className={cn(
-                "inline-flex items-center rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider font-mono",
-                top.backendConfirmed
-                  ? "border-buy/40 text-buy bg-buy/10"
-                  : "border-warn/40 text-warn bg-warn/10",
-              )}
-            >
-              {top.backendConfirmed ? "BACKEND ✓" : "UNCONFIRMED"}
-            </span>
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-1.5">
-          {top.confluence.map((c) => (
-            <span
-              key={c}
-              className="rounded bg-bg2 px-2 py-0.5 text-[10px] font-mono text-dim border border-bd"
-            >
-              {c}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Ladder + risk */}
-      <div className="grid gap-3 lg:grid-cols-3">
-        <PlanCard title="Entries" tone="info">
-          <Row
-            label="E1"
-            value={fmtPrice(plan.entries.e1, top.symbol)}
-            sub={`${plan.lotSize.e1.toFixed(2)} lot / SL ${fmtPrice(plan.stops?.e1 ?? plan.sl, top.symbol)}`}
+      <div className="space-y-4">
+        {topCandidates.map((candidate) => (
+          <PlanCandidateCard
+            key={candidate.signal.id}
+            signal={candidate.signal}
+            plan={candidate.plan}
+            price={snapshot?.prices.find((entry) => entry.symbol === candidate.signal.symbol)}
+            planComplete={candidate.planComplete}
           />
-          <Row
-            label="E2"
-            value={fmtPrice(plan.entries.e2, top.symbol)}
-            sub={`${plan.lotSize.e2.toFixed(2)} lot / SL ${fmtPrice(plan.stops?.e2 ?? plan.sl, top.symbol)}`}
-          />
-          <Row
-            label="E3"
-            value={fmtPrice(plan.entries.e3, top.symbol)}
-            sub={`${plan.lotSize.e3.toFixed(2)} lot / SL ${fmtPrice(plan.stops?.e3 ?? plan.sl, top.symbol)}`}
-          />
-        </PlanCard>
-
-        <PlanCard title="Targets" tone="buy">
-          <Row
-            label="TP1"
-            value={formatOptionalPrice(plan.tps?.tp1, top.symbol)}
-            sub={formatOptionalRatio(plan.rr?.tp1)}
-            valueClass="text-buy"
-          />
-          <Row
-            label="TP2"
-            value={formatOptionalPrice(plan.tps?.tp2, top.symbol)}
-            sub={formatOptionalRatio(plan.rr?.tp2)}
-            valueClass="text-buy"
-          />
-          <Row
-            label="TP3"
-            value={formatOptionalPrice(plan.tps?.tp3, top.symbol)}
-            sub={formatOptionalRatio(plan.rr?.tp3)}
-            valueClass="text-buy"
-          />
-        </PlanCard>
-
-        <PlanCard title="Stop & risk" tone="sell">
-          <Row label="SL" value={fmtPrice(plan.sl, top.symbol)} valueClass="text-sell" />
-          <Row label="Risk" value={fmtUSC(plan.riskUSC)} sub={fmtZAR(plan.riskZAR)} />
-          <Row
-            label="DD impact"
-            value={fmtPct(plan.drawdownImpactPct)}
-            sub="of equity"
-            valueClass="text-warn"
-          />
-        </PlanCard>
-      </div>
-
-      {/* Ladder Status */}
-      {plan.stageFills && (
-        <PlanCard title="Ladder Status" tone="neutral">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span>State:</span>
-              <span
-                className={cn(
-                  "font-mono text-sm",
-                  plan.state === "ACTIVE" ? "text-buy" : "text-sell",
-                )}
-              >
-                {plan.state}
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div
-                className={cn(
-                  "rounded px-2 py-1 text-center text-xs font-mono",
-                  plan.stageFills.e1 ? "bg-buy/20 text-buy" : "bg-bg2 text-dim",
-                )}
-              >
-                E1 {plan.stageFills.e1 ? "Filled" : "Pending"}
-              </div>
-              <div
-                className={cn(
-                  "rounded px-2 py-1 text-center text-xs font-mono",
-                  plan.stageFills.e2 ? "bg-buy/20 text-buy" : "bg-bg2 text-dim",
-                )}
-              >
-                E2 {plan.stageFills.e2 ? "Filled" : "Pending"}
-              </div>
-              <div
-                className={cn(
-                  "rounded px-2 py-1 text-center text-xs font-mono",
-                  plan.stageFills.e3 ? "bg-buy/20 text-buy" : "bg-bg2 text-dim",
-                )}
-              >
-                E3 {plan.stageFills.e3 ? "Filled" : "Pending"}
-              </div>
-            </div>
-          </div>
-        </PlanCard>
-      )}
-
-      {/* CTA */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-bd bg-bg1/40 p-4">
-        <div className="text-xs text-mute">
-          Sending will queue all 3 ladder entries to{" "}
-          <span className="font-mono text-dim">/user/execute-signals</span>.
-        </div>
-        <button
-          onClick={async () => {
-            try {
-              const r = await apiClient.postExecuteSignals({ signalIds: [top.id] });
-              toast.success(`Queued ${r.queued} order${r.queued > 1 ? "s" : ""} for execution`);
-            } catch (err) {
-              toast.error(err instanceof Error ? err.message : "Execution failed");
-            }
-          }}
-          disabled={!top.backendConfirmed || planIncomplete}
-          className={cn(
-            "inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors",
-            top.backendConfirmed && !planIncomplete
-              ? "bg-buy/15 border border-buy/50 text-buy hover:bg-buy/25"
-              : "bg-bg2 border border-bd text-mute cursor-not-allowed",
-          )}
-        >
-          <Send className="h-4 w-4" />
-          Send to execution
-        </button>
-      </div>
-
-      {!top.backendConfirmed && (
-        <WarningLine level="warn">
-          Execution disabled until backend confirms this signal blueprint.
-        </WarningLine>
-      )}
-    </div>
-  );
-}
-
-function PlanCard({
-  title,
-  tone,
-  children,
-}: {
-  title: string;
-  tone: "buy" | "sell" | "info" | "neutral";
-  children: React.ReactNode;
-}) {
-  const accent =
-    tone === "buy"
-      ? "border-buy/30"
-      : tone === "sell"
-        ? "border-sell/30"
-        : tone === "info"
-          ? "border-info/30"
-          : "border-bd";
-  return (
-    <div className={cn("rounded-lg border bg-bg1/50 p-4", accent)}>
-      <div className="text-[11px] font-mono uppercase tracking-wider text-mute mb-3">{title}</div>
-      <div className="space-y-2">{children}</div>
-    </div>
-  );
-}
-
-function Row({
-  label,
-  value,
-  sub,
-  valueClass,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  valueClass?: string;
-}) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <span className="text-[11px] font-mono uppercase tracking-wider text-mute">{label}</span>
-      <div className="text-right">
-        <div className={cn("font-mono text-sm font-semibold", valueClass ?? "text-tx")}>
-          {value}
-        </div>
-        {sub && <div className="text-[10px] font-mono text-mute">{sub}</div>}
+        ))}
       </div>
     </div>
   );
-}
-
-function formatOptionalPrice(value: number | undefined, symbol?: string) {
-  return Number.isFinite(value) ? fmtPrice(value, symbol) : "--";
-}
-
-function formatOptionalRatio(value: number | undefined) {
-  return Number.isFinite(value) ? `R ${value.toFixed(2)}` : "R --";
 }
