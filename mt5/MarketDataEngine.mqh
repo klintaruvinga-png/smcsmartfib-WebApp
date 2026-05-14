@@ -215,6 +215,21 @@ public:
               " | latestClosedCandle_m1=", TimeToString(candleTime_m1, TIME_DATE|TIME_SECONDS),
               " | latestClosedCandle_m15=", TimeToString(candleTime_m15, TIME_DATE|TIME_SECONDS));
 
+        // Equity index session-awareness: NAS100/US30 only trade US equity hours (13:30-20:00 UTC
+        // Mon-Fri). The global SessionManager uses FX hours and cannot distinguish index
+        // off-session from a genuine feed failure. When the equity session is closed, override
+        // freshness to CLOSED and use the current wall-clock time as the push timestamp so the
+        // PHP backend accepts the push (tick.timestamp would be hours old and get rejected by
+        // the >300s stale-data guard). The last known bid/ask is sent as a reference price.
+        bool   indexEquity   = IsEquityIndexSymbol(symbol);
+        bool   equityOpen    = indexEquity ? IsEquitySessionOpen() : true;
+        string freshnessStr  = (indexEquity && !equityOpen)
+                                   ? "CLOSED"
+                                   : FreshnessStateName(GetFreshnessState(symbol));
+        // Use current time as payload timestamp when session is closed so PHP does not reject
+        // the push on the >300s stale-data guard.
+        datetime pushTime    = (indexEquity && !equityOpen) ? TimeGMT() : tick.timestamp;
+
         string json = "{";
 
         if (wpUserId > 0)
@@ -223,10 +238,10 @@ public:
         json += "\"symbol\":\""            + symbol                                     + "\",";
         json += "\"normalized_symbol\":\"" + norm                                       + "\",";
         json += "\"timeframe\":\"M1\",";
-        json += "\"timestamp\":\""         + TimeToIso8601(tick.timestamp) + "\",";
+        json += "\"timestamp\":\""         + TimeToIso8601(pushTime) + "\",";
         json += "\"bid\":"                 + DoubleToString(tick.bid, digits)            + ",";
         json += "\"ask\":"                 + DoubleToString(tick.ask, digits)            + ",";
-        json += "\"freshness\":\""         + FreshnessStateName(GetFreshnessState(symbol)) + "\",";
+        json += "\"freshness\":\""         + freshnessStr                               + "\",";
         json += "\"session\":\""           + GetSessionName()                           + "\"";
 
         // M1 Candle
@@ -400,6 +415,27 @@ private:
             case FRESHNESS_DISCONNECTED: return "DISCONNECTED";
             default:                     return "UNKNOWN";
         }
+    }
+
+    // Returns true for equity index symbols that trade only during the US equity session.
+    bool IsEquityIndexSymbol(string symbol)
+    {
+        string norm = symbolNormalizer.NormalizeSymbol(symbol);
+        return norm == "NAS100" || norm == "US30";
+    }
+
+    // Returns true when the US equity session is currently open (Mon-Fri 13:30-20:00 UTC).
+    // NAS100 (NASDAQ) and US30 (Dow Jones) follow NYSE/NASDAQ regular session hours.
+    bool IsEquitySessionOpen()
+    {
+        MqlDateTime dt;
+        TimeToStruct(TimeGMT(), dt);
+        int dow = dt.day_of_week; // 0=Sunday, 6=Saturday
+        if (dow == 0 || dow == 6)
+            return false;
+        int minutesUtc = dt.hour * 60 + dt.min;
+        // 13:30 UTC = 810 min, 20:00 UTC = 1200 min
+        return minutesUtc >= 810 && minutesUtc < 1200;
     }
 };
 
