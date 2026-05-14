@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ChartSnapshot } from "@/types/sniper";
+import { isChartTickFlashActive, resolveChartCountdownMs } from "@/lib/chartCountdown";
 
 vi.mock("@tanstack/react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-router")>();
@@ -39,10 +40,7 @@ describe("buildLiveChartSeries", () => {
   it("replaces the last point when the backend candle is still within the live poll window", () => {
     const now = Date.parse("2026-05-14T12:00:02.000Z");
     const series = buildLiveChartSeries({
-      candles: buildCandles([
-        "2026-05-14T11:45:00.000Z",
-        "2026-05-14T12:00:01.000Z",
-      ]),
+      candles: buildCandles(["2026-05-14T11:45:00.000Z", "2026-05-14T12:00:01.000Z"]),
       liveMid: 1.3456,
       pollMs: 2_000,
       quoteState: "live",
@@ -71,8 +69,6 @@ describe("buildLiveChartSeries", () => {
     ]);
   });
 
-
-
   it("does not augment the series when the quote state is stale", () => {
     const series = buildLiveChartSeries({
       candles: buildCandles(["2026-05-14T12:00:00.000Z"]),
@@ -93,10 +89,7 @@ describe("buildLiveChartSeries", () => {
   it("keeps the augmented series timestamps unique", () => {
     const now = Date.parse("2026-05-14T12:00:05.000Z");
     const series = buildLiveChartSeries({
-      candles: buildCandles([
-        "2026-05-14T11:45:00.000Z",
-        "2026-05-14T12:00:00.000Z",
-      ]),
+      candles: buildCandles(["2026-05-14T11:45:00.000Z", "2026-05-14T12:00:00.000Z"]),
       liveMid: 1.4567,
       pollMs: 2_000,
       quoteState: "live",
@@ -104,5 +97,49 @@ describe("buildLiveChartSeries", () => {
     });
 
     expect(new Set(series.map((point) => point.t)).size).toBe(series.length);
+  });
+});
+
+describe("resolveChartCountdownMs", () => {
+  it("returns undefined when the timeframe is unsupported", () => {
+    expect(
+      resolveChartCountdownMs(
+        {
+          timeframe: "1week",
+          candles: buildCandles(["2026-05-14T12:00:00.000Z"]),
+        },
+        Date.parse("2026-05-14T12:00:30.000Z"),
+      ),
+    ).toBeUndefined();
+  });
+
+  it("computes a positive countdown for supported intraday timeframes", () => {
+    expect(
+      resolveChartCountdownMs(
+        {
+          timeframe: "1min",
+          candles: buildCandles(["2026-05-14T12:00:00.000Z"]),
+        },
+        Date.parse("2026-05-14T12:00:30.000Z"),
+      ),
+    ).toBe(30_000);
+  });
+
+  it("clamps the countdown at zero when the next candle time has passed", () => {
+    expect(
+      resolveChartCountdownMs(
+        {
+          timeframe: "1min",
+          candles: buildCandles(["2026-05-14T12:00:00.000Z"]),
+        },
+        Date.parse("2026-05-14T12:01:30.000Z"),
+      ),
+    ).toBe(0);
+  });
+});
+
+describe("isChartTickFlashActive", () => {
+  it("returns false when the quote state is stale", () => {
+    expect(isChartTickFlashActive(true, "stale", "up")).toBe(false);
   });
 });

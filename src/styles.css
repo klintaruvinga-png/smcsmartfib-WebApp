@@ -434,4 +434,20 @@
       box-shadow: 0 0 0 0 color-mix(in oklab, var(--buy) 0%, transparent);
     }
   }
+
+  .candle-countdown {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid color-mix(in oklab, var(--bd2) 72%, transparent);
+    border-radius: 9999px;
+    background: color-mix(in oklab, var(--bg2) 82%, transparent);
+    padding: 0.2rem 0.55rem;
+    color: var(--dim);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+    opacity: 0.92;
+    white-space: nowrap;
+  }
 }

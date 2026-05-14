@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   useBackendReady,
@@ -8,8 +8,10 @@ import {
   useCanonicalWatchlist,
   clampSymbolToWatchlist,
 } from "@/hooks/useSniperData";
+import { useTickFlash } from "@/hooks/useTickFlash";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { fmtPrice, fmtPct } from "@/lib/format";
+import { isChartTickFlashActive, useChartCountdownMs } from "@/lib/chartCountdown";
 import { cn } from "@/lib/utils";
 import { TVChart } from "@/components/sniper/TVChart";
 import type { ChartSnapshot, FreshnessState, Symbol } from "@/types/sniper";
@@ -82,6 +84,9 @@ function ChartsPage() {
   );
   const activeSymbol = clampSymbolToWatchlist(selected, watchlist);
   const price = activeSymbol ? pricesBySymbol.get(activeSymbol) : undefined;
+  const tickDirection = useTickFlash(price?.mid);
+  const tickFlash = isChartTickFlashActive(backendReady, price?.state, tickDirection);
+  const lastTickFlash = useRef(false);
 
   useEffect(() => {
     const nextSelected = clampSymbolToWatchlist(selected, watchlist);
@@ -96,6 +101,34 @@ function ChartsPage() {
     enabled: backendReady && pollMs !== null && activeSymbol !== null,
     refetchInterval: backendReady ? (pollMs ?? false) : false,
   });
+  const nextCandleAt =
+    chart && "nextCandleAt" in chart && typeof chart.nextCandleAt === "number"
+      ? chart.nextCandleAt
+      : undefined;
+  const countdownSource = useMemo(
+    () =>
+      chart
+        ? {
+            timeframe: chart.timeframe,
+            candles: chart.candles,
+            nextCandleAt,
+          }
+        : undefined,
+    [chart, nextCandleAt],
+  );
+  const candleCountdownMs = useChartCountdownMs(countdownSource);
+
+  useEffect(() => {
+    if (!lastTickFlash.current && tickFlash && import.meta.env.DEV && !import.meta.vitest) {
+      console.debug("[CHART_TICK_FLASH]", {
+        symbol: activeSymbol,
+        state: price?.state ?? null,
+        updatedAt: price?.updatedAt ?? null,
+      });
+    }
+
+    lastTickFlash.current = tickFlash;
+  }, [activeSymbol, price?.state, price?.updatedAt, tickFlash]);
 
   if (!backendReady) {
     return (
@@ -181,7 +214,13 @@ function ChartsPage() {
           <FreshnessBadge state={chart?.state ?? price?.state ?? "offline"} />
         </div>
 
-        <TVChart series={series} fibs={fibs} symbol={activeSymbol} />
+        <TVChart
+          series={series}
+          fibs={fibs}
+          symbol={activeSymbol}
+          tickFlash={tickFlash}
+          candleCountdownMs={candleCountdownMs}
+        />
 
         <div className="mt-4 flex flex-wrap gap-2">
           {fibs.map((f) => (

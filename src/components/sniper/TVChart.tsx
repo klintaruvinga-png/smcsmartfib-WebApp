@@ -8,6 +8,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { fmtPrice } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { Symbol } from "@/types/sniper";
 
 export type FibLevel = {
@@ -25,20 +26,32 @@ function colorForRole(role: FibLevel["role"], label: string): string {
   return "#9aa6b2";
 }
 
+function formatCountdown(ms: number): string {
+  const safeMs = Math.max(0, ms);
+  const minutes = Math.floor(safeMs / 60_000);
+  const seconds = String(Math.floor((safeMs % 60_000) / 1000)).padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
 export function TVChart({
   series,
   fibs,
   symbol,
+  tickFlash,
+  candleCountdownMs,
 }: {
   series: { t: number; p: number }[];
   fibs: FibLevel[];
   symbol: Symbol | string;
+  tickFlash?: boolean;
+  candleCountdownMs?: number;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const priceLinesRef = useRef<IPriceLine[]>([]);
+  const latestPrice = series.at(-1)?.p;
 
   const precision = useMemo(() => {
     const sample = fmtPrice(1, symbol);
@@ -186,6 +199,23 @@ export function TVChart({
 
   return (
     <div className="-mx-2">
+      {(typeof latestPrice === "number" || candleCountdownMs !== undefined) && (
+        <div className="mb-2 flex items-center gap-2 px-2">
+          {typeof latestPrice === "number" && (
+            <span
+              className={cn(
+                "rounded border border-bd bg-bg2/60 px-2 py-1 font-mono text-[11px] text-tx",
+                tickFlash && "live-dot",
+              )}
+            >
+              {fmtPrice(latestPrice, symbol)}
+            </span>
+          )}
+          {candleCountdownMs !== undefined && (
+            <span className="candle-countdown">{formatCountdown(candleCountdownMs)}</span>
+          )}
+        </div>
+      )}
       <div className="relative h-[420px] w-full">
         <div ref={containerRef} className="h-full w-full" />
         <div ref={overlayRef} className="pointer-events-none absolute inset-0 overflow-hidden" />
