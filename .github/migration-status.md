@@ -77,9 +77,10 @@ Freshness Logic: [PENDING]
 ```
 
 ### Blockers
-- Live 24h/72h soak evidence not complete
+- Final 72h soak evidence complete
 - MT5 M1 -> 15min candle-history aggregation path still needs focused verification
-- Restart-baseline artifacts are now written to `.github/migration/phase-updates/phase-0-soak-summary-2026-05-11.md` and `.github/migration/audits/phase-0-admin-health-baseline-2026-05-11.md`, but the Phase 0 completion log and final parity audit remain pending the scheduled `T+72h` closeout.
+- Unresolved active symbol blockers remain: NAS100/US30 freshness, XAUUSD insufficient candle history, AUDUSD/ETHUSD chop gate blocks
+- Restart-baseline artifacts are now written to `.github/migration/phase-updates/phase-0-soak-summary-2026-05-11.md` and `.github/migration/audits/phase-0-admin-health-baseline-2026-05-11.md`; final parity audit remains pending follow-up on the unresolved symbol issues.
 
 ---
 

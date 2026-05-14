@@ -46,7 +46,7 @@ Update each checkpoint with the exact fetch time, observed health values, and an
 | [x] | T+24h | 2026-05-12 08:57 | Day 1 summary, export fresh soak report, compare against tracker | 2026-05-12 | Day 1 soak report exported and compared against tracker - no anomalies. |
 | [x] | T+36h | 2026-05-12 20:57 | Same fields plus admin health parity spot-check | 2026-05-12 20:58 | Admin health parity spot-check completed; backendSync/live and engineRunState/live matched expectations, feedStatus remained stale. |
 | [x] | T+48h | 2026-05-13 08:57 | Day 2 summary, export fresh soak report, compare against tracker | 2026-05-13 08:57 | Day 2 summary exported; data consistent with prior checkpoints, same blocker set persisted and live engine state remained healthy. |
-| [x] | T+60h | 2026-05-13 20:57 | Same fields plus unresolved blocker review | 2026-05-13 20:57 | Unresolved blocker review completed; no new anomalies beyond NAS100/US30 price freshness issues. |
+| [ ] | T+60h | 2026-05-13 20:57 | Same fields plus unresolved blocker review |  |  |
 | [ ] | T+72h | 2026-05-14 08:57 | Final soak summary, final export, go or no-go for Phase 0 closeout |  |  |
 
 ## 3. What To Verify At Every Scheduled Check
