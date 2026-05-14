@@ -16,6 +16,18 @@ fib_test_assert_same(true, $anchor['valid'], 'Daily->Weekly anchor should be val
 fib_test_assert_near(20.0, $anchor['high'], 0.000001, 'Daily->Weekly high mismatch');
 fib_test_assert_near(2.0, $anchor['low'], 0.000001, 'Daily->Weekly low mismatch');
 
+$dailyToWeeklyIsoBoundary = array(
+    fib_test_make_candle('2024-12-16 12:00:00 UTC', 100, 10),
+    fib_test_make_candle('2024-12-23 12:00:00 UTC', 200, 20),
+    fib_test_make_candle('2024-12-30 12:00:00 UTC', 300, 30),
+    fib_test_make_candle('2025-01-06 12:00:00 UTC', 400, 40),
+    fib_test_make_candle('2025-01-13 12:00:00 UTC', 500, 50),
+);
+$anchor = $service->resolve_htf_authority_anchor($dailyToWeeklyIsoBoundary, 900);
+fib_test_assert_same(true, $anchor['valid'], 'Daily->Weekly ISO boundary anchor should be valid');
+fib_test_assert_near(200.0, $anchor['high'], 0.000001, 'Daily->Weekly ISO boundary high mismatch');
+fib_test_assert_near(20.0, $anchor['low'], 0.000001, 'Daily->Weekly ISO boundary low mismatch');
+
 $weeklyToMonthly = array(
     fib_test_make_candle('2026-01-06 12:00:00 UTC', 10, 1),
     fib_test_make_candle('2026-02-03 12:00:00 UTC', 20, 2),

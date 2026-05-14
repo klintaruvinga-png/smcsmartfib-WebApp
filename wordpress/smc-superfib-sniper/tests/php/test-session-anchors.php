@@ -41,6 +41,20 @@ fib_test_assert_near(11.0, $weeklyAnchors['F2']['low'], 0.000001, 'Weekly F2 low
 fib_test_assert_near(22.0, $weeklyAnchors['F3']['high'], 0.000001, 'Weekly F3 high mismatch');
 fib_test_assert_near(8.0, $weeklyAnchors['F3']['low'], 0.000001, 'Weekly F3 low mismatch');
 
+$isoBoundaryWeeklyCandles = array(
+    fib_test_make_candle('2024-12-23 12:00:00 UTC', 100, 50),
+    fib_test_make_candle('2024-12-30 12:00:00 UTC', 110, 60),
+    fib_test_make_candle('2025-01-06 12:00:00 UTC', 120, 70),
+    fib_test_make_candle('2025-01-13 12:00:00 UTC', 130, 80),
+);
+$isoBoundaryWeeklyAnchors = $service->resolve_session_anchors($isoBoundaryWeeklyCandles, 3600);
+fib_test_assert_near(120.0, $isoBoundaryWeeklyAnchors['F1']['high'], 0.000001, 'ISO weekly F1 high mismatch');
+fib_test_assert_near(70.0, $isoBoundaryWeeklyAnchors['F1']['low'], 0.000001, 'ISO weekly F1 low mismatch');
+fib_test_assert_near(110.0, $isoBoundaryWeeklyAnchors['F2']['high'], 0.000001, 'ISO weekly F2 high mismatch');
+fib_test_assert_near(60.0, $isoBoundaryWeeklyAnchors['F2']['low'], 0.000001, 'ISO weekly F2 low mismatch');
+fib_test_assert_near(100.0, $isoBoundaryWeeklyAnchors['F3']['high'], 0.000001, 'ISO weekly F3 high mismatch');
+fib_test_assert_near(50.0, $isoBoundaryWeeklyAnchors['F3']['low'], 0.000001, 'ISO weekly F3 low mismatch');
+
 $monthlyCandles = array(
     fib_test_make_candle('2026-01-10 12:00:00 UTC', 100, 50),
     fib_test_make_candle('2026-01-20 12:00:00 UTC', 110, 45),
