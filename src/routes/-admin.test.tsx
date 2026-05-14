@@ -63,12 +63,12 @@ let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 function buildHealth(): EngineHealth {
   return {
-    backendSync: "fresh",
+    backendSync: "live",
     priceFeed: "live",
     feedStatus: "live",
     engineRunState: "live",
     twelveDataKey: "present",
-    twelveDataKeyStatus: "present",
+    twelveDataKeyStatus: "ok",
     lastBatchAt: "2026-05-12T08:00:00Z",
     lastEngineRunAt: "2026-05-12T08:01:00Z",
     perSymbolDiagnostics: [],
