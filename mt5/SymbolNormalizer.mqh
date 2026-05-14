@@ -48,16 +48,21 @@ public:
         // Broker alias map — maps non-standard broker names to canonical symbols.
         // Checked after suffix-stripping so "GOLD.PRO" → "GOLD" → "XAUUSD".
         // Add entries here when a broker uses a different ticker for a known instrument.
-        AddAlias("GOLD",    "XAUUSD");   // Common gold ticker (IC Markets, Exness, etc.)
-        AddAlias("SILVER",  "XAGUSD");   // Common silver ticker
-        AddAlias("US100",   "NAS100");   // NASDAQ alias used by some ECN/STP brokers
-        AddAlias("NASDAQ",  "NAS100");
-        AddAlias("NDX",     "NAS100");
-        AddAlias("DJ30",    "US30");     // Dow Jones alias
-        AddAlias("DJI",     "US30");
-        AddAlias("DOW30",   "US30");
-        AddAlias("US500",   "SPX500");   // S&P 500 alias
-        AddAlias("SPX",     "SPX500");
+        AddAlias("GOLD",            "XAUUSD");   // Common gold ticker (IC Markets, Exness, etc.)
+        AddAlias("SILVER",          "XAGUSD");   // Common silver ticker
+        AddAlias("US100",           "NAS100");   // NASDAQ alias used by some ECN/STP brokers
+        AddAlias("NASDAQ",          "NAS100");
+        AddAlias("NDX",             "NAS100");
+        // Multi-word broker display names — checked on raw ToUpperCase output BEFORE the
+        // 12-character truncation guard, so the full name matches reliably.
+        AddAlias("US TECH 100",     "NAS100");   // GT Markets, some IC brokers
+        AddAlias("WALL STREET 30",  "US30");     // GT Markets, some IC brokers
+        AddAlias("WALL STREET",     "US30");     // Fallback: if ToUpperCase truncates at 12 chars
+        AddAlias("DJ30",            "US30");     // Dow Jones alias
+        AddAlias("DJI",             "US30");
+        AddAlias("DOW30",           "US30");
+        AddAlias("US500",           "SPX500");   // S&P 500 alias
+        AddAlias("SPX",             "SPX500");
 
         // FX majors / crosses
         AddKnownSymbol("EURUSD");
