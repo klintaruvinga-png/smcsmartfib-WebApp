@@ -19,11 +19,21 @@ private:
     string multiSuffixes[8];
     int multiSuffixCount;
 
+    // Broker alias map: some brokers use non-standard ticker names (e.g. "GOLD"
+    // instead of "XAUUSD"). An alias entry maps the broker name (uppercase) to
+    // the canonical SMC SuperFib symbol name. Aliases are checked after the base
+    // name is uppercased and after suffix stripping, so "GOLD.PRO" → strip ".PRO"
+    // → "GOLD" → alias → "XAUUSD".
+    string aliasKeys[20];
+    string aliasVals[20];
+    int    aliasCount;
+
 public:
     SymbolNormalizer()
     {
         knownCount       = 0;
         multiSuffixCount = 0;
+        aliasCount       = 0;
 
         // Known broker suffixes (longest first to avoid partial stripping)
         multiSuffixes[multiSuffixCount++] = ".MICRO";
@@ -34,6 +44,20 @@ public:
         multiSuffixes[multiSuffixCount++] = ".A";
         multiSuffixes[multiSuffixCount++] = ".B";
         multiSuffixes[multiSuffixCount++] = ".C";
+
+        // Broker alias map — maps non-standard broker names to canonical symbols.
+        // Checked after suffix-stripping so "GOLD.PRO" → "GOLD" → "XAUUSD".
+        // Add entries here when a broker uses a different ticker for a known instrument.
+        AddAlias("GOLD",    "XAUUSD");   // Common gold ticker (IC Markets, Exness, etc.)
+        AddAlias("SILVER",  "XAGUSD");   // Common silver ticker
+        AddAlias("US100",   "NAS100");   // NASDAQ alias used by some ECN/STP brokers
+        AddAlias("NASDAQ",  "NAS100");
+        AddAlias("NDX",     "NAS100");
+        AddAlias("DJ30",    "US30");     // Dow Jones alias
+        AddAlias("DJI",     "US30");
+        AddAlias("DOW30",   "US30");
+        AddAlias("US500",   "SPX500");   // S&P 500 alias
+        AddAlias("SPX",     "SPX500");
 
         // FX majors / crosses
         AddKnownSymbol("EURUSD");
@@ -80,7 +104,18 @@ public:
     string NormalizeSymbol(string symbol)
     {
         string normalized = ToUpperCase(symbol);
+
+        // Check alias map on raw uppercase name (e.g. "GOLD" → "XAUUSD").
+        string direct = LookupAlias(normalized);
+        if (StringLen(direct) > 0)
+            return direct;
+
         normalized = StripSuffixes(normalized);
+
+        // Check alias map after suffix strip (e.g. "GOLD.PRO" → "GOLD" → "XAUUSD").
+        string stripped = LookupAlias(normalized);
+        if (StringLen(stripped) > 0)
+            return stripped;
 
         if (!IsKnownSymbol(normalized))
             normalized = StripCompactSuffixes(normalized);
@@ -165,6 +200,27 @@ private:
     {
         if (knownCount < 50)
             knownSymbols[knownCount++] = symbol;
+    }
+
+    void AddAlias(string brokerName, string canonicalName)
+    {
+        if (aliasCount < 20)
+        {
+            aliasKeys[aliasCount] = brokerName;
+            aliasVals[aliasCount] = canonicalName;
+            aliasCount++;
+        }
+    }
+
+    // Returns the canonical name if brokerName is in the alias map, else "".
+    string LookupAlias(string brokerName)
+    {
+        for (int i = 0; i < aliasCount; i++)
+        {
+            if (aliasKeys[i] == brokerName)
+                return aliasVals[i];
+        }
+        return "";
     }
 };
 

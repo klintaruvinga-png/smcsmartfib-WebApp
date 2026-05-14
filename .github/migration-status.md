@@ -1,11 +1,11 @@
 # SMC SuperFIB → MT5 Migration Status Board
 
-**Last Updated**: 2026-05-12  
+**Last Updated**: 2026-05-14  
 **Current Phase**: 0 (Stabilization)  
-**Overall Progress**: 38%
-**Status**: In Progress
+**Overall Progress**: 40%
+**Status**: Blocked in Phase 0 closeout
 
-> Snapshot: v13.0.0 MT5 authority hardening verified. EA-authoritative symbols now ignore stale Twelve Data cooldown and key-status escalation in health/blocker paths, MT5-live symbols bypass Twelve Data, EA pushes clear same-symbol TD cooldown state, backendSync receives EA heartbeats, and MT5 day-change derives from UTC-day M1 opens. On 2026-05-07 the watchlist persistence path was hardened. On 2026-05-09 the charts route was stabilized (backendReady gate, lightweight-charts lockfile). On 2026-05-10 DB hygiene was addressed: WP-Cron daily pruning added for engine_runs (7-day retention) and audit_events (14-day retention); dead unreachable methods verify_ea_api_key() and send_cors_headers() removed from the plugin. Phase 0 remains in stabilization pending live soak and candle-history aggregation verification.
+> Snapshot: The restart soak window from 2026-05-11 08:57 SAST to 2026-05-14 08:57 SAST is now closed. Operationally, backendSync stayed live, engineRunState stayed live, and the soak evidence chain was completed. Phase 0 still fails its migration gate because the final closeout remained `feedStatus=stale`, only `5/7` watchlist symbols were live, NAS100/US30 still failed MT5 freshness, XAUUSD still failed candle-history readiness, and AUDUSD/ETHUSD remained chop-gate blocked. Phase 1 backend bridge groundwork exists in-repo, but the program is still gated at Phase 0.
 
 ---
 
@@ -13,8 +13,8 @@
 
 | Phase | Objective | Status | % Complete | Blocker | Target End |
 |-------|-----------|--------|-----------|---------|------------|
-| 0 | Stabilize existing platform | IN-PROGRESS | 35% | Live soak + candle-history aggregation verification | 2026-05-17 |
-| 1 | MT5 bridge infrastructure | NOT-STARTED | 0% | Phase 0 complete | 2026-06-01 |
+| 0 | Stabilize existing platform | BLOCKED | 45% | Final soak closed, but NAS100/US30 freshness, XAUUSD candle history, and chop-gate blockers remain | 2026-05-17 |
+| 1 | MT5 bridge infrastructure | BLOCKED | 20% | Phase 0 closeout not complete; live bridge validation still pending | 2026-06-01 |
 | 2 | Read-only trade telemetry | NOT-STARTED | 0% | Phase 1 complete | 2026-06-15 |
 | 3 | MT5 market data engine | NOT-STARTED | 0% | Phase 2 complete | 2026-07-15 |
 | 4 | Fib engine migration | NOT-STARTED | 0% | Phase 3 complete | 2026-08-15 |
@@ -31,9 +31,9 @@
 
 | Track | Lead | Phase Focus | Status |
 |-------|------|------------|--------|
-| **Track A — MT5 EA** | *TBD* | Phases 1–7 (bridge, telemetry, candle engine, fib, regime, signal, execution) | NOT-STARTED |
-| **Track B — Backend** | *TBD* | Phases 1–9 (APIs, freshness, telemetry, licensing) | NOT-STARTED |
-| **Track C — Dashboard** | *TBD* | Phases 2–9 (visualization, execution console, analytics) | NOT-STARTED |
+| **Track A — MT5 EA** | *TBD* | Phases 1–7 (bridge, telemetry, candle engine, fib, regime, signal, execution) | Foundation implemented, live bridge validation pending |
+| **Track B — Backend** | *TBD* | Phases 1–9 (APIs, freshness, telemetry, licensing) | Phase 0 blocked on freshness/candle-history defects |
+| **Track C — Dashboard** | *TBD* | Phases 2–9 (visualization, execution console, analytics) | Phase 0 parity mostly hardened, waiting on backend truth blockers |
 
 ---
 
@@ -41,13 +41,14 @@
 
 **Objective**: Fix current dashboard/backend instability before migration  
 **Owner**: Track B  
-**Status**: IN-PROGRESS
+**Status**: BLOCKED
 **Completion Target**: 2026-05-17
 
 ### Deliverables
 - [x] Refresh stability hardening: server-time MT5 snapshots, MT5-live TD bypass, same-symbol TD cooldown clearing, and no stale-timestamp corruption in the covered paths
 - [x] EA authority hardening: stale Twelve Data rate-limit/key-status state no longer overrides EA-owned symbol health or engine blocker decisions
 - [x] Watchlist persistence hardening: watchlist writes invalidate engine snapshot cache and dashboard watchlist mutations no longer race against stale local/query state
+- [x] 72h restart-soak evidence captured and closeout log written: `.github/migration/phase-updates/phase-0-completion-2026-05-14.md`
 - [ ] Signal engine stability: deterministic LIVE/STALE states, proper regime gating, valid freshness rules
 - [ ] Backend parity: Pine/backend/dashboard alignment verified
 
@@ -60,7 +61,7 @@
 - [x] No stale engine snapshot reuse in covered watchlist add/remove/save paths after symbol-set changes
 
 ### Test Checklist
-- [ ] Refresh for 24h+
+- [x] Refresh for 24h+ (72h soak completed operationally)
 - [ ] Market-open session testing
 - [ ] Weekend behavior
 - [ ] Disconnect/reconnect testing
@@ -71,16 +72,17 @@
 
 ### Parity Status
 ```
-Pine ↔ Backend Signal: [PENDING]
-Backend → Dashboard: [PENDING]
-Freshness Logic: [PENDING]
+Pine <-> Backend Signal: [PARTIAL]
+Backend -> Dashboard: [PASS on audited admin/dashboard surfaces]
+Freshness Logic: [PARTIAL - route parity passes, live symbol freshness still fails for NAS100/US30]
 ```
 
 ### Blockers
-- Final 72h soak evidence complete
-- MT5 M1 -> 15min candle-history aggregation path still needs focused verification
-- Unresolved active symbol blockers remain: NAS100/US30 freshness, XAUUSD insufficient candle history, AUDUSD/ETHUSD chop gate blocks
-- Restart-baseline artifacts are now written to `.github/migration/phase-updates/phase-0-soak-summary-2026-05-11.md` and `.github/migration/audits/phase-0-admin-health-baseline-2026-05-11.md`; final parity audit remains pending follow-up on the unresolved symbol issues.
+- 72h soak is operationally complete, but Phase 0 closeout failed its gate.
+- **NAS100 / US30 freshness** — Root cause confirmed 2026-05-14: `SessionManager` uses FX-only hours; equity index off-session is reported as `FRESHNESS_STALE`. **FIXED 2026-05-14**: MT5 EA now emits `CLOSED` with current timestamp for NAS100/US30 outside 13:30-20:00 UTC; PHP health check now excludes equity-index off-session symbols from stale counting. Awaiting validation soak.
+- **XAUUSD candle-history readiness** — Root cause confirmed 2026-05-14: `SymbolNormalizer` missing "GOLD" → "XAUUSD" broker alias; EA could not resolve XAUUSD on brokers using "GOLD". **FIXED 2026-05-14**: Alias map added to `SymbolNormalizer.mqh`; GOLD, US100, DJ30, and other common renames now resolve to canonical names. Awaiting EA restart + 7.5h candle accumulation.
+- **AUDUSD / ETHUSD chop-gate** — **Classified 2026-05-14 as Explanation A (correct engine behavior)**. Chop is live-computed, not cached. No code change authorized at this time. No blocker to Phase 0 advancement if NAS100/US30/XAUUSD pass the validation soak.
+- Final closeout evidence is now split across `.github/migration/phase-updates/phase-0-completion-2026-05-14.md` and `.github/migration/audits/phase-0-full-parity-2026-05-14.md`; raw final export remains external at `C:\Users\LEONNA\Downloads\phase0-soak-2026-05-14 (1).md`.
 
 ---
 
@@ -88,7 +90,7 @@ Freshness Logic: [PENDING]
 
 **Objective**: Create stable communication between MT5 and backend  
 **Owner**: Track A + Track B  
-**Status**: NOT-STARTED  
+**Status**: BLOCKED  
 **Prerequisites**: Phase 0 complete  
 **Completion Target**: 2026-06-01
 
@@ -109,7 +111,8 @@ Freshness Logic: [PENDING]
 - [ ] Invalid license rejection
 
 ### Blockers
-- *Phase 0 not complete*
+- Phase 0 closeout not complete
+- Live MT5 terminal verification still pending for `/ea/license-check`, `/ea/heartbeat`, `/ea/account-sync`, and `/ea/symbol-sync`
 
 ---
 
@@ -396,7 +399,7 @@ Confluence Detection: [PENDING]
 
 | Week | Generated | Phases On-Track | Phases At-Risk | Phases Blocked | Action Items |
 |------|-----------|-----------------|----------------|----------------|--------------|
-| 2026-W18 | Pending | — | — | — | — |
+| 2026-W20 | 2026-05-14 | Phase 1 groundwork | Phase 0 signal/freshness parity closeout | Phase 0 | Fix NAS100/US30 freshness, XAUUSD candle history, and chop-gate blockers before any phase advance |
 
 > **Auto-generated**: Every Sunday by migration project manager agent
 > **Location**: `.github/migration/weekly-status-[YYYY-MM-DD].md`
@@ -425,10 +428,10 @@ Confluence Detection: [PENDING]
 ## Document Links
 
 - Migration Plan: [See root migration specification]
-- Parity Audit Archives: `.github/migration-audits/`
-- Phase Checklists: `.github/migration/checklists/`
+- Parity Audit Archives: `.github/migration/audits/`
+- Phase Checklists / Updates: `.github/migration/phase-updates/`
 - Test Logs: `.github/migration/test-logs/`
-- Risk Register: `.github/migration/risk-register.md`
+- Risk Register: Not yet created; track active blockers in this board and in phase closeout artifacts
 
 ---
 
@@ -469,6 +472,6 @@ Confluence Detection: [PENDING]
 
 | Track | Lead | Email | Scope | Status |
 |-------|------|-------|-------|--------|
-| Track A — MT5 EA | *TBD* | *TBD* | Phases 1–7 | NOT-STARTED |
-| Track B — Backend | *TBD* | *TBD* | Phases 1–9 | NOT-STARTED |
-| Track C — Dashboard | *TBD* | *TBD* | Phases 2–9 | NOT-STARTED |
+| Track A — MT5 EA | *TBD* | *TBD* | Phases 1–7 | Foundation implemented, live validation pending |
+| Track B — Backend | *TBD* | *TBD* | Phases 1–9 | Phase 0 blocked |
+| Track C — Dashboard | *TBD* | *TBD* | Phases 2–9 | Phase 0 parity mostly hardened |
