@@ -857,66 +857,48 @@ function runClaudePlanHardening(state) {
       fs.readFileSync(RESEARCH_FILE, "utf8").trim(),
     ].join("\n");
 
-    // On Windows, execSync with shell:true spawns cmd.exe which fails with EPERM
-    // in the detached background process spawned by start-pipeline-runner.js.
-    // Fix: resolve the native claude.exe and call it directly via execFileSync —
-    // no shell required, full input piped via stdin.
     const claudeExe = resolveClaudeExe();
 
     const currentRetryCount = readHardeningRetryCount();
     const nextRetryCount = currentRetryCount + 1;
 
     let planText;
+    // Write the prompt to a temp file and open it as a regular file descriptor for
+    // stdin. This fixes two persistent EPERM failure modes in the detached watcher:
+    //
+    //   1. execFileSync with `input:` creates an anonymous pipe for stdin. On Windows,
+    //      a Job Object with JOB_OBJECT_UILIMIT_HANDLES blocks pipe-handle inheritance
+    //      across process boundaries in a detached (console-less) process — EPERM at
+    //      spawn time. Regular file handles are NOT subject to this restriction.
+    //
+    //   2. execSync with shell:true spawns cmd.exe as an intermediary. cmd.exe also
+    //      fails EPERM in the same Job Object context.
+    //
+    // Passing stdio: [stdinFd, "pipe", "pipe"] — where stdinFd is an open file
+    // descriptor, not a pipe end — succeeds because the OS treats inheritable file
+    // handles differently from anonymous pipe handles under Job Object restrictions.
+    //
+    // NOTE: do NOT add --tools "" — an empty string causes a non-zero exit. Omit the
+    // flag entirely; --print mode already prevents interactive tool use.
+    const contextFile = path.join(REPO_ROOT, "reports", "claude-plan-context.tmp.md");
+    fs.writeFileSync(contextFile, stdinInput, "utf8");
+    let stdinFd = -1;
     try {
+      stdinFd = fs.openSync(contextFile, "r");
+      const claudeBin = claudeExe ?? "claude";
       if (claudeExe) {
         log(
-          `Claude CLI resolved to ${path.basename(path.dirname(claudeExe))}/${path.basename(claudeExe)} - using direct exe invocation`,
+          `Claude CLI resolved to ${path.basename(path.dirname(claudeExe))}/${path.basename(claudeExe)} - using file-based stdin invocation`,
         );
-        // NOTE: do NOT add --tools with an empty string ("") here.
-        // Passing --tools "" causes the Claude CLI to fail with a non-zero exit code
-        // because an empty string is not a valid tool-name list. Omit the flag entirely —
-        // --print mode already prevents interactive tool use; the prompt instructs Claude
-        // not to call any tools. Regression: if you add --tools back, add a non-empty value
-        // (e.g. "--tools", "Bash") or remove it — never pass an empty string.
-        planText = execFileSync(claudeExe, ["--print", "--output-format", "text"], {
-          cwd: REPO_ROOT,
-          input: stdinInput,
-          timeout: CLAUDE_TIMEOUT_MS,
-          encoding: "utf8",
-          maxBuffer: 10 * 1024 * 1024,
-          windowsHide: true,
-        });
-      } else {
-        // Non-Windows or exe not found: fall back to shell-based invocation.
-        // Write the full input to a temp file and redirect via < so the shell
-        // pipes everything (prompt + template + research) into claude's stdin.
-        const contextFile = path.join(REPO_ROOT, "reports", "claude-plan-context.tmp.md");
-        fs.writeFileSync(contextFile, stdinInput, "utf8");
-        try {
-          const cmd = [
-            '"claude"',
-            "--print",
-            "--output-format",
-            "text",
-            "<",
-            `"${contextFile}"`,
-          ].join(" ");
-          planText = execSync(cmd, {
-            cwd: REPO_ROOT,
-            shell: true,
-            windowsHide: true,
-            timeout: CLAUDE_TIMEOUT_MS,
-            encoding: "utf8",
-            maxBuffer: 10 * 1024 * 1024,
-          });
-        } finally {
-          try {
-            fs.unlinkSync(contextFile);
-          } catch {
-            /* ignore */
-          }
-        }
       }
+      planText = execFileSync(claudeBin, ["--print", "--output-format", "text"], {
+        cwd: REPO_ROOT,
+        stdio: [stdinFd, "pipe", "pipe"],
+        timeout: CLAUDE_TIMEOUT_MS,
+        encoding: "utf8",
+        maxBuffer: 10 * 1024 * 1024,
+        windowsHide: true,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       writeHardeningBlockedState(state, message, nextRetryCount);
@@ -931,6 +913,15 @@ function runClaudePlanHardening(state) {
         );
       }
       throw err;
+    } finally {
+      if (stdinFd !== -1) {
+        try {
+          fs.closeSync(stdinFd);
+        } catch {
+          /* ignore */
+        }
+      }
+      removeFileIfExists(contextFile);
     }
 
     planText = planText.trim();
@@ -1266,25 +1257,24 @@ function checkClaudeAvailability() {
     process.exit(1);
   }
 
+  // Regression guard: test the EXACT invocation pattern used in plan hardening —
+  // execFileSync with a file-descriptor for stdin, not an anonymous pipe (input:).
+  // A plain --version with stdio:"ignore" passes even when the fd path is broken.
+  const testFile = path.join(REPO_ROOT, "reports", ".claude-invocation-test.tmp");
+  let testFd = -1;
   try {
-    if (claudeExe) {
-      execFileSync(claudeExe, ["--version"], {
-        timeout: 10000,
-        encoding: "utf8",
-        windowsHide: true,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-      log(`Claude CLI health check passed (${path.basename(claudeExe)})`);
-    } else {
-      execSync('"claude" --version', {
-        shell: true,
-        windowsHide: true,
-        timeout: 10000,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-      log("Claude CLI health check passed");
-    }
+    fs.writeFileSync(testFile, "", "utf8");
+    testFd = fs.openSync(testFile, "r");
+    const claudeBin = claudeExe ?? "claude";
+    execFileSync(claudeBin, ["--version"], {
+      stdio: [testFd, "pipe", "pipe"],
+      timeout: 10000,
+      encoding: "utf8",
+      windowsHide: true,
+    });
+    log(
+      `Claude CLI health check passed (file-based stdio verified, ${claudeExe ? path.basename(claudeExe) : "claude"})`,
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log(
@@ -1292,6 +1282,15 @@ function checkClaudeAvailability() {
     );
     log(`  Reason: ${message}`);
     log(`  Fix:    npm install -g @anthropic-ai/claude-code  then  claude auth`);
+  } finally {
+    if (testFd !== -1) {
+      try {
+        fs.closeSync(testFd);
+      } catch {
+        /* ignore */
+      }
+    }
+    removeFileIfExists(testFile);
   }
 }
 
