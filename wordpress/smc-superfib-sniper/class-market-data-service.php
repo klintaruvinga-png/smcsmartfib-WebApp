@@ -319,6 +319,160 @@ class SMC_MarketData_Service
      * @param string $mysql_time
      * @return string|null
      */
+    public function resolve_session_anchors(array $candles, int $chart_tf_seconds): array
+    {
+        $anchors = array(
+            'F1' => array('high' => null, 'low' => null, 'valid' => false),
+            'F2' => array('high' => null, 'low' => null, 'valid' => false),
+            'F3' => array('high' => null, 'low' => null, 'valid' => false),
+        );
+
+        if (empty($candles)) {
+            return $anchors;
+        }
+
+        $session_tf = $chart_tf_seconds <= 1800
+            ? 'Daily'
+            : ($chart_tf_seconds <= 3600
+                ? 'Weekly'
+                : ($chart_tf_seconds <= 14400
+                    ? 'Monthly'
+                    : ($chart_tf_seconds <= 86400 ? 'Quarterly' : 'Yearly')));
+
+        $sessions = array();
+        foreach ($candles as $candle) {
+            $timestamp = isset($candle['time']) ? strtotime((string) $candle['time']) : false;
+            if ($timestamp === false) {
+                continue;
+            }
+
+            $year = (int) gmdate('Y', $timestamp);
+            $month = (int) gmdate('n', $timestamp);
+            $quarter = (int) floor(($month - 1) / 3) + 1;
+            $week = (int) gmdate('W', $timestamp);
+            $day = (int) gmdate('j', $timestamp);
+
+            if ($session_tf === 'Yearly') {
+                $session_key = $year;
+            } elseif ($session_tf === 'Quarterly') {
+                $session_key = ($year * 10) + $quarter;
+            } elseif ($session_tf === 'Monthly') {
+                $session_key = ($year * 100) + $month;
+            } elseif ($session_tf === 'Weekly') {
+                $session_key = ($year * 100) + $week;
+            } else {
+                $session_key = ($year * 10000) + ($month * 100) + $day;
+            }
+
+            if (!isset($sessions[$session_key])) {
+                $sessions[$session_key] = array(
+                    'high' => (float) $candle['high'],
+                    'low' => (float) $candle['low'],
+                );
+                continue;
+            }
+
+            $sessions[$session_key]['high'] = max($sessions[$session_key]['high'], (float) $candle['high']);
+            $sessions[$session_key]['low'] = min($sessions[$session_key]['low'], (float) $candle['low']);
+        }
+
+        if (count($sessions) <= 1) {
+            return $anchors;
+        }
+
+        $completed_sessions = array_slice(array_values($sessions), 0, -1);
+        $recent_sessions = array_reverse($completed_sessions);
+        $labels = array('F1', 'F2', 'F3');
+        foreach ($labels as $index => $label) {
+            if (!isset($recent_sessions[$index])) {
+                continue;
+            }
+
+            $anchors[$label] = array(
+                'high' => (float) $recent_sessions[$index]['high'],
+                'low' => (float) $recent_sessions[$index]['low'],
+                'valid' => true,
+            );
+        }
+
+        return $anchors;
+    }
+
+    public function resolve_htf_authority_anchor(array $candles, int $chart_tf_seconds): array
+    {
+        $anchor = array('high' => null, 'low' => null, 'valid' => false);
+
+        if (empty($candles)) {
+            return $anchor;
+        }
+
+        $session_tf = $chart_tf_seconds <= 1800
+            ? 'Daily'
+            : ($chart_tf_seconds <= 3600
+                ? 'Weekly'
+                : ($chart_tf_seconds <= 14400
+                    ? 'Monthly'
+                    : ($chart_tf_seconds <= 86400 ? 'Quarterly' : 'Yearly')));
+
+        $authority_tf = $session_tf === 'Daily'
+            ? 'Weekly'
+            : ($session_tf === 'Weekly'
+                ? 'Monthly'
+                : ($session_tf === 'Monthly'
+                    ? 'Quarterly'
+                    : 'Yearly'));
+
+        $sessions = array();
+        foreach ($candles as $candle) {
+            $timestamp = isset($candle['time']) ? strtotime((string) $candle['time']) : false;
+            if ($timestamp === false) {
+                continue;
+            }
+
+            $year = (int) gmdate('Y', $timestamp);
+            $month = (int) gmdate('n', $timestamp);
+            $quarter = (int) floor(($month - 1) / 3) + 1;
+            $week = (int) gmdate('W', $timestamp);
+
+            if ($authority_tf === 'Yearly') {
+                $session_key = $year;
+            } elseif ($authority_tf === 'Quarterly') {
+                $session_key = ($year * 10) + $quarter;
+            } elseif ($authority_tf === 'Monthly') {
+                $session_key = ($year * 100) + $month;
+            } else {
+                $session_key = ($year * 100) + $week;
+            }
+
+            if (!isset($sessions[$session_key])) {
+                $sessions[$session_key] = array(
+                    'high' => (float) $candle['high'],
+                    'low' => (float) $candle['low'],
+                );
+                continue;
+            }
+
+            $sessions[$session_key]['high'] = max($sessions[$session_key]['high'], (float) $candle['high']);
+            $sessions[$session_key]['low'] = min($sessions[$session_key]['low'], (float) $candle['low']);
+        }
+
+        if (count($sessions) <= 3) {
+            return $anchor;
+        }
+
+        $completed_sessions = array_slice(array_values($sessions), 0, -1);
+        $recent_sessions = array_reverse($completed_sessions);
+        if (!isset($recent_sessions[2])) {
+            return $anchor;
+        }
+
+        return array(
+            'high' => (float) $recent_sessions[2]['high'],
+            'low' => (float) $recent_sessions[2]['low'],
+            'valid' => true,
+        );
+    }
+
     private function to_iso($mysql_time)
     {
         if (!$mysql_time)

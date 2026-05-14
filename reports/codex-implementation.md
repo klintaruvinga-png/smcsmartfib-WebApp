@@ -1,36 +1,40 @@
 # Issue summary
 
-Strengthened the `/admin` soak workspace so baseline and checkpoint cards are visually distinct at a glance, age/capture timing is promoted into card headers, print rules explicitly preserve evidence sections, and soak report load/refresh failures now surface operator-facing status with source, HTTP status, parsed error code, and next-action guidance.
+The PHP backend chart fib path was still deriving `LTF_SF` from a raw candle-window high/low pair, which no longer matched the Pine indicator’s completed-session anchor model, recency weighting, compression guard, or next-higher-timeframe authority fib rule.
 
 # Root cause implemented
 
-The soak workspace summary grid relied on generic `HealthCard` rendering with no baseline/checkpoint badge semantics, age context sat in low-priority detail text, print rules did not explicitly force all evidence containers to render as print blocks, and soak report failure copy echoed raw errors without structured operator guidance. The fix stays inside `admin.tsx` by extending the local card presentation API, tightening print-only CSS, and formatting soak report failures through guarded status/code extraction.
+The backend lacked session grouping and authority anchor resolution entirely. I added completed-session F1/F2/F3 resolution in `SMC_MarketData_Service`, replaced raw-window anchoring with Pine-compatible weighted composite logic in `SMC_SuperFib_Sniper_REST`, enforced the Pine compression guard, and emitted additive `HTF_AF` levels plus request-level anchor logging.
 
 # Exact files changed
 
-- `src/routes/admin.tsx`
-- `src/routes/-admin.test.tsx`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-12_admin-ui-polish-soak-report.md`
-- `reports/codex-implementation.md`
+- `wordpress/smc-superfib-sniper/class-market-data-service.php`
+- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+- `wordpress/smc-superfib-sniper/tests/php/fib-test-helpers.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-session-anchors.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-htf-authority-anchor.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-superfib-weighting.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-fib-parity.php`
 
 # Tests run
 
-- `npx vitest run --environment jsdom src/routes/-admin.test.tsx`
-- `npx eslint src/routes/admin.tsx src/routes/-admin.test.tsx`
-- `npm run build`
+- `php -l wordpress/smc-superfib-sniper/class-market-data-service.php`
+- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+- `Get-ChildItem wordpress/smc-superfib-sniper/tests/php -Filter test-*.php | ForEach-Object { php $_.FullName }`
 
 # Reports generated
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-12_admin-ui-polish-soak-report.md`
-- `reports/codex-implementation.md`
-- Parity audit not required by contract for this dashboard-only patch.
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-14_pine-fib-parity.md`
+- `.github/migration/audits/phase-0-pine-backend-parity-2026-05-14.md`
+- `reports/fib-parity-validation.md`
 
 # Remaining risks
 
-- Browser print preview and live forced `/admin/soak-report` failure were not manually exercised in-session because the in-app browser automation runtime required for local verification is not available in this tool context.
-- `Checkpoint age` now prefers the latest checkpoint timestamp when present and otherwise falls back to baseline timing; this remains display-only and uses backend-owned timestamps, but it should still be visually smoke-checked against real report ordering.
+- Live Pine-vs-backend parity on real symbols/timeframes was not runnable from this workspace and still needs manual sign-off.
+- The backend does not expose Pine compression inputs as runtime settings; this patch uses the Pine v13.1.3 source defaults (`20` non-JPY pips, `40` JPY pips).
+- Session grouping uses stored candle open timestamps in UTC, which matches current backend aggregation, but live parity should still confirm no exchange-calendar drift at real session boundaries.
 
 # Any contract ambiguities resolved during implementation
 
-- The contract referenced the `panelError` path for soak report failures, but repository reality renders load/refresh failures through `soakState.kind === "error"`. I applied the operator-facing message hardening to the existing soak report error branch via `formatSoakReportError` without changing `AuthError` handling or save-action `panelError` behavior.
-- The contract required age promotion without changing the 6-column layout. I kept the six-card grid intact and promoted age/capture context into header metadata on the baseline/checkpoint-related cards instead of replacing the grid structure.
+- The `/charts` response previously exposed only `fibLevels` as a flat array. To preserve the existing response contract, `fibLevels` remains the backward-compatible `LTF_SF` array while additive top-level `LTF_SF` and `HTF_AF` arrays were added.
+- No dedicated fib cache layer exists in the current repo, so there was no fib-specific cache key to invalidate. Existing candle/quote transient hygiene remains unchanged.

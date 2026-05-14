@@ -19,6 +19,9 @@ final class SMC_SuperFib_Sniper_REST {
     const ENGINE_SNAPSHOT_MIN_REFRESH_INTERVAL_SEC = 2;
 
     private $ratios = array(-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300);
+    private $fib_context_symbol = '';
+    private $fib_context_timeframe = '';
+    private $fib_context_tf_seconds = 0;
 
     public static function boot() {
         $instance = new self();
@@ -2090,23 +2093,33 @@ final class SMC_SuperFib_Sniper_REST {
         $user_id = get_current_user_id();
         $symbol = strtoupper(sanitize_text_field($request->get_param('symbol') ?: 'GBPUSD'));
         $timeframe = sanitize_text_field($request->get_param('timeframe') ?: '15min');
-        $candles = $this->fetch_candles($user_id, $symbol, $timeframe, 120);
+        $chart_candle_limit = 120;
+        $fib_candle_limit = max($chart_candle_limit, $this->fib_history_window_size($timeframe));
+        $candles = $this->fetch_candles($user_id, $symbol, $timeframe, $fib_candle_limit);
+        $chart_candles = count($candles) > $chart_candle_limit
+            ? array_slice($candles, -1 * $chart_candle_limit)
+            : $candles;
         $state = 'offline';
         $updated_at = null;
-        if (!empty($candles)) {
-            $last_candle = end($candles);
+        if (!empty($chart_candles)) {
+            $last_candle = end($chart_candles);
             $updated_at = isset($last_candle['time']) ? $last_candle['time'] : null;
             $state = $this->is_chart_candle_fresh($last_candle['time'] ?? null, $timeframe) ? 'live' : 'stale';
         } else {
             $state = $this->get_twelve_key_status($user_id) === 'ok' ? 'stale' : 'blocked';
         }
+        $this->fib_context_symbol = $symbol;
+        $this->fib_context_timeframe = $timeframe;
+        $this->fib_context_tf_seconds = max(60, (int) $this->timeframe_seconds($timeframe));
         $levels = $this->fib_levels_from_candles($candles);
 
         return rest_ensure_response(array(
             'symbol' => $symbol,
             'timeframe' => $timeframe,
-            'candles' => $candles,
-            'fibLevels' => $levels,
+            'candles' => $chart_candles,
+            'fibLevels' => $levels['LTF_SF'],
+            'LTF_SF' => $levels['LTF_SF'],
+            'HTF_AF' => $levels['HTF_AF'],
             'updatedAt' => $updated_at,
             'state' => $state,
         ));
@@ -3460,12 +3473,152 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function fib_levels_from_candles($candles) {
+        $empty = array(
+            'LTF_SF' => array(),
+            'HTF_AF' => array(),
+        );
+
         if (empty($candles)) {
-            return array();
+            return $empty;
         }
-        $high = max(array_map(function ($c) { return (float) $c['high']; }, $candles));
-        $low = min(array_map(function ($c) { return (float) $c['low']; }, $candles));
-        return $this->fib_levels($high, $low, 'LTF_SF');
+
+        $chart_tf_seconds = max(60, (int) $this->fib_context_tf_seconds);
+        $symbol = (string) $this->fib_context_symbol;
+        $timeframe = (string) $this->fib_context_timeframe;
+        $svc = new SMC_MarketData_Service();
+        $compression_threshold = $this->fib_compression_threshold($symbol);
+
+        $anchors = $svc->resolve_session_anchors($candles, $chart_tf_seconds);
+        foreach (array('F1', 'F2', 'F3') as $label) {
+            $anchors[$label] = $this->filter_compressed_fib_anchor($anchors[$label], $compression_threshold);
+        }
+
+        $composite = $this->superfib_composite_anchor($anchors);
+        $ltf_levels = array();
+        if ($composite['valid'] && (($composite['high'] - $composite['low']) >= $compression_threshold)) {
+            $ltf_levels = $this->fib_levels($composite['high'], $composite['low'], 'LTF_SF');
+        }
+
+        $htf_anchor = $this->filter_compressed_fib_anchor(
+            $svc->resolve_htf_authority_anchor($candles, $chart_tf_seconds),
+            $compression_threshold
+        );
+        $htf_levels = array();
+        if (!empty($htf_anchor['valid'])) {
+            $htf_levels = $this->fib_levels($htf_anchor['high'], $htf_anchor['low'], 'HTF_AF');
+        }
+
+        $log_payload = array(
+            'symbol' => $symbol,
+            'timeframe' => $timeframe,
+            'chart_tf_seconds' => $chart_tf_seconds,
+            'compression_threshold' => $compression_threshold,
+            'anchors' => $anchors,
+            'composite' => array(
+                'high' => $composite['high'],
+                'low' => $composite['low'],
+                'valid' => $composite['valid'],
+                'valid_count' => $composite['valid_count'],
+            ),
+            'htf_af' => $htf_anchor,
+        );
+        error_log('[INFO] SMC SuperFIB fib calc ' . (function_exists('wp_json_encode') ? wp_json_encode($log_payload) : json_encode($log_payload)));
+
+        return array(
+            'LTF_SF' => $ltf_levels,
+            'HTF_AF' => $htf_levels,
+        );
+    }
+
+    private function fib_history_window_size($timeframe) {
+        $chart_tf_seconds = max(60, (int) $this->timeframe_seconds($timeframe));
+        $authority_span_seconds = $chart_tf_seconds <= 1800
+            ? 28 * 86400
+            : ($chart_tf_seconds <= 3600
+                ? 124 * 86400
+                : ($chart_tf_seconds <= 14400
+                    ? 366 * 86400
+                    : 1462 * 86400));
+
+        return (int) max(120, ceil($authority_span_seconds / $chart_tf_seconds) + 8);
+    }
+
+    private function fib_compression_threshold($symbol) {
+        $spec = $this->get_instrument_spec($symbol);
+        $pip_size = isset($spec['pip_size']) && (float) $spec['pip_size'] > 0 ? (float) $spec['pip_size'] : 0.0001;
+        $is_jpy = substr((string) $symbol, -3) === 'JPY';
+        $minimum_pips = $is_jpy ? 40.0 : 20.0;
+
+        return $minimum_pips * $pip_size;
+    }
+
+    private function filter_compressed_fib_anchor($anchor, $compression_threshold) {
+        $normalized = array(
+            'high' => isset($anchor['high']) ? (float) $anchor['high'] : null,
+            'low' => isset($anchor['low']) ? (float) $anchor['low'] : null,
+            'valid' => !empty($anchor['valid']),
+        );
+
+        if (!$normalized['valid'] || $normalized['high'] === null || $normalized['low'] === null) {
+            $normalized['valid'] = false;
+            return $normalized;
+        }
+
+        if (($normalized['high'] - $normalized['low']) < (float) $compression_threshold) {
+            $normalized['high'] = null;
+            $normalized['low'] = null;
+            $normalized['valid'] = false;
+        }
+
+        return $normalized;
+    }
+
+    private function superfib_composite_anchor($anchors) {
+        $f1_valid = !empty($anchors['F1']['valid']);
+        $f2_valid = !empty($anchors['F2']['valid']);
+        $f3_valid = !empty($anchors['F3']['valid']);
+        $valid_count = ($f1_valid ? 1 : 0) + ($f2_valid ? 1 : 0) + ($f3_valid ? 1 : 0);
+        $weights = array('F1' => 0.0, 'F2' => 0.0, 'F3' => 0.0);
+
+        if ($valid_count === 3) {
+            $weights['F1'] = 0.40;
+            $weights['F2'] = 0.35;
+            $weights['F3'] = 0.25;
+        } elseif ($valid_count === 2) {
+            if ($f1_valid) {
+                $weights['F1'] = 0.55;
+                $weights[$f2_valid ? 'F2' : 'F3'] = 0.45;
+            } else {
+                $weights['F2'] = 0.55;
+                $weights['F3'] = 0.45;
+            }
+        } elseif ($valid_count === 1) {
+            $weights['F1'] = $f1_valid ? 1.0 : 0.0;
+            $weights['F2'] = $f2_valid ? 1.0 : 0.0;
+            $weights['F3'] = $f3_valid ? 1.0 : 0.0;
+        }
+
+        $weight_total = array_sum($weights);
+        if ($valid_count < 1 || $weight_total <= 0.0) {
+            return array('high' => null, 'low' => null, 'valid' => false, 'valid_count' => $valid_count);
+        }
+
+        $sum_high = 0.0;
+        $sum_low = 0.0;
+        foreach ($weights as $label => $weight) {
+            if ($weight <= 0.0 || empty($anchors[$label]['valid'])) {
+                continue;
+            }
+            $sum_high += (float) $anchors[$label]['high'] * $weight;
+            $sum_low += (float) $anchors[$label]['low'] * $weight;
+        }
+
+        return array(
+            'high' => $sum_high / $weight_total,
+            'low' => $sum_low / $weight_total,
+            'valid' => true,
+            'valid_count' => $valid_count,
+        );
     }
 
     private function fib_levels($high, $low, $family) {
