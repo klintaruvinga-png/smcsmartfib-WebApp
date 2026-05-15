@@ -1510,10 +1510,9 @@ final class SMC_SuperFib_Sniper_REST {
         $watchlist = $persisted_settings['watchlist'];
         $watchlist_changed = $previous_watchlist !== $watchlist;
         $this->invalidate_watchlist_snapshot_if_changed($user_id, $previous_watchlist, $watchlist, 'post_watchlist_remove');
-        // Remove stale price row so the symbol does not reappear as a ghost price tile.
-        if ($watchlist_changed) {
-            $wpdb->delete($this->table('snapshots'), array('user_id' => $user_id, 'symbol' => $symbol), array('%d', '%s'));
-        }
+        // Remove stale price row so the symbol does not reappear as a ghost price tile,
+        // even if this request is a no-op (symbol was already absent).
+        $wpdb->delete($this->table('snapshots'), array('user_id' => $user_id, 'symbol' => $symbol), array('%d', '%s'));
         $this->audit($user_id, 'watchlist.remove', array('symbol' => $symbol));
         return rest_ensure_response(array('ok' => true, 'watchlist' => $watchlist));
     }
