@@ -49,7 +49,7 @@
 - [x] Refresh stability hardening: server-time MT5 snapshots, MT5-live TD bypass, same-symbol TD cooldown clearing, and no stale-timestamp corruption in the covered paths
 - [x] EA authority hardening: stale Twelve Data rate-limit/key-status state no longer overrides EA-owned symbol health or engine blocker decisions
 - [x] Watchlist persistence hardening: watchlist writes invalidate engine snapshot cache and dashboard watchlist mutations no longer race against stale local/query state
-- [x] 72h restart-soak evidence captured and closeout log written: `.github/migration/phase-updates/phase-0-completion-2026-05-14.md`
+- [x] 72h restart-soak evidence captured and closeout log written: `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-completion-2026-05-14.md`
 - [x] Signal engine stability: NAS100/US30 LIVE confirmed at 16:37 UTC 2026-05-15 (active US equity session); XAUUSD LIVE with candle-history gate cleared
 - [x] Backend parity: Pine/backend/dashboard alignment verified — 100% on all audited paths
 
@@ -99,6 +99,10 @@ Watchlist Authority: [PASS - 100% parity]
 **Status**: IN-PROGRESS  
 **Prerequisites**: Phase 0 complete ✅  
 **Completion Target**: 2026-06-01
+
+→ Detailed roadmap: [PHASE1_BRIDGE_ROADMAP.md](./migration/PHASE1_BRIDGE_ROADMAP.md)  
+→ Live tracker: [PHASE1_TRACKER.md](./migration/PHASE1_TRACKER.md)  
+→ Task checklist: [PHASE1_CHECKLIST.md](./migration/PHASE1_CHECKLIST.md)
 
 ### Deliverables
 - [ ] MT5 Bridge EA: heartbeat, account sync, symbol sync, terminal telemetry

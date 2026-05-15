@@ -1,38 +1,83 @@
-# Issue summary
+# Codex Implementation Summary
 
-The watchlist persistence defect was not an `AUDCAD` symbol-normalization failure. `AUDCAD` was already supported by the backend instrument registry. The implemented fix closes two real contract gaps instead: `post_user_settings()` now returns the canonical persisted `watchlist` like the other watchlist mutation endpoints, and the frontend watchlist mutations no longer refetch `["user-settings"]` immediately after success, which was the stale-overwrite path that could hide newly persisted symbols.
+## Issue summary
 
-# Root cause implemented
+Verified the Phase 0 closeout against the canonical final artifact, checked the codebase evidence for
+Phase 1 bridge status, created the missing Phase 1 roadmap/tracker/checklist set, and pruned the
+active migration docs surface by archiving superseded Phase 0 checkpoint files and root-level
+artifacts.
 
-The backend and frontend were drifting on watchlist authority. Backend `post_user_settings()` persisted the watchlist but did not return the authoritative post-persist `watchlist` array, while the frontend watchlist hooks invalidated `["user-settings"]` after already receiving a canonical mutation response. That extra refetch reopened the door for a lagging `GET /user/settings` payload to overwrite the correct cache state. I also normalized snapshot invalidation behavior so it is explicitly change-based and logs no-op skips.
+## Root cause implemented
 
-# Exact files changed
+The repo had a canonical Phase 0 closeout artifact but no canonical Phase 1 governance docs, leaving
+live bridge validation without a roadmap, tracker, or checklist. Superseded Phase 0 checkpoint files
+were still mixed into the active `phase-updates/` folder, and two root-level artifacts
+(`stratupdate.md`, `phase3_mt5_simulation_test.php`) were still outside the repo’s current
+documentation and test conventions.
 
-- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
-- `wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`
-- `src/lib/api/sniperClient.ts`
-- `src/hooks/useSniperData.ts`
-- `src/hooks/useSniperData.watchlist.test.tsx`
+## Exact files changed
 
-# Tests run
+- `.github/migration/PHASE1_BRIDGE_ROADMAP.md`
+- `.github/migration/PHASE1_TRACKER.md`
+- `.github/migration/PHASE1_CHECKLIST.md`
+- `.github/migration-status.md`
+- `.github/migration/archive/ARCHIVE_INDEX.md`
+- `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/ARCHIVE_INDEX.md`
+- `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase0-soak-Final-2026-05-14.md`
+- `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-completion-2026-05-14.md`
+- `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-focused-validation-attempt-2026-05-14.md`
+- `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-post-fix-validation-checklist-2026-05-14.md`
+- `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-next-actions-2026-05-14.md`
+- `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-next-72h-checklist-2026-05-11.md`
+- `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-soak-summary-2026-05-11.md`
+- `.github/migration/archive/stratupdate.md`
+- `.github/migration/audits/phase-0-admin-health-baseline-2026-05-11.md`
+- `.github/migration/audits/phase-0-closeout-gate-parity-2026-05-14.md`
+- `.github/migration/audits/phase-0-full-parity-2026-05-14.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-14_phase0-closeout-tracker-verification.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-15_phase1-closeout-doc-governance.md`
+- `wordpress/smc-superfib-sniper/tests/php/phase3_mt5_simulation_test.php`
+- `.gitignore`
+- `scripts/pipeline-watcher.js`
+- `scripts/pipeline-watcher.test.mjs`
+- `src/hooks/useSniperData.test.tsx`
 
-- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+## Tests run
+
+- `node --test scripts/pipeline-watcher.test.mjs`
 - `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`
-- `npx vitest run src/hooks/useSniperData.watchlist.test.tsx`
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php`
+- `npx vitest run src/hooks/useSniperData.test.tsx src/hooks/useSniperData.watchlist.test.tsx`
+- Path checks for:
+  - `.github/migration/PHASE1_BRIDGE_ROADMAP.md`
+  - `.github/migration/PHASE1_TRACKER.md`
+  - `.github/migration/PHASE1_CHECKLIST.md`
+  - `.github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md`
+  - `wordpress/smc-superfib-sniper/tests/php/phase3_mt5_simulation_test.php`
+- Ignore checks for:
+  - `.codex-vite-dev.err.log`
+  - `.codex-vite-dev.log`
+  - `.codex-vite-mock.err.log`
+  - `.codex-vite-mock.log`
+  - `build-watchlist.log`
+- Repo-state checks for:
+  - `phase3_mt5_simulation_test.php` absent from repo root
+  - `.github/migration/phase-updates/` reduced to the canonical closeout artifact
 
-# Reports generated
+## Reports generated
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-15_watchlist-persistence-mismatch.md`
-- `.github/migration/audits/phase-0-watchlist-persistence-parity-2026-05-15.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-15_phase1-closeout-doc-governance.md`
 - `reports/codex-implementation.md`
+- No parity audit generated; the contract did not require parity re-validation for this docs-led patch
 
-# Remaining risks
+## Remaining risks
 
-- Manual staging verification for Account -> Live Radar add/remove of `AUDCAD` was not run from this repo harness.
-- `post_watchlist_remove()` still audits remove requests even when the canonical watchlist is unchanged; snapshot invalidation is now correct, but audit noise on no-op removals remains.
-- The patch assumes the WordPress runtime matches the PHP harness behavior for user-meta deletion and query timing.
+- Phase 1 remains blocked on real MT5 terminal validation, environment readiness capture, and Track A/Track B sign-off
+- Historical docs and archive contents still mention superseded Phase 0 filenames as part of preserved evidence text
+- `.github/migration-status.md` still contains a top-level `Overall Progress: 50%` line while the Phase 1 row remains `20%`; this patch treated the Phase 1 row and deliverables as authoritative and did not widen scope into broader board normalization
 
-# Any contract ambiguities resolved during implementation
+## Any contract ambiguities resolved during implementation
 
-- The contract framed the frontend change as an invalidation ordering check. Code inspection showed the stronger concrete defect was the presence of `["user-settings"]` invalidation itself, which directly contradicted the local stale-overwrite guard comment. I resolved that by removing the invalidation rather than adding timers or broader cache changes.
-- The contract allowed for a possible `AUDCAD` normalization fix. Inspection confirmed `AUDCAD` was already supported in `instrument_specs()` and accepted by `is_supported_symbol()`, so no symbol-map widening was applied.
+- The contract said to move eight superseded Phase 0 files but explicitly listed seven. The implementation moved the seven named files only and recorded that decision in the archive index.
+- The repo’s migration board shows `Overall Progress: 50%` at the header while the Phase 1 phase row states `20%`. The new Phase 1 docs use the phase-specific `20%` value because it matches the Phase 1 deliverable state described in the board and the bridge implementation report.
+- The post-move filename grep requirement is internally broader than the archive-preservation goal. This implementation resolved live path references that would have pointed at dead `phase-updates/` locations, while preserving historical narrative mentions inside archived and audit artifacts.

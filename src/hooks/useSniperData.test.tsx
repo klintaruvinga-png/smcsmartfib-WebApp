@@ -87,7 +87,7 @@ describe("watchlist mutation success handlers", () => {
     reactQueryMocks.useQueryClient.mockReset();
   });
 
-  it("invalidates user-settings after add success", async () => {
+  it("keeps user-settings canonical and refreshes dependent queries after add success", async () => {
     const queryClient = {
       invalidateQueries: vi.fn().mockResolvedValue(undefined),
       refetchQueries: vi.fn().mockResolvedValue(undefined),
@@ -105,17 +105,22 @@ describe("watchlist mutation success handlers", () => {
 
     await mutationOptions?.onSuccess?.({ ok: true, watchlist: ["EURJPY"] });
 
-    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["user-settings"] });
-    const userSettingsInvalidateIndex = queryClient.invalidateQueries.mock.calls.findIndex(
-      (call) => (call[0] as { queryKey: string[] }).queryKey[0] === "user-settings",
-    );
-    expect(userSettingsInvalidateIndex).toBeGreaterThan(-1);
+    expect(queryClient.setQueryData).toHaveBeenCalledWith(["user-settings"], expect.any(Function));
+    expect(queryClient.invalidateQueries).not.toHaveBeenCalledWith({ queryKey: ["user-settings"] });
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["snapshot"],
+      refetchType: "none",
+    });
+    expect(queryClient.refetchQueries).toHaveBeenCalledWith({
+      queryKey: ["snapshot"],
+      type: "active",
+    });
     expect(queryClient.setQueryData.mock.invocationCallOrder[0]).toBeLessThan(
-      queryClient.invalidateQueries.mock.invocationCallOrder[userSettingsInvalidateIndex],
+      queryClient.invalidateQueries.mock.invocationCallOrder[0],
     );
   });
 
-  it("invalidates user-settings after remove success", async () => {
+  it("keeps user-settings canonical and refreshes dependent queries after remove success", async () => {
     const queryClient = {
       invalidateQueries: vi.fn().mockResolvedValue(undefined),
       refetchQueries: vi.fn().mockResolvedValue(undefined),
@@ -133,13 +138,18 @@ describe("watchlist mutation success handlers", () => {
 
     await mutationOptions?.onSuccess?.({ ok: true, watchlist: ["EURJPY"] });
 
-    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["user-settings"] });
-    const userSettingsInvalidateIndex = queryClient.invalidateQueries.mock.calls.findIndex(
-      (call) => (call[0] as { queryKey: string[] }).queryKey[0] === "user-settings",
-    );
-    expect(userSettingsInvalidateIndex).toBeGreaterThan(-1);
+    expect(queryClient.setQueryData).toHaveBeenCalledWith(["user-settings"], expect.any(Function));
+    expect(queryClient.invalidateQueries).not.toHaveBeenCalledWith({ queryKey: ["user-settings"] });
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["snapshot"],
+      refetchType: "none",
+    });
+    expect(queryClient.refetchQueries).toHaveBeenCalledWith({
+      queryKey: ["snapshot"],
+      type: "active",
+    });
     expect(queryClient.setQueryData.mock.invocationCallOrder[0]).toBeLessThan(
-      queryClient.invalidateQueries.mock.invocationCallOrder[userSettingsInvalidateIndex],
+      queryClient.invalidateQueries.mock.invocationCallOrder[0],
     );
   });
 });

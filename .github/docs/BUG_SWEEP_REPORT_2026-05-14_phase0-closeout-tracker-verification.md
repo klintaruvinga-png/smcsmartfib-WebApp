@@ -43,7 +43,7 @@ Phase 0 gate without live verification.
 
 ### BUG-002 — Completion log still framed merged fixes as open investigations (MEDIUM)
 
-**Root cause:** `.github/migration/phase-updates/phase-0-completion-2026-05-14.md` still listed
+**Root cause:** `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-completion-2026-05-14.md` remained the latest closeout log before the superseding Phase 0 final artifact was written
 NAS100/US30 and XAUUSD as investigation tasks even after the root causes were confirmed and the
 fixes were merged.
 
@@ -51,7 +51,7 @@ fixes were merged.
 "live-validated," weakening the repo's source-of-truth chain.
 
 **Files affected:**
-- `.github/migration/phase-updates/phase-0-completion-2026-05-14.md`
+- `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-completion-2026-05-14.md`
 
 ---
 
@@ -65,7 +65,7 @@ before a superseding closeout artifact could be written.
 artifact, creating avoidable ambiguity in the next closeout step.
 
 **Files affected:**
-- `.github/migration/phase-updates/phase-0-post-fix-validation-checklist-2026-05-14.md`
+- `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-post-fix-validation-checklist-2026-05-14.md`
 
 ---
 
@@ -87,7 +87,7 @@ artifact, creating avoidable ambiguity in the next closeout step.
 
 ### PATCH-3 — Added the missing validation gate artifact
 
-- Created `.github/migration/phase-updates/phase-0-post-fix-validation-checklist-2026-05-14.md`
+- Created `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-post-fix-validation-checklist-2026-05-14.md`
   with explicit prerequisites, per-symbol gates, and pending outcome fields.
 
 ---

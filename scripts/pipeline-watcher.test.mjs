@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildClaudeShellCommand, shouldUseClaudeShellFallback } from "./pipeline-watcher.js";
+import {
+  buildClaudeShellCommand,
+  isActivePhaseUpdatePath,
+  shouldUseClaudeShellFallback,
+} from "./pipeline-watcher.js";
 
 const originalPlatform = process.platform;
 
@@ -34,4 +38,17 @@ test("does not use shell fallback on non-Windows platforms", () => {
   Object.defineProperty(process, "platform", { value: "linux" });
 
   assert.equal(shouldUseClaudeShellFallback(null), false);
+});
+
+test("treats migration archive paths as non-active phase updates", () => {
+  assert.equal(
+    isActivePhaseUpdatePath(".github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md"),
+    true,
+  );
+  assert.equal(
+    isActivePhaseUpdatePath(
+      ".github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-completion-2026-05-14.md",
+    ),
+    false,
+  );
 });
