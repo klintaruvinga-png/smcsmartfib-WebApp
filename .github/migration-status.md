@@ -31,9 +31,9 @@
 
 | Track | Lead | Phase Focus | Status |
 |-------|------|------------|--------|
-| **Track A — MT5 EA** | *TBD* | Phases 1–7 (bridge, telemetry, candle engine, fib, regime, signal, execution) | Foundation implemented, live bridge validation pending |
-| **Track B — Backend** | *TBD* | Phases 1–9 (APIs, freshness, telemetry, licensing) | Phase 0 blocked on freshness/candle-history defects |
-| **Track C — Dashboard** | *TBD* | Phases 2–9 (visualization, execution console, analytics) | Phase 0 parity mostly hardened, waiting on backend truth blockers |
+| **Track A — MT5 EA** | *TBD* | Phases 1–7 (bridge, telemetry, candle engine, fib, regime, signal, execution) | Phase 1 active — live bridge validation pending (heartbeat, account-sync, symbol-sync, market-stream) |
+| **Track B — Backend** | *TBD* | Phases 1–9 (APIs, freshness, telemetry, licensing) | Phase 0 complete — Phase 1 backend bridge validation active |
+| **Track C — Dashboard** | *TBD* | Phases 2–9 (visualization, execution console, analytics) | Phase 0 complete — Phase 1 unblocked; awaiting bridge instrumentation to begin dashboard telemetry work |
 
 ---
 
@@ -479,6 +479,6 @@ Confluence Detection: [PENDING]
 
 | Track | Lead | Email | Scope | Status |
 |-------|------|-------|-------|--------|
-| Track A — MT5 EA | *TBD* | *TBD* | Phases 1–7 | Foundation implemented, live validation pending |
-| Track B — Backend | *TBD* | *TBD* | Phases 1–9 | Phase 0 blocked |
-| Track C — Dashboard | *TBD* | *TBD* | Phases 2–9 | Phase 0 parity mostly hardened |
+| Track A — MT5 EA | *TBD* | *TBD* | Phases 1–7 | Phase 1 active — live bridge validation pending |
+| Track B — Backend | *TBD* | *TBD* | Phases 1–9 | Phase 0 complete — Phase 1 bridge validation active |
+| Track C — Dashboard | *TBD* | *TBD* | Phases 2–9 | Phase 0 complete — Phase 1 unblocked |

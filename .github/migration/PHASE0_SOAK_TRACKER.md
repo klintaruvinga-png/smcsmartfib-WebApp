@@ -159,7 +159,7 @@ fetch('/wp-json/sniper/v1/health', {
 | T+0h | 09:45 | stale | 15min=9670, 1min=73783 | Yes | Aggregate totals confirmed. Per-symbol counts copied below. No symbols were under 30 candles; lowest count observed was 33. BTCUSD live, but frontend gate still reported insufficient candle history. |
 | T+12h | 2026-05-11 21:11 | stale | — | Yes | Continuous soak running. NAS100/US30 still at 0 candles. |
 | T+24h | 2026-05-12 10:22 | stale | — | Yes | **Day 1 complete.** NAS100/US30 not resolved. |
-| T+36h | 2026-05-12 03:10 | stale | — | Yes | XAUUSD price now present (after 18h). NAS100/US30 still not resolving. |
+| T+36h | 2026-05-12 ~21:45 (est.) | stale | — | Yes | No direct operator checkpoint at T+36h. XAUUSD live price confirmed by T+18h manual note (12/05 03:10). NAS100/US30 still not resolving. |
 | T+48h | 2026-05-13 07:50 | stale | — | Yes | **Day 2 complete.** Data consistent. NAS100/US30 still missing. |
 | T+60h | 2026-05-13 18:23 | stale | — | Yes | Stable. Same blockers. |
 | T+72h | 2026-05-14 10:16 | stale | — | Yes | **Soak complete** (operational window closed). Final closeout gate failed: NAS100/US30 freshness fix + XAUUSD alias fix merged but live-validation soak pending. |
