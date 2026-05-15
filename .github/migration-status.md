@@ -62,10 +62,10 @@
 
 ### Test Checklist
 - [x] Refresh for 24h+ (72h soak completed operationally)
-- [ ] Market-open session testing
+- [~] Market-open session testing - attempted `2026-05-14 19:30 UTC`; live `/health` still showed pre-fix batch timestamps and failed the NAS100/US30 gate
 - [ ] Weekend behavior
 - [ ] Disconnect/reconnect testing
-- [ ] Backend restart testing
+- [~] Backend restart testing - live runtime still showed `lastBatchAt=2026-05-14T12:37:30Z` during the active-session probe; restart/redeploy not yet evidenced
 - [~] In progress — EA restart + 7.5h accumulation pending post-fix for symbols previously showing `insufficient candle history`
 - [x] Repo soak tracker added: `.github/migration/PHASE0_SOAK_TRACKER.md`
 - [x] Repo log instrumentation added for `PHASE0_SOAK` backend + Live Radar console warnings
@@ -80,12 +80,13 @@ Freshness Logic: [PARTIAL - route parity passes, live symbol freshness still fai
 ### Blockers
 - 72h soak is operationally complete, but Phase 0 closeout failed its gate.
 - **NAS100 / US30 freshness** — Root cause confirmed 2026-05-14: `SessionManager` uses FX-only hours; equity index off-session is reported as `FRESHNESS_STALE`. **FIXED 2026-05-14**: MT5 EA now emits `CLOSED` with current timestamp for NAS100/US30 outside 13:30-20:00 UTC; PHP health check now excludes equity-index off-session symbols from stale counting. Awaiting validation soak.
-  - Post-fix validation soak not yet started as of 2026-05-14 16:00 UTC.
+  - Active-session probe at `2026-05-14 19:30 UTC` still showed `NAS100=PRICE_NOT_MT5_FRESH` and `US30=PRICE_NOT_MT5_FRESH`, with `lastBatchAt=2026-05-14T12:37:30Z`. The live runtime did not yet evidence the required EA/backend reload.
 - **XAUUSD candle-history readiness** — Root cause confirmed 2026-05-14: `SymbolNormalizer` missing "GOLD" → "XAUUSD" broker alias; EA could not resolve XAUUSD on brokers using "GOLD". **FIXED 2026-05-14**: Alias map added to `SymbolNormalizer.mqh`; GOLD, US100, DJ30, and other common renames now resolve to canonical names. Awaiting EA restart + 7.5h candle accumulation.
-  - Post-fix EA restart and candle accumulation not yet confirmed as of 2026-05-14 16:00 UTC.
+  - Active-session probe at `2026-05-14 19:30 UTC` showed `XAUUSD priceState=live` but only `candleCount=120`, below the required `>= 180` readiness gate. Because batch timestamps had not advanced since `12:37 UTC`, this also does not prove a valid post-restart accumulation window.
 - **AUDUSD / ETHUSD chop-gate** — **Classified 2026-05-14 as Explanation A (correct engine behavior)**. Chop is live-computed, not cached. No code change authorized at this time. No blocker to Phase 0 advancement if NAS100/US30/XAUUSD pass the validation soak.
 - Superseding Phase 0 closeout artifact not yet published. Gate remains BLOCKED until focused validation soak passes and artifact is written.
 - Focused post-fix validation gate checklist created: `.github/migration/phase-updates/phase-0-post-fix-validation-checklist-2026-05-14.md`
+- Latest focused validation evidence: `.github/migration/phase-updates/phase-0-focused-validation-attempt-2026-05-14.md`
 - Final closeout evidence is now split across `.github/migration/phase-updates/phase-0-completion-2026-05-14.md` and `.github/migration/audits/phase-0-full-parity-2026-05-14.md`; the raw final soak export is now committed in the repo at `.github/migration/phase-updates/phase0-soak-Final-2026-05-14.md`.
 
 ---
