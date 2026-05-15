@@ -1,0 +1,122 @@
+{
+  "snapshot_type": "FINDINGS",
+  "workflow_id": "stabilize-ea-2026-05-15",
+  "timestamp": "2026-05-15T04:10:00Z",
+  "confirmed_issues": [
+    {
+      "id": "BUG-001",
+      "severity": "MEDIUM",
+      "system": "EA Market Stream Payload Contract",
+      "description": "The published EA payload contract (task specification, CLAUDE.md) uses 'quote_time' for the tick timestamp and 'candles' (array) for candle data. The current handler reads only 'timestamp' and 'candle'/'candle_m15' (single objects). The MQL5 EA itself sends 'timestamp', so EA→backend works. However, external callers or future EA updates using the documented contract will receive silent failures: quote_time is ignored (staleness check skipped), and a candles array is not processed.",
+      "root_cause": "The documented public REST contract diverged from the internal field names during Phase 0 development. No alias mapping was added.",
+      "impact_zones": ["EA Market Stream ingestion", "External REST API callers", "Documentation fidelity"],
+      "proposed_fix": "Add 'quote_time' as a fallback alias for 'timestamp' in the post_ea_market_stream handler. Add 'candles' array shim: if candles[] is present and candle is absent, use candles[0] as the M1 candle object. Update the docblock to reflect both formats. Add regression tests."
+    },
+    {
+      "id": "BUG-002",
+      "severity": "LOW",
+      "system": "EA Market Stream Audit Trail",
+      "description": "When a payload uses 'quote_time' instead of 'timestamp', the audit log entry for 'ea.market_stream.ingested' records 'timestamp' => null even though the actual timestamp was provided as 'quote_time'. This makes audit trail debugging harder.",
+      "root_cause": "The audit call at the end of post_ea_market_stream uses $payload['timestamp'] ?? null hardcoded rather than the resolved timestamp variable.",
+      "impact_zones": ["Audit log", "Debugging"],
+      "proposed_fix": "Use the resolved $timestamp_raw variable (quote_time ?? timestamp) in the audit entry."
+    },
+    {
+      "id": "BUG-003",
+      "severity": "LOW",
+      "system": "EA Market Stream Payload Docblock",
+      "description": "The PHP docblock for post_ea_market_stream (lines 1779-1799) still documents the old payload format with 'timestamp' as the field name and 'candle' as a single object. It does not document 'quote_time', 'source', 'server_time', or the 'candles' array format.",
+      "root_cause": "Docblock not updated when the public contract was specified.",
+      "impact_zones": ["Code documentation", "External developer guidance"],
+      "proposed_fix": "Update docblock to document both the legacy format (timestamp/candle/candle_m15) and the canonical format (quote_time/source/server_time/candles array)."
+    },
+    {
+      "id": "INFO-001",
+      "severity": "INFO",
+      "system": "EA Authentication",
+      "description": "EA authentication is fully correct. X-EA-API-Key header (plus aliases) is read, hash_equals is used, SMC_SF_EA_API_KEY constant/env is checked, missing token returns 401, unconfigured secret returns 503, invalid token returns 403, missing user_id returns 400, invalid user_id returns 403, wp_set_current_user is called before returning true. No action required.",
+      "root_cause": "N/A — this is a PASS finding",
+      "impact_zones": [],
+      "proposed_fix": "None required"
+    },
+    {
+      "id": "INFO-002",
+      "severity": "INFO",
+      "system": "Stale Data Guards",
+      "description": "Stale data rejection is correctly implemented at 300s hard-reject (HTTP 422), 120s drift warning. OHLC guard, epoch timestamp guard, is_finite(bid/ask) guard, and negative volume clamp are all present and tested by regression tests. No action required.",
+      "root_cause": "N/A — this is a PASS finding",
+      "impact_zones": [],
+      "proposed_fix": "None required"
+    },
+    {
+      "id": "INFO-003",
+      "severity": "INFO",
+      "system": "Signal Engine Authority",
+      "description": "Backend remains the single source of truth. Dashboard reads from /snapshot, /live-signals, /ladders - all backend-authoritative. Frontend normalizes numeric fields but does not compute signals. FreshnessBadge uses age_sec from backend. VerdictBadge gates on backend is_live flag. No stale-data qualification of signals detected.",
+      "root_cause": "N/A — this is a PASS finding",
+      "impact_zones": [],
+      "proposed_fix": "None required"
+    },
+    {
+      "id": "INFO-004",
+      "severity": "INFO",
+      "system": "NAS100/US30 Equity Session Freshness",
+      "description": "The equity index session fix is correctly implemented in both layers: (1) mt5/MarketDataEngine.mqh - IsEquityIndexSymbol() + IsEquitySessionOpen() override freshness to CLOSED and use TimeCurrent() as push timestamp during off-hours. (2) smc-superfib-sniper.php - is_equity_index_off_session() excludes NAS100/US30 from stale feed check during their off-session hours, with DST-aware logic. Code fix merged in PR #170/#171. Live validation soak has NOT yet been run.",
+      "root_cause": "N/A — code fix confirmed present",
+      "impact_zones": ["Feed health", "NAS100", "US30"],
+      "proposed_fix": "Run 4-hour validation soak covering at least one US equity session (09:30-16:00 ET)"
+    },
+    {
+      "id": "INFO-005",
+      "severity": "INFO",
+      "system": "XAUUSD Symbol Normalization (GOLD alias)",
+      "description": "SymbolNormalizer.mqh correctly includes AddAlias('GOLD', 'XAUUSD') plus aliases for GOLD.PRO etc. The PHP plugin's map_symbol_aliases() also maps 'GOLD' to 'XAUUSD'. Code fix merged in PR #170. EA restart and 7.5h M15 candle accumulation have not yet been confirmed.",
+      "root_cause": "N/A — code fix confirmed present",
+      "impact_zones": ["XAUUSD candle history", "Feed health"],
+      "proposed_fix": "EA restart required; wait 7.5h (30 x 15min bars) for XAUUSD candle-history readiness gate to pass"
+    }
+  ],
+  "migration_blockers": [
+    {
+      "id": "MIGRATION-001",
+      "phase": "Phase 0",
+      "description": "NAS100/US30 freshness: PRICE_NOT_MT5_FRESH at soak closeout",
+      "status": "CODE_FIX_MERGED - live validation soak NOT started",
+      "validation_required": true,
+      "acceptance_criteria": "NAS100/US30 report feedStatus=live during active US equity session (13:30-20:00 UTC). Outside session, excluded from stale feed count."
+    },
+    {
+      "id": "MIGRATION-002",
+      "phase": "Phase 0",
+      "description": "XAUUSD candle history: INSUFFICIENT_CANDLE_HISTORY at soak closeout due to GOLD alias missing in SymbolNormalizer",
+      "status": "CODE_FIX_MERGED - EA restart and accumulation NOT yet confirmed",
+      "validation_required": true,
+      "acceptance_criteria": "After EA restart, XAUUSD M1 and M15 candles accumulate in DB. mt5_candles_live=true within 7.5h. Signal spot-check produces valid output."
+    },
+    {
+      "id": "MIGRATION-003",
+      "phase": "Phase 0",
+      "description": "Phase 0 closeout gate: requires all critical symbols to pass freshness and candle-history readiness",
+      "status": "BLOCKED - pending MIGRATION-001 and MIGRATION-002 live validation",
+      "validation_required": true,
+      "acceptance_criteria": "All 7 watchlist symbols pass their respective readiness gates during an active market session"
+    }
+  ],
+  "parity_status": {
+    "pine_backend": "PASS - deterministic session-anchor and fib checks verified (2026-05-14 audit)",
+    "backend_dashboard": "PASS - display-layer parity preserved for audited chart surfaces",
+    "mt5_ea_ingress": "PASS - route, auth, timestamps, OHLC guards aligned and regression-covered",
+    "live_symbol_freshness": "PARTIAL - NAS100/US30 code fix merged, live validation pending",
+    "xauusd_candle_history": "PARTIAL - GOLD alias fix merged, accumulation pending",
+    "chop_gate_behavior": "PASS - AUDUSD/ETHUSD chop blocks classified as correct engine behavior"
+  },
+  "statistics": {
+    "total_issues": 3,
+    "critical": 0,
+    "high": 0,
+    "medium": 1,
+    "low": 2,
+    "info": 5,
+    "migration_blockers": 3
+  }
+}

@@ -682,6 +682,99 @@ function test_ea_market_stream() {
         var_dump($no_ts_response);
     }
 
+    // Test 12: quote_time alias accepted — canonical REST contract (BUG-001 2026-05-15 patch)
+    // Confirms that payloads using 'quote_time' instead of 'timestamp' pass the staleness guard
+    // and produce a successful snapshot insertion. This is the canonical published API contract.
+    echo "Test 12: quote_time alias accepted (canonical REST contract — BUG-001 2026-05-15)\n";
+    $quote_time_payload = array(
+        'user_id' => 7,
+        'symbol' => 'USDJPY',
+        'timeframe' => 'M1',
+        'source' => 'MT5',
+        'server_time' => gmdate('c'),
+        'quote_time' => gmdate('c', time() - 5),   // Uses quote_time, NOT timestamp
+        'bid' => 148.321,
+        'ask' => 148.335,
+        'spread' => 1.4,
+        // No 'timestamp' field at all
+    );
+
+    $quote_time_response = dispatch_ea_market_stream($plugin, $quote_time_payload);
+
+    if ($quote_time_response instanceof WP_REST_Response
+        && isset($quote_time_response->data['ok'])
+        && $quote_time_response->data['ok'] === true
+        && $quote_time_response->data['snapshots_inserted'] === 1) {
+        echo "✓ SUCCESS: quote_time alias accepted; snapshot inserted\n";
+    } else {
+        echo "✗ FAILED: quote_time alias was not accepted\n";
+        var_dump($quote_time_response);
+    }
+
+    echo "\n";
+
+    // Test 13: candles[] array shim — canonical REST contract (BUG-001 2026-05-15 patch)
+    // Confirms that a payload using the 'candles' array format (published contract) is processed
+    // correctly by promoting candles[0] to the M1 candle object.
+    echo "Test 13: candles[] array shim accepted (canonical REST contract — BUG-001 2026-05-15)\n";
+    $candles_array_payload = array(
+        'user_id' => 7,
+        'symbol' => 'EURUSD',
+        'timeframe' => 'M1',
+        'source' => 'MT5',
+        'quote_time' => gmdate('c', time() - 5),
+        'bid' => 1.08521,
+        'ask' => 1.08534,
+        'candles' => array(
+            array(
+                'time'        => gmdate('c', time() - 90),
+                'open'        => 1.0850,
+                'high'        => 1.0856,
+                'low'         => 1.0848,
+                'close'       => 1.0853,
+                'tick_volume' => 210,   // canonical uses tick_volume; shim maps to volume
+            ),
+        ),
+        // No 'candle' key — handler must promote candles[0]
+    );
+
+    $candles_array_response = dispatch_ea_market_stream($plugin, $candles_array_payload);
+
+    if ($candles_array_response instanceof WP_REST_Response
+        && isset($candles_array_response->data['ok'])
+        && $candles_array_response->data['ok'] === true
+        && $candles_array_response->data['snapshots_inserted'] === 1
+        && $candles_array_response->data['candles_inserted'] >= 1) {
+        echo "✓ SUCCESS: candles[] array shim accepted; candle promoted and stored\n";
+    } else {
+        echo "✗ FAILED: candles[] array shim was not accepted\n";
+        var_dump($candles_array_response);
+    }
+
+    echo "\n";
+
+    // Test 14: Stale quote_time rejected with 422 (confirms quote_time staleness guard active)
+    echo "Test 14: Stale quote_time rejected with 422 (staleness guard on alias)\n";
+    $stale_quote_time_payload = array(
+        'user_id' => 7,
+        'symbol' => 'EURUSD',
+        'quote_time' => gmdate('c', time() - 400),  // 400s ago — exceeds 300s hard reject
+        'bid' => 1.08521,
+        'ask' => 1.08534,
+    );
+
+    $stale_qt_response = dispatch_ea_market_stream($plugin, $stale_quote_time_payload);
+
+    if ($stale_qt_response instanceof WP_Error
+        && $stale_qt_response->code === 'stale_data'
+        && isset($stale_qt_response->data['status'])
+        && (int) $stale_qt_response->data['status'] === 422) {
+        echo "✓ SUCCESS: Stale quote_time correctly rejected with HTTP 422\n";
+    } else {
+        echo "✗ FAILED: Stale quote_time was not rejected as expected\n";
+        var_dump($stale_qt_response);
+    }
+
     echo "\nTest completed.\n";
 }
 
