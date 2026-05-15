@@ -1842,7 +1842,12 @@ final class SMC_SuperFib_Sniper_REST {
 
         // COMPAT: Accept 'quote_time' (canonical REST contract) as alias for 'timestamp' (legacy EA format).
         // quote_time takes precedence; falls back to timestamp; falls back to null.
-        $timestamp_raw = $payload['quote_time'] ?? $payload['timestamp'] ?? null;
+        // Use !empty() (not ??) so an empty-string quote_time correctly falls through to timestamp.
+        // A bare ?? treats "" as a valid value, causing staleness guards to be skipped when a legacy
+        // sender provides quote_time="" and a real timestamp — this was flagged as P2 in Codex review.
+        $timestamp_raw = !empty($payload['quote_time'])
+            ? $payload['quote_time']
+            : (!empty($payload['timestamp']) ? $payload['timestamp'] : null);
         $snapshot_updated_at = $this->normalize_market_timestamp($timestamp_raw, $this->now_mysql());
 
         // COMPAT: Accept 'candles' array (canonical REST contract) alongside 'candle' object (legacy EA format).
