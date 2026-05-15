@@ -307,6 +307,10 @@ assert_true(
     'is_supported_symbol must accept SOLUSD once it is present in the authoritative instrument registry'
 );
 assert_true(
+    $isSupportedSymbol->invoke($instance, 'AUDCAD'),
+    'is_supported_symbol must keep AUDCAD in the authoritative instrument registry'
+);
+assert_true(
     !$isSupportedSymbol->invoke($instance, 'ADAUSD'),
     'is_supported_symbol must remain fail-closed for unsupported crypto symbols'
 );
@@ -316,15 +320,22 @@ $response = $instance->post_user_settings(new WP_REST_Request(array(
     'backendUrl' => 'https://example.com/wp-json',
     'refreshIntervalSec' => 5,
     'staleThresholdSec' => 60,
-    'watchlist' => array('EURUSD', 'FOOBAR', 'GBPUSD'),
+    'watchlist' => array('EURUSD', 'FOOBAR', 'AUDCAD'),
     'riskAllocation' => array('perTradePct' => 0.5, 'dailyMaxPct' => 2.0, 'ddCapPct' => 6.0),
 )));
-assert_same(array('ok' => true), $response, 'post_user_settings must return success in the test harness');
+assert_same(
+    array(
+        'ok' => true,
+        'watchlist' => array('EURUSD', 'AUDCAD'),
+    ),
+    $response,
+    'post_user_settings must return the authoritative canonical watchlist in the mutation response'
+);
 $savedSettingsRow = $wpdb->tables[$userSettingsTable]['7'] ?? null;
 assert_true(is_array($savedSettingsRow), 'post_user_settings must persist user settings');
 $savedSettings = json_decode($savedSettingsRow['settings'], true);
 assert_same(
-    array('EURUSD', 'GBPUSD'),
+    array('EURUSD', 'AUDCAD'),
     $savedSettings['watchlist'] ?? null,
     'post_user_settings must persist only supported watchlist symbols'
 );

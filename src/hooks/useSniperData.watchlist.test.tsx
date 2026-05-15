@@ -9,6 +9,7 @@ import type { DashboardSettings } from "@/types/sniper";
 const apiMocks = vi.hoisted(() => ({
   getUserSettings: vi.fn(),
   normalizeBackendUrl: vi.fn((value?: string) => (typeof value === "string" ? value.trim() : "")),
+  postWatchlistAdd: vi.fn(),
   postWatchlistRemove: vi.fn(),
   setBackendUrl: vi.fn(),
 }));
@@ -16,13 +17,14 @@ const apiMocks = vi.hoisted(() => ({
 vi.mock("@/lib/api/sniperClient", () => ({
   apiClient: {
     getUserSettings: apiMocks.getUserSettings,
+    postWatchlistAdd: apiMocks.postWatchlistAdd,
     postWatchlistRemove: apiMocks.postWatchlistRemove,
   },
   normalizeBackendUrl: apiMocks.normalizeBackendUrl,
   setBackendUrl: apiMocks.setBackendUrl,
 }));
 
-import { useCanonicalWatchlist, useWatchlistRemove } from "./useSniperData";
+import { useCanonicalWatchlist, useWatchlistAdd, useWatchlistRemove } from "./useSniperData";
 
 const baseSettings: DashboardSettings = {
   backendUrl: "https://backend.example/wp-json",
@@ -36,6 +38,10 @@ const baseSettings: DashboardSettings = {
 describe("watchlist persistence", () => {
   let backendSettings: DashboardSettings;
   let queryClient: QueryClient;
+
+  const wrapper = ({ children }: PropsWithChildren) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
 
   beforeEach(() => {
     backendSettings = structuredClone(baseSettings);
@@ -65,6 +71,16 @@ describe("watchlist persistence", () => {
       };
       return { ok: true, watchlist: structuredClone(backendSettings.watchlist) };
     });
+    apiMocks.postWatchlistAdd.mockReset();
+    apiMocks.postWatchlistAdd.mockImplementation(async (symbol: string) => {
+      backendSettings = {
+        ...backendSettings,
+        watchlist: backendSettings.watchlist.includes(symbol as DashboardSettings["watchlist"][number])
+          ? backendSettings.watchlist
+          : [...backendSettings.watchlist, symbol as DashboardSettings["watchlist"][number]],
+      };
+      return { ok: true, watchlist: structuredClone(backendSettings.watchlist) };
+    });
     apiMocks.normalizeBackendUrl.mockClear();
     apiMocks.setBackendUrl.mockReset();
   });
@@ -74,10 +90,6 @@ describe("watchlist persistence", () => {
   });
 
   it("keeps a removed symbol absent after a remount while the user-settings refetch lags", async () => {
-    const wrapper = ({ children }: PropsWithChildren) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
-
     const watchlistView = renderHook(() => useCanonicalWatchlist(), { wrapper });
     const removeView = renderHook(() => useWatchlistRemove(), { wrapper });
 
@@ -105,5 +117,73 @@ describe("watchlist persistence", () => {
       },
       { timeout: 1500 },
     );
+  });
+
+  it("keeps a newly added symbol when a stale user-settings refetch resolves after the mutation", async () => {
+    backendSettings = {
+      ...structuredClone(baseSettings),
+      watchlist: ["EURJPY"],
+    };
+    const staleSettings = structuredClone(backendSettings);
+    let getUserSettingsCallCount = 0;
+    apiMocks.getUserSettings.mockReset();
+    apiMocks.getUserSettings.mockImplementation(async () => {
+      getUserSettingsCallCount += 1;
+      if (getUserSettingsCallCount === 1) {
+        return structuredClone(backendSettings);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return structuredClone(staleSettings);
+    });
+
+    const watchlistView = renderHook(() => useCanonicalWatchlist(), { wrapper });
+    const addView = renderHook(() => useWatchlistAdd(), { wrapper });
+
+    await waitFor(() => {
+      expect(watchlistView.result.current.watchlist).toEqual(["EURJPY"]);
+    });
+
+    void queryClient.refetchQueries({ queryKey: ["user-settings"], type: "active" });
+
+    await act(async () => {
+      await addView.result.current.mutateAsync("AUDCAD");
+    });
+
+    await waitFor(() => {
+      expect(watchlistView.result.current.watchlist).toEqual(["EURJPY", "AUDCAD"]);
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+    });
+
+    expect(watchlistView.result.current.watchlist).toEqual(["EURJPY", "AUDCAD"]);
+  });
+
+  it("routes malformed watchlist add responses into the mutation onError path", async () => {
+    apiMocks.postWatchlistAdd.mockReset();
+    apiMocks.postWatchlistAdd.mockRejectedValue(
+      new Error("/user/watchlist/add: backend response missing watchlist array"),
+    );
+
+    const watchlistView = renderHook(() => useCanonicalWatchlist(), { wrapper });
+    const addView = renderHook(() => useWatchlistAdd(), { wrapper });
+
+    await waitFor(() => {
+      expect(watchlistView.result.current.watchlist).toEqual(["AUDCAD", "EURJPY"]);
+    });
+
+    await act(async () => {
+      await expect(addView.result.current.mutateAsync("GBPUSD")).rejects.toThrow(
+        "/user/watchlist/add: backend response missing watchlist array",
+      );
+    });
+
+    await waitFor(() => {
+      expect(addView.result.current.isError).toBe(true);
+    });
+
+    expect(watchlistView.result.current.watchlist).toEqual(["AUDCAD", "EURJPY"]);
   });
 });
