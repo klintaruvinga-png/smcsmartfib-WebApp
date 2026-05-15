@@ -86,6 +86,16 @@ interface RequestOpts {
 
 export type AdminHealthResponse = EngineHealth;
 
+function requireWatchlistResponse(path: string, watchlist: Symbol[] | undefined): Symbol[] {
+  if (!Array.isArray(watchlist)) {
+    const message = `${path}: backend response missing watchlist array`;
+    console.error(message);
+    throw new Error(message);
+  }
+
+  return watchlist;
+}
+
 async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
   const headers: Record<string, string> = {};
   if (opts.body) headers["Content-Type"] = "application/json";
@@ -385,10 +395,7 @@ export const apiClient = {
       method: "POST",
       body: { symbol },
     });
-    if (!Array.isArray(result.watchlist)) {
-      throw new Error("/user/watchlist/add: backend response missing watchlist array");
-    }
-    return { ok: result.ok, watchlist: result.watchlist };
+    return { ok: result.ok, watchlist: requireWatchlistResponse("/user/watchlist/add", result.watchlist) };
   },
   async postWatchlistRemove(
     symbol: string,
@@ -402,9 +409,9 @@ export const apiClient = {
       method: "POST",
       body: { symbol },
     });
-    if (!Array.isArray(result.watchlist)) {
-      throw new Error("/user/watchlist/remove: backend response missing watchlist array");
-    }
-    return { ok: result.ok, watchlist: result.watchlist };
+    return {
+      ok: result.ok,
+      watchlist: requireWatchlistResponse("/user/watchlist/remove", result.watchlist),
+    };
   },
 };

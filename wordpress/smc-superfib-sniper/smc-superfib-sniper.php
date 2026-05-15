@@ -1347,16 +1347,12 @@ final class SMC_SuperFib_Sniper_REST {
             'watchlist' => $this->validate_watchlist_symbols(isset($payload['watchlist']) ? $payload['watchlist'] : $current['watchlist']),
             'riskAllocation' => $this->sanitize_risk_allocation(isset($payload['riskAllocation']) ? $payload['riskAllocation'] : $current['riskAllocation'], $current['riskAllocation']),
         ));
-        $watchlist_changed = $current['watchlist'] !== $settings['watchlist'];
-
         $this->replace_json('user_settings', array(
             'user_id' => $user_id,
             'settings' => $settings,
             'updated_at' => $this->now_mysql(),
         ));
-        if ($watchlist_changed) {
-            $this->delete_engine_snapshot($user_id);
-        }
+        $this->invalidate_watchlist_snapshot_if_changed($user_id, $current['watchlist'], $settings['watchlist'], 'post_user_settings');
 
         // Keep riskProfile in sync when the Settings tab edits the three overlapping risk-cap
         // fields so execution sizing always sees the latest user intent regardless of which tab
@@ -1380,9 +1376,10 @@ final class SMC_SuperFib_Sniper_REST {
             ));
         }
 
-        $this->audit($user_id, 'settings.updated', array('watchlist' => $settings['watchlist']));
+        $persisted_settings = $this->get_settings($user_id);
+        $this->audit($user_id, 'settings.updated', array('watchlist' => $persisted_settings['watchlist']));
 
-        return rest_ensure_response(array('ok' => true));
+        return rest_ensure_response(array('ok' => true, 'watchlist' => $persisted_settings['watchlist']));
     }
 
     public function post_twelve_data_key(WP_REST_Request $request) {
@@ -1455,12 +1452,14 @@ final class SMC_SuperFib_Sniper_REST {
     public function post_user_watchlist(WP_REST_Request $request) {
         $user_id = get_current_user_id();
         $payload = $request->get_json_params();
+        $current = $this->get_settings($user_id);
         $symbols = isset($payload['watchlist']) && is_array($payload['watchlist']) ? $payload['watchlist'] : array();
         $validated = $this->validate_watchlist_symbols($symbols);
         $this->save_watchlist($user_id, $validated);
-        $this->delete_engine_snapshot($user_id);
-        $this->audit($user_id, 'watchlist.saved', array('watchlist' => $validated));
-        return rest_ensure_response(array('ok' => true, 'watchlist' => $validated));
+        $this->invalidate_watchlist_snapshot_if_changed($user_id, $current['watchlist'], $validated, 'post_user_watchlist');
+        $persisted_settings = $this->get_settings($user_id);
+        $this->audit($user_id, 'watchlist.saved', array('watchlist' => $persisted_settings['watchlist']));
+        return rest_ensure_response(array('ok' => true, 'watchlist' => $persisted_settings['watchlist']));
     }
 
     public function post_watchlist_add(WP_REST_Request $request) {
@@ -1475,13 +1474,19 @@ final class SMC_SuperFib_Sniper_REST {
             return new WP_Error('smc_sf_watchlist_unsupported', 'Symbol not supported: ' . $symbol, array('status' => 400));
         }
         $settings = $this->get_settings($user_id);
-        $watchlist = $settings['watchlist'];
+        $previous_watchlist = $settings['watchlist'];
+        $watchlist = $previous_watchlist;
         if (!in_array($symbol, $watchlist, true)) {
-            $watchlist[] = $symbol;
-            $watchlist = array_slice($watchlist, 0, 24);
-            $this->save_watchlist($user_id, $watchlist);
-            $this->delete_engine_snapshot($user_id);
+            $next_watchlist = $watchlist;
+            $next_watchlist[] = $symbol;
+            $next_watchlist = array_slice($next_watchlist, 0, 24);
+            $this->save_watchlist($user_id, $next_watchlist);
+            $persisted_settings = $this->get_settings($user_id);
+            $watchlist = $persisted_settings['watchlist'];
+            $this->invalidate_watchlist_snapshot_if_changed($user_id, $previous_watchlist, $watchlist, 'post_watchlist_add');
             $this->audit($user_id, 'watchlist.add', array('symbol' => $symbol));
+        } else {
+            $this->log_watchlist_snapshot_skip($user_id, 'post_watchlist_add');
         }
         return rest_ensure_response(array('ok' => true, 'watchlist' => $watchlist));
     }
@@ -1496,13 +1501,19 @@ final class SMC_SuperFib_Sniper_REST {
             return new WP_Error('smc_sf_watchlist_symbol_missing', 'Symbol is required.', array('status' => 400));
         }
         $settings = $this->get_settings($user_id);
-        $watchlist = array_values(array_filter($settings['watchlist'], function ($w) use ($symbol) {
+        $previous_watchlist = $settings['watchlist'];
+        $watchlist = array_values(array_filter($previous_watchlist, function ($w) use ($symbol) {
             return $w !== $symbol;
         }));
         $this->save_watchlist($user_id, $watchlist);
-        $this->delete_engine_snapshot($user_id);
+        $persisted_settings = $this->get_settings($user_id);
+        $watchlist = $persisted_settings['watchlist'];
+        $watchlist_changed = $previous_watchlist !== $watchlist;
+        $this->invalidate_watchlist_snapshot_if_changed($user_id, $previous_watchlist, $watchlist, 'post_watchlist_remove');
         // Remove stale price row so the symbol does not reappear as a ghost price tile.
-        $wpdb->delete($this->table('snapshots'), array('user_id' => $user_id, 'symbol' => $symbol), array('%d', '%s'));
+        if ($watchlist_changed) {
+            $wpdb->delete($this->table('snapshots'), array('user_id' => $user_id, 'symbol' => $symbol), array('%d', '%s'));
+        }
         $this->audit($user_id, 'watchlist.remove', array('symbol' => $symbol));
         return rest_ensure_response(array('ok' => true, 'watchlist' => $watchlist));
     }
@@ -3988,6 +3999,24 @@ final class SMC_SuperFib_Sniper_REST {
     private function delete_engine_snapshot($user_id) {
         delete_user_meta($user_id, 'smc_sf_engine_snapshot');
         error_log("SMC_SF: engine snapshot invalidated for user {$user_id}");
+    }
+
+    private function invalidate_watchlist_snapshot_if_changed($user_id, $previous_watchlist, $next_watchlist, $context) {
+        if ($previous_watchlist !== $next_watchlist) {
+            $this->delete_engine_snapshot($user_id);
+            return true;
+        }
+
+        $this->log_watchlist_snapshot_skip($user_id, $context);
+        return false;
+    }
+
+    private function log_watchlist_snapshot_skip($user_id, $context) {
+        error_log(sprintf(
+            'SMC_SF WARNING: engine snapshot retained for user %d during %s because watchlist was unchanged',
+            (int) $user_id,
+            (string) $context
+        ));
     }
 
     private function is_engine_snapshot_current($snapshot, $expected_symbols, $refresh_interval_sec) {

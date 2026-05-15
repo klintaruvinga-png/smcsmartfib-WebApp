@@ -239,7 +239,6 @@ export function useWatchlistAdd() {
       },
       onSuccess: async (result) => {
         writeCanonicalWatchlist(queryClient, result.watchlist);
-        queryClient.invalidateQueries({ queryKey: ["user-settings"] });
         await invalidateWatchlistQueries(queryClient);
       },
       onError: (_error, _symbol, context) => {
@@ -272,7 +271,6 @@ export function useWatchlistRemove() {
       },
       onSuccess: async (result) => {
         writeCanonicalWatchlist(queryClient, result.watchlist);
-        queryClient.invalidateQueries({ queryKey: ["user-settings"] });
         await invalidateWatchlistQueries(queryClient);
       },
       onError: (_error, _symbol, context) => {
