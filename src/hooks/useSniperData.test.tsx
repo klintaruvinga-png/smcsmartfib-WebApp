@@ -13,6 +13,8 @@ const apiMocks = vi.hoisted(() => ({
   getEngineHealth: vi.fn(),
   getUserSettings: vi.fn(),
   normalizeBackendUrl: vi.fn((value?: string) => (typeof value === "string" ? value.trim() : "")),
+  postWatchlistAdd: vi.fn(),
+  postWatchlistRemove: vi.fn(),
   setBackendUrl: vi.fn(),
 }));
 
@@ -26,18 +28,22 @@ vi.mock("@/lib/api/sniperClient", () => ({
   apiClient: {
     getEngineHealth: apiMocks.getEngineHealth,
     getUserSettings: apiMocks.getUserSettings,
+    postWatchlistAdd: apiMocks.postWatchlistAdd,
+    postWatchlistRemove: apiMocks.postWatchlistRemove,
   },
   normalizeBackendUrl: apiMocks.normalizeBackendUrl,
   setBackendUrl: apiMocks.setBackendUrl,
 }));
 
-import { useEngineHealth } from "./useSniperData";
+import { useEngineHealth, useWatchlistAdd, useWatchlistRemove } from "./useSniperData";
 
 describe("useEngineHealth", () => {
   beforeEach(() => {
     reactQueryMocks.useQuery.mockReset();
     apiMocks.getEngineHealth.mockReset();
     apiMocks.getUserSettings.mockReset();
+    apiMocks.postWatchlistAdd.mockReset();
+    apiMocks.postWatchlistRemove.mockReset();
     apiMocks.setBackendUrl.mockReset();
     apiMocks.normalizeBackendUrl.mockClear();
   });
@@ -72,5 +78,68 @@ describe("useEngineHealth", () => {
       staleTime: 0,
       refetchInterval: 5_000,
     });
+  });
+});
+
+describe("watchlist mutation success handlers", () => {
+  beforeEach(() => {
+    reactQueryMocks.useMutation.mockReset();
+    reactQueryMocks.useQueryClient.mockReset();
+  });
+
+  it("invalidates user-settings after add success", async () => {
+    const queryClient = {
+      invalidateQueries: vi.fn().mockResolvedValue(undefined),
+      refetchQueries: vi.fn().mockResolvedValue(undefined),
+      setQueryData: vi.fn(),
+    };
+    let mutationOptions: Record<string, (...args: unknown[]) => unknown> | undefined;
+
+    reactQueryMocks.useQueryClient.mockReturnValue(queryClient);
+    reactQueryMocks.useMutation.mockImplementation((options) => {
+      mutationOptions = options;
+      return options;
+    });
+
+    renderHook(() => useWatchlistAdd());
+
+    await mutationOptions?.onSuccess?.({ ok: true, watchlist: ["EURJPY"] });
+
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["user-settings"] });
+    const userSettingsInvalidateIndex = queryClient.invalidateQueries.mock.calls.findIndex(
+      (call) => (call[0] as { queryKey: string[] }).queryKey[0] === "user-settings",
+    );
+    expect(userSettingsInvalidateIndex).toBeGreaterThan(-1);
+    expect(queryClient.setQueryData.mock.invocationCallOrder[0]).toBeLessThan(
+      queryClient.invalidateQueries.mock.invocationCallOrder[userSettingsInvalidateIndex],
+    );
+  });
+
+  it("invalidates user-settings after remove success", async () => {
+    const queryClient = {
+      invalidateQueries: vi.fn().mockResolvedValue(undefined),
+      refetchQueries: vi.fn().mockResolvedValue(undefined),
+      setQueryData: vi.fn(),
+    };
+    let mutationOptions: Record<string, (...args: unknown[]) => unknown> | undefined;
+
+    reactQueryMocks.useQueryClient.mockReturnValue(queryClient);
+    reactQueryMocks.useMutation.mockImplementation((options) => {
+      mutationOptions = options;
+      return options;
+    });
+
+    renderHook(() => useWatchlistRemove());
+
+    await mutationOptions?.onSuccess?.({ ok: true, watchlist: ["EURJPY"] });
+
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["user-settings"] });
+    const userSettingsInvalidateIndex = queryClient.invalidateQueries.mock.calls.findIndex(
+      (call) => (call[0] as { queryKey: string[] }).queryKey[0] === "user-settings",
+    );
+    expect(userSettingsInvalidateIndex).toBeGreaterThan(-1);
+    expect(queryClient.setQueryData.mock.invocationCallOrder[0]).toBeLessThan(
+      queryClient.invalidateQueries.mock.invocationCallOrder[userSettingsInvalidateIndex],
+    );
   });
 });
