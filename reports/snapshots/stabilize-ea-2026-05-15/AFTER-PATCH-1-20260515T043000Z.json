@@ -1,0 +1,53 @@
+{
+  "snapshot_type": "AFTER-PATCH",
+  "patch_number": 1,
+  "workflow_id": "stabilize-ea-2026-05-15",
+  "timestamp": "2026-05-15T04:30:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-WxJFl",
+    "commit_hash": "696d9a7b0fb2968f50ff42bfcdca50fe96633b67",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-15-after-patch-1"
+  },
+  "patches_applied": [
+    {
+      "id": "PATCH-1",
+      "bugs_fixed": ["BUG-001", "BUG-002"],
+      "file": "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "changes": [
+        "Added $timestamp_raw = quote_time ?? timestamp ?? null resolution",
+        "Staleness guard now checks $timestamp_raw (covers quote_time field)",
+        "M1 stream timestamp uses $timestamp_raw instead of payload['timestamp']",
+        "M15 stream timestamp uses $timestamp_raw instead of payload['timestamp']",
+        "Audit log entry now records $timestamp_raw (not null when quote_time used)",
+        "Added candles[] array shim: if candle absent but candles[] present, promotes candles[0] as M1 candle (tick_volume->volume mapped)",
+        "Updated post_ea_market_stream docblock to document canonical and legacy formats"
+      ]
+    },
+    {
+      "id": "PATCH-2",
+      "bugs_fixed": ["BUG-003"],
+      "file": "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "changes": [
+        "Docblock updated to document both canonical REST contract (quote_time/source/server_time/candles[]) and legacy EA format (timestamp/candle/candle_m15)"
+      ]
+    },
+    {
+      "id": "PATCH-3",
+      "bugs_fixed": ["BUG-001 regression protection"],
+      "file": "wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php",
+      "changes": [
+        "Added Test 12: quote_time alias accepted (canonical REST contract)",
+        "Added Test 13: candles[] array shim — candle promoted and stored",
+        "Added Test 14: Stale quote_time rejected with HTTP 422 (staleness guard active on alias)"
+      ]
+    }
+  ],
+  "test_results": {
+    "php_lint": "PASS (smc-superfib-sniper.php, class-market-data-service.php, test-ea-market-stream.php)",
+    "ea_market_stream_tests": "14/14 PASS",
+    "all_php_tests": "17/17 test files pass",
+    "mql_check": "PASS (MQL include verification passed)",
+    "npm_lint": "FAIL (pre-existing: missing @eslint/js package in CI environment — not introduced by patch)",
+    "npm_build": "FAIL (pre-existing: vite not installed in node_modules — not introduced by patch)"
+  }
+}
