@@ -40,6 +40,20 @@ export const Route = createFileRoute("/account")({
 
 type Tab = "settings" | "risk";
 
+const WATCHLIST_LIMIT = 24;
+
+function normalizeWatchlistDraft(watchlist: readonly Symbol[] | undefined | null): Symbol[] {
+  const canonical: Symbol[] = [];
+  for (const symbol of watchlist ?? []) {
+    if (typeof symbol !== "string") continue;
+    const normalized = symbol.trim().toUpperCase() as Symbol;
+    if (!normalized || canonical.includes(normalized)) continue;
+    canonical.push(normalized);
+    if (canonical.length === WATCHLIST_LIMIT) break;
+  }
+  return canonical;
+}
+
 function AccountPage() {
   const [tab, setTab] = useState<Tab>("settings");
   const { data: settings } = useUserSettings();
@@ -125,7 +139,7 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
   const watchlistBusy = addWatchlistMutation.isPending || removeWatchlistMutation.isPending;
 
   function syncDraftWatchlistFromCache(nextWatchlist: DashboardSettings["watchlist"]) {
-    setS((prev) => ({ ...prev, watchlist: nextWatchlist }));
+    setS((prev) => ({ ...prev, watchlist: normalizeWatchlistDraft(nextWatchlist) }));
   }
 
   useEffect(() => {
