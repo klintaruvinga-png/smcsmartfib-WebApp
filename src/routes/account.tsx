@@ -40,6 +40,20 @@ export const Route = createFileRoute("/account")({
 
 type Tab = "settings" | "risk";
 
+const WATCHLIST_LIMIT = 24;
+
+function normalizeWatchlistDraft(watchlist: readonly Symbol[] | undefined | null): Symbol[] {
+  const canonical: Symbol[] = [];
+  for (const symbol of watchlist ?? []) {
+    if (typeof symbol !== "string") continue;
+    const normalized = symbol.trim().toUpperCase() as Symbol;
+    if (!normalized || canonical.includes(normalized)) continue;
+    canonical.push(normalized);
+    if (canonical.length === WATCHLIST_LIMIT) break;
+  }
+  return canonical;
+}
+
 function AccountPage() {
   const [tab, setTab] = useState<Tab>("settings");
   const { data: settings } = useUserSettings();
@@ -109,14 +123,11 @@ function TabButton({
 
 function SettingsTab({ settings }: { settings: DashboardSettings }) {
   const qc = useQueryClient();
-  const { isFetching: isUserSettingsFetching, isSuccess: hasUserSettings } = useUserSettings();
   const { data: health } = useEngineHealth();
   const { watchlist, watchlistSet } = useCanonicalWatchlist();
   const [s, setS] = useState(settings);
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [newPair, setNewPair] = useState("");
-  const [pendingWatchlistSync, setPendingWatchlistSync] =
-    useState<DashboardSettings["watchlist"] | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [keyStatus, setKeyStatus] = useState<TwelveDataKeyStatus>(settings.apiKeyStatus);
   const settingsEditVersion = useRef(0);
@@ -127,8 +138,8 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
   const removeWatchlistMutation = useWatchlistRemove();
   const watchlistBusy = addWatchlistMutation.isPending || removeWatchlistMutation.isPending;
 
-  function syncDraftWatchlistFromCache(fallbackWatchlist: DashboardSettings["watchlist"]) {
-    setPendingWatchlistSync(fallbackWatchlist);
+  function syncDraftWatchlistFromCache(nextWatchlist: DashboardSettings["watchlist"]) {
+    setS((prev) => ({ ...prev, watchlist: normalizeWatchlistDraft(nextWatchlist) }));
   }
 
   useEffect(() => {
@@ -140,12 +151,6 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
   useEffect(() => {
     setKeyStatus(settings.apiKeyStatus);
   }, [settings.apiKeyStatus]);
-
-  useEffect(() => {
-    if (!pendingWatchlistSync || !hasUserSettings || isUserSettingsFetching) return;
-    setS((prev) => ({ ...prev, watchlist }));
-    setPendingWatchlistSync(null);
-  }, [hasUserSettings, isUserSettingsFetching, pendingWatchlistSync, watchlist]);
 
   function updateSettingsDraft(next: DashboardSettings) {
     settingsEditVersion.current += 1;
