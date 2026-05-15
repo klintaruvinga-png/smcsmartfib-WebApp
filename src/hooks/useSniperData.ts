@@ -291,6 +291,8 @@ export function useEngineHealth() {
     queryKey: ["engine-health"],
     queryFn: () => apiClient.getEngineHealth(),
     enabled,
+    // Phase 0: health query must reflect backend state within one poll cycle; disable caching.
+    staleTime: 0,
     refetchInterval: pollMs ?? DEFAULT_POLL_MS,
   });
 }
