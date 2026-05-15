@@ -11,8 +11,10 @@
 ## Current Status
 
 - Phase 0 closeout verified against `.github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md`
-- Backend bridge routes are implemented
-- Live terminal validation has not yet been recorded
+- Backend bridge routes are implemented and PHP-regression-covered (all tests PASS)
+- Environment readiness recorded: Broker Deriv.com, Server Deriv-Demo, Account Demo, MT5 build 5836, EA deployed, WebRequest enabled, bridge auth configured
+- Pre-validation prerequisites: COMPLETE (8/8 per research report 2026-05-15)
+- Live terminal validation: PENDING - awaiting Track A execution start
 - Details and pass thresholds live in `PHASE1_BRIDGE_ROADMAP.md`
 
 ---
@@ -38,7 +40,7 @@
 |---|---|---|---|---|
 | Live terminal verification pending for heartbeat, account-sync, symbol-sync, and market-stream | 2026-05-15 | Track A + Track B | OPEN | Requires environment readiness and scenario execution |
 | Phase 1 roadmap / tracker / checklist missing from canonical docs | 2026-05-15 | Program governance | RESOLVED | Resolved by `PHASE1_BRIDGE_ROADMAP.md`, `PHASE1_TRACKER.md`, and `PHASE1_CHECKLIST.md` |
-| Validation environment facts not yet recorded in canonical docs | 2026-05-15 | Track A | OPEN | Record broker, account type, MT5 build, and access prerequisites before first live run |
+| Validation environment facts not yet recorded in canonical docs | 2026-05-15 | Track A | RESOLVED | Recorded: Deriv.com / Deriv-Demo / Demo account / MT5 build 5836 / EA deployed / WebRequest enabled / bridge auth configured - 2026-05-15 |
 
 ---
 

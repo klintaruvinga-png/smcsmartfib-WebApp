@@ -2,20 +2,20 @@
 
 **Last-Updated**: 2026-05-15
 **Phase**: 1
-**Status**: READY FOR FIELD EXECUTION
+**Status**: IN PROGRESS - Prerequisites complete, awaiting live execution
 
 ---
 
 ## Pre-Validation Prerequisites
 
-- [ ] EA code complete and the exact validation build identified
-- [ ] Backend APIs available in the target validation environment
-- [ ] Broker test/validation account available
-- [ ] MT5 terminal access confirmed
-- [ ] Broker name and server recorded in `PHASE1_TRACKER.md`
-- [ ] Account type recorded in `PHASE1_TRACKER.md`
-- [ ] MT5 build recorded in `PHASE1_TRACKER.md`
-- [ ] `WebhookURL`, `ApiKey`, and `UserId` configured for the validation environment
+- [x] EA code complete and the exact validation build identified
+- [x] Backend APIs available in the target validation environment
+- [x] Broker test/validation account available
+- [x] MT5 terminal access confirmed
+- [x] Broker name and server recorded in `PHASE1_TRACKER.md`
+- [x] Account type recorded in `PHASE1_TRACKER.md`
+- [x] MT5 build recorded in `PHASE1_TRACKER.md`
+- [x] `WebhookURL`, `ApiKey`, and `UserId` configured for the validation environment
 
 ---
 
