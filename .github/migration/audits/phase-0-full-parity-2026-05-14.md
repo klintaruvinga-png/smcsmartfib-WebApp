@@ -118,7 +118,7 @@ Investigation performed on 2026-05-14 after the soak closed with gate still fail
 ## Artifacts
 
 - Final external soak export: `C:\Users\LEONNA\Downloads\phase0-soak-2026-05-14 (1).md`
-- Closeout log: `.github/migration/phase-updates/phase-0-completion-2026-05-14.md`
-- Restart checklist: `.github/migration/phase-updates/phase-0-next-72h-checklist-2026-05-11.md`
-- Restart summary: `.github/migration/phase-updates/phase-0-soak-summary-2026-05-11.md`
+- Closeout log: `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-completion-2026-05-14.md`
+- Restart checklist: `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-next-72h-checklist-2026-05-11.md`
+- Restart summary: `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-soak-summary-2026-05-11.md`
 - Supporting parity audits: `.github/migration/audits/phase-0-*.md`

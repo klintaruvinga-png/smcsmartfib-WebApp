@@ -114,6 +114,17 @@ function buildClaudeShellCommand(args) {
   return ["claude", ...args].join(" ");
 }
 
+function isActivePhaseUpdatePath(filePath) {
+  const resolvedPath = path.normalize(
+    path.isAbsolute(filePath) ? filePath : path.resolve(REPO_ROOT, filePath),
+  );
+  const activePhaseUpdateDir = path.normalize(
+    path.join(REPO_ROOT, ".github", "migration", "phase-updates") + path.sep,
+  );
+
+  return resolvedPath.startsWith(activePhaseUpdateDir);
+}
+
 function shouldUseClaudeShellFallback(claudeExe) {
   return process.platform === "win32" && !claudeExe;
 }
@@ -1338,7 +1349,12 @@ function startPipelineWatcher() {
   setInterval(pollPipeline, POLL_INTERVAL_MS);
 }
 
-export { buildClaudeShellCommand, execClaudeSync, shouldUseClaudeShellFallback };
+export {
+  buildClaudeShellCommand,
+  execClaudeSync,
+  isActivePhaseUpdatePath,
+  shouldUseClaudeShellFallback,
+};
 
 if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
   startPipelineWatcher();

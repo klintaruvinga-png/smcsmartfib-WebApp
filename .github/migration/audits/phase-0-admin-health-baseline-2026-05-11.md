@@ -9,7 +9,7 @@ This artifact documents the baseline evidence now present in git. It does not cl
 ## Evidence sources
 
 - `C:\Users\LEONNA\Downloads\phase0-soak-2026-05-11.md`
-- `.github/migration/phase-updates/phase-0-next-72h-checklist-2026-05-11.md`
+- `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-next-72h-checklist-2026-05-11.md`
 - `.github/migration/audits/phase-0-admin-health-parity-2026-05-10.md`
 - `.github/migration/audits/phase-0-dashboard-admin-health-parity-2026-05-12.md`
 

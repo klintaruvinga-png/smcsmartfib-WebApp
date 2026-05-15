@@ -1,6 +1,12 @@
 # Logs
 logs
 *.log
+*.err.log
+.codex-vite-dev.err.log
+.codex-vite-dev.log
+.codex-vite-mock.err.log
+.codex-vite-mock.log
+build-watchlist.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

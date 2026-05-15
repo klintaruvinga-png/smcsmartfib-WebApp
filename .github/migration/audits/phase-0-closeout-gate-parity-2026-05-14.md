@@ -13,9 +13,9 @@ still outstanding for NAS100, US30, and XAUUSD.
 ## Evidence reviewed
 
 - `.github/migration-status.md`
-- `.github/migration/phase-updates/phase-0-completion-2026-05-14.md`
-- `.github/migration/phase-updates/phase-0-next-actions-2026-05-14.md`
-- `.github/migration/phase-updates/phase0-soak-Final-2026-05-14.md`
+- `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-completion-2026-05-14.md`
+- `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-next-actions-2026-05-14.md`
+- `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase0-soak-Final-2026-05-14.md`
 - `.github/migration/audits/phase-0-full-parity-2026-05-14.md`
 - `reports/copilot-research.md`
 - `reports/codex-plan.md`
@@ -45,5 +45,5 @@ still outstanding for NAS100, US30, and XAUUSD.
 2. Restart the backend so the equity-index off-session logic is active.
 3. Capture live health snapshots for NAS100 and US30 during their active session.
 4. Capture XAUUSD candle readiness after at least 7.5h of post-restart accumulation.
-5. Populate `.github/migration/phase-updates/phase-0-post-fix-validation-checklist-2026-05-14.md`.
+5. Populate `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-post-fix-validation-checklist-2026-05-14.md`.
 6. Only then write the superseding Phase 0 closeout artifact and advance the board.
