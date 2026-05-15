@@ -1779,23 +1779,31 @@ final class SMC_SuperFib_Sniper_REST {
     /**
      * MT5 EA market data ingestion endpoint
      * Accepts live price snapshots and OHLC candles from MT5 Expert Advisor
-     * 
-     * Expected payload:
+     *
+     * Canonical payload (published REST contract):
      * {
+     *   "user_id": 1,
      *   "symbol": "EURUSD",
-     *   "timeframe": "M15",
-     *   "timestamp": "2026-05-04T12:30:00Z",
+     *   "timeframe": "M1",
+     *   "source": "MT5",
+     *   "server_time": "2026-05-11T12:32:10Z",
+     *   "quote_time": "2026-05-11T12:32:09Z",   <- tick timestamp (also accepted as "timestamp")
      *   "bid": 1.08521,
      *   "ask": 1.08534,
-     *   "candle": {
-     *     "time": "2026-05-04T12:30:00Z",
-     *     "open": 1.08450,
-     *     "high": 1.08550,
-     *     "low": 1.08420,
-     *     "close": 1.08510,
-     *     "volume": 1234
-     *   }
+     *   "spread": 1.3,
+     *   "candles": [                              <- array form; also accepted as "candle" (single object)
+     *     { "time": "...", "open": ..., "high": ..., "low": ..., "close": ..., "tick_volume": 123 }
+     *   ]
      * }
+     *
+     * Legacy EA format (MQL5 SMC_MarketDataEA.mq5):
+     *   "timestamp"  instead of "quote_time"
+     *   "candle"     single M1 object (also "candle_m15" for M15)
+     *   "freshness"  LIVE|STALE|CLOSED|DISCONNECTED
+     *   "session"    London|New York|etc.
+     *
+     * Both formats are accepted. quote_time takes precedence over timestamp when both present.
+     * candles[0] is used as M1 when candle object is absent.
      */
     public function post_ea_market_stream(WP_REST_Request $request) {
         global $wpdb;
@@ -1831,7 +1839,24 @@ final class SMC_SuperFib_Sniper_REST {
         // Defence-in-depth alongside the MT5 SymbolNormalizer alias map.
         $symbol = $this->map_symbol_aliases($symbol);
         $timeframe = $this->normalize_mt5_timeframe($payload['timeframe'] ?? 'M15');
-        $snapshot_updated_at = $this->normalize_market_timestamp($payload['timestamp'] ?? null, $this->now_mysql());
+
+        // COMPAT: Accept 'quote_time' (canonical REST contract) as alias for 'timestamp' (legacy EA format).
+        // quote_time takes precedence; falls back to timestamp; falls back to null.
+        $timestamp_raw = $payload['quote_time'] ?? $payload['timestamp'] ?? null;
+        $snapshot_updated_at = $this->normalize_market_timestamp($timestamp_raw, $this->now_mysql());
+
+        // COMPAT: Accept 'candles' array (canonical REST contract) alongside 'candle' object (legacy EA format).
+        // If 'candle' is absent but 'candles' array is present, promote candles[0] as the M1 candle.
+        if (!isset($payload['candle']) && !empty($payload['candles']) && is_array($payload['candles'])) {
+            $first = reset($payload['candles']);
+            if (is_array($first)) {
+                // Map tick_volume → volume if needed (canonical contract uses tick_volume).
+                if (isset($first['tick_volume']) && !isset($first['volume'])) {
+                    $first['volume'] = $first['tick_volume'];
+                }
+                $payload['candle'] = $first;
+            }
+        }
 
         // HARDENING: Separate snapshot-freshness from candle-freshness.
         // The top-level timestamp is the EA's tick time (broker clock). During weekend,
@@ -1840,14 +1865,14 @@ final class SMC_SuperFib_Sniper_REST {
         // Only hard-reject at 300s (5 min) at the payload level; candle staleness is
         // enforced at 180s inside insert_mt5_candle() with a full audit trail.
         // This preserves snapshots during low-liquidity sessions.
-        if (!empty($payload['timestamp'])) {
-            $normalized_payload_timestamp = $this->normalize_market_timestamp($payload['timestamp'], null);
+        if (!empty($timestamp_raw)) {
+            $normalized_payload_timestamp = $this->normalize_market_timestamp($timestamp_raw, null);
             $data_timestamp = $normalized_payload_timestamp ? strtotime($normalized_payload_timestamp) : false;
 
             if ($data_timestamp === false) {
                 $this->audit($user_id, 'ea.market_stream.stale_data_rejected', array(
                     'symbol' => $symbol,
-                    'timestamp' => $payload['timestamp'],
+                    'timestamp' => $timestamp_raw,
                     'normalized_timestamp' => $normalized_payload_timestamp,
                     'reason' => 'unparseable_timestamp',
                     'rejection_level' => 'payload',
@@ -1861,7 +1886,7 @@ final class SMC_SuperFib_Sniper_REST {
             if ($age_seconds > 300) {
                 $this->audit($user_id, 'ea.market_stream.stale_data_rejected', array(
                     'symbol' => $symbol,
-                    'timestamp' => $payload['timestamp'],
+                    'timestamp' => $timestamp_raw,
                     'normalized_timestamp' => $normalized_payload_timestamp,
                     'age_seconds' => $age_seconds,
                     'rejection_level' => 'payload',
@@ -1937,9 +1962,8 @@ final class SMC_SuperFib_Sniper_REST {
                 } else {
                     // HARDENING (BUG-001 2026-05-14): When timestamp is absent, fall back to server
                     // time so the future-candle guard and age staleness guard in insert_mt5_candle()
-                    // are never bypassed. The EA always sends timestamp; this only protects against
-                    // non-standard callers that omit it.
-                    $m1_stream_ts = !empty($payload['timestamp']) ? $payload['timestamp'] : gmdate('c');
+                    // are never bypassed. Uses $timestamp_raw which resolves quote_time|timestamp|null.
+                    $m1_stream_ts = !empty($timestamp_raw) ? $timestamp_raw : gmdate('c');
                     $result = $this->insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $m1_stream_ts);
                     if ($result) {
                         $inserted_candles = 1;
@@ -1989,7 +2013,8 @@ final class SMC_SuperFib_Sniper_REST {
                     error_log("OHLC GUARD: Rejecting M15 candle with invalid OHLC for {$symbol} | O={$candle_m15['open']} H={$candle_m15['high']} L={$candle_m15['low']} C={$candle_m15['close']}");
                 } else {
                     // HARDENING (BUG-001 2026-05-14): Same server-time fallback as M1 block.
-                    $m15_stream_ts = !empty($payload['timestamp']) ? $payload['timestamp'] : gmdate('c');
+                    // Uses $timestamp_raw which resolves quote_time|timestamp|null.
+                    $m15_stream_ts = !empty($timestamp_raw) ? $timestamp_raw : gmdate('c');
                     $result = $this->insert_mt5_candle($user_id, $symbol, '15min', $candle_m15, $m15_stream_ts, 1800);
                     if ($result) {
                         $inserted_candles++;
@@ -2025,7 +2050,7 @@ final class SMC_SuperFib_Sniper_REST {
             'symbol' => $symbol,
             'snapshots_inserted' => $inserted_snapshots,
             'candles_inserted' => $inserted_candles,
-            'timestamp' => $payload['timestamp'] ?? null,
+            'timestamp' => $timestamp_raw,  // resolved from quote_time|timestamp
             'freshness' => $payload['freshness'] ?? null,
             'session' => $payload['session'] ?? null
         ));

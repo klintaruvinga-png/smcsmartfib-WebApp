@@ -1,0 +1,30 @@
+{
+  "snapshot_type": "PRE-PATCH",
+  "workflow_id": "stabilize-ea-2026-05-15",
+  "timestamp": "2026-05-15T04:20:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-WxJFl",
+    "commit_hash": "a237db766c30b8fe6102cc22267d2921717e3f2e",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-15-before-patches"
+  },
+  "planned_patches": [
+    {
+      "id": "PATCH-1",
+      "target_bug": "BUG-001 + BUG-002",
+      "file": "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "description": "Add 'quote_time' as alias for 'timestamp' in post_ea_market_stream handler. Add 'candles' array shim (uses candles[0] as M1 candle when 'candle' absent). Fix audit log to use resolved timestamp. Update docblock."
+    },
+    {
+      "id": "PATCH-2",
+      "target_bug": "BUG-003",
+      "file": "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "description": "Update post_ea_market_stream docblock to document both legacy (timestamp/candle/candle_m15) and canonical (quote_time/source/server_time/candles[]) formats."
+    },
+    {
+      "id": "PATCH-3",
+      "target_bug": "BUG-001 regression protection",
+      "file": "wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php",
+      "description": "Add regression test for quote_time alias: payload using quote_time instead of timestamp must be accepted and correctly processed."
+    }
+  ]
+}
