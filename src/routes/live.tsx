@@ -15,6 +15,7 @@ import { fmtPrice, fmtPct, relTime } from "@/lib/format";
 import { MOCK_MODE } from "@/lib/api/sniperClient";
 import { tickMotionHoldMs, tickMotionStyle } from "@/lib/tickMotion";
 import { cn } from "@/lib/utils";
+import { shouldRenderPendingCard } from "./live.utils";
 import { RefreshCw } from "lucide-react";
 import { useEffect } from "react";
 import type {
@@ -92,10 +93,7 @@ function LivePage() {
         )}
 
         {aligned.map(({ symbol, item: price }) => {
-          const showPending =
-            !price ||
-            (!MOCK_MODE && (price.source !== "mt5" || price.state !== "live")) ||
-            (MOCK_MODE && price.source !== "mock" && price.source !== "mt5");
+          const showPending = shouldRenderPendingCard(price, MOCK_MODE);
           if (showPending) {
             return <PendingCard key={symbol} symbol={symbol} />;
           }

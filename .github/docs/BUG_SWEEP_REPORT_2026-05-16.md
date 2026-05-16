@@ -1,237 +1,118 @@
-# SMC SuperFIB Bug Sweep Report — 2026-05-16
+# Executive Summary
 
-**Workflow ID**: stabilize-ea-2026-05-16  
-**Branch**: claude/nice-fermat-Vv4MK  
-**Date**: 2026-05-16  
-**Performed by**: Stabilization Agent  
-**Plugin Version**: 13.0.3  
-**Phase**: Phase 1 — MT5 Bridge Infrastructure (20%)
+- Report Date: 2026-05-16
+- Phase: Phase 0 - MT5-native stabilization
+- Scanner: Codex automation (`code-bug-fix-and-cleanup`)
+- Scope: Live Radar freshness truth, MT5 market-data timestamp authority, watchlist snapshot integrity, fib/freshness parity spot-checks
+- Overall health: Stable on verified freshness and MT5 authority paths after patching
+- Bugs found this run: 2 confirmed high-severity issues
+- Fixes applied: 2 surgical patches with new regression coverage
+- Remaining risks: full-workspace TypeScript drift outside touched files; regime/signal generation parity not fully re-executed this run
+- Migration readiness: Proceed for scoped freshness-authority surfaces
 
----
+## Summary
 
-## Executive Summary
-
-| Item | Status |
-|------|--------|
-| System Health | **STABLE** |
-| Bugs Found | 1 (LOW severity — Prettier formatting) |
-| Bugs Fixed | 1 (lint auto-fix applied) |
-| Critical Issues | 0 |
-| High Issues | 0 |
-| Remaining Risks | 1 (Phase 1 live MT5 validation pending) |
-| Migration Readiness | Phase 0 COMPLETE — Phase 1 20% (awaiting live bridge validation) |
-| Snapshot Archive | reports/snapshots/stabilize-ea-2026-05-16/ |
-| Rollback Command | `git reset --hard c83222df1fb2d7712377eadcf94b67f7b42e5c42` |
-
-**Overall assessment**: The SMC SuperFIB codebase is in a stable, hardened state entering Phase 1. All Phase 0 blockers were resolved in prior workflow runs. This sweep found zero new architectural, security, or data-integrity issues. One cosmetic lint error was fixed. All checks pass.
-
----
+- Total Issues Found: 2
+- Critical Issues: 0
+- High Priority Issues: 2
+- Medium Priority Issues: 0
+- Low Priority Issues: 0
+- Scoped verification pass rate: 100% of executed suites (7/7)
 
 ## Confirmed Problems
 
-### LINT-001 — Prettier Trailing Comma Errors
+| Severity | Category | Issue | Root Cause | Impact | Blocker |
+|---|---|---|---|---|---|
+| HIGH | Dashboard truth / refresh | Live Radar rendered stale/offline MT5 symbols as `awaiting snapshot` placeholders | `src/routes/live.tsx` treated any non-`live` MT5 row as pending instead of preserving backend state | Operators could miss stale or offline backend truth and misread dead data as missing data | No after patch |
+| HIGH | Backend freshness authority | `SMC_MarketData_Service` persisted server receipt time instead of MT5 payload time for ticks/candles | `wordpress/smc-superfib-sniper/class-market-data-service.php` ignored tick timestamp and partially normalized candles | Freshness age could drift from quote time and create fake-live authority reads on service consumers | No after patch |
 
-| Property | Detail |
-|----------|--------|
-| Severity | LOW |
-| System | Frontend TypeScript |
-| Root Cause | Three return objects/function calls lacked trailing commas after recent Phase 0 patches |
-| Impact | CI lint gate fails; no runtime impact |
-| Files Affected | `scripts/pipeline-watcher.test.mjs`, `src/hooks/useSniperData.watchlist.test.tsx`, `src/lib/api/sniperClient.ts` |
-| Status | **FIXED** |
+## Root Cause / Analysis
 
----
+- The Live Radar route had a UI gating bug, not a backend bug. `PriceCard` already knew how to render stale state, but `LivePage` never let stale/offline MT5 rows reach that renderer.
+- The market-data service had drift from the main plugin’s timestamp hardening. The REST plugin already normalizes MT5 timestamps correctly; the service class lagged behind and could reintroduce quote-time corruption on write paths.
+- No Pine formula, signal math, or backend engine flow rewrites were required.
 
 ## Surgical Fixes Applied
 
-### PATCH-1 — Prettier auto-fix
+| File | Fix |
+|---|---|
+| `src/routes/live.tsx` | Replaced inline pending-card gate with a scoped helper so MT5 stale/offline rows remain visible on Live Radar |
+| `src/routes/live.utils.ts` | Added a focused backend-truth helper for pending-card decisions |
+| `src/routes/-live.test.ts` | Added regression coverage for stale/offline MT5 visibility and true pending fallback |
+| `wordpress/smc-superfib-sniper/class-market-data-service.php` | Normalized MT5 tick/candle timestamps to UTC MySQL format before persistence; snapshot `updated_at` now preserves quote time |
+| `wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php` | Added regression coverage for tick timestamp persistence and canonical M1 candle timestamp normalization |
 
-| Property | Detail |
-|----------|--------|
-| Tool | `npm run lint -- --fix` |
-| Files Changed | 3 (formatting only) |
-| Logic Changed | No |
-| Regression Risk | None |
-| Rollback Tag Before | `rollback/stabilize-ea-2026-05-16-before-patches` |
-| Rollback Tag After | `rollback/stabilize-ea-2026-05-16-after-patch-1` |
-| Commit | `4926afcd2d077dd149ff2f244caaafde1eb79e2d` |
+## Exact Logic Hardened
 
-**Changes**:
-- `scripts/pipeline-watcher.test.mjs:45` — wrap long `isActivePhaseUpdatePath()` call with trailing comma
-- `src/hooks/useSniperData.watchlist.test.tsx:78` — trailing comma on `.includes()` call cast argument
-- `src/lib/api/sniperClient.ts:398` — expand `postWatchlistAdd` return object to multi-line with trailing comma
+- Live Radar now hides cards only when the backend has not emitted an MT5 snapshot yet.
+- MT5 stale/offline prices are no longer collapsed into a generic placeholder.
+- Market-data service writes now preserve MT5 event time rather than server receipt time.
+- MT5 dot-format timestamps (`YYYY.MM.DD HH:MM:SS`) are normalized consistently in the service class.
 
----
+## Regression Protections Added
 
-## EA Integration Status
+- Frontend route regression:
+  - `npx vitest run src/routes/-live.test.ts`
+- Backend service regression:
+  - `php wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php`
 
-| Property | Value |
-|----------|-------|
-| Route | `POST /wp-json/sniper/v1/ea/market-stream` |
-| Auth Model | Shared-secret API key |
-| Required Header | `X-EA-API-Key` (also: `x_ea_api_key`, `X-API-KEY`, `x_api_key`) |
-| Secret Env Var | `SMC_SF_EA_API_KEY` (PHP constant or `getenv()`) |
-| Hash Function | `hash_equals()` — timing-safe |
-| user_id Required | Yes — rejected with 400 if missing, 403 if invalid |
-| wp_set_current_user | Called before returning true |
-| Stale Rejection | Yes — `quote_time` > 300s old → 422 |
-| OHLC Guard | Yes — `high >= max(open,close)` and `low <= min(open,close)` |
-| Epoch Guard | Yes — candle time must be after 2000-01-01 |
-| bid/ask Guard | `is_finite() && > 0 && bid <= ask` |
-| tick_volume Guard | Non-numeric → 0; negative → 0 (audited) |
-| quote_time Alias | `!empty()` test — handles empty-string edge case |
-| candles[] Shim | `candles[0]` promoted to M1 with `tick_volume→volume` mapping |
-| M15 Candle Support | Yes — separate `candle_m15` field with same guards |
-| Phase 1 Bridge Routes | `POST /ea/heartbeat`, `POST /ea/account-sync`, `POST /ea/symbol-sync`, `GET /ea/license-check` — all implemented and regression-covered |
+## Parity Verification Results
 
-### EA Test Commands
+- Fib parity: PASS on executed parity harnesses (`test-fib-parity.php`, `test-htf-authority-anchor.php`, `test-session-anchors.php`, `test-pip-value-parity.php`)
+- Regime parity: Not re-executed end-to-end this run; no regime-calculation code changed
+- Signal parity: Freshness/blocker contract PASS on executed MT5 snapshot contract harness; full signal-generation replay not re-run
+- Freshness parity: PASS on executed Live Radar and MT5 snapshot/service timestamp regressions
 
-```bash
-# Missing token → 401
-curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
-  -H "Content-Type: application/json" \
-  -d '{"user_id":1,"symbol":"EURUSD"}'
+## Verification / Acceptance Criteria
 
-# Invalid token → 403
-curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
-  -H "Content-Type: application/json" \
-  -H "X-EA-API-Key: wrong-token" \
-  -d '{"user_id":1,"symbol":"EURUSD"}'
-
-# Missing user_id → 400
-curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
-  -H "Content-Type: application/json" \
-  -H "X-EA-API-Key: YOUR_TOKEN_HERE" \
-  -d '{"symbol":"EURUSD"}'
-
-# Valid full payload → 200 ok
-curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
-  -H "Content-Type: application/json" \
-  -H "X-EA-API-Key: YOUR_TOKEN_HERE" \
-  -d '{
-    "user_id": 1,
-    "symbol": "EURUSD",
-    "timeframe": "M1",
-    "source": "MT5",
-    "server_time": "2026-05-16T04:10:00Z",
-    "quote_time": "2026-05-16T04:09:59Z",
-    "bid": 1.08521,
-    "ask": 1.08534,
-    "spread": 1.3,
-    "candles": [
-      {
-        "time": "2026-05-16T04:09:00Z",
-        "open": 1.0851,
-        "high": 1.0855,
-        "low": 1.0849,
-        "close": 1.0853,
-        "tick_volume": 123
-      }
-    ]
-  }'
-```
-
----
-
-## Parity Verification
-
-| Check | Status |
-|-------|--------|
-| Pine ↔ Backend Signal | PASS (inherited from `phase-0-pine-backend-parity-2026-05-14.md`) |
-| Backend → Dashboard | PASS (FreshnessBadge reads backend state; VerdictBadge reads backend verdict) |
-| Backend → MT5 payload | PASS (field mapping verified; quote_time alias + candles[] shim applied) |
-| MT5 SymbolNormalizer | PASS (GOLD→XAUUSD, US100→NAS100, DJ30/DOW30→US30, etc.) |
-| useEngineHealth staleTime | PASS (staleTime:0 confirmed in useSniperData.ts:295) |
-| useStreamingTicks truth | PASS (animation only — final tick snaps to exact backend target) |
-| authority-diagnostics 401 | PASS (wp_user permission — correctly 401 for unauthenticated) |
-| Admin routes manage_options | PASS (confirmed in plugin) |
-
----
-
-## Migration Status Update
-
-| Property | Value |
-|----------|-------|
-| Current Phase | 1 — MT5 Bridge Infrastructure |
-| Phase 0 | COMPLETE (gate passed 2026-05-15) |
-| Phase 1 | IN-PROGRESS (20%) |
-
-**Blockers addressed this sweep**: LINT-001 (LOW, cosmetic)
-
-**Remaining Phase 1 blocker**: Live MT5 terminal verification of all 4 bridge routes plus market-stream coexistence (PHASE1-001). Backend routes are implemented and regression-covered — only Track A live execution is missing.
-
----
+- Live Radar must show stale/offline MT5 symbols as their true backend state, not as missing data
+- MT5 market-data persistence must keep quote/candle event time authoritative
+- Watchlist snapshot invalidation must remain intact after the patch set
+- Existing MT5 freshness guards must still degrade stale symbols to `PRICE_STALE`
 
 ## Regression Checklist
 
-| Check | Result |
-|-------|--------|
-| `php -l smc-superfib-sniper.php` | PASS |
-| `php -l class-market-data-service.php` | PASS |
-| `npm run lint` (0 errors) | PASS |
-| `npm run build` | PASS |
-| `npm run check:mql` | PASS |
-| EA route rejects missing X-EA-API-Key | CONFIRMED (401) |
-| EA route rejects invalid X-EA-API-Key | CONFIRMED (403) |
-| EA route rejects missing user_id | CONFIRMED (400) |
-| EA route rejects malformed payload | CONFIRMED (400) |
-| EA route rejects stale quote_time | CONFIRMED (422, >300s) |
-| EA route accepts valid fresh payload | CONFIRMED (200) |
-| Dashboard does not mark stale data as live | CONFIRMED (backend state used) |
-| Signal engine does not run on stale data | CONFIRMED (300s hard-reject) |
-| authority-diagnostics returns 401 for unauthenticated | CONFIRMED (expected behavior) |
-| Admin routes require manage_options | CONFIRMED |
-| No false LIVE states | CONFIRMED (4-day soak evidence from Phase 0) |
+- [x] Live Radar stale/offline visibility test passed
+- [x] Market-data service timestamp persistence test passed
+- [x] MT5 snapshot contract test passed
+- [x] Watchlist snapshot regression test passed
+- [x] Fib parity test passed
+- [x] HTF authority anchor parity test passed
+- [x] Session anchor parity test passed
+- [x] Pip-value regression test passed
+- [ ] Full-workspace TypeScript check clean
 
----
+## Verification Commands
+
+```powershell
+npx vitest run src/routes/-live.test.ts
+php wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php
+php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php
+php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php
+php wordpress/smc-superfib-sniper/tests/php/test-fib-parity.php
+php wordpress/smc-superfib-sniper/tests/php/test-htf-authority-anchor.php
+php wordpress/smc-superfib-sniper/tests/php/test-session-anchors.php
+php wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php
+```
 
 ## Remaining Risks
 
-| Risk | Severity | Owner | Mitigation |
-|------|----------|-------|-----------|
-| Live MT5 bridge validation not yet executed | MEDIUM | Track A | Execute heartbeat/account-sync/symbol-sync/license-check scenarios with live MT5 terminal before Phase 1 gate |
-| 9 pre-existing lint warnings | LOW | Track C | react-hooks/exhaustive-deps warnings in non-critical paths; react-refresh warnings in constants files; no runtime impact |
-| Weekend MT5 behavior not formally tested | LOW | Track A | Deferred from Phase 0; schedule during Phase 1 validation window |
-| Full `tsc --noEmit` pre-existing errors in plan/charts routes | LOW | Track C | Pre-existing TypeScript errors unrelated to bridge or EA paths; tracked separately |
-
----
+- `npx tsc --noEmit` still fails in untouched files:
+  - `src/components/PlanCard.tsx`
+  - `src/routes/-plan.test.tsx`
+  - `src/routes/charts.tsx`
+- Full regime-classification parity and full signal-generation parity were not replayed this run.
+- `SMC_MarketData_Service` and the main plugin still duplicate timestamp normalization logic; future changes must keep them aligned.
 
 ## Safe Deployment Order
 
-1. Merge this branch to `main` (no breaking changes)
-2. Reload WordPress plugin (no schema changes)
-3. Confirm EA heartbeat continues firing after reload
-4. Run `GET /wp-json/sniper/v1/admin/health` to confirm backend is live
-5. Run curl missing-token test to confirm 401 still returned
-6. Proceed with Phase 1 live terminal validation (Track A)
+1. Deploy the backend service timestamp patch first.
+2. Deploy the frontend Live Radar visibility patch.
+3. Run the MT5 snapshot + watchlist regression harnesses in staging.
+4. Confirm stale/offline MT5 symbols visibly degrade in the dashboard before production promotion.
 
----
+## Do Not Touch List
 
-## Rollback Procedure
-
-```bash
-# Emergency rollback to pre-workflow state
-git reset --hard c83222df1fb2d7712377eadcf94b67f7b42e5c42
-
-# Or rollback to main
-git checkout main && git reset --hard origin/main
-
-# All rollback tags
-# snapshot/stabilize-ea-2026-05-16-start-20260516T041151Z
-# rollback/stabilize-ea-2026-05-16-before-patches
-# rollback/stabilize-ea-2026-05-16-after-patch-1
-```
-
----
-
-## Systems Not Touched
-
-- Pine indicator source — no changes
-- Fib engine logic — no changes
-- Regime / chop engine — no changes
-- Signal engine — no changes
-- MT5 execution layer — no changes
-- License / auth system — no changes
-- Database schema — no changes
-- REST API permissions — no changes
-- CORS configuration — no changes
+- Pine trading formulas without a separate parity proof
+- Backend signal-engine decision math in `run_engine_for_symbols` without replay evidence
+- Stale/freshness thresholds in backend authority code without coordinated parity review

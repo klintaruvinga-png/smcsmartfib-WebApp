@@ -37,7 +37,10 @@ class SMC_MarketData_Service
         $ask = (float) $tick['ask'];
         $spread = isset($tick['spread']) ? (int) $tick['spread'] : (int) (($ask - $bid) * 100000);
         $mid = ($bid + $ask) / 2;
-        $timestamp = isset($tick['timestamp']) ? sanitize_text_field($tick['timestamp']) : gmdate('c');
+        $timestamp = $this->normalize_market_timestamp(
+            isset($tick['timestamp']) ? $tick['timestamp'] : null,
+            gmdate('Y-m-d H:i:s')
+        );
 
         return $this->wpdb->replace(
             $this->table_prefix . 'snapshots',
@@ -53,7 +56,7 @@ class SMC_MarketData_Service
                 // HARDENING: explicitly mark MT5-sourced ticks as 'live' so get_cached_price()
                 // does not return state='offline' (the column DEFAULT) for fresh MT5 data.
                 'state' => 'live',
-                'updated_at' => gmdate('Y-m-d H:i:s'),
+                'updated_at' => $timestamp,
             ),
             array('%d', '%s', '%f', '%f', '%f', '%d', '%f', '%s', '%s', '%s')
         ) !== false;
@@ -77,12 +80,10 @@ class SMC_MarketData_Service
         $low = (float) $candle['low'];
         $close = (float) $candle['close'];
         $volume = isset($candle['volume']) ? (int) $candle['volume'] : 0;
-        $timestamp = isset($candle['timestamp']) ? sanitize_text_field($candle['timestamp']) : gmdate('Y-m-d H:i:s');
-
-        // Parse ISO timestamp to MySQL format
-        if (preg_match('/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/', $timestamp)) {
-            $timestamp = gmdate('Y-m-d H:i:s', strtotime($timestamp));
-        }
+        $timestamp = $this->normalize_market_timestamp(
+            isset($candle['timestamp']) ? $candle['timestamp'] : null,
+            gmdate('Y-m-d H:i:s')
+        );
 
         return $this->wpdb->replace(
             $this->table_prefix . 'candles',
@@ -480,5 +481,23 @@ class SMC_MarketData_Service
         if (!$mysql_time)
             return null;
         return gmdate('c', strtotime($mysql_time . ' UTC'));
+    }
+
+    private function normalize_market_timestamp($raw_time, $fallback = null)
+    {
+        $fallback_value = func_num_args() >= 2 ? $fallback : gmdate('Y-m-d H:i:s');
+        if ($raw_time === null || $raw_time === '') {
+            return $fallback_value;
+        }
+
+        $value = trim((string) $raw_time);
+        $value = preg_replace('/^(\d{4})\.(\d{2})\.(\d{2})/', '$1-$2-$3', $value);
+
+        if (!preg_match('/([+-]\d{2}:\d{2}|Z)\s*$/', $value)) {
+            $value .= 'Z';
+        }
+
+        $ts = strtotime($value);
+        return $ts !== false ? gmdate('Y-m-d H:i:s', $ts) : $fallback_value;
     }
 }
