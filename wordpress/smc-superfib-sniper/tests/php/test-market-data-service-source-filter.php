@@ -10,6 +10,15 @@ if (!class_exists('TestWpdb')) {
         public $prefix = 'wp_';
         public $tables = array();
 
+        public function replace($table, $data, $formats = array()) {
+            if (!isset($this->tables[$table])) {
+                $this->tables[$table] = array();
+            }
+            $key = $this->row_key($table, $data);
+            $this->tables[$table][$key] = $data;
+            return 1;
+        }
+
         public function get_row($query, $output = ARRAY_A) {
             if (preg_match("/SELECT \\* FROM ([^ ]+) WHERE user_id = (\\d+) AND symbol = '([^']+)' AND source = '([^']+)' ORDER BY updated_at DESC LIMIT 1/", $query, $m)) {
                 $table = $m[1];
@@ -87,6 +96,16 @@ if (!class_exists('TestWpdb')) {
             }
             return $out;
         }
+
+        private function row_key($table, $data) {
+            if (substr($table, -9) === 'snapshots') {
+                return $data['user_id'] . '|' . $data['symbol'];
+            }
+            if (substr($table, -7) === 'candles') {
+                return $data['user_id'] . '|' . $data['symbol'] . '|' . $data['timeframe'] . '|' . $data['candle_time'];
+            }
+            return uniqid('row_', true);
+        }
     }
 }
 
@@ -131,6 +150,7 @@ function assert_same($expected, $actual, $message) {
 
 $service = new SMC_MarketData_Service();
 $snapshotTable = $wpdb->prefix . 'smc_sf_snapshots';
+$candleTable = $wpdb->prefix . 'smc_sf_candles';
 
 $wpdb->tables[$snapshotTable] = array(
     array(
@@ -174,5 +194,33 @@ assert_same('2026-05-12T08:05:00+00:00', $mt5Snapshot['updated_at'], 'Market dat
 $mt5Authority = $service->get_authority_state(7, 'GBPUSD');
 assert_same('unavailable', $mt5Authority['authority'], 'Authority state should remain unavailable without MT5 candle history even when an MT5 snapshot exists');
 assert_true(is_array($mt5Authority['price']), 'Authority state should still surface the MT5 snapshot after source filtering');
+
+assert_true(
+    $service->store_tick_snapshot(7, 'EURUSD', array(
+        'bid' => 1.1010,
+        'ask' => 1.1012,
+        'spread' => 2,
+        'timestamp' => '2026-05-16T08:15:30Z',
+    )),
+    'store_tick_snapshot should accept MT5 tick payloads'
+);
+$storedTick = $wpdb->tables[$snapshotTable]['7|EURUSD'] ?? null;
+assert_true(is_array($storedTick), 'store_tick_snapshot must persist the MT5 snapshot row');
+assert_same('2026-05-16 08:15:30', $storedTick['updated_at'] ?? null, 'store_tick_snapshot must persist the MT5 quote timestamp instead of server receipt time');
+
+assert_true(
+    $service->store_candle_m1(7, 'EURUSD', array(
+        'timestamp' => '2026.05.16 08:15:00',
+        'open' => 1.1005,
+        'high' => 1.1015,
+        'low' => 1.1001,
+        'close' => 1.1011,
+        'volume' => 12,
+    )),
+    'store_candle_m1 should accept MT5 candle payloads'
+);
+$storedCandle = $wpdb->tables[$candleTable]['7|EURUSD|1min|2026-05-16 08:15:00'] ?? null;
+assert_true(is_array($storedCandle), 'store_candle_m1 must persist the canonical M1 candle row');
+assert_same('2026-05-16 08:15:00', $storedCandle['candle_time'] ?? null, 'store_candle_m1 must normalize MT5 candle timestamps to UTC MySQL format');
 
 fwrite(STDOUT, 'market data service source filter checks passed' . PHP_EOL);
