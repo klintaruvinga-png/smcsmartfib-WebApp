@@ -515,7 +515,7 @@ public:
         double balance      = AccountInfoDouble(ACCOUNT_BALANCE);
         double equity       = AccountInfoDouble(ACCOUNT_EQUITY);
         double margin       = AccountInfoDouble(ACCOUNT_MARGIN);
-        double freeMargin   = AccountInfoDouble(ACCOUNT_FREEMARGIN);
+        double freeMargin   = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
         long   leverage     = AccountInfoInteger(ACCOUNT_LEVERAGE);
         int    tradeAllowed = (int)AccountInfoInteger(ACCOUNT_TRADE_ALLOWED);
         int    connected    = (int)TerminalInfoInteger(TERMINAL_CONNECTED);
