@@ -39,6 +39,10 @@ int    g_rawSymCount = 0;
 bool   g_configValid = true;
 int    g_warnCounter = 0;
 
+// Heartbeat throttle: SendHeartbeat() fires every HEARTBEAT_INTERVAL_TICKS OnTimer() calls.
+int    g_heartbeatTickCount     = 0;
+int    g_heartbeatIntervalTicks = 48;
+
 bool IsBlankInput(string value)
 {
     StringTrimLeft(value);
@@ -201,6 +205,19 @@ int OnInit()
         return INIT_FAILED;
     }
 
+    // REGRESSION GUARD: license-check inversion is a hard failure mode.
+    // Gate reads: if (!SendLicenseCheck()) → INIT_FAILED.
+    // NOT: if (SendLicenseCheck()) → INIT_FAILED.
+    if (!engine.SendLicenseCheck())
+    {
+        Print("[EA] License check denied or timed out. EA will not start.");
+        return INIT_FAILED;
+    }
+
+    // Initial telemetry sync — soft gates, failure does not block startup.
+    engine.SendAccountSync();
+    engine.SendSymbolSync(g_symArray, g_symCount);
+
     EventSetTimer(TimerSec);
     if (!g_configValid)
     {
@@ -237,6 +254,15 @@ void OnTimer()
                   ". Update Inputs and re-attach the EA.");
         }
         return;
+    }
+
+    // Heartbeat throttle — soft gate, fires every g_heartbeatIntervalTicks invocations.
+    // Counter resets to 0 after firing regardless of heartbeat success.
+    g_heartbeatTickCount++;
+    if (g_heartbeatTickCount >= g_heartbeatIntervalTicks)
+    {
+        g_heartbeatTickCount = 0;
+        engine.SendHeartbeat();
     }
 
     // Poll all non-chart symbols so their freshness state stays accurate.

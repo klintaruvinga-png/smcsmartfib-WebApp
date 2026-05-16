@@ -1,224 +1,300 @@
-# Phase 0 Closeout Verification & Phase 1 Roadmap Research
+# EA Side Routes Phase 1 Bridge Implementation — Research Report
 
-**Research Date**: 2026-05-15  
-**Researcher**: Copilot (intake stage)  
-**Issue**: Phase 0 Close out docs are in. verify closeout, check codebase for Phase 1 status, create Phase 1 roadmaps, trackers and checklist. Complete task with a docs merge and prune to declutter repo.
-
----
-
-## 1. Issue Classification
-
-- **Severity**: HIGH
-- **Category**: migration-governance / documentation
-- **Layer(s) affected**: migration-system / repo-organization / project-management / all-phases
-- **Phase impact**: Phase 0 completion / Phase 1 preparation / Cross-phase
+## 1. Issue classification
+- **Severity:** CRITICAL
+- **Category:** wiring, data-contract, migration-governance
+- **Layer(s) affected:** MT5 EA (MQL5), PHP-backend REST-API, workflow
+- **Phase impact:** Phase 1 (blocks phase progression to live validation)
 
 ---
 
-## 2. Confirmed Evidence
+## 2. Confirmed evidence
 
-### Phase 0 Closeout Status
+### Backend Routes — All Implemented and Tested
+- **Route implementations confirmed in:** [smc-superfib-sniper.php](wordpress/smc-superfib-sniper/smc-superfib-sniper.php#L478-L498)
+  - `POST /ea/heartbeat` — Appends `engine_runs` row, stores account telemetry
+  - `POST /ea/account-sync` — Stores EA bridge state under `smc_sf_account_snapshots` JSON blob
+  - `POST /ea/symbol-sync` — Persists to dedicated `smc_sf_symbol_sync` table with upsert semantics
+  - `GET /ea/license-check` — Operational auth gate using EA API-key + user_id
 
-**Official closeout artifact**: `.github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md`
-- **Gate decision**: PASSED
-- **Completion date**: 2026-05-15 16:37 UTC
-- **All success criteria**: Met (100% on all 11 criteria)
-- **Final validation**: NAS100 (29,263.70 LIVE), US30 (49,756.00 LIVE), XAUUSD (4,556.34 LIVE)
-- **Backend soak metrics**: 259,464 engine runs / 0 errors / 69,262 candles over 24h
-- **Parity status**: 100% on Pine/backend/dashboard/watchlist audited surfaces
+- **Test coverage:** All backend routes have PHP unit tests at `wordpress/smc-superfib-sniper/tests/php/`:
+  - [test-ea-heartbeat.php](wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php) — PASS
+  - [test-ea-account-sync.php](wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php) — PASS
+  - [test-ea-symbol-sync.php](wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php) — PASS
+  - [test-ea-license-check.php](wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php) — PASS
 
-**Key blockers resolved**:
-1. NAS100/US30 equity-session freshness — resolved 2026-05-15 with SessionManager fix
-2. XAUUSD candle-history readiness — resolved 2026-05-15 with SymbolNormalizer GOLD alias
-3. Frontend feed-status chip lag (BUG-001) — resolved with `staleTime: 0` on useEngineHealth()
-4. Watchlist persistence defects — resolved with post_user_settings() and hook regression coverage
+- **Auth contract confirmed:** All routes use `permission_ea_bridge` permission callback, expecting:
+  - Header: `X-EA-API-Key` matching `SMC_SF_EA_API_KEY` env var
+  - Payload field: `user_id` (WordPress user ID)
 
-**Files changed for Phase 0 closeout**:
-- `src/hooks/useSniperData.ts` — feed-status fix
-- `src/hooks/useSniperData.test.tsx` — regression test
-- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` — watchlist mutation response fix
-- `src/hooks/useSniperData.watchlist.test.tsx` — Vitest watchlist regression suite
-- `mt5/SymbolNormalizer.mqh` — GOLD alias update
-- `wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php` — PHP watchlist harness
-- `wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php` — EA market stream tests
+- **Baseline route working:** `POST /ea/market-stream` already implemented and called from EA at:
+  - [MarketDataEngine.mqh line 357](mt5/MarketDataEngine.mqh#L357) inside `SendToBackend()` function
+  - Current httpStatus: 422 (payload validation — freshness gate rejecting old candles, route is reachable)
 
-### Phase 1 Status (Current)
+### MT5 EA Side — Critical Gaps
 
-**Status board**: `.github/migration-status.md` (updated 2026-05-15)
-- **Progress**: 20% complete
-- **Target completion**: 2026-06-01
-- **Current blocker**: Live bridge validation pending (heartbeat, account-sync, symbol-sync, market-stream)
-- **Owners**: Track A (MT5 EA) + Track B (Backend)
+**Confirmed missing implementations:**
+1. **`GET /ea/license-check`** — Not called during EA OnInit()
+2. **`POST /ea/heartbeat`** — Not called from EA OnTimer()
+3. **`POST /ea/account-sync`** — Not called from EA OnInit() or OnTimer()
+4. **`POST /ea/symbol-sync`** — Not called from EA OnInit()
 
-**Deliverables - Completed**:
-- [x] Backend APIs: `POST /ea/heartbeat`, `POST /ea/account-sync`, `POST /ea/symbol-sync`, `GET /ea/license-check`
+**Current EA structure (from [SMC_MarketDataEA.mq5](mt5/SMC_MarketDataEA.mq5)):**
+- `OnInit()` at line 119: Validates config, resolves symbols, calls `engine.Initialize()`, sets timer. **No license gate.**
+- `OnTimer()` at line 200: Polls non-chart symbols, calls `engine.OnPeriodic()`. **Heartbeat/account-sync missing.**
+- `OnTick()` at line 192: Passes tick to engine. (No changes needed.)
 
-**Deliverables - Pending**:
-- [ ] MT5 Bridge EA: heartbeat, account sync, symbol sync, terminal telemetry
-- [ ] Live terminal verification: heartbeat stability (48h+), reconnect handling, session validation
+**MarketDataEngine structure (from [MarketDataEngine.mqh](mt5/MarketDataEngine.mqh)):**
+- `OnPeriodic()` at line 120: Already calls `SendToBackend()` for market-stream (working).
+- `SendToBackend()` at line 320: Handles WebRequest retry logic (3 attempts, 150ms between retries).
+- No methods exist for license-check, heartbeat, account-sync, or symbol-sync.
 
-**Success criteria**:
-- Heartbeat stable for 48h+
-- No dropped sessions
-- Automatic reconnect working
-- All test checklist items (terminal restart, VPS restart, internet interruption, duplicate protection, invalid license rejection)
+### Payload Contracts — All Defined in Tests
 
-### Documentation Status
+**License-check (GET):**
+```
+Input: account_id, terminal_id, ea_version (optional)
+Output: { "ok": true, "allowed": true|false, "status": "...", ... }
+Action on denied: Return INIT_FAILED
+```
+Source: [test-ea-license-check.php](wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php)
 
-**Phase 0 documents**: 49 files identified across `.github/migration/phase-updates/` and `.github/migration/audits/`
-- **Primary closeout**: `phase0-soak-closeout-final-2026-05-15.md` (replaces earlier versions)
-- **Superseded documents** (can be archived):
-  - `phase0-soak-Final-2026-05-14.md`
-  - `phase-0-completion-2026-05-14.md`
-  - `phase-0-focused-validation-attempt-2026-05-14.md`
-  - `phase-0-post-fix-validation-checklist-2026-05-14.md`
-  - `phase-0-next-actions-2026-05-14.md`
-  - `phase-0-next-72h-checklist-2026-05-11.md`
-  - `phase-0-soak-summary-2026-05-11.md`
-- **Active parity audits** (keep): `phase-0-watchlist-persistence-parity-2026-05-15.md`, `phase-0-full-parity-2026-05-14.md`, `phase-0-pine-backend-parity-2026-05-14.md`, etc.
+**Heartbeat (POST):**
+```
+Input: account_id, terminal_id, broker, broker_server, ea_version, terminal_build, connected, timestamp
+Output: { "ok": true, "received": true, "status": "live", "server_time": "..." }
+Softness: Log warning on error; continue (soft gate)
+```
+Source: [test-ea-heartbeat.php](wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php)
 
-**Phase 1 documentation**: Missing
-- No Phase 1 roadmap document exists
-- No Phase 1 tracker/checklist exists
-- No Phase 1 success criteria details exist beyond migration-status.md summary
-- Phase 2 and beyond: Similar pattern (summary in migration-status.md but no detailed roadmaps)
+**Account-sync (POST):**
+```
+Input: account_id, terminal_id, broker, broker_server, currency, balance, equity, margin, 
+       free_margin, leverage, trade_allowed, connected, ea_version, terminal_build, timestamp
+Output: { "ok": true, "synced": true, "account_id": "...", "terminal_id": "...", "server_time": "..." }
+Persistence: smc_sf_account_snapshots.data.eaBridge.accounts[account_id|terminal_id]
+```
+Source: [test-ea-account-sync.php](wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php)
 
-**Docs to declutter**:
-- Multiple Phase 0 snapshot folders in `reports/snapshots/` (5+ dated directories) — can be archived/consolidated
-- Build/test log files in root: `.codex-vite-dev.err.log`, `.codex-vite-dev.log`, `.codex-vite-mock.err.log`, `.codex-vite-mock.log` — candidate for cleanup
-- `phase3_mt5_simulation_test.php` in root (likely test artifact) — can be moved to tests/ directory
-- `build-watchlist.log` in root — candidate for cleanup
-- `stratupdate.md` in root — unclear purpose, candidate for review/archive
-
-**Root-level documentation** (keep):
-- `README.md` — main project documentation
-- `CLAUDE.md` — Claude coding contract
-- `PHASE2_IMPLEMENTATION.md` — Phase 2 technical reference
-- `PHASE3_TESTING_GUIDE.md` — Phase 3 testing procedures
-- `MT5_CANONICAL_MARKET_SPEC.md` — architecture reference
-- `SMC_SuperFib_v13.1.3.pine` — Pine indicator source
-- `.github/copilot-instructions.md` — workflow governance
-
-### Codebase Phase 1 Evidence
-
-**MT5 Bridge implementation status** (from `mt5/` directory):
-- [x] TickProcessor.mqh — tick ingestion (complete)
-- [x] CandleBuilder.mqh — M1 candle construction (complete)
-- [x] SessionManager.mqh — session awareness (complete)
-- [x] FreshnessEngine.mqh — freshness states (complete)
-- [x] SymbolNormalizer.mqh — canonicalization (complete, GOLD alias added 2026-05-15)
-- [x] MarketDataEngine.mqh — core engine (complete)
-- [ ] SMC_MarketDataEA.mq5 — live terminal validation pending
-
-**Backend bridge APIs** (from Phase 1 status):
-- [x] POST /ea/heartbeat
-- [x] POST /ea/account-sync
-- [x] POST /ea/symbol-sync
-- [x] GET /ea/license-check
-
-**Dashboard phase 1 work**: Not scheduled (Phase 1 is MT5+backend only; dashboard work deferred to Phase 2)
+**Symbol-sync (POST):**
+```
+Input: account_id, terminal_id, broker, broker_server, timestamp, symbols: [
+  { broker_symbol, normalized_symbol, base_symbol, visible, selected, digits, point, 
+    contract_size, trade_mode, min_lot, max_lot, lot_step, spread, 
+    currency_profit, currency_margin }
+]
+Output: { "ok": true, "synced": true, "symbols_received": N, "symbols_upserted": N }
+Persistence: smc_sf_symbol_sync (upsert by user_id + account_id + terminal_id + broker_symbol)
+```
+Source: [test-ea-symbol-sync.php](wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php)
 
 ---
 
-## 3. Root Cause Hypothesis
+## 3. Root cause hypothesis
 
-**Confirmed**:
-- Phase 0 gate was passed on 2026-05-15 with all success criteria met
-- Phase 1 is currently active but at 20% (backend APIs complete; EA live validation pending)
-- Documentation is scattered: Phase 0 closeout completed but not consolidated; Phase 1-10 lack detailed roadmaps/trackers
-- Repository root contains temporary/test artifacts cluttering the workspace
+**Most likely root cause: Incomplete Phase 1 task subdivision**
+- **Confirmed:** Backend routes are complete, tested, and ready to accept WebRequest calls.
+- **Hypothesis:** Phase 1 delivery was split into two independent tracks:
+  - **Track A (Backend):** Implement PHP routes ✅ DONE (PR #185 merged 2026-05-15)
+  - **Track B (MT5 EA):** Implement WebRequest calls in MQL5 ⚠️ NOT YET STARTED
+- **Why this fits:** The Phase 1 bridge implementation report at [phase-1-ea-bridge-implementation-report.md](reports/phase-1-ea-bridge-implementation-report.md#L113) explicitly states:
+  > "Known limitations: No MT5 EA file changes were made in this patch. Backend routes are live, but EA callers still need staging verification against the new endpoints. Next recommended step: Run staging Phase 1 bridge verification with a real MT5 terminal..."
 
-**Hypothesis**:
-- The issue is primarily **documentation governance** and **repo organization**, not a technical blocker
-- Phase 1 can proceed to live terminal validation without documentation changes
-- However, the lack of detailed Phase 1 roadmap/tracker/checklist increases risk of unclear ownership, sequencing, and acceptance criteria
-- Repository cluttering (test logs, temporary artifacts) reduces discoverability and increases noise
+- **What triggered this:** The user's issue submission identifies the exact 4 missing routes by comparing the backend route inventory against the EA side evidence.
 
----
-
-## 4. Blast Radius
-
-### Files Affected by Documentation Consolidation
-
-**Phase 0 docs to consolidate**:
-- Superseded Phase 0 checkpoints: 8 files can be archived to `.github/migration/archive/`
-- Phase 0 audit trail: Keep latest parity audits; consolidate earlier snapshots
-- PHASE0_SOAK_TRACKER.md: Review whether active soak logging is still needed; may be historic
-
-**Phase 1 docs to create** (new):
-- `.github/migration/PHASE1_BRIDGE_ROADMAP.md` — detailed technical plan (5–7 sections)
-- `.github/migration/PHASE1_TRACKER.md` — live status board (replaces inline status in migration-status.md)
-- `.github/migration/PHASE1_CHECKLIST.md` — task breakdown for teams and acceptance criteria
-
-**Repository root to clean**:
-- Log files: `.codex-vite-dev.err.log`, `.codex-vite-dev.log`, `.codex-vite-mock.err.log`, `.codex-vite-mock.log` → move to `.artifacts/logs/` or .gitignore
-- Test artifact: `phase3_mt5_simulation_test.php` → move to appropriate test directory
-- Unknown: `stratupdate.md` → review and either document or archive
-
-**Every system reading or depending on Phase 0/1 migration docs**:
-- `.github/agents/migration-project-manager.agent.md` — auto-ingests reports from `.github/migration/audits/` and `.github/migration/phase-updates/`
-- `.github/migration-status.md` — currently serves as single source of truth; Phase 1 detailed plan is missing
-- Scripts: `scripts/pipeline-watcher.js` — monitors git branches and phase progression
-- Teams: Track A (MT5 EA), Track B (Backend), Track C (Dashboard) — need clear Phase 1 roadmap to prevent stalled work
-
-**Parity surfaces at risk**:
-- None direct; this is pure documentation. But unclear Phase 1 plan increases risk of wiring gaps or missed acceptance criteria during implementation.
+**Why the gap exists (Hypothesis):**
+- Backend delivery required database schema changes, route registration, handler logic, and comprehensive test coverage (higher complexity).
+- MT5 EA delivery is primarily engineering scaffolding: extend MarketDataEngine with 4 new methods, wire them into OnInit/OnTimer, collect telemetry fields from the MT5 API.
+- Both are prerequisites for Phase 1 validation window (heartbeat continuity 48h+, account/symbol metadata parity).
 
 ---
 
-## 5. Regression Surface
+## 4. Blast radius
 
-**What currently working behavior could break**:
-1. **Pipeline automation**: If `.github/migration/phase-updates/` structure changes, the pipeline watcher may fail to auto-ingest reports. Keep folder structure stable.
-2. **Migration-status.md ingestion**: If the format of phase summary tables changes, automated parsing could break.
-3. **Archive folder**: If archived Phase 0 docs are referenced by scripts, breakage. Need to audit references first.
+### Files directly affected (MT5 EA side):
 
-**Existing guards**:
-- `.github/agents/migration-project-manager.agent.md` — auto-ingests and parses reports; resilient to file renaming if folder structure preserved
-- `.smc-workflow-state.json` — workflow lock prevents conflicting edits during planning phase (currently RESEARCHING)
-- Phase gates in `.github/migration-status.md` — prevent Phase 2+ advancement until Phase 1 complete
+1. **[mt5/MarketDataEngine.mqh](mt5/MarketDataEngine.mqh)**
+   - Add public method `SendLicenseCheck()` — call from OnInit
+   - Add public method `SendHeartbeat()` — call from OnTimer
+   - Add public method `SendAccountSync()` — call from OnInit and periodically from OnTimer
+   - Add public method `SendSymbolSync()` — call from OnInit
+   - Each method builds JSON payload and calls WebRequest (reusing existing retry/error logic in `SendToBackend()` as template)
 
-**Tests covering this area**:
-- `scripts/pipeline-watcher.test.mjs` — tests report ingestion and phase gate logic
-- No tests for doc structure validation (could add to prevent future regressions)
+2. **[mt5/SMC_MarketDataEA.mq5](mt5/SMC_MarketDataEA.mq5)**
+   - `OnInit()` at line 119: Add license-check gate before `EventSetTimer()`
+   - `OnInit()` at line 119: Add account-sync and symbol-sync calls after symbols are resolved
+   - `OnTimer()` at line 200: Add heartbeat call (every 30-60 seconds configurable)
+   - Add module-level timer variable to throttle heartbeat to avoid spam
+
+### Files read but not modified (validation only):
+
+- [wordpress/smc-superfib-sniper/smc-superfib-sniper.php](wordpress/smc-superfib-sniper/smc-superfib-sniper.php) — Backend routes are ready; no changes needed
+- [wordpress/smc-superfib-sniper/tests/php/test-ea-*](wordpress/smc-superfib-sniper/tests/php/) — Backend tests are passing; no changes needed
+
+### Parity surfaces at risk:
+
+1. **License validation truth:** EA startup now gated by backend license-check response. If license-check returns `allowed=false`, EA must not proceed. Dashboard must not try to connect to an EA that failed license-check.
+
+2. **Heartbeat truth:** Backend `engine_runs` table now records explicit heartbeat rows. Dashboard monitoring must understand that heartbeat absence = disconnection.
+
+3. **Account metadata truth:** Backend now stores account state from EA (balance, equity, leverage, etc.). Dashboard must use this authoritative copy, not stale cached values. Reconciliation needed: What happens if balance changes without account-sync? Does dashboard freeze or refresh?
+
+4. **Symbol metadata truth:** Backend now has broker-specific symbol specs (digits, point, min_lot, max_lot, spread). Dashboard must use this for trade calculation. Parity risk: If EA sends symbol-sync with spread=10 but actual spread is 12, dashboard calculations diverge.
+
+### Sequence dependencies:
+
+- License-check **must** complete before `EventSetTimer()` or EA initialization fails (blocking gate).
+- Account-sync **should** complete before market-stream loop starts (metadata freshness).
+- Symbol-sync **should** complete before market-stream loop starts (metadata freshness).
+- Heartbeat **should** be called periodically (every 30-60 sec) to maintain session continuity.
+
+### Cache invalidation risks:
+
+- None currently visible. Heartbeat and account-sync are append/update semantics, not cache displacement.
 
 ---
 
-## 6. Resolution Path Options
+## 5. Regression surface
 
-### Path A: Narrow Consolidation (Documentation Only)
+### Existing behaviors that must not break:
 
-**Scope**: Phase 0 closeout consolidation + Phase 1 roadmap/tracker creation
-1. Archive Phase 0 superseded checkpoints (8 files) → `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/`
-2. Create `PHASE1_BRIDGE_ROADMAP.md` — detailed plan extracted from migration-status.md + EA implementation status
-3. Create `PHASE1_TRACKER.md` — live status board with ownership, dates, blockers
-4. Create `PHASE1_CHECKLIST.md` — task breakdown per team (Track A, B, C specifics)
-5. Update migration-status.md to reference new docs (no structural change)
-6. Leave repository root temp artifacts as-is (low priority)
+1. **Market-stream WebRequest flow** ([MarketDataEngine.mqh line 320-410](mt5/MarketDataEngine.mqh#L320))
+   - Retry logic (3 attempts, 150ms backoff) — must remain unchanged
+   - Header caching (built once in Initialize, reused on every send) — must remain unchanged
+   - JSON payload structure — must remain unchanged
+   - httpStatus evaluation (200/201 = success) — must remain unchanged
 
-**Effort**: 3–4 hours  
-**Risk**: Low; pure documentation, no code changes  
-**Benefit**: Phase 1 teams have clear roadmap; pipeline automation unaffected
+2. **OnInit symbol resolution** ([SMC_MarketDataEA.mq5 line 119](mt5/SMC_MarketDataEA.mq5#L119))
+   - Symbol lookup order (configured → broker → market watch selected) — must remain unchanged
+   - ResolveBrokerSymbol() — must be called before new routes attempt to send telemetry
 
-### Path B: Full Repository Cleanup (Documentation + Artifacts)
+3. **OnTimer tick poll loop** ([SMC_MarketDataEA.mq5 line 200](mt5/SMC_MarketDataEA.mq5#L200))
+   - Poll order (all symbols except chart symbol) — must remain unchanged
+   - Chart symbol handled by OnTick() — must remain unchanged
+   - engine.OnPeriodic() call order — must remain after symbol poll (so freshness is current)
 
-**Scope**: Path A + repository decluttering
-1. All Phase A actions
-2. Move test logs (`.codex-*.log*`) to `.artifacts/logs/`
-3. Move `phase3_mt5_simulation_test.php` to `wordpress/smc-superfib-sniper/tests/php/`
-4. Archive or delete `stratupdate.md` after review
-5. Consolidate `reports/snapshots/` into single archive folder
-6. Add `.gitignore` rules to prevent future log spillage in root
-7. Update `.github/docs/` structure if needed for consistency
+4. **TimeToIso8601() UTC conversion** ([MarketDataEngine.mqh line 430](mt5/MarketDataEngine.mqh#L430))
+   - All payloads (market-stream, heartbeat, account-sync, symbol-sync, license-check) must use consistent UTC timestamp format
+   - Current implementation: broker-local time − broker offset = UTC, then format as YYYY-MM-DDTHH:MM:SSZ
+   - Must NOT change to TimeGMT() directly (breaks compatibility with DST/offset-aware brokers)
 
-**Effort**: 5–6 hours  
-**Risk**: Medium; moving files could break hardcoded references in scripts or CI pipelines (need audit first)  
-**Benefit**: Cleaner repo; improved discoverability; reduced noise
+5. **Auth header construction** ([SMC_MarketDataEA.mq5 line 153](mt5/SMC_MarketDataEA.mq5#L153))
+   - Header format: `"X-EA-API-Key: " + ApiKey`
+   - Must match backend expectation: `get_header('x_ea_api_key')`
+   - All new routes must include this header in WebRequest cachedHeaders
 
-### Recommended: Path A + Selective Path B
+### Guard rails protecting existing code:
 
-**Why**:
-- Phase 1 roadmap creation is high-priority; teams need clarity now (Path A critical)
+- **FreshnessEngine** (phase-2 code) — reads freshness state, not affected by heartbeat changes
+- **CandleBuilder** (phase-2 code) — reads candles, not affected by account/symbol sync changes
+- **SessionManager** (phase-2 code) — reads session state, not affected by EA route changes
+- **SymbolNormalizer** (common code) — used by all routes, must remain thread-safe
+
+### Tests covering existing behavior (keep passing):
+
+- [test-ea-market-stream.php](wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php) — PASS (backend only, no EA changes needed)
+- [test-mt5-snapshot-contract.php](wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php) — PASS (backend only)
+
+---
+
+## 6. Resolution path options
+
+### Path A — Narrow Implementation (Recommended)
+
+**Surface:** Add 4 new methods to MarketDataEngine.mqh + wire into OnInit/OnTimer in SMC_MarketDataEA.mq5
+
+**Scope:**
+1. `MarketDataEngine::SendLicenseCheck()` — GET request, blocking return
+2. `MarketDataEngine::SendHeartbeat()` — POST request, soft error handling
+3. `MarketDataEngine::SendAccountSync()` — POST request, soft error handling
+4. `MarketDataEngine::SendSymbolSync()` — POST request, soft error handling
+5. SMC_MarketDataEA.mq5 OnInit: Add license-check gate + account-sync + symbol-sync calls
+6. SMC_MarketDataEA.mq5 OnTimer: Add heartbeat call with throttle counter
+
+**Rationale:**
+- All payload contracts are defined and tested in PHP tests.
+- Retry logic, error handling, and WebRequest patterns already exist in SendToBackend().
+- No database changes needed (backend already ready).
+- No new module-level state (reuse existing engine, symbolNormalizer, etc.).
+- Minimal risk of breaking market-stream path (new methods are independent).
+- Can be delivered in single commit + single PR.
+
+**Estimated complexity:** 400–600 lines of MQL5 code
+
+### Path B — Broader Structural Approach
+
+**Surface:** Refactor MarketDataEngine to support typed WebRequest wrappers + middleware for auth/retry/logging
+
+**Scope:**
+- Extract WebRequest retry logic into reusable `WebRequestWrapper()` helper
+- Create `PayloadBuilder` class to encapsulate JSON construction for each route type
+- Add telemetry collection (AccountInfo, SymbolInfo) as separate module
+- Add route registry (license-check, heartbeat, account-sync, symbol-sync URLs)
+- Refactor SendToBackend() and new methods to use WebRequestWrapper
+- Add dedicated error logger to distinguish route failures by type
+
+**Rationale:**
+- Improves testability (mock WebRequestWrapper instead of WebRequest directly)
+- Centralizes URL management (easier to change backend endpoints during migration)
+- Reduces duplicate code (retry logic shared across all 5 routes)
+- Supports future routes without repeating patterns
+
+**Risk:** Additional complexity may mask issues in the narrow path; not justified for Phase 1 gate delivery.
+
+### Recommended: Path A
+
+**Why:** Phase 1 is a blocking gate for validation window. Path A delivers the exact 4 missing routes with minimal risk, using existing patterns. Path B improves architecture but delays delivery and adds refactoring risk. After Phase 1 closes, Path B refactoring can be considered for Phase 2+ hardening.
+
+---
+
+## 7. Risk flags
+
+- **High-risk system involved:** YES
+  - Reason: License check gates EA startup. If logic is inverted (denying when allowed), EA won't start. If logic is missing, unlicensed EAs could run unchecked. Requires careful testing: allowed=true → continue, allowed=false → return INIT_FAILED.
+
+- **Requires parity re-validation:** YES
+  - Which engine: Account/symbol metadata engine (Phase 2+)
+  - Why: Dashboard must reconcile heartbeat presence/absence, account balance changes, symbol spread changes. Stale-state risk if EA sends old account snapshot or if account-sync is delayed.
+  - Validation: Run 48h+ soak with account balance changes mid-session. Dashboard must reflect balance update within 5 min of account-sync push.
+
+- **Migration-blocking:** YES
+  - Which phase gate: Phase 1 → Phase 2 transition
+  - Why: Phase 1 closure requires "all five routes working together for validation window". Without these 4 routes, heartbeat continuity cannot be measured, account metadata cannot be validated, and symbol metadata cannot be verified. Phase 2 depends on this foundation.
+
+- **Human review required before merge:** YES
+  - Why: WebRequest auth header must match backend expectation exactly. License-check gate logic must be inverted correctly (allowed=true → continue, allowed=false → INIT_FAILED). Heartbeat throttle interval must be appropriate (30-60 sec, not 1 sec spam or 10 min stale).
+
+---
+
+## 8. Handoff package
+
+### Epicentre files to inspect first:
+1. [mt5/MarketDataEngine.mqh](mt5/MarketDataEngine.mqh) — Add 4 new Send*() methods
+2. [mt5/SMC_MarketDataEA.mq5](mt5/SMC_MarketDataEA.mq5) — Wire OnInit/OnTimer calls
+3. [wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php](wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php) — Payload schema
+4. [wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php](wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php) — Payload schema
+5. [wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php](wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php) — Payload schema
+
+### Inputs Codex must verify before planning:
+1. **License-check gate logic:** Read backend permission_ea_bridge callback and handler. Confirm exact response structure (ok, allowed, status fields). Codex must implement: if allowed=false, return INIT_FAILED immediately.
+2. **Heartbeat interval:** Verify backend expectation. User guidance says "30-60 seconds". Codex must choose interval, add module-level counter, throttle calls accordingly.
+3. **Account telemetry availability:** Codex must query MT5 API (AccountInfoDouble/Integer) to collect balance, equity, margin, leverage during OnInit and OnTimer. Confirm API calls available on every MT5 build (4150+).
+4. **Symbol telemetry availability:** Codex must query SymbolInfoInteger/Double for digits, point, min_lot, max_lot, spread. Confirm available for all symbols in g_symArray[] during OnInit.
+5. **Existing WebRequest timeout:** Current market-stream uses 5000ms timeout. Codex must decide if new routes (smaller payloads) can use shorter timeout or must match 5000ms for consistency.
+6. **Timestamp consistency:** Verify that TimeToIso8601(TimeCurrent()) is called consistently by all new routes. No mixing TimeCurrent() vs TimeGMT().
+
+### Open unknowns that could invalidate current hypothesis:
+1. **Do all MT5 builds support AccountInfo* and SymbolInfo* for telemetry?** Current EA targets "MT5 4150+". Research confirms. Codex should verify no unsupported builds are in use.
+2. **Can WebRequest be called from OnInit() without hanging?** Currently called from OnTimer() only (periodic). Codex should test: Can license-check call WebRequest during OnInit() without blocking symbol resolution? Hypothesis: Yes, but needs verification.
+3. **What is the expected heartbeat response time?** Backend handler is synchronous. Codex should assume 100–500ms. If heartbeat WebRequest times out frequently, this could block OnTimer and freeze market-stream. Should timeout be shorter (2000ms) to avoid blocking?
+4. **Is there a trade-off between license-check blocking vs. soft-start?** Current guidance: "return INIT_FAILED if denied". But what if license-check times out? Should EA wait 3 attempts (450ms) or fail fast? Guidance in issue suggests hard gate (fail if denied OR timeout).
+5. **Does symbol-sync need to batch all symbols or send individually?** Test shows batch (array of symbols). But if there are 100+ symbols and batch request times out, should EA fall back to per-symbol requests? Current guidance: "Batch or individual: TBD (report doesn't specify; likely batch for efficiency)".
+
+---
+
+## 9. Summary
+
+Phase 1 EA Bridge implementation is blocked by a single task: wire 4 missing WebRequest calls into the MT5 EA. Backend is complete, tested, and passing. MT5 EA has the foundational infrastructure (MarketDataEngine, OnInit/OnTimer hooks, auth header, WebRequest retry patterns, UTC timestamp conversion) to support the new routes. All payload schemas are defined and tested. No new databases or architectural changes needed. Implementation is straightforward engineering using existing patterns. Risk is contained to MT5 EA module; no impact on dashboard, backend routes, or Phase 2 code. Requires careful testing of license-check gate logic and heartbeat throttling before merge.
 - Full cleanup (Path B) is lower-risk if done carefully but requires script audit first (deferred)
 - Compromise: Execute Path A immediately; queue Path B for a separate story after Phase 1 planning complete
 
