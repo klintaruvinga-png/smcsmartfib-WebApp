@@ -75,7 +75,9 @@ describe("watchlist persistence", () => {
     apiMocks.postWatchlistAdd.mockImplementation(async (symbol: string) => {
       backendSettings = {
         ...backendSettings,
-        watchlist: backendSettings.watchlist.includes(symbol as DashboardSettings["watchlist"][number])
+        watchlist: backendSettings.watchlist.includes(
+          symbol as DashboardSettings["watchlist"][number],
+        )
           ? backendSettings.watchlist
           : [...backendSettings.watchlist, symbol as DashboardSettings["watchlist"][number]],
       };

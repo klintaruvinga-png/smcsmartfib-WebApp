@@ -1,0 +1,106 @@
+{
+  "snapshot_type": "INITIAL",
+  "workflow_id": "stabilize-ea-2026-05-16",
+  "timestamp": "2026-05-16T04:11:51Z",
+  "git": {
+    "branch": "claude/nice-fermat-Vv4MK",
+    "commit_hash": "c83222df1fb2d7712377eadcf94b67f7b42e5c42",
+    "remote": "origin",
+    "uncommitted_changes_count": 0
+  },
+  "repo_structure": {
+    "plugin_root": "wordpress/smc-superfib-sniper",
+    "plugin_files": [
+      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "wordpress/smc-superfib-sniper/class-market-data-service.php"
+    ],
+    "rest_route_files": [
+      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php"
+    ],
+    "frontend_api_client": "src/lib/api/sniperClient.ts",
+    "mt5_ea_files": [
+      "mt5/SMC_MarketDataEA.mq5",
+      "mt5/CandleBuilder.mqh",
+      "mt5/FreshnessEngine.mqh",
+      "mt5/MarketDataEngine.mqh",
+      "mt5/SessionManager.mqh",
+      "mt5/SymbolNormalizer.mqh",
+      "mt5/TickProcessor.mqh"
+    ],
+    "migration_files": [
+      ".github/migration-status.md",
+      ".github/migration/PHASE1_TRACKER.md",
+      ".github/migration/PHASE1_CHECKLIST.md",
+      ".github/migration/PHASE1_BRIDGE_ROADMAP.md",
+      ".github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md"
+    ]
+  },
+  "app_state": {
+    "workflow_state_file_exists": false,
+    "workflow_state": {},
+    "migration_status": {
+      "current_phase": "1 (MT5 Bridge Infrastructure)",
+      "overall_progress": "50%",
+      "status": "Phase 0 COMPLETE — Phase 1 active (20%)",
+      "blockers": [
+        "Live MT5 terminal verification pending for /ea/license-check, /ea/heartbeat, /ea/account-sync, /ea/symbol-sync"
+      ]
+    }
+  },
+  "known_dev_status": {
+    "authority_diagnostics_requires_wp_session": true,
+    "ea_market_stream_route_exists": true,
+    "ea_auth_header": "X-EA-API-Key",
+    "ea_auth_secret_env": "SMC_SF_EA_API_KEY",
+    "ea_payload_requires_user_id": true,
+    "migration_phase": "MT5-native migration / Phase 1 bridge infrastructure",
+    "plugin_version": "13.0.3",
+    "rest_namespace": "sniper/v1",
+    "build_status": "PASSING",
+    "php_syntax": "PASSING",
+    "mql_check": "PASSING"
+  },
+  "rest_routes_confirmed": [
+    { "path": "/health",                  "method": "GET",    "auth": "public" },
+    { "path": "/session",                 "method": "GET",    "auth": "public" },
+    { "path": "/admin/health",            "method": "GET",    "auth": "manage_options" },
+    { "path": "/admin/soak-report",       "method": "GET",    "auth": "manage_options" },
+    { "path": "/admin/soak-evidence",     "method": "POST",   "auth": "manage_options" },
+    { "path": "/admin/soak-checkpoint",   "method": "POST",   "auth": "manage_options" },
+    { "path": "/snapshot",                "method": "GET",    "auth": "wp_user" },
+    { "path": "/snapshot",                "method": "POST",   "auth": "wp_user" },
+    { "path": "/charts",                  "method": "GET",    "auth": "wp_user" },
+    { "path": "/regimes",                 "method": "GET",    "auth": "wp_user" },
+    { "path": "/regime",                  "method": "POST",   "auth": "wp_user" },
+    { "path": "/live-signals",            "method": "GET",    "auth": "wp_user" },
+    { "path": "/signal",                  "method": "POST",   "auth": "wp_user" },
+    { "path": "/ladders",                 "method": "GET",    "auth": "wp_user" },
+    { "path": "/user/engine-batch",       "method": "POST",   "auth": "wp_user" },
+    { "path": "/user/market-data",        "method": "POST",   "auth": "wp_user" },
+    { "path": "/user/trades",             "method": "GET",    "auth": "wp_user" },
+    { "path": "/user/trades",             "method": "POST",   "auth": "wp_user" },
+    { "path": "/user/account",            "method": "GET",    "auth": "wp_user" },
+    { "path": "/user/account",            "method": "POST",   "auth": "wp_user" },
+    { "path": "/user/settings",           "method": "GET",    "auth": "wp_user" },
+    { "path": "/user/settings",           "method": "POST",   "auth": "wp_user" },
+    { "path": "/user/risk-profile",       "method": "GET",    "auth": "wp_user" },
+    { "path": "/user/risk-profile",       "method": "POST",   "auth": "wp_user" },
+    { "path": "/user/trade-queue",        "method": "GET",    "auth": "wp_user" },
+    { "path": "/user/trade-queue",        "method": "POST",   "auth": "wp_user" },
+    { "path": "/user/execute-signals",    "method": "POST",   "auth": "wp_user" },
+    { "path": "/user/twelve-data-key",    "method": "POST",   "auth": "wp_user" },
+    { "path": "/user/twelve-data-key",    "method": "DELETE", "auth": "wp_user" },
+    { "path": "/user/watchlist",          "method": "GET",    "auth": "wp_user" },
+    { "path": "/user/watchlist",          "method": "POST",   "auth": "wp_user" },
+    { "path": "/user/watchlist/add",      "method": "POST",   "auth": "wp_user" },
+    { "path": "/user/watchlist/remove",   "method": "POST",   "auth": "wp_user" },
+    { "path": "/instruments",             "method": "GET",    "auth": "wp_user" },
+    { "path": "/market-data-authority",   "method": "GET",    "auth": "wp_user" },
+    { "path": "/authority-diagnostics",   "method": "GET",    "auth": "wp_user (401 unauthenticated — expected)" },
+    { "path": "/ea/market-stream",        "method": "POST",   "auth": "ea_api_key + user_id" },
+    { "path": "/ea/heartbeat",            "method": "POST",   "auth": "ea_api_key + user_id" },
+    { "path": "/ea/account-sync",         "method": "POST",   "auth": "ea_api_key + user_id" },
+    { "path": "/ea/symbol-sync",          "method": "POST",   "auth": "ea_api_key + user_id" },
+    { "path": "/ea/license-check",        "method": "GET",    "auth": "ea_api_key + user_id" }
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "snapshot_type": "FINDINGS",
+  "workflow_id": "stabilize-ea-2026-05-16",
+  "timestamp": "2026-05-16T04:11:51Z",
+  "confirmed_issues": [
+    {
+      "id": "LINT-001",
+      "severity": "LOW",
+      "system": "Frontend TypeScript",
+      "description": "3 Prettier trailing-comma formatting errors in sniperClient.ts and useSniperData.watchlist.test.tsx",
+      "root_cause": "Prettier trailing-comma rule not applied consistently after recent patches added return objects without trailing commas.",
+      "impact_zones": ["Build quality", "CI lint gate"],
+      "proposed_fix": "Run npm run lint -- --fix to auto-fix all 3 prettier/prettier errors",
+      "status": "FIXED"
+    }
+  ],
+  "non_issues_confirmed": [
+    {
+      "item": "EA market-stream route",
+      "status": "CONFIRMED CORRECT",
+      "detail": "POST /sniper/v1/ea/market-stream exists, uses permission_ea_bridge, validates X-EA-API-Key via hash_equals, requires user_id, calls wp_set_current_user, rejects stale>300s with 422, validates OHLC, epoch guards candles."
+    },
+    {
+      "item": "authority-diagnostics 401",
+      "status": "CONFIRMED EXPECTED",
+      "detail": "Route uses permission_user (WordPress session). 401 for unauthenticated is correct — do NOT make it public."
+    },
+    {
+      "item": "Admin route protection",
+      "status": "CONFIRMED CORRECT",
+      "detail": "All /admin/* routes require manage_options capability."
+    },
+    {
+      "item": "EA API key header aliases",
+      "status": "CONFIRMED CORRECT",
+      "detail": "All 4 variants accepted: x-ea-api-key, x_ea_api_key, x-api-key, x_api_key."
+    },
+    {
+      "item": "quote_time alias",
+      "status": "CONFIRMED CORRECT",
+      "detail": "Uses !empty() not ?? to correctly handle empty-string edge case. Patched 2026-05-15."
+    },
+    {
+      "item": "candles[] array shim",
+      "status": "CONFIRMED CORRECT",
+      "detail": "candles[0] promoted to M1 candle with tick_volume→volume mapping. Patched 2026-05-15."
+    },
+    {
+      "item": "FreshnessBadge truth",
+      "status": "CONFIRMED CORRECT",
+      "detail": "Reads state prop from backend payload — no local age computation."
+    },
+    {
+      "item": "VerdictBadge truth",
+      "status": "CONFIRMED CORRECT",
+      "detail": "Reads verdict from backend signal object."
+    },
+    {
+      "item": "useEngineHealth staleTime",
+      "status": "CONFIRMED CORRECT",
+      "detail": "staleTime: 0 confirmed in useSniperData.ts:295. BUG-001 from Phase 0 closeout resolved."
+    },
+    {
+      "item": "SymbolNormalizer.mqh aliases",
+      "status": "CONFIRMED CORRECT",
+      "detail": "GOLD→XAUUSD, US100→NAS100, DJ30/DOW30→US30 all present. Patched 2026-05-14."
+    },
+    {
+      "item": "PHP syntax",
+      "status": "CONFIRMED CLEAN",
+      "detail": "Both PHP files pass php -l with no errors."
+    },
+    {
+      "item": "MQL5 includes",
+      "status": "CONFIRMED CLEAN",
+      "detail": "npm run check:mql passes."
+    },
+    {
+      "item": "Build",
+      "status": "CONFIRMED PASSING",
+      "detail": "npm run build succeeds."
+    },
+    {
+      "item": "Bid <= ask spread guard",
+      "status": "CONFIRMED CORRECT",
+      "detail": "Handler checks bid > 0 && ask > 0 && bid <= ask before accepting snapshot — spread is always non-negative."
+    },
+    {
+      "item": "useStreamingTicks purpose",
+      "status": "CONFIRMED NON-ISSUE",
+      "detail": "Client-side animation only. The final sub-tick always snaps to the exact backend target. No signal truth impact."
+    },
+    {
+      "item": "Phase 1 bridge routes",
+      "status": "CONFIRMED IMPLEMENTED",
+      "detail": "POST /ea/heartbeat, POST /ea/account-sync, POST /ea/symbol-sync, GET /ea/license-check all present. PHP regression tests pass. Live MT5 validation pending."
+    }
+  ],
+  "migration_blockers": [
+    {
+      "id": "PHASE1-001",
+      "phase": "Phase 1",
+      "description": "Live MT5 terminal verification pending for /ea/license-check, /ea/heartbeat, /ea/account-sync, /ea/symbol-sync, and /ea/market-stream coexistence",
+      "status": "OPEN — requires Track A execution with live terminal",
+      "validation_required": true
+    }
+  ],
+  "statistics": {
+    "total_issues": 1,
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 1,
+    "migration_blockers": 1
+  }
+}
