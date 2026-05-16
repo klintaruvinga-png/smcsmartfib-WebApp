@@ -28,19 +28,23 @@ Read these files fully before touching code:
 
 ## Execution steps
 
+**CRITICAL ORDER — do not reorder steps 1–5. The pre-commit hook will reject any commit
+if reports/codex-implementation.md is absent or incomplete.**
+
 1. Read both input files completely before editing.
 2. If the contract is ambiguous, resolve only the smallest safe interpretation and record that choice in your implementation summary.
 3. Create the required branch provided in runtime context.
-4. Apply the contract in the planned sequence. Keep each change surgical.
-5. Add or update tests exactly as required by the contract.
+4. Apply the contract in the planned sequence. Keep each change surgical. Add or update tests exactly as required by the contract.
+5. **Write reports/codex-implementation.md NOW** — immediately after the code changes,
+   before running any validation, before generating any reports, and before `git commit`.
+   All seven required sections must be present (see below). This file must be staged
+   in the same commit as the code changes.
 6. Run every validation named in the contract.
 7. Generate a bug sweep report when the issue affects runtime integrity, stale-data paths, wiring, or backend/dashboard truth:
    - `.github/docs/BUG_SWEEP_REPORT_[YYYY-MM-DD]_[short-slug].md`
 8. Generate a parity audit when the contract requires parity re-validation:
    - `.github/migration/audits/phase-[X]-[engine]-parity-[YYYY-MM-DD].md`
-9. Write the implementation summary to:
-   - `reports/codex-implementation.md`
-10. Commit the work, push the branch, and open a normal PR.
+9. Commit the work (reports/codex-implementation.md must be included), push the branch, and open a normal PR.
 
 ## Stop conditions
 

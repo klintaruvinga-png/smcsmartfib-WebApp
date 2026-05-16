@@ -47,6 +47,10 @@ const POLL_INTERVAL_MS = 5000;
 const CLAUDE_TIMEOUT_MS = 900000; // 15 min — larger research reports need more time
 const CODEX_TIMEOUT_MS = 1800000; // 30 min — complex implementations regularly exceed 15 min
 const LOCK_STALE_MS = 30 * 60 * 1000;
+
+// The exact watcher-generated failure reason string for a missing implementation report.
+// Used to distinguish "report missing but PR exists" (recoverable) from other failures.
+const REASON_NO_IMPL_REPORT = "Codex implementation finished without reports/codex-implementation.md";
 // Plan hardening retry policy: up to 3 attempts, 5 min between each.
 // After MAX_HARDENING_RETRIES failures the block becomes permanent and a
 // GitHub issue is filed so the human is notified without manual log review.
@@ -1157,6 +1161,106 @@ function runCodexImplementation(state) {
   });
 }
 
+// Recovery path: Codex created a branch + PR but exited before writing the report.
+// Runs a targeted Claude session on the existing branch to write only the report,
+// then commits and pushes it so the watcher can advance to IMPLEMENTATION_COMPLETE.
+// Called from evaluatePipeline() when state is IMPLEMENTATION_FAILED with the
+// specific REASON_NO_IMPL_REPORT reason and an open PR is confirmed.
+function runReportRecovery(state, issueSlug, prNumber) {
+  withPipelineLock("report-recovery", () => {
+    log(
+      `Report-only recovery: PR #${prNumber} exists for codex/${issueSlug} but implementation report is missing`,
+    );
+
+    // Build a short, focused prompt — avoids the context exhaustion that caused the original failure.
+    const branchName = `codex/${issueSlug}`;
+    const prompt = [
+      "You are recovering from a Codex pipeline failure. The code changes are already committed",
+      `on branch '${branchName}' and PR #${prNumber} is open. The only missing artifact is`,
+      "'reports/codex-implementation.md'.",
+      "",
+      "Your ONLY task:",
+      `1. Run: git checkout ${branchName}`,
+      "2. Read the git diff on this branch: git diff main...HEAD -- (look at changed files)",
+      "3. Read reports/codex-plan.md to understand the issue and contract",
+      "4. Write reports/codex-implementation.md with ALL seven required sections:",
+      "   - Issue summary",
+      "   - Root cause implemented",
+      "   - Exact files changed",
+      "   - Tests run",
+      "   - Reports generated",
+      "   - Remaining risks",
+      "   - Any contract ambiguities resolved during implementation",
+      "5. Stage and commit the report: git add reports/codex-implementation.md && git commit -m 'docs: add missing implementation report'",
+      "6. Push: git push",
+      "",
+      "Do NOT re-implement any code. Do NOT create a new PR. Do NOT modify any files except",
+      "reports/codex-implementation.md.",
+      "",
+      `Current issue: ${state.issue}`,
+    ].join("\n");
+
+    const promptFile = path.join(REPO_ROOT, "reports", "codex-report-recovery.tmp.md");
+    fs.writeFileSync(promptFile, prompt, "utf8");
+
+    const previousImplementationMtime = statMtime(IMPLEMENTATION_FILE);
+    const previousOutputMtime = statMtime(CODEX_OUTPUT_FILE);
+
+    try {
+      const codexBin = process.platform === "win32" ? "codex.cmd" : "codex";
+      const cmd = [
+        `"${codexBin}"`,
+        "exec",
+        "--json",
+        "--dangerously-bypass-approvals-and-sandbox",
+        "-C",
+        `"${REPO_ROOT}"`,
+        "-o",
+        `"${CODEX_OUTPUT_FILE}"`,
+        "-",
+        "<",
+        `"${promptFile}"`,
+      ].join(" ");
+
+      execSync(cmd, {
+        cwd: REPO_ROOT,
+        shell: true,
+        windowsHide: true,
+        timeout: 300000, // 5 min — short task, just the report
+        stdio: ["ignore", "inherit", "inherit"],
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      log(`Report recovery Codex session failed: ${message}`);
+      // Do not flip to IMPLEMENTATION_FAILED again — the PR still exists and
+      // the failure is logged. The watcher will retry on the next cycle.
+      return;
+    } finally {
+      try {
+        fs.unlinkSync(promptFile);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    // Validate that the recovery actually wrote the report.
+    const validationFailure = validateImplementationRun(
+      previousImplementationMtime,
+      previousOutputMtime,
+    );
+    if (validationFailure) {
+      log(`Report recovery completed but validation still fails: ${validationFailure.reason}`);
+      log("Manual intervention required: write reports/codex-implementation.md by hand.");
+      return;
+    }
+
+    writeImplementationMetadata(state);
+    clearImplementationFailedState();
+    markImplementationComplete(state);
+    log(`Report recovery succeeded - PR #${prNumber} now has a valid implementation report`);
+  });
+}
+
 function evaluatePipeline() {
   const state = readState();
   if (!state) {
@@ -1251,11 +1355,21 @@ function evaluatePipeline() {
       return;
     }
 
-    // Self-heal: if an open PR exists for this issue, Codex finished its work
-    // before the execSync wrapper timed out. Advance to IMPLEMENTATION_COMPLETE
-    // so the watcher can wait for the PR to be merged normally.
     const openPr = checkOpenPR(issueSlug);
     if (openPr) {
+      // Special case: Codex wrote the code + PR but skipped the implementation report.
+      // Advancing directly to IMPLEMENTATION_COMPLETE would bypass the report requirement.
+      // Instead, run a short targeted recovery session to write the report onto the branch.
+      if (state.implementation_failure_reason === REASON_NO_IMPL_REPORT) {
+        log(
+          `PR #${openPr.number} exists but implementation report is missing - running report-only recovery`,
+        );
+        runReportRecovery(state, issueSlug, openPr.number);
+        return;
+      }
+
+      // For any other failure reason (e.g. timeout after all work completed), an open PR
+      // means Codex finished before the execSync wrapper expired — safe to advance.
       log(
         `Open PR #${openPr.number} found for codex/${issueSlug} despite recorded failure - advancing to IMPLEMENTATION_COMPLETE`,
       );

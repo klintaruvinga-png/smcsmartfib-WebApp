@@ -35,6 +35,11 @@ private:
     // Cached constant headers — built once in Initialize(), reused every send.
     string   cachedHeaders;
 
+    // Base REST URL derived from webhookUrl (strips the route suffix).
+    // Used by SendLicenseCheck, SendHeartbeat, SendAccountSync, SendSymbolSync.
+    string   baseUrl;
+    string   eaVersion;
+
 public:
     MarketDataEngine()
     {
@@ -48,6 +53,8 @@ public:
         authHeader       = "";
         wpUserId         = 0;
         cachedHeaders    = "";
+        baseUrl          = "";
+        eaVersion        = "1.00";
         ArrayInitialize(lastSentCandleM1, 0);
     }
 
@@ -74,6 +81,11 @@ public:
         webhookUrl = url;
         authHeader = auth;
         wpUserId   = userId;
+
+        // Derive base REST URL by stripping everything from the first /ea/ segment onward.
+        // webhookUrl = "https://site/wp-json/sniper/v1/ea/market-stream" → baseUrl = ".../v1"
+        int eaPos = StringFind(url, "/ea/");
+        baseUrl = (eaPos > 0) ? StringSubstr(url, 0, eaPos) : url;
 
         // Force symbol selection and pre-warm broker history for every tracked symbol.
         // Without SymbolSelect() MT5 may have no M1 history loaded, causing CopyRates()
@@ -379,6 +391,250 @@ public:
 
         Print("SMC_MarketDataEA send failed for ", symbol, " (all 3 attempts)"
               " | lastStatus=", lastStatus);
+        return false;
+    }
+
+    // ---- EA bridge routes (Phase 1) ----
+    // Helper: extract last path component of TERMINAL_DATA_PATH as terminal_id.
+    // Returns the hex identifier MT5 uses (e.g. "D91A3F56...") with no path separators.
+    string GetTerminalId()
+    {
+        string termPath = TerminalInfoString(TERMINAL_DATA_PATH);
+        string termId   = termPath;
+        for (int i = StringLen(termPath) - 1; i >= 0; i--)
+        {
+            ushort ch = StringGetCharacter(termPath, i);
+            if (ch == '\\' || ch == '/')
+            {
+                termId = StringSubstr(termPath, i + 1);
+                break;
+            }
+        }
+        return termId;
+    }
+
+    // GET /ea/license-check — hard gate: returns false if denied OR all attempts fail.
+    // Caller (OnInit) must return INIT_FAILED when this returns false.
+    // Uses 3-attempt / 150ms backoff matching SendToBackend().
+    bool SendLicenseCheck()
+    {
+        if (StringLen(baseUrl) == 0)
+            return false;
+
+        string termId    = GetTerminalId();
+        long   accountId = AccountInfoInteger(ACCOUNT_LOGIN);
+        string url       = baseUrl + "/ea/license-check"
+                         + "?account_id=" + IntegerToString(accountId)
+                         + "&terminal_id=" + termId
+                         + "&ea_version="  + eaVersion;
+
+        char   emptyBody[];
+        char   result[];
+        string responseHeaders;
+
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            int httpStatus = WebRequest("GET", url, cachedHeaders, 5000,
+                                        emptyBody, result, responseHeaders);
+            if (httpStatus == 200)
+            {
+                string body = CharArrayToString(result, 0, -1, CP_UTF8);
+                if (StringFind(body, "\"allowed\":true") >= 0)
+                {
+                    Print("[LicenseCheck] License check passed.");
+                    return true;
+                }
+                Print("[LicenseCheck] License denied by backend: ", body);
+                return false;
+            }
+            Print("[LicenseCheck] Attempt ", attempt + 1, " failed | httpStatus=", httpStatus);
+            Sleep(150);
+        }
+
+        Print("[LicenseCheck] Timed out or unreachable after 3 attempts - treating as denied.");
+        return false;
+    }
+
+    // POST /ea/heartbeat — soft gate: logs warning on failure, never halts.
+    // One attempt only to avoid blocking OnTimer() symbol poll loop.
+    bool SendHeartbeat()
+    {
+        if (StringLen(baseUrl) == 0)
+            return false;
+
+        string termId       = GetTerminalId();
+        long   accountId    = AccountInfoInteger(ACCOUNT_LOGIN);
+        string broker       = AccountInfoString(ACCOUNT_COMPANY);
+        string brokerServer = AccountInfoString(ACCOUNT_SERVER);
+        int    termBuild    = (int)TerminalInfoInteger(TERMINAL_BUILD);
+        int    connected    = (int)TerminalInfoInteger(TERMINAL_CONNECTED);
+        string timestamp    = TimeToIso8601(TimeCurrent());
+
+        string json = "{";
+        json += "\"account_id\":"      + IntegerToString(accountId) + ",";
+        json += "\"terminal_id\":\""   + termId                     + "\",";
+        json += "\"broker\":\""        + broker                     + "\",";
+        json += "\"broker_server\":\"" + brokerServer               + "\",";
+        json += "\"ea_version\":\""    + eaVersion                  + "\",";
+        json += "\"terminal_build\":"  + IntegerToString(termBuild) + ",";
+        json += "\"connected\":"       + IntegerToString(connected) + ",";
+        json += "\"timestamp\":\""     + timestamp                  + "\"";
+        json += "}";
+
+        char   postData[];
+        char   result[];
+        string responseHeaders;
+        StringToCharArray(json, postData, 0, StringLen(json));
+
+        int httpStatus = WebRequest("POST", baseUrl + "/ea/heartbeat",
+                                    cachedHeaders, 5000, postData, result, responseHeaders);
+        if (httpStatus == 200)
+        {
+            Print("[Heartbeat] OK.");
+            return true;
+        }
+
+        string body = CharArrayToString(result, 0, -1, CP_UTF8);
+        Print("[Heartbeat] WARNING: failed | httpStatus=", httpStatus,
+              " | response=", StringLen(body) > 0 ? body : "(empty)");
+        return false;
+    }
+
+    // POST /ea/account-sync — soft gate: logs warning on failure, never halts.
+    // One attempt to avoid blocking startup.
+    bool SendAccountSync()
+    {
+        if (StringLen(baseUrl) == 0)
+            return false;
+
+        string termId       = GetTerminalId();
+        long   accountId    = AccountInfoInteger(ACCOUNT_LOGIN);
+        string broker       = AccountInfoString(ACCOUNT_COMPANY);
+        string brokerServer = AccountInfoString(ACCOUNT_SERVER);
+        string currency     = AccountInfoString(ACCOUNT_CURRENCY);
+        double balance      = AccountInfoDouble(ACCOUNT_BALANCE);
+        double equity       = AccountInfoDouble(ACCOUNT_EQUITY);
+        double margin       = AccountInfoDouble(ACCOUNT_MARGIN);
+        double freeMargin   = AccountInfoDouble(ACCOUNT_FREEMARGIN);
+        long   leverage     = AccountInfoInteger(ACCOUNT_LEVERAGE);
+        int    tradeAllowed = (int)AccountInfoInteger(ACCOUNT_TRADE_ALLOWED);
+        int    connected    = (int)TerminalInfoInteger(TERMINAL_CONNECTED);
+        int    termBuild    = (int)TerminalInfoInteger(TERMINAL_BUILD);
+        string timestamp    = TimeToIso8601(TimeCurrent());
+
+        string json = "{";
+        json += "\"account_id\":"      + IntegerToString(accountId)    + ",";
+        json += "\"terminal_id\":\""   + termId                        + "\",";
+        json += "\"broker\":\""        + broker                        + "\",";
+        json += "\"broker_server\":\"" + brokerServer                  + "\",";
+        json += "\"currency\":\""      + currency                      + "\",";
+        json += "\"balance\":"         + DoubleToString(balance, 2)    + ",";
+        json += "\"equity\":"          + DoubleToString(equity, 2)     + ",";
+        json += "\"margin\":"          + DoubleToString(margin, 2)     + ",";
+        json += "\"free_margin\":"     + DoubleToString(freeMargin, 2) + ",";
+        json += "\"leverage\":"        + IntegerToString(leverage)     + ",";
+        json += "\"trade_allowed\":"   + IntegerToString(tradeAllowed) + ",";
+        json += "\"connected\":"       + IntegerToString(connected)    + ",";
+        json += "\"ea_version\":\""    + eaVersion                     + "\",";
+        json += "\"terminal_build\":"  + IntegerToString(termBuild)    + ",";
+        json += "\"timestamp\":\""     + timestamp                     + "\"";
+        json += "}";
+
+        char   postData[];
+        char   result[];
+        string responseHeaders;
+        StringToCharArray(json, postData, 0, StringLen(json));
+
+        int httpStatus = WebRequest("POST", baseUrl + "/ea/account-sync",
+                                    cachedHeaders, 5000, postData, result, responseHeaders);
+        if (httpStatus == 200)
+        {
+            Print("[AccountSync] OK.");
+            return true;
+        }
+
+        string body = CharArrayToString(result, 0, -1, CP_UTF8);
+        Print("[AccountSync] WARNING: failed | httpStatus=", httpStatus,
+              " | response=", StringLen(body) > 0 ? body : "(empty)");
+        return false;
+    }
+
+    // POST /ea/symbol-sync — soft gate: sends single batch for all resolved symbols.
+    // Must be called after ResolveBrokerSymbol() completes in OnInit().
+    bool SendSymbolSync(string &symArray[], int count)
+    {
+        if (StringLen(baseUrl) == 0 || count == 0)
+            return false;
+
+        string termId       = GetTerminalId();
+        long   accountId    = AccountInfoInteger(ACCOUNT_LOGIN);
+        string broker       = AccountInfoString(ACCOUNT_COMPANY);
+        string brokerServer = AccountInfoString(ACCOUNT_SERVER);
+        string timestamp    = TimeToIso8601(TimeCurrent());
+
+        string json = "{";
+        json += "\"account_id\":"      + IntegerToString(accountId) + ",";
+        json += "\"terminal_id\":\""   + termId                     + "\",";
+        json += "\"broker\":\""        + broker                     + "\",";
+        json += "\"broker_server\":\"" + brokerServer               + "\",";
+        json += "\"timestamp\":\""     + timestamp                  + "\",";
+        json += "\"symbols\":[";
+
+        for (int s = 0; s < count; s++)
+        {
+            string sym         = symArray[s];
+            string norm        = symbolNormalizer.NormalizeSymbol(sym);
+            int    visible     = (int)SymbolInfoInteger(sym, SYMBOL_SELECT);
+            int    digits      = (int)SymbolInfoInteger(sym, SYMBOL_DIGITS);
+            double point       = SymbolInfoDouble(sym, SYMBOL_POINT);
+            double contractSz  = SymbolInfoDouble(sym, SYMBOL_TRADE_CONTRACT_SIZE);
+            int    tradeMode   = (int)SymbolInfoInteger(sym, SYMBOL_TRADE_MODE);
+            double minLot      = SymbolInfoDouble(sym, SYMBOL_VOLUME_MIN);
+            double maxLot      = SymbolInfoDouble(sym, SYMBOL_VOLUME_MAX);
+            double lotStep     = SymbolInfoDouble(sym, SYMBOL_VOLUME_STEP);
+            int    spread      = (int)SymbolInfoInteger(sym, SYMBOL_SPREAD);
+            string currProfit  = SymbolInfoString(sym, SYMBOL_CURRENCY_PROFIT);
+            string currMargin  = SymbolInfoString(sym, SYMBOL_CURRENCY_MARGIN);
+
+            if (s > 0) json += ",";
+            json += "{";
+            json += "\"broker_symbol\":\""     + sym                           + "\",";
+            json += "\"normalized_symbol\":\"" + norm                          + "\",";
+            json += "\"base_symbol\":\""       + norm                          + "\",";
+            json += "\"visible\":"             + IntegerToString(visible)      + ",";
+            json += "\"selected\":"            + IntegerToString(visible)      + ",";
+            json += "\"digits\":"              + IntegerToString(digits)       + ",";
+            json += "\"point\":"               + DoubleToString(point, 10)     + ",";
+            json += "\"contract_size\":"       + DoubleToString(contractSz, 2) + ",";
+            json += "\"trade_mode\":"          + IntegerToString(tradeMode)    + ",";
+            json += "\"min_lot\":"             + DoubleToString(minLot, 2)     + ",";
+            json += "\"max_lot\":"             + DoubleToString(maxLot, 2)     + ",";
+            json += "\"lot_step\":"            + DoubleToString(lotStep, 2)    + ",";
+            json += "\"spread\":"              + IntegerToString(spread)       + ",";
+            json += "\"currency_profit\":\"" + currProfit                      + "\",";
+            json += "\"currency_margin\":\"" + currMargin                      + "\"";
+            json += "}";
+        }
+
+        json += "]}";
+
+        char   postData[];
+        char   result[];
+        string responseHeaders;
+        StringToCharArray(json, postData, 0, StringLen(json));
+
+        int httpStatus = WebRequest("POST", baseUrl + "/ea/symbol-sync",
+                                    cachedHeaders, 5000, postData, result, responseHeaders);
+        if (httpStatus == 200)
+        {
+            string body = CharArrayToString(result, 0, -1, CP_UTF8);
+            Print("[SymbolSync] OK | count=", count, " | response=", body);
+            return true;
+        }
+
+        string body = CharArrayToString(result, 0, -1, CP_UTF8);
+        Print("[SymbolSync] WARNING: failed | httpStatus=", httpStatus,
+              " | response=", StringLen(body) > 0 ? body : "(empty)");
         return false;
     }
 

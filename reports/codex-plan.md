@@ -1,4 +1,4 @@
-# SMC SuperFIB - Claude Plan Hardening Request
+# SMC SuperFIB — EA Side Routes Phase 1 Bridge: Implementation Contract
 
 ---
 
@@ -6,330 +6,354 @@
 
 ### Confirmed
 
-**Phase 0 gate is legitimately closed.**
-The research report cites `.github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md` with gate decision PASSED, 11/11 success criteria met, 100% parity on all audited surfaces, and 259,464 engine runs / 0 errors. No counter-evidence exists. Phase 0 closeout is real and complete.
-
-**Phase 1 is at 20% — backend APIs complete, EA live validation has not started.**
-Migration-status.md corroborates: `POST /ea/heartbeat`, `POST /ea/account-sync`, `POST /ea/symbol-sync`, `GET /ea/license-check` are delivered. `SMC_MarketDataEA.mq5` live terminal validation is pending. This is the actual Phase 1 blocker.
-
-**Documentation gap is real and blocks team coordination.**
-No Phase 1 roadmap, tracker, or checklist document exists beyond the summary table in `migration-status.md`. Absence of explicit ownership, acceptance thresholds, and sequencing increases coordination failure risk as Track A and Track B move into live terminal testing.
-
-**Repository root contains stale artifacts that increase noise.**
-Log files (`.codex-vite-dev.err.log`, `.codex-vite-dev.log`, `.codex-vite-mock.err.log`, `.codex-vite-mock.log`), `build-watchlist.log`, and `phase3_mt5_simulation_test.php` are confirmed present in root. These are not code regressions but are discoverability liabilities.
+- **Root cause: MT5 EA WebRequest calls for four backend routes were never implemented.** The backend PHP routes (`POST /ea/heartbeat`, `POST /ea/account-sync`, `POST /ea/symbol-sync`, `GET /ea/license-check`) are fully implemented, tested, and passing. The MT5 EA has no corresponding caller code for any of these routes. The gap is not a wiring misconfiguration — the code simply does not exist on the EA side.
+- **Evidence:** `SMC_MarketDataEA.mq5 OnInit()` contains no license-check call. `OnTimer()` contains no heartbeat or periodic account-sync call. `MarketDataEngine.mqh` contains no `SendLicenseCheck()`, `SendHeartbeat()`, `SendAccountSync()`, or `SendSymbolSync()` methods.
+- **Delivery split confirmed:** Phase 1 was split into two tracks. Track A (backend) merged in PR #185 on 2026-05-15. Track B (MT5 EA) was never started. The phase-1-ea-bridge-implementation-report explicitly states no MT5 EA file changes were made in that patch.
+- **Baseline WebRequest infrastructure confirmed working:** `POST /ea/market-stream` is called from `MarketDataEngine.mqh:SendToBackend()` at line 357. Current 422 response confirms the route is reachable and auth headers are accepted by the backend; the rejection is payload-level (freshness gate), not auth or transport.
+- **All four payload contracts are defined and testable:** Payload field lists, response schemas, and acceptance semantics are fully specified in the PHP backend tests.
 
 ### Likely
 
-**`stratupdate.md` is a stale working note, not canonical documentation.**
-The research flags it as "unclear purpose." Given the file naming pattern and the absence of any reference to it in canonical governance files, it is likely an ephemeral artifact. Cannot confirm deletion without reading it first; archival is the safe default.
-
-**`reports/snapshots/` dated subdirectories are soak logs, not active references.**
-Five-plus dated snapshot directories consistent with Phase 0 soak cadence. Likely safe to consolidate into a single archive subfolder. Cannot confirm without verifying that `scripts/pipeline-watcher.js` does not glob into this path.
+- **WebRequest can be called from `OnInit()` without hanging.** Current usage is `OnTimer()`-only, but MQL5 `WebRequest()` is synchronous and blocking regardless of handler; there is no documented restriction against calling it from `OnInit()`. The risk is latency during EA startup (license-check adds one synchronous round-trip before `EventSetTimer()` is called), which is acceptable given it is a hard gate.
+- **All required MT5 telemetry API calls are available on MT5 build 4150+.** `AccountInfoDouble(ACCOUNT_BALANCE)`, `AccountInfoDouble(ACCOUNT_EQUITY)`, `AccountInfoDouble(ACCOUNT_MARGIN)`, `AccountInfoDouble(ACCOUNT_FREEMARGIN)`, `AccountInfoInteger(ACCOUNT_LEVERAGE)`, `AccountInfoInteger(ACCOUNT_TRADE_ALLOWED)`, `SymbolInfoInteger()`, `SymbolInfoDouble()` are standard MT5 API; not build-specific above 4150.
 
 ### Unconfirmed
 
-**Whether any CI pipeline or script parses `.github/migration/phase-updates/` directly.**
-Research acknowledges this risk but does not resolve it. Archive actions against that folder must be guarded by a reference audit before execution.
-
-**Whether Track C (Dashboard) is blocked on Phase 1 completion or simply deferred by preference.**
-Research notes it as "explicitly deferred to Phase 2" but flags it as an open unknown. Phase 1 docs should state this boundary explicitly so it does not become a coordination ambiguity.
-
-**Whether the 2026-06-01 Phase 1 target is binding or aspirational.**
-Unresolvable from documentation alone. Plan treats it as a working deadline and flags it in handoff.
-
-**Root cause classification:** This is a documentation governance and repository organization issue. There is no code defect. No backend authority, stale-data protection, Pine formula, or signal engine is implicated. Phase 1 technical work is on its own track; the documentation gap is a parallel risk, not a blocker to EA validation starting.
+- **Optimal heartbeat interval.** Research guidance states 30–60 seconds. Backend test does not specify a minimum interval. Interval must be chosen defensively: long enough to avoid `OnTimer()` blocking market-stream, short enough to satisfy 48h+ continuity tracking. **48 seconds is the recommended default** (48 × 75 timer ticks/hour = manageable; adjustable via EA input parameter).
+- **Symbol-sync batch size safety.** If `g_symArray[]` contains 100+ symbols and the batch payload exceeds backend request size limits, the request will fail silently. The backend test confirms batch semantics but does not specify a size cap. The implementation must send a single batch; if that is later found to fail at scale, per-batch chunking is a follow-on concern (not in this patch).
+- **License-check timeout behavior.** Research recommends treating timeout as denial (hard gate: fail if denied OR timeout). This is conservative and correct for a license gate. **Three retry attempts at 150ms backoff (matching `SendToBackend()` pattern), then `INIT_FAILED`.**
 
 ---
 
 ## 2. Implementation contract
 
-### File 1: `.github/migration/PHASE1_BRIDGE_ROADMAP.md` — NEW
+### File 1: `mt5/MarketDataEngine.mqh`
 
-- **Section to create:** Entire file (does not exist)
-- **Exact change required:** Create a Phase 1 technical roadmap document with the following sections:
-  1. Phase 1 objective and scope boundary (MT5 EA live bridge only; dashboard deferred to Phase 2)
-  2. Track assignments: Track A (MT5 EA owner), Track B (Backend owner), Track C (Dashboard — explicitly deferred, no Phase 1 work)
-  3. Deliverable matrix: each deliverable, owner track, completion state (done / pending), and acceptance threshold
-  4. Acceptance criteria with quantified thresholds: heartbeat stable 48h+ with zero gaps; session drops = 0 (not <0.1%); automatic reconnect validated against terminal restart, VPS restart, internet interruption, duplicate heartbeat rejection, invalid license rejection
-  5. Live terminal environment requirements: broker, account type, MT5 build, infrastructure access prerequisites
-  6. Phase gate definition: what constitutes Phase 1 PASSED and what triggers Phase 2 start
-  7. Timeline: 2026-06-01 target with milestone checkpoints
-- **Guard rails:** Must not modify any MT5 `.mqh` files, backend API contracts, or Pine source. Must not invent acceptance thresholds not derivable from existing `migration-status.md` or Phase 0 precedent. Must not scope in dashboard work.
-- **Why in scope:** No Phase 1 roadmap document exists. Track A and Track B cannot coordinate live validation without explicit acceptance thresholds and environment requirements.
-- **Acceptance criterion:** File exists at the stated path. Acceptance thresholds for all five Phase 1 test scenarios are stated with binary pass/fail criteria. Track assignments name the responsible track (not individuals, since personnel are not in scope to document here).
+**Scope:** Add four new public methods. Do not modify any existing method.
 
 ---
 
-### File 2: `.github/migration/PHASE1_TRACKER.md` — NEW
+**Method: `SendLicenseCheck()`**
 
-- **Section to create:** Entire file (does not exist)
-- **Exact change required:** Create a live status board with:
-  1. Phase 1 current status line (percentage complete, last-updated date, current blocker)
-  2. Deliverables table: deliverable name, track owner, status (DONE / IN-PROGRESS / BLOCKED / PENDING), completion date or estimated date
-  3. Blocker log: each blocker, date opened, date resolved or ETA, owner
-  4. Phase gate progress: checklist of Phase 1 success criteria with current state
-  5. Integration handoff row: when Phase 1 gate passes, what transfers to Phase 2 scope
-- **Guard rails:** Must not duplicate the full narrative from `migration-status.md`. Must reference `PHASE1_BRIDGE_ROADMAP.md` for detail rather than re-stating acceptance criteria inline.
-- **Why in scope:** The `migration-status.md` single-source-of-truth model conflates summary and detail. A separate tracker allows status updates without rewriting narrative docs.
-- **Acceptance criterion:** All six Phase 1 EA test scenarios (terminal restart, VPS restart, internet interruption, duplicate protection, invalid license rejection, 48h heartbeat) appear as trackable checklist items with an explicit pending state.
-
----
-
-### File 3: `.github/migration/PHASE1_CHECKLIST.md` — NEW
-
-- **Section to create:** Entire file (does not exist)
-- **Exact change required:** Create a task-level checklist with:
-  1. Pre-validation prerequisites section: EA code complete, backend APIs in staging, broker test account available, MT5 terminal access confirmed
-  2. Track A checklist: MT5 EA tasks — deploy `SMC_MarketDataEA.mq5` to live terminal, confirm heartbeat POST firing, run each of the five validation scenarios, record results
-  3. Track B checklist: Backend verification tasks — confirm API edge-case handling (invalid license, duplicate heartbeat, out-of-sequence symbol-sync), review server-side logs for each EA test event
-  4. Track C checklist: Single item — "Dashboard work: DEFERRED to Phase 2. No Phase 1 action items."
-  5. Gate sign-off section: explicit fields for Track A sign-off, Track B sign-off, and Phase 1 PASSED declaration with date
-- **Guard rails:** Must not contain code snippets or API contract details (those belong in `PHASE1_BRIDGE_ROADMAP.md`). Must not invent new test scenarios beyond those already stated in `migration-status.md`.
-- **Why in scope:** No checklist exists. Without it, the live terminal validation has no structured acceptance protocol.
-- **Acceptance criterion:** File is usable as a standalone checklist by someone unfamiliar with the prior soak documentation. All five Phase 1 test scenarios from `migration-status.md` appear as discrete checkbox items.
+- **Section to modify:** After the existing `SendToBackend()` method (append new methods at end of class body before closing brace).
+- **Exact change:** Add `public bool SendLicenseCheck()` method.
+  - Build GET URL with query parameters: `account_id` (from `AccountInfoInteger(ACCOUNT_LOGIN)`), `terminal_id` (from `TerminalInfoString(TERMINAL_DATA_PATH)` hashed or raw), `ea_version` (from module-level `EA_VERSION` constant already defined).
+  - Use `WebRequest("GET", url, m_cachedHeaders, 5000, emptyBody, response, httpStatus)`.
+  - On HTTP 200: parse JSON response, check `"allowed": true`. Return `true` if allowed, `false` otherwise.
+  - On HTTP non-200 or timeout (after 3 attempts, 150ms backoff matching `SendToBackend()` pattern): return `false`.
+  - Log result to `Print()` with prefix `[LicenseCheck]`.
+- **Guard rails:**
+  - Must use `m_cachedHeaders` (built in `Initialize()`, already containing `X-EA-API-Key` header) — do not construct new headers inline.
+  - Must use `TimeToIso8601(TimeCurrent())` for any timestamp field (do not call `TimeGMT()` directly).
+  - Must not modify `m_cachedHeaders`.
+  - Must not call `SendToBackend()` (that is the market-stream path; do not reuse it for routing to different endpoints).
+- **Why in scope:** The license-check caller must be in `MarketDataEngine` so it has access to `m_cachedHeaders`, the auth key, and MT5 account API. Placing it in the EA file directly would violate the existing architectural boundary.
+- **Acceptance criterion:** EA `OnInit()` calls `SendLicenseCheck()`. If backend returns `{"ok":true,"allowed":false}`, `OnInit()` returns `INIT_FAILED` and EA does not reach `EventSetTimer()`. If backend returns `{"ok":true,"allowed":true}`, `OnInit()` proceeds normally.
 
 ---
 
-### File 4: `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/` — NEW DIRECTORY + FILE MOVES
+**Method: `SendHeartbeat()`**
 
-- **Section to modify:** Create archive directory; move eight superseded Phase 0 checkpoint files into it
-- **Exact change required:** Move the following files from `.github/migration/phase-updates/` to the archive directory:
-  - `phase0-soak-Final-2026-05-14.md`
-  - `phase-0-completion-2026-05-14.md`
-  - `phase-0-focused-validation-attempt-2026-05-14.md`
-  - `phase-0-post-fix-validation-checklist-2026-05-14.md`
-  - `phase-0-next-actions-2026-05-14.md`
-  - `phase-0-next-72h-checklist-2026-05-11.md`
-  - `phase-0-soak-summary-2026-05-11.md`
-  - Place an `ARCHIVE_INDEX.md` in the archive folder listing the moved files, their supersession reason (replaced by `phase0-soak-closeout-final-2026-05-15.md`), and the archive date
-- **Guard rails:** Do NOT move `phase0-soak-closeout-final-2026-05-15.md` — it is the canonical final artifact and must remain in `phase-updates/`. Do NOT move any parity audit files. Do NOT delete any file; move only. The archive folder must remain within `.github/migration/` to preserve pipeline ingestion path prefixes.
-- **Prerequisite before execution:** Grep all scripts, CI YAML, and agent definition files for direct references to each of the eight file names. If any reference is found, add a redirect stub (one-line file at the old path pointing to the archive location) before moving. This audit must complete before any file is moved.
-- **Why in scope:** Eight superseded checkpoints create confusion about which Phase 0 record is authoritative. `phase0-soak-closeout-final-2026-05-15.md` supersedes all of them.
-- **Acceptance criterion:** Running a search for the eight file names in `phase-updates/` returns zero results. The archive directory exists with all eight files and the index. The canonical closeout file remains in `phase-updates/`.
+- **Section to modify:** After `SendLicenseCheck()`.
+- **Exact change:** Add `public bool SendHeartbeat()` method.
+  - POST payload (JSON): `account_id`, `terminal_id`, `broker` (`AccountInfoString(ACCOUNT_COMPANY)`), `broker_server` (`AccountInfoString(ACCOUNT_SERVER)`), `ea_version`, `terminal_build` (`TerminalInfoInteger(TERMINAL_BUILD)`), `connected` (`TerminalInfoInteger(TERMINAL_CONNECTED)`), `timestamp` (`TimeToIso8601(TimeCurrent())`).
+  - POST to `m_baseUrl + "/ea/heartbeat"`.
+  - On HTTP 200: log success. Return `true`.
+  - On error: log warning (`Print("[Heartbeat] WARNING: ...")`). Return `false`. **Do not halt or return INIT_FAILED** — heartbeat is a soft gate.
+  - No retry loop on heartbeat (unlike license-check): one attempt only, to avoid blocking `OnTimer()`.
+- **Guard rails:**
+  - Must not affect `m_candleBuffer`, `m_freshnessState`, or any market-stream state.
+  - Must be a soft gate: failure must not stop market-stream processing.
+  - Must use same `m_cachedHeaders`.
+- **Why in scope:** Requires engine-level access to `m_baseUrl`, `m_cachedHeaders`, and MT5 terminal API.
+- **Acceptance criterion:** Backend `engine_runs` table receives a row within 60 seconds of EA timer activation. Dashboard heartbeat monitor reflects EA as connected.
 
 ---
 
-### File 5: `.github/migration-status.md` — MODIFY
+**Method: `SendAccountSync()`**
 
-- **Section to modify:** Phase 1 summary section (research reports lines 95–150)
-- **Exact change required:** Add reference links to the three new Phase 1 documents immediately below the Phase 1 status table:
+- **Section to modify:** After `SendHeartbeat()`.
+- **Exact change:** Add `public bool SendAccountSync()` method.
+  - POST payload (JSON): `account_id`, `terminal_id`, `broker`, `broker_server`, `currency` (`AccountInfoString(ACCOUNT_CURRENCY)`), `balance` (`AccountInfoDouble(ACCOUNT_BALANCE)`), `equity` (`AccountInfoDouble(ACCOUNT_EQUITY)`), `margin` (`AccountInfoDouble(ACCOUNT_MARGIN)`), `free_margin` (`AccountInfoDouble(ACCOUNT_FREEMARGIN)`), `leverage` (`AccountInfoInteger(ACCOUNT_LEVERAGE)`), `trade_allowed` (`AccountInfoInteger(ACCOUNT_TRADE_ALLOWED)`), `connected`, `ea_version`, `terminal_build`, `timestamp`.
+  - POST to `m_baseUrl + "/ea/account-sync"`.
+  - On HTTP 200: log success. Return `true`.
+  - On error: log warning. Return `false`. **Soft gate — do not halt.**
+  - No retry loop: one attempt, to avoid blocking.
+- **Guard rails:**
+  - Must not modify any existing account state or cached values used by market-stream.
+  - Must not be called before `Initialize()` completes (headers not yet built).
+  - Must use `TimeToIso8601(TimeCurrent())`.
+- **Why in scope:** Telemetry collection requires engine-level access to `m_baseUrl` and `m_cachedHeaders`.
+- **Acceptance criterion:** Backend `smc_sf_account_snapshots` JSON blob contains an entry keyed by `account_id|terminal_id` with balance matching the live account within one sync cycle.
+
+---
+
+**Method: `SendSymbolSync()`**
+
+- **Section to modify:** After `SendAccountSync()`.
+- **Exact change:** Add `public bool SendSymbolSync(const string &symbols[], int symbolCount)` method.
+  - Accept the resolved symbol array (already available in `SMC_MarketDataEA.mq5` as `g_symArray[]` after `ResolveBrokerSymbol()` completes).
+  - Build JSON: top-level object with `account_id`, `terminal_id`, `broker`, `broker_server`, `timestamp`, and `symbols` array.
+  - Each symbol entry: `broker_symbol` (raw), `normalized_symbol`, `base_symbol`, `visible` (`SymbolInfoInteger(sym, SYMBOL_SELECT)`), `selected`, `digits` (`SymbolInfoInteger(sym, SYMBOL_DIGITS)`), `point` (`SymbolInfoDouble(sym, SYMBOL_POINT)`), `contract_size` (`SymbolInfoDouble(sym, SYMBOL_TRADE_CONTRACT_SIZE)`), `trade_mode` (`SymbolInfoInteger(sym, SYMBOL_TRADE_MODE)`), `min_lot` (`SymbolInfoDouble(sym, SYMBOL_VOLUME_MIN)`), `max_lot` (`SymbolInfoDouble(sym, SYMBOL_VOLUME_MAX)`), `lot_step` (`SymbolInfoDouble(sym, SYMBOL_VOLUME_STEP)`), `spread` (`SymbolInfoInteger(sym, SYMBOL_SPREAD)`), `currency_profit` (`SymbolInfoString(sym, SYMBOL_CURRENCY_PROFIT)`), `currency_margin` (`SymbolInfoString(sym, SYMBOL_CURRENCY_MARGIN)`).
+  - POST to `m_baseUrl + "/ea/symbol-sync"`. One attempt, no retry loop.
+  - On HTTP 200: log `symbols_received` and `symbols_upserted` from response. Return `true`.
+  - On error: log warning. Return `false`. **Soft gate.**
+- **Guard rails:**
+  - Must be called after `ResolveBrokerSymbol()` completes in `OnInit()` — symbol data is only valid after resolution.
+  - Must not alter `g_symArray[]` or any normalizer state.
+  - Must send as a single batch — no per-symbol individual requests in this patch.
+  - Symbol normalization (`normalized_symbol`, `base_symbol`) must use existing `SymbolNormalizer` — do not re-implement normalization inline.
+- **Why in scope:** Requires engine-level access to `m_baseUrl`, `m_cachedHeaders`, and `SymbolNormalizer`.
+- **Acceptance criterion:** Backend `smc_sf_symbol_sync` table contains upserted rows for all symbols in `g_symArray[]` within one minute of EA startup.
+
+---
+
+### File 2: `mt5/SMC_MarketDataEA.mq5`
+
+**Scope:** Wire the four new engine methods into `OnInit()` and `OnTimer()`. Add a module-level heartbeat throttle counter. Do not restructure existing logic.
+
+---
+
+**Change A: Module-level heartbeat counter**
+
+- **Section to modify:** Module-level variable declarations (top of file, alongside existing `g_symArray[]`, engine instance, etc.).
+- **Exact change:** Add `static int g_heartbeatTickCount = 0;` and `static const int HEARTBEAT_INTERVAL_TICKS = 48;` (configurable: one heartbeat every 48 `OnTimer()` invocations, approximately 48 seconds if timer is 1000ms).
+- **Guard rails:** Must not collide with existing module-level variable names. Must be `static` to avoid re-initialization across invocations.
+
+---
+
+**Change B: `OnInit()` — license-check hard gate**
+
+- **Section to modify:** `OnInit()` at line 119, immediately after config validation and before `ResolveBrokerSymbol()` calls.
+- **Exact change:** Insert:
   ```
-  → Detailed roadmap: [PHASE1_BRIDGE_ROADMAP.md](./migration/PHASE1_BRIDGE_ROADMAP.md)
-  → Live tracker: [PHASE1_TRACKER.md](./migration/PHASE1_TRACKER.md)
-  → Task checklist: [PHASE1_CHECKLIST.md](./migration/PHASE1_CHECKLIST.md)
+  if (!engine.SendLicenseCheck()) {
+      Print("[EA] License check denied or timed out. EA will not start.");
+      return INIT_FAILED;
+  }
   ```
-- **Guard rails:** Do not rewrite existing Phase 1 summary content. Do not change the table format or header structure. This is a pointer insertion only. The Phase 2 and beyond sections must not be touched.
-- **Why in scope:** `migration-status.md` is the single source of truth ingested by the migration manager agent. It must reference the new docs so automated ingestion can discover them.
-- **Acceptance criterion:** The three links are present and resolve to the correct relative paths. The rest of the file is byte-for-byte identical to its pre-patch state.
+- **Guard rails:**
+  - Must be placed before `EventSetTimer()`. EA must not begin periodic polling if license is denied.
+  - Must be placed before account-sync and symbol-sync calls.
+  - Must not wrap `ResolveBrokerSymbol()` inside the license gate (symbol resolution is independent of license status and could be needed for diagnostics).
+  - `INIT_FAILED` is the correct MQL5 return code — do not use `INIT_PARAMETERS_INCORRECT` or return `-1`.
 
 ---
 
-### File 6: `.gitignore` — MODIFY
+**Change C: `OnInit()` — account-sync and symbol-sync after symbol resolution**
 
-- **Section to modify:** Add or expand the dev-log exclusion block
-- **Exact change required:** Add the following patterns if not already present:
+- **Section to modify:** `OnInit()` at line 119, after `ResolveBrokerSymbol()` completes and `g_symArray[]` is fully populated, before `EventSetTimer()`.
+- **Exact change:** Insert:
   ```
-  .codex-vite-dev.err.log
-  .codex-vite-dev.log
-  .codex-vite-mock.err.log
-  .codex-vite-mock.log
-  build-watchlist.log
-  *.err.log
+  engine.SendAccountSync();
+  engine.SendSymbolSync(g_symArray, ArraySize(g_symArray));
   ```
-- **Guard rails:** Do not remove any existing ignore rules. Do not add broad wildcards that could suppress intentionally tracked log files in subdirectories.
-- **Why in scope:** Root-level log files are present in the working tree. Gitignore prevents future spillage; the existing committed log files must be removed from tracking separately (see patch sequence step 7).
-- **Acceptance criterion:** `git check-ignore -v .codex-vite-dev.err.log` returns a match. No existing tracked files are newly hidden by the added rules.
+- **Guard rails:**
+  - Must be after `ResolveBrokerSymbol()` — symbol data must be valid before `SendSymbolSync()` is called.
+  - Both are soft gates: failure must not prevent `EventSetTimer()` from being called.
+  - Must be before `EventSetTimer()` so initial metadata is pushed to backend before the market-stream loop begins.
 
 ---
 
-### File 7: Root-level log files — REMOVE FROM TRACKING
+**Change D: `OnTimer()` — heartbeat throttle**
 
-- **Files:** `.codex-vite-dev.err.log`, `.codex-vite-dev.log`, `.codex-vite-mock.err.log`, `.codex-vite-mock.log`, `build-watchlist.log`
-- **Exact change required:** `git rm --cached` each file to remove from tracking without deleting from disk. They will then be covered by the updated `.gitignore`.
-- **Guard rails:** Do not delete files from disk. `--cached` only. Verify `.gitignore` update is committed first so the untracked files are immediately covered.
-- **Why in scope:** Log files committed to the repository increase repo size and create noise in diffs. They carry no canonical documentation value.
-- **Acceptance criterion:** `git status` shows none of the five log file names as tracked files. `git ls-files | grep "\.log"` returns only intentionally tracked log files (if any exist in subdirectories).
-
----
-
-### File 8: `stratupdate.md` — REVIEW AND ARCHIVE OR DELETE
-
-- **Section to modify:** Decision gate before action
-- **Exact change required:**
-  1. Read the file. If it contains no unique information not already in canonical docs, move to `.github/migration/archive/` with a note in the archive index.
-  2. If it contains unique active information, create a JIRA-style note in `PHASE1_TRACKER.md` to incorporate that information and then archive the file.
-  3. Do not delete without reading.
-- **Guard rails:** Do not delete without confirming the file contains no unique governance information. Do not leave it in root.
-- **Why in scope:** Research identifies it as "unclear purpose" — it must be resolved, not left ambiguous.
-- **Acceptance criterion:** File is not present in repository root. Its disposition (archived with note, or content absorbed) is recorded in the archive index.
-
----
-
-### File 9: `phase3_mt5_simulation_test.php` — MOVE
-
-- **Exact change required:** Move from repository root to `wordpress/smc-superfib-sniper/tests/php/phase3_mt5_simulation_test.php`
-- **Guard rails:** Verify the file is not referenced by any CI pipeline path before moving. If referenced, update the CI reference in the same commit.
-- **Why in scope:** Test artifacts in repository root violate the established test directory convention (`wordpress/smc-superfib-sniper/tests/php/`).
-- **Acceptance criterion:** File is absent from root. File exists at the new path. Any CI references resolve correctly.
+- **Section to modify:** `OnTimer()` at line 200, at the top of the function body before existing symbol poll loop.
+- **Exact change:** Insert:
+  ```
+  g_heartbeatTickCount++;
+  if (g_heartbeatTickCount >= HEARTBEAT_INTERVAL_TICKS) {
+      g_heartbeatTickCount = 0;
+      engine.SendHeartbeat();
+  }
+  ```
+- **Guard rails:**
+  - Must be placed before the existing symbol poll loop — heartbeat failure must not block symbol polling (soft gate).
+  - Must not replace or reorder the existing `engine.OnPeriodic()` call.
+  - Must not alter the existing `OnTick()` path.
+  - Counter must reset to 0 after firing, not after a failed heartbeat.
 
 ---
 
 ## 3. Patch sequence
 
-1. **Read `stratupdate.md`** (decision gate — determines File 8 disposition before any commit)
-2. **Audit scripts and CI YAML for references to the eight Phase 0 file names** being archived (required before File 4 archive move; do not proceed to step 3 without completing this)
-3. **Create three Phase 1 documents** (Files 1, 2, 3 — independent, can be authored in parallel)
-4. **Update `.github/migration-status.md`** to add reference links (File 5 — depends on File 1/2/3 paths being finalized)
-5. **Create archive directory and move eight Phase 0 checkpoints** (File 4 — depends on step 2 audit result; add stubs if references found)
-6. **Move `stratupdate.md`** to archive and update archive index (File 8 — depends on step 1 read decision)
-7. **Move `phase3_mt5_simulation_test.php`** to test directory (File 9 — independent of all doc steps)
-8. **Update `.gitignore`** with log file patterns (File 6 — must commit before step 9)
-9. **`git rm --cached` the five root log files** (File 7 — depends on step 8 being committed first)
+1. **`mt5/MarketDataEngine.mqh` — Add `SendLicenseCheck()`**
+   Dependency: None. Uses only existing `m_cachedHeaders`, `m_baseUrl`, and `TimeToIso8601()` which are all already initialized in `Initialize()`.
 
-### Dependency notes
+2. **`mt5/MarketDataEngine.mqh` — Add `SendHeartbeat()`**
+   Dependency: None beyond step 1 (independent method, same access pattern).
 
-- Steps 3 and 7 are independent and can run in parallel.
-- Steps 4 and 5 are blocked until steps 2 and 3 complete respectively.
-- Step 9 is hard-blocked on step 8 being in a committed state; do not run `git rm --cached` against files that are not yet covered by `.gitignore`.
-- No code changes exist in this patch. No database migrations, no state migrations, no contract version bumps are required.
-- The three new Phase 1 docs (step 3) carry no runtime dependency — they are read-only governance artifacts.
+3. **`mt5/MarketDataEngine.mqh` — Add `SendAccountSync()`**
+   Dependency: None beyond step 2.
+
+4. **`mt5/MarketDataEngine.mqh` — Add `SendSymbolSync()`**
+   Dependency: `SymbolNormalizer` must remain unmodified. Depends on symbol array being passed in from caller — does not self-source the array.
+
+5. **`mt5/SMC_MarketDataEA.mq5` — Add module-level heartbeat counter variables**
+   Dependency: Steps 1–4 must be complete (compiler will reject calls to undefined methods).
+
+6. **`mt5/SMC_MarketDataEA.mq5` — Wire `OnInit()`: license-check gate**
+   Dependency: Step 5.
+
+7. **`mt5/SMC_MarketDataEA.mq5` — Wire `OnInit()`: account-sync + symbol-sync after `ResolveBrokerSymbol()`**
+   Dependency: Step 6.
+
+8. **`mt5/SMC_MarketDataEA.mq5` — Wire `OnTimer()`: heartbeat throttle**
+   Dependency: Step 7.
+
+**Sequencing risk:** Steps 1–4 must be committed before steps 5–8 attempt to compile. If both files are modified in the same commit, the MQL5 compiler processes them together and order is not a risk. However, logical review must verify the method signatures in `MarketDataEngine.mqh` exactly match the call sites in `SMC_MarketDataEA.mq5` before compilation.
+
+**No database migration required.** Backend schema is already in place.
+
+**No cache invalidation required.** New routes are append/upsert; they do not displace existing cached state.
 
 ---
 
 ## 4. Regression guards
 
-### Checks the implementation agent must run after patching
+**After patching, the implementation agent must verify:**
 
-1. **Pipeline watcher test:** Run `scripts/pipeline-watcher.test.mjs` and confirm all tests pass. This verifies report ingestion and phase gate logic are unaffected by the archive move.
-2. **Archive reference check:** After moving the eight Phase 0 files, grep the entire repository for each of the eight file names. Any hit that is not in the archive index itself must be resolved before merge.
-3. **Migration-status.md link validation:** Verify all three new relative links in `migration-status.md` resolve to existing files.
-4. **Gitignore coverage:** Run `git check-ignore -v` against each of the five log file names to confirm coverage.
-5. **Git ls-files audit:** `git ls-files | grep "\.log"` — confirm no unintended log files remain tracked.
-6. **Phase 0 canonical artifact present:** Confirm `phase0-soak-closeout-final-2026-05-15.md` is still in `phase-updates/` and was not moved.
-7. **Test directory placement:** Confirm `phase3_mt5_simulation_test.php` exists at `wordpress/smc-superfib-sniper/tests/php/` and is absent from root.
+1. **Market-stream WebRequest path is unchanged.** `SendToBackend()` in `MarketDataEngine.mqh` must have zero modifications. Its retry logic (3 attempts, 150ms backoff), header reuse (`m_cachedHeaders`), JSON payload structure, and `httpStatus` evaluation (200/201 = success) must be bit-for-bit identical to pre-patch.
 
-### Existing protections that must still hold
+2. **`OnInit()` symbol resolution order is unchanged.** `ResolveBrokerSymbol()` must still be called in the same sequence as pre-patch. The license-check gate is prepended before symbol resolution; account-sync and symbol-sync are appended after. No existing `OnInit()` lines may be reordered.
 
-- `.smc-workflow-state.json` workflow lock behavior must be undisturbed — no changes to that file.
-- Phase gate logic in `migration-status.md` (Phase 2+ blocked until Phase 1 complete) must remain structurally intact; the reference link insertion must not alter the gate table.
-- All Phase 0 parity audit files (`phase-0-watchlist-persistence-parity-2026-05-15.md`, `phase-0-full-parity-2026-05-14.md`, `phase-0-pine-backend-parity-2026-05-14.md`) must remain in place and unmodified.
-- `PHASE0_SOAK_TRACKER.md` must remain accessible for Phase 1 reference (do not archive without an explicit decision — research report marks it as "review whether active"; leave it in place until that review produces a concrete decision).
+3. **`OnTimer()` poll order is unchanged.** The existing non-chart symbol poll loop and `engine.OnPeriodic()` call must execute in the same order as pre-patch. The heartbeat block is prepended before the poll loop; it must not be inserted between `engine.OnPeriodic()` and the poll loop.
 
-### Parity re-validations
+4. **`TimeToIso8601()` is not modified.** All new methods must call it without alteration. It must remain the sole timestamp authority (no `TimeGMT()` direct calls in new code).
 
-None required. This patch contains no code changes. Phase 0 parity (100%) is complete and untouched. Phase 1 parity validation is a Phase 1 gate, not a dependency of this documentation patch.
+5. **Auth header is not re-constructed.** All new `WebRequest` calls must pass `m_cachedHeaders` directly. No inline header construction.
 
-### Logging and diagnostics after patch
+6. **License-check inversion is correct.** The gate must read: `if (!engine.SendLicenseCheck()) return INIT_FAILED`. It must NOT read: `if (engine.SendLicenseCheck()) return INIT_FAILED`. This is the highest-risk logic inversion. Reviewer must explicitly check this.
 
-- The three new Phase 1 docs should each carry a `Last-Updated` header that the migration manager agent can parse.
-- The archive index (`ARCHIVE_INDEX.md`) must log the move date (2026-05-15) and the supersession reference for each file.
+7. **Backend PHP tests remain passing (no regressions introduced by this patch):**
+   - `test-ea-heartbeat.php` — PASS
+   - `test-ea-account-sync.php` — PASS
+   - `test-ea-symbol-sync.php` — PASS
+   - `test-ea-license-check.php` — PASS
+   - `test-ea-market-stream.php` — PASS
+   - `test-mt5-snapshot-contract.php` — PASS
+
+8. **`SymbolNormalizer` is not modified.** Symbol normalization must remain identical; `SendSymbolSync()` is a consumer, not a modifier.
+
+9. **Logging prefixes must be distinct.** `[LicenseCheck]`, `[Heartbeat]`, `[AccountSync]`, `[SymbolSync]` must each be present so log analysis can distinguish route failures without ambiguity.
+
+**Parity re-validations required:**
+
+- After EA starts and completes `OnInit()`, backend must show:
+  - One `engine_runs` row from first heartbeat within 60 seconds.
+  - One `smc_sf_account_snapshots` entry matching the live account balance within one sync cycle.
+  - `smc_sf_symbol_sync` rows for all symbols in `g_symArray[]`.
+- After 48h+ soak: heartbeat rows in `engine_runs` must be continuous (no gaps > 120 seconds under normal connectivity).
 
 ---
 
 ## 5. Non-goals
 
-**Explicitly out of scope for this patch:**
+**Out of scope for this patch:**
 
-- Any modification to MT5 `.mqh` files, `SMC_MarketDataEA.mq5`, or any backend PHP or WordPress plugin code
-- Any modification to Pine source (`SMC_SuperFib_v13.1.3.pine`)
-- Any modification to `src/` frontend code, hooks, selectors, or API field names
-- Moving or restructuring `reports/snapshots/` dated subdirectories — research confirms this requires a script audit that is not yet complete; deferred to a separate story
-- Reorganizing `.artifacts/logs/` directory structure — same reason; deferred
-- Modifying CI pipeline YAML beyond what is required to fix a reference broken by the `phase3_mt5_simulation_test.php` move
-- Deleting any file rather than archiving it
-- Writing Phase 2 through Phase 10 roadmaps — out of scope; Phase 1 docs are the explicit deliverable
-- Quantifying or rewriting Phase 1 acceptance thresholds beyond what is already stated in `migration-status.md`; invent nothing
-- Changing the format or structure of `.github/agents/migration-project-manager.agent.md`
+- Any modification to `SendToBackend()` or the market-stream WebRequest flow.
+- Any modification to `OnTick()`.
+- Refactoring `WebRequest` retry logic into a shared `WebRequestWrapper()` helper (Path B — deferred).
+- Extracting `PayloadBuilder` or a route registry class (Path B — deferred).
+- Adding a dedicated error logger or telemetry module (Path B — deferred).
+- Any change to PHP backend routes, handlers, or database schema.
+- Any change to backend PHP tests.
+- Dashboard UI changes related to heartbeat monitoring, account balance display, or symbol metadata.
+- Phase 2 components: `FreshnessEngine`, `CandleBuilder`, `SessionManager`.
+- Symbol-sync chunking or per-batch fallback for large symbol arrays.
+- Per-symbol individual WebRequest fallback if batch fails.
+- Periodic `SendAccountSync()` from `OnTimer()` (only `OnInit()` account-sync is in scope; periodic account-sync is a Phase 2 concern unless explicitly added to this issue).
+- Auto-reconnect logic or WebRequest connection retry beyond the 3-attempt/150ms pattern already established.
 
 **Attractive but unsafe follow-on changes to avoid in this patch:**
 
-- Consolidating `migration-status.md` and the new tracker into a single file — tempting but breaks the agent ingestion path; separate files are intentional
-- Deleting `PHASE0_SOAK_TRACKER.md` without a formal review decision — it may contain active references not visible in the research report
-- Adding `.gitignore` rules broad enough to cover subdirectories (e.g., `**/*.log`) — too wide; could suppress intentionally tracked diagnostic logs in `tests/` or `scripts/`
-- Renaming any file that already appears in `migration-status.md` phase gate tables
+- Do not add a `SendAccountSync()` call inside the heartbeat throttle block in `OnTimer()`. Account-sync every 48 seconds would generate noise in `smc_sf_account_snapshots` and is not required by the Phase 1 gate. If periodic account-sync is needed, it requires a separate interval counter and a separate issue.
+- Do not reduce the WebRequest timeout from 5000ms to a shorter value. Consistency with `SendToBackend()` is more important than micro-optimization at this stage.
+- Do not add an `EventSetTimer()` call inside `SendHeartbeat()` for self-scheduling. Timer management must remain in `OnInit()` only.
+- Do not add `user_id` injection inside `MarketDataEngine.mqh`. If `user_id` is needed beyond the API key, it must be passed as a parameter from the EA file — do not reach into WordPress session state from the engine.
 
 ---
 
 ## 6. Risk assessment
 
-### Worst-case failure mode if patched incorrectly
+**Worst-case failure mode if patched incorrectly:**
 
-If the archive move is executed before the reference audit completes, the migration manager agent or `scripts/pipeline-watcher.js` could fail to locate expected files by path, silently dropping phase gate evaluations or producing false-complete signals. This would not corrupt live data but would corrupt the project's automated governance layer.
+- License-check gate logic is inverted (`if (SendLicenseCheck()) return INIT_FAILED`): EA refuses to start for all licensed users, blocks all market-stream data collection, and Phase 1 validation is impossible until the bug is identified and redeployed. This is a silent failure from the user's perspective (EA simply does not attach).
+- License-check timeout is treated as success: Unlicensed or expired accounts run unchecked. This is a compliance violation.
+- `SendHeartbeat()` is placed inside a hard gate: Heartbeat failure at any point stops market-stream processing. All market-stream data collection halts until EA is restarted manually.
+- `SendSymbolSync()` is called before `ResolveBrokerSymbol()`: Symbol fields are uninitialized or stale. Backend receives garbage symbol metadata that is then used by dashboard calculations.
 
-### User-visible failure mode
+**User-visible failure mode:**
 
-No user-visible frontend or signal behavior is affected. The risk is entirely internal to the project management and CI automation layer. A broken pipeline watcher would manifest as stale phase status in automated reports, not as a dashboard or trading error.
+- If license-check gate inverted: EA does not load; no chart data; terminal shows `[EA] License check denied` log but user's license is valid.
+- If heartbeat hard-gated: Market-stream stops on first heartbeat failure (e.g., transient network blip); dashboard shows stale data or disconnected state even though terminal is online.
+- If symbol-sync precedes symbol resolution: Dashboard trade panel shows wrong lot sizes, wrong spread, or wrong decimal precision.
 
-### Backend authority and stale-state risks
+**Backend authority and stale-state risks:**
 
-None. This patch touches no code that produces, transforms, or caches market data, signals, or session states. Backend authority is fully preserved.
+- `smc_sf_account_snapshots` will be stale if account balance changes significantly between EA restarts and no periodic account-sync is scheduled. This is an accepted limitation in Phase 1 scope; the backend remains the authority but the snapshot is point-in-time.
+- Heartbeat absence (network failure, not EA failure) may cause dashboard to show disconnected state even when EA is running. This is correct behavior, not a bug — backend authority is preserved.
+- Symbol-sync data remains static after `OnInit()`. Live spread changes will not be reflected until EA restarts. This is an accepted Phase 1 limitation.
 
-### Human approval required before merge
+**Human approval required before merge:** YES.
 
-**Yes — required for two reasons:**
-
-1. The archive folder move (File 4) must be approved after the reference audit result is reviewed. If any script reference is found, the stub strategy must be confirmed before merge.
-2. The three Phase 1 documents (Files 1, 2, 3) should be reviewed by Track A and Track B leads for accuracy of acceptance thresholds before the docs are merged as authoritative. If a threshold is stated incorrectly in the roadmap, it becomes the formal standard.
+Reasons:
+1. License-check gate inversion is a one-character logic error with severe consequences. A human reviewer must explicitly verify `if (!engine.SendLicenseCheck())`.
+2. Heartbeat soft-gate classification must be confirmed in code review (not just specified in plan).
+3. WebRequest call from `OnInit()` must be verified as non-blocking on the MT5 build in use before merge to production deployment.
 
 ---
 
 ## 7. Test requirements
 
-### Tests to add
+**Tests to add:**
 
-- **`scripts/pipeline-watcher.test.mjs` — add one test case:** Assert that the pipeline watcher correctly resolves the archive folder as non-active (i.e., files in `.github/migration/archive/` do not trigger phase gate evaluation as if they were active phase-update reports). This guards against the archive folder being misread as a new phase-update batch.
+- **MQL5 unit test (if the project has an MQL5 test harness):** Mock `WebRequest` return for `SendLicenseCheck()` with `allowed=false`; verify `OnInit()` returns `INIT_FAILED`. Mock with `allowed=true`; verify `OnInit()` proceeds to `EventSetTimer()`.
+- **MQL5 integration smoke test:** EA attaches to a live or demo terminal account with valid credentials. Verify backend logs show license-check 200, account-sync 200, symbol-sync 200 within 30 seconds of attach. Verify `engine_runs` shows heartbeat row within 60 seconds.
 
-### Existing tests that must still pass
+**Existing tests that must still pass (no regressions):**
 
-- All existing `scripts/pipeline-watcher.test.mjs` tests (report ingestion, phase gate logic)
-- `wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php` — must continue to pass (file is not moved; verify it is not accidentally caught in any `.gitignore` rule change)
-- `wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php` — same
-- `src/hooks/useSniperData.test.tsx` — same
-- `src/hooks/useSniperData.watchlist.test.tsx` — same
+- `test-ea-heartbeat.php` — PHP backend unit test
+- `test-ea-account-sync.php` — PHP backend unit test
+- `test-ea-symbol-sync.php` — PHP backend unit test
+- `test-ea-license-check.php` — PHP backend unit test
+- `test-ea-market-stream.php` — PHP backend unit test
+- `test-mt5-snapshot-contract.php` — PHP backend unit test
 
-### Manual checks required
+**Live environment verification required:**
 
-1. After creating the three Phase 1 docs, open each in a markdown renderer and confirm section headers, checklist syntax, and relative links render correctly.
-2. After archive move, manually navigate to `.github/migration/phase-updates/` and confirm only active, non-superseded Phase 0 files remain alongside the canonical closeout artifact.
-3. After `.gitignore` update and `git rm --cached`, run `git status` and confirm no unintended files appear as untracked or newly staged.
-
-### Soak, replay, or live-environment verification
-
-None required. This patch is documentation-only. No live-environment verification is applicable.
+- **48-hour soak:** After patch deployment, EA must run continuously for 48 hours. `engine_runs` heartbeat rows must be present with no gaps > 120 seconds (accounting for expected network transients up to 2 heartbeat periods).
+- **License deny path:** Must be manually tested against a revoked or expired license key. EA must log `[LicenseCheck] License check denied or timed out. EA will not start.` and return `INIT_FAILED`.
+- **Account balance parity:** Observe live account balance in terminal. Confirm `smc_sf_account_snapshots` shows matching value within one sync cycle after EA restart.
+- **Symbol metadata parity:** Confirm `smc_sf_symbol_sync` rows for all configured symbols contain spread, digits, and lot constraints matching the terminal's `SymbolInfo*` readings at time of sync.
+- **Market-stream continuity:** Confirm market-stream WebRequest path continues to post candles normally after new routes are added. Existing 422 freshness-gate rejection pattern (confirming route is reachable) must still appear in logs for stale candles.
 
 ---
 
 ## 8. Implementation handoff
 
-### Branch naming recommendation
+**Branch naming recommendation:**
 
 ```
-docs/phase0-verification-phase1-roadmap-2026-05-15
+codex/ea-phase1-bridge-webrequests
 ```
 
-### Suggested commit grouping
+**Suggested commit grouping:**
 
-| Commit | Contents |
-|--------|----------|
-| 1 | Create `PHASE1_BRIDGE_ROADMAP.md`, `PHASE1_TRACKER.md`, `PHASE1_CHECKLIST.md` |
-| 2 | Update `migration-status.md` with reference links to new Phase 1 docs |
-| 3 | Create archive directory; move eight superseded Phase 0 checkpoints; add `ARCHIVE_INDEX.md` |
-| 4 | Resolve `stratupdate.md` (archive with note, or absorb content then archive) |
-| 5 | Move `phase3_mt5_simulation_test.php` to `tests/php/`; update CI reference if applicable |
-| 6 | Update `.gitignore` with log file patterns; `git rm --cached` five root log files |
+- **Commit 1:** `feat(mt5): add SendLicenseCheck to MarketDataEngine`
+- **Commit 2:** `feat(mt5): add SendHeartbeat to MarketDataEngine`
+- **Commit 3:** `feat(mt5): add SendAccountSync to MarketDataEngine`
+- **Commit 4:** `feat(mt5): add SendSymbolSync to MarketDataEngine`
+- **Commit 5:** `feat(mt5): wire license-check gate, account-sync, symbol-sync into OnInit`
+- **Commit 6:** `feat(mt5): wire heartbeat throttle into OnTimer`
 
-Keep commits 1 and 2 together if desired (they are tightly coupled). Commits 3–6 are independent and order-stable after commit 2.
+Commits 1–4 may be squashed into a single `feat(mt5): add four EA bridge WebRequest methods to MarketDataEngine` if the implementation agent prefers atomic delivery. Commits 5–6 must remain separate to keep EA wiring review isolated.
 
-### Required artifacts after implementation
+**Required reports or artifacts to generate after implementation:**
 
-- PR body must list all files moved to archive and confirm the reference audit result (zero references found, or references found and stubs added)
-- PR body must confirm `scripts/pipeline-watcher.test.mjs` passed with the new archive test case
-- PR body must include a link to the three new Phase 1 docs for Track A and Track B review
-- Migration manager agent should auto-ingest the new Phase 1 docs on merge; confirm ingestion in the first post-merge agent run
+- `reports/ea-phase1-bridge-webrequests-implementation-report.md` — Summary of methods added, wiring changes, payload schemas confirmed, lines changed.
+- Backend log snapshot showing: license-check 200, account-sync 200, symbol-sync 200, first heartbeat 200, `engine_runs` row count after 1 hour of soak.
+- `smc_sf_symbol_sync` row count and sample row confirming field parity against terminal `SymbolInfo*` readings.
 
-### State transition
+**State transition:**
 
-```
-READY_FOR_IMPLEMENTATION
-editing_locked=false
-```
+`READY_FOR_IMPLEMENTATION` | `editing_locked=false`
