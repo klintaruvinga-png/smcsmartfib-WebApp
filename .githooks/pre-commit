@@ -1,0 +1,67 @@
+#!/bin/sh
+# Pre-commit guard: enforces reports/codex-implementation.md on codex/* branches.
+#
+# Only runs on branches matching codex/*. Normal development commits are unaffected.
+# The watcher's validateImplementationRun() performs the same checks at pipeline level;
+# this hook catches the problem at commit time so Codex cannot "finish" without the report.
+#
+# To install: git config core.hooksPath .githooks
+# (run once, or add to package.json prepare script)
+
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+
+# Only enforce on Codex implementation branches.
+case "$branch" in
+  codex/*)
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+
+IMPL_FILE="reports/codex-implementation.md"
+
+if [ ! -f "$IMPL_FILE" ]; then
+  echo ""
+  echo "  ✘ [codex pre-commit guard] reports/codex-implementation.md is MISSING."
+  echo "    Write the implementation report BEFORE committing on codex/* branches."
+  echo "    Required sections:"
+  echo "      - Issue summary"
+  echo "      - Root cause implemented"
+  echo "      - Exact files changed"
+  echo "      - Tests run"
+  echo "      - Reports generated"
+  echo "      - Remaining risks"
+  echo "      - Any contract ambiguities resolved during implementation"
+  echo ""
+  exit 1
+fi
+
+# Verify all required sections are present (exact match, same as pipeline-watcher.js).
+missing=""
+for section in \
+  "Issue summary" \
+  "Root cause implemented" \
+  "Exact files changed" \
+  "Tests run" \
+  "Reports generated" \
+  "Remaining risks" \
+  "Any contract ambiguities resolved during implementation"
+do
+  if ! grep -qF "$section" "$IMPL_FILE"; then
+    missing="${missing}      - \"${section}\"\n"
+  fi
+done
+
+if [ -n "$missing" ]; then
+  echo ""
+  echo "  ✘ [codex pre-commit guard] reports/codex-implementation.md is incomplete."
+  echo "    Missing required sections:"
+  printf "%b" "$missing"
+  echo "    The pipeline watcher will reject this artifact. Fix the report first."
+  echo ""
+  exit 1
+fi
+
+echo "  ✔ [codex pre-commit guard] reports/codex-implementation.md OK"
+exit 0

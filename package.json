@@ -13,7 +13,9 @@
     "format": "prettier --write .",
     "check:mql": "node ./mt5/check-mql-includes.mjs",
     "pipeline": "node scripts/pipeline-watcher.js",
-    "pipeline:start": "node scripts/start-pipeline-runner.js"
+    "pipeline:start": "node scripts/start-pipeline-runner.js",
+    "prepare": "git config core.hooksPath .githooks || true",
+    "validate:impl": "node scripts/validate-implementation.mjs"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
