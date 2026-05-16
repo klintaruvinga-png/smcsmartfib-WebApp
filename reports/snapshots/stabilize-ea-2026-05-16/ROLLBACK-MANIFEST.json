@@ -1,6 +1,7 @@
 {
   "workflow_id": "stabilize-ea-2026-05-16",
   "created_at": "2026-05-16T04:11:51Z",
+  "updated_at": "2026-05-16T04:20:00Z",
   "branch": "claude/nice-fermat-Vv4MK",
   "initial_commit": "c83222df1fb2d7712377eadcf94b67f7b42e5c42",
   "rollback_points": [
@@ -10,6 +11,20 @@
       "commit_hash": "c83222df1fb2d7712377eadcf94b67f7b42e5c42",
       "snapshot_file": "INITIAL-20260516T041151Z.json",
       "command": "git reset --hard c83222df1fb2d7712377eadcf94b67f7b42e5c42"
+    },
+    {
+      "name": "Before patches",
+      "tag": "rollback/stabilize-ea-2026-05-16-before-patches",
+      "commit_hash": "c83222df1fb2d7712377eadcf94b67f7b42e5c42",
+      "snapshot_file": "PRE-PATCH-20260516T041151Z.json",
+      "command": "git reset --hard c83222df1fb2d7712377eadcf94b67f7b42e5c42"
+    },
+    {
+      "name": "After Patch 1 (lint fix)",
+      "tag": "rollback/stabilize-ea-2026-05-16-after-patch-1",
+      "commit_hash": "4926afcd2d077dd149ff2f244caaafde1eb79e2d",
+      "snapshot_file": "AFTER-PATCH-1-20260516T042000Z.json",
+      "command": "git reset --hard 4926afcd2d077dd149ff2f244caaafde1eb79e2d"
     }
   ],
   "emergency_rollback": {

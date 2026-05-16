@@ -1,0 +1,29 @@
+{
+  "snapshot_type": "AFTER-PATCH-1",
+  "workflow_id": "stabilize-ea-2026-05-16",
+  "timestamp": "2026-05-16T04:20:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-Vv4MK",
+    "commit_hash": "4926afcd2d077dd149ff2f244caaafde1eb79e2d",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-16-after-patch-1"
+  },
+  "patch_applied": {
+    "id": "PATCH-1",
+    "issue_id": "LINT-001",
+    "description": "Prettier trailing-comma formatting auto-fix",
+    "files_changed": [
+      "scripts/pipeline-watcher.test.mjs",
+      "src/hooks/useSniperData.watchlist.test.tsx",
+      "src/lib/api/sniperClient.ts"
+    ],
+    "logic_changed": false,
+    "regression_risk": "NONE — formatting only"
+  },
+  "post_patch_checks": {
+    "npm_lint": "0 errors, 9 pre-existing warnings — PASS",
+    "npm_build": "PASS",
+    "npm_check_mql": "PASS",
+    "php_syntax_sniper": "No syntax errors — PASS",
+    "php_syntax_market_data": "No syntax errors — PASS"
+  }
+}
