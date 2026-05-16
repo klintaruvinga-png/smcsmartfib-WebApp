@@ -1,0 +1,73 @@
+{
+  "snapshot_type": "FINAL",
+  "workflow_id": "stabilize-ea-2026-05-16",
+  "timestamp": "2026-05-16T04:20:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-Vv4MK",
+    "commit_hash": "4926afcd2d077dd149ff2f244caaafde1eb79e2d",
+    "tags_created": [
+      "snapshot/stabilize-ea-2026-05-16-start-20260516T041151Z",
+      "rollback/stabilize-ea-2026-05-16-before-patches",
+      "rollback/stabilize-ea-2026-05-16-after-patch-1"
+    ]
+  },
+  "patches_applied": [
+    {
+      "id": "PATCH-1",
+      "description": "Prettier trailing-comma formatting fix (3 files, formatting only)",
+      "commit": "4926afcd2d077dd149ff2f244caaafde1eb79e2d"
+    }
+  ],
+  "migration_status_post_patch": {
+    "current_phase": "1 (MT5 Bridge Infrastructure)",
+    "blockers_addressed": [
+      "LINT-001: Prettier errors in sniperClient.ts and related test files (LOW severity)"
+    ],
+    "remaining_blockers": [
+      "PHASE1-001: Live MT5 terminal verification for /ea/heartbeat, /ea/account-sync, /ea/symbol-sync, /ea/license-check, /ea/market-stream coexistence"
+    ],
+    "phase_readiness": "Phase 1 backend routes IMPLEMENTED and REGRESSION-COVERED. Awaiting Track A live terminal execution to advance gate to PASSED."
+  },
+  "tests": {
+    "commands_run": [
+      "php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "php -l wordpress/smc-superfib-sniper/class-market-data-service.php",
+      "npm run lint",
+      "npm run build",
+      "npm run check:mql"
+    ],
+    "passing": true,
+    "failures": []
+  },
+  "ea_integration_status": {
+    "market_stream_route": "POST /wp-json/sniper/v1/ea/market-stream",
+    "auth_required": true,
+    "auth_header": "X-EA-API-Key",
+    "auth_aliases": ["x-ea-api-key", "x_ea_api_key", "x-api-key", "x_api_key"],
+    "secret_env": "SMC_SF_EA_API_KEY",
+    "user_id_required": true,
+    "wp_set_current_user": true,
+    "hash_equals_used": true,
+    "payload_validation": true,
+    "stale_rejection": true,
+    "stale_threshold_sec": 300,
+    "stale_http_code": 422,
+    "ohlc_guard": true,
+    "epoch_guard": true,
+    "tick_volume_guard": true,
+    "quote_time_alias": true,
+    "candles_array_shim": true,
+    "m1_and_m15_supported": true
+  },
+  "phase_1_bridge_status": {
+    "POST /ea/heartbeat": "IMPLEMENTED — PHP regression covered",
+    "POST /ea/account-sync": "IMPLEMENTED — PHP regression covered",
+    "POST /ea/symbol-sync": "IMPLEMENTED — PHP regression covered",
+    "GET /ea/license-check": "IMPLEMENTED — PHP regression covered",
+    "live_mt5_validation": "PENDING — requires Track A execution"
+  },
+  "rollback": {
+    "manifest": "ROLLBACK-MANIFEST.json",
+    "rollback_points_count": 3
+  }
+}

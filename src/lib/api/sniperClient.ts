@@ -395,7 +395,10 @@ export const apiClient = {
       method: "POST",
       body: { symbol },
     });
-    return { ok: result.ok, watchlist: requireWatchlistResponse("/user/watchlist/add", result.watchlist) };
+    return {
+      ok: result.ok,
+      watchlist: requireWatchlistResponse("/user/watchlist/add", result.watchlist),
+    };
   },
   async postWatchlistRemove(
     symbol: string,

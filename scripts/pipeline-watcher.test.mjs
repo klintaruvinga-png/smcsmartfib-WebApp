@@ -42,7 +42,9 @@ test("does not use shell fallback on non-Windows platforms", () => {
 
 test("treats migration archive paths as non-active phase updates", () => {
   assert.equal(
-    isActivePhaseUpdatePath(".github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md"),
+    isActivePhaseUpdatePath(
+      ".github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md",
+    ),
     true,
   );
   assert.equal(
