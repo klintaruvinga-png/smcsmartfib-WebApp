@@ -52,6 +52,15 @@ const LOCK_STALE_MS = 30 * 60 * 1000;
 // Used to distinguish "report missing but PR exists" (recoverable) from other failures.
 const REASON_NO_IMPL_REPORT =
   "Codex implementation finished without reports/codex-implementation.md";
+
+// Patterns that indicate Codex intentionally stopped before creating a branch or PR
+// (contract/reality conflict). When all of these match the last Codex output the pipeline
+// synthesises the implementation report locally instead of waiting for human intervention.
+const STOP_BEFORE_PATCH_PATTERNS = [
+  /no\s+(?:patch|files?)\s+(?:(?:was|were)\s+)?(?:applied|changed)/i,
+  /no\s+branch\s+(?:was\s+)?created/i,
+  /no\s+pr\s+(?:was\s+)?(?:opened|created)/i,
+];
 // Plan hardening retry policy: up to 3 attempts, 5 min between each.
 // After MAX_HARDENING_RETRIES failures the block becomes permanent and a
 // GitHub issue is filed so the human is notified without manual log review.
@@ -1262,6 +1271,97 @@ function runReportRecovery(state, issueSlug, prNumber) {
   });
 }
 
+// Returns true when the Codex last-message text contains all three markers that indicate
+// an intentional stop-before-patch: no files changed, no branch, no PR.
+// All three must be present to avoid false-positives on partial timeout failures.
+function detectStopBeforePatch(text) {
+  if (!text) return false;
+  return STOP_BEFORE_PATCH_PATTERNS.every((re) => re.test(text));
+}
+
+// Recovery for the case where Codex stopped (contract/reality conflict) before creating
+// a branch, PR, or implementation report. Synthesises codex-implementation.md directly
+// from the Codex stop message — no AI invocation required — then archives the cycle
+// and resets the pipeline to IDLE so the human can revise the plan and re-queue.
+function synthesizeStopReport(state, issueSlug) {
+  withPipelineLock("stop-report-synthesis", () => {
+    const stopMessage = fs.existsSync(CODEX_OUTPUT_FILE)
+      ? readTextFile(CODEX_OUTPUT_FILE).trim()
+      : "";
+
+    log(
+      "Stop-report synthesis: Codex stopped before implementation — synthesising report, archiving cycle",
+    );
+
+    const stopExcerpt = stopMessage.slice(0, 2000);
+    const now = new Date().toISOString();
+
+    const implContent = [
+      `# Implementation Report`,
+      ``,
+      `*Synthesised by pipeline stop-report recovery at ${now}*`,
+      ``,
+      `## Issue summary`,
+      ``,
+      `${state.issue ?? "Unknown issue"} — Codex stopped before implementation due to a`,
+      `contract/reality conflict. No code was changed.`,
+      ``,
+      `## Root cause implemented`,
+      ``,
+      `Not implemented. Codex identified a conflict between the implementation contract and`,
+      `the current repository state and stopped before making any code changes.`,
+      `See "Remaining risks" for the specific conflict.`,
+      ``,
+      `## Exact files changed`,
+      ``,
+      `None — Codex stopped before code changes. No branch was created, no commit was made,`,
+      `and no PR was opened.`,
+      ``,
+      `## Tests run`,
+      ``,
+      `None — stopped before code changes.`,
+      ``,
+      `## Reports generated`,
+      ``,
+      `None — stopped before code changes. This stop report was synthesised by the pipeline`,
+      `watcher to unblock the next planning cycle.`,
+      ``,
+      `## Remaining risks`,
+      ``,
+      `The implementation contract could not be applied as written. Codex stop message:`,
+      ``,
+      `\`\`\``,
+      stopExcerpt || "(Codex output not available)",
+      `\`\`\``,
+      ``,
+      `The plan must be revised before the next implementation attempt to address this conflict.`,
+      ``,
+      `## Any contract ambiguities resolved during implementation`,
+      ``,
+      `The contract was not ambiguous — it conflicted with the repository's actual execution`,
+      `path. No ambiguities were resolved because implementation was halted. The conflict`,
+      `should be addressed in the next planning cycle by revising the contract.`,
+    ].join("\n");
+
+    // Write the implementation report so it is preserved in the cycle archive.
+    fs.writeFileSync(IMPLEMENTATION_FILE, `${implContent}\n`, "utf8");
+    log("Stop-report synthesis: wrote reports/codex-implementation.md");
+
+    archiveCycleArtifacts(issueSlug);
+    clearImplementationFailedState();
+
+    const stopSummary = stopExcerpt.slice(0, 300).replace(/\r?\n+/g, " ").trim();
+    markIdle(
+      `Codex stopped (contract conflict) for: ${state.issue}. Stop reason: ${stopSummary}. ` +
+        `Revise the plan and re-queue a new /research-and-plan issue.`,
+    );
+
+    log(
+      "Stop-report synthesis complete — pipeline reset to IDLE. Revise the contract before re-queuing.",
+    );
+  });
+}
+
 function evaluatePipeline() {
   const state = readState();
   if (!state) {
@@ -1377,6 +1477,24 @@ function evaluatePipeline() {
       clearImplementationFailedState();
       markImplementationComplete(state);
       return;
+    }
+
+    // No open PR and no merged PR. Check whether Codex intentionally stopped before
+    // creating a branch (contract/reality conflict). If all three stop-before-patch
+    // markers are present in the last Codex output, synthesise the implementation
+    // report locally and reset the pipeline to IDLE so the human can revise the plan.
+    // This prevents the pipeline from stalling indefinitely on a legitimate stop.
+    if (state.implementation_failure_reason === REASON_NO_IMPL_REPORT) {
+      const lastMessage = fs.existsSync(CODEX_OUTPUT_FILE)
+        ? readTextFile(CODEX_OUTPUT_FILE).trim()
+        : "";
+      if (detectStopBeforePatch(lastMessage)) {
+        log(
+          "Codex stopped before creating a branch or PR — running stop-report synthesis to unblock pipeline",
+        );
+        synthesizeStopReport(state, issueSlug);
+        return;
+      }
     }
 
     log(

@@ -4,88 +4,72 @@
 
 ## 1. Issue validation
 
-**Confirmed**
+### Confirmed
 
-- EA post-init payloads (`SendAccountSync`, `SendSymbolSync`) omitted `user_id` during a payload construction regression, causing `permission_ea_bridge()` to reject ingest requests with a 400/401/403 response due to the `user_id <= 0` guard.
-- Backend auth gate (`smc-superfib-sniper.php` → `permission_ea_bridge()`) is the correct authority. It validates API key then enforces a positive `user_id` before any route handler runs. This model is sound and must not be relaxed.
-- Phase 1 parity audit (`.github/migration/audits/phase-1-mt5-ea-post-init-user-id-parity-2026-05-17.md`) confirms code parity is now in place: EA emits `user_id` and backend consumes it. The fix code is present.
+- `POST /ea/heartbeat` route is registered and auth-gated identically to the passing sync routes (`license-check`, `account-sync`, `symbol-sync`). The backend is ready to receive heartbeats.
+- `post_ea_heartbeat()` handler is implemented and persists data via `insert_engine_heartbeat()`. The handler is not the problem.
+- `SendHeartbeat()` exists in `mt5/MarketDataEngine.mqh` at lines 460–519 and constructs a correct JSON payload.
+- `OnPeriodic()` in `mt5/MarketDataEngine.mqh` is confirmed live — it drives account-sync, symbol-sync, and market-stream dispatches every cycle.
+- **Confirmed root cause:** `OnPeriodic()` does not contain a call to `SendHeartbeat()`. The call site was never wired. Zero heartbeat dispatches across multiple live cycles is the exact symptom produced by a missing call site, not by auth failure, payload error, or route misconfiguration.
 
-**Likely**
+### Likely
 
-- The omission was introduced by a refactor of the post-init chain ordering (`license-check → account-sync → symbol-sync → heartbeat`). `wpUserId` was initialized after the first outbound call in some code paths, meaning early calls fired before `Initialize()` completed its `wpUserId` assignment.
+- The omission originated during initial scaffolding: `SendHeartbeat()` was implemented as a handler before it was wired into the dispatch loop. This is consistent with the pattern where the backend route and PHP tests were completed before the MT5 call site was added.
+- `g_heartbeatIntervalTicks=48` throttle logic is dead code until the call site exists; once wired, throttle behavior will activate automatically on the first `OnPeriodic()` cycle that satisfies the tick count.
 
-**Unconfirmed**
+### Unconfirmed — must verify before patching
 
-- Whether any EA builds currently in circulation (compiled `.ex5` binaries distributed to live terminals) still pre-date the fix. Live attach evidence has not yet been collected.
-- Whether an intermittent race condition on specific platforms can still cause `wpUserId` to be zero at the moment of payload construction even with the current source.
+- **UC-1:** Whether `OnTimer()`, `OnInit()`, or `OnDeinit()` independently calls `SendHeartbeat()` anywhere in the EA codebase. If any such call exists outside the function definition, the root cause differs and this patch would duplicate dispatch.
+- **UC-2:** Whether `baseUrl` inside `SendHeartbeat()` is correctly derived from the webhook URL passed to `Initialize()`, or whether it references `webhookUrl` or a hardcoded string. A misconfigured `baseUrl` would cause the added call to POST to the wrong endpoint, masking a configuration defect.
+- **UC-3:** Whether `wpUserId` is populated correctly at the point `SendHeartbeat()` executes, ensuring the heartbeat payload carries a valid positive `user_id` matching the auth gate requirement.
+- **UC-4:** Whether the 8-minute cadence (`g_heartbeatIntervalTicks=48`) is compatible with the Phase 1 validation gate's liveness threshold. If the gate expects a heartbeat within less than 8 minutes of session start, the first dispatch may arrive too late to satisfy the check.
 
-**Rejected hypotheses**
-
-- Backend-side relaxation (Path B): rejected. Allowing missing `user_id` through a fallback widens the auth model and creates write-ownership ambiguity. Not in scope.
-- Frontend involvement: no frontend signal authority is relevant here. Rejected entirely.
+**If UC-1 finds an existing call site, stop. Do not proceed with this plan. Re-evaluate root cause before any edit.**
 
 ---
 
 ## 2. Implementation contract
 
-> **Note:** Code parity is confirmed as present in the current source by the Phase 1 audit. The implementation contract below addresses the outstanding verification and any residual gap the live attach may expose. It does not pre-authorize rewriting already-correct code.
+### File 1: `mt5/MarketDataEngine.mqh`
 
----
+- **Exact location:** `OnPeriodic()` method body, immediately after the symbol-iteration loop and all `SendToBackend()` calls complete — before the method returns.
+- **Exact change:** Add two lines:
+  1. A `Print()` diagnostic log line recording that heartbeat dispatch is being attempted, including the current tick count and `g_heartbeatIntervalTicks` value, so post-patch log inspection can confirm the call site was reached.
+  2. A call to `SendHeartbeat()` with no arguments (matches the existing function signature).
+- **Guard rails:**
+  - The symbol-iteration loop must not be altered.
+  - `SendToBackend()` call frequency, argument list, and ordering must not change.
+  - `SendHeartbeat()` function body (lines 460–519) must not be modified.
+  - `baseUrl` derivation must not be touched.
+  - No new variables, no new includes, no new conditional blocks beyond the throttle logic already inside `SendHeartbeat()`.
+- **Why in scope:** This is the only periodic dispatch path confirmed active. `SendHeartbeat()` was implemented to be called from this path. The call site is the only missing link.
+- **Acceptance criterion:** After the patch, live session logs must contain at least one `Print()` line confirming `SendHeartbeat()` was reached within the first full `g_heartbeatIntervalTicks` cycle after EA start, and the backend `engine_runs` table must contain a row with `status=heartbeat` and `source=explicit_heartbeat` timestamped after the patched EA version is deployed.
 
-### File 1 — `mt5/MarketDataEngine.mqh`
+### File 2: No other files require changes.
 
-- **Section to inspect:** `SendAccountSync()`, `SendSymbolSync()`, `SendLicenseCheck()`, `BuildWebhookPayload()`
-- **Exact change required:** Verify that every outbound payload construction site reads `wpUserId` after `Initialize()` has assigned it and that the JSON key `user_id` is present in the serialised body (POST) or query string (GET). If any site reads `wpUserId` before assignment, move the read to after `Initialize()` completes.
-- **Guard rails:** Do not alter the JSON key names `user_id`, `api_key`, or any existing field names. Do not alter the `BuildWebhookPayload()` signature or its return type. Do not remove the `wpUserId` class member.
-- **Why in scope:** This file owns all payload construction. It is the confirmed origin of the omission.
-- **Acceptance criterion:** Every call to `SendAccountSync()`, `SendSymbolSync()`, `SendLicenseCheck()`, and the heartbeat equivalent reads a non-zero `wpUserId` and serialises it into the outbound payload before the HTTP call is dispatched.
-
----
-
-### File 2 — `mt5/SMC_MarketDataEA.mq5`
-
-- **Section to inspect:** `OnInit()` — specifically the call to `Initialize(..., userId)` and the ordering of the post-init chain.
-- **Exact change required:** Confirm that `Initialize()` is called and returns success before any post-init payload dispatch (license-check, account-sync, symbol-sync, heartbeat) is triggered. If any dispatch is scheduled or invoked before `Initialize()` completes, move it to after the success return.
-- **Guard rails:** Do not alter the `UserId` EA input declaration or its variable name. Do not alter `OnTick()` or `OnTimer()` logic beyond what sequencing requires. Do not introduce new EA inputs.
-- **Why in scope:** The EA owns the post-init chain ordering. An ordering defect here is the confirmed trigger hypothesis.
-- **Acceptance criterion:** The post-init sequence executes strictly as `license-check → account-sync → symbol-sync → heartbeat`, each call preceded by a confirmed non-zero `UserId`.
-
----
-
-### File 3 — `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
-
-- **Section to inspect:** `permission_ea_bridge()` — the `user_id <= 0` guard and `ea_request_value()` precedence.
-- **Exact change required:** No code change expected or authorised. Verify only that the guard is intact: API key validated first, then `ea_request_value()` extracts `user_id` from JSON body before query params, then `user_id <= 0` rejects, then `wp_set_current_user()` binds.
-- **Guard rails:** Do not soften the `user_id <= 0` rejection. Do not alter `ea_request_value()` precedence rules. Do not add a fallback admin resolution.
-- **Why in scope:** This is the rejection site. Confirming it is unchanged and operating correctly closes the backend side of the contract.
-- **Acceptance criterion:** A POST to `/ea/account-sync` with a valid API key and `user_id > 0` returns 200. A POST with `user_id` absent or zero returns a non-200 error with no DB write.
-
----
-
-### File 4 — `wordpress/smc-superfib-sniper/tests/php/test-ea-*.php`
-
-- **Section to inspect:** Tests covering `account-sync`, `symbol-sync`, and `heartbeat` routes.
-- **Exact change required:** Confirm existing tests assert the `user_id` field is present in the request fixture and that the route returns 200 with a valid `user_id`. If any test fixture omits `user_id` or uses `user_id = 0`, update the fixture to use a valid positive integer. Do not relax any assertion.
-- **Guard rails:** Do not remove existing assertions. Do not mock `permission_ea_bridge()` in a way that bypasses the `user_id` gate.
-- **Why in scope:** These are the regression guards for the confirmed failure path.
-- **Acceptance criterion:** All `test-ea-*.php` tests pass with `user_id` present and positive in every fixture.
+- `mt5/SMC_MarketDataEA.mq5`: `g_heartbeatIntervalTicks=48` is correct as defined. No change.
+- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`: Route and handler are correct. No change.
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php`: Existing tests cover the backend path. No new tests required in this file unless UC-4 reveals a cadence problem requiring a backend-side timing adjustment.
 
 ---
 
 ## 3. Patch sequence
 
-1. **Inspect `mt5/MarketDataEngine.mqh`** — audit all four payload construction sites against the confirmed fix. If a gap exists, apply the minimal correction (move read after assignment). No change if already correct.
-2. **Inspect `mt5/SMC_MarketDataEA.mq5`** — confirm post-init chain ordering. If a sequencing defect exists, correct it. No change if already correct.
-3. **Re-run PHP tests** (`test-ea-*.php`) — must pass before any live attach is attempted.
-4. **Inspect `smc-superfib-sniper.php`** — read-only verification. Confirm no drift from the expected guard structure.
-5. **Rebuild EA binary** — compile the current source into a fresh `.ex5`. This is required before live attach can validate the fix.
-6. **Live attach validation** — attach the rebuilt EA to a live MT5 terminal, trigger the post-init chain, and collect logs and DB evidence.
+1. **Pre-patch verification (blocking):** Search all MT5 source files (`mt5/MarketDataEngine.mqh`, `mt5/SMC_MarketDataEA.mq5`, and all included `.mqh` files) for any invocation of `SendHeartbeat()` outside the function definition at lines 460–519. If none found, proceed. If found, stop and re-evaluate.
+2. **Pre-patch verification (blocking):** Confirm `baseUrl` inside `SendHeartbeat()` (lines 460–519) references the same variable used by `SendToBackend()`, not `webhookUrl` or a hardcoded literal. If misconfigured, do not add the call site — file a separate defect for `baseUrl` misconfiguration.
+3. **Pre-patch verification (blocking):** Confirm `wpUserId` is populated with a positive integer before `OnPeriodic()` can be reached. If `wpUserId` can be zero at dispatch time, the heartbeat POST will fail the auth gate even after the call site is added.
+4. **Single edit:** Add the two lines (diagnostic log + `SendHeartbeat()` call) to `OnPeriodic()` in `mt5/MarketDataEngine.mqh` after the symbol loop.
+5. **Recompile:** Compile the EA in MetaEditor. The patch must produce zero errors and zero warnings before deployment.
+6. **Deploy and verify:** Deploy the recompiled EA, monitor live session logs for the `Print()` diagnostic, and confirm the backend `engine_runs` table receives a heartbeat row within the first `g_heartbeatIntervalTicks` cycle.
+
+**Dependencies:**
+- Steps 1–3 must complete before step 4. If any verification fails, step 4 must not proceed.
+- Step 5 must complete before step 6. A compile error in step 5 blocks deployment.
 
 **Sequencing risks:**
-
-- Steps 1–2 must complete before step 5. Compiling a stale source invalidates the live attach evidence.
-- Step 3 must pass before step 6. A failing PHP test means the backend is not in a known-good state.
-- DB writes in step 6 depend on a valid `user_id` being present end-to-end. Any missing link in the chain will cause silent ingest failure, not a hard crash.
+- No cache invalidation or database migration is required.
+- No contract changes between EA and backend: the heartbeat payload schema (`user_id`, `account_id`, `terminal_id`, `broker`, `broker_server`, `ea_version`, `terminal_build`, `connected`, `timestamp`) is already implemented in `SendHeartbeat()` and expected by `post_ea_heartbeat()`. No schema drift risk.
+- The 8-minute cadence means the first heartbeat will not appear in logs immediately after deploy. The verifier must wait at least one full `g_heartbeatIntervalTicks` cycle (~8 minutes at the OnTimer period) before declaring success or failure.
 
 ---
 
@@ -93,28 +77,27 @@
 
 **Checks the implementation agent must run after patching:**
 
-1. `php ./vendor/bin/phpunit wordpress/smc-superfib-sniper/tests/php/test-ea-*.php` — all tests green.
-2. Compile EA source to `.ex5` with zero compiler warnings on the `user_id` payload sites.
-3. Live attach: inspect MT5 journal for `user_id` in each of `account-sync`, `symbol-sync`, `license-check`, and heartbeat log lines.
-4. Backend log: confirm 200 responses for all four routes with `user_id > 0`.
-5. DB confirmation: verify rows written to `smc_sf_account_snapshots` and `smc_sf_symbol_sync` with the correct `user_id` foreign key.
+1. Recompile the EA in MetaEditor. Zero errors, zero warnings required. Do not deploy if the compiler reports any diagnostic.
+2. Run the full PHP test suite: `test-ea-heartbeat.php`, `test-ea-account-sync.php`, `test-ea-symbol-sync.php`, and `test-ea-bridge-bootstrap.php`. All must pass. These tests do not test MT5 directly but confirm the backend contract has not been disturbed.
+3. Deploy the patched EA in a live session. Confirm via `Print()` log output that `OnPeriodic()` reaches the `SendHeartbeat()` call site.
+4. After at least one full `g_heartbeatIntervalTicks` cycle, query the backend `engine_runs` table and confirm a row exists with `status=heartbeat`, `source=explicit_heartbeat`, and a `user_id` matching the active session.
+5. Confirm account-sync and symbol-sync dispatches continue firing at their existing frequency without suppression or delay.
 
 **Existing protections that must still hold:**
 
-- API key validation (`X-EA-API-Key`) must fire before `user_id` extraction.
-- `ea_request_value()` JSON-before-query-params precedence must remain unchanged.
-- `wp_set_current_user()` must only be called after a confirmed positive `user_id`.
-- All existing PHP route tests must pass without fixture modification beyond `user_id` correctness.
+- `permission_ea_bridge()` must continue to reject requests with missing or invalid `X-EA-API-Key` and must continue to reject `user_id=0`. The PHP negative-path tests in `test-ea-heartbeat.php` cover this; they must still pass.
+- The symbol-iteration loop in `OnPeriodic()` must not change in ordering, frequency, or payload.
 
 **Parity re-validations required:**
 
-- MT5 EA → Backend ingest parity: confirmed via live attach logs and DB row verification.
-- Phase 1 gate re-validation: the pending live attach evidence from the existing audit must be completed and appended to `.github/migration/audits/phase-1-mt5-ea-post-init-user-id-parity-2026-05-17.md`.
+- MT5 EA ↔ Backend: Confirm the heartbeat `POST /ea/heartbeat` returns HTTP 200 for the live session and that the `engine_runs` row is correctly written.
+- Dashboard ↔ Backend: Confirm the Phase 1 intake checklist transitions the heartbeat check from FAIL to PASS after the first successful heartbeat is persisted.
+- EA restart detection: Confirm that a manual EA restart produces a new heartbeat record with an updated timestamp, demonstrating the backend can distinguish restarts.
 
-**Logging and diagnostics:**
+**Logging and diagnostics that must exist after the patch:**
 
-- MT5 journal must emit a log line containing `user_id` and the resolved value at the point each payload is dispatched.
-- Backend must log the resolved `user_id` at the `permission_ea_bridge()` success path (if not already present).
+- At minimum: one `Print()` call in `OnPeriodic()` at the heartbeat dispatch site, logging tick count, interval, and dispatch attempt.
+- The existing `insert_engine_heartbeat()` error logging on the backend side must continue to fire on failure — do not suppress backend error output.
 
 ---
 
@@ -122,20 +105,20 @@
 
 **Out of scope for this patch:**
 
-- Dashboard frontend changes of any kind.
-- Pine script or TradingView formula changes.
-- Backend fallback resolution for missing `user_id` (Path B is rejected).
-- Changes to any DB schema, migration, or table structure.
-- Changes to the `X-EA-API-Key` validation logic.
-- Modifying or extending `ea_request_value()` beyond current behaviour.
-- Audit of EA builds older than the current source — old binaries are a deployment concern, not a code patch concern.
-- Any changes to heartbeat logic beyond confirming `user_id` is present.
+- Refactoring `OnPeriodic()` into a dedicated `OnHeartbeatTimer()` with independent timer registration (Path B from the research report). Unnecessary scope, higher regression risk.
+- Modifying `g_heartbeatIntervalTicks` or the OnTimer period. The 8-minute cadence is an existing decision. If UC-4 reveals a Phase 1 gate incompatibility, that is a separate issue requiring a separate plan.
+- Adding retry logic to `SendHeartbeat()`. The function already exists; adding retry is a scope addition not supported by the current evidence.
+- Modifying `SendToBackend()` or the symbol dispatch logic in any way.
+- Modifying the PHP heartbeat handler, route registration, or auth gate.
+- Adding new fields to the heartbeat payload. The payload is already complete.
+- Adding a heartbeat call to `OnInit()` or `OnDeinit()`. These are not periodic and would create a different dispatch pattern. If startup/teardown heartbeats are needed, that is a separate feature.
+- Modifying dashboard display logic, session state evaluation, or any frontend component.
 
 **Attractive but unsafe follow-on changes to avoid in this patch:**
 
-- Adding a permissive `user_id` fallback to unblock transient EA attaches — this would compromise write ownership and must not be introduced here or as a follow-on without explicit human approval and a dedicated migration gate.
-- Refactoring `BuildWebhookPayload()` for generalisation — premature abstraction; the current contract is stable.
-- Adding retry logic to the post-init chain — out of scope; sequencing correctness is the fix, not retry semantics.
+- Do not adjust `baseUrl` or `webhookUrl` handling even if UC-2 finds a discrepancy. A `baseUrl` fix is a separate defect with its own blast radius.
+- Do not add heartbeat acknowledgment logic to the EA (waiting for backend response code before continuing). The existing fire-and-continue pattern used by `SendToBackend()` is correct and must be matched.
+- Do not change the `engine_runs` table schema or add new columns to the heartbeat record.
 
 ---
 
@@ -143,41 +126,48 @@
 
 **Worst-case failure mode if patched incorrectly:**
 
-- If `user_id` is hardcoded to a fixed value or resolved from the wrong scope, ingest writes will be attributed to the wrong WordPress user. Account snapshots and symbol sync rows will carry incorrect ownership, corrupting all downstream dashboard queries that filter by `user_id`. This is a silent data-integrity failure with no immediate visible error.
+- If `baseUrl` is misconfigured (UC-2 not verified), the added call posts to a wrong endpoint, heartbeats silently fail, and the Phase 1 gate remains blocked while appearing to be wired correctly. Diagnosis becomes harder because the call site now exists.
+- If an existing `SendHeartbeat()` call exists elsewhere (UC-1 not verified), the added call creates duplicate heartbeat records, potentially corrupting session state tracking and EA restart detection timestamps.
+- If `wpUserId` is zero at dispatch time (UC-3 not verified), every heartbeat POST fails auth, producing repeated 401 responses and backend error log noise without any successful heartbeat record.
 
 **User-visible failure mode:**
 
-- Dashboard shows no account data or stale account data for the affected user. Symbol sync indicators are absent or frozen. The user has no feedback that the EA is rejected — the MT5 terminal may show no error if the EA continues running after a failed post-init ingest.
+- Phase 1 intake checklist heartbeat check remains in FAIL state. Dashboard session health indicator shows no live keepalive. Backend cannot distinguish a running EA from a stalled one.
 
 **Backend authority and stale-state risks:**
 
-- If the PHP guard is weakened (not authorised in this patch), any EA with a valid API key can write ingest data without identity binding. This breaks the backend-as-authority model entirely.
-- If the EA is not rebuilt before live attach, the live evidence is invalid and the Phase 1 gate cannot be closed.
+- If the patch is applied but verification steps are skipped and the heartbeat fails silently, the backend may enter a state where account-sync and symbol-sync records exist but no heartbeat record exists, causing the session health evaluator to mark the EA as disconnected despite active sync activity. This is a false-stale state that is harder to diagnose after the fact.
+- No stale-data bypass is introduced by this patch. The heartbeat is a keepalive signal; it does not override sync data or session state decisions made by the backend.
 
 **Human approval required before merge:** Yes.
 
-- Live attach evidence must be reviewed by a human before this PR is merged. The audit must be updated with actual log lines and DB confirmation, not only code inspection. No automated gate can substitute for this step given the Phase 1 migration dependency.
+A human must verify:
+1. The diff shows only the two-line addition in `OnPeriodic()` in `mt5/MarketDataEngine.mqh` with no unintended changes.
+2. The EA recompiles with zero errors and zero warnings.
+3. The PHP test suite passes in full.
+4. At least one live `POST /ea/heartbeat` returns HTTP 200 and is persisted to `engine_runs` with `status=heartbeat`.
+5. The Phase 1 intake checklist heartbeat row transitions to PASS.
 
 ---
 
 ## 7. Test requirements
 
-**Tests to add or update:**
+**Tests to add:**
 
-- `wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php` — add or confirm a test case that sends a POST with `user_id` present and positive and asserts a 200 response and a DB row written.
-- `wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php` — same as above for the symbol-sync route.
-- `wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php` — add or confirm a negative test case that sends `user_id = 0` or omits `user_id` and asserts a non-200 response and no DB write.
+- `mt5/tests/` (or equivalent MT5 unit test surface if one exists): A call-site presence check confirming `OnPeriodic()` contains a reference to `SendHeartbeat()`. This is a static verification guard to prevent the call site from being silently removed in future refactors.
 
 **Existing tests that must still pass:**
 
-- All `test-ea-*.php` files in their current form, covering heartbeat, account-sync, symbol-sync, and license-check routes.
-- No existing assertion may be relaxed or removed.
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php` — all positive and negative path cases.
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php` — full suite, no timing regressions.
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php` — full suite, no timing regressions.
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-bridge-bootstrap.php` — auth helper regression checks.
 
-**Live and soak verification required:**
+**Soak and live-environment verification required:**
 
-- Live attach: MT5 terminal attached to a real MetaTrader 5 instance, EA initialised with a valid `UserId` EA input, post-init chain triggered, journal and backend logs captured.
-- DB soak: confirm rows in `smc_sf_account_snapshots` and `smc_sf_symbol_sync` appear within the expected window after EA attach.
-- Parity replay: re-run the Phase 1 parity checklist from `.github/migration/audits/phase-1-mt5-ea-post-init-user-id-parity-2026-05-17.md` and append live evidence.
+- Soak: Allow the patched EA to run for a minimum of 3 full `g_heartbeatIntervalTicks` cycles (~24 minutes) and confirm 3 heartbeat records appear in `engine_runs` at the expected cadence. Cadence jitter of ±1 tick is acceptable.
+- Parity replay: Confirm account-sync and symbol-sync record counts are unchanged across the soak period — heartbeat dispatch must not suppress or delay other dispatches.
+- Restart detection: Perform one manual EA restart during the soak period and confirm a new heartbeat record appears with an updated timestamp within the first post-restart `g_heartbeatIntervalTicks` cycle.
 
 ---
 
@@ -186,21 +176,19 @@
 **Branch naming recommendation:**
 
 ```
-fix/mt5-post-init-user-id-live-validation
+codex/fix-heartbeat-dispatch-missing-call-site
 ```
 
 **Suggested commit grouping:**
 
-1. `fix(mt5): verify user_id emission in all post-init payloads` — any residual source correction in `MarketDataEngine.mqh` or `SMC_MarketDataEA.mq5`.
-2. `test(php): harden user_id fixture coverage in ea bridge tests` — test fixture updates only.
-3. `audit(phase-1): append live attach evidence to parity audit` — audit document update with log lines and DB confirmation.
+- Commit 1: `fix(mt5): wire SendHeartbeat() call into OnPeriodic() dispatch loop` — contains only the two-line addition in `mt5/MarketDataEngine.mqh`.
+- No additional commits. This patch is a single atomic change. Do not bundle unrelated cleanup or diagnostic improvements into the same commit.
 
-**Required reports or artifacts after implementation:**
+**Required reports or artifacts to generate after implementation:**
 
-- Updated `.github/migration/audits/phase-1-mt5-ea-post-init-user-id-parity-2026-05-17.md` with live attach log lines and DB row confirmation.
-- MT5 journal excerpt showing `user_id` in each of the four post-init dispatch log lines.
-- Backend access log excerpt showing 200 responses for `/ea/account-sync` and `/ea/symbol-sync` with confirmed `user_id`.
+- Implementation report at `reports/codex-implementation.md` confirming: (a) which pre-patch verification steps were run and their outcomes, (b) exact diff applied, (c) compile result, (d) PHP test results, (e) live heartbeat confirmation with timestamp and `engine_runs` row ID.
+- Update `reports/codex-plan.md` status section to reflect implementation complete.
 
 **State transition:**
 
-`READY_FOR_IMPLEMENTATION` — `editing_locked=false`
+`READY_FOR_IMPLEMENTATION` | `editing_locked=false`
