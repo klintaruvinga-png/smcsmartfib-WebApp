@@ -1,0 +1,25 @@
+{
+  "snapshot_type": "AFTER-PATCH-1",
+  "workflow_id": "stabilize-ea-2026-05-17",
+  "timestamp": "2026-05-17T00:20:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-bQ6FF",
+    "commit_hash": "0c013e094801007c5ad0bd5ae7d7cae2669e51fe",
+    "tag": "rollback/stabilize-ea-2026-05-17-after-patch-1"
+  },
+  "patch": {
+    "id": "PATCH-1",
+    "issue_id": "LINT-001",
+    "description": "Prettier formatting fix in scripts/validate-implementation.mjs and scripts/pipeline-watcher.js",
+    "files_changed": ["scripts/validate-implementation.mjs", "scripts/pipeline-watcher.js"],
+    "logic_changed": false,
+    "tests_updated": false
+  },
+  "post_patch_checks": {
+    "php_lint_main_plugin": "PASS — No syntax errors detected",
+    "php_lint_market_data_service": "PASS — No syntax errors detected",
+    "npm_build": "PASS — built in ~8s",
+    "npm_check_mql": "PASS — MQL include verification passed",
+    "npm_lint": "PASS — 0 errors, 9 warnings (pre-existing, out of scope)"
+  }
+}

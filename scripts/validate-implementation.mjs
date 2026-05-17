@@ -28,14 +28,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
-const REPO_ROOT  = path.join(__dirname, "..");
+const __dirname = path.dirname(__filename);
+const REPO_ROOT = path.join(__dirname, "..");
 
-const IMPLEMENTATION_FILE      = path.join(REPO_ROOT, "reports", "codex-implementation.md");
+const IMPLEMENTATION_FILE = path.join(REPO_ROOT, "reports", "codex-implementation.md");
 const IMPLEMENTATION_META_FILE = path.join(REPO_ROOT, "reports", "codex-implementation.meta.json");
-const PLAN_FILE                = path.join(REPO_ROOT, "reports", "codex-plan.md");
-const STATE_FILE               = path.join(REPO_ROOT, ".smc-workflow-state.json");
-const FAILED_FILE              = path.join(REPO_ROOT, "reports", ".codex-implementation-failed.json");
+const PLAN_FILE = path.join(REPO_ROOT, "reports", "codex-plan.md");
+const STATE_FILE = path.join(REPO_ROOT, ".smc-workflow-state.json");
+const FAILED_FILE = path.join(REPO_ROOT, "reports", ".codex-implementation-failed.json");
 
 // Required top-level sections in codex-implementation.md.
 // MUST match isUsableImplementation() in scripts/pipeline-watcher.js exactly.
@@ -49,9 +49,15 @@ const REQUIRED_SECTIONS = [
   "Any contract ambiguities resolved during implementation",
 ];
 
-function pass(msg)  { console.log(`  ✔ ${msg}`); }
-function fail(msg)  { console.error(`  ✘ ${msg}`); }
-function header(msg){ console.log(`\n${msg}`); }
+function pass(msg) {
+  console.log(`  ✔ ${msg}`);
+}
+function fail(msg) {
+  console.error(`  ✘ ${msg}`);
+}
+function header(msg) {
+  console.log(`\n${msg}`);
+}
 
 let failCount = 0;
 
@@ -103,15 +109,21 @@ if (metaExists) {
   }
 
   if (meta) {
-    check(typeof meta.issue === "string" && meta.issue.length > 0,
+    check(
+      typeof meta.issue === "string" && meta.issue.length > 0,
       "Contains 'issue' field",
-      "Missing 'issue' field");
-    check(typeof meta.plan_hash === "string" && meta.plan_hash.length === 64,
+      "Missing 'issue' field",
+    );
+    check(
+      typeof meta.plan_hash === "string" && meta.plan_hash.length === 64,
       "Contains 'plan_hash' (SHA-256)",
-      "Missing or malformed 'plan_hash'");
-    check(typeof meta.written_at === "string",
+      "Missing or malformed 'plan_hash'",
+    );
+    check(
+      typeof meta.written_at === "string",
       "Contains 'written_at' timestamp",
-      "Missing 'written_at'");
+      "Missing 'written_at'",
+    );
 
     // Verify plan_hash matches the current plan file.
     if (fs.existsSync(PLAN_FILE)) {
@@ -131,9 +143,12 @@ if (metaExists) {
 header("3. reports/.codex-implementation-failed.json (must be absent for success)");
 
 const failedExists = fs.existsSync(FAILED_FILE);
-check(!failedExists, "Failure sentinel absent — no recorded failure",
+check(
+  !failedExists,
+  "Failure sentinel absent — no recorded failure",
   "Failure sentinel present — pipeline recorded a failure: " +
-  (failedExists ? JSON.parse(fs.readFileSync(FAILED_FILE, "utf8")).reason : ""));
+    (failedExists ? JSON.parse(fs.readFileSync(FAILED_FILE, "utf8")).reason : ""),
+);
 
 // ── 4. Workflow state ─────────────────────────────────────────────────────────
 
@@ -176,7 +191,9 @@ if (failCount === 0) {
   console.error("  • 'Codex implementation finished without reports/codex-implementation.md'");
   console.error("    → Codex ran successfully but skipped step 9 (write implementation summary).");
   console.error("    → Fix: write reports/codex-implementation.md manually with all 7 required");
-  console.error("      sections, then set .smc-workflow-state.json state to IMPLEMENTATION_COMPLETE.");
+  console.error(
+    "      sections, then set .smc-workflow-state.json state to IMPLEMENTATION_COMPLETE.",
+  );
   console.error("  • plan_hash mismatch");
   console.error("    → The plan was modified after Codex wrote its meta. Re-run validation or");
   console.error("      delete reports/codex-implementation.meta.json and let the watcher retry.");

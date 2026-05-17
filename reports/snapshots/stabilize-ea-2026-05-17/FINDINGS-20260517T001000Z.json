@@ -1,0 +1,94 @@
+{
+  "snapshot_type": "FINDINGS",
+  "workflow_id": "stabilize-ea-2026-05-17",
+  "timestamp": "2026-05-17T00:10:00Z",
+  "confirmed_issues": [
+    {
+      "id": "LINT-001",
+      "severity": "LOW",
+      "system": "Scripts (CI / Pipeline)",
+      "description": "Prettier formatting violations in scripts/validate-implementation.mjs (18 errors) and scripts/pipeline-watcher.js (1 error) causing npm run lint to report 19 errors. No runtime or correctness impact.",
+      "root_cause": "Recent commits to validate-implementation.mjs and pipeline-watcher.js did not run eslint --fix before committing, leaving inconsistent whitespace and trailing-comma formatting.",
+      "impact_zones": ["CI lint gate", "Developer experience"],
+      "proposed_fix": "Run eslint --fix on the two affected scripts files to auto-correct formatting. Zero logic changes."
+    }
+  ],
+  "confirmed_not_issues": [
+    {
+      "id": "INFO-001",
+      "system": "EA Authentication",
+      "description": "permission_ea_bridge: ALL 4 required checks confirmed present — missing key (401), unconfigured secret (503), hash_equals comparison (403), missing user_id (400), invalid user_id (403), wp_set_current_user binding. CORRECT.",
+      "status": "NO ACTION REQUIRED"
+    },
+    {
+      "id": "INFO-002",
+      "system": "EA Payload Validation",
+      "description": "Stale rejection at 300s (422), warn-only 120-300s, OHLC guard, epoch guard (pre-2000 rejection), M1 candle age guard (180s), M15 candle age guard (1800s), tick_volume guard (non-numeric and negative clamped), bid/ask finite positive check, map_symbol_aliases(). ALL CONFIRMED CORRECT.",
+      "status": "NO ACTION REQUIRED"
+    },
+    {
+      "id": "INFO-003",
+      "system": "MQL5 EA vs PHP Payload Parity",
+      "description": "EA sends user_id, symbol, normalized_symbol, timeframe (M1), timestamp (not quote_time — PHP accepts both), bid, ask, freshness, session, candle{time,open,high,low,close,volume}, candle_m15{...}. PHP handler reads and validates all fields correctly.",
+      "status": "100% PARITY CONFIRMED"
+    },
+    {
+      "id": "INFO-004",
+      "system": "authority-diagnostics route",
+      "description": "Returns HTTP 401 for unauthenticated requests via permission_user. This is EXPECTED BEHAVIOR — not a bug.",
+      "status": "PROTECTED AS EXPECTED"
+    },
+    {
+      "id": "INFO-005",
+      "system": "Admin Routes",
+      "description": "All /admin/* routes use permission_admin which requires manage_options capability. CORRECT.",
+      "status": "PROTECTED AS EXPECTED"
+    },
+    {
+      "id": "INFO-006",
+      "system": "Frontend Dashboard Truth",
+      "description": "Dashboard gets is_live, age_sec, and freshness from backend /snapshot. staleTime:0 on useEngineHealth(). No faking of live status. CORRECT.",
+      "status": "BACKEND AUTHORITY PRESERVED"
+    },
+    {
+      "id": "INFO-007",
+      "system": "Phase 1 Bridge Routes",
+      "description": "All 4 Phase 1 routes implemented: POST /ea/heartbeat, POST /ea/account-sync, POST /ea/symbol-sync, GET /ea/license-check. All use permission_ea_bridge. Awaiting live terminal validation.",
+      "status": "IMPLEMENTED — LIVE VALIDATION PENDING"
+    },
+    {
+      "id": "INFO-008",
+      "system": "React Hooks Warnings",
+      "description": "9 pre-existing ESLint warnings (react-hooks/exhaustive-deps, react-refresh/only-export-components) in UI components. Not blocking, not introduced by this workflow.",
+      "status": "PRE-EXISTING — NOT IN SCOPE"
+    }
+  ],
+  "migration_blockers": [
+    {
+      "id": "MIGRATION-PHASE1-001",
+      "phase": "Phase 1",
+      "description": "Live MT5 terminal verification still pending for /ea/license-check, /ea/heartbeat, /ea/account-sync, /ea/symbol-sync routes. Code is implemented and regression-covered; requires Track A live terminal execution.",
+      "status": "PENDING — BLOCKED ON TRACK A LIVE TESTING",
+      "validation_required": true
+    }
+  ],
+  "statistics": {
+    "total_issues": 1,
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 1,
+    "migration_blockers": 1
+  },
+  "assessment": {
+    "system_health": "STABLE",
+    "ea_route_status": "CORRECT — no repair needed",
+    "auth_model_status": "CORRECT — complete and hardened",
+    "payload_validation_status": "CORRECT — comprehensive guards present",
+    "stale_data_protection": "CORRECT — 300s hard reject + 120-300s warn",
+    "backend_authority": "PRESERVED — signal truth lives in WordPress plugin",
+    "dashboard_truth": "CORRECT — no faked live state",
+    "migration_phase_0": "COMPLETE",
+    "migration_phase_1": "IN-PROGRESS — code complete, live validation pending"
+  }
+}
