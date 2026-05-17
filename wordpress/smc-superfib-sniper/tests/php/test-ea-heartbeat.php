@@ -50,4 +50,11 @@ $missing_user = dispatch_ea_request($plugin, 'permission_ea_bridge', 'post_ea_he
 assert_true($missing_user instanceof WP_Error, 'Missing user_id must fail safely.');
 assert_same('smc_sf_user_required', $missing_user->code, 'Missing user_id must use the plugin auth error code.');
 
+$zero_user = dispatch_ea_request($plugin, 'permission_ea_bridge', 'post_ea_heartbeat', array(
+    'user_id' => 0,
+    'account_id' => '12345678',
+), ea_bridge_headers());
+assert_true($zero_user instanceof WP_Error, 'Zero user_id must fail safely.');
+assert_same('smc_sf_user_required', $zero_user->code, 'Zero user_id must preserve the backend auth guard.');
+
 fwrite(STDOUT, "EA heartbeat checks passed\n");

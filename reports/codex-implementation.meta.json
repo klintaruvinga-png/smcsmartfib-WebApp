@@ -1,0 +1,5 @@
+{
+  "issue": "License gate is fixed, but some downstream EA→backend bridge calls are still missing user_id. Check. Immediately after the successful license allow, the logs still show: SMC SuperFIB EA bridge auth failed: missing user_id. migration is no longer blocked at the license gate. The next bug is now isolated to the bridge request payload after init.",
+  "plan_hash": "b28bb36178313066740e3926aa8e80d64ff89bb01e9574c82edf91a0481abae4",
+  "written_at": "2026-05-17T07:46:22.184Z"
+}

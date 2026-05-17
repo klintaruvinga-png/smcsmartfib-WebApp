@@ -9,6 +9,7 @@
 - Resolved the 2026-05-16 live `missing user_id` failure on `GET /ea/license-check` by sending `user_id` as a query parameter from the MT5 EA while preserving the existing backend auth contract.
 
 ## Files changed
+- `mt5/MarketDataEngine.mqh`
 - `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
 - `wordpress/smc-superfib-sniper/tests/php/test-ea-bridge-bootstrap.php`
 - `wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php`
@@ -52,6 +53,18 @@
   `wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php` now covers a query-param-only `user_id` request with an empty JSON body to protect the live GET transport path.
 - Backend authority:
   preserved. Missing `user_id` still returns 400, invalid `user_id` still returns 403, API key handling is unchanged, and `wp_set_current_user()` remains the binding point on success.
+
+## Issue resolution - 2026-05-17 (post-init POST payloads)
+- Evidence:
+  after the license gate fix, the next live failure remained `SMC SuperFIB EA bridge auth failed: missing user_id.` on the first downstream POST bridge calls reached during init.
+- Root cause:
+  `mt5/MarketDataEngine.mqh` stored `wpUserId` correctly but omitted it from the JSON bodies built by `SendHeartbeat()`, `SendAccountSync()`, and `SendSymbolSync()`, so `permission_ea_bridge()` rejected the request before the handlers executed.
+- Fix applied:
+  `mt5/MarketDataEngine.mqh` now injects `"user_id": <wpUserId>` as an integer top-level field in all three POST payloads. No backend auth, route, or stale-data logic was changed.
+- Regression protection:
+  the existing PHP bridge tests for heartbeat, account-sync, and symbol-sync now explicitly assert that missing or zero `user_id` continues to fail with `smc_sf_user_required`, preserving backend authority while documenting the required payload contract.
+- Backend authority:
+  preserved. API key validation order is unchanged, `user_id > 0` enforcement is unchanged, `SendLicenseCheck()` remains query-param based, and the dashboard/backend source-of-truth boundary is unchanged.
 
 ## Tests added
 - `wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php`

@@ -104,6 +104,29 @@ $invalid = dispatch_ea_request($plugin, 'permission_ea_bridge', 'post_ea_symbol_
 assert_true($invalid instanceof WP_Error, 'Symbol-sync missing normalized_symbol must fail safely.');
 assert_same('smc_sf_symbol_sync_symbol_invalid', $invalid->code, 'Symbol-sync invalid payload must use the route validation error code.');
 
+$missing_user = dispatch_ea_request($plugin, 'permission_ea_bridge', 'post_ea_symbol_sync', array(
+    'symbols' => array(
+        array(
+            'broker_symbol' => 'EURUSDm',
+            'normalized_symbol' => 'EURUSD',
+        ),
+    ),
+), ea_bridge_headers());
+assert_true($missing_user instanceof WP_Error, 'Symbol-sync missing user_id must fail safely.');
+assert_same('smc_sf_user_required', $missing_user->code, 'Symbol-sync missing user_id must preserve the backend auth guard.');
+
+$zero_user = dispatch_ea_request($plugin, 'permission_ea_bridge', 'post_ea_symbol_sync', array(
+    'user_id' => 0,
+    'symbols' => array(
+        array(
+            'broker_symbol' => 'EURUSDm',
+            'normalized_symbol' => 'EURUSD',
+        ),
+    ),
+), ea_bridge_headers());
+assert_true($zero_user instanceof WP_Error, 'Symbol-sync zero user_id must fail safely.');
+assert_same('smc_sf_user_required', $zero_user->code, 'Symbol-sync zero user_id must preserve the backend auth guard.');
+
 $missing_key = dispatch_ea_request($plugin, 'permission_ea_bridge', 'post_ea_symbol_sync', $payload, array());
 assert_true($missing_key instanceof WP_Error, 'Symbol-sync missing API key must fail safely.');
 assert_same('smc_sf_api_key_missing', $missing_key->code, 'Symbol-sync missing API key must use the plugin auth error code.');
