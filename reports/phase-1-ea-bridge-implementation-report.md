@@ -6,6 +6,7 @@
 - Reused `smc_sf_account_snapshots` for account-sync by storing EA bridge state inside the existing JSON blob.
 - Added dedicated `smc_sf_symbol_sync` persistence for broker symbol metadata and upserts.
 - Implemented `GET /ea/license-check` as a soft operational gate only. No Stripe, subscription, billing, or commercial licensing logic was added.
+- Resolved the 2026-05-16 live `missing user_id` failure on `GET /ea/license-check` by sending `user_id` as a query parameter from the MT5 EA while preserving the existing backend auth contract.
 
 ## Files changed
 - `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
@@ -40,6 +41,18 @@
 - License-check:
   used the existing EA API-key + `user_id` auth convention as the operational gate and supported optional future block metadata from the account snapshot blob.
 
+## Issue resolution - 2026-05-17
+- Evidence:
+  live logs showed repeated `SMC SuperFIB EA bridge auth failed: missing user_id.` entries with no following `license allowed` or `license blocked` result, confirming the request was rejected inside `permission_ea_bridge()`.
+- Root cause:
+  the MT5 EA `GET /ea/license-check` request was sending `account_id`, `terminal_id`, and `ea_version` in the query string but was not sending `user_id`, so the backend intentionally rejected the request before the license-decision layer.
+- Fix applied:
+  `mt5/MarketDataEngine.mqh` now includes `user_id=<wpUserId>` in the license-check query string. No backend auth relaxation was applied because `ea_request_value()` already reads `$request->get_param('user_id')` for GET requests.
+- Regression protection:
+  `wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php` now covers a query-param-only `user_id` request with an empty JSON body to protect the live GET transport path.
+- Backend authority:
+  preserved. Missing `user_id` still returns 400, invalid `user_id` still returns 403, API key handling is unchanged, and `wp_set_current_user()` remains the binding point on success.
+
 ## Tests added
 - `wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php`
 - `wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php`
@@ -61,7 +74,7 @@
 - PASS: all eight PHP test scripts above completed successfully in the local workspace.
 
 ## Known limitations
-- No MT5 EA file changes were made in this patch. Backend routes are live, but EA callers still need staging verification against the new endpoints.
+- Live MT5 terminal verification was not executable from this workspace, so post-fix runtime confirmation still requires a deployed EA session and server log review.
 - No live soak or staging terminal verification was run from this workspace.
 - `GET /ea/license-check` is intentionally limited to operational access validation and optional stored disable flags. It is not a commercial licensing system.
 - Symbol-sync table creation is available through plugin activation and the bridge-table migration helper used by the symbol-sync path.

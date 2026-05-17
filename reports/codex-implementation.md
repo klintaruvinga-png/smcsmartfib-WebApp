@@ -1,37 +1,41 @@
 ## Issue summary
 
-Replaced the deprecated MQL5 account info constant `ACCOUNT_FREEMARGIN` with `ACCOUNT_MARGIN_FREE` in `SendAccountSync()` so the EA no longer depends on a deprecated enum while preserving the existing `free_margin` payload contract.
+The MT5 EA `GET /ea/license-check` request was reaching the backend without `user_id`, causing `permission_ea_bridge()` to correctly reject it with `smc_sf_user_required` before the license decision layer executed.
 
 ## Root cause implemented
 
-`mt5/MarketDataEngine.mqh` was still reading free margin with the deprecated `ACCOUNT_FREEMARGIN` constant from an older MT5 SDK convention. The current installed MetaTrader `MQL5\\Include\\Trade\\AccountInfo.mqh` and `Trade.mqh` use `ACCOUNT_MARGIN_FREE`, confirming the supported replacement in the local toolchain.
+`mt5/MarketDataEngine.mqh` built the license-check query string with `account_id`, `terminal_id`, and `ea_version`, but omitted `user_id`. The backend already supported reading `user_id` from GET params through `ea_request_value()`, so the implementation fix is EA-side only.
 
 ## Exact files changed
 
 - `mt5/MarketDataEngine.mqh`
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php`
+- `reports/phase-1-ea-bridge-implementation-report.md`
 - `reports/codex-implementation.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-17_ea-license-check-missing-user-id.md`
+- `.github/migration/audits/phase-1-mt5-ea-license-check-parity-2026-05-17.md`
 
 ## Tests run
 
-- Pre-patch verification: searched `mt5/` for `ACCOUNT_FREEMARGIN` and confirmed a single occurrence at `mt5/MarketDataEngine.mqh:518`
-- Toolchain verification: searched local MetaTrader MQL5 includes/examples and confirmed `ACCOUNT_MARGIN_FREE` is present and used with `AccountInfoDouble(...)`
-- Post-patch verification: `git diff -- mt5/MarketDataEngine.mqh` shows exactly one token substitution on one line
-- Post-patch verification: searched `mt5/` for `ACCOUNT_FREEMARGIN` and confirmed zero remaining occurrences
-- Post-patch verification: searched `mt5/` for `ACCOUNT_MARGIN_FREE` and confirmed exactly one occurrence at `mt5/MarketDataEngine.mqh:518`
-- Backend regression test: `php wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php` passed
-- MT5 compile check: attempted headless compile via local `MetaEditor64.exe`, but this environment did not emit a compiler log or compile artifact; compile cleanliness therefore remains unverified from automation here
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php` - passed
+- `php wordpress/smc-superfib-sniper/tests/php/test-cors-regression.php` - passed
+- Manual auth-path validation via local PHP harness:
+  missing `user_id` query param returned `smc_sf_user_required` with status 400
+  `user_id=0` returned `smc_sf_user_required` with status 400
+  valid query-param `user_id` returned status 200
+  success path bound `wp_set_current_user()` to user `7`
 
 ## Reports generated
 
 - `reports/codex-implementation.md`
-- No bug sweep report generated; issue is a deprecation-only MT5 constant replacement and does not alter runtime integrity, stale-data handling, wiring, or backend/dashboard truth
-- No parity audit generated; no parity surface was changed
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-17_ea-license-check-missing-user-id.md`
+- `.github/migration/audits/phase-1-mt5-ea-license-check-parity-2026-05-17.md`
 
 ## Remaining risks
 
-- Automated MT5 compile-time verification could not be conclusively observed from the local `MetaEditor64.exe` CLI because it returned without a log or artifact.
-- The repository appears to have pre-existing unstaged changes in `reports/` metadata files; those were left untouched.
+- Live MT5 terminal execution and server-log confirmation are still required to prove the deployed EA now reaches `license allowed` or `license blocked` instead of `missing user_id`.
+- This workspace can validate the PHP auth contract and request-shape regression, but it cannot execute a real deployed MT5 terminal session.
 
 ## Any contract ambiguities resolved during implementation
 
-- The contract required confirming availability in MT5 build `4150+` before patching. I resolved this by verifying the replacement constant in the locally installed MetaTrader MQL5 include files and examples rather than widening scope to broader SDK or documentation changes.
+- The contract’s backend fallback change was not applied because repository reality already satisfies it: `ea_request_value()` falls back to `$request->get_param('user_id')`, so the smallest safe interpretation is an EA transport fix plus a regression test that exercises the GET query path explicitly.
