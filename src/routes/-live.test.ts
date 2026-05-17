@@ -9,7 +9,7 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
   };
 });
 
-import { shouldRenderPendingCard } from "./live.utils";
+import { shouldRenderPendingCard } from "./-live.utils";
 
 function buildPrice(overrides: Partial<PairPrice>): PairPrice {
   return {

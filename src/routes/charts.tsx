@@ -117,9 +117,10 @@ function ChartsPage() {
     [chart, nextCandleAt],
   );
   const candleCountdownMs = useChartCountdownMs(countdownSource);
+  const isVitestRuntime = "vitest" in import.meta;
 
   useEffect(() => {
-    if (!lastTickFlash.current && tickFlash && import.meta.env.DEV && !import.meta.vitest) {
+    if (!lastTickFlash.current && tickFlash && import.meta.env.DEV && !isVitestRuntime) {
       console.debug("[CHART_TICK_FLASH]", {
         symbol: activeSymbol,
         state: price?.state ?? null,
@@ -128,7 +129,7 @@ function ChartsPage() {
     }
 
     lastTickFlash.current = tickFlash;
-  }, [activeSymbol, price?.state, price?.updatedAt, tickFlash]);
+  }, [activeSymbol, isVitestRuntime, price?.state, price?.updatedAt, tickFlash]);
 
   if (!backendReady) {
     return (

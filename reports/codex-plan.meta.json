@@ -1,5 +1,0 @@
-{
-  "issue": "Implement EA side routes for Phase 1 Bridge: missing 4 critical WebRequest calls in MT5 EA (license-check, heartbeat, account-sync, symbol-sync)",
-  "research_hash": "05b7027d71f7c0ccdcee636eef31175d8d9ce767c0ca7e3e32997913791c8f43",
-  "written_at": "2026-05-16T10:08:53.120Z"
-}

@@ -408,14 +408,18 @@ function StageStatusChip({ label, filled }: { label: string; filled: boolean }) 
   );
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
 function formatLotSize(value: number | undefined) {
-  return Number.isFinite(value) ? `${value.toFixed(2)} lot` : "--";
+  return isFiniteNumber(value) ? `${value.toFixed(2)} lot` : "--";
 }
 
 function formatOptionalPrice(value: number | undefined, symbol?: string) {
-  return Number.isFinite(value) ? fmtPrice(value, symbol) : "--";
+  return isFiniteNumber(value) ? fmtPrice(value, symbol) : "--";
 }
 
 function formatOptionalRatio(value: number | undefined) {
-  return Number.isFinite(value) ? `R ${value.toFixed(2)}` : "R --";
+  return isFiniteNumber(value) ? `R ${value.toFixed(2)}` : "R --";
 }

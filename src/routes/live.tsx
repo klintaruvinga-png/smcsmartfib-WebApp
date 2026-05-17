@@ -15,7 +15,7 @@ import { fmtPrice, fmtPct, relTime } from "@/lib/format";
 import { MOCK_MODE } from "@/lib/api/sniperClient";
 import { tickMotionHoldMs, tickMotionStyle } from "@/lib/tickMotion";
 import { cn } from "@/lib/utils";
-import { shouldRenderPendingCard } from "./live.utils";
+import { shouldRenderPendingCard } from "./-live.utils";
 import { RefreshCw } from "lucide-react";
 import { useEffect } from "react";
 import type {

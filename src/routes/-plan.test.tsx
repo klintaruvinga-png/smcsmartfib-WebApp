@@ -92,6 +92,8 @@ function buildSignal(overrides: Partial<SignalCandidate> = {}): SignalCandidate 
 }
 
 function buildPlan(overrides: Partial<TradePlan> = {}): TradePlan {
+  const baseStops = mockPlan.stops ?? { e1: 0, e2: 0, e3: 0 };
+  const overrideStops = overrides.stops ?? {};
   return {
     ...mockPlan,
     ...overrides,
@@ -99,7 +101,7 @@ function buildPlan(overrides: Partial<TradePlan> = {}): TradePlan {
     tps: { ...mockPlan.tps, ...overrides.tps },
     rr: { ...mockPlan.rr, ...overrides.rr },
     lotSize: { ...mockPlan.lotSize, ...overrides.lotSize },
-    stops: { ...mockPlan.stops, ...overrides.stops },
+    stops: { ...baseStops, ...overrideStops },
   };
 }
 
