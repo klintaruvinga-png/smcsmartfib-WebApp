@@ -3,13 +3,13 @@
 **Report Date**: 2026-05-17  
 **Phase**: Phase 1 - EA bridge post-init sync chain  
 **Auditor**: Codex  
-**Status**: PASS (code parity restored) - live deployment verification pending
+**Status**: PASS (code parity restored, observability hardened) - live deployment verification pending
 
 ---
 
 ## Executive summary
 
-This audit re-validates the Phase 1 MT5 EA bridge contract after the post-license `missing user_id` failures on `/ea/heartbeat`, `/ea/account-sync`, and `/ea/symbol-sync`. Code parity is restored: the EA now sends `user_id` in each post-init JSON body, and the backend already consumes that field through the existing auth gate. Live terminal and database parity remain pending until the patched EA is rebuilt, attached, and observed against a real backend.
+This audit re-validates the Phase 1 MT5 EA bridge contract after the post-license `missing user_id` failures on `/ea/heartbeat`, `/ea/account-sync`, and `/ea/symbol-sync`. Code parity remains restored: the EA sends `user_id` in each post-init payload, and the backend consumes that field through the existing auth gate. This follow-up patch adds the missing route-level diagnostics needed to prove the same resolved `user_id` is dispatched by MT5 and accepted by the backend during live attach validation. Live terminal and database parity remain pending until the patched EA is rebuilt, attached, and observed against a real backend.
 
 ## Contract surfaces checked
 
@@ -23,12 +23,15 @@ This audit re-validates the Phase 1 MT5 EA bridge contract after the post-licens
 | `user_id` extraction order | JSON body top-level field | `ea_request_value()` reads JSON payload before query params | MATCH |
 | Invalid `user_id` behavior | No sender-side bypass | `smc_sf_user_required` for missing or zero values | MATCH |
 | Initialization order | `SendAccountSync()` -> `SendSymbolSync()` -> `EventSetTimer()` | No contract change required | MATCH |
+| Live attach diagnostics | Dispatch log now prints `user_id` before each bridge call | Auth success log now prints resolved `user_id` after binding | MATCH |
 
 ## Evidence re-validated
 
 - `mt5/SMC_MarketDataEA.mq5` still passes `UserId` into `engine.Initialize(..., UserId)` and preserves the existing post-license init order.
 - `mt5/MarketDataEngine.mqh` still stores `wpUserId` as a class member and now injects it into the JSON bodies for `SendHeartbeat()`, `SendAccountSync()`, and `SendSymbolSync()`.
+- `mt5/MarketDataEngine.mqh` now logs the resolved `user_id` at dispatch time for `SendLicenseCheck()`, `SendHeartbeat()`, `SendAccountSync()`, and `SendSymbolSync()`.
 - `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` still validates API key first, then extracts `user_id` from JSON before query params, then rejects `user_id <= 0`, then binds `wp_set_current_user($ea_user_id)`.
+- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` now logs the resolved `user_id` on the auth success path after `wp_set_current_user($ea_user_id)`.
 - The existing PHP route tests now cover omitted and zero `user_id` failures on all three POST routes.
 
 ## Validation results
@@ -39,6 +42,7 @@ This audit re-validates the Phase 1 MT5 EA bridge contract after the post-licens
 - `php wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php` - PASS
 - `npm run check:mql` - PASS
 - `npm run validate:impl` - PASS after adding `reports/codex-implementation.meta.json`
+- `MetaEditor64.exe /compile:.../mt5/SMC_MarketDataEA.mq5` - INCONCLUSIVE (`exit=0`, but the local CLI emitted no compiler log and no `.ex5` artifact)
 
 ## Parity boundaries preserved
 
@@ -52,10 +56,12 @@ This audit re-validates the Phase 1 MT5 EA bridge contract after the post-licens
 The code contract is aligned, but live parity is still pending. Required post-deploy evidence:
 
 - one clean EA attach showing license allow, then successful account-sync and symbol-sync, then a successful heartbeat cycle
+- one clean EA attach showing the new MT5 dispatch logs for `license-check`, `account-sync`, `symbol-sync`, and heartbeat with the resolved `user_id`
+- backend auth-success logs showing the accepted `user_id` for the same attach sequence
 - absence of `SMC SuperFIB EA bridge auth failed: missing user_id.` for normal post-init bridge traffic
 - confirmation that `smc_sf_account_snapshots` receives fresh account data and `smc_sf_symbol_sync` receives symbol rows from the patched EA
 - confirmation that dashboard account telemetry reflects fresh backend data rather than stale state
 
 ## Conclusion
 
-Phase 1 post-init bridge parity is restored at the code-contract level. The remaining gap is live deployment verification of the repaired EA POST payloads against the real backend and dashboard surfaces.
+Phase 1 post-init bridge parity is restored at the code-contract level, and the required observability hooks are now present for live attach verification. The remaining gap is still live deployment verification of the rebuilt EA against the real backend, database writes, and dashboard surfaces.
