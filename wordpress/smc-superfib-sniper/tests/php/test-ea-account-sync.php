@@ -64,6 +64,19 @@ $minimal_response = dispatch_ea_request($plugin, 'permission_ea_bridge', 'post_e
 assert_true($minimal_response instanceof WP_REST_Response, 'Account-sync must handle missing optional fields safely.');
 assert_same(true, $minimal_response->data['synced'], 'Minimal account-sync payload should still sync.');
 
+$missing_user = dispatch_ea_request($plugin, 'permission_ea_bridge', 'post_ea_account_sync', array(
+    'account_id' => '12345678',
+), ea_bridge_headers());
+assert_true($missing_user instanceof WP_Error, 'Account-sync missing user_id must fail safely.');
+assert_same('smc_sf_user_required', $missing_user->code, 'Account-sync missing user_id must preserve the backend auth guard.');
+
+$zero_user = dispatch_ea_request($plugin, 'permission_ea_bridge', 'post_ea_account_sync', array(
+    'user_id' => 0,
+    'account_id' => '12345678',
+), ea_bridge_headers());
+assert_true($zero_user instanceof WP_Error, 'Account-sync zero user_id must fail safely.');
+assert_same('smc_sf_user_required', $zero_user->code, 'Account-sync zero user_id must preserve the backend auth guard.');
+
 $missing_key = dispatch_ea_request($plugin, 'permission_ea_bridge', 'post_ea_account_sync', $payload, array());
 assert_true($missing_key instanceof WP_Error, 'Account-sync missing API key must fail safely.');
 assert_same('smc_sf_api_key_missing', $missing_key->code, 'Account-sync missing API key must use the plugin auth error code.');

@@ -1,41 +1,47 @@
-## Issue summary
+# Issue summary
 
-The MT5 EA `GET /ea/license-check` request was reaching the backend without `user_id`, causing `permission_ea_bridge()` to correctly reject it with `smc_sf_user_required` before the license decision layer executed.
+Immediately after the successful license allow, downstream EA bridge POST calls were still failing the backend auth gate with `SMC SuperFIB EA bridge auth failed: missing user_id.`. The failure surface was limited to the MT5 EA POST payloads sent after init: `/ea/heartbeat`, `/ea/account-sync`, and `/ea/symbol-sync`.
 
-## Root cause implemented
+# Root cause implemented
 
-`mt5/MarketDataEngine.mqh` built the license-check query string with `account_id`, `terminal_id`, and `ea_version`, but omitted `user_id`. The backend already supported reading `user_id` from GET params through `ea_request_value()`, so the implementation fix is EA-side only.
+`mt5/MarketDataEngine.mqh` was constructing JSON bodies for `SendHeartbeat()`, `SendAccountSync()`, and `SendSymbolSync()` without the required top-level `user_id` field. The backend `permission_ea_bridge()` gate reads `user_id` from the JSON payload before falling back to query params and rejects `user_id <= 0`, so the narrow fix was to inject `wpUserId` as an integer into each POST body without changing the backend contract or the working `SendLicenseCheck()` query-param flow.
 
-## Exact files changed
+# Exact files changed
 
 - `mt5/MarketDataEngine.mqh`
-- `wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php`
+- `reports/codex-implementation.meta.json`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-17_ea-post-init-missing-user-id.md`
+- `.github/migration/audits/phase-1-mt5-ea-post-init-user-id-parity-2026-05-17.md`
 - `reports/phase-1-ea-bridge-implementation-report.md`
+- `.smc-workflow-state.json`
 - `reports/codex-implementation.md`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-17_ea-license-check-missing-user-id.md`
-- `.github/migration/audits/phase-1-mt5-ea-license-check-parity-2026-05-17.md`
 
-## Tests run
+# Tests run
 
-- `php wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php` - passed
-- `php wordpress/smc-superfib-sniper/tests/php/test-cors-regression.php` - passed
-- Manual auth-path validation via local PHP harness:
-  missing `user_id` query param returned `smc_sf_user_required` with status 400
-  `user_id=0` returned `smc_sf_user_required` with status 400
-  valid query-param `user_id` returned status 200
-  success path bound `wp_set_current_user()` to user `7`
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php` - PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php` - PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php` - PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php` - PASS
+- `npm run check:mql` - PASS
+- `npm run validate:impl` - PASS
 
-## Reports generated
+# Reports generated
 
 - `reports/codex-implementation.md`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-17_ea-license-check-missing-user-id.md`
-- `.github/migration/audits/phase-1-mt5-ea-license-check-parity-2026-05-17.md`
+- `reports/codex-implementation.meta.json`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-17_ea-post-init-missing-user-id.md`
+- `.github/migration/audits/phase-1-mt5-ea-post-init-user-id-parity-2026-05-17.md`
+- `reports/phase-1-ea-bridge-implementation-report.md` (updated)
 
-## Remaining risks
+# Remaining risks
 
-- Live MT5 terminal execution and server-log confirmation are still required to prove the deployed EA now reaches `license allowed` or `license blocked` instead of `missing user_id`.
-- This workspace can validate the PHP auth contract and request-shape regression, but it cannot execute a real deployed MT5 terminal session.
+- Live MT5 terminal verification is still required to prove the post-license init chain now reaches backend handlers end-to-end.
+- The workspace can validate backend auth behavior and static EA payload construction, but it cannot execute a real MT5 attach/heartbeat cycle from here.
+- Backend stale-data protections remain intact; if `wpUserId` is misconfigured to `<= 0` in a live terminal, the backend will continue to reject the request by design.
 
-## Any contract ambiguities resolved during implementation
+# Any contract ambiguities resolved during implementation
 
-- The contract’s backend fallback change was not applied because repository reality already satisfies it: `ea_request_value()` falls back to `$request->get_param('user_id')`, so the smallest safe interpretation is an EA transport fix plus a regression test that exercises the GET query path explicitly.
+- The contract required tests for the repaired surface, but the repository does not include an executable MT5 test harness for these POST builders. I took the smallest safe interpretation: patch the three MQL payload builders and extend the existing PHP bridge integration tests only for the required auth regressions (`missing user_id` and `user_id = 0`) rather than introducing new infrastructure.

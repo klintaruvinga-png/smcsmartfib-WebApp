@@ -472,6 +472,7 @@ public:
         string timestamp    = TimeToIso8601(TimeCurrent());
 
         string json = "{";
+        json += "\"user_id\":"         + IntegerToString(wpUserId)  + ",";
         json += "\"account_id\":"      + IntegerToString(accountId) + ",";
         json += "\"terminal_id\":\""   + termId                     + "\",";
         json += "\"broker\":\""        + broker                     + "\",";
@@ -524,6 +525,7 @@ public:
         string timestamp    = TimeToIso8601(TimeCurrent());
 
         string json = "{";
+        json += "\"user_id\":"         + IntegerToString(wpUserId)    + ",";
         json += "\"account_id\":"      + IntegerToString(accountId)    + ",";
         json += "\"terminal_id\":\""   + termId                        + "\",";
         json += "\"broker\":\""        + broker                        + "\",";
@@ -574,6 +576,7 @@ public:
         string timestamp    = TimeToIso8601(TimeCurrent());
 
         string json = "{";
+        json += "\"user_id\":"         + IntegerToString(wpUserId)  + ",";
         json += "\"account_id\":"      + IntegerToString(accountId) + ",";
         json += "\"terminal_id\":\""   + termId                     + "\",";
         json += "\"broker\":\""        + broker                     + "\",";
