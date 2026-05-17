@@ -24,6 +24,7 @@ input string WebhookURL = "https://trader.stokvelsociety.co.za/wp-json/sniper/v1
 input string ApiKey     = "";   // Must match SMC_SF_EA_API_KEY in wp-config.php
 input int    UserId     = 1;    // WordPress user_id that owns this data stream
 input int    TimerSec   = 10;   // OnPeriodic interval in seconds
+input bool   DebugLog   = false; // Enable verbose per-tick logging (off in production to avoid log noise)
 input string Symbols    = "EURUSD,GBPUSD,XAUUSD,USDJPY,GBPJPY,AUDUSD";
 
 MarketDataEngine engine;
@@ -259,6 +260,8 @@ void OnTimer()
     // Heartbeat throttle — soft gate, fires every g_heartbeatIntervalTicks invocations.
     // Counter resets to 0 after firing regardless of heartbeat success.
     g_heartbeatTickCount++;
+    if (DebugLog)
+        PrintFormat("DEBUG OnTimer: heartbeatTick=%d / interval=%d", g_heartbeatTickCount, g_heartbeatIntervalTicks);
     if (g_heartbeatTickCount >= g_heartbeatIntervalTicks)
     {
         g_heartbeatTickCount = 0;
