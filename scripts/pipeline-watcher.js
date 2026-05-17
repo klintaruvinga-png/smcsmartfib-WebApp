@@ -59,7 +59,7 @@ const REASON_NO_IMPL_REPORT =
 const STOP_BEFORE_PATCH_PATTERNS = [
   /no\s+(?:patch|files?)\s+(?:(?:was|were)\s+)?(?:applied|changed)/i,
   /no\s+branch\s+(?:was\s+)?created/i,
-  /no\s+pr\s+(?:(?:was\s+)?opened|created)/i,
+  /no\s+pr\s+(?:was\s+)?(?:opened|created)/i,
 ];
 // Plan hardening retry policy: up to 3 attempts, 5 min between each.
 // After MAX_HARDENING_RETRIES failures the block becomes permanent and a
