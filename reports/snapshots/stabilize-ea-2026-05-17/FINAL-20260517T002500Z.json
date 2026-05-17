@@ -1,0 +1,74 @@
+{
+  "snapshot_type": "FINAL",
+  "workflow_id": "stabilize-ea-2026-05-17",
+  "timestamp": "2026-05-17T00:25:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-bQ6FF",
+    "commit_hash": "0c013e094801007c5ad0bd5ae7d7cae2669e51fe",
+    "tags_created": [
+      "snapshot/stabilize-ea-2026-05-17-start-20260517T000000Z",
+      "rollback/stabilize-ea-2026-05-17-before-patches",
+      "rollback/stabilize-ea-2026-05-17-after-patch-1"
+    ]
+  },
+  "patches_applied": [
+    {
+      "id": "PATCH-1",
+      "issue_id": "LINT-001",
+      "description": "Prettier formatting fix in scripts/validate-implementation.mjs and scripts/pipeline-watcher.js — 0 logic changes",
+      "commit": "0c013e094801007c5ad0bd5ae7d7cae2669e51fe"
+    }
+  ],
+  "migration_status_post_patch": {
+    "current_phase": "1 (MT5 Bridge Infrastructure)",
+    "overall_progress": "50%",
+    "blockers_addressed": [
+      "LINT-001: Prettier errors in scripts/ files resolved"
+    ],
+    "remaining_blockers": [
+      "MIGRATION-PHASE1-001: Live MT5 terminal verification for /ea/heartbeat, /ea/account-sync, /ea/symbol-sync, /ea/license-check — requires Track A live terminal execution"
+    ],
+    "phase_readiness": "Phase 1 backend routes IMPLEMENTED and REGRESSION-COVERED. Awaiting Track A live terminal execution to advance gate to PASSED."
+  },
+  "tests": {
+    "commands_run": [
+      "php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "php -l wordpress/smc-superfib-sniper/class-market-data-service.php",
+      "npm run build",
+      "npm run check:mql",
+      "npm run lint"
+    ],
+    "passing": true,
+    "failures": [],
+    "warnings": ["9 pre-existing ESLint warnings in UI components — out of scope"]
+  },
+  "ea_integration_status": {
+    "market_stream_route": "POST /wp-json/sniper/v1/ea/market-stream",
+    "auth_required": true,
+    "auth_header": "X-EA-API-Key",
+    "auth_aliases": ["X-EA-API-Key", "X-API-KEY", "x_ea_api_key", "x_api_key"],
+    "secret_env": "SMC_SF_EA_API_KEY",
+    "user_id_required": true,
+    "payload_validation": true,
+    "stale_rejection": true,
+    "stale_threshold_sec": 300,
+    "stale_warn_threshold_sec": 120,
+    "stale_status_code": 422,
+    "ohlc_validation": true,
+    "epoch_guard": true,
+    "tick_volume_guard": true,
+    "candle_m1_max_age_sec": 180,
+    "candle_m15_max_age_sec": 1800,
+    "symbol_normalization": true,
+    "phase1_bridge_routes": {
+      "heartbeat": "POST /wp-json/sniper/v1/ea/heartbeat",
+      "account_sync": "POST /wp-json/sniper/v1/ea/account-sync",
+      "symbol_sync": "POST /wp-json/sniper/v1/ea/symbol-sync",
+      "license_check": "GET /wp-json/sniper/v1/ea/license-check"
+    }
+  },
+  "rollback": {
+    "manifest": "ROLLBACK-MANIFEST.json",
+    "rollback_points_count": 3
+  }
+}
