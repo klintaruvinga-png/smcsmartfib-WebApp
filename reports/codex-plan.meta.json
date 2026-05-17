@@ -1,5 +1,5 @@
 {
-  "issue": "SMC Intake - resolve account-sync/symbol-sync user_id handling.",
-  "research_hash": "94657e39b8fecd7c6638a18368edc32ae6b6b59ab9e5dd0022e357b03484179a",
-  "written_at": "2026-05-17T09:57:22.035Z"
+  "issue": "POST /ea/heartbeat route exists and auth validates correctly, but live session logs show zero heartbeat dispatches while account-sync (✅ PASS), symbol-sync (✅ PASS), and market-stream (✅ PASS) fire successfully every cycle — heartbeat dispatch is throttled by g_heartbeatIntervalTicks=48 (~8min cadence) but heartbeat timer path either not firing or cadence expectation mismatch between EA and Phase 1 validation gate",
+  "research_hash": "b67f8bf2377dba4ed0f3d0a8df255432792f910546559cee1b56f6fb0790a9d5",
+  "written_at": "2026-05-17T13:22:14.942Z"
 }

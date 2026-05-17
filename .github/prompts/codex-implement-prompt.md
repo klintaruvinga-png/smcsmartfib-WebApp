@@ -55,6 +55,22 @@ Stop and report instead of guessing if:
 - the requested patch would weaken backend authority, stale-data protection, or parity safeguards
 - the issue cannot be verified from available evidence
 
+**When stopping for any of the above reasons you MUST still write `reports/codex-implementation.md`
+before exiting. Use these section values for a stop:**
+
+- **Issue summary**: "Stopped — [one sentence describing the conflict]"
+- **Root cause implemented**: "Not implemented — Codex stopped before code changes. [explain why]"
+- **Exact files changed**: "None — no files changed."
+- **Tests run**: "None — stopped before code changes."
+- **Reports generated**: "None — stopped before code changes."
+- **Remaining risks**: "[the specific conflict or blocker that caused the stop]"
+- **Any contract ambiguities resolved during implementation**: "[the ambiguity or conflict identified]"
+
+Then: `git add reports/codex-implementation.md && git commit -m "docs: add stop report (contract conflict)" && git push`
+on whatever branch you are on (create the required branch first if you have not already).
+This file must exist so the pipeline can advance. The stop reason is recorded and surfaced to the
+human through the watcher log and idle reason — it will not be silently lost.
+
 ## Required implementation summary
 
 Write `reports/codex-implementation.md` with these sections:
