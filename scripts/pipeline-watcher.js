@@ -50,7 +50,8 @@ const LOCK_STALE_MS = 30 * 60 * 1000;
 
 // The exact watcher-generated failure reason string for a missing implementation report.
 // Used to distinguish "report missing but PR exists" (recoverable) from other failures.
-const REASON_NO_IMPL_REPORT = "Codex implementation finished without reports/codex-implementation.md";
+const REASON_NO_IMPL_REPORT =
+  "Codex implementation finished without reports/codex-implementation.md";
 // Plan hardening retry policy: up to 3 attempts, 5 min between each.
 // After MAX_HARDENING_RETRIES failures the block becomes permanent and a
 // GitHub issue is filed so the human is notified without manual log review.

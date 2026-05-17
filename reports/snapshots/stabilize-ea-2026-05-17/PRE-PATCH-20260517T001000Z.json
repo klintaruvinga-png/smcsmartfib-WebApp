@@ -1,0 +1,24 @@
+{
+  "snapshot_type": "PRE-PATCH",
+  "workflow_id": "stabilize-ea-2026-05-17",
+  "timestamp": "2026-05-17T00:10:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-bQ6FF",
+    "commit_hash": "1fe6531c00d3d4ee7a5825f103aa67f7601cb2a3",
+    "uncommitted_changes": [
+      "scripts/validate-implementation.mjs (modified: prettier formatting only)",
+      "scripts/pipeline-watcher.js (modified: prettier formatting only)"
+    ]
+  },
+  "planned_patches": [
+    {
+      "id": "PATCH-1",
+      "issue_id": "LINT-001",
+      "severity": "LOW",
+      "description": "Fix prettier formatting violations in scripts/validate-implementation.mjs and scripts/pipeline-watcher.js via eslint --fix. Zero logic changes.",
+      "files": ["scripts/validate-implementation.mjs", "scripts/pipeline-watcher.js"],
+      "risk": "MINIMAL — formatting only, no logic change",
+      "rollback_tag_before": "rollback/stabilize-ea-2026-05-17-before-patches"
+    }
+  ]
+}
