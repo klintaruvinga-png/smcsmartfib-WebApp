@@ -429,6 +429,11 @@ public:
                          + "&terminal_id=" + termId
                          + "&ea_version="  + eaVersion;
 
+        Print("[LicenseCheck] Dispatch | user_id=", wpUserId,
+              " | account_id=", accountId,
+              " | terminal_id=", termId,
+              " | ea_version=", eaVersion);
+
         char   emptyBody[];
         char   result[];
         string responseHeaders;
@@ -482,6 +487,11 @@ public:
         json += "\"connected\":"       + IntegerToString(connected) + ",";
         json += "\"timestamp\":\""     + timestamp                  + "\"";
         json += "}";
+
+        Print("[Heartbeat] Dispatch | user_id=", wpUserId,
+              " | account_id=", accountId,
+              " | terminal_id=", termId,
+              " | connected=", connected);
 
         char   postData[];
         char   result[];
@@ -542,6 +552,12 @@ public:
         json += "\"terminal_build\":"  + IntegerToString(termBuild)    + ",";
         json += "\"timestamp\":\""     + timestamp                     + "\"";
         json += "}";
+
+        Print("[AccountSync] Dispatch | user_id=", wpUserId,
+              " | account_id=", accountId,
+              " | terminal_id=", termId,
+              " | broker=", broker,
+              " | broker_server=", brokerServer);
 
         char   postData[];
         char   result[];
@@ -621,6 +637,11 @@ public:
         }
 
         json += "]}";
+
+        Print("[SymbolSync] Dispatch | user_id=", wpUserId,
+              " | account_id=", accountId,
+              " | terminal_id=", termId,
+              " | symbol_count=", count);
 
         char   postData[];
         char   result[];

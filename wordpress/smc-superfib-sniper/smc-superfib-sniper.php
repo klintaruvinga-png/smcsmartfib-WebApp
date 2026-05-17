@@ -611,6 +611,14 @@ final class SMC_SuperFib_Sniper_REST {
         // Bind ingest writes to a concrete WordPress user context.
         wp_set_current_user($ea_user_id);
 
+        $route = method_exists($request, 'get_route') ? (string) $request->get_route() : '';
+        $method = method_exists($request, 'get_method') ? (string) $request->get_method() : '';
+        error_log(
+            'SMC SuperFIB EA bridge auth success: user_id=' . $ea_user_id
+            . ($method !== '' ? ' method=' . $method : '')
+            . ($route !== '' ? ' route=' . $route : '')
+        );
+
         return true;
     }
 
