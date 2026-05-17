@@ -40,9 +40,11 @@ int    g_rawSymCount = 0;
 bool   g_configValid = true;
 int    g_warnCounter = 0;
 
-// Heartbeat throttle: SendHeartbeat() fires every HEARTBEAT_INTERVAL_TICKS OnTimer() calls.
+// Heartbeat throttle: SendHeartbeat() fires every g_heartbeatIntervalTicks OnTimer() calls.
+// Initialised from the HeartbeatIntervalTicks input in OnInit() so the trader can tune it
+// from the EA properties dialog without recompiling.
 int    g_heartbeatTickCount     = 0;
-int    g_heartbeatIntervalTicks = 48;
+int    g_heartbeatIntervalTicks = 6;
 
 bool IsBlankInput(string value)
 {
@@ -219,6 +221,7 @@ int OnInit()
     engine.SendAccountSync();
     engine.SendSymbolSync(g_symArray, g_symCount);
 
+    g_heartbeatIntervalTicks = (HeartbeatIntervalTicks > 0) ? HeartbeatIntervalTicks : 6;
     EventSetTimer(TimerSec);
     if (!g_configValid)
     {

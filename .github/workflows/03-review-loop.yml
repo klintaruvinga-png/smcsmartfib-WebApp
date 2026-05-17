@@ -88,6 +88,7 @@ jobs:
           github_token: ${{ secrets.GH_PAT }}
           prompt: ${{ steps.prompt.outputs.prompt }}
           claude_args: "--max-turns 6"
+          allowed_bots: "chatgpt-codex-connector"
 
       - name: Commit and push remediation changes
         run: |
