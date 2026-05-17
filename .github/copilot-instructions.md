@@ -43,7 +43,7 @@ Before performing ANY file edit, code generation, apply_patch, or write operatio
 
 1. Check if `.smc-workflow-state.json` exists in the repository root.
 2. If it exists, read the `state`, `editing_locked`, and `issue` fields.
-3. If `editing_locked` is `true` OR `state` NOT in [READY_FOR_IMPLEMENTATION, IMPLEMENTATION_COMPLETE]:
+3. If `editing_locked` is `true` OR `state` NOT in [IDLE, READY_FOR_IMPLEMENTATION, IMPLEMENTATION_COMPLETE]:
    - REFUSE the edit
    - Respond with:
 
@@ -56,7 +56,7 @@ Before performing ANY file edit, code generation, apply_patch, or write operatio
      Save `reports/copilot-research.md` and let the pipeline harden the plan first.
      ```
 
-4. If `editing_locked` is `false` and `state` is in [READY_FOR_IMPLEMENTATION, IMPLEMENTATION_COMPLETE]: proceed normally.
+4. If `editing_locked` is `false` and `state` is in [IDLE, READY_FOR_IMPLEMENTATION, IMPLEMENTATION_COMPLETE]: proceed normally.
 5. If the file does not exist: proceed normally.
 
 ## Artifact Requirements
