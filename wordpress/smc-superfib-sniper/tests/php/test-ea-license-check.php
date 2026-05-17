@@ -2,6 +2,34 @@
 
 require_once __DIR__ . '/test-ea-bridge-bootstrap.php';
 
+if (!class_exists('QueryParamOnlyWP_REST_Request')) {
+    class QueryParamOnlyWP_REST_Request extends WP_REST_Request {
+        private $query_params;
+        private $headers;
+
+        public function __construct($query_params = array(), $headers = array()) {
+            $this->query_params = is_array($query_params) ? $query_params : array();
+            $this->headers = array();
+            foreach ((array) $headers as $key => $value) {
+                $this->headers[strtolower($key)] = $value;
+            }
+        }
+
+        public function get_json_params() {
+            return array();
+        }
+
+        public function get_param($key) {
+            return array_key_exists($key, $this->query_params) ? $this->query_params[$key] : null;
+        }
+
+        public function get_header($key) {
+            $key = strtolower($key);
+            return isset($this->headers[$key]) ? $this->headers[$key] : '';
+        }
+    }
+}
+
 reset_ea_bridge_test_state();
 
 $plugin = new SMC_SuperFib_Sniper_REST();
@@ -28,6 +56,20 @@ assert_same('internal', $allowed->data['plan'], 'License-check must default to t
 assert_true(array_key_exists('reason', $allowed->data), 'License-check must include a reason field in the response shape.');
 assert_same(null, $allowed->data['reason'], 'License-check allowed response must carry a null reason.');
 assert_true(isset($allowed->data['server_time']), 'License-check must include server_time.');
+
+$query_request = new QueryParamOnlyWP_REST_Request(array(
+    'user_id' => 7,
+    'account_id' => '12345678',
+    'terminal_id' => 'MT5-DESKTOP-ABC',
+    'ea_version' => '13.0.3',
+), ea_bridge_headers());
+$query_permission = $plugin->permission_ea_bridge($query_request);
+assert_same(true, $query_permission, 'License-check query-param user_id must pass auth without a JSON body.');
+$query_allowed = $plugin->get_ea_license_check($query_request);
+assert_true($query_allowed instanceof WP_REST_Response, 'License-check query-param request must return a REST response.');
+assert_same(true, $query_allowed->data['ok'], 'License-check query-param request must still set ok=true.');
+assert_same(true, $query_allowed->data['allowed'], 'License-check query-param request should allow a valid authenticated request by default.');
+assert_same(7, $query_allowed->data['user_id'], 'License-check query-param request must echo the authenticated user_id.');
 
 global $wpdb;
 $wpdb->replace('wp_smc_sf_account_snapshots', array(

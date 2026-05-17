@@ -424,7 +424,8 @@ public:
         string termId    = GetTerminalId();
         long   accountId = AccountInfoInteger(ACCOUNT_LOGIN);
         string url       = baseUrl + "/ea/license-check"
-                         + "?account_id=" + IntegerToString(accountId)
+                         + "?user_id="    + IntegerToString(wpUserId)
+                         + "&account_id=" + IntegerToString(accountId)
                          + "&terminal_id=" + termId
                          + "&ea_version="  + eaVersion;
 
