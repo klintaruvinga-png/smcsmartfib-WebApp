@@ -1,0 +1,76 @@
+{
+  "snapshot_type": "FINAL",
+  "workflow_id": "stabilize-ea-2026-05-18",
+  "timestamp": "2026-05-18T00:04:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-WWAz4",
+    "commit_hash": "649c08f10a189475936e409771c5dde38311cd85",
+    "tags_created": [
+      "snapshot/stabilize-ea-2026-05-18-start-20260518T000000Z",
+      "rollback/stabilize-ea-2026-05-18-before-patches",
+      "rollback/stabilize-ea-2026-05-18-after-patch-1"
+    ]
+  },
+  "patches_applied": [
+    {
+      "id": "PATCH-1",
+      "issue_id": "LINT-001",
+      "description": "Prettier formatting fix in scripts/pipeline-watcher.js:1353 — chained .slice(0,300).replace() split onto separate lines. Zero logic change.",
+      "commit": "649c08f10a189475936e409771c5dde38311cd85"
+    }
+  ],
+  "migration_status_post_patch": {
+    "current_phase": "1 (MT5 Bridge Infrastructure)",
+    "overall_progress": "50%",
+    "blockers_addressed": [
+      "LINT-001: Prettier formatting violation in scripts/pipeline-watcher.js resolved"
+    ],
+    "remaining_blockers": [
+      "MIGRATION-PHASE1-001: Live MT5 terminal verification still pending for /ea/heartbeat, /ea/account-sync, /ea/symbol-sync, /ea/license-check — requires Track A live terminal execution"
+    ],
+    "phase_readiness": "Phase 1 backend routes IMPLEMENTED and REGRESSION-COVERED (all 05-17 patches applied). EA payload transport hardened (user_id in all bridge payloads, observability logs). Awaiting Track A live terminal execution to advance Phase 1 gate to PASSED."
+  },
+  "tests": {
+    "commands_run": [
+      "php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "php -l wordpress/smc-superfib-sniper/class-market-data-service.php",
+      "npm run build",
+      "npm run check:mql",
+      "npm run lint"
+    ],
+    "passing": true,
+    "failures": [],
+    "warnings": ["9 pre-existing ESLint warnings in UI components (react-hooks, react-refresh) — out of scope; carried from prior sprints"]
+  },
+  "ea_integration_status": {
+    "market_stream_route": "POST /wp-json/sniper/v1/ea/market-stream",
+    "auth_required": true,
+    "auth_header": "X-EA-API-Key",
+    "auth_aliases": ["X-EA-API-Key", "X-API-KEY", "x_ea_api_key", "x_api_key"],
+    "secret_env": "SMC_SF_EA_API_KEY",
+    "user_id_required": true,
+    "payload_validation": true,
+    "stale_rejection": true,
+    "stale_threshold_sec": 300,
+    "stale_warn_threshold_sec": 120,
+    "stale_status_code": 422,
+    "ohlc_validation": true,
+    "epoch_guard": true,
+    "tick_volume_guard": true,
+    "candle_m1_max_age_sec": 180,
+    "candle_m15_max_age_sec": 1800,
+    "symbol_normalization": true,
+    "phase1_bridge_routes": {
+      "heartbeat": "POST /wp-json/sniper/v1/ea/heartbeat",
+      "account_sync": "POST /wp-json/sniper/v1/ea/account-sync",
+      "symbol_sync": "POST /wp-json/sniper/v1/ea/symbol-sync",
+      "license_check": "GET /wp-json/sniper/v1/ea/license-check"
+    },
+    "ea_user_id_in_all_payloads": true,
+    "dispatch_observability_logs": true
+  },
+  "rollback": {
+    "manifest": "ROLLBACK-MANIFEST.json",
+    "rollback_points_count": 3
+  }
+}

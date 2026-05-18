@@ -1350,7 +1350,10 @@ function synthesizeStopReport(state, issueSlug) {
     archiveCycleArtifacts(issueSlug);
     clearImplementationFailedState();
 
-    const stopSummary = stopExcerpt.slice(0, 300).replace(/\r?\n+/g, " ").trim();
+    const stopSummary = stopExcerpt
+      .slice(0, 300)
+      .replace(/\r?\n+/g, " ")
+      .trim();
     markIdle(
       `Codex stopped (contract conflict) for: ${state.issue}. Stop reason: ${stopSummary}. ` +
         `Revise the plan and re-queue a new /research-and-plan issue.`,

@@ -1,0 +1,19 @@
+{
+  "snapshot_type": "PRE-PATCH",
+  "workflow_id": "stabilize-ea-2026-05-18",
+  "timestamp": "2026-05-18T00:01:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-WWAz4",
+    "commit_hash": "251e24462064a60a0b97efe4900c455860534598",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-18-before-patches"
+  },
+  "issues_to_patch": [
+    {
+      "id": "LINT-001",
+      "file": "scripts/pipeline-watcher.js",
+      "line": 1353,
+      "fix": "eslint --fix prettier/prettier formatting for chained method calls"
+    }
+  ],
+  "rollback_command": "git reset --hard 251e24462064a60a0b97efe4900c455860534598"
+}
