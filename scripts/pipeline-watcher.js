@@ -425,6 +425,49 @@ function isNoCodeChangeReport() {
   }
 }
 
+// Returns true only when every file changed on codex/<slug> relative to main is
+// under the reports/ directory. This is an objective git-state guard used before
+// the no-PR auto-reset so that real implementation work is never silently discarded
+// based solely on the (model-authored, potentially stale) implementation report.
+// Tries the local branch first, then the remote-tracking ref. Returns false — i.e.
+// refuses cleanup — whenever the branch cannot be resolved or the diff command fails.
+function isReportOnlyBranch(issueSlug) {
+  const branchName = `codex/${issueSlug}`;
+  const candidates = [branchName, `origin/${branchName}`];
+
+  for (const ref of candidates) {
+    let output;
+    try {
+      output = execSync(`git diff --name-only "main...${ref}"`, {
+        cwd: REPO_ROOT,
+        timeout: 10000,
+        shell: true,
+        windowsHide: true,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch {
+      continue; // ref not found or git error — try next candidate
+    }
+
+    const changedFiles = output.trim().split(/\r?\n/).filter(Boolean);
+    if (changedFiles.length === 0) return true; // branch identical to main
+
+    const nonReportFiles = changedFiles.filter((f) => !f.startsWith("reports/"));
+    if (nonReportFiles.length > 0) {
+      log(
+        `isReportOnlyBranch: ${ref} has non-report changes (${nonReportFiles.slice(0, 5).join(", ")}) — skipping auto-reset`,
+      );
+      return false;
+    }
+    return true; // every changed file is under reports/
+  }
+
+  // Neither local nor remote branch resolved — refuse cleanup to be safe.
+  log(`isReportOnlyBranch: branch ${branchName} not found locally or on remote — skipping auto-reset`);
+  return false;
+}
+
 function hashFile(filePath) {
   return createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
 }
@@ -1528,13 +1571,15 @@ function evaluatePipeline() {
       return;
     }
 
-    // If there is no open PR and the implementation report shows no code changes,
-    // Codex stopped before patching (contract conflict). Auto-reset so the pipeline
-    // does not stall waiting for a PR merge that will never arrive.
+    // If there is no open PR and both the implementation report and the actual git
+    // diff confirm no code was changed, Codex stopped before patching (contract conflict).
+    // Auto-reset so the pipeline does not stall waiting for a PR merge that will never
+    // arrive. isReportOnlyBranch() is the authoritative guard — isNoCodeChangeReport()
+    // is a fast pre-filter that avoids the git invocation in the common (PR exists) path.
     const openPr = checkOpenPR(issueSlug);
-    if (!openPr && isNoCodeChangeReport()) {
+    if (!openPr && isNoCodeChangeReport() && isReportOnlyBranch(issueSlug)) {
       log(
-        `No open or merged PR for codex/${issueSlug} and implementation has no code changes — archiving stop-report cycle and resetting`,
+        `No open or merged PR for codex/${issueSlug}, implementation report and git diff both confirm no code changes — archiving stop-report cycle and resetting`,
       );
       archiveCycleArtifacts(issueSlug);
       cleanupStopBranch(issueSlug);
