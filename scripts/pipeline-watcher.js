@@ -412,6 +412,19 @@ function isUsableImplementation(text) {
   return requiredSections.every((section) => text.includes(section));
 }
 
+// Returns true when the implementation report's "Exact files changed" section
+// contains only "None" — indicating Codex stopped before making any code changes.
+function isNoCodeChangeReport() {
+  if (!fs.existsSync(IMPLEMENTATION_FILE)) return false;
+  try {
+    const text = readTextFile(IMPLEMENTATION_FILE);
+    const match = text.match(/##\s+Exact files changed\s*\n([\s\S]*?)(?=\n##|$)/i);
+    return match ? /\bNone\b/i.test(match[1]) : false;
+  } catch {
+    return false;
+  }
+}
+
 function hashFile(filePath) {
   return createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
 }
@@ -1277,12 +1290,14 @@ function runReportRecovery(state, issueSlug, prNumber) {
   });
 }
 
-// Returns true when the Codex last-message text contains all three markers that indicate
-// an intentional stop-before-patch: no files changed, no branch, no PR.
-// All three must be present to avoid false-positives on partial timeout failures.
+// Returns true when the Codex last-message text indicates an intentional stop-before-patch.
+// Originally required all three patterns, but when Codex creates a branch solely to commit
+// a stop report (no code changed), the "no branch was created" pattern never fires.
+// Two-pattern match (no-files-changed + no-PR-opened) is sufficient to identify a stop.
 function detectStopBeforePatch(text) {
   if (!text) return false;
-  return STOP_BEFORE_PATCH_PATTERNS.every((re) => re.test(text));
+  if (STOP_BEFORE_PATCH_PATTERNS.every((re) => re.test(text))) return true;
+  return STOP_BEFORE_PATCH_PATTERNS[0].test(text) && STOP_BEFORE_PATCH_PATTERNS[2].test(text);
 }
 
 // Recovery for the case where Codex stopped (contract/reality conflict) before creating
@@ -1369,6 +1384,55 @@ function synthesizeStopReport(state, issueSlug) {
       "Stop-report synthesis complete — pipeline reset to IDLE. Revise the contract before re-queuing.",
     );
   });
+}
+
+// Deletes the remote and local stop-report branch so the next run for the same
+// issue slug can create a fresh branch without collision.
+function cleanupStopBranch(issueSlug) {
+  const branchName = `codex/${issueSlug}`;
+  try {
+    execSync(`git push origin --delete "${branchName}"`, {
+      cwd: REPO_ROOT,
+      timeout: 15000,
+      shell: true,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+      encoding: "utf8",
+    });
+    log(`Deleted remote stop-report branch ${branchName}`);
+  } catch {
+    // Branch may not exist remotely — ignore
+  }
+  try {
+    const currentBranch = execSync("git rev-parse --abbrev-ref HEAD", {
+      cwd: REPO_ROOT,
+      timeout: 5000,
+      shell: true,
+      windowsHide: true,
+      encoding: "utf8",
+    }).trim();
+    if (currentBranch === branchName) {
+      execSync("git checkout main -f", {
+        cwd: REPO_ROOT,
+        timeout: 10000,
+        shell: true,
+        windowsHide: true,
+        stdio: ["ignore", "pipe", "pipe"],
+        encoding: "utf8",
+      });
+    }
+    execSync(`git branch -D "${branchName}"`, {
+      cwd: REPO_ROOT,
+      timeout: 10000,
+      shell: true,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+      encoding: "utf8",
+    });
+    log(`Deleted local stop-report branch ${branchName}`);
+  } catch {
+    // Branch may not exist locally — ignore
+  }
 }
 
 function evaluatePipeline() {
@@ -1461,9 +1525,27 @@ function evaluatePipeline() {
       archiveCycleArtifacts(issueSlug);
       clearImplementationFailedState();
       markIdle(`PR #${merged.number} merged for: ${state.issue}`);
-    } else {
-      log(`Pipeline cycle complete - PR open for codex/${issueSlug}, waiting for merge`);
+      return;
     }
+
+    // If there is no open PR and the implementation report shows no code changes,
+    // Codex stopped before patching (contract conflict). Auto-reset so the pipeline
+    // does not stall waiting for a PR merge that will never arrive.
+    const openPr = checkOpenPR(issueSlug);
+    if (!openPr && isNoCodeChangeReport()) {
+      log(
+        `No open or merged PR for codex/${issueSlug} and implementation has no code changes — archiving stop-report cycle and resetting`,
+      );
+      archiveCycleArtifacts(issueSlug);
+      cleanupStopBranch(issueSlug);
+      clearImplementationFailedState();
+      markIdle(
+        `Codex stopped (no code changes) for: ${state.issue} — revise the plan and re-queue`,
+      );
+      return;
+    }
+
+    log(`Pipeline cycle complete - PR open for codex/${issueSlug}, waiting for merge`);
     return;
   }
 
