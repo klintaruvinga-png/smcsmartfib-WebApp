@@ -1,0 +1,113 @@
+{
+  "snapshot_type": "FINDINGS",
+  "workflow_id": "stabilize-ea-2026-05-18",
+  "timestamp": "2026-05-18T00:01:00Z",
+  "confirmed_issues": [
+    {
+      "id": "LINT-001",
+      "severity": "LOW",
+      "system": "Scripts (CI / Pipeline)",
+      "description": "Prettier formatting violation in scripts/pipeline-watcher.js at line 1353: chained .slice(0,300).replace() call needs to be broken onto separate lines per prettier multi-line rules. ESLint reports 1 error (prettier/prettier). The 9 warnings are pre-existing react-hooks and react-refresh warnings introduced in prior sprints.",
+      "root_cause": "A recent commit to scripts/pipeline-watcher.js (merge of PR #200 or adjacent commit) added or modified the stopSummary line without running eslint --fix, leaving .slice(0, 300).replace(/\\r?\\n+/g, ' ') on one line where prettier wants them split across multiple lines.",
+      "impact_zones": ["CI lint gate", "Developer experience"],
+      "proposed_fix": "Run eslint --fix on scripts/pipeline-watcher.js to auto-correct formatting. Zero logic changes."
+    }
+  ],
+  "confirmed_not_issues": [
+    {
+      "id": "INFO-001",
+      "system": "EA Authentication",
+      "description": "permission_ea_bridge: ALL checks confirmed — missing key (401), unconfigured secret (503 + error_log), hash_equals (403), missing user_id (400), invalid user_id (403), wp_set_current_user binding. Auth-success observability log confirmed. CORRECT.",
+      "status": "NO ACTION REQUIRED"
+    },
+    {
+      "id": "INFO-002",
+      "system": "EA Payload Validation",
+      "description": "Stale rejection at 300s (422), warn-only 120-300s, OHLC guard, epoch guard (pre-2000 rejection), M1 candle age guard (180s), M15 candle age guard (1800s), tick_volume guard, bid/ask finite positive check, map_symbol_aliases(). ALL CONFIRMED CORRECT.",
+      "status": "NO ACTION REQUIRED"
+    },
+    {
+      "id": "INFO-003",
+      "system": "MQL5 EA vs PHP Payload Parity",
+      "description": "EA sends user_id in ALL bridge payloads: market-stream (JSON body), heartbeat (JSON body), account-sync (JSON body), symbol-sync (JSON body), license-check (query string ?user_id=N). Dispatch logs at each send point. PHP permission_ea_bridge() reads user_id via ea_request_value() (JSON body + query fallback). ALL CONFIRMED CORRECT per 2026-05-17 patches.",
+      "status": "100% PARITY CONFIRMED"
+    },
+    {
+      "id": "INFO-004",
+      "system": "authority-diagnostics route",
+      "description": "Returns HTTP 401 for unauthenticated requests via permission_user. EXPECTED BEHAVIOR.",
+      "status": "PROTECTED AS EXPECTED"
+    },
+    {
+      "id": "INFO-005",
+      "system": "Admin Routes",
+      "description": "All /admin/* routes use permission_admin (manage_options). CORRECT.",
+      "status": "PROTECTED AS EXPECTED"
+    },
+    {
+      "id": "INFO-006",
+      "system": "Frontend Dashboard Truth",
+      "description": "is_live derived from backend freshness=LIVE && source=mt5 in class-market-data-service.php. FreshnessBadge reads state from backend. useEngineHealth() has staleTime:0. No age computed from fetch time. VerdictBadge reads backend Verdict type. CORRECT.",
+      "status": "BACKEND AUTHORITY PRESERVED"
+    },
+    {
+      "id": "INFO-007",
+      "system": "Phase 1 Bridge Routes",
+      "description": "All 4 Phase 1 routes implemented: POST /ea/heartbeat, POST /ea/account-sync, POST /ea/symbol-sync, GET /ea/license-check. All use permission_ea_bridge. user_id injected in all payloads. Observability logs present. Awaiting live terminal validation.",
+      "status": "IMPLEMENTED — LIVE VALIDATION PENDING"
+    },
+    {
+      "id": "INFO-008",
+      "system": "React Hooks Warnings",
+      "description": "9 pre-existing ESLint warnings (react-hooks/exhaustive-deps, react-refresh/only-export-components) in UI components. Not blocking, not introduced by this workflow.",
+      "status": "PRE-EXISTING — NOT IN SCOPE"
+    },
+    {
+      "id": "INFO-009",
+      "system": "PHP Syntax",
+      "description": "php -l PASS on smc-superfib-sniper.php (v13.0.3) and class-market-data-service.php. No syntax errors.",
+      "status": "PASS"
+    },
+    {
+      "id": "INFO-010",
+      "system": "Vite Build",
+      "description": "npm run build PASS — all modules compiled, SSR bundle generated. Chunk size warnings are informational only.",
+      "status": "PASS"
+    },
+    {
+      "id": "INFO-011",
+      "system": "MQL5 Include Validator",
+      "description": "npm run check:mql PASS — all includes present and syntactically valid.",
+      "status": "PASS"
+    }
+  ],
+  "migration_blockers": [
+    {
+      "id": "MIGRATION-PHASE1-001",
+      "phase": "Phase 1",
+      "description": "Live MT5 terminal verification still pending for /ea/heartbeat, /ea/account-sync, /ea/symbol-sync, /ea/license-check. All code is implemented and regression-covered per 2026-05-17 patches. Requires Track A live terminal execution.",
+      "status": "PENDING — BLOCKED ON TRACK A LIVE TESTING",
+      "validation_required": true
+    }
+  ],
+  "statistics": {
+    "total_issues": 1,
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 1,
+    "migration_blockers": 1
+  },
+  "assessment": {
+    "system_health": "STABLE",
+    "ea_route_status": "CORRECT — no repair needed",
+    "auth_model_status": "CORRECT — complete and hardened with observability",
+    "payload_validation_status": "CORRECT — comprehensive guards present",
+    "stale_data_protection": "CORRECT — 300s hard reject + 120-300s warn",
+    "backend_authority": "PRESERVED — signal truth lives in WordPress plugin",
+    "dashboard_truth": "CORRECT — no faked live state",
+    "migration_phase_0": "COMPLETE",
+    "migration_phase_1": "IN-PROGRESS — code complete, live validation pending",
+    "new_issue_vs_yesterday": "LINT-001 recurring (prettier formatting in pipeline-watcher.js:1353, introduced by merge commit)"
+  }
+}
