@@ -1615,6 +1615,26 @@ export {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
   if (process.argv.includes("--reset")) {
+    // Apply the same editing_locked guard as scripts/reset-pipeline.js so this
+    // path cannot bypass the lock that protects an in-flight PLANNING cycle.
+    if (fs.existsSync(STATE_FILE)) {
+      let currentState;
+      try {
+        currentState = readJson(STATE_FILE);
+      } catch {
+        // Corrupt state file — allow the reset so the user can recover.
+      }
+      if (currentState?.editing_locked === true) {
+        console.error(
+          `[pipeline-watcher] ERROR: Cannot reset while editing_locked=true (state: ${currentState.state}).`,
+        );
+        console.error(
+          "  The pipeline is actively hardening the implementation plan. Wait for it to finish.",
+        );
+        console.error("  Use 'npm run pipeline:reset' which enforces the same check.");
+        process.exit(1);
+      }
+    }
     // Write the reset sentinel and exit immediately — the running watcher will
     // pick it up on the next poll cycle (within 5 seconds).
     ensureReportsDir();
