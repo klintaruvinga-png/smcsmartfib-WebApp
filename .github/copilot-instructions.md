@@ -43,7 +43,7 @@ Before performing ANY file edit, code generation, apply_patch, or write operatio
 
 1. Check if `.smc-workflow-state.json` exists in the repository root.
 2. If it exists, read the `state`, `editing_locked`, and `issue` fields.
-3. If `editing_locked` is `true` OR `state` NOT in [IDLE, READY_FOR_IMPLEMENTATION, IMPLEMENTATION_COMPLETE]:
+3. If `editing_locked` is `true`:
    - REFUSE the edit
    - Respond with:
 
@@ -56,7 +56,13 @@ Before performing ANY file edit, code generation, apply_patch, or write operatio
      Save `reports/copilot-research.md` and let the pipeline harden the plan first.
      ```
 
-4. If `editing_locked` is `false` and `state` is in [IDLE, READY_FOR_IMPLEMENTATION, IMPLEMENTATION_COMPLETE]: proceed normally.
+4. If `editing_locked` is `false`: proceed normally, regardless of `state`.
+   - `IMPLEMENTATION_FAILED` always sets `editing_locked: false` — editing is allowed so
+     you can fix the issue, revise research, or start a new `/research-and-plan` cycle.
+   - To reset the pipeline to IDLE after inspecting the failure, run:
+     `npm run pipeline:reset`
+     This writes `reports/.pipeline-reset-requested` and the running watcher clears the
+     state to IDLE within one poll cycle (≤ 5 seconds).
 5. If the file does not exist: proceed normally.
 
 ## Artifact Requirements
@@ -66,7 +72,8 @@ Before performing ANY file edit, code generation, apply_patch, or write operatio
   - `reports/codex-plan.md`
 - `.smc-workflow-state.json` is a local runtime file. Never stage or commit it.
 - If `state` is `IMPLEMENTATION_FAILED`, inspect `reports/.codex-implementation-failed.json` and `reports/codex-last-message.txt` before starting a new cycle.
-- Once `IMPLEMENTATION_COMPLETE`, the pipeline watcher polls GitHub every ~60 s for the merged PR on `codex/<issue-slug>`. When the PR is merged it archives the cycle artifacts to `reports/archive/` and resets state to `IDLE` automatically. Do NOT manually reset state to start a new cycle — wait for the merge or submit a new `/research-and-plan` trigger.
+- Once `IMPLEMENTATION_COMPLETE`, the pipeline watcher polls GitHub every ~60 s for the merged PR on `codex/<issue-slug>`. When the PR is merged it archives the cycle artifacts to `reports/archive/` and resets state to `IDLE` automatically.
+- To manually reset the pipeline to `IDLE` from any non-PLANNING state (e.g. after `IMPLEMENTATION_FAILED`), run `npm run pipeline:reset`. The watcher detects the sentinel file and resets within one poll cycle. Do NOT directly edit `.smc-workflow-state.json` by hand.
 - `IDLE` means no active cycle. The next `/research-and-plan` trigger starts a fresh cycle.
 
 ## Workflow States Reference
@@ -77,5 +84,5 @@ Before performing ANY file edit, code generation, apply_patch, or write operatio
 | RESEARCHING              | No              | Copilot writing research artifact. |
 | PLANNING                 | No (locked)     | Pipeline calling Claude to harden the plan. |
 | READY_FOR_IMPLEMENTATION | Yes             | Plan hardened. Pipeline calling Codex. |
-| IMPLEMENTATION_FAILED    | No              | Codex stopped. Inspect `.codex-implementation-failed.json`. |
+| IMPLEMENTATION_FAILED    | Yes             | Codex stopped. Inspect `.codex-implementation-failed.json`. Run `npm run pipeline:reset` to return to IDLE. |
 | IMPLEMENTATION_COMPLETE  | Yes             | Codex opened PR. Pipeline polling for merge to close cycle. |
