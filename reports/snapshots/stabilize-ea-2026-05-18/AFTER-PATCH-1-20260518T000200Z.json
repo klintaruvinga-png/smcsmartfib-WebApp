@@ -1,0 +1,14 @@
+{
+  "snapshot_type": "AFTER-PATCH-1",
+  "workflow_id": "stabilize-ea-2026-05-18",
+  "timestamp": "2026-05-18T00:02:00Z",
+  "patch_id": "PATCH-1",
+  "issue_id": "LINT-001",
+  "description": "Prettier formatting fix in scripts/pipeline-watcher.js:1353 — chained .slice()/.replace()/.trim() split onto separate lines. Zero logic change.",
+  "commit": "649c08f",
+  "rollback_tag": "rollback/stabilize-ea-2026-05-18-after-patch-1",
+  "lint_status": "0 errors, 9 pre-existing warnings",
+  "build_status": "PASS",
+  "php_syntax_status": "PASS",
+  "check_mql_status": "PASS"
+}
