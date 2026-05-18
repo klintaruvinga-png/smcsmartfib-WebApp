@@ -36,6 +36,11 @@ const CODEX_IMPLEMENT_PROMPT_FILE = path.join(
   "codex-implement-prompt.md",
 );
 const CODEX_OUTPUT_FILE = path.join(REPO_ROOT, "reports", "codex-last-message.txt");
+// Written by `npm run pipeline:reset` (or `node scripts/reset-pipeline.js`).
+// The watcher detects this sentinel on its next poll, archives any current cycle
+// artifacts, deletes the sentinel, and resets state to IDLE. This is the safe
+// programmatic escape from IMPLEMENTATION_FAILED without direct state file edits.
+const PIPELINE_RESET_FILE = path.join(REPO_ROOT, "reports", ".pipeline-reset-requested");
 // Written when the Claude CLI invocation fails so the watcher stops retrying until
 // the research/issue changes or the file is manually deleted.
 const CLAUDE_HARDENING_BLOCKED_FILE = path.join(
@@ -209,6 +214,7 @@ function buildObservedKey() {
     statMtime(IMPLEMENTATION_FILE),
     statMtime(IMPLEMENTATION_FAILED_FILE),
     statMtime(CLAUDE_HARDENING_BLOCKED_FILE),
+    statMtime(PIPELINE_RESET_FILE),
     timeBucket,
   ].join(":");
 }
@@ -1366,6 +1372,21 @@ function synthesizeStopReport(state, issueSlug) {
 }
 
 function evaluatePipeline() {
+  // Check for a manual reset request first — this takes priority over all other
+  // state handling so that a stuck IMPLEMENTATION_FAILED cycle can always be cleared.
+  if (fs.existsSync(PIPELINE_RESET_FILE)) {
+    removeFileIfExists(PIPELINE_RESET_FILE);
+    const state = readState();
+    if (state?.issue) {
+      const issueSlug = slugifyIssue(state.issue);
+      archiveCycleArtifacts(issueSlug);
+    }
+    clearImplementationFailedState();
+    clearHardeningBlockedState();
+    markIdle("Manual pipeline reset requested via reports/.pipeline-reset-requested");
+    return;
+  }
+
   const state = readState();
   if (!state) {
     return;
@@ -1593,5 +1614,20 @@ export {
 };
 
 if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  if (process.argv.includes("--reset")) {
+    // Write the reset sentinel and exit immediately — the running watcher will
+    // pick it up on the next poll cycle (within 5 seconds).
+    ensureReportsDir();
+    fs.writeFileSync(
+      PIPELINE_RESET_FILE,
+      `${JSON.stringify({ requested_at: new Date().toISOString() }, null, 2)}\n`,
+      "utf8",
+    );
+    console.log(
+      "[pipeline-watcher] Reset sentinel written. The running watcher will reset to IDLE within 5 seconds.",
+    );
+    console.log("[pipeline-watcher] If no watcher is running, start one with: npm run pipeline:start");
+    process.exit(0);
+  }
   startPipelineWatcher();
 }
