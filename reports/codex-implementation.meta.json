@@ -1,5 +1,0 @@
-{
-  "issue": "SMC Intake - Re-plan and run targeted checks: confirm OnTimer() prints in live logs and that g_heartbeatTickCount increments",
-  "plan_hash": "17f2c1360124505245817e8628cc5ddc02ee456bb7dcba4afe72365cb2163371",
-  "written_at": "2026-05-17T16:00:00Z"
-}

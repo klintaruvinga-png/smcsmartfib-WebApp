@@ -1,5 +1,5 @@
 {
-  "issue": "POST /ea/heartbeat route exists and auth validates correctly, but live session logs show zero heartbeat dispatches while account-sync (✅ PASS), symbol-sync (✅ PASS), and market-stream (✅ PASS) fire successfully every cycle — heartbeat dispatch is throttled by g_heartbeatIntervalTicks=48 (~8min cadence) but heartbeat timer path either not firing or cadence expectation mismatch between EA and Phase 1 validation gate",
+  "issue": "SMC Intake PR #197 cadence fix patches are not merged and compiled into the running EA yet — the EA running right now is still on the old 48-tick code.",
   "research_hash": "b67f8bf2377dba4ed0f3d0a8df255432792f910546559cee1b56f6fb0790a9d5",
-  "written_at": "2026-05-17T13:22:14.942Z"
+  "written_at": "2026-05-17T23:54:01.170Z"
 }

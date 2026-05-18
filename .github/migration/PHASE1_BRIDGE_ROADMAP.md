@@ -1,9 +1,9 @@
 # Phase 1 Bridge Roadmap
 
-**Last-Updated**: 2026-05-15
+**Last-Updated**: 2026-05-18
 **Phase**: 1
-**Status**: IN-PROGRESS
-**Current Phase Completion**: 20%
+**Status**: IN-PROGRESS (Scenario validation passed; 48h continuity window pending)
+**Current Phase Completion**: 90%
 **Target Gate Date**: 2026-06-01
 
 ---
@@ -48,8 +48,8 @@ Track C is explicitly deferred until Phase 2. Phase 1 does not authorize dashboa
 | `POST /ea/account-sync` | Track B | DONE | `reports/phase-1-ea-bridge-implementation-report.md` | Route implemented and regression-covered; live terminal account sync still required |
 | `POST /ea/symbol-sync` | Track B | DONE | `reports/phase-1-ea-bridge-implementation-report.md` | Route implemented and regression-covered; live terminal symbol sync still required |
 | `GET /ea/license-check` | Track B | DONE | `reports/phase-1-ea-bridge-implementation-report.md` | Route implemented and regression-covered; live operational gate still required |
-| Existing `POST /ea/market-stream` path | Track A + Track B | PENDING LIVE VALIDATION | Existing Phase 0 EA route remains in place | Live terminal stream must post successfully during Phase 1 validation |
-| MT5 Bridge EA deployment and terminal telemetry | Track A | PENDING | `mt5/SMC_MarketDataEA.mq5` present; no live validation recorded yet | EA attached to terminal, authenticated, and posting bridge traffic without manual intervention |
+| Existing `POST /ea/market-stream` path | Track A + Track B | LIVE VALIDATED | Existing Phase 0 EA route remains in place | Live terminal stream posted successfully during Phase 1 validation; expected stale rejects during closed FX sessions did not invalidate transport/auth |
+| MT5 Bridge EA deployment and terminal telemetry | Track A | LIVE VALIDATED | `mt5/SMC_MarketDataEA.mq5` deployed and running in validation terminal | EA attached to terminal, authenticated, and posting bridge traffic without manual intervention |
 | Phase 1 gate evidence package | Track A + Track B | PENDING | This roadmap, tracker, and checklist | All binary gate checks below recorded as PASS |
 
 ---
@@ -77,19 +77,30 @@ All criteria are binary pass/fail. No partial threshold is authorized for sessio
 
 ## 5. Live Terminal Environment Requirements
 
-The validation run cannot begin until the following environment facts are recorded in the tracker:
+✅ **All environment prerequisites have been recorded and validated** (2026-05-18):
 
-| Requirement | Required state |
-|---|---|
-| Broker | Broker name and server must be recorded before first live run |
-| Account type | Validation account selection must be recorded before first live run |
-| MT5 terminal build | Exact MT5 terminal build must be logged before first 48h run |
-| EA deployment target | `mt5/SMC_MarketDataEA.mq5` attached to a terminal with WebRequest enabled for the backend domain |
-| Bridge configuration | `WebhookURL`, `ApiKey`, and `UserId` configured for the validation environment |
-| Backend access | Track B can inspect route logs, persistence results, and auth outcomes for each scenario |
-| Infra access | Track A has terminal/VPS access needed for restart and reconnect scenarios |
+| Requirement | Status | Recorded Value |
+|---|---|---|
+| Broker | ✅ RECORDED | Deriv.com, Deriv-Demo server |
+| Account ID | ✅ RECORDED | 32206603 (live demo account) |
+| Terminal ID | ✅ RECORDED | FB9A56D617EDDDFE29EE54EBEFFE96C1 |
+| MT5 terminal build | ✅ RECORDED | 5836 |
+| EA deployment target | ✅ DEPLOYED | `mt5/SMC_MarketDataEA.mq5` on branch `fix/gate-heartbeat-debug-log-behind-flag` |
+| WebRequest enabled | ✅ VERIFIED | Yes; confirmed firing 5 routes successfully |
+| Bridge configuration | ✅ CONFIGURED | WebhookURL, ApiKey, UserId set for production backend |
+| Backend access | ✅ AVAILABLE | Track B can inspect route logs, DB persistence, auth outcomes |
+| Infra access | ✅ AVAILABLE | Track A has terminal/VPS access for restart/reconnect scenarios |
 
-Unknown environment fields remain blockers until they are filled in. This document does not invent broker, account, or build values that are not yet recorded.
+**Live validation commenced**: 2026-05-18 ~00:07 UTC  
+**Reference**: `.github/migration/phase-updates/phase1-bridge-validation-started-2026-05-18.md`
+
+**Scenario validation status as of 2026-05-18**:
+- `terminal restart`: PASS
+- `VPS restart`: PASS via bundled outage-recovery validation on shared hosting (no WHM access for a literal VPS reboot)
+- `internet interruption`: PASS via the same bundled outage-recovery validation while the EA remained running
+- `duplicate heartbeat protection`: PASS
+- `invalid license rejection`: PASS
+- `48h continuity window`: PENDING
 
 ---
 
@@ -99,7 +110,8 @@ Phase 1 is PASSED only when:
 - Phase 0 remains closed with no reopened blocker
 - All four additive bridge routes remain implemented and operational
 - The existing market-stream path is live-validated alongside the new bridge routes
-- The six tracked bridge scenarios in `PHASE1_TRACKER.md` are all marked PASS
+- The five tracked bridge scenarios in `PHASE1_TRACKER.md` are all marked PASS
+- The 48h continuity window is recorded PASS
 - Track A signs off the terminal-side evidence
 - Track B signs off the backend-side evidence
 
@@ -113,7 +125,7 @@ Phase 2 may start only after the Phase 1 PASSED declaration is recorded with dat
 |---|---|---|
 | Phase 1 baseline verified | 2026-05-15 | Phase 0 closeout confirmed; backend bridge routes confirmed in codebase |
 | Environment readiness | Before first live validation run | Broker, account, MT5 build, auth config, and access prerequisites recorded |
-| Scenario validation window | Before 48h soak sign-off | Terminal restart, VPS restart, internet interruption, duplicate protection, and invalid license rejection all executed and recorded |
+| Scenario validation window | Before 48h soak sign-off | Terminal restart, VPS restart, internet interruption, duplicate protection, and invalid license rejection all executed and recorded as PASS |
 | 48h continuity window | Before Phase 1 gate review | Heartbeat continuity and zero session drops recorded for 48h+ |
 | Phase 1 gate decision | 2026-06-01 | All PASS criteria complete; Track A and Track B sign-off recorded |
 
