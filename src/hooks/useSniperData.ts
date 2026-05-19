@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { apiClient, normalizeBackendUrl, setBackendUrl } from "@/lib/api/sniperClient";
 import type { DashboardSettings, Symbol, SymbolDiagnostic, TradePlan } from "@/types/sniper";
 
@@ -7,70 +7,118 @@ const DEFAULT_POLL_MS = 2_000;
 const WATCHLIST_LIMIT = 24;
 
 export function useBackendReady() {
-  const { data } = useUserSettings();
-  return normalizeBackendUrl(data?.backendUrl).length > 0;
+  return usePollingQueryState().backendReady;
 }
 
 export function usePollMs() {
-  const { data } = useUserSettings();
-  const sec = data?.refreshIntervalSec;
-  // CRITICAL FIX: Only use loaded user settings, never fall back to DEFAULT.
-  // If settings haven't loaded yet, return null to disable polling until ready.
-  // This prevents orphaned queries firing with stale refresh intervals.
-  if (!data) return null;
+  return usePollingQueryState().pollMs;
+}
+
+function resolvePollMs(settings: DashboardSettings | undefined): number | null {
+  const sec = settings?.refreshIntervalSec;
+  // CRITICAL FIX: Only use loaded user settings, never fall back to DEFAULT
+  // before the settings query has resolved.
+  if (!settings) return null;
   return Number.isFinite(sec) && (sec ?? 0) > 0 ? (sec as number) * 1000 : DEFAULT_POLL_MS;
 }
 
+function usePollingQueryState() {
+  const settingsQuery = useUserSettings();
+  const settings = settingsQuery.data;
+  const pendingSettingsLoad =
+    settings === undefined &&
+    (settingsQuery.fetchStatus === "fetching" ||
+      settingsQuery.isPending === true ||
+      settingsQuery.isLoading === true);
+  const pollMs = pendingSettingsLoad ? null : resolvePollMs(settings);
+  const backendReady = normalizeBackendUrl(settings?.backendUrl).length > 0;
+
+  return {
+    backendReady,
+    pendingSettingsLoad,
+    pollMs,
+  };
+}
+
+function useLivePollingDiagnostics(
+  label: string,
+  backendReady: boolean,
+  pendingSettingsLoad: boolean,
+  pollMs: number | null,
+) {
+  const previousPollMsRef = useRef<number | null>(pollMs);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) {
+      previousPollMsRef.current = pollMs;
+      return;
+    }
+
+    if (
+      previousPollMsRef.current === null &&
+      pollMs !== null &&
+      backendReady &&
+      !pendingSettingsLoad
+    ) {
+      console.warn(`[${label}] poll re-enabled after settings resolved`, {
+        backendReady,
+        pollMs,
+      });
+    }
+
+    previousPollMsRef.current = pollMs;
+  }, [backendReady, label, pendingSettingsLoad, pollMs]);
+}
+
 export function useSnapshot() {
-  const backendReady = useBackendReady();
-  const pollMs = usePollMs();
+  const { backendReady, pendingSettingsLoad, pollMs } = usePollingQueryState();
   // CRITICAL: Only enable query when backend is ready AND pollMs is valid (not null).
   // Prevents orphaned queries and race conditions during initialization.
   const enabled = backendReady && pollMs !== null;
+  useLivePollingDiagnostics("SNAPSHOT_POLL", backendReady, pendingSettingsLoad, pollMs);
   return useQuery({
     queryKey: ["snapshot"],
     queryFn: () => apiClient.getSnapshot(),
     enabled,
-    refetchInterval: pollMs ?? DEFAULT_POLL_MS, // Use DEFAULT_POLL_MS when pollMs is null
+    refetchOnWindowFocus: false,
+    refetchInterval: enabled ? pollMs : false,
   });
 }
 
 export function useLiveSignals() {
-  const backendReady = useBackendReady();
-  const pollMs = usePollMs();
+  const { backendReady, pollMs } = usePollingQueryState();
   // CRITICAL: Only enable query when backend is ready AND pollMs is valid (not null).
   const enabled = backendReady && pollMs !== null;
   return useQuery({
     queryKey: ["live-signals"],
     queryFn: () => apiClient.getLiveSignals(),
     enabled,
-    refetchInterval: pollMs ?? DEFAULT_POLL_MS,
+    refetchOnWindowFocus: false,
+    refetchInterval: enabled ? pollMs : false,
   });
 }
 
 export function useUserTrades() {
-  const backendReady = useBackendReady();
-  const pollMs = usePollMs();
+  const { backendReady, pollMs } = usePollingQueryState();
   // CRITICAL: Only enable query when backend is ready AND pollMs is valid (not null).
   const enabled = backendReady && pollMs !== null;
   return useQuery({
     queryKey: ["user-trades"],
     queryFn: () => apiClient.getUserTrades(),
     enabled,
-    refetchInterval: pollMs ?? DEFAULT_POLL_MS,
+    refetchInterval: enabled ? pollMs : false,
   });
 }
 
 export function useUserAccount() {
-  const backendReady = useBackendReady();
-  const pollMs = usePollMs();
+  const { backendReady, pollMs } = usePollingQueryState();
   // CRITICAL: Only enable query when backend is ready AND pollMs is valid (not null).
   const enabled = backendReady && pollMs !== null;
   return useQuery({
     queryKey: ["user-account"],
     queryFn: () => apiClient.getUserAccount(),
     enabled,
-    refetchInterval: pollMs ?? DEFAULT_POLL_MS,
+    refetchInterval: enabled ? pollMs : false,
   });
 }
 
@@ -283,8 +331,7 @@ export function useWatchlistRemove() {
 }
 
 export function useEngineHealth() {
-  const backendReady = useBackendReady();
-  const pollMs = usePollMs();
+  const { backendReady, pollMs } = usePollingQueryState();
   // CRITICAL: Only enable query when backend is ready AND pollMs is valid (not null).
   const enabled = backendReady && pollMs !== null;
   return useQuery({
@@ -293,7 +340,7 @@ export function useEngineHealth() {
     enabled,
     // Phase 0: health query must reflect backend state within one poll cycle; disable caching.
     staleTime: 0,
-    refetchInterval: pollMs ?? DEFAULT_POLL_MS,
+    refetchInterval: enabled ? pollMs : false,
   });
 }
 
@@ -307,14 +354,13 @@ export function useUserRiskProfile() {
 }
 
 export function useLadders() {
-  const backendReady = useBackendReady();
-  const pollMs = usePollMs();
+  const { backendReady, pollMs } = usePollingQueryState();
   const enabled = backendReady && pollMs !== null;
   return useQuery<TradePlan[]>({
     queryKey: ["ladders"],
     queryFn: () => apiClient.getLadders(),
     enabled,
-    refetchInterval: pollMs ?? DEFAULT_POLL_MS,
+    refetchInterval: enabled ? pollMs : false,
   });
 }
 
