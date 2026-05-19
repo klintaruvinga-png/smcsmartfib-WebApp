@@ -23,8 +23,9 @@
 input string WebhookURL = "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream";
 input string ApiKey     = "";   // Must match SMC_SF_EA_API_KEY in wp-config.php
 input int    UserId     = 1;    // WordPress user_id that owns this data stream
-input int    TimerSec   = 10;   // OnPeriodic interval in seconds
-input bool   DebugLog   = false; // Enable verbose per-tick logging (off in production to avoid log noise)
+input int    TimerSec              = 10;   // OnPeriodic interval in seconds
+input int    HeartbeatIntervalTicks = 6;   // Send heartbeat every N OnTimer() calls (default 6 × 10 s = 60 s)
+input bool   DebugLog              = false; // Enable verbose per-tick logging (off in production to avoid log noise)
 input string Symbols    = "EURUSD,GBPUSD,XAUUSD,USDJPY,GBPJPY,AUDUSD";
 
 MarketDataEngine engine;

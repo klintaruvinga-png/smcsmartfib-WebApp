@@ -53,7 +53,9 @@ function main() {
   );
 
   console.log("[reset-pipeline] Reset sentinel written to reports/.pipeline-reset-requested");
-  console.log("[reset-pipeline] If a pipeline watcher is running, it will reset to IDLE within 5 seconds.");
+  console.log(
+    "[reset-pipeline] If a pipeline watcher is running, it will reset to IDLE within 5 seconds.",
+  );
   console.log("[reset-pipeline] If no watcher is running, start one with: npm run pipeline:start");
 }
 
