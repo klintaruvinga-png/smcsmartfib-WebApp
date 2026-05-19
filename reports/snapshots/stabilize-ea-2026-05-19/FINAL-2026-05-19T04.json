@@ -1,0 +1,80 @@
+{
+  "snapshot_type": "FINAL",
+  "workflow_id": "stabilize-ea-2026-05-19",
+  "timestamp": "2026-05-19T04:45:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-Wegf2",
+    "commit_hash": "36b6e76cb4e0802a6a076a4009c3ed70ad34d46e",
+    "tags_created": [
+      "snapshot/stabilize-ea-2026-05-19-start-2026-05-19T04",
+      "rollback/stabilize-ea-2026-05-19-before-patches",
+      "rollback/stabilize-ea-2026-05-19-after-patch-1"
+    ]
+  },
+  "patches_applied": [
+    {
+      "id": "PATCH-1",
+      "bug": "BUG-EA-001",
+      "severity": "CRITICAL",
+      "description": "Added missing `input int HeartbeatIntervalTicks = 6;` to SMC_MarketDataEA.mq5 — resolves MQL5 compiler error"
+    },
+    {
+      "id": "PATCH-2",
+      "bug": "BUG-LINT-001",
+      "severity": "LOW",
+      "description": "Prettier formatting fixed in pipeline-watcher.js and reset-pipeline.js — lint gate now passes with 0 errors"
+    }
+  ],
+  "migration_status_post_patch": {
+    "current_phase": "Phase 1 — MT5 Bridge Infrastructure",
+    "overall_progress": "57%",
+    "blockers_addressed": [
+      "MIGRATION-002: BUG-EA-001 resolved — EA can now be recompiled without error; Phase 1 48h continuity window is no longer at risk of EA compile failure on terminal restart"
+    ],
+    "remaining_blockers": [
+      "MIGRATION-001: 48h heartbeat continuity window still pending (started 2026-05-18 ~00:07 UTC; target gate date 2026-06-01)"
+    ],
+    "phase_readiness": "Phase 1 nearing completion — EA compilation error fixed; 48h continuity window is the sole remaining gate item"
+  },
+  "tests": {
+    "commands_run": [
+      "npm run lint",
+      "npm run build",
+      "npm run check:mql",
+      "php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "php -l wordpress/smc-superfib-sniper/class-market-data-service.php"
+    ],
+    "passing": true,
+    "failures": [],
+    "details": {
+      "npm_run_lint": "0 errors, 9 pre-existing warnings (PASS)",
+      "npm_run_build": "built in 7.09s (PASS)",
+      "npm_run_check_mql": "MQL include verification passed (PASS)",
+      "php_l_smc_superfib_sniper": "No syntax errors detected (PASS)",
+      "php_l_class_market_data_service": "No syntax errors detected (PASS)"
+    }
+  },
+  "ea_integration_status": {
+    "market_stream_route": "POST /wp-json/sniper/v1/ea/market-stream",
+    "auth_required": true,
+    "auth_header": "X-EA-API-Key",
+    "secret_env": "SMC_SF_EA_API_KEY",
+    "user_id_required": true,
+    "payload_validation": true,
+    "stale_rejection": true,
+    "stale_threshold_hard_reject_sec": 300,
+    "stale_threshold_warn_sec": 120,
+    "ohlc_validation": true,
+    "epoch_guard": true,
+    "m1_candle_max_age_sec": 180,
+    "m15_candle_max_age_sec": 1800,
+    "tick_volume_guard": true,
+    "symbol_normalization": "PHP map_symbol_aliases() + MQL5 SymbolNormalizer",
+    "equity_index_session_handling": true
+  },
+  "rollback": {
+    "manifest": "ROLLBACK-MANIFEST.json",
+    "rollback_points_count": 3,
+    "rollback_command": "git reset --hard a3b7515163d0562b39548ca29f609cedfedbe310"
+  }
+}
