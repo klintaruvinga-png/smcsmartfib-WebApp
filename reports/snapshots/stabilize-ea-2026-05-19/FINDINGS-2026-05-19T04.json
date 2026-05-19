@@ -1,0 +1,78 @@
+{
+  "snapshot_type": "FINDINGS",
+  "workflow_id": "stabilize-ea-2026-05-19",
+  "timestamp": "2026-05-19T04:15:00Z",
+  "confirmed_issues": [
+    {
+      "id": "BUG-EA-001",
+      "severity": "CRITICAL",
+      "system": "MT5 EA / MQL5 Compiler",
+      "description": "HeartbeatIntervalTicks used but never declared as an input variable in SMC_MarketDataEA.mq5",
+      "root_cause": "Line 224 reads `g_heartbeatIntervalTicks = (HeartbeatIntervalTicks > 0) ? HeartbeatIntervalTicks : 6;`. The comment at line 44 says 'Initialised from the HeartbeatIntervalTicks input in OnInit()' but `input int HeartbeatIntervalTicks = 6;` is absent from the input declarations block (lines 23–28). The MQL5 compiler will reject this as an undeclared identifier. The check-mql-includes.mjs validator only verifies #include file existence and does not catch undeclared identifiers.",
+      "impact_zones": ["MT5 EA", "Heartbeat delivery", "Phase 1 48h continuity window"],
+      "proposed_fix": "Add `input int HeartbeatIntervalTicks = 6;` to the input block in SMC_MarketDataEA.mq5 after the TimerSec input declaration, matching the comment intent."
+    },
+    {
+      "id": "BUG-LINT-001",
+      "severity": "LOW",
+      "system": "CI / Scripts",
+      "description": "Prettier formatting violations in scripts/pipeline-watcher.js (2 locations) and scripts/reset-pipeline.js (1 location)",
+      "root_cause": "String literals on single long lines violate prettier line-length and trailing-comma rules. Introduced in recent PR merges that did not run eslint --fix before push.",
+      "impact_zones": ["CI lint gate"],
+      "proposed_fix": "Run npx eslint --fix on affected script files."
+    }
+  ],
+  "confirmed_non_issues": [
+    "EA auth: missing token → 401 smc_sf_api_key_missing — CORRECT",
+    "EA auth: unconfigured secret → 503 smc_sf_api_key_unconfigured — CORRECT",
+    "EA auth: hash_equals used — CORRECT",
+    "EA auth: invalid token → 403 smc_sf_api_key_invalid — CORRECT",
+    "EA auth: missing user_id → 400 smc_sf_user_required — CORRECT",
+    "EA auth: invalid user_id → 403 smc_sf_user_invalid — CORRECT",
+    "EA auth: wp_set_current_user called on success — CORRECT",
+    "EA auth: 4 header aliases accepted — CORRECT",
+    "Stale rejection: 300s hard-reject 422, 120-300s warn-only — CORRECT",
+    "OHLC validation: high >= max(open,close), low <= min(open,close) — CORRECT",
+    "Epoch guard: pre-2000-01-01 timestamps rejected — CORRECT",
+    "M1 candle age gate: 180s — CORRECT",
+    "M15 candle age gate: 1800s — CORRECT",
+    "tick_volume guard: non-numeric/negative clamped to 0 — CORRECT",
+    "bid/ask: is_finite && >0 && bid<=ask — CORRECT",
+    "Symbol normalization: PHP map_symbol_aliases() + MQL5 SymbolNormalizer — CORRECT",
+    "Equity index (NAS100/US30): CLOSED freshness + wall-clock time during off-session — CORRECT",
+    "authority-diagnostics: returns 401 unauthenticated — PROTECTED (expected)",
+    "Admin routes: all /admin/* require manage_options — PROTECTED",
+    "Dashboard live truth: age_sec + is_live from backend /snapshot — CORRECT",
+    "Signal engine authority: resides in WordPress plugin — CORRECT",
+    "Phase 1 bridge routes: heartbeat, account-sync, symbol-sync, license-check all registered — CORRECT",
+    "PHP syntax: php -l PASS on both plugin files — PASS",
+    "Vite build: npm run build PASS — PASS",
+    "MQL includes: npm run check:mql PASS — PASS"
+  ],
+  "migration_blockers": [
+    {
+      "id": "MIGRATION-001",
+      "phase": "Phase 1",
+      "description": "48h heartbeat continuity window pending — only remaining Phase 1 gate item",
+      "status": "OPEN",
+      "validation_required": true,
+      "note": "Validation window started 2026-05-18 ~00:07 UTC. Must run stably for 48h+. Target gate date: 2026-06-01."
+    },
+    {
+      "id": "MIGRATION-002",
+      "phase": "Phase 1",
+      "description": "EA will fail to compile if HeartbeatIntervalTicks is not declared — BUG-EA-001",
+      "status": "BLOCKED — requires BUG-EA-001 fix",
+      "validation_required": true,
+      "note": "If the EA was compiled against a version where this was declared, it may still be running. But any recompile attempt on the current mq5 source will fail."
+    }
+  ],
+  "statistics": {
+    "total_issues": 2,
+    "critical": 1,
+    "high": 0,
+    "medium": 0,
+    "low": 1,
+    "migration_blockers": 2
+  }
+}
