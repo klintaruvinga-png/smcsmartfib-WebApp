@@ -1,0 +1,113 @@
+{
+  "snapshot_type": "INITIAL",
+  "workflow_id": "stabilize-ea-2026-05-19",
+  "timestamp": "2026-05-19T04:00:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-Wegf2",
+    "commit_hash": "a3b7515163d0562b39548ca29f609cedfedbe310",
+    "remote": "origin",
+    "uncommitted_changes_count": 0
+  },
+  "repo_structure": {
+    "plugin_root": "wordpress/smc-superfib-sniper",
+    "plugin_files": [
+      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "wordpress/smc-superfib-sniper/class-market-data-service.php"
+    ],
+    "rest_route_files": [
+      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php"
+    ],
+    "frontend_api_client": "src/lib/api/sniperClient.ts",
+    "mt5_ea_files": [
+      "mt5/SMC_MarketDataEA.mq5",
+      "mt5/MarketDataEngine.mqh",
+      "mt5/TickProcessor.mqh",
+      "mt5/CandleBuilder.mqh",
+      "mt5/SessionManager.mqh",
+      "mt5/FreshnessEngine.mqh",
+      "mt5/SymbolNormalizer.mqh",
+      "mt5/check-mql-includes.mjs"
+    ],
+    "migration_files": [
+      ".github/migration-status.md",
+      ".github/migration/PHASE1_TRACKER.md",
+      ".github/migration/PHASE1_BRIDGE_ROADMAP.md",
+      ".github/migration/PHASE1_CHECKLIST.md",
+      ".github/migration/PHASE0_SOAK_TRACKER.md"
+    ]
+  },
+  "rest_routes": {
+    "namespace": "sniper/v1",
+    "public": [
+      "GET /health",
+      "GET /session"
+    ],
+    "permission_user": [
+      "GET /snapshot",
+      "POST /snapshot",
+      "GET /charts",
+      "GET /regimes",
+      "POST /regime",
+      "GET /live-signals",
+      "POST /signal",
+      "GET /ladders",
+      "POST /user/engine-batch",
+      "POST /user/market-data",
+      "GET /user/trades",
+      "POST /user/trades",
+      "GET /user/account",
+      "POST /user/account",
+      "GET /user/settings",
+      "POST /user/settings",
+      "GET /user/risk-profile",
+      "POST /user/risk-profile",
+      "GET /user/trade-queue",
+      "POST /user/trade-queue",
+      "POST /user/execute-signals",
+      "POST /user/twelve-data-key",
+      "DELETE /user/twelve-data-key",
+      "GET /user/watchlist",
+      "POST /user/watchlist",
+      "POST /user/watchlist/add",
+      "POST /user/watchlist/remove",
+      "GET /instruments",
+      "GET /market-data-authority",
+      "GET /authority-diagnostics"
+    ],
+    "permission_admin": [
+      "GET /admin/health",
+      "GET /admin/soak-report",
+      "POST /admin/soak-evidence",
+      "POST /admin/soak-checkpoint"
+    ],
+    "permission_ea_bridge": [
+      "POST /ea/market-stream",
+      "POST /ea/heartbeat",
+      "POST /ea/account-sync",
+      "POST /ea/symbol-sync",
+      "GET /ea/license-check"
+    ]
+  },
+  "app_state": {
+    "workflow_state_file_exists": false,
+    "workflow_state": null,
+    "migration_status": {
+      "current_phase": "1 (MT5 Bridge Infrastructure)",
+      "overall_progress": "57%",
+      "status": "Phase 0 COMPLETE — Phase 1 IN-PROGRESS (90%)",
+      "blockers": [
+        "48h continuity window pending (heartbeat must run stably for 48h+)"
+      ]
+    }
+  },
+  "known_dev_status": {
+    "authority_diagnostics_requires_wp_session": true,
+    "ea_market_stream_route_exists": true,
+    "ea_auth_header": "X-EA-API-Key",
+    "ea_auth_secret_env": "SMC_SF_EA_API_KEY",
+    "ea_payload_requires_user_id": true,
+    "migration_phase": "Phase 1 — MT5 Bridge Infrastructure (IN-PROGRESS)",
+    "phase1_48h_continuity_window_started": "2026-05-18T00:07:00Z",
+    "phase1_completion_target": "2026-06-01"
+  }
+}

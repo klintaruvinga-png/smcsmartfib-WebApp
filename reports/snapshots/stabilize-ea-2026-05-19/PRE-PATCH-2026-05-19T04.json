@@ -1,0 +1,26 @@
+{
+  "snapshot_type": "PRE-PATCH",
+  "workflow_id": "stabilize-ea-2026-05-19",
+  "timestamp": "2026-05-19T04:20:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-Wegf2",
+    "commit_hash": "a3b7515163d0562b39548ca29f609cedfedbe310",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-19-before-patches"
+  },
+  "patches_planned": [
+    {
+      "id": "PATCH-1",
+      "bug": "BUG-EA-001",
+      "severity": "CRITICAL",
+      "file": "mt5/SMC_MarketDataEA.mq5",
+      "change": "Add `input int HeartbeatIntervalTicks = 6;` declaration after TimerSec input"
+    },
+    {
+      "id": "PATCH-2",
+      "bug": "BUG-LINT-001",
+      "severity": "LOW",
+      "files": ["scripts/pipeline-watcher.js", "scripts/reset-pipeline.js"],
+      "change": "Prettier formatting fix via eslint --fix"
+    }
+  ]
+}

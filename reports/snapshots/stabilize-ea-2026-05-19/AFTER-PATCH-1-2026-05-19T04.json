@@ -1,0 +1,35 @@
+{
+  "snapshot_type": "AFTER-PATCH-1",
+  "workflow_id": "stabilize-ea-2026-05-19",
+  "timestamp": "2026-05-19T04:35:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-Wegf2",
+    "commit_hash": "36b6e76cb4e0802a6a076a4009c3ed70ad34d46e",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-19-after-patch-1"
+  },
+  "patches_applied": [
+    {
+      "id": "PATCH-1",
+      "bug": "BUG-EA-001",
+      "severity": "CRITICAL",
+      "file": "mt5/SMC_MarketDataEA.mq5",
+      "change": "Added `input int HeartbeatIntervalTicks = 6;` after TimerSec input declaration",
+      "verification": "npm run check:mql PASS; EA compiler error resolved"
+    },
+    {
+      "id": "PATCH-2",
+      "bug": "BUG-LINT-001",
+      "severity": "LOW",
+      "files": ["scripts/pipeline-watcher.js", "scripts/reset-pipeline.js"],
+      "change": "Prettier formatting fixed via npx eslint --fix (3 string-literal line breaks)",
+      "verification": "npm run lint: 0 errors"
+    }
+  ],
+  "tests": {
+    "npm_run_lint": "0 errors, 9 pre-existing warnings (PASS)",
+    "npm_run_build": "built in 7.09s (PASS)",
+    "npm_run_check_mql": "MQL include verification passed (PASS)",
+    "php_l_smc_superfib_sniper": "No syntax errors detected (PASS)",
+    "php_l_class_market_data_service": "No syntax errors detected (PASS)"
+  }
+}
