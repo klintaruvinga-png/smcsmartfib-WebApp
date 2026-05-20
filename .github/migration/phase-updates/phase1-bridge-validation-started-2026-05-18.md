@@ -1,9 +1,9 @@
 # Phase 1: MT5 Bridge Infrastructure — Live Validation Commenced
 
 **Date**: 2026-05-18  
-**Status**: ACTIVE - All 5 bridge routes confirmed operational; scenario validation passed; 48h continuity window pending  
+**Status**: COMPLETE - Phase 1 PASSED; 48h continuity window complete; see final closeout artifact `phase1-bridge-48h-continuity-complete-2026-05-20.md`  
 **Completion Target**: 2026-06-01  
-**Current Progress**: 90% (bridge routes and scenario validation confirmed; 48h continuity window pending)
+**Current Progress**: 100% (All bridge routes and scenario validations complete; Phase 1 gate closed)
 
 ---
 
@@ -154,7 +154,7 @@ Phase 1 bridge infrastructure is now **LIVE and OPERATIONAL**. All five EA bridg
 
 ## Phase 1 Completion Roadmap
 
-Phase 1 is 90% complete. Remaining work to reach gate closure:
+Phase 1 is 100% complete. Remaining work to reach gate closure:
 
 | Task | Owner | Status | ETA |
 |------|-------|--------|-----|
@@ -163,7 +163,7 @@ Phase 1 is 90% complete. Remaining work to reach gate closure:
 | **Scenario 3: Internet Interruption** | Track A | PASS (bundled with shared-hosting outage-recovery validation) | Completed 2026-05-18 |
 | **Scenario 4: Duplicate Heartbeat Protection** | Track B | PASS | Completed 2026-05-18 |
 | **Scenario 5: Invalid License Rejection** | Track B | PASS | Completed 2026-05-18 |
-| **48h Continuity Window** | Track A + Track B | IN-PROGRESS (started ~00:07 UTC 2026-05-18) | Complete before 2026-06-01 |
+| **48h Continuity Window** | Track A + Track B | PASS (started ~00:07 UTC 2026-05-18; verified complete 2026-05-20) | Complete before 2026-06-01 |
 
 ---
 
@@ -199,7 +199,7 @@ Phase 1 is 90% complete. Remaining work to reach gate closure:
 | `POST /ea/account-sync` fires & persists | ✅ Confirmed | ✅ Yes | ✅ PASS |
 | `POST /ea/symbol-sync` fires & persists 27 symbols | ✅ Confirmed | ✅ Yes | ✅ PASS |
 | `POST /ea/heartbeat` fires on throttle (480 sec) | ✅ Confirmed | ✅ Yes | ✅ PASS |
-| Heartbeat continuity 48h+ with zero gaps | IN-PROGRESS | ✅ Yes | ⏳ PENDING (ETA: 2026-05-20) |
+| Heartbeat continuity 48h+ with zero gaps | ✅ Confirmed | ✅ Yes | ✅ PASS |
 | Zero dropped sessions during executed scenario-validation runs | PASS | Yes | PASS |
 | Terminal restart reconnect verified | PASS | Yes | PASS |
 | VPS restart reconnect verified | PASS via bundled outage-recovery validation | Yes | PASS |
@@ -227,7 +227,7 @@ Phase 1 is 90% complete. Remaining work to reach gate closure:
 
 ## Next Steps (Ordered by Priority)
 
-1. **Complete 48h Continuity Window** (in progress; ETA: 2026-05-20 ~00:07 UTC)
+1. **Complete 48h Continuity Window** (complete; verified 2026-05-20 ~00:07 UTC)
    - Monitor heartbeat row creation in DB every 8 minutes
    - Verify zero gaps in `created_at` timestamps
    - Finalize the continuity-window evidence package

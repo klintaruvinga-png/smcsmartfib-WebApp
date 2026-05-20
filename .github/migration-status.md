@@ -1,9 +1,9 @@
 # SMC SuperFIB → MT5 Migration Status Board
 
-**Last Updated**: 2026-05-18  
+**Last Updated**: 2026-05-20  
 **Current Phase**: 1 (MT5 Bridge Infrastructure)  
-**Overall Progress**: 57%
-**Status**: Phase 0 COMPLETE - Phase 1 ACTIVE (Scenario validation passed; 48h continuity window pending)
+**Overall Progress**: 65%  
+**Status**: Phase 0 COMPLETE - Phase 1 COMPLETE (Phase 1 PASSED; Phase 2 planning/handoff ready)
 
 > Snapshot: Phase 0 gate passed 2026-05-15. Post-fix validation soak at 16:37 UTC confirmed NAS100 (29,263.70) and US30 (49,756.00) both LIVE during active US equity session; XAUUSD (4,556.34) LIVE with candle-history gate cleared. Backend soak: 259,464 engine runs / 0 errors / 69,262 candles over 24h. Frontend feed-status chip lag (BUG-001 staleTime:0) resolved. Watchlist persistence 100% parity. AUDUSD/ETHUSD chop-gate classified as correct live behavior — not a blocker. Full closeout evidence: `.github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md`.
 
@@ -14,7 +14,7 @@
 | Phase | Objective | Status | % Complete | Blocker | Target End |
 |-------|-----------|--------|-----------|---------|------------|
 | 0 | Stabilize existing platform | **COMPLETE** | 100% | None — gate passed 2026-05-15 | 2026-05-15 ✅ |
-| 1 | MT5 bridge infrastructure | **IN-PROGRESS** | 90% | 48h continuity window pending; scenario validation passed | 2026-06-01 |
+| 1 | MT5 bridge infrastructure | **COMPLETE** | 100% | Phase 1 PASSED; Phase 2 planning/handoff ready | 2026-06-01 |
 | 2 | Read-only trade telemetry | NOT-STARTED | 0% | Phase 1 complete | 2026-06-15 |
 | 3 | MT5 market data engine | NOT-STARTED | 0% | Phase 2 complete | 2026-07-15 |
 | 4 | Fib engine migration | NOT-STARTED | 0% | Phase 3 complete | 2026-08-15 |
@@ -31,8 +31,8 @@
 
 | Track | Lead | Phase Focus | Status |
 |-------|------|------------|--------|
-| **Track A — MT5 EA** | *TBD* | Phases 1–7 (bridge, telemetry, candle engine, fib, regime, signal, execution) | Phase 1 active — scenario validation passed; 48h continuity window pending |
-| **Track B — Backend** | *TBD* | Phases 1–9 (APIs, freshness, telemetry, licensing) | Phase 0 complete — Phase 1 bridge verification passed except for the 48h continuity window |
+| **Track A — MT5 EA** | *TBD* | Phases 1–7 (bridge, telemetry, candle engine, fib, regime, signal, execution) | Phase 1 PASSED — Phase 2 handoff ready |
+| **Track B — Backend** | *TBD* | Phases 1–9 (APIs, freshness, telemetry, licensing) | Phase 1 PASSED — Phase 2 handoff ready |
 | **Track C — Dashboard** | *TBD* | Phases 2–9 (visualization, execution console, analytics) | Phase 0 complete — Phase 1 unblocked; awaiting bridge instrumentation to begin dashboard telemetry work |
 
 ---

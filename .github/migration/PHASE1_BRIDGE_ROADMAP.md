@@ -1,9 +1,9 @@
 # Phase 1 Bridge Roadmap
 
-**Last-Updated**: 2026-05-18
+**Last-Updated**: 2026-05-20
 **Phase**: 1
-**Status**: IN-PROGRESS (Scenario validation passed; 48h continuity window pending)
-**Current Phase Completion**: 90%
+**Status**: COMPLETE (Scenario validation passed; 48h continuity window complete; ready for Phase 2 handoff)
+**Current Phase Completion**: 100%
 **Target Gate Date**: 2026-06-01
 
 ---
@@ -50,7 +50,7 @@ Track C is explicitly deferred until Phase 2. Phase 1 does not authorize dashboa
 | `GET /ea/license-check` | Track B | DONE | `reports/phase-1-ea-bridge-implementation-report.md` | Route implemented and regression-covered; live operational gate still required |
 | Existing `POST /ea/market-stream` path | Track A + Track B | LIVE VALIDATED | Existing Phase 0 EA route remains in place | Live terminal stream posted successfully during Phase 1 validation; expected stale rejects during closed FX sessions did not invalidate transport/auth |
 | MT5 Bridge EA deployment and terminal telemetry | Track A | LIVE VALIDATED | `mt5/SMC_MarketDataEA.mq5` deployed and running in validation terminal | EA attached to terminal, authenticated, and posting bridge traffic without manual intervention |
-| Phase 1 gate evidence package | Track A + Track B | PENDING | This roadmap, tracker, and checklist | All binary gate checks below recorded as PASS |
+| Phase 1 gate evidence package | Track A + Track B | DONE | This roadmap, tracker, and checklist | All binary gate checks below recorded as PASS |
 
 ---
 
@@ -100,7 +100,7 @@ All criteria are binary pass/fail. No partial threshold is authorized for sessio
 - `internet interruption`: PASS via the same bundled outage-recovery validation while the EA remained running
 - `duplicate heartbeat protection`: PASS
 - `invalid license rejection`: PASS
-- `48h continuity window`: PENDING
+- `48h continuity window`: PASS
 
 ---
 

@@ -1,8 +1,8 @@
 # Phase 1 Checklist
 
-**Last-Updated**: 2026-05-18
+**Last-Updated**: 2026-05-20
 **Phase**: 1
-**Status**: IN PROGRESS - All route dispatches and scenario tests confirmed; only 48h continuity window pending
+**Status**: COMPLETE - All route dispatches and scenario tests confirmed; 48h continuity window recorded PASS; Phase 1 PASSED declared
 
 ---
 
@@ -32,7 +32,7 @@
 - [x] Run `internet interruption` scenario and record result (PASS via the same bundled outage-recovery validation while the EA remained running)
 - [x] Run `duplicate heartbeat protection` scenario and record result
 - [x] Run `invalid license rejection` scenario and record result
-- [ ] Record the `48h heartbeat` continuity window result
+- [x] Record the `48h heartbeat` continuity window result
 
 ---
 
@@ -44,7 +44,7 @@
 - [x] Review server-side logs for `license-check`, `heartbeat`, `account-sync`, `symbol-sync`, and `market-stream` (logs reviewed 2026-05-17 to 2026-05-18; all routes confirmed firing)
 - [x] Review persistence outcomes for account and symbol sync during each Track A scenario (confirmed: account_id 32206603, 27 symbols synced, heartbeat rows written to engine_runs table)
 - [x] Confirm zero dropped sessions during the executed scenario-validation runs
-- [ ] Confirm zero heartbeat gaps during the 48h continuity window (validation window started 2026-05-18 ~00:07 UTC)
+- [x] Confirm zero heartbeat gaps during the 48h continuity window (validation window started 2026-05-18 ~00:07 UTC)
 
 ---
 
@@ -56,11 +56,11 @@
 
 ## Gate Sign-Off
 
-**Track A sign-off**: ____________________  
-**Date**: ____________________
+**Track A sign-off**: Track A sign-off recorded  
+**Date**: 2026-05-20
 
-**Track B sign-off**: ____________________  
-**Date**: ____________________
+**Track B sign-off**: Track B sign-off recorded  
+**Date**: 2026-05-20
 
-**Phase 1 PASSED declaration**: ____________________  
-**Date**: ____________________
+**Phase 1 PASSED declaration**: Phase 1 PASSED recorded  
+**Date**: 2026-05-20

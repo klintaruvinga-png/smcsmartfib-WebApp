@@ -1,10 +1,10 @@
 # Phase 1 Tracker
 
-**Last-Updated**: 2026-05-18
+**Last-Updated**: 2026-05-20
 **Phase**: 1
-**Status**: IN-PROGRESS (Scenario validation passed; 48h continuity window pending)
-**Current Phase Completion**: 90%
-**Current Blocker**: 48h continuity window pending
+**Status**: COMPLETE (Scenario validation passed; 48h continuity window complete; Track A / Track B sign-off recorded)
+**Current Phase Completion**: 100%
+**Current Blocker**: None — Phase 1 gate closed and handoff to Phase 2 ready
 
 ---
 
@@ -21,7 +21,7 @@
   - `POST /ea/heartbeat`: ✅ PASS (soft gate, firing at ~8 min intervals, confirmed in DB/logs)
   - `POST /ea/market-stream`: ✅ PASS (existing route, auth working; FX stale during weekend, crypto fresh — expected)
 - Scenario testing: COMPLETE
-- 48h continuity window: PENDING
+- 48h continuity window: COMPLETE (48h+ heartbeat continuity verified; no gaps observed)
 - Terminal restart scenario: PASS
 - VPS restart + internet interruption scenarios: PASS via bundled outage-recovery validation on shared hosting
 - Bundled outage-recovery evidence: repeated send failures between ~03:16 and ~03:22 transitioned to recovery at 03:23:12 with `USDJPY` success on attempt 3, followed by broad first-attempt success across multiple symbols
@@ -42,8 +42,8 @@
 | `GET /ea/license-check` implemented | Track B | ✅ DONE | Verified in `reports/phase-1-ea-bridge-implementation-report.md` |
 | Existing `POST /ea/market-stream` route retained for bridge validation | Track A + Track B | ✅ LIVE | Route working; auth passing; candles rejected for weekend stale data (expected behavior) |
 | MT5 EA deployment to validation terminal | Track A | ✅ LIVE | Branch `fix/gate-heartbeat-debug-log-behind-flag` deployed; EA running; all 5 routes firing |
-| Bridge route live validation | Track A + Track B | SCENARIOS PASS | All 5 routes confirmed operational; all scenario tests PASS; only 48h window pending |
-| Phase 1 PASSED declaration | Track A + Track B | PENDING | Target gate date: 2026-06-01 (after 48h continuity window sign-off) |
+| Bridge route live validation | Track A + Track B | ✅ DONE | All 5 routes confirmed operational; all scenario tests PASS; 48h continuity verified |
+| Phase 1 PASSED declaration | Track A + Track B | ✅ DONE | Completed; Phase 1 gate closed and Phase 2 handoff ready |
 
 ---
 
@@ -56,13 +56,13 @@
 | Validation environment facts not yet recorded in canonical docs | 2026-05-15 | Track A | ✅ RESOLVED | Recorded: Deriv.com / Deriv-Demo / Account 32206603 / MT5 build 5836 / EA deployed on `fix/gate-heartbeat-debug-log-behind-flag` / WebRequest enabled / bridge auth configured - 2026-05-18 |
 | Heartbeat not executing in initial EA deployment | 2026-05-17 | Track A | ✅ RESOLVED | Terminal was running stale EA binary; branch `fix/gate-heartbeat-debug-log-behind-flag` with heartbeat logic deployed; confirmed working at 08:07 UTC 2026-05-18 |
 | ~~Field scenario testing pending (restart, VPS, network, license rejection, duplicate protection)~~ | 2026-05-18 | Track A + Track B | RESOLVED | Terminal restart PASS; VPS/network outage recovery PASS via bundled shared-hosting test; duplicate protection PASS; invalid-license rejection PASS |
-| 48h continuity window still open | 2026-05-18 | Track A + Track B | OPEN | Final Phase 1 gate item remaining before PASSED declaration |
+| 48h continuity window complete | 2026-05-20 | Track A + Track B | ✅ PASS | Completed; Phase 1 gate closed and Phase 2 handoff ready |
 
 ---
 
 ## Phase Gate Progress
 
-- [ ] `48h heartbeat` - stable for 48h+ with zero observed gaps (validation window started 2026-05-18 ~00:07 UTC)
+- [x] `48h heartbeat` - stable for 48h+ with zero observed gaps (validation window started 2026-05-18 ~00:07 UTC)
 - [x] `terminal-restart` - reconnect verified after MT5 terminal restart
 - [x] `vps-restart` - reconnect verified after bundled outage-recovery validation on shared hosting
 - [x] `internet-interruption` - reconnect verified after bundled outage-recovery validation while EA remained running
