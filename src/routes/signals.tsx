@@ -4,6 +4,7 @@ import {
   useEngineBatch,
   useLiveSignals,
   useCanonicalWatchlist,
+  usePollingUiState,
 } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { VerdictBadge } from "@/components/sniper/VerdictBadge";
@@ -52,6 +53,7 @@ function blockerSeverity(b: EngineBlocker | undefined): "warn" | "sell" {
 function SignalsPage() {
   const { data: signals } = useLiveSignals();
   const { data: h } = useEngineHealth();
+  const { backendReady, pendingSettingsLoad } = usePollingUiState();
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
   const { watchlist, watchlistSet } = useCanonicalWatchlist();
   const [watchlistOnly, setWatchlistOnly] = useState(true);
@@ -66,6 +68,18 @@ function SignalsPage() {
   );
 
   const divergent = uniqueSignals.filter((s) => s.computedBy === "frontend" && !s.backendConfirmed);
+
+  if (pendingSettingsLoad) {
+    return <div className="text-mute text-sm">Loading signal engine...</div>;
+  }
+
+  if (!backendReady) {
+    return (
+      <div className="text-mute text-sm">
+        Configure a backend URL in Account before loading signal engine data.
+      </div>
+    );
+  }
 
   // feedStatus supersedes priceFeed when present; "rate-limited" is not a FreshnessState value.
   const rawFeedState = h?.feedStatus ?? h?.priceFeed ?? "offline";

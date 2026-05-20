@@ -6,6 +6,12 @@ import type { DashboardSettings, Symbol, SymbolDiagnostic, TradePlan } from "@/t
 const DEFAULT_POLL_MS = 2_000;
 const WATCHLIST_LIMIT = 24;
 
+export type PollingUiState = {
+  backendReady: boolean;
+  pendingSettingsLoad: boolean;
+  pollMs: number | null;
+};
+
 export function useBackendReady() {
   return usePollingQueryState().backendReady;
 }
@@ -38,6 +44,10 @@ function usePollingQueryState() {
     pendingSettingsLoad,
     pollMs,
   };
+}
+
+export function usePollingUiState(): PollingUiState {
+  return usePollingQueryState();
 }
 
 function useLivePollingDiagnostics(

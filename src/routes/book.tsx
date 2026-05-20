@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useUserTrades, useSnapshot } from "@/hooks/useSniperData";
+import { useUserTrades, useSnapshot, usePollingUiState } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { WarningLine } from "@/components/sniper/Warnings";
 import { fmtPrice, fmtPct, fmtUSC, relTime } from "@/lib/format";
@@ -24,7 +24,20 @@ export const Route = createFileRoute("/book")({
 function BookPage() {
   const { data: trades } = useUserTrades();
   const { data: snap } = useSnapshot();
+  const { backendReady, pendingSettingsLoad } = usePollingUiState();
   const positions = trades?.positions ?? [];
+
+  if (pendingSettingsLoad) {
+    return <div className="text-mute text-sm">Loading active book...</div>;
+  }
+
+  if (!backendReady) {
+    return (
+      <div className="text-mute text-sm">
+        Configure a backend URL in Account before loading the active book.
+      </div>
+    );
+  }
 
   const grouped = positions.reduce<Record<string, Position[]>>((acc, p) => {
     (acc[p.symbol] ??= []).push(p);

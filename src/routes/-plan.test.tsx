@@ -11,6 +11,7 @@ const hookMocks = vi.hoisted(() => ({
   useLadders: vi.fn(),
   useSnapshot: vi.fn(),
   useCanonicalWatchlist: vi.fn(),
+  usePollingUiState: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-router", async (importOriginal) => {
@@ -26,6 +27,7 @@ vi.mock("@/hooks/useSniperData", () => ({
   useLadders: hookMocks.useLadders,
   useSnapshot: hookMocks.useSnapshot,
   useCanonicalWatchlist: hookMocks.useCanonicalWatchlist,
+  usePollingUiState: hookMocks.usePollingUiState,
 }));
 
 vi.mock("@/hooks/useAnimatedNumber", () => ({
@@ -193,6 +195,11 @@ describe("PlanPage ranking and execution guards", () => {
     hookMocks.useSnapshot.mockReturnValue({
       data: { prices: [], diagnostics: [] },
       isLoading: false,
+    });
+    hookMocks.usePollingUiState.mockReturnValue({
+      backendReady: true,
+      pendingSettingsLoad: false,
+      pollMs: 5_000,
     });
     mockWatchlist(["GBPUSD", "USDJPY", "AUDUSD", "EURUSD", "XAUUSD"]);
   });

@@ -35,7 +35,12 @@ vi.mock("@/lib/api/sniperClient", () => ({
   setBackendUrl: apiMocks.setBackendUrl,
 }));
 
-import { useEngineHealth, useWatchlistAdd, useWatchlistRemove } from "./useSniperData";
+import {
+  useEngineHealth,
+  usePollingUiState,
+  useWatchlistAdd,
+  useWatchlistRemove,
+} from "./useSniperData";
 
 describe("useEngineHealth", () => {
   beforeEach(() => {
@@ -77,6 +82,65 @@ describe("useEngineHealth", () => {
       enabled: true,
       staleTime: 0,
       refetchInterval: 5_000,
+    });
+  });
+});
+
+describe("usePollingUiState", () => {
+  beforeEach(() => {
+    reactQueryMocks.useQuery.mockReset();
+    apiMocks.getUserSettings.mockReset();
+    apiMocks.setBackendUrl.mockReset();
+    apiMocks.normalizeBackendUrl.mockClear();
+  });
+
+  it("holds polling disabled while user settings are still loading", () => {
+    reactQueryMocks.useQuery.mockImplementation((options: { queryKey: string[] }) => {
+      if (options.queryKey[0] === "user-settings") {
+        return {
+          data: undefined,
+          fetchStatus: "fetching",
+          isPending: true,
+          isLoading: true,
+        };
+      }
+
+      return { data: undefined };
+    });
+
+    const { result } = renderHook(() => usePollingUiState());
+
+    expect(result.current).toEqual({
+      backendReady: false,
+      pendingSettingsLoad: true,
+      pollMs: null,
+    });
+  });
+
+  it("marks the backend as unready after settings resolve without a backend URL", () => {
+    reactQueryMocks.useQuery.mockImplementation((options: { queryKey: string[] }) => {
+      if (options.queryKey[0] === "user-settings") {
+        return {
+          data: {
+            backendUrl: "   ",
+            refreshIntervalSec: 5,
+            watchlist: [],
+          },
+          fetchStatus: "idle",
+          isPending: false,
+          isLoading: false,
+        };
+      }
+
+      return { data: undefined };
+    });
+
+    const { result } = renderHook(() => usePollingUiState());
+
+    expect(result.current).toEqual({
+      backendReady: false,
+      pendingSettingsLoad: false,
+      pollMs: 5_000,
     });
   });
 });

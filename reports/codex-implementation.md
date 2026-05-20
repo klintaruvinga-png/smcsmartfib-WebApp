@@ -1,66 +1,75 @@
+# Implementation Report
+
 ## Issue summary
 
-Fixed the live polling chain that was freezing the chart and ticker. The root cause was `usePollMs()` returning `null` indefinitely when settings loaded asynchronously, keeping `enabled = false` on all live queries even after settings resolved.
+This `codex/*` branch contains the dashboard live polling / chart ticker recovery work, but the commit was blocked because `reports/codex-implementation.md` had been removed from the worktree. The branch guard in `.githooks/pre-commit` requires this report to exist before any commit can succeed on a `codex/*` branch.
 
 ## Root cause implemented
 
-`useSnapshot()`, `useLiveSignals()`, and all polling hooks used `refetchInterval: pollMs ?? DEFAULT_POLL_MS`. When `pollMs` was `null` (settings not yet loaded), this silently fell back to `DEFAULT_POLL_MS` while `enabled` was still `false` — so the interval was set but queries never fired. After settings resolved, the transition from `null` to a valid pollMs did not reliably re-trigger query execution because there was no discriminator separating "settings loading" from "settings loaded, backendUrl empty".
+The immediate commit failure was caused by a missing required artifact, not by a source-code merge conflict or a git branch corruption issue. The fix implemented here restores the required implementation report and records the actual staged work for this branch so the pre-commit guard can validate successfully.
+
+The staged application work on this branch is focused on preserving backend-authority UI truth for dashboard polling:
+
+- `useSniperData` now exposes polling UI state so route layers can distinguish `settings loading`, `backend not configured`, and `backend ready`.
+- `live`, `signals`, `plan`, and `book` routes now gate their UI off that shared polling state instead of rendering misleading loading or empty states when polling is disabled.
+- Regression coverage was added around the new polling-state contract and live route gating.
 
 ## Exact files changed
 
-**`src/hooks/useSniperData.ts`** — sole file patched:
+Application and test files currently staged on this branch:
 
-- Extracted `usePollingQueryState()`: centralized hook that reads `useUserSettings()` once and derives `backendReady`, `pollMs`, and `pendingSettingsLoad` together. `pendingSettingsLoad` is `true` only while the settings fetch is in-flight (`fetchStatus === "fetching"` or `isPending`), ensuring `pollMs` stays `null` during load but transitions deterministically to a valid integer once settings resolve.
-- Added `useLivePollingDiagnostics()`: DEV-only `useEffect` that fires a `console.warn` when `pollMs` transitions from `null` to a valid value, confirming the re-enablement path executed (regression guard from contract §4).
-- Fixed `refetchInterval` across all polling hooks (`useSnapshot`, `useLiveSignals`, `useUserTrades`, `useUserAccount`, `useEngineHealth`, `useLadders`): changed from `pollMs ?? DEFAULT_POLL_MS` to `enabled ? pollMs : false`. When `enabled` is `false`, the interval is now explicitly `false` (disabled) rather than a live timer running against a suppressed query.
-- Added `refetchOnWindowFocus: false` to `useSnapshot()` and `useLiveSignals()` (contract requirement, prevents spurious refetches masking the real enablement state).
-- `useBackendReady()` and `usePollMs()` now delegate to `usePollingQueryState()`, eliminating duplicate `useUserSettings()` calls across consumers.
+- `src/hooks/useSniperData.ts`
+- `src/hooks/useSniperData.test.tsx`
+- `src/routes/live.tsx`
+- `src/routes/signals.tsx`
+- `src/routes/plan.tsx`
+- `src/routes/book.tsx`
+- `src/routes/-live.page.test.tsx`
+- `src/routes/-plan.test.tsx`
+- `scripts/pipeline-watcher.js`
+- `scripts/reset-pipeline.js`
 
-## Regression protections added
+Report / audit artifacts currently staged on this branch:
 
-Per contract §4, verified:
-1. `pollMs` remains `null` while `pendingSettingsLoad` is `true` — orphaned-query contract preserved.
-2. `pollMs` transitions to a valid integer after `useUserSettings().data` resolves.
-3. `refetchInterval: false` on all hooks when `enabled` is `false` — no phantom poll timers.
-4. `price.state` gate in `buildLiveChartSeries()` untouched — backend remains authoritative.
-5. `pollMs * 1.5` candle-replace window untouched.
-6. Ticker de-duplication in `useStreamingTicks.ts` confirmed correct (line 120 short-circuit on `numericTarget === prevTarget`); no suppression of legitimate events — not modified.
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-19.md`
+- `.github/migration/audits/phase-1-dashboard-polling-parity-2026-05-19.md`
+- `reports/codex-implementation.md`
 
-## Audit findings for non-edited files
+Previously generated Codex workflow artifacts were staged for removal:
 
-**`src/routes/charts.tsx` — `buildLiveChartSeries()` stale closure audit:**
-No stale closure found. `pollMs` is read from `usePollMs()` at component render scope and passed as a direct prop to the pure function on every render. No capture in `useMemo`/`useCallback`/`useEffect`. No edit required.
-
-**`src/hooks/useStreamingTicks.ts` — tick dedup audit:**
-Value-equality short-circuit at line 120 (`if (numericTarget === prevTarget) return`) confirmed present and intentional. Correct behavior: no tick flash when backend returns identical consecutive prices. With poll gating fixed upstream, this path only fires when the backend genuinely returns the same price — a valid no-op. No edit required.
-
-## Parity impact
-
-- Dashboard-JS: polling chain repaired — `useSnapshot()` and `useLiveSignals()` now activate without page reload after settings load.
-- MT5/Backend: zero changes — no route handlers, middleware, or API contracts touched.
-- Pine Script: not implicated.
+- `reports/codex-plan.md`
+- `reports/codex-plan.meta.json`
+- `reports/copilot-research.md`
+- `reports/.codex-implementation-failed.json`
 
 ## Tests run
 
-No automated test suite changes were required — the fix is behavioural (query enablement timing) and the existing hook tests in `src/hooks/` continue to pass without modification. Manual smoke-check protocol per contract §7: run dashboard against a live or mock backend for one full `refreshIntervalSec` cycle and confirm chart candles update and ticker flashes without a page reload. `src/routes/-admin.test.tsx` unmodified and must pass.
+No new tests were executed as part of this branch-recovery patch itself.
+
+The staged audit documentation for this branch records the following verification as already performed for the polling-state fix bundle:
+
+- `npx vitest run src/hooks/useSniperData.test.tsx src/routes/-live.page.test.tsx src/routes/-live.test.ts src/routes/-plan.test.tsx src/hooks/useSniperData.watchlist.test.tsx src/routes/-charts.test.ts`
+- `npm run lint`
+- `npm run build`
+
+Those results should be treated as reported branch artifacts unless re-run in the current worktree.
 
 ## Reports generated
 
-- `reports/codex-implementation.md` — this file.
+The branch currently includes these generated or maintained reports:
+
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-19.md`
+- `.github/migration/audits/phase-1-dashboard-polling-parity-2026-05-19.md`
+- `reports/codex-implementation.md`
 
 ## Remaining risks
 
-No blocking risks. The one open question is whether the deployed EA terminal is running the current branch with `SendHeartbeat()` active — this is an operational check, not a code issue. If `price.state` is `"stale"` at runtime despite correct polling, the backend-side snapshot freshness path should be investigated separately.
+- I did not re-run the recorded test suite during this recovery step, so current pass/fail status in this worktree is not re-verified here.
+- `reports/codex-implementation.meta.json` is still absent; that does not block the current pre-commit hook, but it may matter for any higher-level pipeline validation that expects meta artifacts.
+- The branch still contains staged deletion of older workflow artifacts; if those files are still needed by an external automation path, that deletion should be reviewed before merge.
 
 ## Any contract ambiguities resolved during implementation
 
-The contract listed `refetchOnWindowFocus` as required on `useSnapshot()` and `useLiveSignals()` only. Applied as specified — not extended to other hooks, which is consistent with the non-goals. The `pendingSettingsLoad` discriminator covers the case where `settings === undefined` and the fetch has not yet started (e.g. `fetchStatus === "idle"`): in that case `isPending` is `true`, so `pendingSettingsLoad` is `true` and `pollMs` stays `null` until the first successful settings response.
+The only ambiguity in this recovery step was whether the branch issue was a true git branch problem or a Codex branch-policy problem. Inspection confirmed it is a branch-policy problem specific to `codex/*` branches: `.githooks/pre-commit` requires `reports/codex-implementation.md` with the seven mandatory section headers.
 
-## Systems intentionally not touched (Do Not Touch)
-
-- `mt5/SMC_MarketDataEA.mq5` — `SendHeartbeat()` confirmed present in `OnTimer()`.
-- `mt5/MarketDataEngine.mqh` — heartbeat POST confirmed implemented.
-- `src/routes/charts.tsx` — no stale closure found; no edit made.
-- `src/hooks/useStreamingTicks.ts` — dedup behavior correct; no edit made.
-- `src/components/sniper/AppShell.tsx` — fix is in hook layer.
-- Any backend route handler or `/ea/heartbeat` registration.
+I did not restore the older plan/meta artifacts automatically because that would risk reintroducing stale workflow state. The safest grounded fix for the reported commit failure is to restore the required implementation report only and leave the rest of the staged code changes intact.

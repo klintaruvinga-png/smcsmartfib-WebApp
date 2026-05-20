@@ -464,7 +464,9 @@ function isReportOnlyBranch(issueSlug) {
   }
 
   // Neither local nor remote branch resolved — refuse cleanup to be safe.
-  log(`isReportOnlyBranch: branch ${branchName} not found locally or on remote — skipping auto-reset`);
+  log(
+    `isReportOnlyBranch: branch ${branchName} not found locally or on remote — skipping auto-reset`,
+  );
   return false;
 }
 
@@ -1773,7 +1775,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
     console.log(
       "[pipeline-watcher] Reset sentinel written. The running watcher will reset to IDLE within 5 seconds.",
     );
-    console.log("[pipeline-watcher] If no watcher is running, start one with: npm run pipeline:start");
+    console.log(
+      "[pipeline-watcher] If no watcher is running, start one with: npm run pipeline:start",
+    );
     process.exit(0);
   }
   startPipelineWatcher();
