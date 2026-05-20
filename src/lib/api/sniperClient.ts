@@ -15,6 +15,7 @@ export class AuthError extends Error {
 }
 
 import type {
+  AccountTelemetry,
   AccountState,
   ChartSnapshot,
   DashboardSettings,
@@ -85,6 +86,48 @@ interface RequestOpts {
 }
 
 export type AdminHealthResponse = EngineHealth;
+
+type RawAccountTelemetryResponse = {
+  account_id: string;
+  terminal_id: string;
+  balance: number;
+  equity: number;
+  margin: number;
+  free_margin: number;
+  margin_level: number;
+  floating_pl: number;
+  currency: string;
+  leverage: number;
+  ea_version: string;
+  last_seen_at: string | null;
+  updated_at: string | null;
+  freshness: AccountTelemetry["state"];
+};
+
+type RawPositionResponse = {
+  position_id: string;
+  symbol: string;
+  direction: Position["direction"];
+  entry_price: number;
+  current_price: number;
+  volume: number;
+  profit: number;
+  opened_at: string | null;
+  freshness: Position["state"];
+};
+
+type RawOrderResponse = {
+  order_id: string;
+  symbol: string;
+  direction: PendingOrder["direction"];
+  order_type: string;
+  entry_price: number;
+  volume: number;
+  sl: number;
+  tp: number;
+  placed_at: string | null;
+  freshness: PendingOrder["state"];
+};
 
 function requireWatchlistResponse(path: string, watchlist: Symbol[] | undefined): Symbol[] {
   if (!Array.isArray(watchlist)) {
@@ -186,6 +229,66 @@ export async function createSoakCheckpoint(opts?: {
       operator_notes: opts?.operatorNotes ?? "",
       checkpoint_type: opts?.checkpointType ?? "checkpoint",
     },
+  });
+}
+
+function normalizeAccountTelemetry(response: RawAccountTelemetryResponse): AccountTelemetry {
+  return {
+    accountId: response.account_id ?? "",
+    terminalId: response.terminal_id ?? "",
+    balance: toFiniteNumber(response.balance),
+    equity: toFiniteNumber(response.equity),
+    margin: toFiniteNumber(response.margin),
+    freeMargin: toFiniteNumber(response.free_margin),
+    marginLevel: toFiniteNumber(response.margin_level),
+    floatingPl: toFiniteNumber(response.floating_pl),
+    currency: response.currency ?? "",
+    leverage: toFiniteNumber(response.leverage, Number(response.leverage)),
+    eaVersion: response.ea_version ?? "",
+    lastSeenAt: response.last_seen_at ?? null,
+    updatedAt: response.updated_at ?? null,
+    state: response.freshness ?? "unavailable",
+  };
+}
+
+function normalizeTelemetryPositions(rows: RawPositionResponse[]): Position[] {
+  return (rows ?? []).map((row) => {
+    const pnlUSC = toFiniteNumber(row.profit);
+    const entry = toFiniteNumber(row.entry_price);
+    const current = toFiniteNumber(row.current_price, entry);
+    const volume = toFiniteNumber(row.volume);
+    const notional = Math.abs(entry * volume);
+    return {
+      id: row.position_id,
+      symbol: row.symbol as Symbol,
+      direction: row.direction,
+      entry,
+      current,
+      lots: volume,
+      pnlUSC,
+      pnlPct: notional > 0 ? (pnlUSC / notional) * 100 : 0,
+      openedAt: row.opened_at ?? new Date(0).toISOString(),
+      state: row.freshness ?? "unavailable",
+    };
+  });
+}
+
+function normalizeTelemetryOrders(rows: RawOrderResponse[]): PendingOrder[] {
+  return (rows ?? []).map((row) => {
+    const rawType = String(row.order_type ?? "").toUpperCase();
+    const type: PendingOrder["type"] = rawType.includes("STOP") ? "STOP" : "LIMIT";
+    return {
+      id: row.order_id,
+      symbol: row.symbol as Symbol,
+      direction: row.direction,
+      type,
+      price: toFiniteNumber(row.entry_price),
+      lots: toFiniteNumber(row.volume),
+      sl: toFiniteNumber(row.sl),
+      tp: toFiniteNumber(row.tp),
+      placedAt: row.placed_at ?? new Date(0).toISOString(),
+      state: row.freshness ?? "unavailable",
+    };
   });
 }
 
@@ -313,13 +416,43 @@ export const apiClient = {
   async getAdminHealth(): Promise<AdminHealthResponse> {
     return fetchAdminHealth();
   },
+  async getAccountTelemetry(mock = MOCK_MODE): Promise<AccountTelemetry> {
+    if (mock) {
+      return {
+        accountId: "mock-account",
+        terminalId: "mock-terminal",
+        balance: mockAccount.balanceUSC,
+        equity: mockAccount.equityUSC,
+        margin: (mockAccount.marginUsedPct / 100) * mockAccount.equityUSC,
+        freeMargin: mockAccount.equityUSC - (mockAccount.marginUsedPct / 100) * mockAccount.equityUSC,
+        marginLevel: mockAccount.marginUsedPct > 0 ? (100 / mockAccount.marginUsedPct) * 100 : 0,
+        floatingPl: mockAccount.equityUSC - mockAccount.balanceUSC,
+        currency: "USC",
+        leverage: 0,
+        eaVersion: "mock",
+        lastSeenAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        state: mockAccount.state,
+      };
+    }
+    return normalizeAccountTelemetry(
+      await call<RawAccountTelemetryResponse>("/account-telemetry", { cacheBust: true }),
+    );
+  },
 
   // Authenticated user
   async getUserTrades(
     mock = MOCK_MODE,
   ): Promise<{ positions: Position[]; orders: PendingOrder[] }> {
     if (mock) return { positions: mockPositions, orders: mockOrders };
-    return call("/user/trades");
+    const [positions, orders] = await Promise.all([
+      call<RawPositionResponse[]>("/positions", { cacheBust: true }),
+      call<RawOrderResponse[]>("/orders", { cacheBust: true }),
+    ]);
+    return {
+      positions: normalizeTelemetryPositions(positions),
+      orders: normalizeTelemetryOrders(orders),
+    };
   },
   async getUserAccount(mock = MOCK_MODE): Promise<AccountState> {
     if (mock) return mockAccount;

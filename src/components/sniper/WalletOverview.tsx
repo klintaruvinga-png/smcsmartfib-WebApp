@@ -1,10 +1,10 @@
 import { cn } from "@/lib/utils";
-import { useUserAccount } from "@/hooks/useSniperData";
+import { useAccountTelemetry } from "@/hooks/useSniperData";
 import { fmtUSC } from "@/lib/format";
 import { FreshnessBadge } from "./FreshnessBadge";
 
 export function WalletOverview() {
-  const { data: account, isLoading, error } = useUserAccount();
+  const { data: account, isLoading, error } = useAccountTelemetry();
 
   if (isLoading) {
     return (
@@ -40,10 +40,10 @@ export function WalletOverview() {
     );
   }
 
-  const floating = account.equityUSC - account.balanceUSC;
-  const onePctBalance = account.balanceUSC * 0.01;
-  const onePctEquity = account.equityUSC * 0.01;
-  const marginLevel = account.marginUsedPct > 0 ? (100 / account.marginUsedPct) * 100 : 0;
+  const floating = account.floatingPl;
+  const onePctBalance = account.balance * 0.01;
+  const onePctEquity = account.equity * 0.01;
+  const marginLevel = account.marginLevel > 0 ? account.marginLevel : 0;
   const marginStrength = marginLevel > 1000 ? "Strong" : marginLevel > 200 ? "Healthy" : "Tight";
 
   return (
@@ -62,13 +62,13 @@ export function WalletOverview() {
         <div className="grid grid-cols-2 lg:grid-cols-4 divide-bd divide-y lg:divide-y-0 lg:divide-x [&>*]:border-bd">
           <Cell
             label="EQUITY"
-            value={fmtUSC(account.equityUSC)}
+            value={fmtUSC(account.equity)}
             valueClass="text-buy"
             sub={<span className="text-mute">1% = {onePctEquity.toFixed(2)} USC</span>}
           />
           <Cell
             label="BALANCE"
-            value={fmtUSC(account.balanceUSC)}
+            value={fmtUSC(account.balance)}
             valueClass="text-info"
             sub={<span className="text-mute">1% = {onePctBalance.toFixed(2)} USC</span>}
           />

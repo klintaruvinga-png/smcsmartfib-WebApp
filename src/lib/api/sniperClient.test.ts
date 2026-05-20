@@ -6,7 +6,7 @@ vi.mock("@/lib/auth", () => ({
   getWordPressNonce: vi.fn(() => "test-nonce"),
 }));
 
-import { fetchSoakReport, setBackendUrl } from "./sniperClient";
+import { apiClient, fetchSoakReport, setBackendUrl } from "./sniperClient";
 
 describe("fetchSoakReport", () => {
   beforeEach(() => {
@@ -95,6 +95,115 @@ describe("fetchSoakReport", () => {
 
     await expect(fetchSoakReport()).rejects.toThrow(
       /API \/admin\/soak-report failed: 500 - {"error":"table_init_failed","detail":"dbDelta unavailable"}/,
+    );
+  });
+});
+
+describe("Phase 2 telemetry client reads", () => {
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("reads positions and orders from the new read-only endpoints without POSTing trade state", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              position_id: "1001",
+              symbol: "EURUSD",
+              direction: "LONG",
+              entry_price: 1.08,
+              current_price: 1.081,
+              volume: 0.5,
+              profit: 125,
+              opened_at: "2026-05-20T10:00:00Z",
+              freshness: "live",
+            },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              order_id: "2001",
+              symbol: "EURUSD",
+              direction: "SHORT",
+              order_type: "SELL_LIMIT",
+              entry_price: 1.09,
+              volume: 0.25,
+              sl: 1.095,
+              tp: 1.08,
+              placed_at: "2026-05-20T10:05:00Z",
+              freshness: "live",
+            },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await apiClient.getUserTrades(false);
+
+    expect(result.positions).toHaveLength(1);
+    expect(result.orders).toHaveLength(1);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("/sniper/v1/positions"),
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("/sniper/v1/orders"),
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+  });
+
+  it("reads account telemetry from the backend-owned account endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          account_id: "32206603",
+          terminal_id: "terminal-1",
+          balance: 10000,
+          equity: 10125,
+          margin: 1000,
+          free_margin: 9125,
+          margin_level: 1012.5,
+          floating_pl: 125,
+          currency: "USC",
+          leverage: 500,
+          ea_version: "1.00",
+          last_seen_at: "2026-05-20T10:15:00Z",
+          updated_at: "2026-05-20T10:15:00Z",
+          freshness: "live",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const telemetry = await apiClient.getAccountTelemetry(false);
+
+    expect(telemetry).toMatchObject({
+      accountId: "32206603",
+      floatingPl: 125,
+      state: "live",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/account-telemetry"),
+      expect.objectContaining({ method: "GET" }),
     );
   });
 });

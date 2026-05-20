@@ -22,8 +22,8 @@ export const Route = createFileRoute("/book")({
   component: BookPage,
 });
 
-function BookPage() {
-  const { data: trades } = useUserTrades();
+export function BookPage() {
+  const { data: trades, isLoading, error } = useUserTrades();
   const { data: snap } = useSnapshot();
   const {
     pendingSettingsLoad,
@@ -56,8 +56,21 @@ function BookPage() {
     );
   }
 
+  if (isLoading) {
+    return <div className="text-mute text-sm">Loading active book...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="text-mute text-sm">
+        Active book unavailable while backend trade telemetry is unreachable.
+      </div>
+    );
+  }
+
   const grouped = positions.reduce<Record<string, Position[]>>((acc, p) => {
-    (acc[p.symbol] ??= []).push(p);
+    const groupKey = `${p.symbol}:${p.direction}`;
+    (acc[groupKey] ??= []).push(p);
     return acc;
   }, {});
 
@@ -79,15 +92,27 @@ function BookPage() {
       )}
 
       <div className="space-y-4">
-        {Object.entries(grouped).map(([symbol, posList]) => {
+        {Object.entries(grouped).map(([groupKey, posList]) => {
+          const symbol = posList[0]?.symbol ?? groupKey;
+          const direction = posList[0]?.direction ?? "LONG";
           const snapPair = snap?.prices.find((p) => p.symbol === symbol);
           const stale = posList.some((p) => p.state === "stale") || snapPair?.state === "stale";
           const groupPnl = posList.reduce((s, p) => s + p.pnlUSC, 0);
           return (
-            <div key={symbol} className="rounded-lg border border-bd bg-bg1/60 overflow-hidden">
+            <div key={groupKey} className="rounded-lg border border-bd bg-bg1/60 overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2.5 border-b border-bd bg-bg2/30">
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-sm font-semibold">{symbol}</span>
+                  <span
+                    className={cn(
+                      "inline-flex items-center justify-center rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider font-mono",
+                      direction === "LONG"
+                        ? "border-buy/40 text-buy bg-buy/10"
+                        : "border-sell/40 text-sell bg-sell/10",
+                    )}
+                  >
+                    {direction}
+                  </span>
                   <span className="text-[10px] font-mono text-mute">{posList.length} pos</span>
                 </div>
                 <div className="flex items-center gap-3">

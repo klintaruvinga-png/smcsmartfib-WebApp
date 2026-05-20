@@ -1,5 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useUserAccount, useUserTrades, useUserRiskProfile } from "@/hooks/useSniperData";
+import {
+  useAccountTelemetry,
+  useUserAccount,
+  useUserTrades,
+  useUserRiskProfile,
+} from "@/hooks/useSniperData";
 import { mockEquityCurve } from "@/mocks/sniperData";
 import { MOCK_MODE } from "@/lib/api/sniperClient";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
@@ -22,17 +27,26 @@ export const Route = createFileRoute("/analytics")({
   component: AnalyticsPage,
 });
 
-function AnalyticsPage() {
+export function AnalyticsPage() {
+  const { data: accountTelemetry, error: accountTelemetryError } = useAccountTelemetry();
   const { data: account } = useUserAccount();
-  const { data: trades } = useUserTrades();
+  const { data: trades, error: tradesError } = useUserTrades();
   const { data: risk } = useUserRiskProfile();
 
-  if (!account || !risk) return null;
+  if (!risk) return null;
 
   const positions = trades?.positions ?? [];
   const floatingPnl = positions.reduce((s, p) => s + p.pnlUSC, 0);
-  const ddRatio = account.drawdownPct / risk.ddCapPct;
+  const ddRatio = (account?.drawdownPct ?? 0) / risk.ddCapPct;
   const equityCurveData = MOCK_MODE ? mockEquityCurve : null;
+  const telemetryUnavailable =
+    accountTelemetryError != null ||
+    tradesError != null ||
+    !accountTelemetry ||
+    trades == null;
+  const accountFreshness = telemetryUnavailable ? "unavailable" : accountTelemetry.state;
+  const balanceValue = accountTelemetry?.balance ?? 0;
+  const equityValue = accountTelemetry?.equity ?? 0;
 
   return (
     <div className="space-y-4">
@@ -50,10 +64,10 @@ function AnalyticsPage() {
                 Equity (30d)
               </div>
               <div className="font-mono text-2xl font-semibold mt-1">
-                {fmtUSC(account.equityUSC)}
+                {telemetryUnavailable ? "Unavailable" : fmtUSC(equityValue)}
               </div>
             </div>
-            <FreshnessBadge state={account.state} />
+            <FreshnessBadge state={accountFreshness} />
           </div>
           <div className="h-[200px] -mx-2">
             {equityCurveData ? (
@@ -106,24 +120,32 @@ function AnalyticsPage() {
 
         <Stat
           label="Today P/L"
-          value={fmtUSC(account.todayPnlUSC, true)}
-          sub={fmtPct(account.todayPnlPct)}
-          tone={account.todayPnlUSC >= 0 ? "buy" : "sell"}
-          state={account.state}
+          value={fmtUSC(account?.todayPnlUSC ?? 0, true)}
+          sub={fmtPct(account?.todayPnlPct ?? 0)}
+          tone={(account?.todayPnlUSC ?? 0) >= 0 ? "buy" : "sell"}
+          state={account?.state ?? "unavailable"}
         />
         <Stat
           label="Floating P/L"
-          value={fmtUSC(floatingPnl, true)}
-          sub={`${positions.length} positions`}
+          value={telemetryUnavailable ? "Unavailable" : fmtUSC(floatingPnl, true)}
+          sub={
+            telemetryUnavailable
+              ? "Waiting for backend trade telemetry"
+              : `${positions.length} positions`
+          }
           tone={floatingPnl >= 0 ? "buy" : "sell"}
-          state={account.state}
+          state={accountFreshness}
         />
         <Stat
           label="Margin used"
-          value={fmtPct(account.marginUsedPct, false)}
-          sub={`${fmtUSC(account.balanceUSC)} bal`}
+          value={
+            telemetryUnavailable
+              ? "Unavailable"
+              : fmtPct(equityValue > 0 ? ((accountTelemetry?.margin ?? 0) / equityValue) * 100 : 0, false)
+          }
+          sub={telemetryUnavailable ? "Waiting for backend account telemetry" : `${fmtUSC(balanceValue)} bal`}
           tone="info"
-          state={account.state}
+          state={accountFreshness}
         />
 
         {/* Drawdown card */}
@@ -132,13 +154,13 @@ function AnalyticsPage() {
             <div className="text-[11px] font-mono uppercase tracking-wider text-mute">
               Drawdown vs cap
             </div>
-            <FreshnessBadge state={account.state} />
+            <FreshnessBadge state={account?.state ?? "unavailable"} />
           </div>
           <div className="font-mono text-xl">
             <span
               className={cn(ddRatio > 0.7 ? "text-sell" : ddRatio > 0.4 ? "text-warn" : "text-buy")}
             >
-              {fmtPct(account.drawdownPct, false)}
+              {fmtPct(account?.drawdownPct ?? 0, false)}
             </span>
             <span className="text-mute text-sm"> / {fmtPct(risk.ddCapPct, false)}</span>
           </div>
