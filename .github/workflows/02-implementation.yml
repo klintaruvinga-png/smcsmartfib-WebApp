@@ -1,40 +1,18 @@
-name: 02 - Artifact Validation
+name: 02 - Artifact Validation (Manual Only)
 
 on:
-  push:
-    paths:
-      - reports/codex-plan.md
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: implementation-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  validate:
+  disabled:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GH_PAT }}
-
-      - name: Validate artifacts
+      - name: Explain disabled state
         run: |
-          test -f reports/copilot-research.md || (echo "Missing reports/copilot-research.md" && exit 1)
-          test -f reports/codex-plan.md || (echo "Missing reports/codex-plan.md" && exit 1)
-          test ! -f .smc-workflow-state.json || (echo ".smc-workflow-state.json must remain local-only" && exit 1)
-
-      - name: Upload pipeline artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: pipeline-artifacts-${{ github.sha }}
-          path: |
-            reports/copilot-research.md
-            reports/codex-plan.md
-          if-no-files-found: error
-          retention-days: 14
+          echo "02 - Artifact Validation is intentionally manual-only."
+          echo "The authoritative automation pipeline runs locally via scripts/pipeline-watcher.js."
+          echo "reports/copilot-research.md, reports/codex-plan.md, and .smc-workflow-state.json are local runtime artifacts and are not guaranteed to exist in GitHub."
