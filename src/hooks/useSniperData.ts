@@ -6,6 +6,16 @@ import type { DashboardSettings, Symbol, SymbolDiagnostic, TradePlan } from "@/t
 const DEFAULT_POLL_MS = 2_000;
 const WATCHLIST_LIMIT = 24;
 
+export type PollingUiState = {
+  backendReady: boolean;
+  pendingSettingsLoad: boolean;
+  missingBackendUrl: boolean;
+  settingsLoadFailed: boolean;
+  settingsLoadError: string | null;
+  pollMs: number | null;
+  retrySettingsLoad: () => Promise<unknown>;
+};
+
 export function useBackendReady() {
   return usePollingQueryState().backendReady;
 }
@@ -30,14 +40,28 @@ function usePollingQueryState() {
     (settingsQuery.fetchStatus === "fetching" ||
       settingsQuery.isPending === true ||
       settingsQuery.isLoading === true);
+  const settingsLoadFailed =
+    settings === undefined && (settingsQuery.isError === true || settingsQuery.status === "error");
   const pollMs = pendingSettingsLoad ? null : resolvePollMs(settings);
-  const backendReady = normalizeBackendUrl(settings?.backendUrl).length > 0;
+  const backendUrl = normalizeBackendUrl(settings?.backendUrl);
+  const backendReady = backendUrl.length > 0;
+  const missingBackendUrl = !pendingSettingsLoad && !settingsLoadFailed && backendUrl.length === 0;
+  const settingsLoadError =
+    settingsLoadFailed && settingsQuery.error instanceof Error ? settingsQuery.error.message : null;
 
   return {
     backendReady,
     pendingSettingsLoad,
+    missingBackendUrl,
+    settingsLoadFailed,
+    settingsLoadError,
     pollMs,
+    retrySettingsLoad: settingsQuery.refetch,
   };
+}
+
+export function usePollingUiState(): PollingUiState {
+  return usePollingQueryState();
 }
 
 function useLivePollingDiagnostics(

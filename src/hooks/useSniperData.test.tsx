@@ -35,7 +35,12 @@ vi.mock("@/lib/api/sniperClient", () => ({
   setBackendUrl: apiMocks.setBackendUrl,
 }));
 
-import { useEngineHealth, useWatchlistAdd, useWatchlistRemove } from "./useSniperData";
+import {
+  useEngineHealth,
+  usePollingUiState,
+  useWatchlistAdd,
+  useWatchlistRemove,
+} from "./useSniperData";
 
 describe("useEngineHealth", () => {
   beforeEach(() => {
@@ -78,6 +83,108 @@ describe("useEngineHealth", () => {
       staleTime: 0,
       refetchInterval: 5_000,
     });
+  });
+});
+
+describe("usePollingUiState", () => {
+  beforeEach(() => {
+    reactQueryMocks.useQuery.mockReset();
+    apiMocks.getUserSettings.mockReset();
+    apiMocks.setBackendUrl.mockReset();
+    apiMocks.normalizeBackendUrl.mockClear();
+  });
+
+  it("holds polling disabled while user settings are still loading", () => {
+    reactQueryMocks.useQuery.mockImplementation((options: { queryKey: string[] }) => {
+      if (options.queryKey[0] === "user-settings") {
+        return {
+          data: undefined,
+          fetchStatus: "fetching",
+          isPending: true,
+          isLoading: true,
+          refetch: vi.fn(),
+        };
+      }
+
+      return { data: undefined };
+    });
+
+    const { result } = renderHook(() => usePollingUiState());
+
+    expect(result.current).toMatchObject({
+      backendReady: false,
+      pendingSettingsLoad: true,
+      missingBackendUrl: false,
+      settingsLoadFailed: false,
+      settingsLoadError: null,
+      pollMs: null,
+    });
+    expect(result.current.retrySettingsLoad).toEqual(expect.any(Function));
+  });
+
+  it("marks the backend as unready after settings resolve without a backend URL", () => {
+    reactQueryMocks.useQuery.mockImplementation((options: { queryKey: string[] }) => {
+      if (options.queryKey[0] === "user-settings") {
+        return {
+          data: {
+            backendUrl: "   ",
+            refreshIntervalSec: 5,
+            watchlist: [],
+          },
+          fetchStatus: "idle",
+          isPending: false,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+
+      return { data: undefined };
+    });
+
+    const { result } = renderHook(() => usePollingUiState());
+
+    expect(result.current).toMatchObject({
+      backendReady: false,
+      pendingSettingsLoad: false,
+      missingBackendUrl: true,
+      settingsLoadFailed: false,
+      settingsLoadError: null,
+      pollMs: 5_000,
+    });
+    expect(result.current.retrySettingsLoad).toEqual(expect.any(Function));
+  });
+
+  it("surfaces a settings-query failure separately from a missing backend URL", () => {
+    const refetch = vi.fn();
+
+    reactQueryMocks.useQuery.mockImplementation((options: { queryKey: string[] }) => {
+      if (options.queryKey[0] === "user-settings") {
+        return {
+          data: undefined,
+          error: new Error("settings fetch failed"),
+          fetchStatus: "idle",
+          isError: true,
+          isPending: false,
+          isLoading: false,
+          status: "error",
+          refetch,
+        };
+      }
+
+      return { data: undefined };
+    });
+
+    const { result } = renderHook(() => usePollingUiState());
+
+    expect(result.current).toMatchObject({
+      backendReady: false,
+      pendingSettingsLoad: false,
+      missingBackendUrl: false,
+      settingsLoadFailed: true,
+      settingsLoadError: "settings fetch failed",
+      pollMs: null,
+    });
+    expect(result.current.retrySettingsLoad).toBe(refetch);
   });
 });
 

@@ -4,8 +4,10 @@ import {
   useLiveSignals,
   useLadders,
   useSnapshot,
+  usePollingUiState,
 } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
+import { SettingsQueryErrorState } from "@/components/sniper/SettingsQueryErrorState";
 import { DivergenceBanner } from "@/components/sniper/Warnings";
 import { AlertTriangle, Loader2, Search } from "lucide-react";
 import { deduplicateById } from "@/lib/utils";
@@ -75,6 +77,13 @@ export function PlanPage() {
   const { data: signals, isLoading: signalsLoading } = useLiveSignals();
   const { data: ladders, isLoading: laddersLoading } = useLadders();
   const { data: snapshot } = useSnapshot();
+  const {
+    pendingSettingsLoad,
+    missingBackendUrl,
+    settingsLoadFailed,
+    settingsLoadError,
+    retrySettingsLoad,
+  } = usePollingUiState();
   const { watchlist, watchlistSet } = useCanonicalWatchlist();
 
   const uniqueSignals = signals
@@ -103,11 +112,29 @@ export function PlanPage() {
   ).length;
   const firstWatchlistCandidate = rankedWatchlistCandidates[0];
 
-  if (signalsLoading || laddersLoading) {
+  if (pendingSettingsLoad || signalsLoading || laddersLoading) {
     return (
       <div className="flex items-center gap-2 text-mute text-sm">
         <Loader2 className="h-4 w-4 animate-spin" />
         Loading signal data and blueprints...
+      </div>
+    );
+  }
+
+  if (settingsLoadFailed) {
+    return (
+      <SettingsQueryErrorState
+        resourceLabel="signal plans"
+        errorDetail={settingsLoadError}
+        onRetry={retrySettingsLoad}
+      />
+    );
+  }
+
+  if (missingBackendUrl) {
+    return (
+      <div className="text-mute text-sm">
+        Configure a backend URL in Account before loading signal plans.
       </div>
     );
   }

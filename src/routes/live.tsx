@@ -5,11 +5,13 @@ import {
   usePollMs,
   useCanonicalWatchlist,
   alignWatchlistItems,
+  usePollingUiState,
 } from "@/hooks/useSniperData";
 import { useStreamingTicks } from "@/hooks/useStreamingTicks";
 import { useTickFlash } from "@/hooks/useTickFlash";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { BiasBadge, ChopMeter, GateBadge } from "@/components/sniper/Indicators";
+import { SettingsQueryErrorState } from "@/components/sniper/SettingsQueryErrorState";
 import { WarningLine } from "@/components/sniper/Warnings";
 import { fmtPrice, fmtPct, relTime } from "@/lib/format";
 import { MOCK_MODE } from "@/lib/api/sniperClient";
@@ -56,12 +58,38 @@ function blockerWarning(blocker: EngineBlocker | undefined): string | null {
   return map[blocker] ?? blocker.replace(/_/g, " ").toLowerCase();
 }
 
-function LivePage() {
+export function LivePage() {
   const { data, isLoading } = useSnapshot();
+  const {
+    pendingSettingsLoad,
+    missingBackendUrl,
+    settingsLoadFailed,
+    settingsLoadError,
+    retrySettingsLoad,
+  } = usePollingUiState();
   const pollMs = usePollMs() ?? 2000;
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
   const { watchlist } = useCanonicalWatchlist();
-  if (isLoading || !data) return <div className="text-mute text-sm">Loading radar...</div>;
+  if (pendingSettingsLoad || isLoading) {
+    return <div className="text-mute text-sm">Loading radar...</div>;
+  }
+  if (settingsLoadFailed) {
+    return (
+      <SettingsQueryErrorState
+        resourceLabel="live radar"
+        errorDetail={settingsLoadError}
+        onRetry={retrySettingsLoad}
+      />
+    );
+  }
+  if (missingBackendUrl) {
+    return (
+      <div className="text-mute text-sm">
+        Configure a backend URL in Account before loading live radar.
+      </div>
+    );
+  }
+  if (!data) return <div className="text-mute text-sm">Awaiting backend radar snapshot...</div>;
 
   // Render every watchlist symbol — placeholder cards for symbols missing from
   // the snapshot prevent the radar flickering 4→2→3 when sparse snapshots
