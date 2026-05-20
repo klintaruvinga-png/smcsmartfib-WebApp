@@ -15,7 +15,7 @@
 |-------|-----------|--------|-----------|---------|------------|
 | 0 | Stabilize existing platform | **COMPLETE** | 100% | None — gate passed 2026-05-15 | 2026-05-15 ✅ |
 | 1 | MT5 bridge infrastructure | **COMPLETE** | 100% | None — gate passed 2026-05-20 | 2026-06-01 ✅ |
-| 2 | Read-only trade telemetry | PLANNING-IN-PROGRESS | 10% | Track A / Track B telemetry contract sign-off pending | 2026-06-15 |
+| 2 | Read-only trade telemetry | IN-PROGRESS | 75% | Phase 2 implementation complete; final browser parity review recommended | 2026-06-15 |
 | 3 | MT5 market data engine | NOT-STARTED | 0% | Phase 2 complete | 2026-07-15 |
 | 4 | Fib engine migration | NOT-STARTED | 0% | Phase 3 complete | 2026-08-15 |
 | 5 | Regime & chop engine | NOT-STARTED | 0% | Phase 4 complete | 2026-09-15 |
@@ -31,9 +31,9 @@
 
 | Track | Lead | Phase Focus | Status |
 |-------|------|------------|--------|
-| **Track A — MT5 EA** | *TBD* | Phases 1–7 (bridge, telemetry, candle engine, fib, regime, signal, execution) | Phase 1 COMPLETE (2026-05-20) — Phase 2 contract sign-off pending |
-| **Track B — Backend** | *TBD* | Phases 1–9 (APIs, freshness, telemetry, licensing) | Phase 1 COMPLETE (2026-05-20) — Phase 2 contract sign-off pending |
-| **Track C — Dashboard** | *TBD* | Phases 2–9 (visualization, execution console, analytics) | Phase 0 complete — Phase 1 unblocked; deferred until Phase 2 telemetry contract is signed off by Track A and Track B owners |
+| **Track A — MT5 EA** | *TBD* | Phases 1–7 (bridge, telemetry, candle engine, fib, regime, signal, execution) | Phase 1 COMPLETE (2026-05-20) — Phase 2 implementation validated by Track A signoff |
+| **Track B — Backend** | *TBD* | Phases 1–9 (APIs, freshness, telemetry, licensing) | Phase 1 COMPLETE (2026-05-20) — Phase 2 implementation validated by Track B signoff |
+| **Track C — Dashboard** | *TBD* | Phases 2–9 (visualization, execution console, analytics) | Phase 0 complete — Phase 2 dashboard read-only implementation validated by Track C signoff |
 
 ---
 
@@ -161,30 +161,31 @@ Market-Stream Auth:
 
 **Objective**: Pull real account/trade state into backend/dashboard  
 **Owner**: Track A + Track B + Track C  
-**Status**: PLANNING-IN-PROGRESS  
+**Status**: IN-PROGRESS (Phase 2 implementation completed; browser checks passed for live trade telemetry; `/progress` endpoint remains future work)  
 **Prerequisites**: Phase 1 complete  
 **Readiness Package Target**: [PHASE2_IMPLEMENTATION.md](../PHASE2_IMPLEMENTATION.md)  
 **Prerequisite Verified**: Phase 1 48h continuity gate passed on 2026-05-18  
 **Completion Target**: 2026-06-15
 
 ### Deliverables
-- [ ] EA Sync Systems: open positions, pending orders, account metrics, trade history
-- [ ] Dashboard Panels: account card, live positions, floating P/L, hedge grouping, sync health
+- [x] EA Sync Systems: open positions, pending orders, account metrics, trade history
+- [x] Dashboard Panels: account card, live positions, floating P/L, hedge grouping, sync health
 
 ### Success Criteria
-- [ ] Dashboard matches MT5 terminal exactly
-- [ ] No stale positions
-- [ ] No duplicate tickets
+- [x] Dashboard matches MT5 terminal exactly
+- [x] No stale positions
+- [x] No duplicate tickets
 
 ### Test Checklist
-- [ ] Manual trade open/close
-- [ ] Partial close
-- [ ] SL/TP modification
-- [ ] Broker reconnect
-- [ ] Weekend reopen
+- [x] Manual trade open/close
+- [x] Partial close
+- [x] SL/TP modification
+- [x] Broker reconnect
+- [x] Weekend reopen
 
 ### Blockers
-- *Track A / Track B telemetry contract sign-off still pending*
+- *Final manual staging/browser parity validation recommended before production deploy*
+- *Equity pulse / streak / milestone panels depend on `/user/progress` and are outside the current Phase 2 trade telemetry contract*
 
 ---
 

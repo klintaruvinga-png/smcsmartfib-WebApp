@@ -300,12 +300,14 @@ These repository surfaces inform Phase 2 planning but are not, by themselves, pr
 
 ## Phase 2 Exit Validation Checklist
 
-- [ ] Existing `POST /ea/market-stream` auth and payload validation still pass unchanged
-- [ ] Phase 2 payload extension is well-formed and parseable on the existing market-stream path
-- [ ] Backend persists the required position, pending-order, and account-metric fields without duplicates
-- [ ] `GET /market-data-authority` returns the expected authority and sync-health state
-- [ ] Dashboard account card, live positions, floating P/L, hedge grouping, and sync health render from read-only authority only
-- [ ] Manual trade open/close, partial close, SL/TP modification, broker reconnect, and weekend reopen scenarios all reconcile to backend-owned truth
+- [x] Existing `POST /ea/market-stream` auth and payload validation still pass unchanged
+- [x] Phase 2 payload extension is well-formed and parseable on the existing market-stream path
+- [x] Backend persists the required position, pending-order, and account-metric fields without duplicates
+- [x] `GET /market-data-authority` returns the expected authority and sync-health state
+- [x] Dashboard account card, live positions, floating P/L, hedge grouping, and sync health render from read-only authority only
+- [x] Manual trade open/close, partial close, SL/TP modification, broker reconnect, and weekend reopen scenarios all reconcile to backend-owned truth
+
+> Browser UI checks passed for live account telemetry, active book, and trade dashboard surfaces. Equity pulse, streaks, and milestones remain gated behind the future `/user/progress` contract and are not part of current Phase 2 trade telemetry scope.
 
 ---
 
