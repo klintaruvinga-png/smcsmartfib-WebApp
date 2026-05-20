@@ -4704,6 +4704,24 @@ final class SMC_SuperFib_Sniper_REST {
         );
     }
 
+    private function resolve_active_trade_identity(int $user_id): array {
+        global $wpdb;
+
+        $row = $wpdb->get_row($wpdb->prepare(
+            "SELECT account_id, terminal_id FROM {$this->table('account_telemetry')} WHERE user_id = %d ORDER BY last_seen_at DESC, updated_at DESC, id DESC LIMIT 1",
+            $user_id
+        ), ARRAY_A);
+
+        if (!is_array($row)) {
+            return array('account_id' => '', 'terminal_id' => '');
+        }
+
+        return array(
+            'account_id' => (string) ($row['account_id'] ?? ''),
+            'terminal_id' => (string) ($row['terminal_id'] ?? ''),
+        );
+    }
+
     private function read_trade_positions(int $user_id): array {
         global $wpdb;
 
@@ -4711,9 +4729,12 @@ final class SMC_SuperFib_Sniper_REST {
             return array();
         }
 
+        $identity = $this->resolve_active_trade_identity($user_id);
         $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$this->table('trade_positions')} WHERE user_id = %d AND state = %s",
+            "SELECT * FROM {$this->table('trade_positions')} WHERE user_id = %d AND account_id = %s AND terminal_id = %s AND state = %s",
             $user_id,
+            $identity['account_id'],
+            $identity['terminal_id'],
             'open'
         ), ARRAY_A);
 
@@ -4752,9 +4773,12 @@ final class SMC_SuperFib_Sniper_REST {
             return array();
         }
 
+        $identity = $this->resolve_active_trade_identity($user_id);
         $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$this->table('trade_orders')} WHERE user_id = %d AND state = %s",
+            "SELECT * FROM {$this->table('trade_orders')} WHERE user_id = %d AND account_id = %s AND terminal_id = %s AND state = %s",
             $user_id,
+            $identity['account_id'],
+            $identity['terminal_id'],
             'active'
         ), ARRAY_A);
 
