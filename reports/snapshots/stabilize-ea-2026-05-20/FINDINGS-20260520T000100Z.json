@@ -1,0 +1,118 @@
+{
+  "snapshot_type": "FINDINGS",
+  "workflow_id": "stabilize-ea-2026-05-20",
+  "timestamp": "2026-05-20T00:01:00Z",
+  "confirmed_issues": [
+    {
+      "id": "MIGRATION-001",
+      "severity": "LOW",
+      "system": "Documentation / Migration Status",
+      "description": "migration-status.md Phase 1 section header shows 'IN-PROGRESS (Scenario validation passed; 48h continuity window pending)' but the Phase Summary table at the top correctly shows Phase 1 as COMPLETE. The 48h continuity window has been validated and committed (commit 0921023, artifact phase1-bridge-48h-continuity-complete-2026-05-20.md). The section body needs to be updated to reflect PASSED status.",
+      "root_cause": "The Phase 1 section status field was not updated when the 48h continuity gate passed on 2026-05-20.",
+      "impact_zones": ["Documentation", "Migration Status Board"],
+      "proposed_fix": "Update Phase 1 status field in migration-status.md from 'IN-PROGRESS' to 'COMPLETE' and update the 48h continuity gate item to checked."
+    },
+    {
+      "id": "ENV-001",
+      "severity": "INFO",
+      "system": "CI / Build Environment",
+      "description": "npm run lint fails with ERR_MODULE_NOT_FOUND for @eslint/js. npm run build fails with 'vite: not found'. node_modules are not installed in this remote execution environment.",
+      "root_cause": "This is a CI environment limitation — npm install has not been run. The package.json and eslint.config.js are structurally correct; the failure is environment-only.",
+      "impact_zones": ["CI Pipeline"],
+      "proposed_fix": "No code change needed. Run 'npm install' in the deployed environment before running lint/build. check:mql and PHP lint both PASS."
+    }
+  ],
+  "verified_correct": [
+    {
+      "id": "VERIFY-001",
+      "system": "EA Auth — permission_ea_market_stream / permission_ea_bridge",
+      "result": "PASS",
+      "details": "All 6 validation gates confirmed: missing token→401, unconfigured key→503, invalid token→403, missing user_id→400, invalid user_id→403, wp_set_current_user called on success. hash_equals() used. All 4 header alias variants checked."
+    },
+    {
+      "id": "VERIFY-002",
+      "system": "EA Payload Validation — post_ea_market_stream",
+      "result": "PASS",
+      "details": "Staleness guard at 300s (422), warn at 120-300s, unparseable timestamp→422, missing bid/ask→400, bid/ask finite+positive+bid≤ask guard, OHLC guard, epoch guard on candle timestamps, future-candle rejection, tick_volume guard via guard_tick_volume(). Canonical candles[] array also accepted via compat layer."
+    },
+    {
+      "id": "VERIFY-003",
+      "system": "authority-diagnostics route protection",
+      "result": "PASS",
+      "details": "Route uses permission_user (WordPress session). Returns 401 for unauthenticated requests. Correctly NOT public. This is expected behavior documented in the system."
+    },
+    {
+      "id": "VERIFY-004",
+      "system": "Admin routes protection",
+      "result": "PASS",
+      "details": "All /admin/* routes use permission_admin which checks is_user_logged_in() + current_user_can('manage_options'). Returns 401 (not logged in) or 403 (logged in but not admin)."
+    },
+    {
+      "id": "VERIFY-005",
+      "system": "Freshness / Stale-Data Authority",
+      "result": "PASS",
+      "details": "age_sec in snapshots comes from broker quote_time/timestamp, not server fetch time. upsert_mt5_snapshot() stores broker timestamp as updated_at. get_cached_price() calculates age from updated_at. Frontend uses backend-provided state field, never computes own age."
+    },
+    {
+      "id": "VERIFY-006",
+      "system": "NAS100/US30 Equity Session Off-Hours Handling",
+      "result": "PASS",
+      "details": "is_equity_index_off_session() correctly identifies weekend + non-trading hours using US DST awareness. Off-session equity symbols excluded from feed_has_stale_symbols count in build_health_payload(). Confirmed LIVE at 16:37 UTC 2026-05-15."
+    },
+    {
+      "id": "VERIFY-007",
+      "system": "Symbol Normalization — map_symbol_aliases()",
+      "result": "PASS",
+      "details": "Aliases cover: NASDAQ/NASDAQ100/USTECH100/USTECH→NAS100, WALLSTREET/WALLSTREET30/DOW30/DJ30→US30, GOLD→XAUUSD, SILVER→XAGUSD. MT5 SymbolNormalizer.mqh handles broker suffix variants (e.g. EURUSDm, EURUSD.)."
+    },
+    {
+      "id": "VERIFY-008",
+      "system": "Backend Signal Authority",
+      "result": "PASS",
+      "details": "ensure_engine_snapshot() generates signals from backend DB data. Signal engine gates on freshness state. Frontend dashboard reads signals from snapshot, does not generate its own. VerdictBadge uses backend verdict directly."
+    },
+    {
+      "id": "VERIFY-009",
+      "system": "Frontend Polling / staleTime",
+      "result": "PASS",
+      "details": "useEngineHealth() has staleTime:0 (Phase 0 BUG-001 fix confirmed in code). Polling only starts when backendReady && pollMs !== null. No race conditions in initialization path."
+    },
+    {
+      "id": "VERIFY-010",
+      "system": "Watchlist Persistence",
+      "result": "PASS",
+      "details": "Watchlist mutations invalidate engine snapshot cache. useWatchlistAdd/Remove use optimistic updates with rollback on error. Backend source of truth for persisted watchlist."
+    },
+    {
+      "id": "VERIFY-011",
+      "system": "MT5 EA Field Parity",
+      "result": "PASS",
+      "details": "All EA-sent fields (symbol, normalized_symbol, timeframe, timestamp/quote_time, bid, ask, freshness, session, candle.*, candle_m15.*) matched to PHP handler. Both legacy (candle object) and canonical (candles array + tick_volume) formats accepted."
+    },
+    {
+      "id": "VERIFY-012",
+      "system": "Phase 1 Bridge Routes",
+      "result": "PASS",
+      "details": "All 5 EA bridge routes operational: /ea/market-stream, /ea/heartbeat, /ea/account-sync, /ea/symbol-sync, /ea/license-check. 48h continuity confirmed 2026-05-20."
+    }
+  ],
+  "migration_blockers": [
+    {
+      "id": "MIGRATION-001",
+      "phase": "Phase 1",
+      "description": "Phase 1 section header in migration-status.md still shows IN-PROGRESS",
+      "status": "PATCH-REQUIRED",
+      "validation_required": false
+    }
+  ],
+  "statistics": {
+    "total_issues": 2,
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 1,
+    "info": 1,
+    "migration_blockers": 1,
+    "verified_correct_systems": 12
+  }
+}

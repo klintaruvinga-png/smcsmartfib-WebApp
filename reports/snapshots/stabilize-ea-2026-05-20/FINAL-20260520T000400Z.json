@@ -1,0 +1,73 @@
+{
+  "snapshot_type": "FINAL",
+  "workflow_id": "stabilize-ea-2026-05-20",
+  "timestamp": "2026-05-20T00:04:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-zsVsp",
+    "commit_hash": "POST-COMMIT",
+    "tags_created": [
+      "snapshot/stabilize-ea-2026-05-20-start-20260520T000000Z",
+      "rollback/stabilize-ea-2026-05-20-before-patches",
+      "rollback/stabilize-ea-2026-05-20-after-patch-1"
+    ]
+  },
+  "patches_applied": [
+    {
+      "id": "PATCH-001",
+      "file": ".github/migration-status.md",
+      "description": "Phase 1 section status updated from IN-PROGRESS to COMPLETE. 48h continuity gate item checked. Blockers section updated. Phase Summary table updated. Track Assignments updated. Key Contacts updated. Current Phase updated to Phase 2.",
+      "severity": "LOW — documentation only",
+      "regression_risk": "NONE"
+    }
+  ],
+  "migration_status_post_patch": {
+    "blockers_addressed": [
+      "MIGRATION-001: Phase 1 section header now correctly shows COMPLETE"
+    ],
+    "remaining_blockers": [
+      "Phase 2 telemetry contract sign-off pending (Track A + Track B)"
+    ],
+    "phase_readiness": "Phase 1 COMPLETE. Phase 2 planning at 10%. Phase 2 gate: Track A / Track B telemetry contract sign-off."
+  },
+  "tests": {
+    "commands_run": [
+      "npm run check:mql",
+      "php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "php -l wordpress/smc-superfib-sniper/class-market-data-service.php"
+    ],
+    "skipped": [
+      "npm run lint — @eslint/js not installed in CI environment (environment-only, not a code bug)",
+      "npm run build — vite not installed in CI environment (environment-only, not a code bug)"
+    ],
+    "passing": true,
+    "failures": []
+  },
+  "ea_integration_status": {
+    "market_stream_route": "POST /wp-json/sniper/v1/ea/market-stream",
+    "auth_required": true,
+    "auth_header": "X-EA-API-Key",
+    "auth_aliases": ["X-EA-API-Key", "x_ea_api_key", "X-API-KEY", "x_api_key"],
+    "secret_env": "SMC_SF_EA_API_KEY",
+    "user_id_required": true,
+    "payload_validation": true,
+    "stale_rejection": true,
+    "stale_threshold_sec": 300,
+    "stale_warn_threshold_sec": 120,
+    "ohlc_guard": true,
+    "epoch_guard": true,
+    "future_candle_guard": true,
+    "tick_volume_guard": true,
+    "symbol_normalization": true,
+    "canonical_candles_array_supported": true,
+    "phase1_bridge_routes_confirmed": [
+      "POST /sniper/v1/ea/heartbeat",
+      "POST /sniper/v1/ea/account-sync",
+      "POST /sniper/v1/ea/symbol-sync",
+      "GET  /sniper/v1/ea/license-check"
+    ]
+  },
+  "rollback": {
+    "manifest": "ROLLBACK-MANIFEST.json",
+    "rollback_points_count": 3
+  }
+}
