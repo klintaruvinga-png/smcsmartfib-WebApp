@@ -12,5 +12,5 @@
   },
   "php_lint_post_patch": "PASS — no PHP files changed",
   "check_mql_post_patch": "PASS — no MQL5 files changed",
-  "rollback_command": "git reset --hard rollback/stabilize-ea-2026-05-20-before-patches"
+  "rollback_command": "git reset --hard f89d4de9c5217bf8d4f50df571a45fc53c9daa18"
 }

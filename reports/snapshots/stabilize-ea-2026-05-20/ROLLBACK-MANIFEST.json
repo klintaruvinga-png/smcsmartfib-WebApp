@@ -16,14 +16,14 @@
       "tag": "rollback/stabilize-ea-2026-05-20-before-patches",
       "commit_hash": "f89d4de9c5217bf8d4f50df571a45fc53c9daa18",
       "snapshot_file": "PRE-PATCH-20260520T000200Z.json",
-      "command": "git reset --hard rollback/stabilize-ea-2026-05-20-before-patches"
+      "command": "git reset --hard f89d4de9c5217bf8d4f50df571a45fc53c9daa18"
     },
     {
       "name": "After patch 1 — migration-status.md Phase 1 closeout",
       "tag": "rollback/stabilize-ea-2026-05-20-after-patch-1",
-      "commit_hash": "POST-COMMIT",
+      "commit_hash": "324ae222be588ab5895a67056a6223775abbdce7",
       "snapshot_file": "AFTER-PATCH-1-20260520T000300Z.json",
-      "command": "git reset --hard rollback/stabilize-ea-2026-05-20-after-patch-1"
+      "command": "git reset --hard 324ae222be588ab5895a67056a6223775abbdce7"
     }
   ],
   "emergency_rollback": {

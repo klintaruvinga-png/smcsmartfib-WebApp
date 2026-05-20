@@ -4,7 +4,7 @@
   "timestamp": "2026-05-20T00:04:00Z",
   "git": {
     "branch": "claude/nice-fermat-zsVsp",
-    "commit_hash": "POST-COMMIT",
+    "commit_hash": "324ae222be588ab5895a67056a6223775abbdce7",
     "tags_created": [
       "snapshot/stabilize-ea-2026-05-20-start-20260520T000000Z",
       "rollback/stabilize-ea-2026-05-20-before-patches",

@@ -18,7 +18,7 @@
 **Migration Readiness**: Phase 1 COMPLETE. Phase 2 planning unblocked pending Track A/B contract sign-off.
 
 **Snapshot Archive**: `reports/snapshots/stabilize-ea-2026-05-20/`  
-**Rollback Command**: `git reset --hard rollback/stabilize-ea-2026-05-20-before-patches`
+**Rollback Command**: `git reset --hard f89d4de9c5217bf8d4f50df571a45fc53c9daa18`
 
 ---
 
@@ -67,7 +67,7 @@
 - Key Contacts table: updated Track A/B status
 
 **Regression protection**: Documentation-only. No logic, no runtime behavior changed.  
-**Rollback before**: `rollback/stabilize-ea-2026-05-20-before-patches`  
+**Rollback before**: `f89d4de9c5217bf8d4f50df571a45fc53c9daa18`  
 **Rollback after**: `rollback/stabilize-ea-2026-05-20-after-patch-1`
 
 ---
@@ -180,11 +180,11 @@
 ## Rollback Procedure
 
 ```bash
-# Return to state before any patches
-git reset --hard rollback/stabilize-ea-2026-05-20-before-patches
+# Return to state before any patches (initial HEAD — same as initial state)
+git reset --hard f89d4de9c5217bf8d4f50df571a45fc53c9daa18
 
-# Or return to initial state (same commit in this run)
-git reset --hard snapshot/stabilize-ea-2026-05-20-start-20260520T000000Z
+# Return to post-patch state (final commit of this workflow)
+git reset --hard 324ae222be588ab5895a67056a6223775abbdce7
 
 # Emergency full rollback
 git checkout main && git reset --hard origin/main
