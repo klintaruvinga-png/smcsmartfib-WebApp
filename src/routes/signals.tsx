@@ -7,6 +7,7 @@ import {
   usePollingUiState,
 } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
+import { SettingsQueryErrorState } from "@/components/sniper/SettingsQueryErrorState";
 import { VerdictBadge } from "@/components/sniper/VerdictBadge";
 import { DivergenceBanner } from "@/components/sniper/Warnings";
 import { relTime } from "@/lib/format";
@@ -53,7 +54,13 @@ function blockerSeverity(b: EngineBlocker | undefined): "warn" | "sell" {
 function SignalsPage() {
   const { data: signals } = useLiveSignals();
   const { data: h } = useEngineHealth();
-  const { backendReady, pendingSettingsLoad } = usePollingUiState();
+  const {
+    pendingSettingsLoad,
+    missingBackendUrl,
+    settingsLoadFailed,
+    settingsLoadError,
+    retrySettingsLoad,
+  } = usePollingUiState();
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
   const { watchlist, watchlistSet } = useCanonicalWatchlist();
   const [watchlistOnly, setWatchlistOnly] = useState(true);
@@ -73,7 +80,17 @@ function SignalsPage() {
     return <div className="text-mute text-sm">Loading signal engine...</div>;
   }
 
-  if (!backendReady) {
+  if (settingsLoadFailed) {
+    return (
+      <SettingsQueryErrorState
+        resourceLabel="signal engine data"
+        errorDetail={settingsLoadError}
+        onRetry={retrySettingsLoad}
+      />
+    );
+  }
+
+  if (missingBackendUrl) {
     return (
       <div className="text-mute text-sm">
         Configure a backend URL in Account before loading signal engine data.

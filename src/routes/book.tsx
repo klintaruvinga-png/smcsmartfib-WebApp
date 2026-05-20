@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useUserTrades, useSnapshot, usePollingUiState } from "@/hooks/useSniperData";
+import { SettingsQueryErrorState } from "@/components/sniper/SettingsQueryErrorState";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { WarningLine } from "@/components/sniper/Warnings";
 import { fmtPrice, fmtPct, fmtUSC, relTime } from "@/lib/format";
@@ -24,14 +25,30 @@ export const Route = createFileRoute("/book")({
 function BookPage() {
   const { data: trades } = useUserTrades();
   const { data: snap } = useSnapshot();
-  const { backendReady, pendingSettingsLoad } = usePollingUiState();
+  const {
+    pendingSettingsLoad,
+    missingBackendUrl,
+    settingsLoadFailed,
+    settingsLoadError,
+    retrySettingsLoad,
+  } = usePollingUiState();
   const positions = trades?.positions ?? [];
 
   if (pendingSettingsLoad) {
     return <div className="text-mute text-sm">Loading active book...</div>;
   }
 
-  if (!backendReady) {
+  if (settingsLoadFailed) {
+    return (
+      <SettingsQueryErrorState
+        resourceLabel="the active book"
+        errorDetail={settingsLoadError}
+        onRetry={retrySettingsLoad}
+      />
+    );
+  }
+
+  if (missingBackendUrl) {
     return (
       <div className="text-mute text-sm">
         Configure a backend URL in Account before loading the active book.

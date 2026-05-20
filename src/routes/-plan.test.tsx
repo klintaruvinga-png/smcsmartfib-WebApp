@@ -199,7 +199,11 @@ describe("PlanPage ranking and execution guards", () => {
     hookMocks.usePollingUiState.mockReturnValue({
       backendReady: true,
       pendingSettingsLoad: false,
+      missingBackendUrl: false,
+      settingsLoadFailed: false,
+      settingsLoadError: null,
       pollMs: 5_000,
+      retrySettingsLoad: vi.fn(),
     });
     mockWatchlist(["GBPUSD", "USDJPY", "AUDUSD", "EURUSD", "XAUUSD"]);
   });
@@ -263,6 +267,31 @@ describe("PlanPage ranking and execution guards", () => {
     expect(
       (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
     ).toBe(false);
+  });
+
+  it("shows a retryable settings error instead of the backend URL guard when settings fail", () => {
+    hookMocks.usePollingUiState.mockReturnValue({
+      backendReady: false,
+      pendingSettingsLoad: false,
+      missingBackendUrl: false,
+      settingsLoadFailed: true,
+      settingsLoadError: "settings fetch failed",
+      pollMs: null,
+      retrySettingsLoad: vi.fn(),
+    });
+
+    renderPlanPage({
+      signals: [],
+      ladders: [],
+      watchlist: [],
+    });
+
+    expect(
+      screen.getByText("Unable to load Account settings. Retry before loading signal plans."),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText("Configure a backend URL in Account before loading signal plans."),
+    ).toBeNull();
   });
 
   it("scopes rendered cards to the canonical watchlist", () => {

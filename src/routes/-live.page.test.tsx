@@ -71,7 +71,11 @@ describe("LivePage backend gating", () => {
     hookMocks.usePollingUiState.mockReturnValue({
       backendReady: false,
       pendingSettingsLoad: false,
+      missingBackendUrl: true,
+      settingsLoadFailed: false,
+      settingsLoadError: null,
       pollMs: 5_000,
+      retrySettingsLoad: vi.fn(),
     });
 
     render(<LivePage />);
@@ -85,11 +89,37 @@ describe("LivePage backend gating", () => {
     hookMocks.usePollingUiState.mockReturnValue({
       backendReady: false,
       pendingSettingsLoad: true,
+      missingBackendUrl: false,
+      settingsLoadFailed: false,
+      settingsLoadError: null,
       pollMs: null,
+      retrySettingsLoad: vi.fn(),
     });
 
     render(<LivePage />);
 
     expect(screen.getByText("Loading radar...")).toBeTruthy();
+  });
+
+  it("shows a retryable settings error instead of the backend URL guard when settings fail", () => {
+    hookMocks.usePollingUiState.mockReturnValue({
+      backendReady: false,
+      pendingSettingsLoad: false,
+      missingBackendUrl: false,
+      settingsLoadFailed: true,
+      settingsLoadError: "settings fetch failed",
+      pollMs: null,
+      retrySettingsLoad: vi.fn(),
+    });
+
+    render(<LivePage />);
+
+    expect(
+      screen.getByText("Unable to load Account settings. Retry before loading live radar."),
+    ).toBeTruthy();
+    expect(screen.getByText("settings fetch failed")).toBeTruthy();
+    expect(
+      screen.queryByText("Configure a backend URL in Account before loading live radar."),
+    ).toBeNull();
   });
 });

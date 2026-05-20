@@ -11,6 +11,7 @@ import { useStreamingTicks } from "@/hooks/useStreamingTicks";
 import { useTickFlash } from "@/hooks/useTickFlash";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { BiasBadge, ChopMeter, GateBadge } from "@/components/sniper/Indicators";
+import { SettingsQueryErrorState } from "@/components/sniper/SettingsQueryErrorState";
 import { WarningLine } from "@/components/sniper/Warnings";
 import { fmtPrice, fmtPct, relTime } from "@/lib/format";
 import { MOCK_MODE } from "@/lib/api/sniperClient";
@@ -59,14 +60,29 @@ function blockerWarning(blocker: EngineBlocker | undefined): string | null {
 
 export function LivePage() {
   const { data, isLoading } = useSnapshot();
-  const { backendReady, pendingSettingsLoad } = usePollingUiState();
+  const {
+    pendingSettingsLoad,
+    missingBackendUrl,
+    settingsLoadFailed,
+    settingsLoadError,
+    retrySettingsLoad,
+  } = usePollingUiState();
   const pollMs = usePollMs() ?? 2000;
   const { mutate: runBatch, isPending: batchRunning } = useEngineBatch();
   const { watchlist } = useCanonicalWatchlist();
   if (pendingSettingsLoad || isLoading) {
     return <div className="text-mute text-sm">Loading radar...</div>;
   }
-  if (!backendReady) {
+  if (settingsLoadFailed) {
+    return (
+      <SettingsQueryErrorState
+        resourceLabel="live radar"
+        errorDetail={settingsLoadError}
+        onRetry={retrySettingsLoad}
+      />
+    );
+  }
+  if (missingBackendUrl) {
     return (
       <div className="text-mute text-sm">
         Configure a backend URL in Account before loading live radar.

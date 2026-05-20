@@ -2,12 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  useBackendReady,
+  usePollingUiState,
   useSnapshot,
   usePollMs,
   useCanonicalWatchlist,
   clampSymbolToWatchlist,
 } from "@/hooks/useSniperData";
+import { SettingsQueryErrorState } from "@/components/sniper/SettingsQueryErrorState";
 import { useTickFlash } from "@/hooks/useTickFlash";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { fmtPrice, fmtPct } from "@/lib/format";
@@ -72,7 +73,14 @@ export const Route = createFileRoute("/charts")({
 
 function ChartsPage() {
   const { data } = useSnapshot();
-  const backendReady = useBackendReady();
+  const {
+    backendReady,
+    pendingSettingsLoad,
+    missingBackendUrl,
+    settingsLoadFailed,
+    settingsLoadError,
+    retrySettingsLoad,
+  } = usePollingUiState();
   const pollMs = usePollMs();
   const { watchlist } = useCanonicalWatchlist();
   const [selected, setSelected] = useState<Symbol | null>(null);
@@ -131,7 +139,21 @@ function ChartsPage() {
     lastTickFlash.current = tickFlash;
   }, [activeSymbol, isVitestRuntime, price?.state, price?.updatedAt, tickFlash]);
 
-  if (!backendReady) {
+  if (pendingSettingsLoad) {
+    return <div className="text-mute text-sm">Loading chart data...</div>;
+  }
+
+  if (settingsLoadFailed) {
+    return (
+      <SettingsQueryErrorState
+        resourceLabel="chart data"
+        errorDetail={settingsLoadError}
+        onRetry={retrySettingsLoad}
+      />
+    );
+  }
+
+  if (missingBackendUrl) {
     return (
       <div className="text-mute text-sm">
         Configure a backend URL in Account before loading chart data.

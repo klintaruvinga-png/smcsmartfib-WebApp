@@ -102,6 +102,7 @@ describe("usePollingUiState", () => {
           fetchStatus: "fetching",
           isPending: true,
           isLoading: true,
+          refetch: vi.fn(),
         };
       }
 
@@ -110,11 +111,15 @@ describe("usePollingUiState", () => {
 
     const { result } = renderHook(() => usePollingUiState());
 
-    expect(result.current).toEqual({
+    expect(result.current).toMatchObject({
       backendReady: false,
       pendingSettingsLoad: true,
+      missingBackendUrl: false,
+      settingsLoadFailed: false,
+      settingsLoadError: null,
       pollMs: null,
     });
+    expect(result.current.retrySettingsLoad).toEqual(expect.any(Function));
   });
 
   it("marks the backend as unready after settings resolve without a backend URL", () => {
@@ -129,6 +134,7 @@ describe("usePollingUiState", () => {
           fetchStatus: "idle",
           isPending: false,
           isLoading: false,
+          refetch: vi.fn(),
         };
       }
 
@@ -137,11 +143,48 @@ describe("usePollingUiState", () => {
 
     const { result } = renderHook(() => usePollingUiState());
 
-    expect(result.current).toEqual({
+    expect(result.current).toMatchObject({
       backendReady: false,
       pendingSettingsLoad: false,
+      missingBackendUrl: true,
+      settingsLoadFailed: false,
+      settingsLoadError: null,
       pollMs: 5_000,
     });
+    expect(result.current.retrySettingsLoad).toEqual(expect.any(Function));
+  });
+
+  it("surfaces a settings-query failure separately from a missing backend URL", () => {
+    const refetch = vi.fn();
+
+    reactQueryMocks.useQuery.mockImplementation((options: { queryKey: string[] }) => {
+      if (options.queryKey[0] === "user-settings") {
+        return {
+          data: undefined,
+          error: new Error("settings fetch failed"),
+          fetchStatus: "idle",
+          isError: true,
+          isPending: false,
+          isLoading: false,
+          status: "error",
+          refetch,
+        };
+      }
+
+      return { data: undefined };
+    });
+
+    const { result } = renderHook(() => usePollingUiState());
+
+    expect(result.current).toMatchObject({
+      backendReady: false,
+      pendingSettingsLoad: false,
+      missingBackendUrl: false,
+      settingsLoadFailed: true,
+      settingsLoadError: "settings fetch failed",
+      pollMs: null,
+    });
+    expect(result.current.retrySettingsLoad).toBe(refetch);
   });
 });
 
