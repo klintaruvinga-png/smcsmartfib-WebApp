@@ -290,6 +290,34 @@ export interface AccountTelemetry {
   state: FreshnessState;
 }
 
+export type UserProgressState = "LIVE" | "STALE" | "UNAVAILABLE";
+
+export interface UserProgressEquityPulse {
+  equityUSC: number;
+  todayPnlUSC: number;
+  state: UserProgressState;
+}
+
+export interface UserProgressStreak {
+  currentStreakDays: number;
+  lastActiveDate: string | null;
+  state: UserProgressState;
+}
+
+export interface UserProgressMilestones {
+  firstHeartbeat: boolean;
+  firstMarketStream: boolean;
+  firstTradeTelemetry: boolean;
+  state: UserProgressState;
+}
+
+export interface UserProgress {
+  equityPulse: UserProgressEquityPulse;
+  streak: UserProgressStreak;
+  milestones: UserProgressMilestones;
+  generatedAt: string;
+}
+
 export type SoakEvidenceType =
   | "baseline_metadata"
   | "signal_parity_confirm"

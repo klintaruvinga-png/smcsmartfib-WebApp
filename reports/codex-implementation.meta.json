@@ -1,5 +1,5 @@
 {
-  "issue": "SMC Intake - Begin Phase 2 Implementation.",
-  "plan_hash": "71675b24b1d3fa2ec3c6a1abdd2f0ea30883834e5230d3aa9caea146647dc428",
-  "written_at": "2026-05-20T06:13:19.6798983+02:00"
+  "issue": "SMC Intake - Using the Phase 2 Progress page plan attached as a guide, Implement the /user/progress backend contract and wire the progress page data source for equity pulse / streak / milestone panels",
+  "plan_hash": "513cbf6d7df5ca6554a8d34165a6caca905669d8c0d99601fa6a93df915c19d1",
+  "written_at": "2026-05-20T21:24:21.0780900Z"
 }

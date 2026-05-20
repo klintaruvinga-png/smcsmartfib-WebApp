@@ -12,6 +12,7 @@ import type {
   SignalCandidate,
   Symbol,
   TradePlan,
+  UserProgress,
 } from "@/types/sniper";
 
 const now = () => new Date().toISOString();
@@ -388,6 +389,26 @@ export const mockAccount: AccountState = {
   todayPnlUSC: 56.4,
   todayPnlPct: 0.23,
   state: "mock",
+};
+
+export const mockUserProgress: UserProgress = {
+  equityPulse: {
+    equityUSC: mockAccount.equityUSC,
+    todayPnlUSC: mockAccount.todayPnlUSC,
+    state: "LIVE",
+  },
+  streak: {
+    currentStreakDays: 4,
+    lastActiveDate: new Date().toISOString().slice(0, 10),
+    state: "LIVE",
+  },
+  milestones: {
+    firstHeartbeat: true,
+    firstMarketStream: true,
+    firstTradeTelemetry: true,
+    state: "LIVE",
+  },
+  generatedAt: now(),
 };
 
 function xorshift32(seed: number): () => number {

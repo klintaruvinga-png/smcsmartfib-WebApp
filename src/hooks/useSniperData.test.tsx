@@ -12,6 +12,7 @@ const reactQueryMocks = vi.hoisted(() => ({
 const apiMocks = vi.hoisted(() => ({
   getAccountTelemetry: vi.fn(),
   getEngineHealth: vi.fn(),
+  getUserProgress: vi.fn(),
   getUserSettings: vi.fn(),
   normalizeBackendUrl: vi.fn((value?: string) => (typeof value === "string" ? value.trim() : "")),
   postWatchlistAdd: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock("@/lib/api/sniperClient", () => ({
   apiClient: {
     getAccountTelemetry: apiMocks.getAccountTelemetry,
     getEngineHealth: apiMocks.getEngineHealth,
+    getUserProgress: apiMocks.getUserProgress,
     getUserSettings: apiMocks.getUserSettings,
     postWatchlistAdd: apiMocks.postWatchlistAdd,
     postWatchlistRemove: apiMocks.postWatchlistRemove,
@@ -41,6 +43,7 @@ import {
   useAccountTelemetry,
   useEngineHealth,
   usePollingUiState,
+  useUserProgress,
   useWatchlistAdd,
   useWatchlistRemove,
 } from "./useSniperData";
@@ -50,6 +53,7 @@ describe("useEngineHealth", () => {
     reactQueryMocks.useQuery.mockReset();
     apiMocks.getAccountTelemetry.mockReset();
     apiMocks.getEngineHealth.mockReset();
+    apiMocks.getUserProgress.mockReset();
     apiMocks.getUserSettings.mockReset();
     apiMocks.postWatchlistAdd.mockReset();
     apiMocks.postWatchlistRemove.mockReset();
@@ -122,6 +126,44 @@ describe("useAccountTelemetry", () => {
     expect(accountTelemetryOptions).toMatchObject({
       queryKey: ["account-telemetry"],
       enabled: true,
+      refetchInterval: 5_000,
+    });
+  });
+});
+
+describe("useUserProgress", () => {
+  beforeEach(() => {
+    reactQueryMocks.useQuery.mockReset();
+  });
+
+  it("polls /user/progress on the settings cadence without adding cache time", () => {
+    let progressOptions: Record<string, unknown> | undefined;
+
+    reactQueryMocks.useQuery.mockImplementation((options: { queryKey: string[] }) => {
+      if (options.queryKey[0] === "user-settings") {
+        return {
+          data: {
+            backendUrl: "https://backend.example/wp-json",
+            refreshIntervalSec: 5,
+            watchlist: [],
+          },
+        };
+      }
+
+      if (options.queryKey[0] === "user-progress") {
+        progressOptions = options;
+        return { data: undefined };
+      }
+
+      return { data: undefined };
+    });
+
+    renderHook(() => useUserProgress());
+
+    expect(progressOptions).toMatchObject({
+      queryKey: ["user-progress"],
+      enabled: true,
+      staleTime: 0,
       refetchInterval: 5_000,
     });
   });

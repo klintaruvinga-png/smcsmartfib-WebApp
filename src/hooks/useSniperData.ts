@@ -38,10 +38,9 @@ function usePollingQueryState() {
   const pendingSettingsLoad =
     settings === undefined &&
     (settingsQuery.fetchStatus === "fetching" ||
-      settingsQuery.isPending === true ||
-      settingsQuery.isLoading === true);
-  const settingsLoadFailed =
-    settings === undefined && (settingsQuery.isError === true || settingsQuery.status === "error");
+      settingsQuery.isPending ||
+      settingsQuery.isLoading);
+  const settingsLoadFailed = settings === undefined && Boolean(settingsQuery.isError);
   const pollMs = pendingSettingsLoad ? null : resolvePollMs(settings);
   const backendUrl = normalizeBackendUrl(settings?.backendUrl);
   const backendReady = backendUrl.length > 0;
@@ -142,6 +141,18 @@ export function useUserAccount() {
     queryKey: ["user-account"],
     queryFn: () => apiClient.getUserAccount(),
     enabled,
+    refetchInterval: enabled ? pollMs : false,
+  });
+}
+
+export function useUserProgress() {
+  const { backendReady, pollMs } = usePollingQueryState();
+  const enabled = backendReady && pollMs !== null;
+  return useQuery({
+    queryKey: ["user-progress"],
+    queryFn: () => apiClient.getUserProgress(),
+    enabled,
+    staleTime: 0,
     refetchInterval: enabled ? pollMs : false,
   });
 }

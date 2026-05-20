@@ -185,7 +185,7 @@ Market-Stream Auth:
 
 ### Blockers
 - *Final manual staging/browser parity validation recommended before production deploy*
-- *Equity pulse / streak / milestone panels depend on `/user/progress` and are outside the current Phase 2 trade telemetry contract*
+- *`/user/progress` implemented on 2026-05-20; Progress page now reads backend-owned streak and milestone state. Remaining follow-up: approve the backend active-day definition before enabling non-zero streak calculations.*
 
 ---
 
