@@ -1,9 +1,9 @@
 # SMC SuperFIB → MT5 Migration Status Board
 
 **Last Updated**: 2026-05-20  
-**Current Phase**: 1 (MT5 Bridge Infrastructure)  
+**Current Phase**: 2 (Read-Only Trade Telemetry — Planning)  
 **Overall Progress**: 65%  
-**Status**: Phase 0 COMPLETE - Phase 1 COMPLETE (Phase 2 planning in progress)
+**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 planning in progress
 
 > Snapshot: Phase 0 gate passed 2026-05-15. Post-fix validation soak at 16:37 UTC confirmed NAS100 (29,263.70) and US30 (49,756.00) both LIVE during active US equity session; XAUUSD (4,556.34) LIVE with candle-history gate cleared. Backend soak: 259,464 engine runs / 0 errors / 69,262 candles over 24h. Frontend feed-status chip lag (BUG-001 staleTime:0) resolved. Watchlist persistence 100% parity. AUDUSD/ETHUSD chop-gate classified as correct live behavior — not a blocker. Full closeout evidence: `.github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md`.
 
@@ -14,7 +14,7 @@
 | Phase | Objective | Status | % Complete | Blocker | Target End |
 |-------|-----------|--------|-----------|---------|------------|
 | 0 | Stabilize existing platform | **COMPLETE** | 100% | None — gate passed 2026-05-15 | 2026-05-15 ✅ |
-| 1 | MT5 bridge infrastructure | **COMPLETE** | 100% | Phase 1 PASSED; Phase 2 planning/handoff ready | 2026-06-01 |
+| 1 | MT5 bridge infrastructure | **COMPLETE** | 100% | None — gate passed 2026-05-20 | 2026-06-01 ✅ |
 | 2 | Read-only trade telemetry | PLANNING-IN-PROGRESS | 10% | Track A / Track B telemetry contract sign-off pending | 2026-06-15 |
 | 3 | MT5 market data engine | NOT-STARTED | 0% | Phase 2 complete | 2026-07-15 |
 | 4 | Fib engine migration | NOT-STARTED | 0% | Phase 3 complete | 2026-08-15 |
@@ -31,8 +31,8 @@
 
 | Track | Lead | Phase Focus | Status |
 |-------|------|------------|--------|
-| **Track A — MT5 EA** | *TBD* | Phases 1–7 (bridge, telemetry, candle engine, fib, regime, signal, execution) | Phase 1 PASSED — Phase 2 handoff ready |
-| **Track B — Backend** | *TBD* | Phases 1–9 (APIs, freshness, telemetry, licensing) | Phase 1 PASSED — Phase 2 handoff ready |
+| **Track A — MT5 EA** | *TBD* | Phases 1–7 (bridge, telemetry, candle engine, fib, regime, signal, execution) | Phase 1 COMPLETE (2026-05-20) — Phase 2 contract sign-off pending |
+| **Track B — Backend** | *TBD* | Phases 1–9 (APIs, freshness, telemetry, licensing) | Phase 1 COMPLETE (2026-05-20) — Phase 2 contract sign-off pending |
 | **Track C — Dashboard** | *TBD* | Phases 2–9 (visualization, execution console, analytics) | Phase 0 complete — Phase 1 unblocked; deferred until Phase 2 telemetry contract is signed off by Track A and Track B owners |
 
 ---
@@ -96,9 +96,10 @@ Watchlist Authority: [PASS - 100% parity]
 
 **Objective**: Create stable communication between MT5 and backend  
 **Owner**: Track A + Track B  
-**Status**: IN-PROGRESS (Scenario validation passed; 48h continuity window pending)  
+**Status**: COMPLETE  
+**Completed**: 2026-05-20  
 **Prerequisites**: Phase 0 complete ✅  
-**Completion Target**: 2026-06-01
+**Completion Target**: 2026-06-01 ✅
 
 → Detailed roadmap: [PHASE1_BRIDGE_ROADMAP.md](./migration/PHASE1_BRIDGE_ROADMAP.md)  
 → Live tracker: [PHASE1_TRACKER.md](./migration/PHASE1_TRACKER.md)  
@@ -114,11 +115,11 @@ Watchlist Authority: [PASS - 100% parity]
 - [x] `POST /ea/symbol-sync` — syncs all broker symbols (✅ PASS: 27 symbols upserted)
 - [x] `POST /ea/heartbeat` — fires on configured throttle (✅ PASS: confirmed every ~480 sec = 8 min)
 - [x] `POST /ea/market-stream` — existing route operational (✅ PASS: auth working; FX stale during weekend, crypto fresh = expected)
-- [ ] Heartbeat stable for 48h+ (only remaining open Phase 1 gate item)
+- [x] Heartbeat stable for 48h+ (✅ PASS: 48h+ confirmed 2026-05-20 per phase1-bridge-48h-continuity-complete-2026-05-20.md)
 - [x] No dropped sessions observed in executed scenario-validation runs
 - [x] Reconnect works automatically after restart/outage
 
-### Test Checklist (Only 48h continuity window still pending)
+### Test Checklist (All items complete)
 - [x] License-check gate (✅ confirmed working)
 - [x] Account-sync dispatch (✅ confirmed working)
 - [x] Symbol-sync dispatch (✅ confirmed working)
@@ -152,7 +153,7 @@ Market-Stream Auth:
 ### Blockers
 - ~~Phase 0 closeout not complete~~ — **CLEARED 2026-05-15**
 - ~~Live MT5 terminal verification still pending for `/ea/license-check`, `/ea/heartbeat`, `/ea/account-sync`, and `/ea/symbol-sync`~~ — **CLEARED 2026-05-18** (all routes confirmed operational)
-- 48h continuity window pending; scenario validation passed, including bundled VPS/network recovery evidence under shared-hosting constraints
+- ~~48h continuity window pending~~ — **CLEARED 2026-05-20**: 48h+ heartbeat continuity confirmed. Full closeout: `.github/migration/phase-updates/phase1-bridge-48h-continuity-complete-2026-05-20.md`
 
 ---
 
@@ -515,6 +516,6 @@ Confluence Detection: [PENDING]
 
 | Track | Lead | Email | Scope | Status |
 |-------|------|-------|-------|--------|
-| Track A — MT5 EA | *TBD* | *TBD* | Phases 1–7 | Phase 1 active — scenario validation passed; 48h continuity window pending |
-| Track B — Backend | *TBD* | *TBD* | Phases 1–9 | Phase 0 complete — Phase 1 bridge verification passed except for the 48h continuity window |
+| Track A — MT5 EA | *TBD* | *TBD* | Phases 1–7 | Phase 1 COMPLETE (2026-05-20) — Phase 2 telemetry contract sign-off pending |
+| Track B — Backend | *TBD* | *TBD* | Phases 1–9 | Phase 1 COMPLETE (2026-05-20) — Phase 2 planning in progress |
 | Track C — Dashboard | *TBD* | *TBD* | Phases 2–9 | Phase 0 complete — Phase 1 unblocked |

@@ -1,0 +1,106 @@
+{
+  "snapshot_type": "INITIAL",
+  "workflow_id": "stabilize-ea-2026-05-20",
+  "timestamp": "2026-05-20T00:00:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-zsVsp",
+    "commit_hash": "f89d4de9c5217bf8d4f50df571a45fc53c9daa18",
+    "remote": "origin",
+    "uncommitted_changes_count": 0
+  },
+  "repo_structure": {
+    "plugin_root": "wordpress/smc-superfib-sniper",
+    "plugin_files": [
+      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "wordpress/smc-superfib-sniper/class-market-data-service.php"
+    ],
+    "rest_route_files": [
+      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php"
+    ],
+    "frontend_api_client": "src/lib/api/sniperClient.ts",
+    "mt5_ea_files": [
+      "mt5/SMC_MarketDataEA.mq5",
+      "mt5/CandleBuilder.mqh",
+      "mt5/FreshnessEngine.mqh",
+      "mt5/MarketDataEngine.mqh",
+      "mt5/SessionManager.mqh",
+      "mt5/SymbolNormalizer.mqh",
+      "mt5/TickProcessor.mqh"
+    ],
+    "migration_files": [
+      ".github/migration-status.md",
+      ".github/migration/PHASE0_SOAK_TRACKER.md",
+      ".github/migration/PHASE1_BRIDGE_ROADMAP.md",
+      ".github/migration/PHASE1_CHECKLIST.md",
+      ".github/migration/PHASE1_TRACKER.md",
+      ".github/migration/phase-updates/phase1-bridge-48h-continuity-complete-2026-05-20.md"
+    ]
+  },
+  "app_state": {
+    "workflow_state_file_exists": false,
+    "workflow_state": {},
+    "migration_status": {
+      "current_phase": "1 (MT5 Bridge Infrastructure) — COMPLETE; Phase 2 planning in progress",
+      "overall_progress": "65%",
+      "blockers": [
+        "Phase 1 section header in migration-status.md still shows IN-PROGRESS despite Phase Summary table saying COMPLETE — minor doc inconsistency"
+      ]
+    }
+  },
+  "known_dev_status": {
+    "authority_diagnostics_requires_wp_session": true,
+    "ea_market_stream_route_exists": true,
+    "ea_auth_header": "X-EA-API-Key",
+    "ea_auth_secret_env": "SMC_SF_EA_API_KEY",
+    "ea_payload_requires_user_id": true,
+    "migration_phase": "Phase 1 COMPLETE — Phase 2 PLANNING-IN-PROGRESS",
+    "node_modules_installed": false,
+    "npm_lint_status": "SKIPPED — @eslint/js not installed in this environment",
+    "npm_build_status": "SKIPPED — vite not installed in this environment",
+    "php_lint_status": "PASS — both plugin files syntax-clean",
+    "check_mql_status": "PASS"
+  },
+  "rest_routes_confirmed": [
+    "GET  /sniper/v1/health             — public",
+    "GET  /sniper/v1/admin/health       — permission_admin (manage_options)",
+    "GET  /sniper/v1/admin/soak-report  — permission_admin",
+    "POST /sniper/v1/admin/soak-evidence — permission_admin",
+    "POST /sniper/v1/admin/soak-checkpoint — permission_admin",
+    "GET  /sniper/v1/session            — public",
+    "GET  /sniper/v1/snapshot           — permission_user (WP session)",
+    "POST /sniper/v1/snapshot           — permission_user",
+    "GET  /sniper/v1/charts             — permission_user",
+    "GET  /sniper/v1/regimes            — permission_user",
+    "POST /sniper/v1/regime             — permission_user",
+    "GET  /sniper/v1/live-signals       — permission_user",
+    "POST /sniper/v1/signal             — permission_user",
+    "GET  /sniper/v1/ladders            — permission_user",
+    "POST /sniper/v1/user/engine-batch  — permission_user",
+    "POST /sniper/v1/user/market-data   — permission_user",
+    "GET  /sniper/v1/user/trades        — permission_user",
+    "POST /sniper/v1/user/trades        — permission_user",
+    "GET  /sniper/v1/user/account       — permission_user",
+    "POST /sniper/v1/user/account       — permission_user",
+    "GET  /sniper/v1/user/settings      — permission_user",
+    "POST /sniper/v1/user/settings      — permission_user",
+    "GET  /sniper/v1/user/risk-profile  — permission_user",
+    "POST /sniper/v1/user/risk-profile  — permission_user",
+    "GET  /sniper/v1/user/trade-queue   — permission_user",
+    "POST /sniper/v1/user/trade-queue   — permission_user",
+    "POST /sniper/v1/user/execute-signals — permission_user",
+    "POST /sniper/v1/user/twelve-data-key — permission_user",
+    "DELETE /sniper/v1/user/twelve-data-key — permission_user",
+    "GET  /sniper/v1/user/watchlist     — permission_user",
+    "POST /sniper/v1/user/watchlist     — permission_user",
+    "POST /sniper/v1/user/watchlist/add — permission_user",
+    "POST /sniper/v1/user/watchlist/remove — permission_user",
+    "GET  /sniper/v1/instruments        — permission_user",
+    "GET  /sniper/v1/market-data-authority — permission_user",
+    "GET  /sniper/v1/authority-diagnostics — permission_user (WP session, 401 for unauth — expected)",
+    "POST /sniper/v1/ea/market-stream   — permission_ea_market_stream (X-EA-API-Key shared secret)",
+    "POST /sniper/v1/ea/heartbeat       — permission_ea_bridge",
+    "POST /sniper/v1/ea/account-sync    — permission_ea_bridge",
+    "POST /sniper/v1/ea/symbol-sync     — permission_ea_bridge",
+    "GET  /sniper/v1/ea/license-check   — permission_ea_bridge"
+  ]
+}
