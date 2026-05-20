@@ -273,6 +273,23 @@ export interface AccountState {
   state: FreshnessState;
 }
 
+export interface AccountTelemetry {
+  accountId: string;
+  terminalId: string;
+  balance: number;
+  equity: number;
+  margin: number;
+  freeMargin: number;
+  marginLevel: number;
+  floatingPl: number;
+  currency: string;
+  leverage: number;
+  eaVersion: string;
+  lastSeenAt: string | null;
+  updatedAt: string | null;
+  state: FreshnessState;
+}
+
 export type SoakEvidenceType =
   | "baseline_metadata"
   | "signal_parity_confirm"

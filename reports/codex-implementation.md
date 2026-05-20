@@ -1,41 +1,58 @@
-# Codex Implementation Summary
-
 ## Issue summary
 
-Started the Phase 2 implementation effort by converting the migration docs into a consistent planning/readiness package, closing the Phase 1 handoff note, and documenting the canonical Phase 2 read-only telemetry contract without changing runtime code.
+Implemented Phase 2 MT5 trade telemetry on the existing EA market-stream path: backend persistence for account metrics, open positions, and pending orders; new read-only GET endpoints; MT5 payload emission; and dashboard consumption of backend-owned telemetry.
 
 ## Root cause implemented
 
-The repo had a governance truth mismatch: `.github/migration-status.md` still showed Phase 2 as not started while `PHASE2_IMPLEMENTATION.md` claimed the phase was already complete. I corrected the docs to reflect planning-in-progress status, added concrete Phase 2 acceptance criteria, and preserved the existing backend-authority boundary by keeping the existing `POST /ea/market-stream` route as the documented write path.
+Phase 2 trade telemetry was missing across the full authority chain. The EA market-stream payload carried only Phase 1 quote/candle data, the backend had no authoritative trade/account telemetry tables or sweep logic, and the dashboard trade/account panels were still reading `/user/trades` and `/user/account` instead of backend-owned Phase 2 read endpoints.
 
 ## Exact files changed
 
-- `.github/migration/PHASE1_TRACKER.md`
-- `.github/migration-status.md`
-- `PHASE2_IMPLEMENTATION.md`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-20_phase-2-planning-contract.md`
-- `.github/migration/audits/phase-2-engine-parity-2026-05-20.md`
-- `reports/codex-implementation.md`
-- `reports/codex-implementation.meta.json`
+- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php`
+- `mt5/MarketDataEngine.mqh`
+- `src/lib/api/sniperClient.ts`
+- `src/lib/api/sniperClient.test.ts`
+- `src/hooks/useSniperData.ts`
+- `src/hooks/useSniperData.test.tsx`
+- `src/types/sniper.ts`
+- `src/components/sniper/WalletOverview.tsx`
+- `src/components/sniper/WalletOverview.test.tsx`
+- `src/routes/book.tsx`
+- `src/routes/orders.tsx`
+- `src/routes/analytics.tsx`
+- `src/routes/-book.page.test.tsx`
+- `src/routes/-orders.page.test.tsx`
+- `src/routes/-analytics.page.test.tsx`
 
 ## Tests run
 
+- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+- `php -l wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php`
 - `php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php`
+- `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx src/components/sniper/WalletOverview.test.tsx src/routes/-book.page.test.tsx src/routes/-orders.page.test.tsx src/routes/-analytics.page.test.tsx`
+- `npm run check:mql`
+- `npm run build`
 - `node scripts/validate-implementation.mjs`
 
 ## Reports generated
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-20_phase-2-planning-contract.md`
-- `.github/migration/audits/phase-2-engine-parity-2026-05-20.md`
 - `reports/codex-implementation.md`
+- `reports/codex-implementation.meta.json`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-20_smc-intake-phase-2.md`
+- `reports/phase2-track-a-signoff.md`
+- `reports/phase2-track-b-signoff.md`
+- `reports/phase2-track-c-signoff.md`
+- `reports/phase2-implementation-closeout.md`
 
 ## Remaining risks
 
-- The new Phase 2 payload and persistence contract is a planning artifact only; Track A and Track B still need to confirm the future EA field set before source-code implementation begins.
-- `PHASE2_IMPLEMENTATION.md` previously contained stale "complete" framing, so any external references to that older status may still exist outside the files updated in this patch.
-- No runtime code changed here, so backend/dashboard parity for live trade telemetry remains a pre-implementation gate rather than a verified result of this patch.
+- The MT5 payload extension is logically aligned to the contract, but real MT5 compilation/runtime verification is still pending.
+- Sweep logic is locally validated but still requires the contract-mandated human review before production merge/deploy.
+- Manual staging/browser verification remains recommended for final dashboard parity confirmation.
+- The backend schema gate required one ambiguity resolution: Phase 1-only market-stream payloads remain accepted, while Phase 2 telemetry payloads missing `schema_version` are rejected.
 
 ## Any contract ambiguities resolved during implementation
 
-- `PHASE2_IMPLEMENTATION.md` conflicted with the issue and migration board by presenting Phase 2 as already complete. I resolved that by re-basing the file as the canonical planning contract while retaining the historical repository-surface notes as context.
-- The user contract required `reports/codex-implementation.md`, but the repo validator also requires `reports/codex-implementation.meta.json`. I added the meta file so the enforced validation path passes without widening runtime scope.
+- The contract conflicted on `schema_version` handling: one section required rejection when `schema_version` is absent, while another required Phase 1-only payloads without `schema_version` to keep returning 200. Smallest safe interpretation applied: strict rejection only for Phase 2 telemetry payloads missing `schema_version`; strict backward compatibility preserved for Phase 1-only payloads.

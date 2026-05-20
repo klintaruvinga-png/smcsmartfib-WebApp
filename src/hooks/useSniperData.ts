@@ -146,6 +146,17 @@ export function useUserAccount() {
   });
 }
 
+export function useAccountTelemetry() {
+  const { backendReady, pollMs } = usePollingQueryState();
+  const enabled = backendReady && pollMs !== null;
+  return useQuery({
+    queryKey: ["account-telemetry"],
+    queryFn: () => apiClient.getAccountTelemetry(),
+    enabled,
+    refetchInterval: enabled ? pollMs : false,
+  });
+}
+
 export function useUserSettings() {
   return useQuery({
     queryKey: ["user-settings"],

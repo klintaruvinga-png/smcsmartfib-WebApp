@@ -282,6 +282,89 @@ final class SMC_SuperFib_Sniper_REST {
             KEY normalized_symbol (normalized_symbol)
         ) $charset;";
 
+        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_trade_positions (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            deterministic_key VARCHAR(191) NOT NULL,
+            user_id BIGINT UNSIGNED NOT NULL,
+            account_id VARCHAR(64) NOT NULL DEFAULT '',
+            terminal_id VARCHAR(96) NOT NULL DEFAULT '',
+            position_id VARCHAR(64) NOT NULL DEFAULT '',
+            symbol VARCHAR(96) NOT NULL DEFAULT '',
+            normalized_symbol VARCHAR(64) NOT NULL DEFAULT '',
+            direction VARCHAR(32) NOT NULL DEFAULT '',
+            entry_price DECIMAL(20,8) NOT NULL DEFAULT 0,
+            current_price DECIMAL(20,8) NOT NULL DEFAULT 0,
+            sl DECIMAL(20,8) NOT NULL DEFAULT 0,
+            tp DECIMAL(20,8) NOT NULL DEFAULT 0,
+            volume DECIMAL(20,8) NOT NULL DEFAULT 0,
+            profit DECIMAL(20,8) NOT NULL DEFAULT 0,
+            swap DECIMAL(20,8) NOT NULL DEFAULT 0,
+            commission DECIMAL(20,8) NOT NULL DEFAULT 0,
+            magic BIGINT NOT NULL DEFAULT 0,
+            comment TEXT NULL,
+            opened_at DATETIME NULL,
+            state VARCHAR(32) NOT NULL DEFAULT 'open',
+            ea_version VARCHAR(64) NOT NULL DEFAULT '',
+            last_seen_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            raw_json LONGTEXT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY deterministic_key (deterministic_key),
+            KEY user_state (user_id, state),
+            KEY user_account_terminal (user_id, account_id, terminal_id)
+        ) $charset;";
+
+        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_trade_orders (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            deterministic_key VARCHAR(191) NOT NULL,
+            user_id BIGINT UNSIGNED NOT NULL,
+            account_id VARCHAR(64) NOT NULL DEFAULT '',
+            terminal_id VARCHAR(96) NOT NULL DEFAULT '',
+            order_id VARCHAR(64) NOT NULL DEFAULT '',
+            symbol VARCHAR(96) NOT NULL DEFAULT '',
+            normalized_symbol VARCHAR(64) NOT NULL DEFAULT '',
+            order_type VARCHAR(32) NOT NULL DEFAULT '',
+            direction VARCHAR(32) NOT NULL DEFAULT '',
+            entry_price DECIMAL(20,8) NOT NULL DEFAULT 0,
+            sl DECIMAL(20,8) NOT NULL DEFAULT 0,
+            tp DECIMAL(20,8) NOT NULL DEFAULT 0,
+            volume DECIMAL(20,8) NOT NULL DEFAULT 0,
+            magic BIGINT NOT NULL DEFAULT 0,
+            comment TEXT NULL,
+            placed_at DATETIME NULL,
+            state VARCHAR(32) NOT NULL DEFAULT 'active',
+            ea_version VARCHAR(64) NOT NULL DEFAULT '',
+            last_seen_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            raw_json LONGTEXT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY deterministic_key (deterministic_key),
+            KEY user_state (user_id, state),
+            KEY user_account_terminal (user_id, account_id, terminal_id)
+        ) $charset;";
+
+        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_account_telemetry (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT UNSIGNED NOT NULL,
+            account_id VARCHAR(64) NOT NULL DEFAULT '',
+            terminal_id VARCHAR(96) NOT NULL DEFAULT '',
+            balance DECIMAL(20,8) NOT NULL DEFAULT 0,
+            equity DECIMAL(20,8) NOT NULL DEFAULT 0,
+            margin DECIMAL(20,8) NOT NULL DEFAULT 0,
+            free_margin DECIMAL(20,8) NOT NULL DEFAULT 0,
+            margin_level DECIMAL(20,8) NOT NULL DEFAULT 0,
+            floating_pl DECIMAL(20,8) NOT NULL DEFAULT 0,
+            currency VARCHAR(32) NOT NULL DEFAULT '',
+            leverage BIGINT NOT NULL DEFAULT 0,
+            ea_version VARCHAR(64) NOT NULL DEFAULT '',
+            last_seen_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            raw_json LONGTEXT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY user_account_terminal (user_id, account_id, terminal_id),
+            KEY user_last_seen (user_id, last_seen_at)
+        ) $charset;";
+
         $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_trades (
             id VARCHAR(64) NOT NULL,
             user_id BIGINT UNSIGNED NOT NULL,
@@ -307,6 +390,7 @@ final class SMC_SuperFib_Sniper_REST {
             dbDelta($sql);
         }
 
+        self::ensure_trade_telemetry_tables();
         self::ensure_soak_tables();
     }
 
@@ -358,6 +442,117 @@ final class SMC_SuperFib_Sniper_REST {
             UNIQUE KEY user_account_terminal_symbol (user_id, account_id, terminal_id, broker_symbol),
             KEY user_account_terminal (user_id, account_id, terminal_id),
             KEY normalized_symbol (normalized_symbol)
+        ) $charset;";
+
+        foreach ($tables as $sql) {
+            dbDelta($sql);
+            if (is_object($wpdb) && property_exists($wpdb, 'last_error') && $wpdb->last_error !== '') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function ensure_trade_telemetry_tables() {
+        global $wpdb;
+
+        if (file_exists(ABSPATH . 'wp-admin/includes/upgrade.php')) {
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        }
+
+        if (!function_exists('dbDelta')) {
+            return false;
+        }
+
+        if (is_object($wpdb) && property_exists($wpdb, 'last_error')) {
+            $wpdb->last_error = '';
+        }
+
+        $charset = $wpdb->get_charset_collate();
+        $tables = array();
+
+        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_trade_positions (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            deterministic_key VARCHAR(191) NOT NULL,
+            user_id BIGINT UNSIGNED NOT NULL,
+            account_id VARCHAR(64) NOT NULL DEFAULT '',
+            terminal_id VARCHAR(96) NOT NULL DEFAULT '',
+            position_id VARCHAR(64) NOT NULL DEFAULT '',
+            symbol VARCHAR(96) NOT NULL DEFAULT '',
+            normalized_symbol VARCHAR(64) NOT NULL DEFAULT '',
+            direction VARCHAR(32) NOT NULL DEFAULT '',
+            entry_price DECIMAL(20,8) NOT NULL DEFAULT 0,
+            current_price DECIMAL(20,8) NOT NULL DEFAULT 0,
+            sl DECIMAL(20,8) NOT NULL DEFAULT 0,
+            tp DECIMAL(20,8) NOT NULL DEFAULT 0,
+            volume DECIMAL(20,8) NOT NULL DEFAULT 0,
+            profit DECIMAL(20,8) NOT NULL DEFAULT 0,
+            swap DECIMAL(20,8) NOT NULL DEFAULT 0,
+            commission DECIMAL(20,8) NOT NULL DEFAULT 0,
+            magic BIGINT NOT NULL DEFAULT 0,
+            comment TEXT NULL,
+            opened_at DATETIME NULL,
+            state VARCHAR(32) NOT NULL DEFAULT 'open',
+            ea_version VARCHAR(64) NOT NULL DEFAULT '',
+            last_seen_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            raw_json LONGTEXT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY deterministic_key (deterministic_key),
+            KEY user_state (user_id, state),
+            KEY user_account_terminal (user_id, account_id, terminal_id)
+        ) $charset;";
+
+        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_trade_orders (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            deterministic_key VARCHAR(191) NOT NULL,
+            user_id BIGINT UNSIGNED NOT NULL,
+            account_id VARCHAR(64) NOT NULL DEFAULT '',
+            terminal_id VARCHAR(96) NOT NULL DEFAULT '',
+            order_id VARCHAR(64) NOT NULL DEFAULT '',
+            symbol VARCHAR(96) NOT NULL DEFAULT '',
+            normalized_symbol VARCHAR(64) NOT NULL DEFAULT '',
+            order_type VARCHAR(32) NOT NULL DEFAULT '',
+            direction VARCHAR(32) NOT NULL DEFAULT '',
+            entry_price DECIMAL(20,8) NOT NULL DEFAULT 0,
+            sl DECIMAL(20,8) NOT NULL DEFAULT 0,
+            tp DECIMAL(20,8) NOT NULL DEFAULT 0,
+            volume DECIMAL(20,8) NOT NULL DEFAULT 0,
+            magic BIGINT NOT NULL DEFAULT 0,
+            comment TEXT NULL,
+            placed_at DATETIME NULL,
+            state VARCHAR(32) NOT NULL DEFAULT 'active',
+            ea_version VARCHAR(64) NOT NULL DEFAULT '',
+            last_seen_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            raw_json LONGTEXT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY deterministic_key (deterministic_key),
+            KEY user_state (user_id, state),
+            KEY user_account_terminal (user_id, account_id, terminal_id)
+        ) $charset;";
+
+        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_account_telemetry (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT UNSIGNED NOT NULL,
+            account_id VARCHAR(64) NOT NULL DEFAULT '',
+            terminal_id VARCHAR(96) NOT NULL DEFAULT '',
+            balance DECIMAL(20,8) NOT NULL DEFAULT 0,
+            equity DECIMAL(20,8) NOT NULL DEFAULT 0,
+            margin DECIMAL(20,8) NOT NULL DEFAULT 0,
+            free_margin DECIMAL(20,8) NOT NULL DEFAULT 0,
+            margin_level DECIMAL(20,8) NOT NULL DEFAULT 0,
+            floating_pl DECIMAL(20,8) NOT NULL DEFAULT 0,
+            currency VARCHAR(32) NOT NULL DEFAULT '',
+            leverage BIGINT NOT NULL DEFAULT 0,
+            ea_version VARCHAR(64) NOT NULL DEFAULT '',
+            last_seen_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            raw_json LONGTEXT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY user_account_terminal (user_id, account_id, terminal_id),
+            KEY user_last_seen (user_id, last_seen_at)
         ) $charset;";
 
         foreach ($tables as $sql) {
@@ -472,6 +667,9 @@ final class SMC_SuperFib_Sniper_REST {
         $this->route('/user/watchlist/add', WP_REST_Server::CREATABLE, 'post_watchlist_add', true);
         $this->route('/user/watchlist/remove', WP_REST_Server::CREATABLE, 'post_watchlist_remove', true);
         $this->route('/instruments', WP_REST_Server::READABLE, 'get_instruments', true);
+        $this->route('/account-telemetry', WP_REST_Server::READABLE, 'get_account_telemetry', true);
+        $this->route('/positions', WP_REST_Server::READABLE, 'get_positions', true);
+        $this->route('/orders', WP_REST_Server::READABLE, 'get_orders', true);
         $this->route('/market-data-authority', WP_REST_Server::READABLE, 'get_market_data_authority', true);
         $this->route('/authority-diagnostics', WP_REST_Server::READABLE, 'get_authority_diagnostics', true);
 
@@ -1842,6 +2040,24 @@ final class SMC_SuperFib_Sniper_REST {
             return new WP_Error('smc_sf_user_invalid', 'user_id must reference a valid readable user.', array('status' => 403));
         }
 
+        $phase2_trade_payload = $this->has_phase2_trade_telemetry_payload($payload);
+        $schema_version = $this->sanitize_ea_text($payload['schema_version'] ?? '', 64);
+        // Ambiguity resolved: preserve Phase 1 compatibility when the payload is strictly
+        // Phase 1-only, but reject Phase 2 telemetry batches that omit schema_version.
+        if ($phase2_trade_payload && $schema_version === '') {
+            $this->audit($user_id, 'ea.trade_telemetry.rejected', array(
+                'reason' => 'missing_schema_version',
+                'symbol' => $payload['symbol'] ?? null,
+                'account_id' => $payload['account_id'] ?? null,
+                'terminal_id' => $payload['terminal_id'] ?? null,
+            ));
+            return new WP_Error(
+                'smc_sf_trade_telemetry_schema_required',
+                'schema_version is required for Phase 2 trade telemetry payloads.',
+                array('status' => 400)
+            );
+        }
+
         // Regression guard: Validate payload structure
         if (!$payload || !isset($payload['symbol'])) {
             $this->audit($user_id, 'ea.market_stream.invalid_payload', array('reason' => 'missing_symbol', 'payload' => $payload));
@@ -2070,6 +2286,21 @@ final class SMC_SuperFib_Sniper_REST {
             $this->insert_engine_heartbeat($user_id, array('source' => 'ea_push', 'symbol' => $symbol));
         }
 
+        $trade_telemetry_counts = array(
+            'account_telemetry_upserted' => 0,
+            'positions_upserted' => 0,
+            'orders_upserted' => 0,
+            'positions_swept' => 0,
+            'orders_swept' => 0,
+        );
+        if ($schema_version !== '') {
+            $telemetry_result = $this->persist_phase2_trade_telemetry($request, $payload, $user_id);
+            if (is_wp_error($telemetry_result)) {
+                return $telemetry_result;
+            }
+            $trade_telemetry_counts = array_merge($trade_telemetry_counts, $telemetry_result);
+        }
+
         // Audit successful ingestion
         $this->audit($user_id, 'ea.market_stream.ingested', array(
             'symbol' => $symbol,
@@ -2077,7 +2308,9 @@ final class SMC_SuperFib_Sniper_REST {
             'candles_inserted' => $inserted_candles,
             'timestamp' => $timestamp_raw,  // resolved from quote_time|timestamp
             'freshness' => $payload['freshness'] ?? null,
-            'session' => $payload['session'] ?? null
+            'session' => $payload['session'] ?? null,
+            'schema_version' => $schema_version !== '' ? $schema_version : null,
+            'trade_telemetry' => $trade_telemetry_counts,
         ));
 
         return rest_ensure_response(array(
@@ -2085,6 +2318,11 @@ final class SMC_SuperFib_Sniper_REST {
             'symbol' => $symbol,
             'snapshots_inserted' => $inserted_snapshots,
             'candles_inserted' => $inserted_candles,
+            'account_telemetry_upserted' => $trade_telemetry_counts['account_telemetry_upserted'],
+            'positions_upserted' => $trade_telemetry_counts['positions_upserted'],
+            'orders_upserted' => $trade_telemetry_counts['orders_upserted'],
+            'positions_swept' => $trade_telemetry_counts['positions_swept'],
+            'orders_swept' => $trade_telemetry_counts['orders_swept'],
             'server_time' => gmdate('c')
         ));
     }
@@ -2746,6 +2984,18 @@ final class SMC_SuperFib_Sniper_REST {
             'positions' => $this->read_trade_payloads($user_id, 'position'),
             'orders' => $this->read_pending_orders($user_id),
         ));
+    }
+
+    public function get_account_telemetry() {
+        return rest_ensure_response($this->read_account_telemetry(get_current_user_id()));
+    }
+
+    public function get_positions() {
+        return rest_ensure_response($this->read_trade_positions(get_current_user_id()));
+    }
+
+    public function get_orders() {
+        return rest_ensure_response($this->read_trade_orders(get_current_user_id()));
     }
 
     // Audit-only stub — does not process payload; trade state is sourced from MT4/MT5 bridge.
@@ -3962,6 +4212,594 @@ final class SMC_SuperFib_Sniper_REST {
             $payload = json_decode($row['payload'], true);
             return is_array($payload) ? $payload : null;
         }, $rows)));
+    }
+
+    private function has_phase2_trade_telemetry_payload(array $payload): bool {
+        return array_key_exists('schema_version', $payload)
+            || array_key_exists('positions', $payload)
+            || array_key_exists('pending_orders', $payload)
+            || array_key_exists('account_metrics', $payload)
+            || array_key_exists('account_id', $payload)
+            || array_key_exists('terminal_id', $payload);
+    }
+
+    private function persist_phase2_trade_telemetry(WP_REST_Request $request, array $payload, int $user_id) {
+        global $wpdb;
+
+        if (!self::ensure_trade_telemetry_tables()) {
+            $detail = $this->wpdb_last_error();
+            $this->audit($user_id, 'ea.trade_telemetry.rejected', array(
+                'reason' => 'table_init_failed',
+                'detail' => $detail !== null ? $detail : 'dbDelta unavailable',
+            ));
+            return new WP_Error(
+                'smc_sf_trade_telemetry_table_init_failed',
+                'Could not initialize Phase 2 trade telemetry storage.',
+                array('status' => 500)
+            );
+        }
+
+        $schema_version = $this->sanitize_ea_text($payload['schema_version'] ?? '', 64);
+        if ($schema_version === '') {
+            $this->audit($user_id, 'ea.trade_telemetry.rejected', array('reason' => 'missing_schema_version'));
+            return new WP_Error(
+                'smc_sf_trade_telemetry_schema_required',
+                'schema_version is required for Phase 2 trade telemetry payloads.',
+                array('status' => 400)
+            );
+        }
+
+        if (!isset($payload['positions']) || !is_array($payload['positions'])) {
+            $this->audit($user_id, 'ea.trade_telemetry.rejected', array('reason' => 'positions_missing_or_invalid'));
+            return new WP_Error('smc_sf_trade_telemetry_positions_required', 'positions[] is required.', array('status' => 400));
+        }
+        if (!isset($payload['pending_orders']) || !is_array($payload['pending_orders'])) {
+            $this->audit($user_id, 'ea.trade_telemetry.rejected', array('reason' => 'pending_orders_missing_or_invalid'));
+            return new WP_Error('smc_sf_trade_telemetry_orders_required', 'pending_orders[] is required.', array('status' => 400));
+        }
+        if (!isset($payload['account_metrics']) || !is_array($payload['account_metrics'])) {
+            $this->audit($user_id, 'ea.trade_telemetry.rejected', array('reason' => 'account_metrics_missing_or_invalid'));
+            return new WP_Error('smc_sf_trade_telemetry_account_required', 'account_metrics is required.', array('status' => 400));
+        }
+
+        $account_id = $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'account_id', ''), 64);
+        $terminal_id = $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'terminal_id', ''), 96);
+        if ($account_id === '' || $terminal_id === '') {
+            $this->audit($user_id, 'ea.trade_telemetry.rejected', array(
+                'reason' => 'missing_account_identity',
+                'account_id' => $account_id,
+                'terminal_id' => $terminal_id,
+            ));
+            return new WP_Error(
+                'smc_sf_trade_telemetry_identity_required',
+                'account_id and terminal_id are required for Phase 2 trade telemetry.',
+                array('status' => 400)
+            );
+        }
+
+        $ea_version = $this->sanitize_ea_text($this->ea_request_value($request, $payload, 'ea_version', ''), 64);
+        $seen_at = $this->normalize_market_timestamp(
+            $this->ea_request_value($request, $payload, 'timestamp', gmdate('c')),
+            $this->now_mysql()
+        );
+        $updated_at = $this->now_mysql();
+
+        $account_metrics = $this->build_account_telemetry_record(
+            $user_id,
+            $account_id,
+            $terminal_id,
+            $payload['account_metrics'],
+            $ea_version,
+            $seen_at,
+            $updated_at
+        );
+        if (is_wp_error($account_metrics)) {
+            return $account_metrics;
+        }
+
+        $positions = array();
+        foreach ($payload['positions'] as $index => $position_payload) {
+            if (!is_array($position_payload)) {
+                $this->audit($user_id, 'ea.trade_telemetry.rejected', array(
+                    'reason' => 'position_not_object',
+                    'index' => $index,
+                ));
+                return new WP_Error('smc_sf_trade_telemetry_position_invalid', 'Each positions[] entry must be an object.', array('status' => 400));
+            }
+            $record = $this->build_trade_position_record(
+                $user_id,
+                $account_id,
+                $terminal_id,
+                $position_payload,
+                $ea_version,
+                $seen_at,
+                $updated_at
+            );
+            if (is_wp_error($record)) {
+                return $record;
+            }
+            $positions[] = $record;
+        }
+
+        $orders = array();
+        foreach ($payload['pending_orders'] as $index => $order_payload) {
+            if (!is_array($order_payload)) {
+                $this->audit($user_id, 'ea.trade_telemetry.rejected', array(
+                    'reason' => 'order_not_object',
+                    'index' => $index,
+                ));
+                return new WP_Error('smc_sf_trade_telemetry_order_invalid', 'Each pending_orders[] entry must be an object.', array('status' => 400));
+            }
+            $record = $this->build_trade_order_record(
+                $user_id,
+                $account_id,
+                $terminal_id,
+                $order_payload,
+                $ea_version,
+                $seen_at,
+                $updated_at
+            );
+            if (is_wp_error($record)) {
+                return $record;
+            }
+            $orders[] = $record;
+        }
+
+        $account_saved = $wpdb->replace(
+            $this->table('account_telemetry'),
+            $account_metrics,
+            array('%d', '%s', '%s', '%f', '%f', '%f', '%f', '%f', '%f', '%s', '%d', '%s', '%s', '%s', '%s')
+        );
+        if ($account_saved === false) {
+            return new WP_Error('smc_sf_trade_telemetry_account_write_failed', 'Could not persist account telemetry.', array('status' => 500));
+        }
+
+        $positions_upserted = 0;
+        foreach ($positions as $record) {
+            $saved = $wpdb->replace(
+                $this->table('trade_positions'),
+                $record,
+                array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
+            );
+            if ($saved === false) {
+                return new WP_Error('smc_sf_trade_telemetry_position_write_failed', 'Could not persist trade positions.', array('status' => 500));
+            }
+            $positions_upserted++;
+        }
+
+        $orders_upserted = 0;
+        foreach ($orders as $record) {
+            $saved = $wpdb->replace(
+                $this->table('trade_orders'),
+                $record,
+                array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
+            );
+            if ($saved === false) {
+                return new WP_Error('smc_sf_trade_telemetry_order_write_failed', 'Could not persist trade orders.', array('status' => 500));
+            }
+            $orders_upserted++;
+        }
+
+        $positions_swept = $this->sweep_absent_trade_rows(
+            'trade_positions',
+            'position_id',
+            'open',
+            'closed',
+            $user_id,
+            $account_id,
+            $terminal_id,
+            array_map(function ($record) {
+                return $record['position_id'];
+            }, $positions),
+            'ea.trade_telemetry.position_swept'
+        );
+        $orders_swept = $this->sweep_absent_trade_rows(
+            'trade_orders',
+            'order_id',
+            'active',
+            'inactive',
+            $user_id,
+            $account_id,
+            $terminal_id,
+            array_map(function ($record) {
+                return $record['order_id'];
+            }, $orders),
+            'ea.trade_telemetry.order_swept'
+        );
+
+        $this->audit($user_id, 'ea.trade_telemetry.batch_seen', array(
+            'schema_version' => $schema_version,
+            'account_id' => $account_id,
+            'terminal_id' => $terminal_id,
+            'positions_received' => count($positions),
+            'pending_orders_received' => count($orders),
+            'last_seen_at' => $this->to_iso($seen_at),
+        ));
+
+        return array(
+            'account_telemetry_upserted' => 1,
+            'positions_upserted' => $positions_upserted,
+            'orders_upserted' => $orders_upserted,
+            'positions_swept' => $positions_swept,
+            'orders_swept' => $orders_swept,
+        );
+    }
+
+    private function build_account_telemetry_record(
+        int $user_id,
+        string $account_id,
+        string $terminal_id,
+        array $metrics,
+        string $ea_version,
+        string $seen_at,
+        string $updated_at
+    ) {
+        foreach (array('balance', 'equity', 'margin', 'free_margin', 'floating_pl') as $required_key) {
+            if (!array_key_exists($required_key, $metrics)) {
+                $this->audit($user_id, 'ea.trade_telemetry.rejected', array(
+                    'reason' => 'account_metrics_missing_field',
+                    'field' => $required_key,
+                ));
+                return new WP_Error(
+                    'smc_sf_trade_telemetry_account_invalid',
+                    'account_metrics is missing required field ' . $required_key . '.',
+                    array('status' => 400)
+                );
+            }
+        }
+
+        return array(
+            'user_id' => $user_id,
+            'account_id' => $account_id,
+            'terminal_id' => $terminal_id,
+            'balance' => $this->sanitize_ea_number($metrics['balance']),
+            'equity' => $this->sanitize_ea_number($metrics['equity']),
+            'margin' => $this->sanitize_ea_number($metrics['margin']),
+            'free_margin' => $this->sanitize_ea_number($metrics['free_margin']),
+            'margin_level' => $this->sanitize_ea_number($metrics['margin_level'] ?? 0),
+            'floating_pl' => $this->sanitize_ea_number($metrics['floating_pl']),
+            'currency' => $this->sanitize_ea_text($metrics['currency'] ?? '', 32),
+            'leverage' => $this->sanitize_ea_int($metrics['leverage'] ?? 0),
+            'ea_version' => $ea_version,
+            'last_seen_at' => $seen_at,
+            'updated_at' => $updated_at,
+            'raw_json' => wp_json_encode($metrics),
+        );
+    }
+
+    private function build_trade_position_record(
+        int $user_id,
+        string $account_id,
+        string $terminal_id,
+        array $position,
+        string $ea_version,
+        string $seen_at,
+        string $updated_at
+    ) {
+        foreach (array('position_id', 'symbol', 'direction', 'entry_price', 'sl', 'tp', 'volume', 'opened_at', 'state') as $required_key) {
+            if (!array_key_exists($required_key, $position)) {
+                $this->audit($user_id, 'ea.trade_telemetry.rejected', array(
+                    'reason' => 'position_missing_field',
+                    'field' => $required_key,
+                    'position' => $position,
+                ));
+                return new WP_Error(
+                    'smc_sf_trade_telemetry_position_invalid',
+                    'positions[] is missing required field ' . $required_key . '.',
+                    array('status' => 400)
+                );
+            }
+        }
+
+        $symbol = $this->sanitize_ea_text($position['symbol'], 96);
+        $normalized_symbol = $this->sanitize_ea_text($position['normalized_symbol'] ?? $this->map_symbol_aliases($symbol), 64);
+        $position_id = $this->sanitize_ea_text($position['position_id'], 64);
+
+        return array(
+            'deterministic_key' => sprintf('position:%d:%s:%s:%s', $user_id, $account_id, $terminal_id, $position_id),
+            'user_id' => $user_id,
+            'account_id' => $account_id,
+            'terminal_id' => $terminal_id,
+            'position_id' => $position_id,
+            'symbol' => $symbol,
+            'normalized_symbol' => $normalized_symbol,
+            'direction' => $this->sanitize_ea_text($position['direction'], 32),
+            'entry_price' => $this->sanitize_ea_number($position['entry_price']),
+            'current_price' => $this->sanitize_ea_number($position['current_price'] ?? 0),
+            'sl' => $this->sanitize_ea_number($position['sl']),
+            'tp' => $this->sanitize_ea_number($position['tp']),
+            'volume' => $this->sanitize_ea_number($position['volume']),
+            'profit' => $this->sanitize_ea_number($position['profit'] ?? 0),
+            'swap' => $this->sanitize_ea_number($position['swap'] ?? 0),
+            'commission' => $this->sanitize_ea_number($position['commission'] ?? 0),
+            'magic' => $this->sanitize_ea_int($position['magic'] ?? 0),
+            'comment' => $this->sanitize_ea_text($position['comment'] ?? '', 191),
+            'opened_at' => $this->normalize_market_timestamp($position['opened_at'], $seen_at),
+            'state' => 'open',
+            'ea_version' => $ea_version,
+            'last_seen_at' => $seen_at,
+            'updated_at' => $updated_at,
+            'raw_json' => wp_json_encode($position),
+        );
+    }
+
+    private function build_trade_order_record(
+        int $user_id,
+        string $account_id,
+        string $terminal_id,
+        array $order,
+        string $ea_version,
+        string $seen_at,
+        string $updated_at
+    ) {
+        foreach (array('order_id', 'symbol', 'order_type', 'direction', 'entry_price', 'sl', 'tp', 'volume', 'placed_at', 'state') as $required_key) {
+            if (!array_key_exists($required_key, $order)) {
+                $this->audit($user_id, 'ea.trade_telemetry.rejected', array(
+                    'reason' => 'order_missing_field',
+                    'field' => $required_key,
+                    'order' => $order,
+                ));
+                return new WP_Error(
+                    'smc_sf_trade_telemetry_order_invalid',
+                    'pending_orders[] is missing required field ' . $required_key . '.',
+                    array('status' => 400)
+                );
+            }
+        }
+
+        $symbol = $this->sanitize_ea_text($order['symbol'], 96);
+        $normalized_symbol = $this->sanitize_ea_text($order['normalized_symbol'] ?? $this->map_symbol_aliases($symbol), 64);
+        $order_id = $this->sanitize_ea_text($order['order_id'], 64);
+
+        return array(
+            'deterministic_key' => sprintf('order:%d:%s:%s:%s', $user_id, $account_id, $terminal_id, $order_id),
+            'user_id' => $user_id,
+            'account_id' => $account_id,
+            'terminal_id' => $terminal_id,
+            'order_id' => $order_id,
+            'symbol' => $symbol,
+            'normalized_symbol' => $normalized_symbol,
+            'order_type' => $this->sanitize_ea_text($order['order_type'], 32),
+            'direction' => $this->sanitize_ea_text($order['direction'], 32),
+            'entry_price' => $this->sanitize_ea_number($order['entry_price']),
+            'sl' => $this->sanitize_ea_number($order['sl']),
+            'tp' => $this->sanitize_ea_number($order['tp']),
+            'volume' => $this->sanitize_ea_number($order['volume']),
+            'magic' => $this->sanitize_ea_int($order['magic'] ?? 0),
+            'comment' => $this->sanitize_ea_text($order['comment'] ?? '', 191),
+            'placed_at' => $this->normalize_market_timestamp($order['placed_at'], $seen_at),
+            'state' => 'active',
+            'ea_version' => $ea_version,
+            'last_seen_at' => $seen_at,
+            'updated_at' => $updated_at,
+            'raw_json' => wp_json_encode($order),
+        );
+    }
+
+    private function sweep_absent_trade_rows(
+        string $table_name,
+        string $id_field,
+        string $active_state,
+        string $inactive_state,
+        int $user_id,
+        string $account_id,
+        string $terminal_id,
+        array $current_ids,
+        string $audit_event
+    ): int {
+        global $wpdb;
+
+        $existing_rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table($table_name)} WHERE user_id = %d AND account_id = %s AND terminal_id = %s AND state = %s",
+            $user_id,
+            $account_id,
+            $terminal_id,
+            $active_state
+        ), ARRAY_A);
+
+        $active_ids = array_values(array_filter(array_map('strval', $current_ids), function ($value) {
+            return $value !== '';
+        }));
+        $swept = 0;
+
+        foreach ($existing_rows as $row) {
+            $row_id = (string) ($row[$id_field] ?? '');
+            if ($row_id === '' || in_array($row_id, $active_ids, true)) {
+                continue;
+            }
+
+            $updated = $wpdb->update(
+                $this->table($table_name),
+                array(
+                    'state' => $inactive_state,
+                    'updated_at' => $this->now_mysql(),
+                ),
+                array(
+                    'deterministic_key' => $row['deterministic_key'],
+                ),
+                array('%s', '%s'),
+                array('%s')
+            );
+
+            if ($updated !== false) {
+                $swept++;
+                $this->audit($user_id, $audit_event, array(
+                    $id_field => $row_id,
+                    'account_id' => $account_id,
+                    'terminal_id' => $terminal_id,
+                    'reason' => 'absent_from_fresh_batch',
+                ));
+            }
+        }
+
+        return $swept;
+    }
+
+    private function read_account_telemetry(int $user_id): array {
+        global $wpdb;
+
+        if (!self::ensure_trade_telemetry_tables()) {
+            return array(
+                'balance' => 0,
+                'equity' => 0,
+                'margin' => 0,
+                'free_margin' => 0,
+                'margin_level' => 0,
+                'floating_pl' => 0,
+                'currency' => '',
+                'leverage' => 0,
+                'account_id' => '',
+                'terminal_id' => '',
+                'ea_version' => '',
+                'last_seen_at' => null,
+                'updated_at' => null,
+                'freshness' => 'unavailable',
+            );
+        }
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table('account_telemetry')} WHERE user_id = %d",
+            $user_id
+        ), ARRAY_A);
+
+        if (empty($rows)) {
+            return array(
+                'balance' => 0,
+                'equity' => 0,
+                'margin' => 0,
+                'free_margin' => 0,
+                'margin_level' => 0,
+                'floating_pl' => 0,
+                'currency' => '',
+                'leverage' => 0,
+                'account_id' => '',
+                'terminal_id' => '',
+                'ea_version' => '',
+                'last_seen_at' => null,
+                'updated_at' => null,
+                'freshness' => 'unavailable',
+            );
+        }
+
+        usort($rows, function ($left, $right) {
+            return strcmp((string) ($right['last_seen_at'] ?? ''), (string) ($left['last_seen_at'] ?? ''));
+        });
+
+        $row = $rows[0];
+        return array(
+            'account_id' => (string) ($row['account_id'] ?? ''),
+            'terminal_id' => (string) ($row['terminal_id'] ?? ''),
+            'balance' => (float) ($row['balance'] ?? 0),
+            'equity' => (float) ($row['equity'] ?? 0),
+            'margin' => (float) ($row['margin'] ?? 0),
+            'free_margin' => (float) ($row['free_margin'] ?? 0),
+            'margin_level' => (float) ($row['margin_level'] ?? 0),
+            'floating_pl' => (float) ($row['floating_pl'] ?? 0),
+            'currency' => (string) ($row['currency'] ?? ''),
+            'leverage' => (int) ($row['leverage'] ?? 0),
+            'ea_version' => (string) ($row['ea_version'] ?? ''),
+            'last_seen_at' => $this->to_iso($row['last_seen_at'] ?? null),
+            'updated_at' => $this->to_iso($row['updated_at'] ?? null),
+            'freshness' => $this->telemetry_freshness_state($row['last_seen_at'] ?? null),
+        );
+    }
+
+    private function read_trade_positions(int $user_id): array {
+        global $wpdb;
+
+        if (!self::ensure_trade_telemetry_tables()) {
+            return array();
+        }
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table('trade_positions')} WHERE user_id = %d AND state = %s",
+            $user_id,
+            'open'
+        ), ARRAY_A);
+
+        return array_values(array_map(function ($row) {
+            return array(
+                'position_id' => (string) ($row['position_id'] ?? ''),
+                'symbol' => (string) ($row['symbol'] ?? ''),
+                'normalized_symbol' => (string) ($row['normalized_symbol'] ?? ''),
+                'direction' => $this->normalize_trade_direction_for_read($row['direction'] ?? ''),
+                'entry_price' => (float) ($row['entry_price'] ?? 0),
+                'current_price' => (float) ($row['current_price'] ?? 0),
+                'sl' => (float) ($row['sl'] ?? 0),
+                'tp' => (float) ($row['tp'] ?? 0),
+                'volume' => (float) ($row['volume'] ?? 0),
+                'profit' => (float) ($row['profit'] ?? 0),
+                'swap' => (float) ($row['swap'] ?? 0),
+                'commission' => (float) ($row['commission'] ?? 0),
+                'magic' => (int) ($row['magic'] ?? 0),
+                'comment' => (string) ($row['comment'] ?? ''),
+                'opened_at' => $this->to_iso($row['opened_at'] ?? null),
+                'state' => 'open',
+                'freshness' => $this->telemetry_freshness_state($row['last_seen_at'] ?? null),
+                'account_id' => (string) ($row['account_id'] ?? ''),
+                'terminal_id' => (string) ($row['terminal_id'] ?? ''),
+                'ea_version' => (string) ($row['ea_version'] ?? ''),
+                'last_seen_at' => $this->to_iso($row['last_seen_at'] ?? null),
+                'updated_at' => $this->to_iso($row['updated_at'] ?? null),
+            );
+        }, is_array($rows) ? $rows : array()));
+    }
+
+    private function read_trade_orders(int $user_id): array {
+        global $wpdb;
+
+        if (!self::ensure_trade_telemetry_tables()) {
+            return array();
+        }
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table('trade_orders')} WHERE user_id = %d AND state = %s",
+            $user_id,
+            'active'
+        ), ARRAY_A);
+
+        return array_values(array_map(function ($row) {
+            return array(
+                'order_id' => (string) ($row['order_id'] ?? ''),
+                'symbol' => (string) ($row['symbol'] ?? ''),
+                'normalized_symbol' => (string) ($row['normalized_symbol'] ?? ''),
+                'order_type' => (string) ($row['order_type'] ?? ''),
+                'direction' => $this->normalize_trade_direction_for_read($row['direction'] ?? ''),
+                'entry_price' => (float) ($row['entry_price'] ?? 0),
+                'sl' => (float) ($row['sl'] ?? 0),
+                'tp' => (float) ($row['tp'] ?? 0),
+                'volume' => (float) ($row['volume'] ?? 0),
+                'magic' => (int) ($row['magic'] ?? 0),
+                'comment' => (string) ($row['comment'] ?? ''),
+                'placed_at' => $this->to_iso($row['placed_at'] ?? null),
+                'state' => 'active',
+                'freshness' => $this->telemetry_freshness_state($row['last_seen_at'] ?? null),
+                'account_id' => (string) ($row['account_id'] ?? ''),
+                'terminal_id' => (string) ($row['terminal_id'] ?? ''),
+                'ea_version' => (string) ($row['ea_version'] ?? ''),
+                'last_seen_at' => $this->to_iso($row['last_seen_at'] ?? null),
+                'updated_at' => $this->to_iso($row['updated_at'] ?? null),
+            );
+        }, is_array($rows) ? $rows : array()));
+    }
+
+    private function normalize_trade_direction_for_read($direction): string {
+        $value = strtoupper(trim((string) $direction));
+        if (in_array($value, array('BUY', 'BUY_LIMIT', 'BUY_STOP', 'BUY_STOP_LIMIT'), true)) {
+            return 'LONG';
+        }
+        if (in_array($value, array('SELL', 'SELL_LIMIT', 'SELL_STOP', 'SELL_STOP_LIMIT'), true)) {
+            return 'SHORT';
+        }
+        return $value !== '' ? $value : 'LONG';
+    }
+
+    private function telemetry_freshness_state($last_seen_at): string {
+        if (!$last_seen_at) {
+            return 'unavailable';
+        }
+
+        return (time() - strtotime((string) $last_seen_at . ' UTC')) <= 300 ? 'live' : 'stale';
     }
 
     private function get_engine_snapshot($user_id) {

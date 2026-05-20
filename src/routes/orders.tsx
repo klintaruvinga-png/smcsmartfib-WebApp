@@ -18,9 +18,21 @@ export const Route = createFileRoute("/orders")({
   component: OrdersPage,
 });
 
-function OrdersPage() {
-  const { data: trades } = useUserTrades();
+export function OrdersPage() {
+  const { data: trades, isLoading, error } = useUserTrades();
   const orders = trades?.orders ?? [];
+
+  if (isLoading) {
+    return <div className="text-mute text-sm">Loading pending orders...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="text-mute text-sm">
+        Pending orders unavailable while backend trade telemetry is unreachable.
+      </div>
+    );
+  }
 
   const grouped = orders.reduce<Record<string, PendingOrder[]>>((acc, o) => {
     (acc[o.symbol] ??= []).push(o);

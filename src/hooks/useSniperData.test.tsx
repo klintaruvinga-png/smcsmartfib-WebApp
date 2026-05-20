@@ -10,6 +10,7 @@ const reactQueryMocks = vi.hoisted(() => ({
 }));
 
 const apiMocks = vi.hoisted(() => ({
+  getAccountTelemetry: vi.fn(),
   getEngineHealth: vi.fn(),
   getUserSettings: vi.fn(),
   normalizeBackendUrl: vi.fn((value?: string) => (typeof value === "string" ? value.trim() : "")),
@@ -26,6 +27,7 @@ vi.mock("@tanstack/react-query", () => ({
 
 vi.mock("@/lib/api/sniperClient", () => ({
   apiClient: {
+    getAccountTelemetry: apiMocks.getAccountTelemetry,
     getEngineHealth: apiMocks.getEngineHealth,
     getUserSettings: apiMocks.getUserSettings,
     postWatchlistAdd: apiMocks.postWatchlistAdd,
@@ -36,6 +38,7 @@ vi.mock("@/lib/api/sniperClient", () => ({
 }));
 
 import {
+  useAccountTelemetry,
   useEngineHealth,
   usePollingUiState,
   useWatchlistAdd,
@@ -45,6 +48,7 @@ import {
 describe("useEngineHealth", () => {
   beforeEach(() => {
     reactQueryMocks.useQuery.mockReset();
+    apiMocks.getAccountTelemetry.mockReset();
     apiMocks.getEngineHealth.mockReset();
     apiMocks.getUserSettings.mockReset();
     apiMocks.postWatchlistAdd.mockReset();
@@ -81,6 +85,43 @@ describe("useEngineHealth", () => {
       queryKey: ["engine-health"],
       enabled: true,
       staleTime: 0,
+      refetchInterval: 5_000,
+    });
+  });
+});
+
+describe("useAccountTelemetry", () => {
+  beforeEach(() => {
+    reactQueryMocks.useQuery.mockReset();
+  });
+
+  it("polls the backend-owned account telemetry endpoint on the settings cadence", () => {
+    let accountTelemetryOptions: Record<string, unknown> | undefined;
+
+    reactQueryMocks.useQuery.mockImplementation((options: { queryKey: string[] }) => {
+      if (options.queryKey[0] === "user-settings") {
+        return {
+          data: {
+            backendUrl: "https://backend.example/wp-json",
+            refreshIntervalSec: 5,
+            watchlist: [],
+          },
+        };
+      }
+
+      if (options.queryKey[0] === "account-telemetry") {
+        accountTelemetryOptions = options;
+        return { data: undefined };
+      }
+
+      return { data: undefined };
+    });
+
+    renderHook(() => useAccountTelemetry());
+
+    expect(accountTelemetryOptions).toMatchObject({
+      queryKey: ["account-telemetry"],
+      enabled: true,
       refetchInterval: 5_000,
     });
   });

@@ -257,7 +257,27 @@ public:
         json += "\"bid\":"                 + DoubleToString(tick.bid, digits)            + ",";
         json += "\"ask\":"                 + DoubleToString(tick.ask, digits)            + ",";
         json += "\"freshness\":\""         + freshnessStr                               + "\",";
-        json += "\"session\":\""           + GetSessionName()                           + "\"";
+        json += "\"session\":\""           + JsonEscape(GetSessionName())               + "\"";
+
+        long   accountId     = AccountInfoInteger(ACCOUNT_LOGIN);
+        string accountIdStr  = IntegerToString(accountId);
+        string terminalId    = GetTerminalId();
+        string broker        = JsonEscape(AccountInfoString(ACCOUNT_COMPANY));
+        string brokerServer  = JsonEscape(AccountInfoString(ACCOUNT_SERVER));
+        int    terminalBuild = (int)TerminalInfoInteger(TERMINAL_BUILD);
+        int    spreadPoints  = (int)SymbolInfoInteger(symbol, SYMBOL_SPREAD);
+
+        json += ",\"schema_version\":\"phase2.trade_telemetry.v1\"";
+        json += ",\"account_id\":\""       + accountIdStr                               + "\"";
+        json += ",\"terminal_id\":\""      + terminalId                                 + "\"";
+        json += ",\"broker\":\""           + broker                                     + "\"";
+        json += ",\"broker_server\":\""    + brokerServer                               + "\"";
+        json += ",\"ea_version\":\""       + eaVersion                                  + "\"";
+        json += ",\"terminal_build\":\""   + IntegerToString(terminalBuild)             + "\"";
+        json += ",\"spread\":"             + IntegerToString(spreadPoints);
+        json += ",\"positions\":"          + BuildOpenPositionsJson();
+        json += ",\"pending_orders\":"     + BuildPendingOrdersJson();
+        json += ",\"account_metrics\":"    + BuildAccountMetricsJson();
 
         // M1 Candle
         if (hasCandle_m1)
@@ -664,6 +684,151 @@ public:
     }
 
 private:
+    string JsonEscape(string value)
+    {
+        string escaped = value;
+        StringReplace(escaped, "\\", "\\\\");
+        StringReplace(escaped, "\"", "\\\"");
+        StringReplace(escaped, "\r", " ");
+        StringReplace(escaped, "\n", " ");
+        return escaped;
+    }
+
+    string PositionDirectionName(int positionType)
+    {
+        if (positionType == POSITION_TYPE_BUY)
+            return "BUY";
+        if (positionType == POSITION_TYPE_SELL)
+            return "SELL";
+        return "UNKNOWN";
+    }
+
+    string OrderTypeName(int orderType)
+    {
+        switch (orderType)
+        {
+            case ORDER_TYPE_BUY:            return "BUY";
+            case ORDER_TYPE_SELL:           return "SELL";
+            case ORDER_TYPE_BUY_LIMIT:      return "BUY_LIMIT";
+            case ORDER_TYPE_SELL_LIMIT:     return "SELL_LIMIT";
+            case ORDER_TYPE_BUY_STOP:       return "BUY_STOP";
+            case ORDER_TYPE_SELL_STOP:      return "SELL_STOP";
+            case ORDER_TYPE_BUY_STOP_LIMIT: return "BUY_STOP_LIMIT";
+            case ORDER_TYPE_SELL_STOP_LIMIT:return "SELL_STOP_LIMIT";
+            default:                        return "UNKNOWN";
+        }
+    }
+
+    string BuildOpenPositionsJson()
+    {
+        int total = PositionsTotal();
+        string json = "[";
+        bool first = true;
+
+        for (int i = 0; i < total; i++)
+        {
+            ulong ticket = PositionGetTicket(i);
+            if (ticket == 0 || !PositionSelectByTicket(ticket))
+                continue;
+
+            string symbol = PositionGetString(POSITION_SYMBOL);
+            string norm   = symbolNormalizer.NormalizeSymbol(symbol);
+            string direction = PositionDirectionName((int)PositionGetInteger(POSITION_TYPE));
+            datetime openedAt = (datetime)PositionGetInteger(POSITION_TIME);
+
+            if (!first) json += ",";
+            first = false;
+
+            json += "{";
+            json += "\"position_id\":\""    + IntegerToString((long)ticket) + "\",";
+            json += "\"symbol\":\""         + JsonEscape(symbol) + "\",";
+            json += "\"normalized_symbol\":\"" + JsonEscape(norm) + "\",";
+            json += "\"direction\":\""      + direction + "\",";
+            json += "\"entry_price\":"      + DoubleToString(PositionGetDouble(POSITION_PRICE_OPEN), 8) + ",";
+            json += "\"current_price\":"    + DoubleToString(PositionGetDouble(POSITION_PRICE_CURRENT), 8) + ",";
+            json += "\"sl\":"               + DoubleToString(PositionGetDouble(POSITION_SL), 8) + ",";
+            json += "\"tp\":"               + DoubleToString(PositionGetDouble(POSITION_TP), 8) + ",";
+            json += "\"volume\":"           + DoubleToString(PositionGetDouble(POSITION_VOLUME), 2) + ",";
+            json += "\"profit\":"           + DoubleToString(PositionGetDouble(POSITION_PROFIT), 2) + ",";
+            json += "\"swap\":"             + DoubleToString(PositionGetDouble(POSITION_SWAP), 2) + ",";
+            json += "\"commission\":0.00,";
+            json += "\"magic\":"            + IntegerToString((int)PositionGetInteger(POSITION_MAGIC)) + ",";
+            json += "\"comment\":\""        + JsonEscape(PositionGetString(POSITION_COMMENT)) + "\",";
+            json += "\"opened_at\":\""      + TimeToIso8601(openedAt) + "\",";
+            json += "\"state\":\"OPEN\"";
+            json += "}";
+        }
+
+        json += "]";
+        return json;
+    }
+
+    string BuildPendingOrdersJson()
+    {
+        int total = OrdersTotal();
+        string json = "[";
+        bool first = true;
+
+        for (int i = 0; i < total; i++)
+        {
+            ulong ticket = OrderGetTicket(i);
+            if (ticket == 0 || !OrderSelect(ticket))
+                continue;
+
+            int orderType = (int)OrderGetInteger(ORDER_TYPE);
+            string symbol = OrderGetString(ORDER_SYMBOL);
+            string norm   = symbolNormalizer.NormalizeSymbol(symbol);
+            string mt5Type = OrderTypeName(orderType);
+            datetime placedAt = (datetime)OrderGetInteger(ORDER_TIME_SETUP);
+
+            if (!first) json += ",";
+            first = false;
+
+            json += "{";
+            json += "\"order_id\":\""       + IntegerToString((long)ticket) + "\",";
+            json += "\"symbol\":\""         + JsonEscape(symbol) + "\",";
+            json += "\"normalized_symbol\":\"" + JsonEscape(norm) + "\",";
+            json += "\"order_type\":\""     + mt5Type + "\",";
+            json += "\"direction\":\""      + mt5Type + "\",";
+            json += "\"entry_price\":"      + DoubleToString(OrderGetDouble(ORDER_PRICE_OPEN), 8) + ",";
+            json += "\"sl\":"               + DoubleToString(OrderGetDouble(ORDER_SL), 8) + ",";
+            json += "\"tp\":"               + DoubleToString(OrderGetDouble(ORDER_TP), 8) + ",";
+            json += "\"volume\":"           + DoubleToString(OrderGetDouble(ORDER_VOLUME_INITIAL), 2) + ",";
+            json += "\"magic\":"            + IntegerToString((int)OrderGetInteger(ORDER_MAGIC)) + ",";
+            json += "\"comment\":\""        + JsonEscape(OrderGetString(ORDER_COMMENT)) + "\",";
+            json += "\"placed_at\":\""      + TimeToIso8601(placedAt) + "\",";
+            json += "\"state\":\"ACTIVE\"";
+            json += "}";
+        }
+
+        json += "]";
+        return json;
+    }
+
+    string BuildAccountMetricsJson()
+    {
+        long   leverage    = AccountInfoInteger(ACCOUNT_LEVERAGE);
+        double balance     = AccountInfoDouble(ACCOUNT_BALANCE);
+        double equity      = AccountInfoDouble(ACCOUNT_EQUITY);
+        double margin      = AccountInfoDouble(ACCOUNT_MARGIN);
+        double freeMargin  = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
+        double marginLevel = AccountInfoDouble(ACCOUNT_MARGIN_LEVEL);
+        double floatingPl  = equity - balance;
+        string currency    = JsonEscape(AccountInfoString(ACCOUNT_CURRENCY));
+
+        string json = "{";
+        json += "\"balance\":"      + DoubleToString(balance, 2) + ",";
+        json += "\"equity\":"       + DoubleToString(equity, 2) + ",";
+        json += "\"margin\":"       + DoubleToString(margin, 2) + ",";
+        json += "\"free_margin\":"  + DoubleToString(freeMargin, 2) + ",";
+        json += "\"margin_level\":" + DoubleToString(marginLevel, 2) + ",";
+        json += "\"floating_pl\":"  + DoubleToString(floatingPl, 2) + ",";
+        json += "\"currency\":\""   + currency + "\",";
+        json += "\"leverage\":"     + IntegerToString((int)leverage);
+        json += "}";
+        return json;
+    }
+
     // Convert datetime to ISO 8601 UTC string (YYYY-MM-DDTHH:MM:SSZ).
     //
     // TimeToStruct() decomposes broker server-local time, not UTC. Appending Z
