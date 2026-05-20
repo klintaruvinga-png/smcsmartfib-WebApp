@@ -43,7 +43,7 @@ vi.mock("@/hooks/useTickFlash", () => ({
   useTickFlash: () => null,
 }));
 
-import { LivePage } from "./live";
+import { LivePage } from "./-live.page";
 
 describe("LivePage backend gating", () => {
   beforeEach(() => {

@@ -75,7 +75,7 @@ vi.mock("sonner", () => ({
   },
 }));
 
-import { PlanPage } from "./plan";
+import { PlanPage } from "./-plan.page";
 import { isTradePlanComplete } from "./-plan.utils";
 
 function buildSignal(overrides: Partial<SignalCandidate> = {}): SignalCandidate {
