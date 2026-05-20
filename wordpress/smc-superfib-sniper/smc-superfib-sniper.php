@@ -4741,8 +4741,8 @@ final class SMC_SuperFib_Sniper_REST {
         return array_values(array_map(function ($row) {
             return array(
                 'position_id' => (string) ($row['position_id'] ?? ''),
-                'symbol' => (string) ($row['symbol'] ?? ''),
-                'normalized_symbol' => (string) ($row['normalized_symbol'] ?? ''),
+                'symbol' => (string) (($row['normalized_symbol'] ?? '') !== '' ? $row['normalized_symbol'] : ($row['symbol'] ?? '')),
+                'normalized_symbol' => (string) (($row['normalized_symbol'] ?? '') !== '' ? $row['normalized_symbol'] : ($row['symbol'] ?? '')),
                 'direction' => $this->normalize_trade_direction_for_read($row['direction'] ?? ''),
                 'entry_price' => (float) ($row['entry_price'] ?? 0),
                 'current_price' => (float) ($row['current_price'] ?? 0),
@@ -4785,8 +4785,8 @@ final class SMC_SuperFib_Sniper_REST {
         return array_values(array_map(function ($row) {
             return array(
                 'order_id' => (string) ($row['order_id'] ?? ''),
-                'symbol' => (string) ($row['symbol'] ?? ''),
-                'normalized_symbol' => (string) ($row['normalized_symbol'] ?? ''),
+                'symbol' => (string) (($row['normalized_symbol'] ?? '') !== '' ? $row['normalized_symbol'] : ($row['symbol'] ?? '')),
+                'normalized_symbol' => (string) (($row['normalized_symbol'] ?? '') !== '' ? $row['normalized_symbol'] : ($row['symbol'] ?? '')),
                 'order_type' => (string) ($row['order_type'] ?? ''),
                 'direction' => $this->normalize_trade_direction_for_read($row['direction'] ?? ''),
                 'entry_price' => (float) ($row['entry_price'] ?? 0),
