@@ -3,7 +3,7 @@
 **Last Updated**: 2026-05-20  
 **Current Phase**: 1 (MT5 Bridge Infrastructure)  
 **Overall Progress**: 65%  
-**Status**: Phase 0 COMPLETE - Phase 1 COMPLETE (Phase 1 PASSED; Phase 2 planning/handoff ready)
+**Status**: Phase 0 COMPLETE - Phase 1 COMPLETE (Phase 2 planning in progress)
 
 > Snapshot: Phase 0 gate passed 2026-05-15. Post-fix validation soak at 16:37 UTC confirmed NAS100 (29,263.70) and US30 (49,756.00) both LIVE during active US equity session; XAUUSD (4,556.34) LIVE with candle-history gate cleared. Backend soak: 259,464 engine runs / 0 errors / 69,262 candles over 24h. Frontend feed-status chip lag (BUG-001 staleTime:0) resolved. Watchlist persistence 100% parity. AUDUSD/ETHUSD chop-gate classified as correct live behavior — not a blocker. Full closeout evidence: `.github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md`.
 
@@ -15,7 +15,7 @@
 |-------|-----------|--------|-----------|---------|------------|
 | 0 | Stabilize existing platform | **COMPLETE** | 100% | None — gate passed 2026-05-15 | 2026-05-15 ✅ |
 | 1 | MT5 bridge infrastructure | **COMPLETE** | 100% | Phase 1 PASSED; Phase 2 planning/handoff ready | 2026-06-01 |
-| 2 | Read-only trade telemetry | NOT-STARTED | 0% | Phase 1 complete | 2026-06-15 |
+| 2 | Read-only trade telemetry | PLANNING-IN-PROGRESS | 10% | Track A / Track B telemetry contract sign-off pending | 2026-06-15 |
 | 3 | MT5 market data engine | NOT-STARTED | 0% | Phase 2 complete | 2026-07-15 |
 | 4 | Fib engine migration | NOT-STARTED | 0% | Phase 3 complete | 2026-08-15 |
 | 5 | Regime & chop engine | NOT-STARTED | 0% | Phase 4 complete | 2026-09-15 |
@@ -33,7 +33,7 @@
 |-------|------|------------|--------|
 | **Track A — MT5 EA** | *TBD* | Phases 1–7 (bridge, telemetry, candle engine, fib, regime, signal, execution) | Phase 1 PASSED — Phase 2 handoff ready |
 | **Track B — Backend** | *TBD* | Phases 1–9 (APIs, freshness, telemetry, licensing) | Phase 1 PASSED — Phase 2 handoff ready |
-| **Track C — Dashboard** | *TBD* | Phases 2–9 (visualization, execution console, analytics) | Phase 0 complete — Phase 1 unblocked; awaiting bridge instrumentation to begin dashboard telemetry work |
+| **Track C — Dashboard** | *TBD* | Phases 2–9 (visualization, execution console, analytics) | Phase 0 complete — Phase 1 unblocked; deferred until Phase 2 telemetry contract is signed off by Track A and Track B owners |
 
 ---
 
@@ -160,8 +160,10 @@ Market-Stream Auth:
 
 **Objective**: Pull real account/trade state into backend/dashboard  
 **Owner**: Track A + Track B + Track C  
-**Status**: NOT-STARTED  
+**Status**: PLANNING-IN-PROGRESS  
 **Prerequisites**: Phase 1 complete  
+**Readiness Package Target**: [PHASE2_IMPLEMENTATION.md](../PHASE2_IMPLEMENTATION.md)  
+**Prerequisite Verified**: Phase 1 48h continuity gate passed on 2026-05-18  
 **Completion Target**: 2026-06-15
 
 ### Deliverables
@@ -181,7 +183,7 @@ Market-Stream Auth:
 - [ ] Weekend reopen
 
 ### Blockers
-- *Phase 1 not complete*
+- *Track A / Track B telemetry contract sign-off still pending*
 
 ---
 
