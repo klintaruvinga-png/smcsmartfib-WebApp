@@ -144,6 +144,32 @@ if (!class_exists('TestWpdb')) {
         }
 
         public function get_var($query) {
+            if (preg_match("/SELECT 1 FROM ([^ ]+)/", $query, $m) && strpos($query, 'summary LIKE') !== false) {
+                $table = trim($m[1]);
+                preg_match("/user_id = (\\d+)/", $query, $user_match);
+                preg_match("/status = '([^']+)'/", $query, $status_match);
+                preg_match("/summary LIKE '([^']+)'/", $query, $needle_match);
+                $user_id = (int) ($user_match[1] ?? 0);
+                $status = $status_match[1] ?? '';
+                $needle = isset($needle_match[1]) ? str_replace('%', '', str_replace("''", "'", $needle_match[1])) : '';
+                $needle = str_replace(array('\\_', '\\%', '\\\\'), array('_', '%', '\\'), $needle);
+                if ($needle === '' && strpos($query, 'explicit_heartbeat') !== false) {
+                    $needle = 'explicit_heartbeat';
+                } elseif ($needle === '' && strpos($query, 'ea_push') !== false) {
+                    $needle = 'ea_push';
+                }
+                foreach ($this->tables[$table] ?? array() as $row) {
+                    if ((int) ($row['user_id'] ?? 0) !== $user_id || (string) ($row['status'] ?? '') !== $status) {
+                        continue;
+                    }
+                    $summary = (string) ($row['summary'] ?? '');
+                    if ($needle !== '' && strpos($summary, $needle) !== false) {
+                        return '1';
+                    }
+                }
+                return null;
+            }
+
             if (preg_match("/SELECT data FROM ([^ ]+) WHERE user_id = (\\d+)/", $query, $m)) {
                 $table = $m[1];
                 $user_id = (int) $m[2];
@@ -235,6 +261,12 @@ if (!class_exists('TestWpdb')) {
                 $state = $state_match[1];
                 $rows = array_values(array_filter($rows, function ($row) use ($state) {
                     return (string) ($row['state'] ?? '') === $state;
+                }));
+            }
+            if (preg_match("/status = '([^']+)'/", $conditions, $status_match)) {
+                $status = $status_match[1];
+                $rows = array_values(array_filter($rows, function ($row) use ($status) {
+                    return (string) ($row['status'] ?? '') === $status;
                 }));
             }
 
@@ -612,6 +644,10 @@ function test_phase2_trade_telemetry() {
     phase2_assert_true(phase2_find_route('/account-telemetry') !== null, 'GET /account-telemetry route must register');
     phase2_assert_true(phase2_find_route('/positions') !== null, 'GET /positions route must register');
     phase2_assert_true(phase2_find_route('/orders') !== null, 'GET /orders route must register');
+    $progress_route = phase2_find_route('/user/progress');
+    phase2_assert_true($progress_route !== null, 'GET /user/progress route must register');
+    phase2_assert_true(is_array($progress_route['args']['permission_callback']), 'GET /user/progress must use authenticated permission callback');
+    phase2_assert_same('permission_user', $progress_route['args']['permission_callback'][1] ?? null, 'GET /user/progress permission callback mismatch');
     echo "PASS route registration\n";
 
     phase2_assert_true(phase2_invoke_static_private('SMC_SuperFib_Sniper_REST', 'ensure_trade_telemetry_tables') === true, 'Phase 2 tables must initialize');
@@ -677,6 +713,57 @@ function test_phase2_trade_telemetry() {
     phase2_assert_true(!array_key_exists('raw_json', $orders_response->data[0]), 'raw_json must not be exposed on orders GET');
     phase2_assert_true(!array_key_exists('raw_json', $account_response->data), 'raw_json must not be exposed on account telemetry GET');
     echo "PASS GET normalization and raw_json hiding\n";
+
+    $wpdb->replace('wp_smc_sf_account_snapshots', array(
+        'user_id' => 7,
+        'data' => wp_json_encode(array(
+            'account' => array(
+                'todayPnlUSC' => 48.5,
+            ),
+        )),
+        'updated_at' => gmdate('Y-m-d H:i:s', time() - 5),
+    ));
+    $wpdb->insert('wp_smc_sf_engine_runs', array(
+        'user_id' => 7,
+        'status' => 'heartbeat',
+        'summary' => wp_json_encode(array('source' => 'explicit_heartbeat')),
+        'created_at' => gmdate('Y-m-d H:i:s', time() - 5),
+    ));
+    $progress_response = $plugin->get_user_progress();
+    phase2_assert_true($progress_response instanceof WP_REST_Response, 'GET /user/progress must return a REST response');
+    phase2_assert_same(10125.0, (float) ($progress_response->data['equity_pulse']['equity_usc'] ?? 0), 'Progress equity must mirror account telemetry equity');
+    phase2_assert_same(48.5, (float) ($progress_response->data['equity_pulse']['today_pnl_usc'] ?? 0), 'Progress today P/L must expose the persisted account snapshot value when present');
+    phase2_assert_same('LIVE', $progress_response->data['equity_pulse']['state'] ?? null, 'Live telemetry must map to LIVE progress state');
+    phase2_assert_same(0, $progress_response->data['streak']['current_streak_days'] ?? null, 'Streak must degrade to 0 while active-day definition is unresolved');
+    phase2_assert_same('UNAVAILABLE', $progress_response->data['streak']['state'] ?? null, 'Streak must stay UNAVAILABLE until the active-day definition is approved');
+    phase2_assert_true(!empty($progress_response->data['streak']['last_active_date']), 'Streak must still expose the latest activity date when engine activity exists');
+    phase2_assert_same(true, $progress_response->data['milestones']['first_heartbeat'] ?? false, 'Explicit heartbeat milestone must require a persisted explicit heartbeat row');
+    phase2_assert_same(true, $progress_response->data['milestones']['first_market_stream'] ?? false, 'Market-stream milestone must require a persisted ea_push heartbeat row');
+    phase2_assert_same(true, $progress_response->data['milestones']['first_trade_telemetry'] ?? false, 'Trade telemetry milestone must require persisted trade telemetry');
+    phase2_assert_same('LIVE', $progress_response->data['milestones']['state'] ?? null, 'Fresh milestone sources must map to LIVE');
+    phase2_assert_true(!empty($progress_response->data['generated_at']), 'Progress response must include generated_at');
+    echo "PASS progress endpoint schema and milestone detection\n";
+
+    $wpdb->replace('wp_smc_sf_account_telemetry', array(
+        'user_id' => 7,
+        'account_id' => '32206603',
+        'terminal_id' => 'FB9A56D617EDDDFE29EE54EBEFFE96C1',
+        'balance' => 10000,
+        'equity' => 10125,
+        'margin' => 800,
+        'free_margin' => 9325,
+        'margin_level' => 1265.625,
+        'floating_pl' => 125,
+        'currency' => 'USC',
+        'leverage' => 500,
+        'ea_version' => '1.00',
+        'last_seen_at' => gmdate('Y-m-d H:i:s', time() - 601),
+        'updated_at' => gmdate('Y-m-d H:i:s', time() - 601),
+        'raw_json' => '{}',
+    ));
+    $stale_progress = $plugin->get_user_progress();
+    phase2_assert_same('STALE', $stale_progress->data['equity_pulse']['state'] ?? null, 'Stale account telemetry must propagate as STALE on /user/progress');
+    echo "PASS progress stale-state propagation\n";
 
     $empty_positions_payload = phase2_payload();
     $empty_positions_payload['positions'] = array();

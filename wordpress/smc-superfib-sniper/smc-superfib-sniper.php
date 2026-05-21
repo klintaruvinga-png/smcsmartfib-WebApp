@@ -17,6 +17,7 @@ final class SMC_SuperFib_Sniper_REST {
     const NAMESPACE = 'sniper/v1';
     const TWELVE_PROVIDER = 'twelve_data';
     const ENGINE_SNAPSHOT_MIN_REFRESH_INTERVAL_SEC = 2;
+    const ACTIVE_DAY_DEFINITION = 'UNRESOLVED_REQUIRES_SIGNOFF';
 
     private $ratios = array(-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300);
     private $fib_context_symbol = '';
@@ -653,6 +654,7 @@ final class SMC_SuperFib_Sniper_REST {
         $this->route('/user/trades', WP_REST_Server::CREATABLE, 'post_user_trades', true);
         $this->route('/user/account', WP_REST_Server::READABLE, 'get_user_account', true);
         $this->route('/user/account', WP_REST_Server::CREATABLE, 'post_user_account', true);
+        $this->route('/user/progress', WP_REST_Server::READABLE, 'get_user_progress', true);
         $this->route('/user/settings', WP_REST_Server::READABLE, 'get_user_settings', true);
         $this->route('/user/settings', WP_REST_Server::CREATABLE, 'post_user_settings', true);
         $this->route('/user/risk-profile', WP_REST_Server::READABLE, 'get_user_risk_profile', true);
@@ -3008,6 +3010,10 @@ final class SMC_SuperFib_Sniper_REST {
         return rest_ensure_response($this->get_account_state(get_current_user_id()));
     }
 
+    public function get_user_progress() {
+        return rest_ensure_response($this->read_user_progress(get_current_user_id()));
+    }
+
     public function post_user_account(WP_REST_Request $request) {
         $user_id = get_current_user_id();
         $payload = $request->get_json_params();
@@ -4179,6 +4185,15 @@ final class SMC_SuperFib_Sniper_REST {
         return $default;
     }
 
+    private function read_user_progress(int $user_id): array {
+        return array(
+            'equity_pulse' => $this->read_progress_equity_pulse($user_id),
+            'streak' => $this->read_progress_streak($user_id),
+            'milestones' => $this->read_progress_milestones($user_id),
+            'generated_at' => gmdate('c'),
+        );
+    }
+
     private function get_account_blob($user_id) {
         global $wpdb;
         $row = $wpdb->get_var($wpdb->prepare(
@@ -4704,6 +4719,54 @@ final class SMC_SuperFib_Sniper_REST {
         );
     }
 
+    private function read_progress_equity_pulse(int $user_id): array {
+        $telemetry = $this->read_account_telemetry($user_id);
+        $account_blob = $this->get_account_blob($user_id);
+        $today_pnl = 0.0;
+        if (isset($account_blob['account']) && is_array($account_blob['account'])) {
+            $today_pnl = (float) ($account_blob['account']['todayPnlUSC'] ?? 0);
+        }
+
+        return array(
+            'equity_usc' => (float) ($telemetry['equity'] ?? 0),
+            'today_pnl_usc' => $today_pnl,
+            'state' => $this->progress_state_from_freshness((string) ($telemetry['freshness'] ?? 'unavailable')),
+        );
+    }
+
+    private function read_progress_streak(int $user_id): array {
+        $last_active_at = $this->latest_timestamp('engine_runs', $user_id, 'created_at');
+        return array(
+            'current_streak_days' => 0,
+            'last_active_date' => $last_active_at ? gmdate('Y-m-d', strtotime($last_active_at . ' UTC')) : null,
+            'state' => 'UNAVAILABLE',
+        );
+    }
+
+    private function read_progress_milestones(int $user_id): array {
+        $heartbeat_seen = $this->has_engine_heartbeat_source($user_id, 'explicit_heartbeat');
+        $market_stream_seen = $this->has_engine_heartbeat_source($user_id, 'ea_push');
+        $trade_telemetry_seen = $this->has_any_trade_telemetry($user_id);
+        $latest_engine_activity = $this->latest_timestamp('engine_runs', $user_id, 'created_at');
+        $latest_trade_telemetry = $this->latest_trade_telemetry_seen_at($user_id);
+        $latest_source = $this->max_mysql_timestamp($latest_engine_activity, $latest_trade_telemetry);
+
+        if (!$heartbeat_seen && !$market_stream_seen && !$trade_telemetry_seen) {
+            $state = 'UNAVAILABLE';
+        } elseif ($latest_source !== null && $this->telemetry_freshness_state($latest_source) === 'stale') {
+            $state = 'STALE';
+        } else {
+            $state = 'LIVE';
+        }
+
+        return array(
+            'first_heartbeat' => $heartbeat_seen,
+            'first_market_stream' => $market_stream_seen,
+            'first_trade_telemetry' => $trade_telemetry_seen,
+            'state' => $state,
+        );
+    }
+
     private function resolve_active_trade_identity(int $user_id): array {
         global $wpdb;
 
@@ -4824,6 +4887,91 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         return (time() - strtotime((string) $last_seen_at . ' UTC')) <= 300 ? 'live' : 'stale';
+    }
+
+    private function progress_state_from_freshness(string $freshness): string {
+        if ($freshness === 'live') {
+            return 'LIVE';
+        }
+        if ($freshness === 'stale') {
+            return 'STALE';
+        }
+        return 'UNAVAILABLE';
+    }
+
+    private function has_engine_heartbeat_source(int $user_id, string $source): bool {
+        global $wpdb;
+
+        $escaped_source = method_exists($wpdb, 'esc_like')
+            ? $wpdb->esc_like($source)
+            : addcslashes($source, '\\%_');
+
+        $match = $wpdb->get_var($wpdb->prepare(
+            "SELECT 1 FROM {$this->table('engine_runs')}
+             WHERE user_id = %d
+               AND status = %s
+               AND summary LIKE %s
+             LIMIT 1",
+            $user_id,
+            'heartbeat',
+            '%"source":"' . $escaped_source . '"%'
+        ));
+
+        if ($match !== null) {
+            return true;
+        }
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table('engine_runs')} WHERE user_id = %d AND status = %s",
+            $user_id,
+            'heartbeat'
+        ), ARRAY_A);
+
+        foreach (is_array($rows) ? $rows : array() as $row) {
+            $summary = json_decode((string) ($row['summary'] ?? ''), true);
+            if (is_array($summary) && (string) ($summary['source'] ?? '') === $source) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function has_any_trade_telemetry(int $user_id): bool {
+        return $this->latest_trade_telemetry_seen_at($user_id) !== null;
+    }
+
+    private function latest_trade_telemetry_seen_at(int $user_id): ?string {
+        global $wpdb;
+
+        if (!self::ensure_trade_telemetry_tables()) {
+            return null;
+        }
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table('account_telemetry')} WHERE user_id = %d",
+            $user_id
+        ), ARRAY_A);
+
+        $latest = null;
+        foreach (is_array($rows) ? $rows : array() as $row) {
+            $candidate = (string) ($row['last_seen_at'] ?? '');
+            if ($candidate !== '' && ($latest === null || strcmp($candidate, $latest) > 0)) {
+                $latest = $candidate;
+            }
+        }
+
+        return $latest;
+    }
+
+    private function max_mysql_timestamp(?string $left, ?string $right): ?string {
+        if ($left === null || $left === '') {
+            return $right !== '' ? $right : null;
+        }
+        if ($right === null || $right === '') {
+            return $left;
+        }
+        return strcmp($left, $right) >= 0 ? $left : $right;
     }
 
     private function get_engine_snapshot($user_id) {

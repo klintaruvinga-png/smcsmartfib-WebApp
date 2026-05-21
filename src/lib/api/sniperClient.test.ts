@@ -206,4 +206,73 @@ describe("Phase 2 telemetry client reads", () => {
       expect.objectContaining({ method: "GET" }),
     );
   });
+
+  it("normalizes the /user/progress contract from snake_case to camelCase", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          equity_pulse: {
+            equity_usc: 10125,
+            today_pnl_usc: 48.5,
+            state: "LIVE",
+          },
+          streak: {
+            current_streak_days: 0,
+            last_active_date: "2026-05-20",
+            state: "UNAVAILABLE",
+          },
+          milestones: {
+            first_heartbeat: true,
+            first_market_stream: true,
+            first_trade_telemetry: true,
+            state: "LIVE",
+          },
+          generated_at: "2026-05-20T10:15:00Z",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const progress = await apiClient.getUserProgress(false);
+
+    expect(progress).toMatchObject({
+      equityPulse: {
+        equityUSC: 10125,
+        todayPnlUSC: 48.5,
+        state: "LIVE",
+      },
+      streak: {
+        currentStreakDays: 0,
+        lastActiveDate: "2026-05-20",
+        state: "UNAVAILABLE",
+      },
+      milestones: {
+        firstHeartbeat: true,
+        firstMarketStream: true,
+        firstTradeTelemetry: true,
+        state: "LIVE",
+      },
+      generatedAt: "2026-05-20T10:15:00Z",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/user/progress"),
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
+  it("returns the typed mock user-progress payload in mock mode", async () => {
+    await expect(apiClient.getUserProgress(true)).resolves.toMatchObject({
+      equityPulse: {
+        state: "LIVE",
+      },
+      streak: {
+        state: "LIVE",
+      },
+      milestones: {
+        state: "LIVE",
+      },
+    });
+  });
 });

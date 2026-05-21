@@ -1,51 +1,65 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useUserAccount, useUserRiskProfile } from "@/hooks/useSniperData";
+import { useUserAccount, useUserProgress, useUserRiskProfile } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { fmtUSC, fmtPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Flame } from "lucide-react";
 
-const PROGRESS_NOT_IMPLEMENTED = true;
-
 export const Route = createFileRoute("/progress")({
-  head: () => {
-    const progressDescription = PROGRESS_NOT_IMPLEMENTED
-      ? "Account pulse and drawdown visibility while progress tracking is unavailable."
-      : "Account pulse, milestones and trading streaks.";
-    const progressOgDescription = PROGRESS_NOT_IMPLEMENTED
-      ? "Track account pulse and drawdown visibility."
-      : "Track milestones and account growth.";
-
-    return {
-      meta: [
-        { title: "Progress - SMC SuperFIB" },
-        { name: "description", content: progressDescription },
-        { property: "og:title", content: "Progress - SMC SuperFIB" },
-        { property: "og:description", content: progressOgDescription },
-      ],
-    };
-  },
+  head: () => ({
+    meta: [
+      { title: "Progress - SMC SuperFIB" },
+      { name: "description", content: "Account pulse, milestones and trading streaks." },
+      { property: "og:title", content: "Progress - SMC SuperFIB" },
+      { property: "og:description", content: "Track milestones and account growth." },
+    ],
+  }),
   component: ProgressPage,
 });
 
-function ProgressPage() {
+function toBadgeState(state: "LIVE" | "STALE" | "UNAVAILABLE") {
+  if (state === "LIVE") return "live" as const;
+  if (state === "STALE") return "stale" as const;
+  return "unavailable" as const;
+}
+
+function StreakPanelState({ message }: { message: string }) {
+  return (
+    <>
+      <div className="flex items-center gap-2 mt-2">
+        <Flame className="h-6 w-6 text-mute" />
+        <span className="font-mono text-sm font-semibold">Unavailable</span>
+      </div>
+      <div className="text-[11px] font-mono text-mute mt-0.5">{message}</div>
+    </>
+  );
+}
+
+function ProgressLoadingBlock() {
+  return (
+    <div className="mt-3 space-y-2 animate-pulse" aria-label="Loading progress data">
+      <div className="h-5 w-20 rounded bg-bg3" />
+      <div className="h-3 w-32 rounded bg-bg3" />
+    </div>
+  );
+}
+
+export function ProgressPage() {
   const { data: account } = useUserAccount();
   const { data: risk } = useUserRiskProfile();
+  const {
+    data: progressData,
+    isLoading: progressLoading,
+    isError: progressError,
+  } = useUserProgress();
   if (!account) return null;
   const ddCap = risk?.ddCapPct ?? 6.0;
-  const progressSubtitle = PROGRESS_NOT_IMPLEMENTED
-    ? "Pulse - equity - drawdown"
-    : "Pulse - streaks - milestones";
-  const streakIconClass = PROGRESS_NOT_IMPLEMENTED ? "h-6 w-6 text-mute" : "h-6 w-6 text-warn";
-  const unavailableNoteClass = PROGRESS_NOT_IMPLEMENTED
-    ? "text-[11px] font-mono text-mute mt-0.5"
-    : "text-[10px] font-mono text-mute mt-0.5";
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Progress</h1>
-        <p className="text-xs text-mute mt-0.5">{progressSubtitle}</p>
+        <p className="text-xs text-mute mt-0.5">Pulse - streaks - milestones</p>
       </div>
 
       {/* Pulse */}
@@ -66,14 +80,29 @@ function ProgressPage() {
           </div>
         </div>
         <div className="rounded-lg border border-bd bg-bg1/60 p-4">
-          <div className="text-[11px] font-mono uppercase tracking-wider text-mute">Streak</div>
-          <div className="flex items-center gap-2 mt-2">
-            <Flame className={streakIconClass} />
-            <span className="font-mono text-sm font-semibold">Unavailable</span>
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-mute">Streak</div>
+            {progressData ? <FreshnessBadge state={toBadgeState(progressData.streak.state)} /> : null}
           </div>
-          <div className={unavailableNoteClass}>
-            Streak estimates are unavailable until /user/progress is implemented.
-          </div>
+          {progressLoading ? (
+            <ProgressLoadingBlock />
+          ) : progressError || !progressData ? (
+            <StreakPanelState message="Progress data unavailable while /user/progress is unreachable." />
+          ) : progressData.streak.state === "UNAVAILABLE" ? (
+            <StreakPanelState message="Streak remains unavailable until the backend active-day definition is approved." />
+          ) : (
+            <>
+              <div className="flex items-center gap-2 mt-2">
+                <Flame className="h-6 w-6 text-warn" />
+                <span className="font-mono text-2xl font-semibold">
+                  {progressData.streak.currentStreakDays}d
+                </span>
+              </div>
+              <div className="text-[10px] font-mono text-mute mt-0.5">
+                Last active {progressData.streak.lastActiveDate ?? "unknown"}
+              </div>
+            </>
+          )}
         </div>
         <div className="rounded-lg border border-bd bg-bg1/60 p-4">
           <div className="text-[11px] font-mono uppercase tracking-wider text-mute">
@@ -90,13 +119,55 @@ function ProgressPage() {
 
       {/* Milestones */}
       <div className="rounded-lg border border-bd bg-bg1/60 p-4">
-        <div className="border-b border-bd px-4 py-2.5 text-[11px] font-mono uppercase tracking-wider text-mute">
-          Milestones
+        <div className="flex items-center justify-between border-b border-bd px-4 py-2.5">
+          <div className="text-[11px] font-mono uppercase tracking-wider text-mute">Milestones</div>
+          {progressData ? (
+            <FreshnessBadge state={toBadgeState(progressData.milestones.state)} />
+          ) : null}
         </div>
-        <div className="px-4 py-6 text-sm text-dim">
-          Milestone progress is unavailable until the /user/progress endpoint is implemented.
-        </div>
+        {progressLoading ? (
+          <div className="px-4 py-4">
+            <ProgressLoadingBlock />
+          </div>
+        ) : progressError || !progressData ? (
+          <div className="px-4 py-6 text-sm text-dim">
+            Milestone progress is unavailable while /user/progress is unreachable.
+          </div>
+        ) : (
+          <div className="space-y-3 px-4 py-4 text-sm">
+            <MilestoneRow
+              label="First heartbeat"
+              complete={progressData.milestones.firstHeartbeat}
+            />
+            <MilestoneRow
+              label="First market stream"
+              complete={progressData.milestones.firstMarketStream}
+            />
+            <MilestoneRow
+              label="First trade telemetry"
+              complete={progressData.milestones.firstTradeTelemetry}
+            />
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function MilestoneRow({ label, complete }: { label: string; complete: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="font-mono text-[11px] uppercase tracking-wider text-mute">{label}</span>
+      <span
+        className={cn(
+          "rounded border px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider",
+          complete
+            ? "border-buy/40 bg-buy/15 text-buy"
+            : "border-mute/30 bg-mute/10 text-mute",
+        )}
+      >
+        {complete ? "Complete" : "Pending"}
+      </span>
     </div>
   );
 }

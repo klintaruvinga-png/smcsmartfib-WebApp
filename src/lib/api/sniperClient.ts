@@ -35,6 +35,8 @@ import type {
   SoakReport,
   TwelveDataKeyStatus,
   TradePlan,
+  UserProgress,
+  UserProgressState,
 } from "@/types/sniper";
 
 import {
@@ -51,6 +53,7 @@ import {
   mockFibLevels,
   mockPriceSeries,
   mockSignals,
+  mockUserProgress,
 } from "@/mocks/sniperData";
 
 const DEFAULT_BACKEND_URL =
@@ -127,6 +130,26 @@ type RawOrderResponse = {
   tp: number;
   placed_at: string | null;
   freshness: PendingOrder["state"];
+};
+
+type RawUserProgressResponse = {
+  equity_pulse?: {
+    equity_usc?: number;
+    today_pnl_usc?: number;
+    state?: string;
+  };
+  streak?: {
+    current_streak_days?: number;
+    last_active_date?: string | null;
+    state?: string;
+  };
+  milestones?: {
+    first_heartbeat?: boolean;
+    first_market_stream?: boolean;
+    first_trade_telemetry?: boolean;
+    state?: string;
+  };
+  generated_at?: string;
 };
 
 function requireWatchlistResponse(path: string, watchlist: Symbol[] | undefined): Symbol[] {
@@ -290,6 +313,32 @@ function normalizeTelemetryOrders(rows: RawOrderResponse[]): PendingOrder[] {
       state: row.freshness ?? "unavailable",
     };
   });
+}
+
+function normalizeUserProgressState(value: unknown): UserProgressState {
+  return value === "LIVE" || value === "STALE" || value === "UNAVAILABLE" ? value : "UNAVAILABLE";
+}
+
+function normalizeUserProgress(response: RawUserProgressResponse): UserProgress {
+  return {
+    equityPulse: {
+      equityUSC: toFiniteNumber(response.equity_pulse?.equity_usc),
+      todayPnlUSC: toFiniteNumber(response.equity_pulse?.today_pnl_usc),
+      state: normalizeUserProgressState(response.equity_pulse?.state),
+    },
+    streak: {
+      currentStreakDays: toFiniteNumber(response.streak?.current_streak_days),
+      lastActiveDate: response.streak?.last_active_date ?? null,
+      state: normalizeUserProgressState(response.streak?.state),
+    },
+    milestones: {
+      firstHeartbeat: Boolean(response.milestones?.first_heartbeat),
+      firstMarketStream: Boolean(response.milestones?.first_market_stream),
+      firstTradeTelemetry: Boolean(response.milestones?.first_trade_telemetry),
+      state: normalizeUserProgressState(response.milestones?.state),
+    },
+    generatedAt: response.generated_at ?? new Date(0).toISOString(),
+  };
 }
 
 function toFiniteNumber(value: unknown, fallback = 0): number {
@@ -487,6 +536,12 @@ export const apiClient = {
   async getUserRiskProfile(mock = MOCK_MODE): Promise<RiskProfile> {
     if (mock) return mockRiskProfile;
     return call("/user/risk-profile");
+  },
+  async getUserProgress(mock = MOCK_MODE): Promise<UserProgress> {
+    if (mock) return mockUserProgress;
+    return normalizeUserProgress(
+      await call<RawUserProgressResponse>("/user/progress", { cacheBust: true }),
+    );
   },
   async postUserRiskProfile(
     payload: Partial<RiskProfile>,

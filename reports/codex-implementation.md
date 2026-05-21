@@ -1,58 +1,39 @@
-## Issue summary
+# Issue summary
 
-Implemented Phase 2 MT5 trade telemetry on the existing EA market-stream path: backend persistence for account metrics, open positions, and pending orders; new read-only GET endpoints; MT5 payload emission; and dashboard consumption of backend-owned telemetry.
+Implemented the missing `/user/progress` backend contract and wired the Progress page Streak and Milestones panels to that backend-owned read path while preserving the existing Equity and Drawdown card sources.
 
-## Root cause implemented
+# Root cause implemented
 
-Phase 2 trade telemetry was missing across the full authority chain. The EA market-stream payload carried only Phase 1 quote/candle data, the backend had no authoritative trade/account telemetry tables or sweep logic, and the dashboard trade/account panels were still reading `/user/trades` and `/user/account` instead of backend-owned Phase 2 read endpoints.
+The Progress page gap was a deferred feature, not a regression: `GET /user/progress` did not exist, the frontend had no typed client/hook for it, and `progress.tsx` was hard-gated behind `PROGRESS_NOT_IMPLEMENTED`.
 
-## Exact files changed
+# Exact files changed
 
 - `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
 - `wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php`
-- `mt5/MarketDataEngine.mqh`
+- `src/types/sniper.ts`
+- `src/mocks/sniperData.ts`
 - `src/lib/api/sniperClient.ts`
 - `src/lib/api/sniperClient.test.ts`
 - `src/hooks/useSniperData.ts`
 - `src/hooks/useSniperData.test.tsx`
-- `src/types/sniper.ts`
-- `src/components/sniper/WalletOverview.tsx`
-- `src/components/sniper/WalletOverview.test.tsx`
-- `src/routes/book.tsx`
-- `src/routes/orders.tsx`
-- `src/routes/analytics.tsx`
-- `src/routes/-book.page.test.tsx`
-- `src/routes/-orders.page.test.tsx`
-- `src/routes/-analytics.page.test.tsx`
+- `src/routes/progress.tsx`
+- `src/routes/-progress.page.test.tsx`
 
-## Tests run
+# Tests run
 
-- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
-- `php -l wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php`
 - `php wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php`
-- `php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php`
-- `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx src/components/sniper/WalletOverview.test.tsx src/routes/-book.page.test.tsx src/routes/-orders.page.test.tsx src/routes/-analytics.page.test.tsx`
-- `npm run check:mql`
-- `npm run build`
-- `node scripts/validate-implementation.mjs`
+- `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx src/routes/-progress.page.test.tsx`
+- `npx tsc --noEmit`
 
-## Reports generated
+# Reports generated
 
-- `reports/codex-implementation.md`
-- `reports/codex-implementation.meta.json`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-20_smc-intake-phase-2.md`
-- `reports/phase2-track-a-signoff.md`
-- `reports/phase2-track-b-signoff.md`
-- `reports/phase2-track-c-signoff.md`
-- `reports/phase2-implementation-closeout.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-20_progress-page-progress-contract.md`
+- `.github/migration/audits/phase-2-backend-dashboard-progress-parity-2026-05-20.md`
 
-## Remaining risks
+# Remaining risks
 
-- The MT5 payload extension is logically aligned to the contract, but real MT5 compilation/runtime verification is still pending.
-- Sweep logic is locally validated but still requires the contract-mandated human review before production merge/deploy.
-- Manual staging/browser verification remains recommended for final dashboard parity confirmation.
-- The backend schema gate required one ambiguity resolution: Phase 1-only market-stream payloads remain accepted, while Phase 2 telemetry payloads missing `schema_version` are rejected.
+`streak.current_streak_days` is intentionally degraded to `0` with `state: "UNAVAILABLE"` until the backend active-day definition receives explicit business sign-off. `equity_pulse.today_pnl_usc` has no Phase 2 telemetry table field, so the handler reads the persisted account snapshot value when present and otherwise falls back to `0`.
 
-## Any contract ambiguities resolved during implementation
+# Any contract ambiguities resolved during implementation
 
-- The contract conflicted on `schema_version` handling: one section required rejection when `schema_version` is absent, while another required Phase 1-only payloads without `schema_version` to keep returning 200. Smallest safe interpretation applied: strict rejection only for Phase 2 telemetry payloads missing `schema_version`; strict backward compatibility preserved for Phase 1-only payloads.
+Resolved `first_trade_telemetry` to mean confirmed persisted Phase 2 telemetry existence in `smc_sf_account_telemetry`, because that table is authoritative, guaranteed on valid telemetry batches, and already backs `/account-telemetry`. Resolved the missing `today_pnl_usc` Phase 2 source by using the persisted backend account snapshot value rather than inventing frontend truth.
