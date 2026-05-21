@@ -1,39 +1,27 @@
 # Issue summary
 
-Implemented the missing `/user/progress` backend contract and wired the Progress page Streak and Milestones panels to that backend-owned read path while preserving the existing Equity and Drawdown card sources.
+Stopped - the implementation contract requires explicit written signoff of the backend active-day definition, but the repository still records the rule as unresolved and does not contain an approved definition string or signoff record.
 
 # Root cause implemented
 
-The Progress page gap was a deferred feature, not a regression: `GET /user/progress` did not exist, the frontend had no typed client/hook for it, and `progress.tsx` was hard-gated behind `PROGRESS_NOT_IMPLEMENTED`.
+Not implemented - Codex stopped before code changes. The contract blocks implementation until governance signoff is obtained and the exact approved active-day definition is confirmed.
 
 # Exact files changed
 
-- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
-- `wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php`
-- `src/types/sniper.ts`
-- `src/mocks/sniperData.ts`
-- `src/lib/api/sniperClient.ts`
-- `src/lib/api/sniperClient.test.ts`
-- `src/hooks/useSniperData.ts`
-- `src/hooks/useSniperData.test.tsx`
-- `src/routes/progress.tsx`
-- `src/routes/-progress.page.test.tsx`
+None - no files changed.
 
 # Tests run
 
-- `php wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php`
-- `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx src/routes/-progress.page.test.tsx`
-- `npx tsc --noEmit`
+None - stopped before code changes.
 
 # Reports generated
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-20_progress-page-progress-contract.md`
-- `.github/migration/audits/phase-2-backend-dashboard-progress-parity-2026-05-20.md`
+None - stopped before code changes.
 
 # Remaining risks
 
-`streak.current_streak_days` is intentionally degraded to `0` with `state: "UNAVAILABLE"` until the backend active-day definition receives explicit business sign-off. `equity_pulse.today_pnl_usc` has no Phase 2 telemetry table field, so the handler reads the persisted account snapshot value when present and otherwise falls back to `0`.
+The active-day business rule remains unresolved. Changing `ACTIVE_DAY_DEFINITION` or enabling live streak computation without written signoff would weaken the contract's backend-authority and stale-data safeguards.
 
 # Any contract ambiguities resolved during implementation
 
-Resolved `first_trade_telemetry` to mean confirmed persisted Phase 2 telemetry existence in `smc_sf_account_telemetry`, because that table is authoritative, guaranteed on valid telemetry batches, and already backs `/account-telemetry`. Resolved the missing `today_pnl_usc` Phase 2 source by using the persisted backend account snapshot value rather than inventing frontend truth.
+The smallest safe interpretation is that implementation cannot proceed because two required inputs are missing: explicit written signoff and the exact approved definition string to replace `UNRESOLVED_REQUIRES_SIGNOFF`.
