@@ -1,0 +1,32 @@
+{
+  "workflow_id": "stabilize-ea-2026-05-21",
+  "created_at": "2026-05-21T00:00:00Z",
+  "branch": "claude/nice-fermat-B7rHO",
+  "initial_commit": "8911601bdde7efaab5aee30ba7980cc4d4154d4a",
+  "rollback_points": [
+    {
+      "name": "Initial state",
+      "tag": "snapshot/stabilize-ea-2026-05-21-start-20260521T0000Z",
+      "commit_hash": "8911601bdde7efaab5aee30ba7980cc4d4154d4a",
+      "snapshot_file": "INITIAL-2026-05-21T0000Z.json",
+      "command": "git reset --hard 8911601bdde7efaab5aee30ba7980cc4d4154d4a"
+    },
+    {
+      "name": "Before patches",
+      "tag": "rollback/stabilize-ea-2026-05-21-before-patches",
+      "commit_hash": "8911601bdde7efaab5aee30ba7980cc4d4154d4a",
+      "snapshot_file": "PRE-PATCH-2026-05-21T0130Z.json",
+      "command": "git reset --hard 8911601bdde7efaab5aee30ba7980cc4d4154d4a"
+    },
+    {
+      "name": "After patch 1 (diagnostic log + Prettier fix)",
+      "tag": "rollback/stabilize-ea-2026-05-21-after-patch-1",
+      "commit_hash": "50051820bc8d4ceacafa5c5db309cf78f18710fc",
+      "snapshot_file": "AFTER-PATCH-1-2026-05-21T0200Z.json",
+      "command": "git reset --hard <post-patch-commit-hash>"
+    }
+  ],
+  "emergency_rollback": {
+    "command": "git checkout main && git reset --hard origin/main"
+  }
+}

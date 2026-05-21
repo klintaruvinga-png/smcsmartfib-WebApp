@@ -1,0 +1,120 @@
+{
+  "snapshot_type": "FINDINGS",
+  "workflow_id": "stabilize-ea-2026-05-21",
+  "timestamp": "2026-05-21T01:00:00Z",
+  "confirmed_issues": [
+    {
+      "id": "BUG-001",
+      "severity": "LOW",
+      "system": "Frontend Build / Developer Experience",
+      "description": "npm run lint fails with 49 Prettier formatting errors and 9 warnings across multiple source files (analytics.tsx, progress.tsx, sniperClient.ts, __root.tsx, charts.tsx, and others). These are all whitespace/style violations — no logic errors.",
+      "root_cause": "Pre-existing CRLF/Prettier drift first noted in BUG_SWEEP_REPORT_2026-05-20.md. npm dependencies were not installed in the CI environment on this run (node_modules was absent); after npm install, the lint failures are Prettier formatting drift unrelated to logic.",
+      "impact_zones": ["Developer Experience", "CI pipeline"],
+      "proposed_fix": "Run eslint --fix with prettier to autoformat. Low priority — does not affect runtime behavior, auth, or signal correctness.",
+      "severity_rationale": "Style errors only. No logic, auth, or data-integrity impact. Build still succeeds."
+    },
+    {
+      "id": "BUG-002",
+      "severity": "LOW",
+      "system": "Frontend Build",
+      "description": "Vite build produces a 920 kB main bundle (index-D_QN9J3U.js) that exceeds the 500 kB chunk-size warning threshold.",
+      "root_cause": "Pre-existing chunking architecture. The shared router chunk accumulates most component code. Documented in BUG_SWEEP_REPORT_2026-05-20.md.",
+      "impact_zones": ["Performance (initial load time)"],
+      "proposed_fix": "Add rollupOptions.output.manualChunks in vite.config.ts to split the router from large shared dependencies. Deferred — requires dedicated bundle architecture pass.",
+      "severity_rationale": "Build succeeds and app is functional. Warning only. No auth, signal, or data-integrity impact."
+    },
+    {
+      "id": "OBS-001",
+      "severity": "INFO",
+      "system": "EA Market Stream — Payload Handling",
+      "description": "The canonical REST contract documents a `candles` array field that can contain multiple candle objects. The PHP handler compat layer (post_ea_market_stream line ~2091) only promotes candles[0] to the `candle` field for M1 processing. Any additional array entries are silently dropped.",
+      "root_cause": "By design for current Phase 0/1 streaming: the EA sends M1 as a `candle` object and M15 as `candle_m15`. The `candles` array compat layer exists only to support the canonical REST contract format. Multiple-candle batch ingestion is not in scope until Phase 3.",
+      "impact_zones": ["EA Market Stream"],
+      "proposed_fix": "None required for current phase. Add a warning log if candles.length > 1 to surface unexpected multi-candle batches. Document as Phase 3 scope.",
+      "severity_rationale": "Documented design choice. No data loss for current EA usage pattern."
+    }
+  ],
+  "migration_blockers": [
+    {
+      "id": "MIGRATION-001",
+      "phase": "Phase 2",
+      "description": "Active-day business rule sign-off required before enabling non-zero streak calculations in /user/progress endpoint. Current behavior: streak state is intentionally UNAVAILABLE until ACTIVE_DAY_DEFINITION constant is resolved from 'UNRESOLVED_REQUIRES_SIGNOFF'.",
+      "status": "OPEN — awaiting business sign-off",
+      "validation_required": true,
+      "blocker_type": "business_rule",
+      "file_reference": "smc-superfib-sniper.php line 21: const ACTIVE_DAY_DEFINITION = 'UNRESOLVED_REQUIRES_SIGNOFF'"
+    },
+    {
+      "id": "MIGRATION-002",
+      "phase": "Phase 2",
+      "description": "Final browser parity review recommended for Phase 2 trade telemetry panels (account card, live positions, floating P/L, hedge grouping, sync health) before production deploy.",
+      "status": "OPEN — recommended pre-deploy validation",
+      "validation_required": true,
+      "blocker_type": "validation",
+      "file_reference": ".github/migration-status.md Phase 2 blockers"
+    }
+  ],
+  "systems_confirmed_clean": [
+    {
+      "system": "EA Authentication (permission_ea_bridge)",
+      "status": "CONFIRMED CORRECT",
+      "notes": "X-EA-API-Key read from 4 header aliases; hash_equals used; missing token → 401; unconfigured → 503; invalid → 403; missing user_id → 400; invalid user_id → 403; wp_set_current_user called. All correct."
+    },
+    {
+      "system": "EA Market Stream Payload Validation",
+      "status": "CONFIRMED CORRECT",
+      "notes": "symbol required; bid/ask validated finite+positive+bid<=ask; quote_time/timestamp compat layer; stale >300s rejected (422); 120-300s logged; candle epoch guard (>2000-01-01); OHLC validate_ohlc(); tick_volume guard_tick_volume() clamps to non-negative int; future-candle rejection."
+    },
+    {
+      "system": "age_sec / Freshness Calculation",
+      "status": "CONFIRMED CORRECT",
+      "notes": "get_cached_price() computes age_sec from updated_at (broker timestamp stored in DB), not from fetch time. iso_age_sec() is used. price_state transitions to 'stale' if age_sec > staleThresholdSec. Backend is authoritative."
+    },
+    {
+      "system": "FreshnessBadge Component",
+      "status": "CONFIRMED CORRECT",
+      "notes": "Reads state from backend price object. Does not compute freshness locally. Has guard for unknown states (falls back to stale style). Does not fake live status."
+    },
+    {
+      "system": "VerdictBadge Component",
+      "status": "CONFIRMED CORRECT",
+      "notes": "Reads verdict from backend signal data. Does not derive verdict locally."
+    },
+    {
+      "system": "authority-diagnostics Route",
+      "status": "CONFIRMED PROTECTED",
+      "notes": "Uses permission_user (WP session required). Returns 401 for unauthenticated requests. Correct by design."
+    },
+    {
+      "system": "Admin Routes",
+      "status": "CONFIRMED PROTECTED",
+      "notes": "All /admin/* routes use permission_admin (manage_options required). Returns 401/403 for non-admin. Correct."
+    },
+    {
+      "system": "Signal Engine Stale Gating",
+      "status": "CONFIRMED CORRECT",
+      "notes": "Signal engine reads price_age from age_sec, checks price_state === 'live', and requires candle_age_sec <= 7200. Does not run on stale data."
+    },
+    {
+      "system": "useSniperData Polling",
+      "status": "CONFIRMED CORRECT",
+      "notes": "All queries gated on backendReady && pollMs !== null. Prevents orphaned queries during initialization. No duplicate refresh loops."
+    },
+    {
+      "system": "Watchlist Mutations",
+      "status": "CONFIRMED CORRECT",
+      "notes": "Optimistic updates with rollback on error. Invalidates related queries after success. Backend is authoritative for watchlist."
+    }
+  ],
+  "statistics": {
+    "total_issues": 3,
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 2,
+    "info": 1,
+    "migration_blockers": 2,
+    "migration_blockers_new": 0,
+    "migration_blockers_pre_existing": 2
+  }
+}

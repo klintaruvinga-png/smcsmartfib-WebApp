@@ -1,0 +1,37 @@
+{
+  "snapshot_type": "PRE-PATCH",
+  "workflow_id": "stabilize-ea-2026-05-21",
+  "timestamp": "2026-05-21T01:30:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-B7rHO",
+    "commit_hash": "8911601bdde7efaab5aee30ba7980cc4d4154d4a",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-21-before-patches"
+  },
+  "patches_planned": [
+    {
+      "id": "PATCH-001",
+      "target_issue": "OBS-001",
+      "description": "Add diagnostic warning log when candles[] array contains more than one element, to surface unexpected multi-candle batch payloads for investigation.",
+      "file": "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "type": "defensive_logging",
+      "risk": "none — log-only, no behavior change"
+    },
+    {
+      "id": "PATCH-002",
+      "target_issue": "BUG-001",
+      "description": "Apply eslint --fix (Prettier) to the files with confirmed formatting drift to restore lint clean status for the patched files.",
+      "file": "src/routes/progress.tsx, src/routes/analytics.tsx, src/lib/api/sniperClient.ts",
+      "type": "style_fix",
+      "risk": "none — formatting only"
+    }
+  ],
+  "no_patch_required": [
+    "EA auth (permission_ea_bridge) — confirmed correct",
+    "Payload validation — confirmed correct including all guard functions",
+    "Freshness calculation — confirmed correct (broker timestamp, not fetch time)",
+    "Signal engine gating — confirmed correct",
+    "FreshnessBadge / VerdictBadge — confirmed correct (read from backend, no local derivation)",
+    "authority-diagnostics protection — confirmed correct",
+    "Admin route protection — confirmed correct"
+  ]
+}
