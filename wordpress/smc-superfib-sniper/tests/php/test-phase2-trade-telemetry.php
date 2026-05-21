@@ -144,6 +144,31 @@ if (!class_exists('TestWpdb')) {
         }
 
         public function get_var($query) {
+            if (preg_match("/SELECT 1 FROM ([^ ]+)/", $query, $m) && strpos($query, 'summary LIKE') !== false) {
+                $table = $m[1];
+                preg_match("/user_id = (\\d+)/", $query, $user_match);
+                preg_match("/status = '([^']+)'/", $query, $status_match);
+                preg_match("/summary LIKE '([^']+)'/", $query, $needle_match);
+                $user_id = (int) ($user_match[1] ?? 0);
+                $status = $status_match[1] ?? '';
+                $needle = isset($needle_match[1]) ? str_replace('%', '', str_replace("''", "'", $needle_match[1])) : '';
+                if ($needle === '' && strpos($query, 'explicit_heartbeat') !== false) {
+                    $needle = 'explicit_heartbeat';
+                } elseif ($needle === '' && strpos($query, 'ea_push') !== false) {
+                    $needle = 'ea_push';
+                }
+                foreach ($this->tables[$table] ?? array() as $row) {
+                    if ((int) ($row['user_id'] ?? 0) !== $user_id || (string) ($row['status'] ?? '') !== $status) {
+                        continue;
+                    }
+                    $summary = (string) ($row['summary'] ?? '');
+                    if ($needle !== '' && strpos($summary, $needle) !== false) {
+                        return '1';
+                    }
+                }
+                return null;
+            }
+
             if (preg_match("/SELECT data FROM ([^ ]+) WHERE user_id = (\\d+)/", $query, $m)) {
                 $table = $m[1];
                 $user_id = (int) $m[2];
