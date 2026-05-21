@@ -308,7 +308,7 @@ These repository surfaces inform Phase 2 planning but are not, by themselves, pr
 - [x] `GET /user/progress` returns backend-owned equity pulse, milestone state, and conservative streak state for the Progress page
 - [x] Manual trade open/close, partial close, SL/TP modification, broker reconnect, and weekend reopen scenarios all reconcile to backend-owned truth
 
-> Browser and regression checks now cover live account telemetry, active book, trade dashboard surfaces, and the `/progress` route wiring. The Progress page streak and milestone panels read from the backend-owned `/user/progress` contract. Streak remains intentionally conservative (`UNAVAILABLE`, `0`) until the active-day definition is formally approved.
+> Browser and regression checks now cover live account telemetry, active book, trade dashboard surfaces, and the `/progress` route wiring. The Progress page streak and milestone panels read from the backend-owned `/user/progress` contract. Progress page implementation is verified with backend progress-state wiring in place. Streak remains intentionally conservative (`UNAVAILABLE`, `0`) until the active-day definition is formally approved.
 
 ---
 
