@@ -170,26 +170,27 @@ describe("Phase 2 telemetry client reads", () => {
   });
 
   it("reads account telemetry from the backend-owned account endpoint", async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          account_id: "32206603",
-          terminal_id: "terminal-1",
-          balance: 10000,
-          equity: 10125,
-          margin: 1000,
-          free_margin: 9125,
-          margin_level: 1012.5,
-          floating_pl: 125,
-          currency: "USC",
-          leverage: 500,
-          ea_version: "1.00",
-          last_seen_at: "2026-05-20T10:15:00Z",
-          updated_at: "2026-05-20T10:15:00Z",
-          freshness: "live",
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      ),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            account_id: "32206603",
+            terminal_id: "terminal-1",
+            balance: 10000,
+            equity: 10125,
+            margin: 1000,
+            free_margin: 9125,
+            margin_level: 1012.5,
+            floating_pl: 125,
+            currency: "USC",
+            leverage: 500,
+            ea_version: "1.00",
+            last_seen_at: "2026-05-20T10:15:00Z",
+            updated_at: "2026-05-20T10:15:00Z",
+            freshness: "live",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
     );
 
     vi.stubGlobal("fetch", fetchMock);
@@ -208,29 +209,30 @@ describe("Phase 2 telemetry client reads", () => {
   });
 
   it("normalizes the /user/progress contract from snake_case to camelCase", async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          equity_pulse: {
-            equity_usc: 10125,
-            today_pnl_usc: 48.5,
-            state: "LIVE",
-          },
-          streak: {
-            current_streak_days: 0,
-            last_active_date: "2026-05-20",
-            state: "UNAVAILABLE",
-          },
-          milestones: {
-            first_heartbeat: true,
-            first_market_stream: true,
-            first_trade_telemetry: true,
-            state: "LIVE",
-          },
-          generated_at: "2026-05-20T10:15:00Z",
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      ),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            equity_pulse: {
+              equity_usc: 10125,
+              today_pnl_usc: 48.5,
+              state: "LIVE",
+            },
+            streak: {
+              current_streak_days: 0,
+              last_active_date: "2026-05-20",
+              state: "UNAVAILABLE",
+            },
+            milestones: {
+              first_heartbeat: true,
+              first_market_stream: true,
+              first_trade_telemetry: true,
+              state: "LIVE",
+            },
+            generated_at: "2026-05-20T10:15:00Z",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
     );
 
     vi.stubGlobal("fetch", fetchMock);

@@ -1,9 +1,9 @@
 # SMC SuperFIB → MT5 Migration Status Board
 
-**Last Updated**: 2026-05-20  
-**Current Phase**: 2 (Read-Only Trade Telemetry — Planning)  
-**Overall Progress**: 65%  
-**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 planning in progress
+**Last Updated**: 2026-05-21  
+**Current Phase**: 2 (Read-Only Trade Telemetry — Implementation Complete, Validation Pending)  
+**Overall Progress**: 68%  
+**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 implementation complete, 2 non-code blockers remain
 
 > Snapshot: Phase 0 gate passed 2026-05-15. Post-fix validation soak at 16:37 UTC confirmed NAS100 (29,263.70) and US30 (49,756.00) both LIVE during active US equity session; XAUUSD (4,556.34) LIVE with candle-history gate cleared. Backend soak: 259,464 engine runs / 0 errors / 69,262 candles over 24h. Frontend feed-status chip lag (BUG-001 staleTime:0) resolved. Watchlist persistence 100% parity. AUDUSD/ETHUSD chop-gate classified as correct live behavior — not a blocker. Full closeout evidence: `.github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md`.
 
@@ -187,6 +187,7 @@ Market-Stream Auth:
 - *Final manual staging/browser parity validation recommended before production deploy*
 - *`/user/progress` implemented on 2026-05-20; Progress page now reads backend-owned streak and milestone state. Remaining follow-up: approve the backend active-day definition before enabling non-zero streak calculations.*
 - *Progress page implementation verified on 2026-05-21; streak state is intentionally shown as UNAVAILABLE until the active-day business rule receives sign-off.*
+- *Stabilization sweep 2026-05-21: No parity blockers or code gaps found. Two non-code blockers remain: (1) active-day sign-off for `ACTIVE_DAY_DEFINITION`; (2) browser parity review for trade telemetry panels before production deploy. Lint clean (0 errors) after Prettier autofix. Diagnostic log added for multi-candle batch payloads (Phase 3 scope).*
 
 ---
 

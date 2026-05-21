@@ -2090,6 +2090,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         // COMPAT: Accept 'candles' array (canonical REST contract) alongside 'candle' object (legacy EA format).
         // If 'candle' is absent but 'candles' array is present, promote candles[0] as the M1 candle.
+        // Multi-candle batch ingestion (Phase 3 scope) is not yet implemented — only candles[0] is stored.
         if (!isset($payload['candle']) && !empty($payload['candles']) && is_array($payload['candles'])) {
             $first = reset($payload['candles']);
             if (is_array($first)) {
@@ -2098,6 +2099,20 @@ final class SMC_SuperFib_Sniper_REST {
                     $first['volume'] = $first['tick_volume'];
                 }
                 $payload['candle'] = $first;
+            }
+            // DIAGNOSTIC: Log if caller sends more than one candle entry; extra entries are not yet persisted.
+            $candle_count = count($payload['candles']);
+            if ($candle_count > 1) {
+                error_log(sprintf(
+                    '[SMC_SF] ea/market-stream: candles[] array has %d entries for symbol=%s; only candles[0] is stored. Multi-candle batch is Phase 3 scope.',
+                    $candle_count,
+                    $symbol
+                ));
+                $this->audit($user_id, 'ea.market_stream.multi_candle_batch_truncated', array(
+                    'symbol'       => $symbol,
+                    'candle_count' => $candle_count,
+                    'note'         => 'Only candles[0] stored. Phase 3 will add full batch ingestion.',
+                ));
             }
         }
 

@@ -1,0 +1,74 @@
+{
+  "snapshot_type": "FINAL",
+  "workflow_id": "stabilize-ea-2026-05-21",
+  "timestamp": "2026-05-21T03:00:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-B7rHO",
+    "commit_hash": "TBD-after-commit",
+    "tags_created": [
+      "snapshot/stabilize-ea-2026-05-21-start-20260521T0000Z",
+      "rollback/stabilize-ea-2026-05-21-before-patches",
+      "rollback/stabilize-ea-2026-05-21-after-patch-1"
+    ]
+  },
+  "patches_applied": [
+    {
+      "id": "PATCH-001",
+      "target": "smc-superfib-sniper.php",
+      "type": "defensive_logging",
+      "description": "Add audit log when candles[] array has > 1 element in ea/market-stream payload"
+    },
+    {
+      "id": "PATCH-002",
+      "target": "src/routes/progress.tsx, src/routes/analytics.tsx, src/lib/api/sniperClient.ts, src/lib/api/sniperClient.test.ts",
+      "type": "style_fix",
+      "description": "Prettier formatting auto-fix — 49 formatting errors resolved; lint now 0 errors"
+    }
+  ],
+  "migration_status_post_patch": {
+    "blockers_addressed": [],
+    "remaining_blockers": [
+      "MIGRATION-001: Active-day business rule sign-off for streak calculation (ACTIVE_DAY_DEFINITION constant = 'UNRESOLVED_REQUIRES_SIGNOFF')",
+      "MIGRATION-002: Final browser parity review for Phase 2 trade telemetry panels"
+    ],
+    "phase_readiness": "Phase 2 is 75% complete. Implementation is done. Blockers are business/validation items, not code items."
+  },
+  "tests": {
+    "commands_run": [
+      "php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "php -l wordpress/smc-superfib-sniper/class-market-data-service.php",
+      "npm run lint",
+      "npm run build",
+      "npm run check:mql"
+    ],
+    "passing": true,
+    "failures": [],
+    "warnings": [
+      "npm run build: chunk size warning — main bundle 920 kB (pre-existing)",
+      "npm run lint: 9 warnings (react-hooks/exhaustive-deps, react-refresh/only-export-components) — pre-existing, not fixable with --fix"
+    ]
+  },
+  "ea_integration_status": {
+    "market_stream_route": "POST /wp-json/sniper/v1/ea/market-stream",
+    "auth_required": true,
+    "auth_header": "X-EA-API-Key",
+    "auth_aliases": ["X-EA-API-Key", "x_ea_api_key", "X-API-KEY", "x_api_key"],
+    "secret_env": "SMC_SF_EA_API_KEY",
+    "secret_constant": "SMC_SF_EA_API_KEY (PHP constant, getenv fallback)",
+    "user_id_required": true,
+    "payload_validation": true,
+    "stale_rejection": true,
+    "stale_threshold_hard_reject_sec": 300,
+    "stale_threshold_warn_sec": 120,
+    "candle_validation": ["epoch_guard (>2000-01-01)", "future_candle_guard", "ohlc_validate", "age_gate (M1: 180s, M15: 1800s)"],
+    "missing_token_response": {"code": "smc_sf_api_key_missing", "status": 401},
+    "unconfigured_secret_response": {"code": "smc_sf_api_key_unconfigured", "status": 503},
+    "invalid_token_response": {"code": "smc_sf_api_key_invalid", "status": 403},
+    "missing_user_id_response": {"code": "smc_sf_user_required", "status": 400},
+    "stale_payload_response": {"code": "stale_data", "status": 422}
+  },
+  "rollback": {
+    "manifest": "ROLLBACK-MANIFEST.json",
+    "rollback_points_count": 2
+  }
+}
