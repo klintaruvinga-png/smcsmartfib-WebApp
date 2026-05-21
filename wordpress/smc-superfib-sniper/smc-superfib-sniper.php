@@ -4727,13 +4727,6 @@ final class SMC_SuperFib_Sniper_REST {
             $today_pnl = (float) ($account_blob['account']['todayPnlUSC'] ?? 0);
         }
 
-        error_log(sprintf(
-            'SMC SuperFIB user_progress equity source: user_id=%d last_seen_at=%s updated_at=%s',
-            $user_id,
-            (string) ($telemetry['last_seen_at'] ?? 'null'),
-            (string) ($telemetry['updated_at'] ?? 'null')
-        ));
-
         return array(
             'equity_usc' => (float) ($telemetry['equity'] ?? 0),
             'today_pnl_usc' => $today_pnl,
@@ -4743,13 +4736,6 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function read_progress_streak(int $user_id): array {
         $last_active_at = $this->latest_timestamp('engine_runs', $user_id, 'created_at');
-        error_log(sprintf(
-            'SMC SuperFIB user_progress streak unavailable: user_id=%d active_day_definition=%s last_active_at=%s',
-            $user_id,
-            self::ACTIVE_DAY_DEFINITION,
-            $last_active_at !== null ? $last_active_at : 'null'
-        ));
-
         return array(
             'current_streak_days' => 0,
             'last_active_date' => $last_active_at ? gmdate('Y-m-d', strtotime($last_active_at . ' UTC')) : null,
@@ -4916,6 +4902,10 @@ final class SMC_SuperFib_Sniper_REST {
     private function has_engine_heartbeat_source(int $user_id, string $source): bool {
         global $wpdb;
 
+        $escaped_source = method_exists($wpdb, 'esc_like')
+            ? $wpdb->esc_like($source)
+            : addcslashes($source, '\\%_');
+
         $match = $wpdb->get_var($wpdb->prepare(
             "SELECT 1 FROM {$this->table('engine_runs')}
              WHERE user_id = %d
@@ -4924,7 +4914,7 @@ final class SMC_SuperFib_Sniper_REST {
              LIMIT 1",
             $user_id,
             'heartbeat',
-            '%"source":"' . $source . '"%'
+            '%"source":"' . $escaped_source . '"%'
         ));
 
         if ($match !== null) {
