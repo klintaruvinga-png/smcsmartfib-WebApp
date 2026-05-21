@@ -5798,11 +5798,19 @@ final class SMC_SuperFib_Sniper_REST {
         
         $value = trim((string) $iso_time);
         
-        // Strip timezone abbreviations (UTC, GMT, EST, PST, etc.) that appear at the end
-        $value = preg_replace('/\s+(UTC|GMT|[A-Z]{3,4})\s*$/', '', $value);
+        // Preserve non-UTC timezone abbreviations (EST, PST, CET, etc.) so PHP can convert
+        // them correctly instead of silently coercing to UTC wall-clock.
+        $has_named_tz = preg_match('/\s+([A-Z]{2,5})\s*$/i', $value, $tz_match) === 1;
+        if ($has_named_tz) {
+            $tz_abbrev = strtoupper($tz_match[1]);
+            if (in_array($tz_abbrev, array('UTC', 'GMT', 'UT', 'Z'), true)) {
+                $value = preg_replace('/\s+([A-Z]{2,5})\s*$/i', '', $value);
+                $has_named_tz = false;
+            }
+        }
         
         // If timestamp doesn't already have a timezone offset ([+-]HH:MM or Z), add Z
-        if (!preg_match('/([+-]\d{2}:\d{2}|Z)\s*$/', $value)) {
+        if (!$has_named_tz && !preg_match('/([+-]\d{2}:\d{2}|Z)\s*$/', $value)) {
             $value .= 'Z';
         }
         
