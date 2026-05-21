@@ -145,7 +145,7 @@ if (!class_exists('TestWpdb')) {
 
         public function get_var($query) {
             if (preg_match("/SELECT 1 FROM ([^ ]+)/", $query, $m) && strpos($query, 'summary LIKE') !== false) {
-                $table = $m[1];
+                $table = trim($m[1]);
                 preg_match("/user_id = (\\d+)/", $query, $user_match);
                 preg_match("/status = '([^']+)'/", $query, $status_match);
                 preg_match("/summary LIKE '([^']+)'/", $query, $needle_match);
