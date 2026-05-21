@@ -492,6 +492,7 @@ class SMC_MarketData_Service
 
         $value = trim((string) $raw_time);
         $value = preg_replace('/^(\d{4})\.(\d{2})\.(\d{2})/', '$1-$2-$3', $value);
+        $value = preg_replace('/\s+(UTC|GMT|[A-Z]{3,4})\s*$/', '', $value);
 
         if (!preg_match('/([+-]\d{2}:\d{2}|Z)\s*$/', $value)) {
             $value .= 'Z';
