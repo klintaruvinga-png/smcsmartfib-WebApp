@@ -152,6 +152,7 @@ if (!class_exists('TestWpdb')) {
                 $user_id = (int) ($user_match[1] ?? 0);
                 $status = $status_match[1] ?? '';
                 $needle = isset($needle_match[1]) ? str_replace('%', '', str_replace("''", "'", $needle_match[1])) : '';
+                $needle = str_replace(array('\\_', '\\%', '\\\\'), array('_', '%', '\\'), $needle);
                 if ($needle === '' && strpos($query, 'explicit_heartbeat') !== false) {
                     $needle = 'explicit_heartbeat';
                 } elseif ($needle === '' && strpos($query, 'ea_push') !== false) {

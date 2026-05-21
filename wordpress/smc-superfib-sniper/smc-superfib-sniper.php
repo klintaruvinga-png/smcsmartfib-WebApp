@@ -4902,6 +4902,10 @@ final class SMC_SuperFib_Sniper_REST {
     private function has_engine_heartbeat_source(int $user_id, string $source): bool {
         global $wpdb;
 
+        $escaped_source = method_exists($wpdb, 'esc_like')
+            ? $wpdb->esc_like($source)
+            : addcslashes($source, '\\%_');
+
         $match = $wpdb->get_var($wpdb->prepare(
             "SELECT 1 FROM {$this->table('engine_runs')}
              WHERE user_id = %d
@@ -4910,7 +4914,7 @@ final class SMC_SuperFib_Sniper_REST {
              LIMIT 1",
             $user_id,
             'heartbeat',
-            '%"source":"' . $source . '"%'
+            '%"source":"' . $escaped_source . '"%'
         ));
 
         if ($match !== null) {
