@@ -82,7 +82,9 @@ export function ProgressPage() {
         <div className="rounded-lg border border-bd bg-bg1/60 p-4">
           <div className="flex items-center justify-between">
             <div className="text-[11px] font-mono uppercase tracking-wider text-mute">Streak</div>
-            {progressData ? <FreshnessBadge state={toBadgeState(progressData.streak.state)} /> : null}
+            {progressData ? (
+              <FreshnessBadge state={toBadgeState(progressData.streak.state)} />
+            ) : null}
           </div>
           {progressLoading ? (
             <ProgressLoadingBlock />
@@ -161,9 +163,7 @@ function MilestoneRow({ label, complete }: { label: string; complete: boolean })
       <span
         className={cn(
           "rounded border px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider",
-          complete
-            ? "border-buy/40 bg-buy/15 text-buy"
-            : "border-mute/30 bg-mute/10 text-mute",
+          complete ? "border-buy/40 bg-buy/15 text-buy" : "border-mute/30 bg-mute/10 text-mute",
         )}
       >
         {complete ? "Complete" : "Pending"}

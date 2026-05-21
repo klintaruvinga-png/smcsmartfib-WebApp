@@ -473,7 +473,8 @@ export const apiClient = {
         balance: mockAccount.balanceUSC,
         equity: mockAccount.equityUSC,
         margin: (mockAccount.marginUsedPct / 100) * mockAccount.equityUSC,
-        freeMargin: mockAccount.equityUSC - (mockAccount.marginUsedPct / 100) * mockAccount.equityUSC,
+        freeMargin:
+          mockAccount.equityUSC - (mockAccount.marginUsedPct / 100) * mockAccount.equityUSC,
         marginLevel: mockAccount.marginUsedPct > 0 ? (100 / mockAccount.marginUsedPct) * 100 : 0,
         floatingPl: mockAccount.equityUSC - mockAccount.balanceUSC,
         currency: "USC",

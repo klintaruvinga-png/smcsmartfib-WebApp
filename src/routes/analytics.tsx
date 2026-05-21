@@ -40,10 +40,7 @@ export function AnalyticsPage() {
   const ddRatio = (account?.drawdownPct ?? 0) / risk.ddCapPct;
   const equityCurveData = MOCK_MODE ? mockEquityCurve : null;
   const telemetryUnavailable =
-    accountTelemetryError != null ||
-    tradesError != null ||
-    !accountTelemetry ||
-    trades == null;
+    accountTelemetryError != null || tradesError != null || !accountTelemetry || trades == null;
   const accountFreshness = telemetryUnavailable ? "unavailable" : accountTelemetry.state;
   const balanceValue = accountTelemetry?.balance ?? 0;
   const equityValue = accountTelemetry?.equity ?? 0;
@@ -141,9 +138,16 @@ export function AnalyticsPage() {
           value={
             telemetryUnavailable
               ? "Unavailable"
-              : fmtPct(equityValue > 0 ? ((accountTelemetry?.margin ?? 0) / equityValue) * 100 : 0, false)
+              : fmtPct(
+                  equityValue > 0 ? ((accountTelemetry?.margin ?? 0) / equityValue) * 100 : 0,
+                  false,
+                )
           }
-          sub={telemetryUnavailable ? "Waiting for backend account telemetry" : `${fmtUSC(balanceValue)} bal`}
+          sub={
+            telemetryUnavailable
+              ? "Waiting for backend account telemetry"
+              : `${fmtUSC(balanceValue)} bal`
+          }
           tone="info"
           state={accountFreshness}
         />
