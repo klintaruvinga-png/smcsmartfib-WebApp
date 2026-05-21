@@ -4916,6 +4916,21 @@ final class SMC_SuperFib_Sniper_REST {
     private function has_engine_heartbeat_source(int $user_id, string $source): bool {
         global $wpdb;
 
+        $match = $wpdb->get_var($wpdb->prepare(
+            "SELECT 1 FROM {$this->table('engine_runs')}
+             WHERE user_id = %d
+               AND status = %s
+               AND summary LIKE %s
+             LIMIT 1",
+            $user_id,
+            'heartbeat',
+            '%"source":"' . $source . '"%'
+        ));
+
+        if ($match !== null) {
+            return true;
+        }
+
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM {$this->table('engine_runs')} WHERE user_id = %d AND status = %s",
             $user_id,
