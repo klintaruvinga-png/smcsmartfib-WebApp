@@ -4,7 +4,7 @@
   "timestamp": "2026-05-21T03:00:00Z",
   "git": {
     "branch": "claude/nice-fermat-B7rHO",
-    "commit_hash": "TBD-after-commit",
+    "commit_hash": "50051820bc8d4ceacafa5c5db309cf78f18710fc",
     "tags_created": [
       "snapshot/stabilize-ea-2026-05-21-start-20260521T0000Z",
       "rollback/stabilize-ea-2026-05-21-before-patches",

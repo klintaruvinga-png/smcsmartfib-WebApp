@@ -26,7 +26,7 @@
 
 ## Final State
 - File: FINAL-2026-05-21T0300Z.json
-- Commit: TBD after final push
+- Commit: 50051820bc8d4ceacafa5c5db309cf78f18710fc
 - Ready for deployment: YES (both patches are non-behavior-changing)
 
 ## Rollback Points
