@@ -1968,8 +1968,15 @@ final class SMC_SuperFib_Sniper_REST {
                 if (isset($first['tick_volume']) && !isset($first['volume'])) {
                     $first['volume'] = $first['tick_volume'];
                 }
+                if (isset($first['time']) && !isset($first['timestamp'])) {
+                    $first['timestamp'] = $first['time'];
+                }
                 $payload['candle_m1'] = $first;
             }
+        }
+
+        if (isset($payload['candle_m1']) && is_array($payload['candle_m1']) && isset($payload['candle_m1']['time']) && !isset($payload['candle_m1']['timestamp'])) {
+            $payload['candle_m1']['timestamp'] = $payload['candle_m1']['time'];
         }
 
         return $payload;
