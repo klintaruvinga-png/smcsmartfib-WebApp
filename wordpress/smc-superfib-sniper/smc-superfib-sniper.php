@@ -2103,8 +2103,8 @@ final class SMC_SuperFib_Sniper_REST {
             return array('field' => 'session', 'message' => 'session is required and must be a valid MT5 session name.');
         }
 
-        $has_m1_candle = isset($payload['candle']) || $this->has_any_phase3_candle_alias($payload, 'candle_');
-        $has_m15_candle = isset($payload['candle_m15']) || $this->has_any_phase3_candle_alias($payload, 'candle_m15_');
+        $has_m1_candle = array_key_exists('candle', $payload) || $this->has_any_phase3_candle_alias($payload, 'candle_');
+        $has_m15_candle = array_key_exists('candle_m15', $payload) || $this->has_any_phase3_candle_alias($payload, 'candle_m15_');
 
         $required_candles = array();
         if ($has_m1_candle || !$has_m15_candle) {

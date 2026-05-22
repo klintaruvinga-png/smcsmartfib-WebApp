@@ -182,4 +182,12 @@ $m15_only_time = gmdate('Y-m-d H:i:s', strtotime($payload['candle_m15']['time'])
 assert_same(0, count(phase3_candle_rows(7, 'EURUSD', '1min')), 'M15-only payload must not require or insert an M1 candle row');
 assert_same(1, count(phase3_candle_rows(7, 'EURUSD', '15min', $m15_only_time)), 'M15-only payload must persist exactly one MT5 M15 candle row');
 
+// 9. Explicit null M1 candle must be treated as present and rejected.
+reset_ea_bridge_test_state();
+$plugin = new SMC_SuperFib_Sniper_REST();
+$payload = phase3_base_payload();
+$payload['candle'] = null;
+$response = phase3_dispatch($plugin, $payload);
+phase3_assert_wp_error($response, 'invalid_phase3_payload', 400, 'Null explicit M1 candle');
+
 fwrite(STDOUT, "phase3 mt5 simulation checks passed\n");
