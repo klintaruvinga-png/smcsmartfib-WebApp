@@ -223,7 +223,9 @@ int OnInit()
     engine.SendSymbolSync(g_symArray, g_symCount);
 
     g_heartbeatIntervalTicks = (HeartbeatIntervalTicks > 0) ? HeartbeatIntervalTicks : 6;
-    EventSetTimer(TimerSec);
+    if (TimerSec != 10)
+        Print("SMC_MarketDataEA: TimerSec input ignored - Phase 3 dispatch interval is fixed at 10 seconds.");
+    EventSetTimer(10);
     if (!g_configValid)
     {
         Print("WARNING: SMC_MarketDataEA started with invalid backend config. ", BuildConfigIssueSummary(),

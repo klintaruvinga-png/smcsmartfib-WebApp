@@ -54,46 +54,61 @@ public:
 
         lastTickTimes[index] = tickTime;
         stagnationTimers[index] = 0;
-
-        // Determine freshness
-        freshnessStates[index] = FRESHNESS_LIVE;  // Since we just got a tick
+        freshnessStates[index] = FRESHNESS_LIVE;
     }
 
-    // Update freshness periodically.
+    // Update freshness periodically for all known symbols.
     // Pass is_market_open=false during weekends/holidays so symbols transition
     // to FRESHNESS_CLOSED rather than incorrectly aging into FRESHNESS_STALE.
     void UpdatePeriodic(bool is_market_open = true)
     {
         datetime now = TimeCurrent();
         for (int i = 0; i < symbolCount; i++)
+            UpdateSymbolPeriodic(symbolList[i], is_market_open, now);
+    }
+
+    // Update one symbol using the canonical MT5 thresholds:
+    // LIVE < 30s, DELAYED < 300s, STALE >= 300s, CLOSED outside session hours.
+    void UpdateSymbolPeriodic(string symbol, bool is_market_open = true, datetime now = 0)
+    {
+        int index = GetSymbolIndex(symbol);
+        if (index == -1)
+            index = AddSymbol(symbol);
+        if (index == -1)
         {
-            // HARDENING: disconnected terminal always wins — no live data possible.
-            if (!IsTerminalConnected())
-            {
-                freshnessStates[i] = FRESHNESS_DISCONNECTED;
-                stagnationTimers[i] = (int)(now - lastTickTimes[i]);
-                continue;
-            }
-
-            // HARDENING: propagate CLOSED state from session manager so market-closed
-            // symbols are not misrepresented as STALE during weekends/holidays.
-            if (!is_market_open)
-            {
-                freshnessStates[i] = FRESHNESS_CLOSED;
-                stagnationTimers[i] = (int)(now - lastTickTimes[i]);
-                continue;
-            }
-
-            int secondsSinceTick = (int)(now - lastTickTimes[i]);
-            stagnationTimers[i] = secondsSinceTick;
-
-            if (secondsSinceTick < 30)
-                freshnessStates[i] = FRESHNESS_LIVE;
-            else if (secondsSinceTick < 300)
-                freshnessStates[i] = FRESHNESS_DELAYED;
-            else
-                freshnessStates[i] = FRESHNESS_STALE;
+            Print("FreshnessEngine: capacity full, skipping periodic update for symbol: ", symbol);
+            return;
         }
+
+        if (now <= 0)
+            now = TimeCurrent();
+
+        // HARDENING: disconnected terminal always wins - no live data possible.
+        if (!IsTerminalConnected())
+        {
+            freshnessStates[index] = FRESHNESS_DISCONNECTED;
+            stagnationTimers[index] = (int)(now - lastTickTimes[index]);
+            return;
+        }
+
+        // HARDENING: propagate CLOSED state from session manager so market-closed
+        // symbols are not misrepresented as STALE during weekends/holidays/off-hours.
+        if (!is_market_open)
+        {
+            freshnessStates[index] = FRESHNESS_CLOSED;
+            stagnationTimers[index] = (int)(now - lastTickTimes[index]);
+            return;
+        }
+
+        int secondsSinceTick = (int)(now - lastTickTimes[index]);
+        stagnationTimers[index] = secondsSinceTick;
+
+        if (secondsSinceTick < 30)
+            freshnessStates[index] = FRESHNESS_LIVE;
+        else if (secondsSinceTick < 300)
+            freshnessStates[index] = FRESHNESS_DELAYED;
+        else
+            freshnessStates[index] = FRESHNESS_STALE;
     }
 
     // Get freshness state

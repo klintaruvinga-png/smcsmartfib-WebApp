@@ -1982,6 +1982,153 @@ final class SMC_SuperFib_Sniper_REST {
         return $payload;
     }
 
+    private function normalize_phase3_market_stream_payload(array $payload): array
+    {
+        if (!isset($payload['candle']) && $this->has_any_phase3_candle_alias($payload, 'candle_')) {
+            $payload['candle'] = array(
+                'time' => $payload['candle_time'] ?? null,
+                'open' => $payload['candle_open'] ?? null,
+                'high' => $payload['candle_high'] ?? null,
+                'low' => $payload['candle_low'] ?? null,
+                'close' => $payload['candle_close'] ?? null,
+                'volume' => $payload['candle_volume'] ?? null,
+            );
+        }
+
+        if (!isset($payload['candle_m15']) && $this->has_any_phase3_candle_alias($payload, 'candle_m15_')) {
+            $payload['candle_m15'] = array(
+                'time' => $payload['candle_m15_time'] ?? null,
+                'open' => $payload['candle_m15_open'] ?? null,
+                'high' => $payload['candle_m15_high'] ?? null,
+                'low' => $payload['candle_m15_low'] ?? null,
+                'close' => $payload['candle_m15_close'] ?? null,
+                'volume' => $payload['candle_m15_volume'] ?? null,
+            );
+        }
+
+        if (isset($payload['candle']) && is_array($payload['candle'])) {
+            if (isset($payload['candle']['tick_volume']) && !isset($payload['candle']['volume'])) {
+                $payload['candle']['volume'] = $payload['candle']['tick_volume'];
+            }
+            if (isset($payload['candle']['time']) && !isset($payload['candle']['timestamp'])) {
+                $payload['candle']['timestamp'] = $payload['candle']['time'];
+            }
+        }
+
+        if (isset($payload['candle_m15']) && is_array($payload['candle_m15'])) {
+            if (isset($payload['candle_m15']['tick_volume']) && !isset($payload['candle_m15']['volume'])) {
+                $payload['candle_m15']['volume'] = $payload['candle_m15']['tick_volume'];
+            }
+            if (isset($payload['candle_m15']['time']) && !isset($payload['candle_m15']['timestamp'])) {
+                $payload['candle_m15']['timestamp'] = $payload['candle_m15']['time'];
+            }
+        }
+
+        return $payload;
+    }
+
+    private function has_any_phase3_candle_alias(array $payload, $prefix): bool
+    {
+        foreach (array('time', 'open', 'high', 'low', 'close', 'volume') as $suffix) {
+            if (array_key_exists($prefix . $suffix, $payload)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function is_phase3_market_stream_payload(array $payload): bool
+    {
+        foreach (array('candle_m15', 'candle_m15_open', 'candle_m15_time') as $key) {
+            if (array_key_exists($key, $payload)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function normalize_mt5_freshness_value($freshness): string
+    {
+        $value = strtoupper(trim((string) $freshness));
+        $allowed = array('LIVE', 'DELAYED', 'STALE', 'CLOSED', 'DISCONNECTED');
+        return in_array($value, $allowed, true) ? $value : '';
+    }
+
+    private function normalize_mt5_session_value($session): string
+    {
+        $value = trim((string) $session);
+        if ($value === '') {
+            return '';
+        }
+
+        $upper = strtoupper(str_replace(array('-', ' '), '_', $value));
+        $map = array(
+            'SYDNEY' => 'Sydney',
+            'TOKYO' => 'Tokyo',
+            'ASIAN' => 'Tokyo',
+            'LONDON' => 'London',
+            'NEW_YORK' => 'New York',
+            'NEWYORK' => 'New York',
+            'OVERLAP' => 'Overlap',
+            'CLOSED' => 'Closed',
+            'WEEKEND' => 'Closed',
+        );
+
+        return $map[$upper] ?? '';
+    }
+
+    private function validate_phase3_market_stream_payload(array $payload): array
+    {
+        $timestamp_raw = !empty($payload['quote_time'])
+            ? $payload['quote_time']
+            : (!empty($payload['timestamp']) ? $payload['timestamp'] : null);
+
+        if ($timestamp_raw === null || $timestamp_raw === '') {
+            return array('field' => 'timestamp', 'message' => 'timestamp or quote_time is required for Phase 3 payloads.');
+        }
+
+        foreach (array('bid', 'ask', 'spread') as $field) {
+            if (!array_key_exists($field, $payload) || $payload[$field] === '' || $payload[$field] === null) {
+                return array('field' => $field, 'message' => $field . ' is required for Phase 3 payloads.');
+            }
+        }
+
+        if ($this->normalize_mt5_freshness_value($payload['freshness'] ?? '') === '') {
+            return array('field' => 'freshness', 'message' => 'freshness is required and must be a valid MT5 freshness state.');
+        }
+
+        if ($this->normalize_mt5_session_value($payload['session'] ?? '') === '') {
+            return array('field' => 'session', 'message' => 'session is required and must be a valid MT5 session name.');
+        }
+
+        $has_m1_candle = array_key_exists('candle', $payload) || $this->has_any_phase3_candle_alias($payload, 'candle_');
+        $has_m15_candle = array_key_exists('candle_m15', $payload) || $this->has_any_phase3_candle_alias($payload, 'candle_m15_');
+
+        $required_candles = array();
+        if ($has_m1_candle || !$has_m15_candle) {
+            $required_candles['candle'] = 'M1';
+        }
+        if ($has_m15_candle) {
+            $required_candles['candle_m15'] = 'M15';
+        }
+
+        foreach ($required_candles as $key => $label) {
+            if (!isset($payload[$key]) || !is_array($payload[$key])) {
+                return array('field' => $key, 'message' => $key . ' is required for Phase 3 payloads.');
+            }
+
+            foreach (array('time', 'open', 'high', 'low', 'close', 'volume') as $field) {
+                if (!array_key_exists($field, $payload[$key]) || $payload[$key][$field] === '' || $payload[$key][$field] === null) {
+                    return array('field' => $key . '.' . $field, 'message' => $label . ' candle field ' . $field . ' is required.');
+                }
+            }
+        }
+
+        return array();
+    }
+
     public function get_market_data_authority(WP_REST_Request $request) {
         $user_id = get_current_user_id();
         $symbol  = strtoupper(sanitize_text_field($request->get_param('symbol') ?: ''));
@@ -2124,6 +2271,7 @@ final class SMC_SuperFib_Sniper_REST {
         // Defence-in-depth alongside the MT5 SymbolNormalizer alias map.
         $symbol = $this->map_symbol_aliases($symbol);
         $timeframe = $this->normalize_mt5_timeframe($payload['timeframe'] ?? 'M15');
+        $payload = $this->normalize_phase3_market_stream_payload($payload);
 
         // COMPAT: Accept 'quote_time' (canonical REST contract) as alias for 'timestamp' (legacy EA format).
         // quote_time takes precedence; falls back to timestamp; falls back to null.
@@ -2160,6 +2308,26 @@ final class SMC_SuperFib_Sniper_REST {
                     'candle_count' => $candle_count,
                     'note'         => 'Only candles[0] stored. Phase 3 will add full batch ingestion.',
                 ));
+            }
+        }
+
+        $phase3_freshness = $this->normalize_mt5_freshness_value($payload['freshness'] ?? '');
+        $phase3_session = $this->normalize_mt5_session_value($payload['session'] ?? '');
+
+        if ($this->is_phase3_market_stream_payload($payload)) {
+            $phase3_validation_error = $this->validate_phase3_market_stream_payload($payload);
+            if (!empty($phase3_validation_error)) {
+                error_log(sprintf(
+                    '[SMC_SF] ea/market-stream invalid Phase 3 payload symbol=%s field=%s',
+                    $symbol,
+                    $phase3_validation_error['field']
+                ));
+                $this->audit($user_id, 'ea.market_stream.invalid_phase3_payload', array(
+                    'symbol' => $symbol,
+                    'field' => $phase3_validation_error['field'],
+                    'message' => $phase3_validation_error['message'],
+                ));
+                return new WP_Error('invalid_phase3_payload', $phase3_validation_error['message'], array('status' => 400));
             }
         }
 
@@ -2218,7 +2386,7 @@ final class SMC_SuperFib_Sniper_REST {
             $ask = (float) $payload['ask'];
             
             if (is_finite($bid) && is_finite($ask) && $bid > 0 && $ask > 0 && $bid <= $ask) {
-                $result = $this->upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $snapshot_updated_at);
+                $result = $this->upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $snapshot_updated_at, $phase3_freshness);
                 if ($result) {
                     $inserted_snapshots = 1;
                     delete_transient('smc_sf_qt_' . $user_id . '_' . md5($symbol));
@@ -2336,14 +2504,12 @@ final class SMC_SuperFib_Sniper_REST {
             }
         }
 
-        if (!empty($payload['freshness'])) {
-            $freshness = strtoupper(sanitize_text_field($payload['freshness']));
-            set_transient('smc_sf_freshness_' . $user_id . '_' . $symbol, $freshness, 300);
+        if ($phase3_freshness !== '') {
+            set_transient('smc_sf_freshness_' . $user_id . '_' . $symbol, $phase3_freshness, 300);
         }
 
-        if (!empty($payload['session'])) {
-            $session = sanitize_text_field($payload['session']);
-            set_transient('smc_sf_session_' . $user_id . '_' . $symbol, $session, 300);
+        if ($phase3_session !== '') {
+            set_transient('smc_sf_session_' . $user_id . '_' . $symbol, $phase3_session, 300);
         }
 
         if ($inserted_snapshots > 0) {
@@ -2365,14 +2531,23 @@ final class SMC_SuperFib_Sniper_REST {
             $trade_telemetry_counts = array_merge($trade_telemetry_counts, $telemetry_result);
         }
 
+        if ($phase3_freshness !== '' || $phase3_session !== '') {
+            error_log(sprintf(
+                '[SMC_SF] ea/market-stream ingested symbol=%s freshness=%s session=%s',
+                $symbol,
+                $phase3_freshness !== '' ? $phase3_freshness : '(none)',
+                $phase3_session !== '' ? $phase3_session : '(none)'
+            ));
+        }
+
         // Audit successful ingestion
         $this->audit($user_id, 'ea.market_stream.ingested', array(
             'symbol' => $symbol,
             'snapshots_inserted' => $inserted_snapshots,
             'candles_inserted' => $inserted_candles,
             'timestamp' => $timestamp_raw,  // resolved from quote_time|timestamp
-            'freshness' => $payload['freshness'] ?? null,
-            'session' => $payload['session'] ?? null,
+            'freshness' => $phase3_freshness !== '' ? $phase3_freshness : null,
+            'session' => $phase3_session !== '' ? $phase3_session : null,
             'schema_version' => $schema_version !== '' ? $schema_version : null,
             'trade_telemetry' => $trade_telemetry_counts,
         ));
@@ -2798,7 +2973,7 @@ final class SMC_SuperFib_Sniper_REST {
      * Insert or update MT5 price snapshot
      * Regression guard: Atomic operation with proper source tagging
      */
-    private function upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $updated_at = null) {
+    private function upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $updated_at = null, $freshness = '') {
         global $wpdb;
 
         $mid = ($bid + $ask) / 2;
@@ -2813,6 +2988,9 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         $change_pct_1d = $this->mt5_change_pct_1d($user_id, $symbol, $bid);
+        $snapshot_state = $freshness !== ''
+            ? $this->mt5_freshness_to_snapshot_state($freshness)
+            : 'live';
 
         $result = $wpdb->replace(
             $this->table('snapshots'),
@@ -2825,7 +3003,7 @@ final class SMC_SuperFib_Sniper_REST {
                 'spread' => $spread,
                 'change_pct_1d' => $change_pct_1d,
                 'source' => 'mt5',
-                'state' => 'live',
+                'state' => $snapshot_state,
                 'updated_at' => $updated_at
             ),
             array('%d', '%s', '%f', '%f', '%f', '%d', '%f', '%s', '%s', '%s')

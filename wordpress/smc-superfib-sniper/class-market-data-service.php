@@ -35,12 +35,16 @@ class SMC_MarketData_Service
 
         $bid = (float) $tick['bid'];
         $ask = (float) $tick['ask'];
-        $spread = isset($tick['spread']) ? (int) $tick['spread'] : (int) (($ask - $bid) * 100000);
+        $spread = isset($tick['spread']) ? (int) round((float) $tick['spread']) : (int) (($ask - $bid) * 100000);
         $mid = ($bid + $ask) / 2;
         $timestamp = $this->normalize_market_timestamp(
             isset($tick['timestamp']) ? $tick['timestamp'] : null,
             gmdate('Y-m-d H:i:s')
         );
+        $freshness = $this->normalize_freshness(isset($tick['freshness']) ? $tick['freshness'] : 'LIVE');
+        $state = $freshness === 'CLOSED' || $freshness === 'DISCONNECTED'
+            ? 'offline'
+            : ($freshness === 'LIVE' ? 'live' : 'stale');
 
         return $this->wpdb->replace(
             $this->table_prefix . 'snapshots',
@@ -53,9 +57,7 @@ class SMC_MarketData_Service
                 'spread' => $spread,
                 'change_pct_1d' => 0,
                 'source' => 'mt5',
-                // HARDENING: explicitly mark MT5-sourced ticks as 'live' so get_cached_price()
-                // does not return state='offline' (the column DEFAULT) for fresh MT5 data.
-                'state' => 'live',
+                'state' => $state,
                 'updated_at' => $timestamp,
             ),
             array('%d', '%s', '%f', '%f', '%f', '%d', '%f', '%s', '%s', '%s')
@@ -114,13 +116,13 @@ class SMC_MarketData_Service
      */
     public function store_freshness($user_id, $symbol, $state)
     {
-        $allowed_states = array('LIVE', 'DELAYED', 'STALE', 'CLOSED', 'DISCONNECTED');
-        
-        if (!in_array($state, $allowed_states, true))
+        $normalized = $this->normalize_freshness($state);
+
+        if ($normalized === '')
             return false;
 
         $key = 'smc_sf_freshness_' . $user_id . '_' . strtoupper(sanitize_text_field($symbol));
-        return set_transient($key, $state, 300) !== false;  // 5 min TTL
+        return set_transient($key, $normalized, 300) !== false;  // 5 min TTL
     }
 
     /**
@@ -147,8 +149,12 @@ class SMC_MarketData_Service
      */
     public function store_session($user_id, $symbol, $session)
     {
+        $normalized = $this->normalize_session($session);
+        if ($normalized === '')
+            return false;
+
         $key = 'smc_sf_session_' . $user_id . '_' . strtoupper(sanitize_text_field($symbol));
-        return set_transient($key, $session, 300) !== false;
+        return set_transient($key, $normalized, 300) !== false;
     }
 
     /**
@@ -508,5 +514,30 @@ class SMC_MarketData_Service
 
         $ts = strtotime($value);
         return $ts !== false ? gmdate('Y-m-d H:i:s', $ts) : $fallback_value;
+    }
+
+    private function normalize_freshness($state)
+    {
+        $value = strtoupper(trim((string) $state));
+        $allowed = array('LIVE', 'DELAYED', 'STALE', 'CLOSED', 'DISCONNECTED');
+        return in_array($value, $allowed, true) ? $value : '';
+    }
+
+    private function normalize_session($session)
+    {
+        $value = strtoupper(str_replace(array('-', ' '), '_', trim((string) $session)));
+        $map = array(
+            'SYDNEY' => 'Sydney',
+            'TOKYO' => 'Tokyo',
+            'ASIAN' => 'Tokyo',
+            'LONDON' => 'London',
+            'NEW_YORK' => 'New York',
+            'NEWYORK' => 'New York',
+            'OVERLAP' => 'Overlap',
+            'CLOSED' => 'Closed',
+            'WEEKEND' => 'Closed',
+        );
+
+        return $map[$value] ?? '';
     }
 }

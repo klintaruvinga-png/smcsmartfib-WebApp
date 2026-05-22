@@ -2,7 +2,7 @@
 #define SESSION_MANAGER_MQH
 
 //+------------------------------------------------------------------+
-//| Session States                                                    |
+//| Session States                                                   |
 //+------------------------------------------------------------------+
 enum ENUM_SESSION_STATE
 {
@@ -17,20 +17,14 @@ enum ENUM_SESSION_STATE
 
 //+------------------------------------------------------------------+
 //| SessionManager Class                                             |
-//| All session boundaries are UTC hours.                            |
-//|                                                                  |
-//| Sydney   : Sun 22:00 – Mon 06:00  (wraps midnight)              |
-//| Tokyo    : 00:00 – 08:00                                         |
-//| London   : 07:00 – 15:00                                         |
-//| New York : 12:00 – 20:00                                         |
-//| Overlap  : London+Tokyo 07-08, London+NY 12-15                  |
+//| Session boundaries are evaluated in UTC after converting broker  |
+//| server time to UTC.                                              |
 //+------------------------------------------------------------------+
 class SessionManager
 {
 private:
     ENUM_SESSION_STATE currentSession;
     bool isHoliday;
-    MqlDateTime dt;
 
 public:
     SessionManager()
@@ -41,79 +35,20 @@ public:
 
     ~SessionManager() {}
 
-    void UpdateSession(datetime utcTime)
+    void UpdateSession(datetime serverTime)
     {
-        if (isHoliday)
-        {
-            currentSession = SESSION_CLOSED;
-            return;
-        }
-
-        TimeToStruct(utcTime, dt);
-        int dow  = dt.day_of_week;  // 0=Sunday, 6=Saturday
-        int hour = dt.hour;
-
-        // Saturday is always closed market
-        if (dow == 6)
-        {
-            currentSession = SESSION_WEEKEND;
-            return;
-        }
-
-        // Sunday: market opens at 22:00 UTC (Sydney open)
-        if (dow == 0)
-        {
-            currentSession = (hour >= 22) ? SESSION_SYDNEY : SESSION_WEEKEND;
-            return;
-        }
-
-        // Friday: market closes at 22:00 UTC (New York close +2 h buffer)
-        if (dow == 5 && hour >= 22)
-        {
-            currentSession = SESSION_WEEKEND;
-            return;
-        }
-
-        // Intraday: determine session by UTC hour
-        bool sydney   = (hour >= 22) || (hour < 6);
-        bool tokyo    = (hour >= 0)  && (hour < 8);
-        bool london   = (hour >= 7)  && (hour < 15);
-        bool newYork  = (hour >= 12) && (hour < 20);
-
-        // Overlaps take precedence (highest liquidity)
-        if (london && newYork)
-        {
-            currentSession = SESSION_OVERLAP;
-        }
-        else if (london && tokyo)
-        {
-            currentSession = SESSION_OVERLAP;
-        }
-        else if (london)
-        {
-            currentSession = SESSION_LONDON;
-        }
-        else if (newYork)
-        {
-            currentSession = SESSION_NEWYORK;
-        }
-        else if (tokyo)
-        {
-            currentSession = SESSION_TOKYO;
-        }
-        else if (sydney)
-        {
-            currentSession = SESSION_SYDNEY;
-        }
-        else
-        {
-            currentSession = SESSION_CLOSED;
-        }
+        currentSession = ResolveSessionStateForSymbol("", serverTime);
     }
 
     bool IsMarketOpen()
     {
         return currentSession != SESSION_CLOSED && currentSession != SESSION_WEEKEND;
+    }
+
+    bool IsMarketOpenForSymbol(string symbol, datetime serverTime = 0)
+    {
+        ENUM_SESSION_STATE session = ResolveSessionStateForSymbol(symbol, serverTime <= 0 ? TimeCurrent() : serverTime);
+        return session != SESSION_CLOSED && session != SESSION_WEEKEND;
     }
 
     bool IsHighLiquidity()
@@ -128,18 +63,21 @@ public:
         return currentSession;
     }
 
+    ENUM_SESSION_STATE GetCurrentSessionForSymbol(string symbol, datetime serverTime = 0)
+    {
+        return ResolveSessionStateForSymbol(symbol, serverTime <= 0 ? TimeCurrent() : serverTime);
+    }
+
     string GetSessionName()
     {
-        switch (currentSession)
-        {
-            case SESSION_SYDNEY:   return "Sydney";
-            case SESSION_TOKYO:    return "Tokyo";
-            case SESSION_LONDON:   return "London";
-            case SESSION_NEWYORK:  return "New York";
-            case SESSION_OVERLAP:  return "Overlap";
-            case SESSION_WEEKEND:  return "Weekend";
-            default:               return "Closed";
-        }
+        return SessionNameFromState(currentSession);
+    }
+
+    string GetSessionNameForSymbol(string symbol, datetime serverTime = 0)
+    {
+        return SessionNameFromState(
+            ResolveSessionStateForSymbol(symbol, serverTime <= 0 ? TimeCurrent() : serverTime)
+        );
     }
 
     void SetHoliday(bool holiday)
@@ -147,11 +85,138 @@ public:
         isHoliday = holiday;
     }
 
-    bool IsSessionTransition(datetime utcTime)
+    bool IsSessionTransition(datetime serverTime)
     {
         ENUM_SESSION_STATE before = currentSession;
-        UpdateSession(utcTime);
+        UpdateSession(serverTime);
         return currentSession != before;
+    }
+
+private:
+    ENUM_SESSION_STATE ResolveSessionStateForSymbol(string symbol, datetime serverTime)
+    {
+        datetime utcTime = ToUtc(serverTime);
+
+        if (isHoliday)
+            return SESSION_CLOSED;
+
+        if (IsEquityIndexSymbol(symbol) && !IsUsEquitySessionOpen(utcTime))
+            return SESSION_CLOSED;
+
+        return ResolveBaseSessionState(utcTime);
+    }
+
+    ENUM_SESSION_STATE ResolveBaseSessionState(datetime utcTime)
+    {
+        MqlDateTime dt;
+        TimeToStruct(utcTime, dt);
+
+        int dow  = dt.day_of_week;  // 0=Sunday, 6=Saturday
+        int hour = dt.hour;
+
+        if (dow == 6)
+            return SESSION_WEEKEND;
+
+        if (dow == 0)
+            return (hour >= 22) ? SESSION_SYDNEY : SESSION_WEEKEND;
+
+        if (dow == 5 && hour >= 22)
+            return SESSION_WEEKEND;
+
+        bool sydney  = (hour >= 22) || (hour < 6);
+        bool tokyo   = (hour >= 0)  && (hour < 8);
+        bool london  = (hour >= 7)  && (hour < 15);
+        bool newYork = (hour >= 12) && (hour < 20);
+
+        if (london && newYork)
+            return SESSION_OVERLAP;
+        if (london && tokyo)
+            return SESSION_OVERLAP;
+        if (london)
+            return SESSION_LONDON;
+        if (newYork)
+            return SESSION_NEWYORK;
+        if (tokyo)
+            return SESSION_TOKYO;
+        if (sydney)
+            return SESSION_SYDNEY;
+        return SESSION_CLOSED;
+    }
+
+    string SessionNameFromState(ENUM_SESSION_STATE session)
+    {
+        switch (session)
+        {
+            case SESSION_SYDNEY:   return "Sydney";
+            case SESSION_TOKYO:    return "Tokyo";
+            case SESSION_LONDON:   return "London";
+            case SESSION_NEWYORK:  return "New York";
+            case SESSION_OVERLAP:  return "Overlap";
+            default:               return "Closed";
+        }
+    }
+
+    datetime ToUtc(datetime serverTime)
+    {
+        datetime brokerUtcOffset = TimeCurrent() - TimeGMT();
+        return serverTime - brokerUtcOffset;
+    }
+
+    bool IsEquityIndexSymbol(string symbol)
+    {
+        string upper = symbol;
+        StringToUpper(upper);
+        return StringFind(upper, "NAS100") >= 0 || StringFind(upper, "US30") >= 0;
+    }
+
+    bool IsUsEquitySessionOpen(datetime utcTime)
+    {
+        MqlDateTime dt;
+        TimeToStruct(utcTime, dt);
+
+        int dow = dt.day_of_week;
+        if (dow == 0 || dow == 6)
+            return false;
+
+        int minutesUtc = dt.hour * 60 + dt.min;
+        if (IsUsDstActive(utcTime))
+            return minutesUtc >= 810 && minutesUtc < 1200;  // EDT: 13:30-20:00 UTC
+        return minutesUtc >= 870 && minutesUtc < 1260;      // EST: 14:30-21:00 UTC
+    }
+
+    bool IsUsDstActive(datetime utcTime)
+    {
+        MqlDateTime now;
+        TimeToStruct(utcTime, now);
+
+        int month = now.mon;
+        int day   = now.day;
+        int hour  = now.hour;
+
+        if (month < 3 || month > 11) return false;
+        if (month > 3 && month < 11) return true;
+
+        MqlDateTime first;
+        first.year = now.year;
+        first.mon  = month;
+        first.day  = 1;
+        first.hour = 0;
+        first.min  = 0;
+        first.sec  = 0;
+
+        datetime dtFirst = StructToTime(first);
+        MqlDateTime firstStruct;
+        TimeToStruct(dtFirst, firstStruct);
+        int dow1 = firstStruct.day_of_week;
+        int firstSunday = (dow1 == 0) ? 1 : (1 + 7 - dow1);
+
+        if (month == 3)
+        {
+            int secondSunday = firstSunday + 7;
+            return day > secondSunday || (day == secondSunday && hour >= 7);
+        }
+
+        return day < firstSunday || (day == firstSunday && hour < 6);
     }
 };
 
