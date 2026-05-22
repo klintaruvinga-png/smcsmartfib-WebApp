@@ -209,6 +209,19 @@ assert_true(is_array($storedTick), 'store_tick_snapshot must persist the MT5 sna
 assert_same('2026-05-16 08:15:30', $storedTick['updated_at'] ?? null, 'store_tick_snapshot must persist the MT5 quote timestamp instead of server receipt time');
 
 assert_true(
+    $service->store_tick_snapshot(7, 'USDJPY', array(
+        'bid' => 156.250,
+        'ask' => 156.252,
+        'spread' => 2,
+        'timestamp' => '2026-05-16 08:16:30 UTC',
+    )),
+    'store_tick_snapshot should accept UTC-suffixed broker timestamps'
+);
+$storedUtcTick = $wpdb->tables[$snapshotTable]['7|USDJPY'] ?? null;
+assert_true(is_array($storedUtcTick), 'store_tick_snapshot must persist UTC-suffixed MT5 tick rows');
+assert_same('2026-05-16 08:16:30', $storedUtcTick['updated_at'] ?? null, 'store_tick_snapshot must normalize UTC-suffixed timestamps instead of falling back to receipt time');
+
+assert_true(
     $service->store_candle_m1(7, 'EURUSD', array(
         'timestamp' => '2026.05.16 08:15:00',
         'open' => 1.1005,
@@ -222,5 +235,20 @@ assert_true(
 $storedCandle = $wpdb->tables[$candleTable]['7|EURUSD|1min|2026-05-16 08:15:00'] ?? null;
 assert_true(is_array($storedCandle), 'store_candle_m1 must persist the canonical M1 candle row');
 assert_same('2026-05-16 08:15:00', $storedCandle['candle_time'] ?? null, 'store_candle_m1 must normalize MT5 candle timestamps to UTC MySQL format');
+
+assert_true(
+    $service->store_candle_m1(7, 'USDJPY', array(
+        'timestamp' => '2026-05-16 08:16:00 UTC',
+        'open' => 156.200,
+        'high' => 156.300,
+        'low' => 156.150,
+        'close' => 156.250,
+        'volume' => 8,
+    )),
+    'store_candle_m1 should accept UTC-suffixed MT5 candle timestamps'
+);
+$storedUtcCandle = $wpdb->tables[$candleTable]['7|USDJPY|1min|2026-05-16 08:16:00'] ?? null;
+assert_true(is_array($storedUtcCandle), 'store_candle_m1 must persist UTC-suffixed MT5 candle rows');
+assert_same('2026-05-16 08:16:00', $storedUtcCandle['candle_time'] ?? null, 'store_candle_m1 must normalize UTC-suffixed timestamps instead of falling back to receipt time');
 
 fwrite(STDOUT, 'market data service source filter checks passed' . PHP_EOL);

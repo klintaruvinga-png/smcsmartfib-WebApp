@@ -493,7 +493,16 @@ class SMC_MarketData_Service
         $value = trim((string) $raw_time);
         $value = preg_replace('/^(\d{4})\.(\d{2})\.(\d{2})/', '$1-$2-$3', $value);
 
-        if (!preg_match('/([+-]\d{2}:\d{2}|Z)\s*$/', $value)) {
+        $has_named_tz = preg_match('/\s+([A-Z]{2,5})\s*$/i', $value, $tz_match) === 1;
+        if ($has_named_tz) {
+            $tz_abbrev = strtoupper($tz_match[1]);
+            if (in_array($tz_abbrev, array('UTC', 'GMT', 'UT', 'Z'), true)) {
+                $value = preg_replace('/\s+([A-Z]{2,5})\s*$/i', '', $value);
+                $has_named_tz = false;
+            }
+        }
+
+        if (!$has_named_tz && !preg_match('/([+-]\d{2}:\d{2}|Z)\s*$/', $value)) {
             $value .= 'Z';
         }
 

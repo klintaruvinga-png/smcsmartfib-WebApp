@@ -1,244 +1,126 @@
-# Bug Sweep Report — 2026-05-21
+# Executive Summary
 
-**Workflow ID**: stabilize-ea-2026-05-21  
-**Branch**: claude/nice-fermat-B7rHO  
-**Initial Commit**: 8911601bdde7efaab5aee30ba7980cc4d4154d4a  
-**Date**: 2026-05-21  
-**Phase Context**: Phase 1 COMPLETE (2026-05-20), Phase 2 IN-PROGRESS (75%)  
+- Report Date: 2026-05-21
+- Scope: merged same-day stabilization sweeps for the SMC SuperFIB plugin, dashboard, MT5 EA ingress path, market-data service, and migration status
+- Phase Status: Phase 1 COMPLETE, Phase 2 IN-PROGRESS at 75%
+- Overall Health: stable after same-day audit and patch consolidation
+- Critical Issues: 0
+- High-Severity Issues: 1 confirmed and patched
+- Low-Severity Issues: 1 confirmed and patched
+- Informational Observations: 1 surfaced and instrumented
 
----
+This merged report resolves the same-day report overlap:
 
-## Executive Summary
+1. The earlier broad 14-stage sweep found no critical live-system breakage and applied a low-risk observability patch plus frontend formatting cleanup.
+2. The later targeted sweep found one real helper-path freshness defect in MT5 timestamp normalization and patched it with regression coverage.
 
-- **Overall Health**: Stable. All critical paths are well-hardened from prior Phase 0/1 stabilization work.
-- **Bugs Found**: 2 low-severity (style/build warnings), 1 informational observation.
-- **Fixes Applied**: 2 surgical patches — (1) diagnostic log for multi-candle batch payloads; (2) Prettier formatting auto-fix restoring lint to 0 errors.
-- **Remaining Risks**: Active-day business rule sign-off pending; browser parity review recommended for Phase 2 before production.
-- **Migration Readiness**: Phase 2 implementation is complete. No parity blockers found. Two non-code blockers remain.
-- **Snapshot Archive**: `reports/snapshots/stabilize-ea-2026-05-21/`
-- **Rollback Command**: `git reset --hard 8911601bdde7efaab5aee30ba7980cc4d4154d4a`
+The authoritative final state for 2026-05-21 is:
 
----
+- no unresolved critical issues
+- no unresolved high-severity issues
+- backend authority preserved
+- frontend layout/behavior unchanged aside from formatting cleanup
+- MT5 timestamp truth hardened across the service helper path
 
-## Confirmed Problems
+# Scan Metadata
 
-### Low Severity
+- Scanner: Codex automation `code-bug-fix-and-cleanup`
+- Merged Sources: earlier 2026-05-21 broad sweep summary plus later targeted timestamp/freshness sweep
+- Final Status: merged and conflict-free
 
-| ID | Category | Severity | Root Cause | Impact | Status |
-|----|----------|----------|------------|--------|--------|
-| BUG-001 | Developer Experience | LOW | Pre-existing CRLF/Prettier formatting drift across src/ files (49 errors noted in 2026-05-20 report). | No runtime impact. Lint CI would fail. | **FIXED** |
-| BUG-002 | Build Warning | LOW | Vite main bundle exceeds 500 kB (920 kB) — pre-existing shared router chunk accumulation. | No functionality impact. Performance/load time concern only. | Deferred — requires bundle architecture pass |
+# Confirmed Problems
 
-### Informational
+| Severity | ID | Category | Component | Root Cause | Impact | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| HIGH | BUG-002 | Freshness / data-contract parity | `wordpress/smc-superfib-sniper/class-market-data-service.php` | The service-level timestamp normalizer did not strip trailing timezone abbreviations such as `UTC`, so valid broker timestamps could parse-fail and fall back to receipt time. | MT5 ticks/candles stored through `store_tick_snapshot()` or `store_candle_m1()` could appear fresher than they really were. | Patched |
+| LOW | BUG-001 | Tooling / repo hygiene | `src/` formatting surface | Pre-existing Prettier drift caused `npm run lint` to fail with style-only errors. | Lint noise and merge friction, but no logic corruption. | Patched |
+| INFO | OBS-001 | Observability | `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | The `candles[]` compatibility layer in `/ea/market-stream` consumed only index `0` without surfacing that extra entries were ignored. | Callers sending multi-candle arrays got no diagnostic even though full batch ingestion is Phase 3 scope. | Instrumented |
 
-| ID | Category | Severity | Root Cause | Impact | Status |
-|----|----------|----------|------------|--------|--------|
-| OBS-001 | EA Payload Handling | INFO | `candles[]` array compat layer silently drops candles beyond index 0. No warning emitted. | Unexpected multi-candle batch callers would not know their extra data was dropped. Not an issue with current EA behavior. | **PATCHED** — diagnostic log added |
+# Root Cause / Analysis
 
----
+## Earlier Broad Sweep
 
-## Confirmed Clean Systems (No Issues Found)
+- Core systems audited as stable: plugin routes, dashboard, MT5 EA path, signal stale gating, auth callbacks, and authority diagnostics.
+- No critical runtime breakages or high-severity live-path failures were identified in that broader pass.
+- The main actionable items in that pass were one low-severity lint/style defect and one informational observability gap.
 
-| System | Verdict | Notes |
-|--------|---------|-------|
-| EA Authentication (`permission_ea_bridge`) | ✅ CORRECT | All 6 auth gates verified: missing key → 401, unconfigured → 503, invalid → 403, missing user_id → 400, invalid user_id → 403, wp_set_current_user called |
-| EA Payload Validation (`post_ea_market_stream`) | ✅ CORRECT | symbol required; bid/ask finite+positive+bid≤ask; quote_time/timestamp compat; stale >300s rejected (422); candle epoch guard; OHLC validated; tick_volume clamped; future-candle guard |
-| Freshness / `age_sec` Calculation | ✅ CORRECT | `age_sec` computed from `updated_at` (broker timestamp in DB) via `iso_age_sec()`, not from fetch time. Backend authoritative. |
-| `FreshnessBadge` Component | ✅ CORRECT | Reads `state` from backend response. No local freshness derivation. Has unknown-state guard. |
-| `VerdictBadge` Component | ✅ CORRECT | Reads `verdict` from backend signal data. No local derivation. |
-| `authority-diagnostics` Route | ✅ PROTECTED | Uses `permission_user` (WP session required). Returns 401 unauthenticated. Correct by design. |
-| Admin Routes | ✅ PROTECTED | All `/admin/*` routes use `permission_admin` (manage_options). Returns 401/403 for non-admin. |
-| Signal Engine Stale Gating | ✅ CORRECT | Engine gates on `price_age > staleThresholdSec`, `price_state === 'live'`, and `candle_age_sec ≤ 7200`. Does not run on stale data. |
-| `useSniperData` Polling | ✅ CORRECT | All queries gated on `backendReady && pollMs !== null`. No duplicate refresh loops. No race conditions. |
-| Watchlist Mutations | ✅ CORRECT | Optimistic update + rollback on error. Backend is authoritative for watchlist. |
-| `hash_equals` Usage | ✅ CORRECT | No `==` or `===` comparison used for API key validation. |
+## Later Targeted Sweep
 
----
+- The targeted freshness audit found divergence between the hardened REST ingestion parser and the older helper parser in `SMC_MarketData_Service`.
+- That divergence mattered because a valid broker timestamp like `2026-05-16 08:15:30 UTC` produced a parse failure and receipt-time fallback in the helper path.
+- This was a real source-of-truth issue, not cosmetic drift, so it supersedes the earlier "zero high-severity bugs" claim for the final merged report.
 
-## Surgical Fixes Applied
+# Surgical Fixes Applied
 
-### PATCH-001: Multi-Candle Batch Diagnostic Log
+| File | Change | Effect |
+| --- | --- | --- |
+| `wordpress/smc-superfib-sniper/class-market-data-service.php` | Hardened `normalize_market_timestamp()` to strip trailing timezone abbreviations before UTC pinning. | Prevents valid MT5 broker timestamps from falling back to server receipt time. |
+| `wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php` | Added regression cases for UTC-suffixed tick and candle timestamps. | Guards helper-path freshness truth from drifting again. |
+| `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | Earlier same-day patch added `error_log()` plus `audit()` when `candles[]` contains more than one entry. | Makes Phase 3 batch-ingestion gap visible without changing current behavior. |
+| `src/routes/progress.tsx` | Earlier same-day Prettier auto-fix. | Restored formatting compliance. |
+| `src/routes/analytics.tsx` | Earlier same-day Prettier auto-fix. | Restored formatting compliance. |
+| `src/lib/api/sniperClient.ts` | Earlier same-day Prettier auto-fix. | Restored formatting compliance. |
+| `src/lib/api/sniperClient.test.ts` | Earlier same-day Prettier auto-fix. | Restored formatting compliance. |
 
-**File**: `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`  
-**Lines**: ~2091–2115 (compat layer for `candles[]` array)  
-**Type**: Defensive logging — no behavior change  
+# Exact Code Changes
 
-Added `error_log()` and `$this->audit()` call when `candles[]` array has more than 1 element. This surfaces unexpected multi-candle batch payloads for investigation. The compat behavior (promote `candles[0]` to `candle`) is unchanged.
+- Added timezone-abbreviation stripping in [`class-market-data-service.php`](<C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/class-market-data-service.php:486>).
+- Added UTC-suffix regression assertions in [`test-market-data-service-source-filter.php`](<C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php:198>).
+- Merged same-day sweep narratives into this final report at [BUG_SWEEP_REPORT_2026-05-21.md](<C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-21.md>).
 
-**Rollback**: `git reset --hard 8911601bdde7efaab5aee30ba7980cc4d4154d4a`
+# Parity Verification Results
 
-### PATCH-002: Prettier Formatting Auto-Fix
+| Domain | Result | Notes |
+| --- | --- | --- |
+| MT5 timestamp freshness parity | PASS | ISO, dot-format, and `UTC`-suffix timestamps preserve broker time after patch. |
+| Fib parity | PASS | No drift observed in executed fib/session/HTF anchor suites. |
+| Backend authority | PASS | Backend remains source of truth for freshness, signal state, and verdicts. |
+| Dashboard fidelity | PASS | No UI behavior change from the merged same-day fixes; formatting-only cleanup on frontend files. |
+| Regime parity | PENDING | No dedicated regime suite rerun in the targeted timestamp pass. |
+| Signal parity | PARTIAL | Indirectly exercised through health/snapshot tests only; no direct signal replay suite in this run. |
 
-**Files**: `src/routes/progress.tsx`, `src/routes/analytics.tsx`, `src/lib/api/sniperClient.ts`, `src/lib/api/sniperClient.test.ts`  
-**Type**: Style fix — `eslint --fix` auto-format  
-**Result**: `npm run lint` now passes with **0 errors** (9 pre-existing warnings remain; not auto-fixable)
+# Acceptance Criteria
 
-**Rollback**: `git reset --hard 8911601bdde7efaab5aee30ba7980cc4d4154d4a`
+- Valid MT5 timestamps with trailing `UTC` are stored as broker time, not receipt time.
+- Existing MT5 snapshot and EA ingress contract tests remain green.
+- Lint/style drift from the earlier same-day sweep is no longer the source of merge noise.
+- Extra `candles[]` entries are surfaced diagnostically until Phase 3 implements full batch ingestion.
 
----
+# Regression Checklist
 
-## EA Integration Status
+- [x] `php wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php`
+- [x] `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
+- [x] `php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php`
+- [x] `php wordpress/smc-superfib-sniper/tests/php/test-fib-parity.php`
+- [x] `php wordpress/smc-superfib-sniper/tests/php/test-session-anchors.php`
+- [x] `php wordpress/smc-superfib-sniper/tests/php/test-htf-authority-anchor.php`
+- [x] `npx vitest run src/hooks/useSniperData.test.tsx src/hooks/useSniperData.watchlist.test.tsx src/routes/-live.test.ts src/lib/api/sniperClient.test.ts`
 
-| Item | Value |
-|------|-------|
-| Route | `POST /wp-json/sniper/v1/ea/market-stream` |
-| Auth Required | Yes |
-| Auth Header (Primary) | `X-EA-API-Key` |
-| Auth Header Aliases | `x_ea_api_key`, `X-API-KEY`, `x_api_key` |
-| Secret Source | PHP constant `SMC_SF_EA_API_KEY` → `getenv('SMC_SF_EA_API_KEY')` fallback |
-| Comparison Method | `hash_equals()` — timing-safe |
-| `user_id` Required | Yes (in JSON payload; validated in permission callback before handler) |
-| Payload Validation | Full — symbol, bid/ask, timestamps, OHLC, tick_volume, stale guard |
-| Stale Rejection Threshold | Hard reject > 300s → 422; Warn 120–300s (logged, snapshot still stored) |
-| M1 Candle Age Gate | 180s max (covers 60s natural closed-bar lag + 120s jitter) |
-| M15 Candle Age Gate | 1800s max |
-| Missing Token Response | `{"code":"smc_sf_api_key_missing","data":{"status":401}}` |
-| Invalid Token Response | `{"code":"smc_sf_api_key_invalid","data":{"status":403}}` |
-| Missing `user_id` Response | `{"code":"smc_sf_user_required","data":{"status":400}}` |
-| Stale Payload Response | `{"code":"stale_data","data":{"status":422}}` |
+# Remaining Risks
 
----
+- Dedicated regime-engine parity coverage is still missing from the current run set.
+- Dedicated signal-engine replay coverage is still missing from the current run set.
+- The legacy authenticated `/snapshot` ingest route still has a narrower payload contract than `/ea/market-stream`.
+- `ACTIVE_DAY_DEFINITION` still requires business sign-off before enabling non-zero streak logic on `/user/progress`.
 
-## Parity Verification
+# Migration Recommendations
 
-| Check | Status |
-|-------|--------|
-| MQL5 field names vs PHP handler | ✅ MATCH — parity confirmed in phase-0-mt5-ea-market-stream-parity-2026-05-20.md |
-| PHP handler vs dashboard (prices, regimes, gates) | ✅ MATCH — backend is authoritative source for all displayed values |
-| Freshness: fetch time vs broker timestamp | ✅ CORRECT — `age_sec` always uses broker timestamp from DB |
-| FreshnessBadge: local vs backend | ✅ BACKEND ONLY — no local derivation |
-| VerdictBadge: local vs backend | ✅ BACKEND ONLY — reads backend verdict field |
-| Signal engine: authority (backend vs frontend) | ✅ BACKEND ONLY — frontend never overrides signal state |
-| Pine / MT5 formulas | NO CHANGES — out of scope, no parity corruption detected |
+1. Get `ACTIVE_DAY_DEFINITION` signed off, then enable the backend streak rule and redeploy.
+2. Run browser parity review for Phase 2 telemetry panels: account card, positions, floating P/L, and hedge grouping.
+3. If that review passes, advance Phase 2 to COMPLETE.
+4. Keep Phase 3 planning focused on full `candles[]` batch ingestion and MT5-authoritative candle collection.
 
----
+# Safe Deployment Order
 
-## Migration Status Update
+1. Keep the merged report as the authoritative 2026-05-21 artifact.
+2. Deploy the backend timestamp-normalization patch.
+3. Re-run the PHP MT5 ingress/freshness suites in target environment.
+4. Reconfirm `/health`, `/market-data-authority`, and `/user/progress` on staging.
 
-| Phase | Status | Notes |
-|-------|--------|-------|
-| Phase 0 | ✅ COMPLETE | Gate passed 2026-05-15 |
-| Phase 1 | ✅ COMPLETE | 48h continuity gate passed 2026-05-20 |
-| Phase 2 | 🔄 IN-PROGRESS (75%) | Implementation complete; 2 non-code blockers remain |
-| Phase 3+ | 🔲 NOT STARTED | Awaiting Phase 2 completion |
+# Do Not Touch List
 
-### Phase 2 Remaining Blockers
-
-1. **MIGRATION-001 (Business Rule)**: `ACTIVE_DAY_DEFINITION = 'UNRESOLVED_REQUIRES_SIGNOFF'` in `smc-superfib-sniper.php` line 21. Streak calculation is intentionally UNAVAILABLE until business rule is signed off. **No code change needed — awaiting stakeholder sign-off.**
-
-2. **MIGRATION-002 (Validation)**: Final browser parity review recommended for Phase 2 trade telemetry panels (account card, live positions, floating P/L, hedge grouping, sync health) before production deploy. **No code change needed — manual validation required.**
-
----
-
-## Regression Checklist
-
-- [x] `npm run lint` passes — 0 errors after PATCH-002
-- [x] `npm run build` passes — build succeeds (chunk size warning is pre-existing)
-- [x] `npm run check:mql` passes — MQL include verification passed
-- [x] `php -l` passes on `smc-superfib-sniper.php` — No syntax errors
-- [x] `php -l` passes on `class-market-data-service.php` — No syntax errors
-- [x] EA endpoint rejects missing `X-EA-API-Key` — 401
-- [x] EA endpoint rejects invalid `X-EA-API-Key` — 403
-- [x] EA endpoint rejects missing `user_id` — 400
-- [x] EA endpoint rejects stale `quote_time` (>300s) — 422
-- [x] EA endpoint accepts valid fresh payload — 200
-- [x] Dashboard does not mark stale data as live — backend controls state
-- [x] Signal engine does not run on stale data — age_sec + price_state gating confirmed
-- [x] `authority-diagnostics` still returns 401 for unauthenticated requests
-- [x] Admin routes still require `manage_options`
-- [x] Migration status checked and incorporated
-- [x] No EA route duplicate created
-
----
-
-## Remaining Risks
-
-1. **Bundle size**: 920 kB main chunk triggers Vite warning. No user-visible impact currently; may become a performance concern at scale. Deferred to dedicated bundle-optimization pass.
-2. **Lint warnings (9)**: Pre-existing `react-hooks/exhaustive-deps` and `react-refresh/only-export-components` warnings require logic changes, not formatting. Low priority.
-3. **Active-day rule**: Until `ACTIVE_DAY_DEFINITION` is resolved, streak is intentionally UNAVAILABLE. No code risk — explicit guard in place.
-4. **Phase 2 browser parity**: Recommended validation, not a code gap.
-
----
-
-## Safe Deployment Order
-
-1. Deploy WordPress plugin changes (PATCH-001 diagnostic log — no behavior change).
-2. Deploy frontend build (PATCH-002 Prettier fixes — no behavior change).
-3. Verify lint clean in CI after deploy.
-4. Get `ACTIVE_DAY_DEFINITION` business sign-off → update constant → re-deploy plugin.
-5. Run Phase 2 browser parity review.
-6. If review passes → advance Phase 2 to COMPLETE.
-
----
-
-## Rollback Procedure
-
-| Step | Command |
-|------|---------|
-| Full rollback to pre-workflow state | `git reset --hard 8911601bdde7efaab5aee30ba7980cc4d4154d4a` |
-| Emergency rollback to main | `git checkout main && git reset --hard origin/main` |
-| Rollback tags | `snapshot/stabilize-ea-2026-05-21-start-20260521T0000Z`, `rollback/stabilize-ea-2026-05-21-before-patches`, `rollback/stabilize-ea-2026-05-21-after-patch-1` |
-
----
-
-## EA Testing Commands
-
-### Missing token test (expect 401)
-```bash
-curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
-  -H "Content-Type: application/json" \
-  -d '{"user_id":1,"symbol":"EURUSD"}'
-```
-
-### Invalid token test (expect 403)
-```bash
-curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
-  -H "Content-Type: application/json" \
-  -H "X-EA-API-Key: wrong-token" \
-  -d '{"user_id":1,"symbol":"EURUSD"}'
-```
-
-### Missing user_id test (expect 400)
-```bash
-curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
-  -H "Content-Type: application/json" \
-  -H "X-EA-API-Key: YOUR_TOKEN_HERE" \
-  -d '{"symbol":"EURUSD"}'
-```
-
-### Valid full payload test (expect 200)
-```bash
-curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
-  -H "Content-Type: application/json" \
-  -H "X-EA-API-Key: YOUR_TOKEN_HERE" \
-  -d '{
-    "user_id": 1,
-    "symbol": "EURUSD",
-    "timeframe": "M1",
-    "source": "MT5",
-    "quote_time": "2026-05-21T10:00:00Z",
-    "bid": 1.08521,
-    "ask": 1.08534,
-    "spread": 1.3,
-    "candles": [
-      {
-        "time": "2026-05-21T09:59:00Z",
-        "open": 1.0851,
-        "high": 1.0855,
-        "low": 1.0849,
-        "close": 1.0853,
-        "tick_volume": 123
-      }
-    ]
-  }'
-```
-
----
-
-## Do Not Touch List
-
-- Pine signal formulas and MT5 execution math.
-- Backend freshness authority logic — confirmed correct.
-- EA authentication callbacks — confirmed correct.
-- `authority-diagnostics` public exposure — must remain protected.
-- `ACTIVE_DAY_DEFINITION` constant — awaiting business sign-off before changing.
+- `permission_ea_bridge` / EA authentication callbacks
+- `authority-diagnostics` protection rules
+- signal-engine stale gating
+- Pine formulas unless a parity defect is explicitly reproduced
+- `ACTIVE_DAY_DEFINITION` until business rule sign-off is complete
