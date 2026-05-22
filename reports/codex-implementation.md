@@ -1,36 +1,46 @@
-# Codex Implementation Summary
-
 ## Issue summary
 
-Created the missing root-level `PHASE3_IMPLEMENTATION.md` planning artifact with owner placeholders, a Phase 3 checklist bounded to existing repository documentation, and updated the Phase 3 migration board entries to reflect that planning is now active on the required working branch.
+Implemented the Phase 3 EA candle-engine contract across the MT5 payload builder, per-symbol session/freshness handling, and the WordPress `ea/market-stream` ingestion seam, while preserving the existing backend authority model and legacy snapshot-only compatibility.
 
 ## Root cause implemented
 
-The repository had Phase 3 testing guidance and migration-board placeholders, but no canonical Phase 3 implementation plan artifact and no active Phase 3 planning entry tied to the current work branch. This patch adds the missing plan document and advances the migration board from `NOT-STARTED` to `IN-PROGRESS` without changing any runtime code or acceptance criteria.
+The live contract gap was at the EA-to-backend handoff: MT5 freshness/session evaluation was still partly global instead of symbol-aware, the EA payload did not expose flat Phase 3 candle aliases, and the backend route accepted incomplete Phase 3 payloads without surfacing a hard error. The patch makes session/open-state evaluation symbol-aware, normalizes the Phase 3 payload shape, validates required Phase 3 fields when that payload shape is used, and preserves `source='mt5'` authority on persistence.
 
 ## Exact files changed
 
-- `PHASE3_IMPLEMENTATION.md` - new root-level implementation plan with owner placeholders, scope copied from Phase 3 testing guidance, bounded implementation checklist, and referenced phase gate criteria
-- `.github/migration-status.md` - Phase 3 summary row updated to `IN-PROGRESS`, planning branch recorded, Phase 3 section linked to the new implementation plan, blocker text narrowed to remaining Phase 2 closeout
-- `reports/codex-implementation.md` - required implementation summary for this patch
+- `mt5/FreshnessEngine.mqh`
+- `mt5/SessionManager.mqh`
+- `mt5/MarketDataEngine.mqh`
+- `mt5/SMC_MarketDataEA.mq5`
+- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+- `wordpress/smc-superfib-sniper/class-market-data-service.php`
+- `wordpress/smc-superfib-sniper/tests/php/phase3_mt5_simulation_test.php`
 
 ## Tests run
 
-- `git diff --check` - PASS
-- `git diff -- .github/migration/README.md PHASE3_TESTING_GUIDE.md` - PASS (confirmed source docs unchanged)
-- `git diff --name-only -- . ":(exclude)reports/codex-implementation.meta.json" ":(exclude)reports/codex-plan.md" ":(exclude)reports/codex-plan.meta.json" ":(exclude)reports/copilot-research.md"` - PASS (only intended tracked patch files remain in scope)
-- `rg -n "markdownlint|remark-lint|mdl|mdformat|prettier.*md|lint:md|markdown" .` - no repository markdown-lint command/config found for this docs-only patch
+- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+- `php -l wordpress/smc-superfib-sniper/class-market-data-service.php`
+- `php -l wordpress/smc-superfib-sniper/tests/php/phase3_mt5_simulation_test.php`
+- `php wordpress/smc-superfib-sniper/tests/php/phase3_mt5_simulation_test.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
+- Directory-wide PHP test script sweep in `wordpress/smc-superfib-sniper/tests/php`
+  Result: all changed-seam tests passed; one unrelated existing failure remained in `test-phase2-trade-telemetry.php` on streak counting (`current_streak_days` expected `1`, actual `0`).
 
 ## Reports generated
 
-- `reports/codex-implementation.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-22_ea-market-stream-phase3-contract.md`
+- `.github/migration/audits/phase-3-mt5-parity-2026-05-22.md`
+- `reports/phase3-ea-implementation-report.md`
 
 ## Remaining risks
 
-- Track A and Track B leads are still placeholders and require human assignment before merge
-- The working branch required by runtime context (`codex/smc-intake-create-phase3-implementation-md-and-o`) does not follow the repository's documented `mt5-phase-[X]-[feature]` monitoring convention; this patch records the actual branch used for the PR to avoid inventing a non-existent branch
-- Phase 2 closeout remains a gate for substantive Phase 3 implementation completion
+- MT5 files were patched logically against the contract, but MQL compilation/runtime validation has not been run yet in this workspace.
+- The contract text conflicts with repo reality on timestamp format and session canonicalization; the safest repo-compatible interpretation was applied and the changed PHP bridge seam validated, but MT5 runtime parity still needs live verification.
+- The directory-wide PHP sweep still has one unrelated failure in `wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php` on streak counting. This patch did not modify streak logic, but the suite is not fully green.
 
 ## Any contract ambiguities resolved during implementation
 
-- Resolved the branch-name conflict by treating the runtime-required working branch as authoritative for the implementation patch, while preserving the repository's existing phase-gate structure and recording the actual branch in `.github/migration-status.md`
+- `timestamp`: the contract text says Unix milliseconds, but the repo’s MT5/backend live contract and existing PHP normalizers use ISO 8601 UTC strings. ISO 8601 was preserved.
+- `session` values: the plan examples and canonical spec are inconsistent. The implementation preserved the repo/spec session vocabulary (`Sydney`, `Tokyo`, `London`, `New York`, `Overlap`, `Closed`) and normalized closed windows to `Closed` instead of inventing new session names.
+- `class-market-data-service.php`: the contract names it as the MT5 upsert path, but the live `ea/market-stream` persistence path is in `smc-superfib-sniper.php`. The live route was patched first, and the service class was kept behaviorally consistent without widening architecture.

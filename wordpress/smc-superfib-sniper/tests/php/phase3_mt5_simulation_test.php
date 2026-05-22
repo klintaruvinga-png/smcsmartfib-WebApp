@@ -1,182 +1,171 @@
 <?php
-/**
- * Phase 3 Testing: Simulate MT5 EA sending price and candlestick data to backend
- *
- * This script simulates the MT5 EA sending webhook payloads to the WordPress REST API
- * to test if the backend correctly receives and stores price and candlestick data.
- */
 
-// Configuration - set these through environment variables for your WordPress instance.
-$wordpress_url = getenv('SMC_SF_EA_ENDPOINT') ?: 'https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream';
-$api_key       = getenv('SMC_SF_EA_API_KEY') ?: '';
-$user_id       = (int) (getenv('SMC_SF_EA_USER_ID') ?: 1);
+require_once __DIR__ . '/test-ea-bridge-bootstrap.php';
 
-if ($api_key === '') {
-    echo "Missing SMC_SF_EA_API_KEY environment variable.\n";
-    exit(1);
+function phase3_base_payload() {
+    $now = time();
+
+    return array(
+        'user_id' => 7,
+        'symbol' => 'EURUSD',
+        'normalized_symbol' => 'EURUSD',
+        'timeframe' => 'M1',
+        'timestamp' => gmdate('c', $now - 5),
+        'bid' => 1.08450,
+        'ask' => 1.08470,
+        'spread' => 0.00020,
+        'freshness' => 'LIVE',
+        'session' => 'London',
+        'candle' => array(
+            'time' => gmdate('c', $now - 60),
+            'open' => 1.08400,
+            'high' => 1.08500,
+            'low' => 1.08350,
+            'close' => 1.08450,
+            'volume' => 5000,
+        ),
+        'candle_m15' => array(
+            'time' => gmdate('c', $now - 900),
+            'open' => 1.08200,
+            'high' => 1.08600,
+            'low' => 1.08150,
+            'close' => 1.08450,
+            'volume' => 15000,
+        ),
+    );
 }
 
-// Sample MT5 payload (matches the format from MarketDataEngine.mqh)
-$sample_payload = [
-    'user_id' => $user_id,
-    'symbol' => 'EURUSD',
-    'normalized_symbol' => 'EURUSD',
-    'timeframe' => 'M1',
-    'timestamp' => gmdate('c'),
-    'bid' => 1.0845,
-    'ask' => 1.0847,
-    'freshness' => 'LIVE',
-    'session' => 'London',
-    'candle' => [
-        'time' => gmdate('c', time() - 60),
-        'open' => 1.0840,
-        'high' => 1.0850,
-        'low' => 1.0835,
-        'close' => 1.0845,
-        'volume' => 5000
-    ],
-    'is_synthetic' => false
-];
-
-echo "Phase 3 Testing: Simulating MT5 EA webhook to backend\n";
-echo "==================================================\n\n";
-
-echo "Sending payload to: $wordpress_url\n";
-echo "Payload:\n" . json_encode($sample_payload, JSON_PRETTY_PRINT) . "\n\n";
-
-$json_body = json_encode($sample_payload);
-
-if (function_exists('curl_init')) {
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $wordpress_url);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $json_body);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Content-Type: application/json',
-        'X-API-KEY: ' . $api_key,
-    ]);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    $response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curl_err  = curl_error($ch);
-    curl_close($ch);
-
-    if ($curl_err) {
-        echo "cURL Error: $curl_err\n";
-        exit(1);
-    }
-} elseif (in_array(parse_url($wordpress_url, PHP_URL_SCHEME), stream_get_wrappers())) {
-    // Fallback: file_get_contents — gate on the actual URL scheme, not a hardcoded 'https'
-    $context = stream_context_create([
-        'http' => [
-            'method'        => 'POST',
-            'header'        => implode("\r\n", [
-                'Content-Type: application/json',
-                'X-API-KEY: ' . $api_key,
-            ]),
-            'content'       => $json_body,
-            'ignore_errors' => true,
-            'timeout'       => 15,
-        ],
-        'ssl' => [
-            'verify_peer'      => false,
-            'verify_peer_name' => false,
-        ],
-    ]);
-    $response  = file_get_contents($wordpress_url, false, $context);
-    $http_code = 0;
-    foreach ($http_response_header ?? [] as $h) {
-        if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $m)) {
-            $http_code = (int) $m[1];
-        }
-    }
-    if ($response === false) {
-        echo "Request failed (file_get_contents). Check URL and network.\n";
-        exit(1);
-    }
-} elseif (function_exists('exec')) {
-    // Last resort: shell out to curl.exe (bundled with Windows 10+) or PowerShell
-    $escaped_url  = escapeshellarg($wordpress_url);
-    $escaped_body = escapeshellarg($json_body);
-    $escaped_auth = escapeshellarg('X-API-KEY: ' . $api_key);
-
-    // Try curl.exe first (Windows 10 1803+ ships it in System32)
-    exec('curl.exe --version 2>NUL', $ver_out, $ver_ret);
-    if ($ver_ret === 0) {
-        // Write body to a temp file to avoid shell quoting issues with JSON on Windows
-        $tmp = tempnam(sys_get_temp_dir(), 'mt5_');
-        file_put_contents($tmp, $json_body);
-        $escaped_tmp = escapeshellarg($tmp);
-
-        // Use a safe sentinel with no newline so cmd.exe doesn't split the command
-        $cmd = "curl.exe -s -o - -w \"__HTTP_CODE__:%{http_code}\" "
-             . "-X POST $escaped_url "
-             . "-H \"Content-Type: application/json\" "
-             . "-H $escaped_auth "
-             . "--data @$escaped_tmp "
-             . "--insecure";
-        exec($cmd, $out, $ret);
-        @unlink($tmp);
-        $raw       = implode("\n", $out);
-        $http_code = 0;
-        if (preg_match('#__HTTP_CODE__:(\d+)$#', $raw, $m)) {
-            $http_code = (int) $m[1];
-            $response  = preg_replace('#__HTTP_CODE__:\d+$#', '', $raw);
-        } else {
-            $response = $raw;
-        }
-        if ($ret !== 0 && $http_code === 0) {
-            echo "curl.exe failed (exit $ret). Check URL and network.\n";
-            exit(1);
-        }
-    } else {
-        // Final fallback: PowerShell Invoke-WebRequest
-        $ps_body = str_replace("'", "''", $json_body);
-        $ps_cmd  = "powershell -NoProfile -Command \""
-                 . "\$r = Invoke-WebRequest -Uri '$wordpress_url' "
-                 . "-Method POST "
-                 . "-Headers @{'Content-Type'='application/json';'X-API-KEY'='" . addslashes($api_key) . "'} "
-                 . "-Body '" . $ps_body . "' -UseBasicParsing; "
-                 . "Write-Output (\$r.StatusCode.ToString() + '|' + \$r.Content)"
-                 . "\"";
-        exec($ps_cmd, $out, $ret);
-        $raw = implode('', $out);
-        if ($ret !== 0 || strpos($raw, '|') === false) {
-            echo "PowerShell request failed. Check URL and network.\n";
-            exit(1);
-        }
-        [$http_code, $response] = explode('|', $raw, 2);
-        $http_code = (int) $http_code;
-    }
-} else {
-    echo "No HTTP transport available: PHP curl extension, openssl wrapper, and exec() are all disabled.\n";
-    echo "Enable at least one of: extension=curl, extension=openssl, or allow exec() in php.ini.\n";
-    exit(1);
+function phase3_dispatch($plugin, array $payload) {
+    return dispatch_ea_request(
+        $plugin,
+        'permission_ea_market_stream',
+        'post_ea_market_stream',
+        $payload,
+        ea_bridge_headers()
+    );
 }
 
-echo "HTTP Response Code: $http_code\n";
-echo "Response:\n$response\n\n";
+function phase3_snapshot_rows($user_id, $symbol) {
+    global $wpdb;
 
-if ($http_code === 200) {
-    $response_data = json_decode($response, true);
-    if (isset($response_data['ok']) && $response_data['ok'] === true) {
-        echo "SUCCESS: Backend accepted the MT5 payload\n";
-        echo "Price data (tick) should be stored in snapshots table with source='mt5'\n";
-        echo "Candlestick data (M1) should be stored in candles table with source='mt5'\n";
-        echo "Freshness state should be stored as transient\n";
-        echo "Session state should be stored as transient\n";
-    } else {
-        echo "FAILURE: Backend rejected the payload\n";
+    $rows = array();
+    foreach ($wpdb->tables['wp_smc_sf_snapshots'] ?? array() as $row) {
+        if ((int) ($row['user_id'] ?? 0) === $user_id
+            && ($row['symbol'] ?? '') === $symbol
+            && ($row['source'] ?? '') === 'mt5') {
+            $rows[] = $row;
+        }
     }
-} else {
-    echo "FAILURE: HTTP error $http_code\n";
+
+    return $rows;
 }
 
-echo "\nNext Steps:\n";
-echo "1. Configure the correct WordPress URL and auth token above\n";
-echo "2. Run this script to send test data\n";
-echo "3. Check WordPress database for stored data\n";
-echo "4. Verify dashboard shows MT5 as authoritative source\n";
-echo "5. Run actual MT5 EA and monitor incoming webhooks\n";
-?>
+function phase3_candle_rows($user_id, $symbol, $timeframe = null, $candle_time = null) {
+    global $wpdb;
+
+    $rows = array();
+    foreach ($wpdb->tables['wp_smc_sf_candles'] ?? array() as $row) {
+        if ((int) ($row['user_id'] ?? 0) !== $user_id) {
+            continue;
+        }
+        if (($row['symbol'] ?? '') !== $symbol || ($row['source'] ?? '') !== 'mt5') {
+            continue;
+        }
+        if ($timeframe !== null && ($row['timeframe'] ?? '') !== $timeframe) {
+            continue;
+        }
+        if ($candle_time !== null && ($row['candle_time'] ?? '') !== $candle_time) {
+            continue;
+        }
+        $rows[] = $row;
+    }
+
+    return $rows;
+}
+
+function phase3_assert_wp_error($response, $code, $status, $message) {
+    assert_true(is_wp_error($response), $message . ' must return WP_Error');
+    assert_same($code, $response->code, $message . ' must return expected error code');
+    assert_same($status, (int) ($response->data['status'] ?? 0), $message . ' must return expected HTTP status');
+}
+
+reset_ea_bridge_test_state();
+$plugin = new SMC_SuperFib_Sniper_REST();
+
+// 1. Full Phase 3 payload ingestion.
+$payload = phase3_base_payload();
+$response = phase3_dispatch($plugin, $payload);
+assert_true($response instanceof WP_REST_Response, 'Full Phase 3 payload must return a REST response');
+assert_true(!empty($response->data['ok']), 'Full Phase 3 payload must succeed');
+assert_same(1, (int) $response->data['snapshots_inserted'], 'Full Phase 3 payload must insert one snapshot row');
+assert_same(2, (int) $response->data['candles_inserted'], 'Full Phase 3 payload must insert one M1 and one M15 candle row');
+$snapshot_rows = phase3_snapshot_rows(7, 'EURUSD');
+assert_same(1, count($snapshot_rows), 'Full Phase 3 payload must persist exactly one MT5 snapshot row');
+$m1_time = gmdate('Y-m-d H:i:s', strtotime($payload['candle']['time']));
+$m15_time = gmdate('Y-m-d H:i:s', strtotime($payload['candle_m15']['time']));
+assert_same(1, count(phase3_candle_rows(7, 'EURUSD', '1min', $m1_time)), 'Full Phase 3 payload must persist exactly one MT5 M1 candle row');
+assert_same(1, count(phase3_candle_rows(7, 'EURUSD', '15min', $m15_time)), 'Full Phase 3 payload must persist exactly one MT5 M15 candle row');
+assert_same('LIVE', $GLOBALS['test_transients']['smc_sf_freshness_7_EURUSD'] ?? null, 'Full Phase 3 payload must store MT5 freshness');
+assert_same('London', $GLOBALS['test_transients']['smc_sf_session_7_EURUSD'] ?? null, 'Full Phase 3 payload must store MT5 session');
+
+// 2. Missing freshness.
+reset_ea_bridge_test_state();
+$plugin = new SMC_SuperFib_Sniper_REST();
+$payload = phase3_base_payload();
+unset($payload['freshness']);
+$response = phase3_dispatch($plugin, $payload);
+phase3_assert_wp_error($response, 'invalid_phase3_payload', 400, 'Missing freshness');
+
+// 3. Missing session.
+reset_ea_bridge_test_state();
+$plugin = new SMC_SuperFib_Sniper_REST();
+$payload = phase3_base_payload();
+unset($payload['session']);
+$response = phase3_dispatch($plugin, $payload);
+phase3_assert_wp_error($response, 'invalid_phase3_payload', 400, 'Missing session');
+
+// 4. Missing OHLC field.
+reset_ea_bridge_test_state();
+$plugin = new SMC_SuperFib_Sniper_REST();
+$payload = phase3_base_payload();
+unset($payload['candle']['close']);
+$response = phase3_dispatch($plugin, $payload);
+phase3_assert_wp_error($response, 'invalid_phase3_payload', 400, 'Missing OHLC field');
+
+// 5. Stale payload (>300 seconds old).
+reset_ea_bridge_test_state();
+$plugin = new SMC_SuperFib_Sniper_REST();
+$payload = phase3_base_payload();
+$payload['timestamp'] = gmdate('c', time() - 400);
+$response = phase3_dispatch($plugin, $payload);
+phase3_assert_wp_error($response, 'stale_data', 422, 'Stale Phase 3 payload');
+
+// 6. CLOSED freshness state persists without stale rejection.
+reset_ea_bridge_test_state();
+$plugin = new SMC_SuperFib_Sniper_REST();
+$payload = phase3_base_payload();
+$payload['freshness'] = 'CLOSED';
+$payload['session'] = 'Closed';
+$payload['timestamp'] = gmdate('c', time());
+$response = phase3_dispatch($plugin, $payload);
+assert_true($response instanceof WP_REST_Response, 'CLOSED freshness payload must return a REST response');
+assert_true(!empty($response->data['ok']), 'CLOSED freshness payload must succeed');
+$snapshot_rows = phase3_snapshot_rows(7, 'EURUSD');
+assert_same(1, count($snapshot_rows), 'CLOSED freshness payload must still persist the MT5 snapshot row');
+assert_same('offline', $snapshot_rows[0]['state'] ?? null, 'CLOSED freshness payload must persist an offline snapshot state');
+assert_same('CLOSED', $GLOBALS['test_transients']['smc_sf_freshness_7_EURUSD'] ?? null, 'CLOSED freshness payload must store CLOSED freshness');
+
+// 7. Duplicate candle upsert.
+reset_ea_bridge_test_state();
+$plugin = new SMC_SuperFib_Sniper_REST();
+$payload = phase3_base_payload();
+$duplicate_m1_time = gmdate('Y-m-d H:i:s', strtotime($payload['candle']['time']));
+$duplicate_m15_time = gmdate('Y-m-d H:i:s', strtotime($payload['candle_m15']['time']));
+$response = phase3_dispatch($plugin, $payload);
+assert_true($response instanceof WP_REST_Response && !empty($response->data['ok']), 'Initial duplicate test payload must succeed');
+$response = phase3_dispatch($plugin, $payload);
+assert_true($response instanceof WP_REST_Response && !empty($response->data['ok']), 'Repeated duplicate test payload must succeed');
+assert_same(1, count(phase3_candle_rows(7, 'EURUSD', '1min', $duplicate_m1_time)), 'Duplicate Phase 3 M1 candle payloads must upsert to one row');
+assert_same(1, count(phase3_candle_rows(7, 'EURUSD', '15min', $duplicate_m15_time)), 'Duplicate Phase 3 M15 candle payloads must upsert to one row');
+
+fwrite(STDOUT, "phase3 mt5 simulation checks passed\n");

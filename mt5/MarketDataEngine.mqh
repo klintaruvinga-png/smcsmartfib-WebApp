@@ -126,20 +126,19 @@ public:
     void OnPeriodic()
     {
         Print("SMC_MarketDataEA: OnPeriodic fired");
-
-        // Refresh session with wall-clock time so IsMarketOpen() stays accurate
-        // even when no ticks arrive (e.g. during market close / weekend).
-        sessionManager.UpdateSession(TimeCurrent());
-
-        // Let FreshnessEngine age states; pass market-open flag so it can
-        // set CLOSED instead of STALE during weekend/holiday gaps.
-        freshnessEngine.UpdatePeriodic(sessionManager.IsMarketOpen());
+        datetime now = TimeCurrent();
+        sessionManager.UpdateSession(now);
 
         if (StringLen(webhookUrl) == 0)
             return;
 
         for (int i = 0; i < symbolCount; i++)
+        {
+            string normalized = symbolNormalizer.NormalizeSymbol(symbols[i]);
+            bool isMarketOpen = sessionManager.IsMarketOpenForSymbol(normalized, now);
+            freshnessEngine.UpdateSymbolPeriodic(normalized, isMarketOpen, now);
             SendToBackend(symbols[i]);
+        }
     }
 
     // ---- Getters ----
@@ -233,17 +232,17 @@ public:
         // freshness to CLOSED and use the current wall-clock time as the push timestamp so the
         // PHP backend accepts the push (tick.timestamp would be hours old and get rejected by
         // the >300s stale-data guard). The last known bid/ask is sent as a reference price.
-        bool   indexEquity   = IsEquityIndexSymbol(symbol);
-        bool   equityOpen    = indexEquity ? IsEquitySessionOpen() : true;
-        string freshnessStr  = (indexEquity && !equityOpen)
-                                   ? "CLOSED"
-                                   : FreshnessStateName(GetFreshnessState(symbol));
+        bool   isMarketOpen  = sessionManager.IsMarketOpenForSymbol(norm, now);
+        string freshnessStr  = isMarketOpen
+                                   ? FreshnessStateName(GetFreshnessState(symbol))
+                                   : "CLOSED";
+        string sessionName   = sessionManager.GetSessionNameForSymbol(norm, now);
         // Use current broker-local time as payload timestamp when session is closed so PHP does
         // not reject the push on the >300s stale-data guard. TimeCurrent() is broker-local;
         // TimeToIso8601() converts it to UTC by subtracting the broker offset. Passing TimeGMT()
         // here would cause a double-shift on non-UTC brokers (TimeToIso8601 subtracts the offset
         // again, producing a timestamp hours in the past).
-        datetime pushTime    = (indexEquity && !equityOpen) ? TimeCurrent() : tick.timestamp;
+        datetime pushTime    = isMarketOpen ? tick.timestamp : now;
 
         string json = "{";
 
@@ -257,7 +256,7 @@ public:
         json += "\"bid\":"                 + DoubleToString(tick.bid, digits)            + ",";
         json += "\"ask\":"                 + DoubleToString(tick.ask, digits)            + ",";
         json += "\"freshness\":\""         + freshnessStr                               + "\",";
-        json += "\"session\":\""           + JsonEscape(GetSessionName())               + "\"";
+        json += "\"session\":\""           + JsonEscape(sessionName)                    + "\"";
 
         long   accountId     = AccountInfoInteger(ACCOUNT_LOGIN);
         string accountIdStr  = IntegerToString(accountId);
@@ -265,7 +264,7 @@ public:
         string broker        = JsonEscape(AccountInfoString(ACCOUNT_COMPANY));
         string brokerServer  = JsonEscape(AccountInfoString(ACCOUNT_SERVER));
         int    terminalBuild = (int)TerminalInfoInteger(TERMINAL_BUILD);
-        int    spreadPoints  = (int)SymbolInfoInteger(symbol, SYMBOL_SPREAD);
+        double spreadValue   = tick.ask - tick.bid;
 
         json += ",\"schema_version\":\"phase2.trade_telemetry.v1\"";
         json += ",\"account_id\":\""       + accountIdStr                               + "\"";
@@ -274,7 +273,7 @@ public:
         json += ",\"broker_server\":\""    + brokerServer                               + "\"";
         json += ",\"ea_version\":\""       + eaVersion                                  + "\"";
         json += ",\"terminal_build\":\""   + IntegerToString(terminalBuild)             + "\"";
-        json += ",\"spread\":"             + IntegerToString(spreadPoints);
+        json += ",\"spread\":"             + DoubleToString(spreadValue, digits);
         json += ",\"positions\":"          + BuildOpenPositionsJson();
         json += ",\"pending_orders\":"     + BuildPendingOrdersJson();
         json += ",\"account_metrics\":"    + BuildAccountMetricsJson();
@@ -300,6 +299,12 @@ public:
                 json += "\"close\":"   + DoubleToString(rates_m1[0].close,       digits)  + ",";
                 json += "\"volume\":"  + IntegerToString((long)rates_m1[0].tick_volume);
                 json += "}";
+                json += ",\"candle_time\":\""  + TimeToIso8601(candleTime_m1)                + "\"";
+                json += ",\"candle_open\":"    + DoubleToString(rates_m1[0].open,       digits);
+                json += ",\"candle_high\":"    + DoubleToString(rates_m1[0].high,       digits);
+                json += ",\"candle_low\":"     + DoubleToString(rates_m1[0].low,        digits);
+                json += ",\"candle_close\":"   + DoubleToString(rates_m1[0].close,      digits);
+                json += ",\"candle_volume\":"  + IntegerToString((long)rates_m1[0].tick_volume);
 
                 Print("EA SEND → ", symbol,
                       " | M1_time=", TimeToString(candleTime_m1, TIME_DATE|TIME_SECONDS),
@@ -332,6 +337,12 @@ public:
                 json += "\"close\":"   + DoubleToString(rates_m15[0].close,      digits)  + ",";
                 json += "\"volume\":"  + IntegerToString((long)rates_m15[0].tick_volume);
                 json += "}";
+                json += ",\"candle_m15_time\":\""  + TimeToIso8601(candleTime_m15)               + "\"";
+                json += ",\"candle_m15_open\":"    + DoubleToString(rates_m15[0].open,      digits);
+                json += ",\"candle_m15_high\":"    + DoubleToString(rates_m15[0].high,      digits);
+                json += ",\"candle_m15_low\":"     + DoubleToString(rates_m15[0].low,       digits);
+                json += ",\"candle_m15_close\":"   + DoubleToString(rates_m15[0].close,     digits);
+                json += ",\"candle_m15_volume\":"  + IntegerToString((long)rates_m15[0].tick_volume);
 
                 Print("EA SEND → ", symbol,
                       " | M15_time=", TimeToString(candleTime_m15, TIME_DATE|TIME_SECONDS),
