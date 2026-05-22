@@ -568,6 +568,44 @@ assert_true(is_array($invalidSourceAudit), 'Invalid-source MT5 payload must crea
 assert_same('mt5_snapshot.invalid_source', $invalidSourceAudit['event_type'] ?? null, 'Invalid-source MT5 payload must audit the rejected source');
 assert_true(strpos((string) ($invalidSourceAudit['payload'] ?? ''), '"level":"ERROR"') !== false, 'Invalid-source MT5 payload audit must be tagged at ERROR level');
 
+$canonicalSnapshot = $instance->post_snapshot(new WP_REST_Request(array(
+    'symbol' => 'US Tech 100',
+    'normalized_symbol' => 'USTECH100',
+    'source' => 'MT5',
+    'bid' => 18654.2,
+    'ask' => 18654.8,
+    'spread' => 6,
+    'quote_time' => '2026-05-03T08:20:30Z',
+    'candles' => array(
+        array(
+            'time' => '2026-05-03T08:20:00Z',
+            'open' => 18650.0,
+            'high' => 18656.0,
+            'low' => 18649.5,
+            'close' => 18654.4,
+            'tick_volume' => 27,
+        ),
+    ),
+    'freshness' => 'LIVE',
+    'session' => 'New York',
+)));
+
+assert_true(is_array($canonicalSnapshot) && !empty($canonicalSnapshot['ok']), 'Canonical MT5 snapshot payload should succeed on the authenticated /snapshot route');
+$canonicalSnapshotRow = $wpdb->tables[$snapshotTable]['7|NAS100'] ?? null;
+assert_true(is_array($canonicalSnapshotRow), 'Canonical MT5 snapshot payload must persist the aliased snapshot row');
+assert_same('2026-05-03 08:20:30', $canonicalSnapshotRow['updated_at'], 'Canonical MT5 snapshot payload must persist quote_time as the quote timestamp');
+assert_same('live', $canonicalSnapshotRow['state'], 'Canonical MT5 snapshot payload must persist canonical live state');
+$canonicalCandleRow = null;
+foreach (($wpdb->tables[$wpdb->prefix . 'smc_sf_candles'] ?? array()) as $row) {
+    if (($row['symbol'] ?? null) === 'NAS100' && ($row['timeframe'] ?? null) === '1min') {
+        $canonicalCandleRow = $row;
+        break;
+    }
+}
+assert_true(is_array($canonicalCandleRow), 'Canonical MT5 snapshot payload must promote candles[0] into an M1 candle row');
+assert_same('27', $canonicalCandleRow['volume'] ?? null, 'Canonical MT5 snapshot payload must map tick_volume onto candle volume');
+assert_same('LIVE', $GLOBALS['test_transients']['smc_sf_freshness_7_NAS100'] ?? null, 'Canonical MT5 snapshot payload must persist freshness against the aliased symbol');
+
 $wpdb->replace($snapshotTable, array(
     'user_id' => 7,
     'symbol' => 'USDJPY',

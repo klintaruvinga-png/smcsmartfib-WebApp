@@ -1806,8 +1806,11 @@ final class SMC_SuperFib_Sniper_REST {
             return new WP_REST_Response(array('error' => 'Invalid payload'), 400);
         }
 
-        $symbol = strtoupper(sanitize_text_field($payload['symbol']));
-        $normalized_symbol = isset($payload['normalized_symbol']) ? strtoupper(sanitize_text_field($payload['normalized_symbol'])) : $symbol;
+        $payload = $this->normalize_snapshot_payload_compat($payload);
+        $symbol = $this->map_symbol_aliases(strtoupper(sanitize_text_field($payload['symbol'])));
+        $normalized_symbol = isset($payload['normalized_symbol'])
+            ? $this->map_symbol_aliases(strtoupper(sanitize_text_field($payload['normalized_symbol'])))
+            : $symbol;
         $freshness_raw = isset($payload['freshness']) ? sanitize_text_field($payload['freshness']) : '';
         $snapshot_state = $this->mt5_freshness_to_snapshot_state($freshness_raw);
         $requested_source = array_key_exists('source', $payload) ? strtolower(trim((string) $payload['source'])) : 'mt5';
@@ -1937,6 +1940,39 @@ final class SMC_SuperFib_Sniper_REST {
         ));
 
         return rest_ensure_response(array('ok' => true));
+    }
+
+    private function normalize_snapshot_payload_compat(array $payload): array {
+        if (!isset($payload['tick']) && (isset($payload['bid']) || isset($payload['ask']))) {
+            $payload['tick'] = array(
+                'bid' => $payload['bid'] ?? null,
+                'ask' => $payload['ask'] ?? null,
+                'spread' => $payload['spread'] ?? 0,
+                'timestamp' => !empty($payload['quote_time'])
+                    ? $payload['quote_time']
+                    : ($payload['timestamp'] ?? null),
+            );
+        } elseif (isset($payload['tick']) && is_array($payload['tick']) && !isset($payload['tick']['timestamp'])) {
+            $payload['tick']['timestamp'] = !empty($payload['quote_time'])
+                ? $payload['quote_time']
+                : ($payload['timestamp'] ?? null);
+        }
+
+        if (!isset($payload['candle_m1']) && isset($payload['candle']) && is_array($payload['candle'])) {
+            $payload['candle_m1'] = $payload['candle'];
+        }
+
+        if (!isset($payload['candle_m1']) && !empty($payload['candles']) && is_array($payload['candles'])) {
+            $first = reset($payload['candles']);
+            if (is_array($first)) {
+                if (isset($first['tick_volume']) && !isset($first['volume'])) {
+                    $first['volume'] = $first['tick_volume'];
+                }
+                $payload['candle_m1'] = $first;
+            }
+        }
+
+        return $payload;
     }
 
     public function get_market_data_authority(WP_REST_Request $request) {
