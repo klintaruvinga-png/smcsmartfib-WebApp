@@ -55,9 +55,9 @@ Phase 3 testing verifies that the MT5 Expert Advisor (EA) successfully sends pri
 - [x] `engine_runs` receives heartbeat rows after successful MT5 snapshot writes — `insert_engine_heartbeat($user_id, ['source'=>'ea_push'])` called when `$inserted_snapshots > 0` (line 2516)
 - [x] MT5 `change_pct_1d` is non-zero after the first UTC-day M1 candle exists, or `0` during cold start — `mt5_change_pct_1d()` queries first M1 candle of the UTC day; returns `0` if none exists
 - [x] GET `/sniper/v1/market-data-authority` returns MT5 as authoritative — `get_market_data_authority()` at line 2132; returns `authority='mt5'`
-- [ ] Dashboard shows "MT5" as data source — pending live browser verification
-- [ ] Freshness indicators update (LIVE/DELAYED/STALE) — pending live browser verification
-- [ ] Session indicators show current market session — pending live browser verification
+- [x] Dashboard shows "MT5" as data source — Signals page "MT5 authority · Live" confirmed 2026-05-22; Admin diagnostics price=live/candle=live/count=120 for all EA-watched symbols
+- [x] Freshness indicators update (LIVE/DELAYED/STALE) — 10/12 symbols LIVE; NAS100/US30 OFFLINE = config gap (not in EA Symbols input, not a code regression)
+- [x] Session indicators show current market session — "London" session chip confirmed in header 2026-05-22
 - [x] MT5-live symbols do not display stale Twelve Data `rate-limited` state after a successful EA push — TD rate-limit transient deleted on every successful MT5 snapshot write
 - [x] Non-EA watchlist symbols still surface real Twelve Data `rate-limited` state when TD returns 429 — transient delete is scoped per-symbol; only fires for MT5-written symbols
 
@@ -69,8 +69,8 @@ Reference gate: `PHASE3_TESTING_GUIDE.md` success criteria
 
 - [x] MT5 EA sends webhooks without errors — EA implemented and parity audit passed 2026-05-22
 - [x] Backend stores data with `source='mt5'` — confirmed via `phase3_mt5_simulation_test.php`, `test-ea-market-stream.php`, `test-mt5-snapshot-contract.php` (all PASS)
-- [ ] Dashboard recognizes MT5 as authoritative data source — pending live browser verification
+- [x] Dashboard recognizes MT5 as authoritative data source — Signals "MT5 authority · Live" + Admin diagnostics confirmed 2026-05-22
 - [x] No data conflicts between MT5 and Twelve Data for MT5-live symbols — TD transients cleared on every MT5 push; compat shim landed (PR #221, #225)
 - [x] Twelve Data remains the visible fallback/feed state for non-EA watchlist symbols — scoped per-symbol delete preserves TD state for non-MT5 symbols
-- [ ] Freshness and session states update correctly — pending live browser verification
-- [ ] 72-hour stability test passes (no frozen quotes, proper session handling) — pending soak
+- [x] Freshness and session states update correctly — 10/12 symbols live; London session confirmed in header; NAS100/US30 offline = EA Symbols config gap (add to EA Symbols input, not a code issue)
+- [ ] 72-hour stability test passes (no frozen quotes, proper session handling) — **SOAK WINDOW OPEN from 2026-05-22**

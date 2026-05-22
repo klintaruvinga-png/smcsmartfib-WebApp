@@ -1,9 +1,9 @@
 # SMC SuperFIB → MT5 Migration Status Board
 
-**Last Updated**: 2026-05-21  
-**Current Phase**: 2 (Read-Only Trade Telemetry — Implementation Complete, Validation Pending)  
-**Overall Progress**: 68%  
-**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 implementation complete, 2 non-code blockers remain
+**Last Updated**: 2026-05-22  
+**Current Phase**: 3 (MT5 Market Data Engine — 72h stability soak in progress)  
+**Overall Progress**: 80%  
+**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 browser verification PASSED (2026-05-22); 72h soak window open
 
 > Snapshot: Phase 0 gate passed 2026-05-15. Post-fix validation soak at 16:37 UTC confirmed NAS100 (29,263.70) and US30 (49,756.00) both LIVE during active US equity session; XAUUSD (4,556.34) LIVE with candle-history gate cleared. Backend soak: 259,464 engine runs / 0 errors / 69,262 candles over 24h. Frontend feed-status chip lag (BUG-001 staleTime:0) resolved. Watchlist persistence 100% parity. AUDUSD/ETHUSD chop-gate classified as correct live behavior — not a blocker. Full closeout evidence: `.github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md`.
 
@@ -15,8 +15,8 @@
 |-------|-----------|--------|-----------|---------|------------|
 | 0 | Stabilize existing platform | **COMPLETE** | 100% | None — gate passed 2026-05-15 | 2026-05-15 ✅ |
 | 1 | MT5 bridge infrastructure | **COMPLETE** | 100% | None — gate passed 2026-05-20 | 2026-06-01 ✅ |
-| 2 | Read-only trade telemetry | IN-PROGRESS | 75% | Phase 2 implementation complete; final browser parity review recommended | 2026-06-15 |
-| 3 | MT5 market data engine | IN-PROGRESS | 75% | Track A (EA candle engine) ✅ Track B (backend freshness layer) ✅ — live browser verification + 72h soak remaining | 2026-07-15 |
+| 2 | Read-only trade telemetry | **COMPLETE** | 100% | None — gate passed 2026-05-22 | 2026-05-22 ✅ |
+| 3 | MT5 market data engine | IN-PROGRESS | 90% | 72h stability soak pending (soak window opened 2026-05-22); NAS100/US30 EA config item (non-blocking) | 2026-07-15 |
 | 4 | Fib engine migration | NOT-STARTED | 0% | Phase 3 complete | 2026-08-15 |
 | 5 | Regime & chop engine | NOT-STARTED | 0% | Phase 4 complete | 2026-09-15 |
 | 6 | Signal engine dual-run | NOT-STARTED | 0% | Phase 5 complete | 2026-10-15 |
@@ -205,8 +205,8 @@ Market-Stream Auth:
 
 ### Success Criteria
 - [x] No fake-live states — TD rate-limit transients cleared on every MT5 push; freshness gated by broker timestamp age
-- [ ] No frozen live feeds — pending 72h live soak
-- [x] Fresh/stale detection accurate — LIVE/DELAYED/STALE/CLOSED enforced in EA + backend; parity audit PASS 2026-05-22
+- [ ] No frozen live feeds — 72h soak window OPEN from 2026-05-22
+- [x] Fresh/stale detection accurate — LIVE/DELAYED/STALE/CLOSED enforced in EA + backend; parity audit PASS; browser confirmed 2026-05-22
 
 ### Test Checklist
 - [x] Low/high volatility — FreshnessEngine thresholds handle tick gaps correctly
@@ -216,10 +216,11 @@ Market-Stream Auth:
 
 ### Blockers
 - ~~Phase 2 closeout~~ — **CLEARED 2026-05-22**
-- ~~EA candle engine (Track A)~~ — **CLEARED 2026-05-22**: All modules verified against codebase; parity tests passing
-- ~~Backend freshness layer (Track B)~~ — **CLEARED 2026-05-22**: All storage paths confirmed in smc-superfib-sniper.php
-- *Live browser verification pending* — dashboard MT5 source indicator, freshness/session chips need browser confirmation
-- *72-hour stability soak pending* — required before Phase 3 gate closes
+- ~~EA candle engine (Track A)~~ — **CLEARED 2026-05-22**: All modules verified; parity tests passing
+- ~~Backend freshness layer (Track B)~~ — **CLEARED 2026-05-22**: All storage paths confirmed
+- ~~Live browser verification~~ — **CLEARED 2026-05-22**: MT5 authority Live ✅ · BACKEND LIVE ✅ · London session ✅ · 10/12 symbols live ✅ · Streak 8d LIVE ✅
+- **NAS100/US30 config item** — Not in EA Symbols input; fix: add `NAS100,US30` to EA Properties → Inputs → Symbols. Non-blocking (code correct, engine guard working as designed)
+- **72-hour stability soak** — Soak window opened 2026-05-22; required before Phase 3 gate closes
 
 ---
 
