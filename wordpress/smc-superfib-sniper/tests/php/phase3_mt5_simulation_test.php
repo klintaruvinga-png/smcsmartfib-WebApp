@@ -168,4 +168,18 @@ assert_true($response instanceof WP_REST_Response && !empty($response->data['ok'
 assert_same(1, count(phase3_candle_rows(7, 'EURUSD', '1min', $duplicate_m1_time)), 'Duplicate Phase 3 M1 candle payloads must upsert to one row');
 assert_same(1, count(phase3_candle_rows(7, 'EURUSD', '15min', $duplicate_m15_time)), 'Duplicate Phase 3 M15 candle payloads must upsert to one row');
 
+// 8. Legacy M15-only payload remains accepted.
+reset_ea_bridge_test_state();
+$plugin = new SMC_SuperFib_Sniper_REST();
+$payload = phase3_base_payload();
+unset($payload['candle']);
+$response = phase3_dispatch($plugin, $payload);
+assert_true($response instanceof WP_REST_Response, 'M15-only payload must return a REST response');
+assert_true(!empty($response->data['ok']), 'M15-only payload must succeed');
+assert_same(1, (int) $response->data['snapshots_inserted'], 'M15-only payload must still insert one snapshot row');
+assert_same(1, (int) $response->data['candles_inserted'], 'M15-only payload must insert only one M15 candle row');
+$m15_only_time = gmdate('Y-m-d H:i:s', strtotime($payload['candle_m15']['time']));
+assert_same(0, count(phase3_candle_rows(7, 'EURUSD', '1min')), 'M15-only payload must not require or insert an M1 candle row');
+assert_same(1, count(phase3_candle_rows(7, 'EURUSD', '15min', $m15_only_time)), 'M15-only payload must persist exactly one MT5 M15 candle row');
+
 fwrite(STDOUT, "phase3 mt5 simulation checks passed\n");
