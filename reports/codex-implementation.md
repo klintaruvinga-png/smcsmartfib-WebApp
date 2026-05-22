@@ -1,36 +1,27 @@
-# Codex Implementation Summary
-
 ## Issue summary
 
-Created the missing root-level `PHASE3_IMPLEMENTATION.md` planning artifact with owner placeholders, a Phase 3 checklist bounded to existing repository documentation, and updated the Phase 3 migration board entries to reflect that planning is now active on the required working branch.
+Stopped — Phase 3 operational validation cannot be completed from this workspace because the required MT5 webhook credentials/live endpoint evidence are unavailable, and the contract’s presumed code gaps conflict with current repository reality.
 
 ## Root cause implemented
 
-The repository had Phase 3 testing guidance and migration-board placeholders, but no canonical Phase 3 implementation plan artifact and no active Phase 3 planning entry tied to the current work branch. This patch adds the missing plan document and advances the migration board from `NOT-STARTED` to `IN-PROGRESS` without changing any runtime code or acceptance criteria.
+Not implemented — Codex stopped before code changes. Pre-patch audit found the MT5 webhook success path already writes an `engine_runs` heartbeat via `insert_engine_heartbeat(... source => 'ea_push' ...)`, and the dashboard already surfaces backend-owned authority state through `/health`; the live MT5 webhook validation cannot be executed because `SMC_SF_EA_API_KEY` is absent in this environment.
 
 ## Exact files changed
 
-- `PHASE3_IMPLEMENTATION.md` - new root-level implementation plan with owner placeholders, scope copied from Phase 3 testing guidance, bounded implementation checklist, and referenced phase gate criteria
-- `.github/migration-status.md` - Phase 3 summary row updated to `IN-PROGRESS`, planning branch recorded, Phase 3 section linked to the new implementation plan, blocker text narrowed to remaining Phase 2 closeout
-- `reports/codex-implementation.md` - required implementation summary for this patch
+None — no files changed.
 
 ## Tests run
 
-- `git diff --check` - PASS
-- `git diff -- .github/migration/README.md PHASE3_TESTING_GUIDE.md` - PASS (confirmed source docs unchanged)
-- `git diff --name-only -- . ":(exclude)reports/codex-implementation.meta.json" ":(exclude)reports/codex-plan.md" ":(exclude)reports/codex-plan.meta.json" ":(exclude)reports/copilot-research.md"` - PASS (only intended tracked patch files remain in scope)
-- `rg -n "markdownlint|remark-lint|mdl|mdformat|prettier.*md|lint:md|markdown" .` - no repository markdown-lint command/config found for this docs-only patch
+None — stopped before code changes.
 
 ## Reports generated
 
-- `reports/codex-implementation.md`
+None — stopped before code changes.
 
 ## Remaining risks
 
-- Track A and Track B leads are still placeholders and require human assignment before merge
-- The working branch required by runtime context (`codex/smc-intake-create-phase3-implementation-md-and-o`) does not follow the repository's documented `mt5-phase-[X]-[feature]` monitoring convention; this patch records the actual branch used for the PR to avoid inventing a non-existent branch
-- Phase 2 closeout remains a gate for substantive Phase 3 implementation completion
+The current workspace cannot verify the live MT5 EA -> WordPress webhook -> database path without a valid `SMC_SF_EA_API_KEY`, a reachable target WordPress instance, and post-write database/transient evidence. Separately, the contract’s FILE B heartbeat gap is already closed in `post_ea_market_stream()`, and FILE A’s prescribed endpoint polling would duplicate an existing backend-authoritative dashboard signal path that already uses `/health`.
 
 ## Any contract ambiguities resolved during implementation
 
-- Resolved the branch-name conflict by treating the runtime-required working branch as authoritative for the implementation patch, while preserving the repository's existing phase-gate structure and recording the actual branch in `.github/migration-status.md`
+The contract assumes missing `engine_runs` heartbeat wiring and probable missing dashboard authority recognition. The audit resolved the smallest safe interpretation as follows: FILE B is out of scope because the heartbeat already exists on the MT5 success path, and FILE A cannot be applied safely as-written because the frontend already reflects backend authority through `/health` even though it does not call `/market-data-authority` or `/authority-diagnostics` directly.
