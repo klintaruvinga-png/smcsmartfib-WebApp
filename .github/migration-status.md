@@ -16,7 +16,7 @@
 | 0 | Stabilize existing platform | **COMPLETE** | 100% | None — gate passed 2026-05-15 | 2026-05-15 ✅ |
 | 1 | MT5 bridge infrastructure | **COMPLETE** | 100% | None — gate passed 2026-05-20 | 2026-06-01 ✅ |
 | 2 | Read-only trade telemetry | IN-PROGRESS | 75% | Phase 2 implementation complete; final browser parity review recommended | 2026-06-15 |
-| 3 | MT5 market data engine | NOT-STARTED | 0% | Phase 2 complete | 2026-07-15 |
+| 3 | MT5 market data engine | IN-PROGRESS | 5% | Planning branch `codex/smc-intake-create-phase3-implementation-md-and-o`; Phase 2 closeout still gates implementation completion | 2026-07-15 |
 | 4 | Fib engine migration | NOT-STARTED | 0% | Phase 3 complete | 2026-08-15 |
 | 5 | Regime & chop engine | NOT-STARTED | 0% | Phase 4 complete | 2026-09-15 |
 | 6 | Signal engine dual-run | NOT-STARTED | 0% | Phase 5 complete | 2026-10-15 |
@@ -193,8 +193,10 @@ Market-Stream Auth:
 
 **Objective**: EA becomes authoritative market-data collector  
 **Owner**: Track A + Track B  
-**Status**: NOT-STARTED  
+**Status**: IN-PROGRESS
 **Prerequisites**: Phase 2 complete  
+**Planning Branch**: `codex/smc-intake-create-phase3-implementation-md-and-o`
+**Readiness Package Target**: [PHASE3_IMPLEMENTATION.md](../PHASE3_IMPLEMENTATION.md)
 **Completion Target**: 2026-07-15
 
 ### Deliverables
@@ -213,7 +215,7 @@ Market-Stream Auth:
 - [ ] Symbol suffix handling
 
 ### Blockers
-- *Phase 2 not complete*
+- *Phase 2 closeout still gates implementation completion*
 
 ---
 
