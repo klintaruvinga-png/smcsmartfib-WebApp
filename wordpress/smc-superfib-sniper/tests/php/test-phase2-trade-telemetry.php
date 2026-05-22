@@ -734,8 +734,8 @@ function test_phase2_trade_telemetry() {
     phase2_assert_same(10125.0, (float) ($progress_response->data['equity_pulse']['equity_usc'] ?? 0), 'Progress equity must mirror account telemetry equity');
     phase2_assert_same(48.5, (float) ($progress_response->data['equity_pulse']['today_pnl_usc'] ?? 0), 'Progress today P/L must expose the persisted account snapshot value when present');
     phase2_assert_same('LIVE', $progress_response->data['equity_pulse']['state'] ?? null, 'Live telemetry must map to LIVE progress state');
-    phase2_assert_same(0, $progress_response->data['streak']['current_streak_days'] ?? null, 'Streak must degrade to 0 while active-day definition is unresolved');
-    phase2_assert_same('UNAVAILABLE', $progress_response->data['streak']['state'] ?? null, 'Streak must stay UNAVAILABLE until the active-day definition is approved');
+    phase2_assert_same(1, $progress_response->data['streak']['current_streak_days'] ?? null, 'Streak must return 1 consecutive day when one engine run exists from today (CALENDAR_DAY_WITH_ANY_COMPLETED_ENGINE_RUN)');
+    phase2_assert_same('LIVE', $progress_response->data['streak']['state'] ?? null, 'Streak must return LIVE state once active-day definition is approved and engine run data exists');
     phase2_assert_true(!empty($progress_response->data['streak']['last_active_date']), 'Streak must still expose the latest activity date when engine activity exists');
     phase2_assert_same(true, $progress_response->data['milestones']['first_heartbeat'] ?? false, 'Explicit heartbeat milestone must require a persisted explicit heartbeat row');
     phase2_assert_same(true, $progress_response->data['milestones']['first_market_stream'] ?? false, 'Market-stream milestone must require a persisted ea_push heartbeat row');
@@ -906,4 +906,72 @@ function test_phase2_trade_telemetry() {
     echo "\nAll Phase 2 telemetry tests passed.\n";
 }
 
+function test_progress_streak_live_state_with_consecutive_run_fixtures() {
+    global $wpdb;
+
+    echo "\nTesting progress streak: live state with consecutive run fixtures\n";
+    echo "=================================================================\n\n";
+
+    phase2_reset_state();
+    $plugin = new SMC_SuperFib_Sniper_REST();
+    $plugin->register_routes();
+
+    // Insert engine runs for 3 consecutive days ending today.
+    $today     = gmdate('Y-m-d H:i:s');
+    $yesterday = gmdate('Y-m-d H:i:s', strtotime('-1 day'));
+    $two_ago   = gmdate('Y-m-d H:i:s', strtotime('-2 days'));
+    $wpdb->insert('wp_smc_sf_engine_runs', array('user_id' => 7, 'status' => 'heartbeat', 'summary' => '{}', 'created_at' => $today));
+    $wpdb->insert('wp_smc_sf_engine_runs', array('user_id' => 7, 'status' => 'heartbeat', 'summary' => '{}', 'created_at' => $yesterday));
+    $wpdb->insert('wp_smc_sf_engine_runs', array('user_id' => 7, 'status' => 'heartbeat', 'summary' => '{}', 'created_at' => $two_ago));
+
+    // Seed account telemetry so equity_pulse resolves.
+    $wpdb->replace('wp_smc_sf_account_telemetry', array(
+        'user_id' => 7, 'account_id' => 'acc', 'terminal_id' => 'term',
+        'balance' => 10000, 'equity' => 10000, 'margin' => 0, 'free_margin' => 10000,
+        'margin_level' => 0, 'floating_pl' => 0, 'currency' => 'USC', 'leverage' => 500,
+        'ea_version' => '1.00',
+        'last_seen_at' => gmdate('Y-m-d H:i:s', time() - 5),
+        'updated_at' => gmdate('Y-m-d H:i:s', time() - 5),
+        'raw_json' => '{}',
+    ));
+
+    $response = $plugin->get_user_progress();
+    phase2_assert_true($response instanceof WP_REST_Response, 'GET /user/progress must return a response');
+    phase2_assert_same(3, $response->data['streak']['current_streak_days'] ?? null, 'Streak must count 3 consecutive days from today');
+    phase2_assert_same('LIVE', $response->data['streak']['state'] ?? null, 'Streak must be LIVE when consecutive run data exists');
+    phase2_assert_true(!empty($response->data['streak']['last_active_date']), 'last_active_date must be populated');
+    echo "PASS streak live state with 3 consecutive run fixtures\n";
+}
+
+function test_progress_streak_unavailable_with_no_run_data() {
+    global $wpdb;
+
+    echo "\nTesting progress streak: unavailable state with no run data\n";
+    echo "===========================================================\n\n";
+
+    phase2_reset_state();
+    $plugin = new SMC_SuperFib_Sniper_REST();
+    $plugin->register_routes();
+
+    // No engine_runs rows inserted — table is empty.
+    $wpdb->replace('wp_smc_sf_account_telemetry', array(
+        'user_id' => 7, 'account_id' => 'acc', 'terminal_id' => 'term',
+        'balance' => 10000, 'equity' => 10000, 'margin' => 0, 'free_margin' => 10000,
+        'margin_level' => 0, 'floating_pl' => 0, 'currency' => 'USC', 'leverage' => 500,
+        'ea_version' => '1.00',
+        'last_seen_at' => gmdate('Y-m-d H:i:s', time() - 5),
+        'updated_at' => gmdate('Y-m-d H:i:s', time() - 5),
+        'raw_json' => '{}',
+    ));
+
+    $response = $plugin->get_user_progress();
+    phase2_assert_true($response instanceof WP_REST_Response, 'GET /user/progress must return a response with no run data');
+    phase2_assert_same(0, $response->data['streak']['current_streak_days'] ?? -1, 'Streak must be 0 when no run data exists');
+    phase2_assert_same('UNAVAILABLE', $response->data['streak']['state'] ?? null, 'Streak state must be UNAVAILABLE when no run data exists');
+    phase2_assert_true($response->data['streak']['last_active_date'] === null, 'last_active_date must be null when no run data exists');
+    echo "PASS streak unavailable with no run data\n";
+}
+
 test_phase2_trade_telemetry();
+test_progress_streak_live_state_with_consecutive_run_fixtures();
+test_progress_streak_unavailable_with_no_run_data();

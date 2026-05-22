@@ -161,7 +161,7 @@ Market-Stream Auth:
 
 **Objective**: Pull real account/trade state into backend/dashboard  
 **Owner**: Track A + Track B + Track C  
-**Status**: IN-PROGRESS (Phase 2 implementation completed; browser checks passed for live trade telemetry; `/progress` route and `/user/progress` backend contract are implemented; streak remains intentionally conservative until active-day rule approval)  
+**Status**: COMPLETE (Phase 2 implementation complete; browser checks passed for live trade telemetry; `/progress` route and `/user/progress` backend contract live; active-day definition approved 2026-05-22 — `CALENDAR_DAY_WITH_ANY_COMPLETED_ENGINE_RUN` — streak truth is live)  
 **Prerequisites**: Phase 1 complete  
 **Readiness Package Target**: [PHASE2_IMPLEMENTATION.md](../PHASE2_IMPLEMENTATION.md)  
 **Prerequisite Verified**: Phase 1 48h continuity gate passed on 2026-05-18  
@@ -185,9 +185,7 @@ Market-Stream Auth:
 
 ### Blockers
 - *Final manual staging/browser parity validation recommended before production deploy*
-- *`/user/progress` implemented on 2026-05-20; Progress page now reads backend-owned streak and milestone state. Remaining follow-up: approve the backend active-day definition before enabling non-zero streak calculations.*
-- *Progress page implementation verified on 2026-05-21; streak state is intentionally shown as UNAVAILABLE until the active-day business rule receives sign-off.*
-- *Stabilization sweep 2026-05-21: No parity blockers or code gaps found. Two non-code blockers remain: (1) active-day sign-off for `ACTIVE_DAY_DEFINITION`; (2) browser parity review for trade telemetry panels before production deploy. Lint clean (0 errors) after Prettier autofix. Diagnostic log added for multi-candle batch payloads (Phase 3 scope).*
+- *Active-day definition approved 2026-05-22. Definition: `CALENDAR_DAY_WITH_ANY_COMPLETED_ENGINE_RUN` (any completed engine run in `engine_runs` table counts as an active day; all historical records included in streak backfill). Streak truth is now live — `GET /user/progress` returns `streak.state = "LIVE"` and a non-zero `current_streak_days` for users with engine run history.*
 
 ---
 
