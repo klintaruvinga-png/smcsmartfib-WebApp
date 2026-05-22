@@ -91,7 +91,7 @@ export function ProgressPage() {
           ) : progressError || !progressData ? (
             <StreakPanelState message="Progress data unavailable while /user/progress is unreachable." />
           ) : progressData.streak.state === "UNAVAILABLE" ? (
-            <StreakPanelState message="Streak remains unavailable until the backend active-day definition is approved." />
+            <StreakPanelState message="No engine run data found for this account yet." />
           ) : (
             <>
               <div className="flex items-center gap-2 mt-2">
