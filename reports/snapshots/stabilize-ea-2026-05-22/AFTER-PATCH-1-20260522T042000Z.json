@@ -1,0 +1,29 @@
+{
+  "snapshot_type": "AFTER-PATCH-1",
+  "workflow_id": "stabilize-ea-2026-05-22",
+  "timestamp": "2026-05-22T04:20:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-NHBxb",
+    "commit_hash": "de4f32c",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-22-after-patch-1"
+  },
+  "patches_applied": [
+    {
+      "id": "PATCH-001",
+      "bug_id": "BUG-001",
+      "severity": "LOW",
+      "file": "src/routes/-progress.page.test.tsx",
+      "description": "Collapsed multi-line screen.getByText() call at line 115 to single line to satisfy Prettier formatting rule",
+      "type": "style-only",
+      "regression_risk": "none — test logic unchanged",
+      "verified": "npm run lint exits 0 errors after fix"
+    }
+  ],
+  "tests_run": {
+    "npm_run_lint": "PASS (0 errors, 9 warnings — all pre-existing)",
+    "npm_run_build": "PASS (built in 7.36s)",
+    "npm_run_check_mql": "PASS (MQL include verification passed)",
+    "php_l_smc_superfib_sniper": "PASS (No syntax errors)",
+    "php_l_class_market_data_service": "PASS (No syntax errors)"
+  }
+}

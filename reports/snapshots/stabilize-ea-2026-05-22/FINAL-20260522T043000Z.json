@@ -1,0 +1,66 @@
+{
+  "snapshot_type": "FINAL",
+  "workflow_id": "stabilize-ea-2026-05-22",
+  "timestamp": "2026-05-22T04:30:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-NHBxb",
+    "commit_hash": "de4f32c462ded7501f42c97531df42fc7b5cf99b",
+    "tags_created": [
+      "snapshot/stabilize-ea-2026-05-22-start-20260522T040000Z",
+      "rollback/stabilize-ea-2026-05-22-before-patches",
+      "rollback/stabilize-ea-2026-05-22-after-patch-1"
+    ]
+  },
+  "patches_applied": [
+    {
+      "id": "PATCH-001",
+      "file": "src/routes/-progress.page.test.tsx",
+      "description": "Prettier format fix — collapsed multi-line screen.getByText() call",
+      "commit": "de4f32c"
+    }
+  ],
+  "migration_status_post_patch": {
+    "blockers_addressed": [
+      "Active-day definition CALENDAR_DAY_WITH_ANY_COMPLETED_ENGINE_RUN approved and implemented (2026-05-22) — streak state is now LIVE for users with engine run history"
+    ],
+    "remaining_blockers": [
+      "Phase 2 browser parity review recommended before production deploy (manual testing step, not a code blocker)",
+      "Phase 3 multi-candle batch ingestion pending (known Phase 3 scope)"
+    ],
+    "phase_readiness": "Phase 2 implementation complete — advance to closeout after browser parity review passes; Phase 3 planning branch exists"
+  },
+  "tests": {
+    "commands_run": [
+      "npm run lint",
+      "npm run build",
+      "npm run check:mql",
+      "php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "php -l wordpress/smc-superfib-sniper/class-market-data-service.php"
+    ],
+    "passing": true,
+    "failures": []
+  },
+  "ea_integration_status": {
+    "market_stream_route": "POST /wp-json/sniper/v1/ea/market-stream",
+    "auth_required": true,
+    "auth_header": "X-EA-API-Key",
+    "auth_header_aliases": ["x-ea-api-key", "x_ea_api_key", "x-api-key", "x_api_key"],
+    "secret_env": "SMC_SF_EA_API_KEY",
+    "user_id_required": true,
+    "payload_validation": true,
+    "stale_rejection": true,
+    "stale_hard_reject_threshold_sec": 300,
+    "stale_warn_threshold_sec": 120,
+    "candle_staleness_check_m1_sec": 180,
+    "candle_staleness_check_m15_sec": 1800,
+    "ohlc_validation": true,
+    "epoch_candle_guard": true,
+    "tick_volume_guard": true,
+    "symbol_normalization": true,
+    "equity_session_guard": true
+  },
+  "rollback": {
+    "manifest": "ROLLBACK-MANIFEST.json",
+    "rollback_points_count": 3
+  }
+}
