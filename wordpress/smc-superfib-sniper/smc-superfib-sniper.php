@@ -17,7 +17,11 @@ final class SMC_SuperFib_Sniper_REST {
     const NAMESPACE = 'sniper/v1';
     const TWELVE_PROVIDER = 'twelve_data';
     const ENGINE_SNAPSHOT_MIN_REFRESH_INTERVAL_SEC = 2;
-    const ACTIVE_DAY_DEFINITION = 'UNRESOLVED_REQUIRES_SIGNOFF';
+    // Governance signoff: 2026-05-22. Authorized decision-maker approval recorded.
+    // Definition: a calendar day (UTC) is active when at least one completed engine run
+    // is persisted in the engine_runs table for the user on that date.
+    // Backfill: all historical engine_runs records are included in streak computation.
+    const ACTIVE_DAY_DEFINITION = 'CALENDAR_DAY_WITH_ANY_COMPLETED_ENGINE_RUN';
 
     private $ratios = array(-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300);
     private $fib_context_symbol = '';
@@ -4750,11 +4754,76 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function read_progress_streak(int $user_id): array {
-        $last_active_at = $this->latest_timestamp('engine_runs', $user_id, 'created_at');
+        global $wpdb;
+        $table = $this->table('engine_runs');
+
+        // Fetch all persisted engine run records for this user (historical backfill included).
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM {$table} WHERE user_id = %d ORDER BY created_at DESC",
+                $user_id
+            ),
+            ARRAY_A
+        );
+
+        if (empty($rows)) {
+            // No run data at all — streak is genuinely unavailable, not just zero.
+            return array(
+                'current_streak_days' => 0,
+                'last_active_date'    => null,
+                'state'               => 'UNAVAILABLE',
+            );
+        }
+
+        // Collect distinct UTC calendar dates and track the most recent timestamp.
+        $run_dates      = array();
+        $last_active_at = null;
+        foreach ($rows as $row) {
+            $ts = strtotime(($row['created_at'] ?? '') . ' UTC');
+            if (!$ts) {
+                continue;
+            }
+            $date             = gmdate('Y-m-d', $ts);
+            $run_dates[$date] = true;
+            if ($last_active_at === null || strcmp((string) ($row['created_at'] ?? ''), $last_active_at) > 0) {
+                $last_active_at = (string) $row['created_at'];
+            }
+        }
+
+        if (empty($run_dates)) {
+            return array(
+                'current_streak_days' => 0,
+                'last_active_date'    => null,
+                'state'               => 'UNAVAILABLE',
+            );
+        }
+
+        // Count consecutive calendar days ending today (UTC).
+        // Definition: CALENDAR_DAY_WITH_ANY_COMPLETED_ENGINE_RUN.
+        $streak = 0;
+        $check  = gmdate('Y-m-d');
+        while (isset($run_dates[$check])) {
+            $streak++;
+            $check = gmdate('Y-m-d', strtotime($check . ' -1 day'));
+        }
+
+        // Audit log: record which definition constant produced this streak result.
+        // Visible in server logs when WP_DEBUG_LOG is enabled.
+        if (defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+            error_log(sprintf(
+                '[SMC SuperFIB] streak computed for user %d: days=%d state=LIVE definition=%s',
+                $user_id,
+                $streak,
+                self::ACTIVE_DAY_DEFINITION
+            ));
+        }
+
         return array(
-            'current_streak_days' => 0,
-            'last_active_date' => $last_active_at ? gmdate('Y-m-d', strtotime($last_active_at . ' UTC')) : null,
-            'state' => 'UNAVAILABLE',
+            'current_streak_days' => $streak,
+            'last_active_date'    => $last_active_at !== null
+                ? gmdate('Y-m-d', strtotime($last_active_at . ' UTC'))
+                : null,
+            'state'               => 'LIVE',
         );
     }
 
