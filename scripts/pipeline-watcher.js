@@ -1131,7 +1131,7 @@ function runCodexImplementation(state) {
 - Required branch: codex/${issueSlug}
 - Implementation summary target: reports/codex-implementation.md
 - Open a normal PR, not a draft PR.
-- The existing Codex PR review automation starts after PR creation.
+- After PR creation, apply review fixes locally via Claude Code (see CLAUDE.md — PR Review Fix Stage).
 `;
   const previousImplementationMtime = statMtime(IMPLEMENTATION_FILE);
   const previousOutputMtime = statMtime(CODEX_OUTPUT_FILE);

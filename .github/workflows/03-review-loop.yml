@@ -1,102 +1,38 @@
 name: 03 - Autonomous Review Loop
 
+# DISABLED — auto-trigger removed 2026-05-22.
+#
+# This workflow previously used anthropics/claude-code-action@v1 to apply
+# P1/P2/P3 review fixes automatically after a Codex PR review was submitted.
+# That action requires ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN (paid
+# Claude API access), which is not available in this setup.
+#
+# Replacement: Local Claude Code is the review-fix path.
+# After Codex opens a PR, run the review fix stage locally:
+#   1. The pipeline watcher writes reports/codex-review.json (PR review data).
+#   2. Open Claude Code and say: "Review PR #<N> and apply fixes"
+#   3. Claude Code reads .github/prompts/claude-remediate-prompt.md,
+#      reports/codex-review.json, and reports/review-event.json,
+#      applies P1/P2/P3 fixes, commits, and pushes to the branch.
+#
+# This workflow is kept as workflow_dispatch so it can be re-enabled later
+# if CLAUDE_CODE_OAUTH_TOKEN is added to repo secrets.
+
 on:
-  pull_request_review_comment:
-    types: [created]
-  pull_request_review:
-    types: [submitted]
+  workflow_dispatch:
 
 permissions:
   contents: write
   pull-requests: write
 
-concurrency:
-  group: review-loop-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
-
 jobs:
-  remediate:
-    if: >
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      (
-        (
-          github.event_name == 'pull_request_review_comment' &&
-          (
-            github.event.comment.user.login == 'chatgpt-codex-connector' ||
-            (
-              contains(github.event.comment.body, 'Severity:') &&
-              contains(github.event.comment.body, 'Source: Codex')
-            ) ||
-            startsWith(github.event.pull_request.head.ref, 'codex/')
-          )
-        ) ||
-        (
-          github.event_name == 'pull_request_review' &&
-          (
-            github.event.review.user.login == 'chatgpt-codex-connector' ||
-            (
-              contains(github.event.review.body, 'Severity:') &&
-              contains(github.event.review.body, 'Source: Codex')
-            ) ||
-            (
-              startsWith(github.event.pull_request.head.ref, 'codex/') &&
-              github.event.review.state != 'approved'
-            )
-          )
-        )
-      )
+  disabled:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PR branch
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GH_PAT }}
-          ref: ${{ github.event.pull_request.head.ref }}
-
-      - name: Validate remediation prompt
-        run: test -f .github/prompts/claude-remediate-prompt.md
-
-      - name: Capture review context
-        env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
-          EVENT_JSON: ${{ toJson(github.event) }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REPO: ${{ github.repository }}
+      - name: Explain disabled state
         run: |
-          mkdir -p reports
-          printf '%s\n' "$EVENT_JSON" > reports/review-event.json
-          gh pr view "$PR_NUMBER" --repo "$REPO" --json title,body,files,reviews,comments > reports/codex-review.json
-
-      - name: Load remediation prompt
-        id: prompt
-        run: |
-          {
-            echo 'prompt<<EOF'
-            cat .github/prompts/claude-remediate-prompt.md
-            echo
-            echo 'Repository context:'
-            echo '- Review payload: reports/review-event.json'
-            echo '- Aggregated PR review data: reports/codex-review.json'
-            echo 'EOF'
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Run Claude remediation
-        uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          github_token: ${{ secrets.GH_PAT }}
-          prompt: ${{ steps.prompt.outputs.prompt }}
-          claude_args: "--max-turns 6"
-          allowed_bots: "chatgpt-codex-connector"
-
-      - name: Commit and push remediation changes
-        run: |
-          if git diff --quiet && git diff --cached --quiet; then
-            exit 0
-          fi
-          git config user.email "bot@superfib.local"
-          git config user.name "SuperFIB Bot"
-          git add -A
-          git commit -m "fix(remediation): address review feedback"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          echo "03 - Autonomous Review Loop is intentionally disabled."
+          echo "Review fixes are applied via local Claude Code, not the cloud action."
+          echo "See .github/prompts/claude-remediate-prompt.md for the fix protocol."
+          echo "Re-enable by restoring the pull_request_review trigger and setting"
+          echo "CLAUDE_CODE_OAUTH_TOKEN in repository secrets."
