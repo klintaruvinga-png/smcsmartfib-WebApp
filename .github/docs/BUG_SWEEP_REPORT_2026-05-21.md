@@ -2,7 +2,7 @@
 
 - Report Date: 2026-05-21
 - Scope: merged same-day stabilization sweeps for the SMC SuperFIB plugin, dashboard, MT5 EA ingress path, market-data service, and migration status
-- Phase Status: Phase 1 COMPLETE, Phase 2 IN-PROGRESS at 75%
+- Phase Status: Phase 1 COMPLETE, Phase 2 COMPLETE (active-day definition approved 2026-05-22)
 - Overall Health: stable after same-day audit and patch consolidation
 - Critical Issues: 0
 - High-Severity Issues: 1 confirmed and patched
@@ -96,12 +96,12 @@ The authoritative final state for 2026-05-21 is:
 - [x] `php wordpress/smc-superfib-sniper/tests/php/test-htf-authority-anchor.php`
 - [x] `npx vitest run src/hooks/useSniperData.test.tsx src/hooks/useSniperData.watchlist.test.tsx src/routes/-live.test.ts src/lib/api/sniperClient.test.ts`
 
-# Remaining Risks
-
-- Dedicated regime-engine parity coverage is still missing from the current run set.
-- Dedicated signal-engine replay coverage is still missing from the current run set.
-- The legacy authenticated `/snapshot` ingest route still has a narrower payload contract than `/ea/market-stream`.
-- `ACTIVE_DAY_DEFINITION` still requires business sign-off before enabling non-zero streak logic on `/user/progress`.
+- # Remaining Risks
+-
+- - Dedicated regime-engine parity coverage is still missing from the current run set.
+- - Dedicated signal-engine replay coverage is still missing from the current run set.
+- - The legacy authenticated `/snapshot` ingest route still has a narrower payload contract than `/ea/market-stream`.
+- - Active-day definition signed off 2026-05-22: `CALENDAR_DAY_WITH_ANY_COMPLETED_ENGINE_RUN`. Streak computation is now live for users with engine run history; historical backfill applied.
 
 # Migration Recommendations
 

@@ -3,8 +3,8 @@
 - Overall health: Improved. The Progress page now reads backend-owned progress state instead of hardcoded unavailable placeholders.
 - Bugs found: 2 confirmed contract gaps resolved in this patch.
 - Fixes applied: Added `GET /user/progress`, wired the frontend client/hook/page to it, and preserved the existing equity/drawdown authority boundaries.
-- Remaining risks: Streak remains intentionally conservative until the active-day definition is approved.
-- Migration readiness: Phase 2 blocker removed for `/user/progress` wiring; manual staging verification is still recommended before production deploy.
+-- Remaining risks: Active-day definition approved 2026-05-22; streak truth is live and `/user/progress` now returns `streak.state = "LIVE"` for accounts with engine run history. Manual staging verification is still recommended before production deploy.
+-- Migration readiness: Phase 2 blocker removed for `/user/progress` wiring; manual staging verification is still recommended before production deploy.
 
 **Report Date**: 2026-05-20  
 **Phase**: 2 (Progress contract / backend-dashboard wiring)  

@@ -180,6 +180,6 @@ transport parity and identifies any remaining gaps.
 | Item | Phase | Notes |
 |------|-------|-------|
 | Multi-candle batch ingestion (full `candles[]` array processing) | Phase 3 | Only `candles[0]` stored currently; diagnostic log added (PATCH-001) |
-| Active-day business rule definition | Phase 2 | `ACTIVE_DAY_DEFINITION = 'UNRESOLVED_REQUIRES_SIGNOFF'` |
+| Active-day business rule definition | Phase 2 | **RESOLVED 2026-05-22** — `CALENDAR_DAY_WITH_ANY_COMPLETED_ENGINE_RUN` signed off; streak computation live and historical backfill applied. |
 | Browser parity review for Phase 2 panels | Phase 2 | Recommended before production deploy |
 | Bundle size optimization | Maintenance | 920 kB main chunk; deferred |
