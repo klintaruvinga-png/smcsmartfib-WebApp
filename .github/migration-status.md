@@ -431,6 +431,7 @@ Confluence Detection: [PENDING]
 
 | Report | Date | Phase | Issues Found | Status |
 |--------|------|-------|--------------|--------|
+| `BUG_SWEEP_REPORT_2026-05-22.md` | 2026-05-22 | 2 | 1 confirmed (LOW lint/Prettier) — patched; 0 critical/high; all core systems confirmed correct | Verified |
 | `BUG_SWEEP_REPORT_2026-05-10.md` | 2026-05-10 | 0 | 3 confirmed (1 high DB growth, 2 low dead methods) — all patched | Verified |
 | `BUG_SWEEP_REPORT_2026-05-09.md` | 2026-05-09 | 0 | 2 confirmed (charts route lockfile + backendReady gate) — all patched | Verified |
 | `BUG_SWEEP_REPORT_2026-05-05_V13-MT5-Authority-Verification.md` | 2026-05-05 | 0 | 0 blockers; 2 deferred maintenance items | Verified |
