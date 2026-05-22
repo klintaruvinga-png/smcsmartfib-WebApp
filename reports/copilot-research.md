@@ -1,3 +1,68 @@
+# Issue Research: Backend Freshness Layer
+
+### 1. Issue classification
+- Severity: HIGH
+- Category: data-contract / stale-data
+- Layer(s) affected: MT5 / PHP-backend / REST-API / Dashboard-JS
+- Phase impact: Phase 3
+
+### 2. Confirmed evidence
+- Backend TODO & acceptance requirement: [.github/migration-status.md](.github/migration-status.md) lists "Backend Freshness Layer: `quote_updated_at`, `last_seen_at`, stagnation state, feed health" as a Phase 3 deliverable.
+- PHP schema includes `last_seen_at` and snapshot `updated_at` columns: [wordpress/smc-superfib-sniper/smc-superfib-sniper.php](wordpress/smc-superfib-sniper/smc-superfib-sniper.php).
+- Market-data service persists MT5 snapshots and candles and exposes `updated_at` and freshness/session APIs: [wordpress/smc-superfib-sniper/class-market-data-service.php](wordpress/smc-superfib-sniper/class-market-data-service.php) (`store_tick_snapshot`, `store_candle_m1`, `get_price_snapshot`, `store_freshness`, `get_freshness`).
+- Freshness persisted via WordPress transients with a 300s TTL in `store_freshness()` and read via `get_freshness()` in the market data service: [wordpress/smc-superfib-sniper/class-market-data-service.php](wordpress/smc-superfib-sniper/class-market-data-service.php).
+- Backend/frontend parity audits map `last_seen_at` -> `LIVE/STALE/UNAVAILABLE`: [.github/migration/audits/phase-2-backend-dashboard-progress-parity-2026-05-20.md](.github/migration/audits/phase-2-backend-dashboard-progress-parity-2026-05-20.md).
+- PHP regression tests exercise `last_seen_at` live/stale behavior and progress mapping: [wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php](wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php).
+
+### 3. Root cause hypothesis
+- Most likely root cause: the backend freshness contract is partially implemented (DB columns and transient-based freshness exist) but lacks a canonical, persisted `quote_updated_at`/`last_seen_at` canonicalization and explicit stagnation/feed-health persistence and mappings required for Phase 3. (Hypothesis)
+- Why: evidence shows `last_seen_at` column and transient freshness are present, but migration-status explicitly lists the freshness layer as an outstanding Phase 3 deliverable, and tests/audits continue to exercise mapping behavior rather than a full persisted feed-health model. (Confirmed/Hypothesis)
+- Likely trigger: Phase 2 → Phase 3 handoff exposes the need for a durable freshness record (not just transient state) and explicit stagnation detection, which is required by downstream engine consumers and the dashboard. (Hypothesis)
+
+### 4. Blast radius
+- Files likely affected:
+  - wordpress/smc-superfib-sniper/smc-superfib-sniper.php
+  - wordpress/smc-superfib-sniper/class-market-data-service.php
+  - wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php
+  - .github/migration-status.md and related audit artifacts
+  - src/dashboard consumers that display freshness / progress (frontend API client and FreshnessBadge component)
+- Systems that read/write the component: MT5 EA (EA -> /ea/market-stream), WordPress REST API, DB (`smc_sf_snapshots`, `smc_sf_candles`, `smc_sf_account_telemetry`), Dashboard JS consumers.
+- Parity surfaces at risk: MT5 (EA) -> Backend freshness semantics -> Dashboard freshness UI; signal integrity and LIVE-state gating for downstream engines.
+- Risks: stale/transient-only freshness can lead to false LIVE states after a transient eviction, or inability to reason about long-running stagnation/health across restarts.
+
+### 5. Regression surface
+- Must not break: EA authoritative writes to `smc_sf_snapshots`/`smc_sf_candles` and the `/ea/market-stream` auth contract.
+- Existing guards: DB schema with `last_seen_at` and snapshot `updated_at`; tests that assert stale/live mappings; transient TTL-based freshness guard (`store_freshness()` TTL=300s).
+- Tests/audits: Phase 2 PHP regression tests and the Phase 2 parity audit cover mapping behavior; any change must retain those guarantees or extend them with durable feed-health proofs.
+
+### 6. Resolution path options
+- Path A (narrow): Add canonical persisted `quote_updated_at` and `last_seen_at` writes on every MT5 snapshot/candle ingest, and implement deterministic stagnation rules that set a durable `feed_health` row or column. Keep transient freshness for fast reads but use persisted timestamps as the authority for longer-term state and auditability.
+- Path B (broader): Rework the freshness model into a small persisted service table (per-user, per-symbol) containing `last_seen_at`, `quote_updated_at`, `stagnation_state`, `feed_health`, and add idempotent upserts from EA and a background job to compute derived `stagnation_state` and to avoid transient-only authority.
+- Recommended: Path A — minimal blast radius, leverages existing schema, preserves current transient optimizations, and satisfies Phase 3 acceptance while keeping the implementation surface small for careful review.
+
+### 7. Risk flags
+- High-risk system involved: Yes — price authority and freshness influence LIVE-state gating and downstream signal engines.
+- Requires parity re-validation: Yes — backend freshness engine and dashboard FreshnessBadge / progress consumers.
+- Migration-blocking: Yes — Phase 3 readiness explicitly lists this deliverable.
+- Human review required before merge: Yes — authority boundaries, persisted fields, and tests must be reviewed to avoid introducing false-live or frozen-live regressions.
+
+### 8. Handoff package
+- Epicentre files to inspect first:
+  - [wordpress/smc-superfib-sniper/class-market-data-service.php](wordpress/smc-superfib-sniper/class-market-data-service.php)
+  - [wordpress/smc-superfib-sniper/smc-superfib-sniper.php](wordpress/smc-superfib-sniper/smc-superfib-sniper.php)
+  - [wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php](wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php)
+- Inputs Codex must verify before planning:
+  - Does `store_tick_snapshot()`/`store_candle_m1()` already persist a canonical `quote_updated_at` on ingest? (Unconfirmed / inspect `store_tick_snapshot` call sites)
+  - Are transients sufficient for short-term freshness only, and is a persisted feed-health row required by Phase 3? (Unconfirmed — migration-status suggests yes)
+  - What consumers rely on transient-only freshness vs persisted timestamp fields (frontend caches, signal engine, audits)? (Unconfirmed — needs inventory)
+- Open unknowns that could invalidate hypothesis:
+  - Whether EA payload currently includes an explicit `quote_updated_at` field and if backend already writes it (EA payload inspection required).
+  - Whether background jobs or other processes already compute stagnation/feed-health from persisted timestamps (no evidence found).
+  - Exact expected stagnation thresholds and mapping to `LIVE/DELAYED/STALE/CLOSED` for all asset classes and sessions (business rules may vary).
+
+---
+
+Generated by Copilot intake on behalf of the repository triage process.
 # SMC SuperFIB Phase 3 Research Report
 ## MT5 EA Webhook Market-Data Flow Validation
 
