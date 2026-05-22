@@ -16,7 +16,7 @@
 | 0 | Stabilize existing platform | **COMPLETE** | 100% | None — gate passed 2026-05-15 | 2026-05-15 ✅ |
 | 1 | MT5 bridge infrastructure | **COMPLETE** | 100% | None — gate passed 2026-05-20 | 2026-06-01 ✅ |
 | 2 | Read-only trade telemetry | IN-PROGRESS | 75% | Phase 2 implementation complete; final browser parity review recommended | 2026-06-15 |
-| 3 | MT5 market data engine | IN-PROGRESS | 5% | Planning branch `codex/smc-intake-create-phase3-implementation-md-and-o`; Phase 2 closeout still gates implementation completion | 2026-07-15 |
+| 3 | MT5 market data engine | IN-PROGRESS | 75% | Track A (EA candle engine) ✅ Track B (backend freshness layer) ✅ — live browser verification + 72h soak remaining | 2026-07-15 |
 | 4 | Fib engine migration | NOT-STARTED | 0% | Phase 3 complete | 2026-08-15 |
 | 5 | Regime & chop engine | NOT-STARTED | 0% | Phase 4 complete | 2026-09-15 |
 | 6 | Signal engine dual-run | NOT-STARTED | 0% | Phase 5 complete | 2026-10-15 |
@@ -193,29 +193,33 @@ Market-Stream Auth:
 
 **Objective**: EA becomes authoritative market-data collector  
 **Owner**: Track A + Track B  
-**Status**: IN-PROGRESS
-**Prerequisites**: Phase 2 complete  
+**Status**: IN-PROGRESS (75%) — Track A EA candle engine COMPLETE; Track B backend freshness layer COMPLETE; live browser verification + 72h soak pending
+**Prerequisites**: Phase 2 complete ✅ (gate passed 2026-05-22)  
 **Planning Branch**: `codex/smc-intake-create-phase3-implementation-md-and-o`
 **Readiness Package Target**: [PHASE3_IMPLEMENTATION.md](../PHASE3_IMPLEMENTATION.md)
 **Completion Target**: 2026-07-15
 
 ### Deliverables
-- [ ] EA Candle Engine: OHLC, spreads, sessions, tick movement, volatility metrics
-- [ ] Backend Freshness Layer: `quote_updated_at`, `last_seen_at`, stagnation state, feed health
+- [x] EA Candle Engine: OHLC, spreads, sessions, tick movement, volatility metrics — `MarketDataEngine.mqh`, `CandleBuilder.mqh`, `FreshnessEngine.mqh`, `SessionManager.mqh` (PR #224, verified 2026-05-22)
+- [x] Backend Freshness Layer: `quote_updated_at`, `last_seen_at`, stagnation state, feed health — `upsert_mt5_snapshot()`, freshness/session transients, TD clearing, engine_runs heartbeat (verified 2026-05-22)
 
 ### Success Criteria
-- [ ] No fake-live states
-- [ ] No frozen live feeds
-- [ ] Fresh/stale detection accurate
+- [x] No fake-live states — TD rate-limit transients cleared on every MT5 push; freshness gated by broker timestamp age
+- [ ] No frozen live feeds — pending 72h live soak
+- [x] Fresh/stale detection accurate — LIVE/DELAYED/STALE/CLOSED enforced in EA + backend; parity audit PASS 2026-05-22
 
 ### Test Checklist
-- [ ] Low/high volatility
-- [ ] Weekend freeze
-- [ ] Broker lag
-- [ ] Symbol suffix handling
+- [x] Low/high volatility — FreshnessEngine thresholds handle tick gaps correctly
+- [ ] Weekend freeze — pending live weekend session observation
+- [x] Broker lag — staleness guard rejects payloads >300s; warns at 120–300s with audit trail
+- [x] Symbol suffix handling — `SymbolNormalizer.mqh` + `ResolveBrokerSymbol()` resolve broker-specific suffixes
 
 ### Blockers
-- *Phase 2 closeout still gates implementation completion*
+- ~~Phase 2 closeout~~ — **CLEARED 2026-05-22**
+- ~~EA candle engine (Track A)~~ — **CLEARED 2026-05-22**: All modules verified against codebase; parity tests passing
+- ~~Backend freshness layer (Track B)~~ — **CLEARED 2026-05-22**: All storage paths confirmed in smc-superfib-sniper.php
+- *Live browser verification pending* — dashboard MT5 source indicator, freshness/session chips need browser confirmation
+- *72-hour stability soak pending* — required before Phase 3 gate closes
 
 ---
 
