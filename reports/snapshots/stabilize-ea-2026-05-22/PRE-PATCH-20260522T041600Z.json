@@ -1,0 +1,21 @@
+{
+  "snapshot_type": "PRE-PATCH",
+  "workflow_id": "stabilize-ea-2026-05-22",
+  "timestamp": "2026-05-22T04:16:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-NHBxb",
+    "commit_hash": "b2bfa866847ff4f49a653a44f7ff6f7de14252e8",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-22-before-patches"
+  },
+  "patches_planned": [
+    {
+      "id": "PATCH-001",
+      "bug_id": "BUG-001",
+      "severity": "LOW",
+      "file": "src/routes/-progress.page.test.tsx",
+      "description": "Fix Prettier formatting violation at line 115 — collapse multi-line screen.getByText() to single line",
+      "type": "style-only — no logic change"
+    }
+  ],
+  "note": "Only 1 confirmed code issue requiring a patch. All core systems (EA auth, payload validation, signal engine, freshness, symbol normalization) confirmed correct."
+}

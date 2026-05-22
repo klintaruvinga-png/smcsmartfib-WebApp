@@ -1,0 +1,126 @@
+{
+  "snapshot_type": "FINDINGS",
+  "workflow_id": "stabilize-ea-2026-05-22",
+  "timestamp": "2026-05-22T04:15:00Z",
+  "confirmed_issues": [
+    {
+      "id": "BUG-001",
+      "severity": "LOW",
+      "system": "Frontend / Test Suite",
+      "description": "Prettier formatting violation in src/routes/-progress.page.test.tsx (line 115). A multi-line screen.getByText() call was not collapsed to the Prettier line-length limit.",
+      "root_cause": "Prettier drift introduced when the UNAVAILABLE streak message was updated (commit ce66d12/8ffaaf0) without running autoformat.",
+      "impact_zones": ["CI lint gate"],
+      "proposed_fix": "Collapse the multi-line getByText() call to a single line. Applied immediately.",
+      "status": "FIXED"
+    }
+  ],
+  "audit_results": {
+    "ea_route": {
+      "path": "POST /sniper/v1/ea/market-stream",
+      "permission_callback": "permission_ea_market_stream (delegates to permission_ea_bridge)",
+      "missing_key_response": "401 smc_sf_api_key_missing",
+      "unconfigured_secret_response": "503 smc_sf_api_key_unconfigured",
+      "invalid_key_response": "403 smc_sf_api_key_invalid",
+      "missing_user_id_response": "400 smc_sf_user_required",
+      "invalid_user_id_response": "403 smc_sf_user_invalid",
+      "hash_equals_used": true,
+      "wp_set_current_user_called": true,
+      "header_aliases_checked": ["x-ea-api-key", "x_ea_api_key", "x-api-key", "x_api_key"],
+      "status": "CORRECT — all auth checks in place"
+    },
+    "payload_validation": {
+      "symbol_required": true,
+      "bid_ask_required_and_validated_finite_positive": true,
+      "ohlc_validated": true,
+      "candle_epoch_guard": true,
+      "candle_future_guard": true,
+      "quote_time_stale_hard_reject_sec": 300,
+      "quote_time_stale_warn_sec": 120,
+      "candle_age_max_m1_sec": 180,
+      "candle_age_max_m15_sec": 1800,
+      "tick_volume_clamped_to_nonneg": true,
+      "tick_volume_alias": "tick_volume mapped to volume",
+      "canonical_candles_array_compat": true,
+      "status": "CORRECT — all validations in place"
+    },
+    "signal_engine": {
+      "price_source_gate": "rejects non-mt5",
+      "price_state_gate": "rejects non-live",
+      "price_age_gate": "rejects > staleThresholdSec",
+      "candle_freshness_gate": "rejects candles older than 7200s",
+      "chop_gate": "blocks READY when chop >= 0.7",
+      "backend_authoritative": true,
+      "frontend_derives_signal_state": false,
+      "status": "CORRECT — all gates in place"
+    },
+    "freshness_badge": {
+      "reads_from_backend_state": true,
+      "computes_age_locally": false,
+      "unknown_state_guard": "falls back to STALE styles",
+      "status": "CORRECT"
+    },
+    "verdict_badge": {
+      "reads_backend_verdict": true,
+      "derives_verdict_locally": false,
+      "status": "CORRECT"
+    },
+    "age_sec_computation": {
+      "uses_broker_timestamp": true,
+      "uses_fetch_time": false,
+      "source": "iso_age_sec(updated_at) where updated_at = normalize_market_timestamp(quote_time)",
+      "status": "CORRECT"
+    },
+    "authority_diagnostics": {
+      "permission": "permission_user (WP session required)",
+      "publicly_accessible": false,
+      "expected_unauthenticated_response": "401",
+      "status": "CORRECT — not a bug"
+    },
+    "symbol_normalization": {
+      "GOLD_to_XAUUSD": true,
+      "SILVER_to_XAGUSD": true,
+      "NASDAQ_to_NAS100": true,
+      "WALLSTREET_to_US30": true,
+      "equity_session_guard_dst_aware": true,
+      "status": "CORRECT"
+    },
+    "streak_computation": {
+      "definition": "CALENDAR_DAY_WITH_ANY_COMPLETED_ENGINE_RUN",
+      "filters_heartbeat_rows": true,
+      "backfill_included": true,
+      "signoff_date": "2026-05-22",
+      "status": "CORRECT — matches approved definition"
+    },
+    "useSniperData_polling": {
+      "waits_for_settings_before_polling": true,
+      "engine_health_stale_time_zero": true,
+      "no_orphaned_queries": true,
+      "status": "CORRECT"
+    }
+  },
+  "migration_blockers": [
+    {
+      "id": "MIGRATION-P2-001",
+      "phase": "Phase 2",
+      "description": "Browser parity review for Phase 2 trade telemetry panels (account card, positions, floating P/L, hedge grouping) recommended before production deploy",
+      "status": "DEFERRED — not a code blocker; manual testing step",
+      "validation_required": true
+    },
+    {
+      "id": "MIGRATION-P3-001",
+      "phase": "Phase 3",
+      "description": "Multi-candle batch ingestion: only candles[0] stored in ea/market-stream; full candles[] array is Phase 3 scope",
+      "status": "KNOWN — instrumented with audit log in PATCH-001",
+      "validation_required": false
+    }
+  ],
+  "statistics": {
+    "total_issues": 1,
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 1,
+    "migration_blockers": 2,
+    "migration_blockers_requiring_code_changes": 0
+  }
+}

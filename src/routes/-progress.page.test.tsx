@@ -112,11 +112,7 @@ describe("ProgressPage", () => {
 
     render(<ProgressPage />);
 
-    expect(
-      screen.getByText(
-        "No engine run data found for this account yet.",
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText("No engine run data found for this account yet.")).toBeTruthy();
     expect(screen.getAllByText("Pending").length).toBe(3);
   });
 
