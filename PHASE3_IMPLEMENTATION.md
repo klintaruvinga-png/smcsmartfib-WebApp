@@ -1,7 +1,7 @@
 # Phase 3 Implementation Plan - MT5 EA to Backend Market-Data Handoff
 
 **Date:** 2026-05-22
-**Status:** NOT-STARTED
+**Status:** IN-PROGRESS
 
 ---
 
@@ -21,6 +21,8 @@ Phase 3 testing verifies that the MT5 Expert Advisor (EA) successfully sends pri
 ---
 
 ## Implementation Checklist
+
+- [x] Phase 3 implementation plan created and linked from the migration board
 
 ### Track A - MT5 EA
 

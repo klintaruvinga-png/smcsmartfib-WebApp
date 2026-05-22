@@ -3,6 +3,8 @@
 ## Overview
 Phase 3 testing verifies that the MT5 Expert Advisor (EA) successfully sends price and candlestick data to the WordPress backend via webhooks, and that the backend correctly stores this data as the authoritative market data source.
 
+> Note: Phase 3 planning is complete and this guide is ready for execution.
+
 ## Prerequisites
 1. **MT5 Terminal** with the SMC_MarketDataEA.mq5 attached to a chart
 2. **WordPress Site** with SMC SuperFIB Sniper plugin activated
