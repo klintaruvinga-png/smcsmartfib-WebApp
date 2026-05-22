@@ -14,6 +14,7 @@ import { getAuthHeader, hasCredentials, hasWordPressNonce } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { SOAK_TEMPLATES } from "@/types/sniper";
 import type {
   DashboardSettings,
   PairPrice,
@@ -22,6 +23,7 @@ import type {
   SoakEvidenceRow,
   SoakEvidenceType,
   SoakReport,
+  SoakType,
   SymbolDiagnostic,
 } from "@/types/sniper";
 
@@ -31,7 +33,7 @@ export const Route = createFileRoute("/admin")({
       { title: "Admin Health - SMC SuperFIB" },
       {
         name: "description",
-        content: "Admin-only backend health summary and Phase 0 soak workspace.",
+        content: "Admin-only backend health summary and soak workspace.",
       },
     ],
   }),
@@ -81,19 +83,24 @@ export function AdminPage() {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [soakState, setSoakState] = useState<SoakLoadState>({ kind: "loading" });
   const [pageAccessedAt] = useState(() => defaultDateTimeLocalValue());
-  const [baselineForm, setBaselineForm] = useState<BaselineForm>(() => ({
-    startedBy: resolveOperatorIdentifier(),
-    startedAt: pageAccessedAt,
-    eaSymbols: "",
-    frontendWatchlist: "",
-    mt5TerminalStatus: "Online",
-    backendHealthEndpoint: resolveHealthEndpointHint(),
-    t0HealthSummary: "",
-    authConfirmed: "YES",
-    twelveDataKeyStatus: "",
-    watchlistLiveSymbols: "",
-    notes: "",
-  }));
+  const [soakType, setSoakType] = useState<SoakType>("PHASE_3_STABILITY_72H");
+  const [durationHours, setDurationHours] = useState(
+    SOAK_TEMPLATES.PHASE_3_STABILITY_72H.defaultDurationHours,
+  );
+  const [checkpointCount, setCheckpointCount] = useState(
+    SOAK_TEMPLATES.PHASE_3_STABILITY_72H.defaultCheckpointCount,
+  );
+  const [baselineForm, setBaselineForm] = useState<BaselineForm>(() =>
+    createBaselineFormDefaults({
+      pageAccessedAt,
+      autoBaselineFields: {
+        frontendWatchlist: "",
+        watchlistLiveSymbols: "",
+        notes: "",
+      },
+      health: null,
+    }),
+  );
   const [evidenceForm, setEvidenceForm] = useState<SoakEvidencePayload>({
     evidence_key: "",
     evidence_type: "manual_note",
@@ -226,13 +233,7 @@ export function AdminPage() {
     setBaselineForm((current) => ({
       ...current,
       t0HealthSummary:
-        current.t0HealthSummary !== ""
-          ? current.t0HealthSummary
-          : [
-              `feedStatus=${state.health.feedStatus ?? state.health.priceFeed}`,
-              `backendSync=${state.health.backendSync}`,
-              `twelveDataKeyStatus=${state.health.twelveDataKeyStatus ?? state.health.twelveDataKey}`,
-            ].join(", "),
+        current.t0HealthSummary !== "" ? current.t0HealthSummary : buildHealthSummary(state.health),
       twelveDataKeyStatus:
         current.twelveDataKeyStatus !== ""
           ? current.twelveDataKeyStatus
@@ -242,24 +243,7 @@ export function AdminPage() {
 
   useEffect(() => {
     if (soakState.kind !== "ready") return;
-    const evidenceMap = indexEvidenceByKey(soakState.report.manual_evidence);
-    setBaselineForm((current) => ({
-      ...current,
-      startedBy: evidenceMap["baseline.started_by"] ?? current.startedBy,
-      startedAt: evidenceMap["baseline.started_at"] ?? current.startedAt,
-      eaSymbols: evidenceMap["baseline.ea_symbols"] ?? current.eaSymbols,
-      frontendWatchlist: evidenceMap["baseline.frontend_watchlist"] ?? current.frontendWatchlist,
-      mt5TerminalStatus: evidenceMap["baseline.mt5_terminal_status"] ?? current.mt5TerminalStatus,
-      backendHealthEndpoint:
-        evidenceMap["baseline.backend_health_endpoint"] ?? current.backendHealthEndpoint,
-      t0HealthSummary: evidenceMap["baseline.t0_health_summary"] ?? current.t0HealthSummary,
-      authConfirmed: evidenceMap["baseline.auth_confirmed"] ?? current.authConfirmed,
-      twelveDataKeyStatus:
-        evidenceMap["baseline.twelve_data_key_status"] ?? current.twelveDataKeyStatus,
-      watchlistLiveSymbols:
-        evidenceMap["baseline.watchlist_live_symbols"] ?? current.watchlistLiveSymbols,
-      notes: evidenceMap["baseline.notes"] ?? current.notes,
-    }));
+    setBaselineForm((current) => hydrateBaselineForm(current, soakState.report.manual_evidence));
   }, [soakState]);
 
   if (state.kind === "loading") {
@@ -295,12 +279,41 @@ export function AdminPage() {
     soakState.kind === "ready" ? soakState.report.baseline_checkpoint : null;
   const latestCheckpoint =
     soakState.kind === "ready" ? (soakState.report.checkpoints[0] ?? null) : null;
+  const selectedSoakTemplate = SOAK_TEMPLATES[soakType];
+  const derivedCheckpointLabels = deriveCheckpointLabels(soakType, durationHours, checkpointCount);
+  const derivedCheckpointSummary =
+    derivedCheckpointLabels.length > 0
+      ? derivedCheckpointLabels.join(", ")
+      : "configured checkpoints once duration and count are set";
+  const nextCheckpointLabel =
+    derivedCheckpointLabels[soakState.kind === "ready" ? soakState.report.checkpoints.length : 0] ??
+    null;
   const baselineCaptureLocked = baselineCheckpoint !== null;
   const evidenceRows = soakState.kind === "ready" ? soakState.report.manual_evidence : [];
   const baselineAge = formatSoakAge(baselineCheckpoint?.created_at ?? null);
   const checkpointAge = formatSoakAge(
     latestCheckpoint?.created_at ?? baselineCheckpoint?.created_at ?? null,
   );
+
+  function handleSoakTypeChange(nextType: SoakType) {
+    const template = SOAK_TEMPLATES[nextType];
+    setSoakType(nextType);
+    setDurationHours(template.defaultDurationHours);
+    setCheckpointCount(template.defaultCheckpointCount);
+    setCheckpointNotes("");
+    setPanelMessage(null);
+    setPanelError(null);
+    setBaselineForm(
+      hydrateBaselineForm(
+        createBaselineFormDefaults({
+          pageAccessedAt,
+          autoBaselineFields,
+          health: state.kind === "ready" ? state.health : null,
+        }),
+        soakState.kind === "ready" ? soakState.report.manual_evidence : [],
+      ),
+    );
+  }
 
   async function refreshSoakReport() {
     if (soakRefreshInFlight.current) {
@@ -555,7 +568,7 @@ export function AdminPage() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Admin Health</h1>
         <p className="mt-0.5 text-xs text-mute">
-          Administrator-only backend status and Phase 0 soak workspace from{" "}
+          Administrator-only backend status and soak workspace from{" "}
           <span className="font-mono">/sniper/v1/admin/*</span>
         </p>
       </div>
@@ -664,7 +677,7 @@ export function AdminPage() {
         <summary className="cursor-pointer list-none border-b border-bd px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold tracking-tight">Phase 0 Soak Workspace</h2>
+              <h2 className="text-sm font-semibold tracking-tight">{selectedSoakTemplate.label}</h2>
               <p className="mt-0.5 text-xs text-mute">
                 Capture the baseline, store operator evidence, and save checkpoint snapshots during
                 the live soak.
@@ -697,7 +710,7 @@ export function AdminPage() {
           {soakState.kind === "ready" && (
             <div className="hidden print:block soak-report-print-block">
               <h3 className="text-base font-semibold tracking-tight text-tx">
-                Phase 0 Soak Report
+                {selectedSoakTemplate.label} Report
               </h3>
               <p className="mt-1 text-xs text-dim">
                 Generated {formatTimestamp(soakState.report.generated_at)}
@@ -718,7 +731,7 @@ export function AdminPage() {
           )}
 
           {soakState.kind === "loading" && (
-            <div className="text-sm text-mute">Loading Phase 0 soak report...</div>
+            <div className="text-sm text-mute">Loading soak report...</div>
           )}
 
           {soakState.kind === "error" && (
@@ -857,6 +870,85 @@ export function AdminPage() {
                   Use the forms below to record soak metadata, evidence, and checkpoints. These
                   entries do not edit backend health state.
                 </p>
+                <div className="mt-3 grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="soak-type"
+                      className="text-[11px] font-mono uppercase tracking-wider text-mute"
+                    >
+                      Soak type
+                    </label>
+                    <select
+                      id="soak-type"
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      value={soakType}
+                      onChange={(event) => handleSoakTypeChange(event.target.value as SoakType)}
+                    >
+                      {Object.values(SOAK_TEMPLATES).map((template) => (
+                        <option key={template.soakType} value={template.soakType}>
+                          {template.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="text-[11px] text-dim">{selectedSoakTemplate.description}</div>
+                  </div>
+
+                  {soakType === "CUSTOM" ? (
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="custom-duration-hours"
+                          className="text-[11px] font-mono uppercase tracking-wider text-mute"
+                        >
+                          Duration (hours)
+                        </label>
+                        <Input
+                          id="custom-duration-hours"
+                          type="number"
+                          min={1}
+                          max={720}
+                          step={1}
+                          value={durationHours}
+                          onChange={(event) =>
+                            setDurationHours(Number.parseInt(event.target.value || "0", 10) || 0)
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="custom-checkpoint-count"
+                          className="text-[11px] font-mono uppercase tracking-wider text-mute"
+                        >
+                          Checkpoint count
+                        </label>
+                        <Input
+                          id="custom-checkpoint-count"
+                          type="number"
+                          min={1}
+                          max={24}
+                          step={1}
+                          value={checkpointCount}
+                          onChange={(event) =>
+                            setCheckpointCount(
+                              Number.parseInt(event.target.value || "0", 10) || 0,
+                            )
+                          }
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-bd bg-bg1/60 px-3 py-3">
+                      <div className="text-[11px] font-mono uppercase tracking-wider text-mute">
+                        Template schedule
+                      </div>
+                      <div className="mt-2 grid gap-1 text-xs text-dim">
+                        <div>Duration: {selectedSoakTemplate.defaultDurationHours}h</div>
+                        <div>Checkpoints: {selectedSoakTemplate.defaultCheckpointCount}</div>
+                        <div>Labels: {selectedSoakTemplate.checkpointLabels.join(", ")}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="soak-report-print-grid grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
@@ -865,11 +957,12 @@ export function AdminPage() {
                     <Flag className="mt-0.5 h-4 w-4 text-accent" />
                     <div>
                       <h3 className="text-sm font-semibold tracking-tight">
-                        Operator Gathered Baseline
+                        {selectedSoakTemplate.label} - Operator Baseline
                       </h3>
                       <p className="mt-0.5 text-xs text-mute">
-                        Capture the T+0 soak facts and save the first snapshot. If no baseline
-                        exists yet, the first snapshot saved here is automatically marked{" "}
+                        Capture the T0 baseline at soak start. Use checkpoint snapshots for{" "}
+                        {derivedCheckpointSummary}. If no baseline exists yet, the first snapshot
+                        saved here is automatically marked{" "}
                         <span className="font-mono">baseline</span>.
                       </p>
                       <p className="mt-1 text-[11px] text-dim">
@@ -1041,20 +1134,21 @@ export function AdminPage() {
                   <div className="flex items-start gap-3">
                     <ClipboardList className="mt-0.5 h-4 w-4 text-accent" />
                     <div>
-                      <h3 className="text-sm font-semibold tracking-tight">Soak Timeline</h3>
+                      <h3 className="text-sm font-semibold tracking-tight">
+                        {selectedSoakTemplate.label} Timeline
+                      </h3>
                       <p className="mt-0.5 text-xs text-mute">
-                        Use checkpoint snapshots for T+12h, T+24h, T+48h, and T+72h. Baseline is
-                        stored separately and never overwritten by later checkpoints.
+                        Use checkpoint snapshots for {derivedCheckpointSummary}. Baseline is stored
+                        separately and never overwritten by later checkpoints.
                       </p>
                     </div>
                   </div>
 
                   <div className="space-y-2 text-xs text-dim">
-                    {renderTimelineRow("T+0h", baselineCheckpoint)}
-                    {renderTimelineRow("T+12h", soakState.report.checkpoints[0] ?? null)}
-                    {renderTimelineRow("T+24h", soakState.report.checkpoints[1] ?? null)}
-                    {renderTimelineRow("T+48h", soakState.report.checkpoints[2] ?? null)}
-                    {renderTimelineRow("T+72h", soakState.report.checkpoints[3] ?? null)}
+                    {renderTimelineRow("T0 baseline", baselineCheckpoint)}
+                    {derivedCheckpointLabels.map((label, index) =>
+                      renderTimelineRow(label, soakState.report.checkpoints[index] ?? null),
+                    )}
                   </div>
 
                   <div className="soak-report-print-block rounded-md border border-bd bg-bg1/60 px-3 py-3">
@@ -1198,6 +1292,14 @@ export function AdminPage() {
                   </div>
 
                   <div className="space-y-3">
+                    <div className="rounded-md border border-bd bg-bg1/60 px-3 py-3">
+                      <div className="text-[11px] font-mono uppercase tracking-wider text-mute">
+                        Next checkpoint
+                      </div>
+                      <div className="mt-1 text-xs text-dim">
+                        {nextCheckpointLabel ?? "All planned checkpoints are already labeled."}
+                      </div>
+                    </div>
                     <TextField
                       label="Checkpoint notes"
                       value={checkpointNotes}
@@ -1207,14 +1309,25 @@ export function AdminPage() {
                     <Button
                       type="button"
                       onClick={handleCheckpointSave}
-                      disabled={checkpointSaving || !baselineCheckpoint}
+                      disabled={
+                        checkpointSaving || !baselineCheckpoint || derivedCheckpointLabels.length === 0
+                      }
                     >
-                      {checkpointSaving ? "Saving..." : "Save Checkpoint Snapshot"}
+                      {checkpointSaving
+                        ? "Saving..."
+                        : nextCheckpointLabel
+                          ? `Save ${nextCheckpointLabel} Snapshot`
+                          : "Save Checkpoint Snapshot"}
                     </Button>
                     {!baselineCheckpoint && (
                       <div className="text-xs text-warn">
                         Capture the baseline first. The soak starts when the baseline snapshot is
                         saved.
+                      </div>
+                    )}
+                    {baselineCheckpoint && derivedCheckpointLabels.length === 0 && (
+                      <div className="text-xs text-warn">
+                        Configure duration and checkpoint count before saving snapshots.
                       </div>
                     )}
                   </div>
@@ -1563,6 +1676,86 @@ function deriveAutoBaselineFields(
     watchlistLiveSymbols,
     notes: notesParts.join(" "),
   };
+}
+
+function createBaselineFormDefaults({
+  pageAccessedAt,
+  autoBaselineFields,
+  health,
+}: {
+  pageAccessedAt: string;
+  autoBaselineFields: AutoBaselineFields;
+  health: AdminHealthResponse | null;
+}): BaselineForm {
+  return {
+    startedBy: resolveOperatorIdentifier(),
+    startedAt: pageAccessedAt,
+    eaSymbols: "",
+    frontendWatchlist: autoBaselineFields.frontendWatchlist,
+    mt5TerminalStatus: "Online",
+    backendHealthEndpoint: resolveHealthEndpointHint(),
+    t0HealthSummary: health ? buildHealthSummary(health) : "",
+    authConfirmed: "YES",
+    twelveDataKeyStatus: health ? (health.twelveDataKeyStatus ?? health.twelveDataKey) : "",
+    watchlistLiveSymbols: autoBaselineFields.watchlistLiveSymbols,
+    notes: autoBaselineFields.notes,
+  };
+}
+
+function hydrateBaselineForm(form: BaselineForm, rows: SoakEvidenceRow[]): BaselineForm {
+  const evidenceMap = indexEvidenceByKey(rows);
+  return {
+    ...form,
+    startedBy: evidenceMap["baseline.started_by"] ?? form.startedBy,
+    startedAt: evidenceMap["baseline.started_at"] ?? form.startedAt,
+    eaSymbols: evidenceMap["baseline.ea_symbols"] ?? form.eaSymbols,
+    frontendWatchlist: evidenceMap["baseline.frontend_watchlist"] ?? form.frontendWatchlist,
+    mt5TerminalStatus: evidenceMap["baseline.mt5_terminal_status"] ?? form.mt5TerminalStatus,
+    backendHealthEndpoint:
+      evidenceMap["baseline.backend_health_endpoint"] ?? form.backendHealthEndpoint,
+    t0HealthSummary: evidenceMap["baseline.t0_health_summary"] ?? form.t0HealthSummary,
+    authConfirmed: evidenceMap["baseline.auth_confirmed"] ?? form.authConfirmed,
+    twelveDataKeyStatus:
+      evidenceMap["baseline.twelve_data_key_status"] ?? form.twelveDataKeyStatus,
+    watchlistLiveSymbols:
+      evidenceMap["baseline.watchlist_live_symbols"] ?? form.watchlistLiveSymbols,
+    notes: evidenceMap["baseline.notes"] ?? form.notes,
+  };
+}
+
+function buildHealthSummary(health: AdminHealthResponse): string {
+  return [
+    `feedStatus=${health.feedStatus ?? health.priceFeed}`,
+    `backendSync=${health.backendSync}`,
+    `twelveDataKeyStatus=${health.twelveDataKeyStatus ?? health.twelveDataKey}`,
+  ].join(", ");
+}
+
+function deriveCheckpointLabels(
+  soakType: SoakType,
+  durationHours: number,
+  checkpointCount: number,
+): string[] {
+  if (soakType !== "CUSTOM") {
+    return SOAK_TEMPLATES[soakType].checkpointLabels;
+  }
+
+  if (durationHours < 1 || checkpointCount < 1) {
+    return [];
+  }
+
+  return Array.from({ length: checkpointCount }, (_, index) => {
+    const checkpointHour = (durationHours * (index + 1)) / checkpointCount;
+    return `T+${formatCheckpointHour(checkpointHour)}h`;
+  });
+}
+
+function formatCheckpointHour(value: number): string {
+  if (Number.isInteger(value)) {
+    return String(value);
+  }
+
+  return value.toFixed(2).replace(/\.?0+$/, "");
 }
 
 function buildBaselineEvidenceEntries(form: BaselineForm, operator: string): SoakEvidencePayload[] {
