@@ -4757,11 +4757,13 @@ final class SMC_SuperFib_Sniper_REST {
         global $wpdb;
         $table = $this->table('engine_runs');
 
-        // Fetch all persisted engine run records for this user (historical backfill included).
+        // Fetch only completed engine run records for this user (historical backfill included).
+        // Heartbeat rows do not satisfy the active-day contract.
         $rows = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT * FROM {$table} WHERE user_id = %d ORDER BY created_at DESC",
-                $user_id
+                "SELECT * FROM {$table} WHERE user_id = %d AND status = %s ORDER BY created_at DESC",
+                $user_id,
+                'complete'
             ),
             ARRAY_A
         );
