@@ -5291,7 +5291,15 @@ final class SMC_SuperFib_Sniper_REST {
         $symbols = $settings['watchlist'];
         $snapshot = $this->get_engine_snapshot($user_id);
 
-        if (!$force && $this->is_engine_snapshot_current($snapshot, $symbols, (int) $settings['refreshIntervalSec'])) {
+        if (
+            !$force &&
+            $this->is_engine_snapshot_current(
+                $snapshot,
+                $symbols,
+                (int) $settings['refreshIntervalSec'],
+                (int) $settings['staleThresholdSec']
+            )
+        ) {
             return $snapshot;
         }
 
@@ -5345,7 +5353,7 @@ final class SMC_SuperFib_Sniper_REST {
         ));
     }
 
-    private function is_engine_snapshot_current($snapshot, $expected_symbols, $refresh_interval_sec) {
+    private function is_engine_snapshot_current($snapshot, $expected_symbols, $refresh_interval_sec, $stale_threshold_sec = null) {
         if (!is_array($snapshot) || empty($snapshot['prices']) || empty($snapshot['meta']['computedAt'])) {
             return false;
         }
@@ -5368,6 +5376,24 @@ final class SMC_SuperFib_Sniper_REST {
         }
         if ((time() - $computed_at) > max(self::ENGINE_SNAPSHOT_MIN_REFRESH_INTERVAL_SEC, (int) $refresh_interval_sec)) {
             return false;
+        }
+
+        if ($stale_threshold_sec !== null) {
+            foreach (is_array($snapshot['prices']) ? $snapshot['prices'] : array() as $price) {
+                $price_state = isset($price['state']) ? (string) $price['state'] : 'offline';
+                if ($price_state !== 'live') {
+                    continue;
+                }
+
+                $updated_at = isset($price['updatedAt']) ? $price['updatedAt'] : null;
+                if (!is_string($updated_at) || $updated_at === '') {
+                    return false;
+                }
+
+                if ($this->iso_age_sec($updated_at) > (int) $stale_threshold_sec) {
+                    return false;
+                }
+            }
         }
 
         return true;

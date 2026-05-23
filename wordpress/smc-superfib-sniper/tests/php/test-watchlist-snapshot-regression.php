@@ -225,11 +225,11 @@ $freshSnapshot = array(
 );
 
 assert_true(
-    $isCurrent->invoke($instance, $freshSnapshot, array('EURUSD', 'USDJPY'), 30),
+    $isCurrent->invoke($instance, $freshSnapshot, array('EURUSD', 'USDJPY'), 30, 60),
     'matching symbols with a fresh timestamp must keep the snapshot current'
 );
 assert_true(
-    !$isCurrent->invoke($instance, $freshSnapshot, array('EURUSD'), 30),
+    !$isCurrent->invoke($instance, $freshSnapshot, array('EURUSD'), 30, 60),
     'symbol-set mismatch must invalidate a fresh snapshot before timestamp freshness is considered'
 );
 assert_true(
@@ -240,8 +240,28 @@ assert_true(
         'meta' => array(
             'computedAt' => gmdate('c'),
         ),
-    ), array('EURUSD', 'USDJPY'), 30),
+    ), array('EURUSD', 'USDJPY'), 30, 60),
     'symbol additions must also invalidate a fresh snapshot before timestamp freshness is considered'
+);
+assert_true(
+    !$isCurrent->invoke($instance, array(
+        'prices' => array(
+            array(
+                'symbol' => 'EURUSD',
+                'state' => 'live',
+                'updatedAt' => gmdate('c', time() - 15),
+            ),
+            array(
+                'symbol' => 'USDJPY',
+                'state' => 'live',
+                'updatedAt' => gmdate('c', time() - 15),
+            ),
+        ),
+        'meta' => array(
+            'computedAt' => gmdate('c'),
+        ),
+    ), array('EURUSD', 'USDJPY'), 30, 10),
+    'freshly computed engine snapshots must be invalidated once live quote timestamps exceed the stale threshold'
 );
 
 $deleteSnapshot->invoke($instance, 42);
