@@ -1,0 +1,29 @@
+{
+  "snapshot_type": "AFTER-PATCH-1",
+  "workflow_id": "stabilize-ea-2026-05-23",
+  "timestamp": "2026-05-23T00:03:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-LKa98",
+    "commit_hash": "12f281d5d7307caf0861872a9b6a175077eebd93",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-23-after-patch-1",
+    "prev_commit_hash": "cd3cf5b1ca1947516b3a9cd965fdf83dff256d0c"
+  },
+  "patch_applied": {
+    "id": "PATCH-001",
+    "bug_fixed": "BUG-001",
+    "files_changed": [
+      "src/routes/-admin.test.tsx",
+      "src/routes/admin.tsx",
+      "src/types/sniper.ts"
+    ],
+    "change_type": "formatting",
+    "logic_changed": false
+  },
+  "verification": {
+    "npm_run_lint": "PASS (0 errors, 9 warnings — all warnings are pre-existing non-fatal react-hooks/react-refresh rules)",
+    "npm_run_build": "PASS (vite built successfully, no errors)",
+    "npm_run_check_mql": "PASS (MQL include verification passed)",
+    "php_syntax_smc_superfib_sniper": "PASS",
+    "php_syntax_class_market_data_service": "PASS"
+  }
+}

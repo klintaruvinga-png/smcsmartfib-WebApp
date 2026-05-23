@@ -1,0 +1,37 @@
+{
+  "snapshot_type": "PRE-PATCH",
+  "workflow_id": "stabilize-ea-2026-05-23",
+  "timestamp": "2026-05-23T00:02:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-LKa98",
+    "commit_hash": "cd3cf5b1ca1947516b3a9cd965fdf83dff256d0c",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-23-before-patches"
+  },
+  "patches_planned": [
+    {
+      "id": "PATCH-001",
+      "target": "BUG-001",
+      "files": [
+        "src/routes/-admin.test.tsx",
+        "src/routes/admin.tsx",
+        "src/types/sniper.ts"
+      ],
+      "description": "Fix 8 Prettier formatting errors via eslint --fix. No logic changes.",
+      "risk": "Minimal — formatting only"
+    }
+  ],
+  "not_patching": [
+    {
+      "id": "BUG-002",
+      "reason": "Pre-existing test harness failure in test-phase2-trade-telemetry.php. Outside Phase 3 MT5 payload seam. Requires dedicated test-harness fix scoped separately."
+    },
+    {
+      "id": "MIGRATION-001",
+      "reason": "72h soak is time-based, no code fix needed"
+    },
+    {
+      "id": "MIGRATION-002",
+      "reason": "NAS100/US30 is a trader configuration item (EA Properties), not a code defect"
+    }
+  ]
+}
