@@ -1522,7 +1522,26 @@ function evaluatePipeline() {
       log("RESEARCHING - reports/copilot-research.md exists but is empty, still waiting");
       return;
     }
-    log("RESEARCHING complete - research artifact present, advancing to PLANNING");
+
+    const cycleStartedAt = Date.parse(state.started_at ?? "");
+    if (Number.isFinite(cycleStartedAt)) {
+      const researchMtime = (() => {
+        try {
+          return fs.statSync(RESEARCH_FILE).mtimeMs;
+        } catch {
+          return NaN;
+        }
+      })();
+
+      if (!Number.isFinite(researchMtime) || researchMtime < cycleStartedAt) {
+        log(
+          "RESEARCHING - research artifact predates current cycle start, waiting for fresh research write"
+        );
+        return;
+      }
+    }
+
+    log("RESEARCHING complete - current-cycle research artifact detected, advancing to PLANNING");
     writeJson(STATE_FILE, {
       ...state,
       state: "PLANNING",
