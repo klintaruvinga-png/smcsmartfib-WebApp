@@ -297,7 +297,9 @@ function checkOpenPR(issueSlug) {
     );
     const prs = JSON.parse(raw.trim() || "[]");
     return prs.length ? prs[0] : null;
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log(`checkOpenPR error: ${msg}`);
     return null;
   }
 }
@@ -334,6 +336,8 @@ function checkMergedPR(issueSlug, cycleStartedAt) {
       ) || null
     );
   } catch {
+    const msg = err instanceof Error ? err.message : String(err);
+    log(`checkMergedPR error: ${msg}`);
     return null;
   }
 }
