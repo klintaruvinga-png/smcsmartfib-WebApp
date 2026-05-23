@@ -395,10 +395,7 @@ export interface SoakReport {
   seeded?: boolean;
 }
 
-export type SoakType =
-  | "PHASE_0_RESTART_72H"
-  | "PHASE_3_STABILITY_72H"
-  | "CUSTOM";
+export type SoakType = "PHASE_0_RESTART_72H" | "PHASE_3_STABILITY_72H" | "CUSTOM";
 
 export interface SoakTemplateConfig {
   soakType: SoakType;

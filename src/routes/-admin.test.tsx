@@ -443,7 +443,9 @@ describe("AdminPage", () => {
     expect(await screen.findByRole("heading", { name: "Phase 3 - Stability Soak" })).toBeTruthy();
     selectSoakType("PHASE_0_RESTART_72H");
     expect(screen.getByRole("heading", { name: "Phase 0 - Restart Soak" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Phase 0 - Restart Soak - Operator Baseline" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Phase 0 - Restart Soak - Operator Baseline" }),
+    ).toBeTruthy();
     expect(screen.getAllByText("T+12h").length).toBeGreaterThan(0);
     expect(screen.getAllByText("T+24h").length).toBeGreaterThan(0);
     expect(screen.getAllByText("T+48h").length).toBeGreaterThan(0);
@@ -466,7 +468,9 @@ describe("AdminPage", () => {
     selectSoakType("PHASE_0_RESTART_72H");
     selectSoakType("PHASE_3_STABILITY_72H");
 
-    expect(screen.getByRole("heading", { name: "Phase 3 - Stability Soak - Operator Baseline" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Phase 3 - Stability Soak - Operator Baseline" }),
+    ).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Phase 3 - Stability Soak Timeline" })).toBeTruthy();
     expect(screen.getAllByText("T+24h").length).toBeGreaterThan(0);
   });
@@ -511,7 +515,9 @@ describe("AdminPage", () => {
         updated_at: "2026-05-12T08:05:00Z",
       },
     ];
-    apiMocks.fetchSoakReport.mockResolvedValueOnce(phase0Report).mockResolvedValueOnce(phase0Report);
+    apiMocks.fetchSoakReport
+      .mockResolvedValueOnce(phase0Report)
+      .mockResolvedValueOnce(phase0Report);
 
     render(<AdminPage />);
 
@@ -562,6 +568,8 @@ describe("AdminPage", () => {
 
     selectSoakType("PHASE_0_RESTART_72H");
 
-    expect((screen.getByPlaceholderText("EURUSD, USDJPY, GBPUSD...") as HTMLTextAreaElement).value).toBe("");
+    expect(
+      (screen.getByPlaceholderText("EURUSD, USDJPY, GBPUSD...") as HTMLTextAreaElement).value,
+    ).toBe("");
   });
 });
