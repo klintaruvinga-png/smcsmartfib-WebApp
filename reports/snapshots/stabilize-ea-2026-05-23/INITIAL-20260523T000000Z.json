@@ -1,0 +1,153 @@
+{
+  "snapshot_type": "INITIAL",
+  "workflow_id": "stabilize-ea-2026-05-23",
+  "timestamp": "2026-05-23T00:00:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-LKa98",
+    "commit_hash": "cd3cf5b1ca1947516b3a9cd965fdf83dff256d0c",
+    "remote": "origin",
+    "uncommitted_changes_count": 3,
+    "uncommitted_files": [
+      "src/routes/-admin.test.tsx",
+      "src/routes/admin.tsx",
+      "src/types/sniper.ts"
+    ],
+    "note": "Prettier formatting fixes were already applied during Stage 0 linting discovery; changes are formatting-only, no logic altered"
+  },
+  "repo_structure": {
+    "plugin_root": "wordpress/smc-superfib-sniper",
+    "plugin_files": [
+      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "wordpress/smc-superfib-sniper/class-market-data-service.php",
+      "wordpress/smc-superfib-sniper/tests/php/fib-test-helpers.php",
+      "wordpress/smc-superfib-sniper/tests/php/phase3_mt5_simulation_test.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-cors-regression.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-ea-bridge-bootstrap.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-fib-parity.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-get-soak-report.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-htf-authority-anchor.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-rest-bootstrap-settings.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-session-anchors.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-settings-risk-fallbacks.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-superfib-weighting.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php"
+    ],
+    "rest_route_files": [
+      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php"
+    ],
+    "frontend_api_client": "src/lib/api/sniperClient.ts",
+    "mt5_ea_files": [
+      "mt5/SMC_MarketDataEA.mq5",
+      "mt5/MarketDataEngine.mqh",
+      "mt5/TickProcessor.mqh",
+      "mt5/CandleBuilder.mqh",
+      "mt5/SessionManager.mqh",
+      "mt5/FreshnessEngine.mqh",
+      "mt5/SymbolNormalizer.mqh"
+    ],
+    "migration_files": [
+      ".github/migration-status.md",
+      ".github/migration/audits/phase-0-ea-authority-rate-limit-parity-2026-05-06.md",
+      ".github/migration/audits/phase-0-mt5-authority-parity-2026-05-03.md",
+      ".github/migration/audits/phase-0-freshness-authority-parity-2026-05-04.md",
+      ".github/migration/audits/phase-3-mt5-parity-2026-05-22.md"
+    ]
+  },
+  "app_state": {
+    "workflow_state_file_exists": false,
+    "workflow_state": {},
+    "migration_status": {
+      "current_phase": "3 (MT5 Market Data Engine)",
+      "overall_progress": "80%",
+      "status": "Phase 0 COMPLETE — Phase 1 COMPLETE — Phase 2 COMPLETE — Phase 3 browser verification PASSED; 72h soak window open since 2026-05-22",
+      "blockers": [
+        "72-hour stability soak in progress (soak window opened 2026-05-22)",
+        "NAS100/US30 not in EA Symbols input (non-blocking config item)"
+      ]
+    }
+  },
+  "rest_routes_confirmed": {
+    "namespace": "sniper/v1",
+    "public_routes": [
+      "GET /sniper/v1/health",
+      "GET /sniper/v1/session"
+    ],
+    "authenticated_user_routes": [
+      "GET /sniper/v1/snapshot",
+      "POST /sniper/v1/snapshot",
+      "GET /sniper/v1/charts",
+      "GET /sniper/v1/regimes",
+      "POST /sniper/v1/regime",
+      "GET /sniper/v1/live-signals",
+      "POST /sniper/v1/signal",
+      "GET /sniper/v1/ladders",
+      "POST /sniper/v1/user/engine-batch",
+      "POST /sniper/v1/user/market-data",
+      "GET /sniper/v1/user/trades",
+      "POST /sniper/v1/user/trades",
+      "GET /sniper/v1/user/account",
+      "POST /sniper/v1/user/account",
+      "GET /sniper/v1/user/progress",
+      "GET /sniper/v1/user/settings",
+      "POST /sniper/v1/user/settings",
+      "GET /sniper/v1/user/risk-profile",
+      "POST /sniper/v1/user/risk-profile",
+      "GET /sniper/v1/user/trade-queue",
+      "POST /sniper/v1/user/trade-queue",
+      "POST /sniper/v1/user/execute-signals",
+      "POST /sniper/v1/user/twelve-data-key",
+      "DELETE /sniper/v1/user/twelve-data-key",
+      "GET /sniper/v1/user/watchlist",
+      "POST /sniper/v1/user/watchlist",
+      "POST /sniper/v1/user/watchlist/add",
+      "POST /sniper/v1/user/watchlist/remove",
+      "GET /sniper/v1/instruments",
+      "GET /sniper/v1/account-telemetry",
+      "GET /sniper/v1/positions",
+      "GET /sniper/v1/orders",
+      "GET /sniper/v1/market-data-authority",
+      "GET /sniper/v1/authority-diagnostics"
+    ],
+    "admin_routes": [
+      "GET /sniper/v1/admin/health",
+      "GET /sniper/v1/admin/soak-report",
+      "POST /sniper/v1/admin/soak-evidence",
+      "POST /sniper/v1/admin/soak-checkpoint"
+    ],
+    "ea_routes": [
+      "POST /sniper/v1/ea/market-stream",
+      "POST /sniper/v1/ea/heartbeat",
+      "POST /sniper/v1/ea/account-sync",
+      "POST /sniper/v1/ea/symbol-sync",
+      "GET /sniper/v1/ea/license-check"
+    ]
+  },
+  "known_dev_status": {
+    "authority_diagnostics_requires_wp_session": true,
+    "ea_market_stream_route_exists": true,
+    "ea_auth_header": "X-EA-API-Key",
+    "ea_auth_secret_env": "SMC_SF_EA_API_KEY",
+    "ea_payload_requires_user_id": true,
+    "migration_phase": "MT5-native migration / Phase 3 soak",
+    "plugin_version": "13.0.3",
+    "actual_ea_payload_fields": [
+      "user_id", "symbol", "normalized_symbol", "timeframe",
+      "quote_time", "timestamp", "bid", "ask", "spread",
+      "freshness", "session", "candle", "candle_m15",
+      "candle_*_flat_aliases", "candle_m15_*_flat_aliases",
+      "schema_version"
+    ],
+    "stale_rejection_threshold_sec": 300,
+    "stale_warn_threshold_sec": 120,
+    "candle_stale_threshold_sec": 180
+  }
+}

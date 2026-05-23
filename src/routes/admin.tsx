@@ -946,9 +946,7 @@ export function AdminPage() {
                           step={1}
                           value={checkpointCount}
                           onChange={(event) =>
-                            setCheckpointCount(
-                              Number.parseInt(event.target.value || "0", 10) || 0,
-                            )
+                            setCheckpointCount(Number.parseInt(event.target.value || "0", 10) || 0)
                           }
                         />
                       </div>
@@ -1327,7 +1325,9 @@ export function AdminPage() {
                       type="button"
                       onClick={handleCheckpointSave}
                       disabled={
-                        checkpointSaving || !baselineCheckpoint || derivedCheckpointLabels.length === 0
+                        checkpointSaving ||
+                        !baselineCheckpoint ||
+                        derivedCheckpointLabels.length === 0
                       }
                     >
                       {checkpointSaving
@@ -1732,8 +1732,7 @@ function hydrateBaselineForm(form: BaselineForm, rows: SoakEvidenceRow[]): Basel
       evidenceMap["baseline.backend_health_endpoint"] ?? form.backendHealthEndpoint,
     t0HealthSummary: evidenceMap["baseline.t0_health_summary"] ?? form.t0HealthSummary,
     authConfirmed: evidenceMap["baseline.auth_confirmed"] ?? form.authConfirmed,
-    twelveDataKeyStatus:
-      evidenceMap["baseline.twelve_data_key_status"] ?? form.twelveDataKeyStatus,
+    twelveDataKeyStatus: evidenceMap["baseline.twelve_data_key_status"] ?? form.twelveDataKeyStatus,
     watchlistLiveSymbols:
       evidenceMap["baseline.watchlist_live_symbols"] ?? form.watchlistLiveSymbols,
     notes: evidenceMap["baseline.notes"] ?? form.notes,
