@@ -120,6 +120,8 @@ export function AdminPage() {
     notes: "",
   });
   const soakRefreshInFlight = useRef<Promise<SoakReport | null> | null>(null);
+  const soakTypeInitializedFromReport = useRef(false);
+  const soakTypeManuallyChanged = useRef(false);
 
   useEffect(() => {
     if (!hasCredentials() && !hasWordPressNonce()) {
@@ -248,8 +250,11 @@ export function AdminPage() {
 
   useEffect(() => {
     if (soakState.kind !== "ready") return;
+    if (soakTypeInitializedFromReport.current) return;
+    if (soakTypeManuallyChanged.current) return;
 
     const reportSoakType = inferSoakTypeFromReport(soakState.report);
+    soakTypeInitializedFromReport.current = true;
     if (!reportSoakType || reportSoakType === "CUSTOM") return;
 
     setSoakType(reportSoakType);
@@ -307,6 +312,7 @@ export function AdminPage() {
   );
 
   function handleSoakTypeChange(nextType: SoakType) {
+    soakTypeManuallyChanged.current = true;
     const template = SOAK_TEMPLATES[nextType];
     setSoakType(nextType);
     setDurationHours(template.defaultDurationHours);
@@ -1774,14 +1780,6 @@ function inferSoakTypeFromReport(report: SoakReport): SoakType | null {
 
   if (persistedType === "PHASE_0_RESTART_72H" || persistedType === "PHASE_3_STABILITY_72H") {
     return persistedType;
-  }
-
-  const checkpointText = report.checkpoints
-    .map((checkpoint) => checkpoint.operator_notes ?? "")
-    .join(" ")
-    .toUpperCase();
-  if (checkpointText.includes("T+12H")) {
-    return "PHASE_0_RESTART_72H";
   }
 
   return null;
