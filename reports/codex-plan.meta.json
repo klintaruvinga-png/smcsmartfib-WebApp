@@ -1,5 +1,5 @@
 {
-  "issue": "SMC Intake - Execute Phase 3 by validating the MT5 EA webhook market-data flow and the backend storage path for source='mt5'.",
-  "research_hash": "ef8825877e393ec85716b91bca142906faf3f610d43cf2497d9a2a0887c78ef0",
-  "written_at": "2026-05-22T05:54:59.751Z"
+  "issue": "SMC Intake - Fix offline/weekend times for crypto market currently showing offline during weekend hours(regular market closure) Candles are being sent from EA to dashboard but cryptocurrencies are showing offline",
+  "research_hash": "7f1e80fa5f24c98f590d3962bf608a03926549debb6e395913f081ae4b3bf241",
+  "written_at": "2026-05-23T03:46:15.764Z"
 }
