@@ -1501,6 +1501,55 @@ function evaluatePipeline() {
     return;
   }
 
+  // RESEARCHING is set by Copilot while it writes the research artifact. The watcher
+  // has no role during that window — but once copilot-research.md exists and is non-empty
+  // it must advance the state to PLANNING so Claude plan hardening can run. Without this
+  // handler the pipeline stalls silently: the watcher falls through all branches,
+  // logs nothing, and never triggers hardening. (Bug surfaced 2026-05-23.)
+  if (state.state === "RESEARCHING") {
+    if (!fs.existsSync(RESEARCH_FILE)) {
+      log("RESEARCHING - waiting for reports/copilot-research.md");
+      return;
+    }
+    const researchContent = (() => {
+      try {
+        return readTextFile(RESEARCH_FILE).trim();
+      } catch {
+        return "";
+      }
+    })();
+    if (!researchContent) {
+      log("RESEARCHING - reports/copilot-research.md exists but is empty, still waiting");
+      return;
+    }
+
+    const cycleStartedAt = Date.parse(state.started_at ?? "");
+    if (Number.isFinite(cycleStartedAt)) {
+      const researchMtime = (() => {
+        try {
+          return fs.statSync(RESEARCH_FILE).mtimeMs;
+        } catch {
+          return NaN;
+        }
+      })();
+
+      if (!Number.isFinite(researchMtime) || researchMtime < cycleStartedAt) {
+        log(
+          "RESEARCHING - research artifact predates current cycle start, waiting for fresh research write"
+        );
+        return;
+      }
+    }
+
+    log("RESEARCHING complete - current-cycle research artifact detected, advancing to PLANNING");
+    writeJson(STATE_FILE, {
+      ...state,
+      state: "PLANNING",
+      editing_locked: true,
+    });
+    return;
+  }
+
   if (state.state === "PLANNING") {
     if (state.editing_locked !== true) {
       log("PLANNING state is invalid: editing_locked must be true");

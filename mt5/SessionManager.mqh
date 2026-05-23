@@ -15,6 +15,18 @@ enum ENUM_SESSION_STATE
     SESSION_WEEKEND
 };
 
+const string CRYPTO_SYMBOL_PREFIXES[] =
+{
+    "BTC",
+    "ETH",
+    "LTC",
+    "XRP",
+    "BNB",
+    "SOL",
+    "ADA",
+    "DOGE"
+};
+
 //+------------------------------------------------------------------+
 //| SessionManager Class                                             |
 //| Session boundaries are evaluated in UTC after converting broker  |
@@ -47,6 +59,9 @@ public:
 
     bool IsMarketOpenForSymbol(string symbol, datetime serverTime = 0)
     {
+        if (IsCryptoSymbol(symbol))
+            return true;
+
         ENUM_SESSION_STATE session = ResolveSessionStateForSymbol(symbol, serverTime <= 0 ? TimeCurrent() : serverTime);
         return session != SESSION_CLOSED && session != SESSION_WEEKEND;
     }
@@ -66,6 +81,21 @@ public:
     ENUM_SESSION_STATE GetCurrentSessionForSymbol(string symbol, datetime serverTime = 0)
     {
         return ResolveSessionStateForSymbol(symbol, serverTime <= 0 ? TimeCurrent() : serverTime);
+    }
+
+    bool IsCryptoSymbol(string symbol)
+    {
+        string upper = symbol;
+        StringToUpper(upper);
+
+        for (int i = 0; i < ArraySize(CRYPTO_SYMBOL_PREFIXES); i++)
+        {
+            string prefix = CRYPTO_SYMBOL_PREFIXES[i];
+            if (StringFind(upper, prefix) == 0)
+                return true;
+        }
+
+        return false;
     }
 
     string GetSessionName()
