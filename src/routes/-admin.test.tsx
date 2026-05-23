@@ -143,6 +143,10 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
+function selectSoakType(value: "PHASE_0_RESTART_72H" | "PHASE_3_STABILITY_72H" | "CUSTOM") {
+  fireEvent.change(screen.getByLabelText("Soak type"), { target: { value } });
+}
+
 describe("AdminPage", () => {
   beforeEach(() => {
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -436,7 +440,14 @@ describe("AdminPage", () => {
 
     render(<AdminPage />);
 
-    expect(await screen.findByText("Operator Gathered Baseline")).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Phase 3 - Stability Soak" })).toBeTruthy();
+    selectSoakType("PHASE_0_RESTART_72H");
+    expect(screen.getByRole("heading", { name: "Phase 0 - Restart Soak" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Phase 0 - Restart Soak - Operator Baseline" })).toBeTruthy();
+    expect(screen.getAllByText("T+12h").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("T+24h").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("T+48h").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("T+72h").length).toBeGreaterThan(0);
     expect(screen.queryByText(BASELINE_EXISTS_WARNING)).toBeNull();
 
     const captureButton = screen.getByRole("button", { name: "Capture Baseline & Start Soak" });
@@ -444,5 +455,113 @@ describe("AdminPage", () => {
     expect(captureButton.getAttribute("title")).toBeNull();
     expect(captureButton.getAttribute("aria-label")).toBeNull();
     expect(screen.queryByRole("button", { name: "Update Baseline Evidence" })).toBeNull();
+  });
+
+  it("renders the Phase 3 template heading and checkpoint labels", async () => {
+    apiMocks.fetchSoakReport.mockResolvedValue(buildSoakReport());
+
+    render(<AdminPage />);
+
+    expect(await screen.findByRole("heading", { name: "Phase 3 - Stability Soak" })).toBeTruthy();
+    selectSoakType("PHASE_0_RESTART_72H");
+    selectSoakType("PHASE_3_STABILITY_72H");
+
+    expect(screen.getByRole("heading", { name: "Phase 3 - Stability Soak - Operator Baseline" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Phase 3 - Stability Soak Timeline" })).toBeTruthy();
+    expect(screen.getAllByText("T+24h").length).toBeGreaterThan(0);
+  });
+
+  it("initializes soak template from persisted soak-type evidence on first load", async () => {
+    const report = buildSoakReport();
+    report.baseline_checkpoint = buildCheckpoint(
+      1,
+      "baseline",
+      "2026-05-12T08:05:00Z",
+      "Initial soak capture.",
+    );
+    report.manual_evidence = [
+      {
+        id: 1,
+        evidence_key: "baseline.soak_type",
+        evidence_type: "baseline_metadata",
+        evidence_value: "PHASE_0_RESTART_72H",
+        operator: "tester",
+        created_at: "2026-05-12T08:05:00Z",
+        updated_at: "2026-05-12T08:05:00Z",
+      },
+    ];
+    apiMocks.fetchSoakReport.mockResolvedValue(report);
+
+    render(<AdminPage />);
+
+    expect(await screen.findByRole("heading", { name: "Phase 0 - Restart Soak" })).toBeTruthy();
+    expect(screen.getAllByText("T+12h").length).toBeGreaterThan(0);
+  });
+
+  it("does not override manual soak template selection on later report refreshes", async () => {
+    const phase0Report = buildSoakReport();
+    phase0Report.manual_evidence = [
+      {
+        id: 1,
+        evidence_key: "baseline.soak_type",
+        evidence_type: "baseline_metadata",
+        evidence_value: "PHASE_0_RESTART_72H",
+        operator: "tester",
+        created_at: "2026-05-12T08:05:00Z",
+        updated_at: "2026-05-12T08:05:00Z",
+      },
+    ];
+    apiMocks.fetchSoakReport.mockResolvedValueOnce(phase0Report).mockResolvedValueOnce(phase0Report);
+
+    render(<AdminPage />);
+
+    expect(await screen.findByRole("heading", { name: "Phase 0 - Restart Soak" })).toBeTruthy();
+    selectSoakType("PHASE_3_STABILITY_72H");
+    expect(screen.getByRole("heading", { name: "Phase 3 - Stability Soak" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh soak report" }));
+    await waitFor(() => {
+      expect(apiMocks.fetchSoakReport).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.getByRole("heading", { name: "Phase 3 - Stability Soak" })).toBeTruthy();
+  });
+
+  it("shows custom duration and checkpoint controls and renders evenly spaced labels", async () => {
+    apiMocks.fetchSoakReport.mockResolvedValue(buildSoakReport());
+
+    render(<AdminPage />);
+
+    expect(await screen.findByRole("heading", { name: "Phase 3 - Stability Soak" })).toBeTruthy();
+    selectSoakType("CUSTOM");
+
+    const durationInput = screen.getByLabelText("Duration (hours)");
+    const checkpointCountInput = screen.getByLabelText("Checkpoint count");
+
+    expect(durationInput).toBeTruthy();
+    expect(checkpointCountInput).toBeTruthy();
+
+    fireEvent.change(durationInput, { target: { value: "48" } });
+    fireEvent.change(checkpointCountInput, { target: { value: "3" } });
+
+    expect(screen.getAllByText("T+16h").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("T+32h").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("T+48h").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Save T+16h Snapshot" })).toBeTruthy();
+  });
+
+  it("clears unsaved baseline form state when switching templates", async () => {
+    apiMocks.fetchSoakReport.mockResolvedValue(buildSoakReport());
+
+    render(<AdminPage />);
+
+    expect(await screen.findByRole("heading", { name: "Phase 3 - Stability Soak" })).toBeTruthy();
+
+    const eaSymbolsInput = screen.getByPlaceholderText("EURUSD, USDJPY, GBPUSD...");
+    fireEvent.change(eaSymbolsInput, { target: { value: "EURUSD, GBPUSD" } });
+    expect((eaSymbolsInput as HTMLTextAreaElement).value).toBe("EURUSD, GBPUSD");
+
+    selectSoakType("PHASE_0_RESTART_72H");
+
+    expect((screen.getByPlaceholderText("EURUSD, USDJPY, GBPUSD...") as HTMLTextAreaElement).value).toBe("");
   });
 });
