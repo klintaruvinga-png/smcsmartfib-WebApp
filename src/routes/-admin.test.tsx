@@ -471,6 +471,61 @@ describe("AdminPage", () => {
     expect(screen.getAllByText("T+24h").length).toBeGreaterThan(0);
   });
 
+  it("initializes soak template from persisted soak-type evidence on first load", async () => {
+    const report = buildSoakReport();
+    report.baseline_checkpoint = buildCheckpoint(
+      1,
+      "baseline",
+      "2026-05-12T08:05:00Z",
+      "Initial soak capture.",
+    );
+    report.manual_evidence = [
+      {
+        id: 1,
+        evidence_key: "baseline.soak_type",
+        evidence_type: "baseline_metadata",
+        evidence_value: "PHASE_0_RESTART_72H",
+        operator: "tester",
+        created_at: "2026-05-12T08:05:00Z",
+        updated_at: "2026-05-12T08:05:00Z",
+      },
+    ];
+    apiMocks.fetchSoakReport.mockResolvedValue(report);
+
+    render(<AdminPage />);
+
+    expect(await screen.findByRole("heading", { name: "Phase 0 - Restart Soak" })).toBeTruthy();
+    expect(screen.getAllByText("T+12h").length).toBeGreaterThan(0);
+  });
+
+  it("does not override manual soak template selection on later report refreshes", async () => {
+    const phase0Report = buildSoakReport();
+    phase0Report.manual_evidence = [
+      {
+        id: 1,
+        evidence_key: "baseline.soak_type",
+        evidence_type: "baseline_metadata",
+        evidence_value: "PHASE_0_RESTART_72H",
+        operator: "tester",
+        created_at: "2026-05-12T08:05:00Z",
+        updated_at: "2026-05-12T08:05:00Z",
+      },
+    ];
+    apiMocks.fetchSoakReport.mockResolvedValueOnce(phase0Report).mockResolvedValueOnce(phase0Report);
+
+    render(<AdminPage />);
+
+    expect(await screen.findByRole("heading", { name: "Phase 0 - Restart Soak" })).toBeTruthy();
+    selectSoakType("PHASE_3_STABILITY_72H");
+    expect(screen.getByRole("heading", { name: "Phase 3 - Stability Soak" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh soak report" }));
+    await waitFor(() => {
+      expect(apiMocks.fetchSoakReport).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.getByRole("heading", { name: "Phase 3 - Stability Soak" })).toBeTruthy();
+  });
+
   it("shows custom duration and checkpoint controls and renders evenly spaced labels", async () => {
     apiMocks.fetchSoakReport.mockResolvedValue(buildSoakReport());
 

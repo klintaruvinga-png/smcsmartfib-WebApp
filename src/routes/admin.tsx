@@ -120,6 +120,8 @@ export function AdminPage() {
     notes: "",
   });
   const soakRefreshInFlight = useRef<Promise<SoakReport | null> | null>(null);
+  const soakTypeInitializedFromReport = useRef(false);
+  const soakTypeManuallyChanged = useRef(false);
 
   useEffect(() => {
     if (!hasCredentials() && !hasWordPressNonce()) {
@@ -246,6 +248,20 @@ export function AdminPage() {
     setBaselineForm((current) => hydrateBaselineForm(current, soakState.report.manual_evidence));
   }, [soakState]);
 
+  useEffect(() => {
+    if (soakState.kind !== "ready") return;
+    if (soakTypeInitializedFromReport.current) return;
+    if (soakTypeManuallyChanged.current) return;
+
+    const reportSoakType = inferSoakTypeFromReport(soakState.report);
+    soakTypeInitializedFromReport.current = true;
+    if (!reportSoakType || reportSoakType === "CUSTOM") return;
+
+    setSoakType(reportSoakType);
+    setDurationHours(SOAK_TEMPLATES[reportSoakType].defaultDurationHours);
+    setCheckpointCount(SOAK_TEMPLATES[reportSoakType].defaultCheckpointCount);
+  }, [soakState]);
+
   if (state.kind === "loading") {
     return <div className="text-mute text-sm">Loading admin health...</div>;
   }
@@ -296,6 +312,7 @@ export function AdminPage() {
   );
 
   function handleSoakTypeChange(nextType: SoakType) {
+    soakTypeManuallyChanged.current = true;
     const template = SOAK_TEMPLATES[nextType];
     setSoakType(nextType);
     setDurationHours(template.defaultDurationHours);
@@ -1748,6 +1765,24 @@ function deriveCheckpointLabels(
     const checkpointHour = (durationHours * (index + 1)) / checkpointCount;
     return `T+${formatCheckpointHour(checkpointHour)}h`;
   });
+}
+
+function inferSoakTypeFromReport(report: SoakReport): SoakType | null {
+  const evidenceMap = indexEvidenceByKey(report.manual_evidence);
+  const persistedType = (
+    evidenceMap["baseline.soak_type"] ??
+    evidenceMap["soak.type"] ??
+    evidenceMap["soak_type"] ??
+    ""
+  )
+    .trim()
+    .toUpperCase();
+
+  if (persistedType === "PHASE_0_RESTART_72H" || persistedType === "PHASE_3_STABILITY_72H") {
+    return persistedType;
+  }
+
+  return null;
 }
 
 function formatCheckpointHour(value: number): string {
