@@ -222,6 +222,20 @@ assert_true(is_array($storedUtcTick), 'store_tick_snapshot must persist UTC-suff
 assert_same('2026-05-16 08:16:30', $storedUtcTick['updated_at'] ?? null, 'store_tick_snapshot must normalize UTC-suffixed timestamps instead of falling back to receipt time');
 
 assert_true(
+    $service->store_tick_snapshot(7, 'BTCUSD', array(
+        'bid' => 103250.10,
+        'ask' => 103250.90,
+        'spread' => 80,
+        'timestamp' => '2026-05-23T12:00:00Z',
+        'freshness' => 'LIVE',
+    )),
+    'store_tick_snapshot should keep crypto LIVE payloads writable'
+);
+$storedCryptoTick = $wpdb->tables[$snapshotTable]['7|BTCUSD'] ?? null;
+assert_true(is_array($storedCryptoTick), 'store_tick_snapshot must persist the MT5 crypto snapshot row');
+assert_same('live', $storedCryptoTick['state'] ?? null, 'store_tick_snapshot must persist crypto LIVE freshness as a live snapshot state');
+
+assert_true(
     $service->store_candle_m1(7, 'EURUSD', array(
         'timestamp' => '2026.05.16 08:15:00',
         'open' => 1.1005,

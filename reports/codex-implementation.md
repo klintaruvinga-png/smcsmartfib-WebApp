@@ -1,31 +1,37 @@
-## Issue summary
+# Issue summary
 
-Updated the `/admin` soak workspace so operators can switch between Phase 0, Phase 3, and custom soak templates instead of being locked to the retired Phase 0 72h workflow.
+Crypto symbols were being classified as weekend-closed by the MT5 `SessionManager`, which caused weekend crypto payloads to propagate `CLOSED` freshness and land in the dashboard as `offline` even while candles continued streaming.
 
-## Root cause implemented
+# Root cause implemented
 
-The admin render layer hardcoded Phase 0 copy and checkpoint labels even though the underlying soak report types were generic. The patch adds a typed soak template registry, drives the workspace UI from the selected template, and generates custom checkpoint labels locally without changing backend ownership.
+Added an explicit crypto symbol classifier in `mt5/SessionManager.mqh` and used it as an early-return guard in `IsMarketOpenForSymbol()` so normalized crypto symbols stay market-open during weekend gating. Added a narrow MT5 regression script for Saturday UTC classification checks and one PHP regression assertion confirming a crypto `LIVE` snapshot persists as non-offline state. Validation details are pending and will be appended after step 6.
 
-## Exact files changed
+# Exact files changed
 
-- `src/types/sniper.ts`
-- `src/routes/admin.tsx`
-- `src/routes/-admin.test.tsx`
+- `mt5/SessionManager.mqh`
+- `mt5/SessionManagerWeekendClassificationTest.mq5`
+- `wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php`
 
-## Tests run
+# Tests run
 
-- `npx tsc --noEmit --pretty false`
-- `npx vitest run --environment jsdom src/routes/-admin.test.tsx`
+- `node mt5/check-mql-includes.mjs` — passed
+- `php wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php` — passed
+- `php wordpress/smc-superfib-sniper/tests/php/phase3_mt5_simulation_test.php` — passed
+- `MetaEditor64.exe /compile:.../mt5/SessionManagerWeekendClassificationTest.mq5` — inconclusive; CLI returned without a repo-local compiler log or `.ex5` artifact
+- `MetaEditor64.exe /compile:.../mt5/SMC_MarketDataEA.mq5` — inconclusive; CLI returned without a repo-local compiler log or `.ex5` artifact
 
-## Reports generated
+# Reports generated
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-22_admin-soak-template-selector.md`
-- `.github/migration/audits/phase-3-dashboard-parity-2026-05-22.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-23_crypto-weekend-offline-state.md`
+- `.github/migration/audits/phase-3-mt5-parity-2026-05-23.md`
 
-## Remaining risks
+# Remaining risks
 
-The repository does not expose any backend field or checkpoint API parameter for persisting a soak template label. The selector therefore remains component-local, which matches the contract non-goals, but backend endpoint parity can only be fully verified after manual runtime testing. Manual `/admin` browser verification was not completed because browser tooling was unavailable in this session. Markdown export still uses the legacy `Phase 0 Soak Report` title because export-format changes were outside this patch scope.
+- Live weekend parity remains unverified until the patched EA is recompiled, reloaded, and observed on Saturday/Sunday UTC with crypto live and FX closed in the same session.
+- MetaEditor CLI compilation remains inconclusive from this workspace because no compiler artifact or log was emitted locally even though the process returned successfully.
+- The contract kept session-label logic out of scope, so weekend crypto may still surface a closed/weekend session label while freshness gating remains live.
 
-## Any contract ambiguities resolved during implementation
+# Any contract ambiguities resolved during implementation
 
-`PHASE3_SOAK_WINDOW_TASKS.md` does not define explicit Phase 3 checkpoint names, so the contract fallback was used: `T+24h`, `T+48h`, `T+72h`. The contract also references passing a checkpoint identifier string into backend checkpoint saves, but the existing checkpoint API only accepts `checkpointType` and `operatorNotes`; the smallest safe implementation kept backend calls unchanged and applied the template selection at the UI layer only.
+- The contract asked for a backend test using `freshness=FRESH`, but the repository’s canonical MT5 freshness contract is `LIVE|DELAYED|STALE|CLOSED|DISCONNECTED`. Safest grounded interpretation: use `LIVE` in the new backend regression assertion instead of silently widening the PHP freshness API.
+- The contract’s suggested two-commit grouping conflicts with the mandatory requirement that `reports/codex-implementation.md` exist before validation and be staged with the code changes. Safest implementation path: keep the summary file in the same final patch set and record this ambiguity here.
