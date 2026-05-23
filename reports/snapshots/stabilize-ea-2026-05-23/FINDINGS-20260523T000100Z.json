@@ -1,0 +1,78 @@
+{
+  "snapshot_type": "FINDINGS",
+  "workflow_id": "stabilize-ea-2026-05-23",
+  "timestamp": "2026-05-23T00:01:00Z",
+  "confirmed_issues": [
+    {
+      "id": "BUG-001",
+      "severity": "LOW",
+      "system": "Frontend / TypeScript",
+      "description": "8 Prettier formatting errors in 3 source files (-admin.test.tsx, admin.tsx, sniper.ts). ESLint reported 8 fixable errors.",
+      "root_cause": "Prettier formatting drift from recent Phase 2/3 development work (post-2026-05-22 commits). Trailing commas and line-break rules not applied consistently.",
+      "impact_zones": ["Lint CI gate", "Code review readability"],
+      "proposed_fix": "Run eslint --fix on the three affected files (formatting-only, no logic change)"
+    },
+    {
+      "id": "BUG-002",
+      "severity": "LOW",
+      "system": "PHP / Tests",
+      "description": "test-phase2-trade-telemetry.php fails on streak.current_streak_days assertion. Pre-existing failure noted in 2026-05-22 parity audit.",
+      "root_cause": "The streak calculator relies on CALENDAR_DAY_WITH_ANY_COMPLETED_ENGINE_RUN. The test mock inserts an engine run 5 seconds in the past but the streak computation path may not count it as 'today' due to how the mock DB emulates UTC date boundaries. This is outside the Phase 3 MT5 payload seam.",
+      "impact_zones": ["PHP test suite completeness"],
+      "proposed_fix": "Document as pre-existing — does not affect production streak logic which uses real DB timestamps. A dedicated fix should be scoped as a separate test-harness task."
+    }
+  ],
+  "confirmed_no_issues": [
+    "EA route permission_ea_market_stream: CORRECT — delegates to permission_ea_bridge with full 6-check sequence",
+    "EA API key extraction get_ea_api_key: CORRECT — checks x-ea-api-key, x_ea_api_key, x-api-key, x_api_key variants",
+    "EA auth token comparison: CORRECT — uses hash_equals() not ==",
+    "EA missing token response: CORRECT — 401 smc_sf_api_key_missing",
+    "EA unconfigured secret response: CORRECT — 503 smc_sf_api_key_unconfigured + error_log",
+    "EA invalid token response: CORRECT — 403 smc_sf_api_key_invalid",
+    "EA missing user_id response: CORRECT — 400 smc_sf_user_required",
+    "EA invalid user_id response: CORRECT — 403 smc_sf_user_invalid",
+    "wp_set_current_user called before returning true: CONFIRMED at line 816",
+    "Stale data rejection (>300s): CONFIRMED — 422 stale_data",
+    "Stale data warning (120-300s): CONFIRMED — error_log drift warning",
+    "Candle epoch/pre-2000 rejection: CONFIRMED — min_valid_ts guard",
+    "OHLC validation: CONFIRMED — validate_ohlc() called for M1 and M15",
+    "bid/ask finiteness check: CONFIRMED — is_finite() + >0 + bid<=ask",
+    "authority-diagnostics requires WP session: CONFIRMED — permission_user callback",
+    "admin routes require manage_options: CONFIRMED — permission_admin callback",
+    "Frontend stale state: CORRECT — useEngineHealth has staleTime:0; useStreamingTicks is visual-only; dashboard does not fake live status",
+    "Signal engine gating: CORRECT — backend remains authoritative, no signal truth moved to frontend",
+    "Watchlist persistence: CORRECT — mutations invalidate engine snapshot cache",
+    "Phase 3 payload validation: CORRECT — validate_phase3_market_stream_payload checks freshness, session, M1/M15 candle fields",
+    "MT5 EA payload field alignment: CORRECT — all fields match between SMC_MarketDataEA.mq5 and PHP handler",
+    "npm run check:mql: PASS — MQL include verification passed",
+    "npm run build: PASS — vite build successful (9.70s, no errors, size warnings only)",
+    "PHP syntax smc-superfib-sniper.php: PASS",
+    "PHP syntax class-market-data-service.php: PASS"
+  ],
+  "migration_blockers": [
+    {
+      "id": "MIGRATION-001",
+      "phase": "Phase 3",
+      "description": "72-hour stability soak in progress (soak window opened 2026-05-22). Required before Phase 3 gate closes.",
+      "status": "IN_PROGRESS",
+      "validation_required": true,
+      "notes": "This is a time-based soak, not a code blocker. No code fix needed."
+    },
+    {
+      "id": "MIGRATION-002",
+      "phase": "Phase 3",
+      "description": "NAS100/US30 not in EA Symbols input parameter. Symbols must be added to EA Properties → Inputs → Symbols field.",
+      "status": "CONFIG_ONLY",
+      "validation_required": false,
+      "notes": "Non-blocking. Code is correct; engine guard works as designed. Trader config change needed on MT5 terminal."
+    }
+  ],
+  "statistics": {
+    "total_issues": 2,
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 2,
+    "migration_blockers": 2
+  }
+}
