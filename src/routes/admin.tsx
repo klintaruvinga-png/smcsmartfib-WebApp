@@ -246,6 +246,17 @@ export function AdminPage() {
     setBaselineForm((current) => hydrateBaselineForm(current, soakState.report.manual_evidence));
   }, [soakState]);
 
+  useEffect(() => {
+    if (soakState.kind !== "ready") return;
+
+    const reportSoakType = inferSoakTypeFromReport(soakState.report);
+    if (!reportSoakType || reportSoakType === "CUSTOM") return;
+
+    setSoakType(reportSoakType);
+    setDurationHours(SOAK_TEMPLATES[reportSoakType].defaultDurationHours);
+    setCheckpointCount(SOAK_TEMPLATES[reportSoakType].defaultCheckpointCount);
+  }, [soakState]);
+
   if (state.kind === "loading") {
     return <div className="text-mute text-sm">Loading admin health...</div>;
   }
@@ -1748,6 +1759,32 @@ function deriveCheckpointLabels(
     const checkpointHour = (durationHours * (index + 1)) / checkpointCount;
     return `T+${formatCheckpointHour(checkpointHour)}h`;
   });
+}
+
+function inferSoakTypeFromReport(report: SoakReport): SoakType | null {
+  const evidenceMap = indexEvidenceByKey(report.manual_evidence);
+  const persistedType = (
+    evidenceMap["baseline.soak_type"] ??
+    evidenceMap["soak.type"] ??
+    evidenceMap["soak_type"] ??
+    ""
+  )
+    .trim()
+    .toUpperCase();
+
+  if (persistedType === "PHASE_0_RESTART_72H" || persistedType === "PHASE_3_STABILITY_72H") {
+    return persistedType;
+  }
+
+  const checkpointText = report.checkpoints
+    .map((checkpoint) => checkpoint.operator_notes ?? "")
+    .join(" ")
+    .toUpperCase();
+  if (checkpointText.includes("T+12H")) {
+    return "PHASE_0_RESTART_72H";
+  }
+
+  return null;
 }
 
 function formatCheckpointHour(value: number): string {

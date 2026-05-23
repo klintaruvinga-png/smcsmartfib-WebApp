@@ -471,6 +471,25 @@ describe("AdminPage", () => {
     expect(screen.getAllByText("T+24h").length).toBeGreaterThan(0);
   });
 
+  it("initializes soak template from persisted report checkpoints on first load", async () => {
+    const report = buildSoakReport();
+    report.baseline_checkpoint = buildCheckpoint(
+      1,
+      "baseline",
+      "2026-05-12T08:05:00Z",
+      "Initial soak capture.",
+    );
+    report.checkpoints = [
+      buildCheckpoint(2, "checkpoint", "2026-05-12T20:05:00Z", "T+12h checkpoint."),
+    ];
+    apiMocks.fetchSoakReport.mockResolvedValue(report);
+
+    render(<AdminPage />);
+
+    expect(await screen.findByRole("heading", { name: "Phase 0 - Restart Soak" })).toBeTruthy();
+    expect(screen.getAllByText("T+12h").length).toBeGreaterThan(0);
+  });
+
   it("shows custom duration and checkpoint controls and renders evenly spaced labels", async () => {
     apiMocks.fetchSoakReport.mockResolvedValue(buildSoakReport());
 
