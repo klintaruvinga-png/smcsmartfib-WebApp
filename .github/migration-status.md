@@ -1,6 +1,6 @@
 # SMC SuperFIB → MT5 Migration Status Board
 
-**Last Updated**: 2026-05-22  
+**Last Updated**: 2026-05-24  
 **Current Phase**: 3 (MT5 Market Data Engine — 72h stability soak in progress)  
 **Overall Progress**: 80%  
 **Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 browser verification PASSED (2026-05-22); 72h soak window open
@@ -204,7 +204,7 @@ Market-Stream Auth:
 - [x] Backend Freshness Layer: `quote_updated_at`, `last_seen_at`, stagnation state, feed health — `upsert_mt5_snapshot()`, freshness/session transients, TD clearing, engine_runs heartbeat (verified 2026-05-22)
 
 ### Success Criteria
-- [x] No fake-live states — TD rate-limit transients cleared on every MT5 push; freshness gated by broker timestamp age
+- [x] No fake-live states — TD rate-limit transients cleared on every MT5 push; freshness gated by broker timestamp age; synthetic `updatedAt` fabrication in `build_symbol_state()` patched 2026-05-24 (commit `6f3c835`)
 - [ ] No frozen live feeds — 72h soak window OPEN from 2026-05-22
 - [x] Fresh/stale detection accurate — LIVE/DELAYED/STALE/CLOSED enforced in EA + backend; parity audit PASS; browser confirmed 2026-05-22
 
@@ -436,6 +436,7 @@ Confluence Detection: [PENDING]
 
 | Report | Date | Phase | Issues Found | Status |
 |--------|------|-------|--------------|--------|
+| `BUG_SWEEP_REPORT_2026-05-24.md` | 2026-05-24 | 2/3 | 1 confirmed (HIGH synthetic quote timestamp in `build_symbol_state()`) — patched; `updatedAt=null` for missing-price path; GBPUSD candle-only regression added | Verified |
 | `BUG_SWEEP_REPORT_2026-05-22.md` | 2026-05-22 | 2 | 1 confirmed (LOW lint/Prettier) — patched; 0 critical/high; all core systems confirmed correct | Verified |
 | `BUG_SWEEP_REPORT_2026-05-10.md` | 2026-05-10 | 0 | 3 confirmed (1 high DB growth, 2 low dead methods) — all patched | Verified |
 | `BUG_SWEEP_REPORT_2026-05-09.md` | 2026-05-09 | 0 | 2 confirmed (charts route lockfile + backendReady gate) — all patched | Verified |

@@ -21,7 +21,8 @@
   - Open `/admin` → Soak Workspace → Capture Baseline
   - Record: EA symbols active, health endpoint status, MT5 authority confirmed
   - This is the reference point used to compare against soak closeout numbers
-  - **Status**: ⏳ Pending
+  - **Admin workspace ready**: `soakType` / `soakPurpose` fields, `PHASE_3_STABILITY_72H` template, and evidence hydration implemented (PR #231, `3a5881d`). Select "Phase 3 - Stability Soak" from the soak type dropdown before capturing.
+  - **Status**: ⏳ Pending (operator action required — soak workspace is ready)
 
 ---
 
