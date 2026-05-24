@@ -1,0 +1,33 @@
+{
+  "snapshot_type": "PRE-PATCH",
+  "workflow_id": "stabilize-ea-2026-05-24",
+  "timestamp": "2026-05-24T00:02:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-DXM43",
+    "commit_hash": "505ddaed9ea125b1aad2df1e7f2c021006145845",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-24-before-patches"
+  },
+  "pending_patches": [
+    {
+      "id": "PATCH-001",
+      "targets": "scripts/pipeline-watcher.js:1542",
+      "description": "Insert trailing comma to fix Prettier/ESLint lint error"
+    }
+  ],
+  "baseline_tests": {
+    "php_syntax_smc_superfib_sniper": "PASS",
+    "php_syntax_class_market_data_service": "PASS",
+    "test_ea_market_stream": "14/14 PASS",
+    "test_fib_parity": "PASS",
+    "test_session_anchors": "PASS",
+    "test_htf_authority_anchor": "PASS",
+    "test_mt5_snapshot_contract": "PASS",
+    "test_watchlist_snapshot_regression": "PASS",
+    "test_market_data_service_source_filter": "PASS",
+    "test_superfib_weighting": "PASS",
+    "test_cors_regression": "PASS",
+    "npm_build": "PASS",
+    "npm_check_mql": "PASS",
+    "npm_lint": "FAIL — 1 error (prettier/prettier missing comma), 9 warnings"
+  }
+}

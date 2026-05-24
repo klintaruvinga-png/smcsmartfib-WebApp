@@ -1,0 +1,119 @@
+{
+  "snapshot_type": "INITIAL",
+  "workflow_id": "stabilize-ea-2026-05-24",
+  "timestamp": "2026-05-24T00:00:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-DXM43",
+    "commit_hash": "505ddaed9ea125b1aad2df1e7f2c021006145845",
+    "remote": "origin",
+    "uncommitted_changes_count": 0
+  },
+  "repo_structure": {
+    "plugin_root": "wordpress/smc-superfib-sniper",
+    "plugin_files": [
+      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "wordpress/smc-superfib-sniper/class-market-data-service.php"
+    ],
+    "rest_route_files": [
+      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php"
+    ],
+    "frontend_api_client": "src/lib/api/sniperClient.ts",
+    "mt5_ea_files": [
+      "mt5/SMC_MarketDataEA.mq5",
+      "mt5/CandleBuilder.mqh",
+      "mt5/FreshnessEngine.mqh",
+      "mt5/MarketDataEngine.mqh",
+      "mt5/SessionManager.mqh",
+      "mt5/SymbolNormalizer.mqh",
+      "mt5/TickProcessor.mqh"
+    ],
+    "migration_files": [
+      ".github/migration-status.md",
+      ".github/migration/PHASE0_SOAK_TRACKER.md",
+      ".github/migration/PHASE1_BRIDGE_ROADMAP.md",
+      ".github/migration/PHASE1_CHECKLIST.md",
+      ".github/migration/PHASE1_TRACKER.md",
+      ".github/migration/phase-updates/phase1-bridge-48h-continuity-complete-2026-05-20.md",
+      ".github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md"
+    ]
+  },
+  "app_state": {
+    "workflow_state_file_exists": false,
+    "workflow_state": {},
+    "migration_status": {
+      "current_phase": "Phase 3 — MT5 Market Data Engine (72h stability soak in progress)",
+      "overall_progress": "80%",
+      "blockers": [
+        {
+          "id": "BLOCKER-P3-001",
+          "phase": "Phase 3",
+          "description": "72-hour stability soak window open since 2026-05-22; required before Phase 3 gate closes",
+          "status": "IN-PROGRESS"
+        },
+        {
+          "id": "BLOCKER-P3-002",
+          "phase": "Phase 3",
+          "description": "NAS100/US30 not in EA Symbols input — add NAS100,US30 to EA Properties → Inputs → Symbols; non-blocking (code correct)",
+          "status": "NON-BLOCKING"
+        }
+      ]
+    }
+  },
+  "known_dev_status": {
+    "authority_diagnostics_requires_wp_session": true,
+    "ea_market_stream_route_exists": true,
+    "ea_auth_header": "X-EA-API-Key",
+    "ea_auth_secret_env": "SMC_SF_EA_API_KEY",
+    "ea_payload_requires_user_id": true,
+    "migration_phase": "MT5-native migration / Phase 3 soak",
+    "php_syntax_clean": true,
+    "all_php_regression_tests_pass": true
+  },
+  "rest_routes_confirmed": [
+    {"path": "/sniper/v1/health", "method": "GET", "auth": "public"},
+    {"path": "/sniper/v1/session", "method": "GET", "auth": "public"},
+    {"path": "/sniper/v1/snapshot", "method": "GET", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/snapshot", "method": "POST", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/charts", "method": "GET", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/regimes", "method": "GET", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/regime", "method": "POST", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/live-signals", "method": "GET", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/signal", "method": "POST", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/ladders", "method": "GET", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/engine-batch", "method": "POST", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/market-data", "method": "POST", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/trades", "method": "GET", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/trades", "method": "POST", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/account", "method": "GET", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/account", "method": "POST", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/progress", "method": "GET", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/settings", "method": "GET", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/settings", "method": "POST", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/risk-profile", "method": "GET", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/risk-profile", "method": "POST", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/trade-queue", "method": "GET", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/trade-queue", "method": "POST", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/execute-signals", "method": "POST", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/twelve-data-key", "method": "POST", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/twelve-data-key", "method": "DELETE", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/watchlist", "method": "GET", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/watchlist", "method": "POST", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/watchlist/add", "method": "POST", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/user/watchlist/remove", "method": "POST", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/instruments", "method": "GET", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/account-telemetry", "method": "GET", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/positions", "method": "GET", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/orders", "method": "GET", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/market-data-authority", "method": "GET", "auth": "permission_user (WP session)"},
+    {"path": "/sniper/v1/authority-diagnostics", "method": "GET", "auth": "permission_user (WP session) — 401 for unauthenticated: EXPECTED"},
+    {"path": "/sniper/v1/admin/health", "method": "GET", "auth": "permission_admin (manage_options)"},
+    {"path": "/sniper/v1/admin/soak-report", "method": "GET", "auth": "permission_admin (manage_options)"},
+    {"path": "/sniper/v1/admin/soak-evidence", "method": "POST", "auth": "permission_admin (manage_options)"},
+    {"path": "/sniper/v1/admin/soak-checkpoint", "method": "POST", "auth": "permission_admin (manage_options)"},
+    {"path": "/sniper/v1/ea/market-stream", "method": "POST", "auth": "permission_ea_market_stream (X-EA-API-Key shared secret)"},
+    {"path": "/sniper/v1/ea/heartbeat", "method": "POST", "auth": "permission_ea_bridge (X-EA-API-Key shared secret)"},
+    {"path": "/sniper/v1/ea/account-sync", "method": "POST", "auth": "permission_ea_bridge (X-EA-API-Key shared secret)"},
+    {"path": "/sniper/v1/ea/symbol-sync", "method": "POST", "auth": "permission_ea_bridge (X-EA-API-Key shared secret)"},
+    {"path": "/sniper/v1/ea/license-check", "method": "GET", "auth": "permission_ea_bridge (X-EA-API-Key shared secret)"}
+  ]
+}

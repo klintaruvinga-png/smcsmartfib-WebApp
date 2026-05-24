@@ -1,0 +1,36 @@
+{
+  "snapshot_type": "AFTER-PATCH-1",
+  "workflow_id": "stabilize-ea-2026-05-24",
+  "timestamp": "2026-05-24T00:03:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-DXM43",
+    "commit_hash": "6b113d0b692acfcd316910f535aa4906118d8a94",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-24-after-patch-1"
+  },
+  "patches_applied": [
+    {
+      "id": "PATCH-001",
+      "file": "scripts/pipeline-watcher.js",
+      "line": 1542,
+      "description": "Inserted missing trailing comma after log message string — fixes Prettier/ESLint error",
+      "before": "\"RESEARCHING - research artifact predates current cycle start, waiting for fresh research write\"",
+      "after": "\"RESEARCHING - research artifact predates current cycle start, waiting for fresh research write\","
+    }
+  ],
+  "post_patch_tests": {
+    "npm_lint": "PASS — 0 errors, 9 pre-existing advisory warnings",
+    "npm_build": "PASS — built in 5.67s",
+    "npm_check_mql": "PASS — MQL include verification passed",
+    "php_syntax_smc_superfib_sniper": "PASS",
+    "php_syntax_class_market_data_service": "PASS",
+    "test_ea_market_stream": "14/14 PASS",
+    "test_fib_parity": "PASS",
+    "test_session_anchors": "PASS",
+    "test_htf_authority_anchor": "PASS",
+    "test_mt5_snapshot_contract": "PASS",
+    "test_watchlist_snapshot_regression": "PASS",
+    "test_market_data_service_source_filter": "PASS",
+    "test_superfib_weighting": "PASS",
+    "test_cors_regression": "PASS"
+  }
+}
