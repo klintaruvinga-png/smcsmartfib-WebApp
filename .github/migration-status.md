@@ -2,8 +2,8 @@
 
 **Last Updated**: 2026-05-24  
 **Current Phase**: 3 (MT5 Market Data Engine — 72h stability soak in progress)  
-**Overall Progress**: 80%  
-**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 browser verification PASSED (2026-05-22); 72h soak window open
+**Overall Progress**: 75% (recalculated: Phase 5B added; 3/12 phases complete)  
+**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 browser verification PASSED (2026-05-22); 72h soak window open — Phase 5B (Fundamentals Regime Feed) added to plan
 
 > Snapshot: Phase 0 gate passed 2026-05-15. Post-fix validation soak at 16:37 UTC confirmed NAS100 (29,263.70) and US30 (49,756.00) both LIVE during active US equity session; XAUUSD (4,556.34) LIVE with candle-history gate cleared. Backend soak: 259,464 engine runs / 0 errors / 69,262 candles over 24h. Frontend feed-status chip lag (BUG-001 staleTime:0) resolved. Watchlist persistence 100% parity. AUDUSD/ETHUSD chop-gate classified as correct live behavior — not a blocker. Full closeout evidence: `.github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md`.
 
@@ -19,7 +19,8 @@
 | 3 | MT5 market data engine | IN-PROGRESS | 90% | 72h stability soak pending (soak window opened 2026-05-22); NAS100/US30 EA config item (non-blocking) | 2026-07-15 |
 | 4 | Fib engine migration | NOT-STARTED | 0% | Phase 3 complete | 2026-08-15 |
 | 5 | Regime & chop engine | NOT-STARTED | 0% | Phase 4 complete | 2026-09-15 |
-| 6 | Signal engine dual-run | NOT-STARTED | 0% | Phase 5 complete | 2026-10-15 |
+| 5B | Fundamentals regime feed | NOT-STARTED | 0% | Phase 5 complete | 2026-10-01 |
+| 6 | Signal engine dual-run | NOT-STARTED | 0% | Phase 5B complete | 2026-10-15 |
 | 7 | Controlled manual execution | NOT-STARTED | 0% | Phase 6 parity >95% | 2026-11-15 |
 | 8 | Semi-automation layer | NOT-STARTED | 0% | Phase 7 complete | 2026-12-01 |
 | 9 | SaaS & licensing system | NOT-STARTED | 0% | Phase 8 complete | 2026-12-15 |
@@ -291,12 +292,101 @@ Volatility Gating: [PENDING]
 
 ---
 
+## Phase 5B: Fundamentals Regime Feed
+
+**Objective**: Integrate macro-economic data as a numerical bias overlay that filters and weights technical regime and signal conditions  
+**Owner**: Track B (data ingestion + normalization) + Track A (MT5 conviction propagation) + Track C (dashboard display)  
+**Status**: NOT-STARTED  
+**Prerequisites**: Phase 5 complete  
+**Completion Target**: 2026-10-01
+
+### Design Principle
+
+Fundamentals do not replace fib/regime/signal logic — they filter and weight it:
+- **Technicals** = precision entries/exits
+- **Fundamentals** = directional conviction multiplier
+
+A fundamental bias score is computed per currency from economic events, normalized into a numeric value, and injected as a macro overlay into the regime engine. The signal engine then applies a conviction weight based on alignment between the technical setup and the fundamental bias.
+
+### Deliverables
+
+- [ ] **Data Ingestion Layer** (Track B)
+  - Economic calendar feed (Twelve Data economic events API — `GET /economic_calendar`)
+  - Central bank policy state parser: rate decision → hawkish (+1) / hold (0) / dovish (−1) bias flag
+  - Market sentiment proxies: VIX (via existing TD integration), DXY tracking for USD conviction
+  - Backend storage: `smc_sf_fundamental_events` table (raw scored events) + `smc_sf_fundamental_bias` cache (composite score per currency, TTL-bounded)
+  - Cron-based pull every 30 min + on-demand `POST /fundamentals/refresh`
+
+- [ ] **Normalization Engine** (Track B)
+  - CPI surprise score: `(actual − forecast) / forecast` → mapped to −2 / −1 / 0 / +1 / +2 range
+  - Rate decision bias: +1 hike/hawkish, 0 hold, −1 cut/dovish
+  - Composite per-currency bias: weighted sum of recent events with time decay (recent events weighted heavier)
+  - Bias categories: BULLISH (+2/+1) / NEUTRAL (0) / BEARISH (−1/−2) stored per base + quote currency
+  - Decay function: events older than 30 days carry 0.25x weight; older than 90 days excluded
+
+- [ ] **Regime Integration** (Track A + Track B)
+  - `FundamentalBiasEngine` module reads composite bias score at regime evaluation time
+  - Fundamental bias score appended to regime state payload as `fundamental_bias: { base, quote, composite, category }`
+  - Backend `ensure_engine_snapshot()` reads and includes fundamental bias at snapshot generation time
+  - MT5 EA: `FreshnessEngine` can optionally receive bias score from backend via heartbeat response (read-only; does not affect MT5 data emission)
+
+- [ ] **Signal Conviction Weighting** (Track B)
+  - Signal generation reads fundamental bias alignment before computing conviction
+  - Conviction multiplier: aligned (1.0×) / neutral (0.7×) / opposed (0.3× — requires stronger technical threshold to qualify)
+  - Opposed signals not suppressed outright — flagged with reduced conviction so operator can decide
+  - `conviction_weight` field added to signal output payload
+
+- [ ] **Dashboard Visualization** (Track C)
+  - Fundamentals bias chip per currency on watchlist row (BULLISH / NEUTRAL / BEARISH)
+  - Per-pair bias breakdown panel (base vs. quote currency bias)
+  - Upcoming economic events widget (next 24h, filtered by watched pairs)
+  - Conviction weight indicator on signal cards
+  - Manual bias override toggle (operator can pin a pair to NEUTRAL in edge cases, e.g., pre-NFP blackout)
+
+### Success Criteria
+
+- [ ] Economic calendar events ingested and scored within 15 min of release
+- [ ] Composite bias score per currency accurate on known historical test events (NFP, CPI, rate decisions ≥ 2025)
+- [ ] Signal conviction weighting applied and visible in dashboard without breaking existing Phase 5 regime parity
+- [ ] Existing fib/regime/signal parity thresholds unchanged after Phase 5B overlay
+- [ ] Manual bias override does not affect engine snapshot authority or MT5 data emission
+
+### Test Checklist
+
+- [ ] CPI surprise normalization — positive/negative/zero surprise score correctly derived
+- [ ] Rate decision parser — hike / cut / hold correctly classified for Fed, ECB, SARB
+- [ ] Composite bias decay — 7-day-old event vs. same-day event carry different weights
+- [ ] Signal conviction weighting — aligned vs. opposed vs. neutral setups each receive correct multiplier
+- [ ] Regime parity regression — Phase 5 parity suites pass unchanged after 5B overlay is live
+- [ ] Dashboard conviction chip — renders correctly on all watchlist symbols including pairs with no recent events (defaults to NEUTRAL)
+
+### Data Sources
+
+| Feed | Use | Integration |
+|------|-----|-------------|
+| Twelve Data economic calendar | CPI, NFP, rate decisions | REST API, existing TD credentials |
+| Twelve Data cross rates | DXY proxy, currency strength | Existing MT5 + TD pipeline |
+| VIX (via TD or MT5 index) | Risk-on / risk-off regime filter | MT5 `MarketDataEngine.mqh` |
+| Central bank statement parser | Hawkish/dovish policy bias | Backend NLP-light keyword scoring on FOMC/ECB/SARB statement summaries |
+
+### Parity Status
+```
+Fundamental bias accuracy vs. known events: [PENDING]
+Signal conviction weighting regression: [PENDING]
+Regime engine parity post-overlay: [PENDING]
+```
+
+### Blockers
+- *Phase 5 (Regime Engine) not complete*
+
+---
+
 ## Phase 6: Signal Engine Dual-Run
 
 **Objective**: MT5 generates signals in parallel with Pine; Pine authoritative  
 **Owner**: Track A + Track B  
 **Status**: NOT-STARTED  
-**Prerequisites**: Phase 5 complete  
+**Prerequisites**: Phase 5B complete  
 **Completion Target**: 2026-10-15
 
 ### Deliverables
@@ -473,6 +563,7 @@ Confluence Detection: [PENDING]
 |-------------|----------|--------|
 | Phases 0–2 | 2–4 weeks | 1 week |
 | Phases 3–5 | 4–8 weeks | 1 week |
+| Phase 5B | 3–5 weeks | 1 week |
 | Phases 6–7 | 4–6 weeks | 1 week |
 | Phases 8–10 | 4–8 weeks | 1 week |
 | **TOTAL** | **~4–6 months** | **Recommended** |
