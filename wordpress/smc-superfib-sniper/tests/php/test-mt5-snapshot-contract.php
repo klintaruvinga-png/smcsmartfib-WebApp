@@ -738,6 +738,23 @@ foreach (array('EURUSD' => 1.1000, 'USDJPY' => 156.0000) as $symbol => $base) {
     }
 }
 
+for ($i = 0; $i < 450; $i++) {
+    $price = 1.2500 + ($i * 0.00001);
+    $wpdb->replace($candleTable, array(
+        'user_id' => 7,
+        'symbol' => 'GBPUSD',
+        'timeframe' => '1min',
+        'candle_time' => gmdate('Y-m-d H:i:s', $firstM1 + ($i * 60)),
+        'open' => $price,
+        'high' => $price + 0.0002,
+        'low' => $price - 0.0002,
+        'close' => $price + 0.00005,
+        'volume' => '10',
+        'source' => 'mt5',
+        'created_at' => gmdate('Y-m-d H:i:s'),
+    ));
+}
+
 $ensureEngineSnapshot = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'ensure_engine_snapshot');
 $ensureEngineSnapshot->setAccessible(true);
 unset($GLOBALS['test_user_meta'][7]['smc_sf_engine_snapshot']);
@@ -901,6 +918,13 @@ assert_same($lastChartCandle['time'], $chart['updatedAt'], 'Chart snapshot updat
 // The regex /[Z+\-]\d{0,2}:?\d{0,2}$/ already matches the Z suffix, so
 // removing str_ends_with() is behaviour-neutral on PHP 8 and fixes PHP 7.
 // ─────────────────────────────────────────────────────────────────────────────
+$buildSymbolState = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'build_symbol_state');
+$buildSymbolState->setAccessible(true);
+$missingQuoteState = $buildSymbolState->invoke($instance, 7, 'GBPUSD', null);
+assert_same('QUOTE_UNAVAILABLE', $missingQuoteState['diagnostic']['engineBlocker'] ?? null, 'build_symbol_state must keep quote-unavailable diagnostics when candles exist without a quote');
+assert_true(array_key_exists('lastPriceAt', $missingQuoteState['diagnostic']), 'build_symbol_state diagnostics must retain the lastPriceAt field when quotes are missing');
+assert_same(null, $missingQuoteState['diagnostic']['lastPriceAt'], 'build_symbol_state must not fabricate lastPriceAt when no authoritative quote exists');
+
 $normalizeTs = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'normalize_market_timestamp');
 $normalizeTs->setAccessible(true);
 

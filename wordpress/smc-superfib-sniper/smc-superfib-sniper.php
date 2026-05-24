@@ -3540,7 +3540,8 @@ final class SMC_SuperFib_Sniper_REST {
         $state = ($has_key || $mt5_authority) ? 'stale' : 'blocked';
 
         if (!$price) {
-            $price = array('symbol' => $symbol, 'mid' => 0, 'updatedAt' => gmdate('c'), 'state' => $state);
+            // Never synthesize a quote timestamp when no authoritative quote exists.
+            $price = array('symbol' => $symbol, 'mid' => 0, 'updatedAt' => null, 'state' => $state);
         }
 
         // Enforce staleThresholdSec on price freshness using iso_age_sec() — is_stale() appends
