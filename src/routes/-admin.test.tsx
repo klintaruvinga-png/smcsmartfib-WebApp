@@ -502,6 +502,50 @@ describe("AdminPage", () => {
     expect(screen.getAllByText("T+12h").length).toBeGreaterThan(0);
   });
 
+  it("hydrates baseline soak type from legacy soak.type evidence when updating baseline", async () => {
+    const report = buildSoakReport();
+    report.baseline_checkpoint = buildCheckpoint(
+      1,
+      "baseline",
+      "2026-05-12T08:05:00Z",
+      "Initial soak capture.",
+    );
+    report.manual_evidence = [
+      {
+        id: 1,
+        evidence_key: "soak.type",
+        evidence_type: "baseline_metadata",
+        evidence_value: "PHASE_0_RESTART_72H",
+        operator: "tester",
+        created_at: "2026-05-12T08:05:00Z",
+        updated_at: "2026-05-12T08:05:00Z",
+      },
+    ];
+    apiMocks.fetchSoakReport.mockResolvedValue(report);
+    apiMocks.upsertSoakEvidence.mockResolvedValue([]);
+
+    render(<AdminPage />);
+
+    expect(await screen.findByRole("heading", { name: "Phase 0 - Restart Soak" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Update Baseline Evidence" }));
+
+    await waitFor(() => {
+      expect(apiMocks.upsertSoakEvidence).toHaveBeenCalled();
+    });
+    const payload = apiMocks.upsertSoakEvidence.mock.calls.at(-1)?.[0] as
+      | Array<{ evidence_key: string; evidence_value: string }>
+      | undefined;
+    expect(payload).toBeDefined();
+    expect(payload).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          evidence_key: "baseline.soak_type",
+          evidence_value: "PHASE_0_RESTART_72H",
+        }),
+      ]),
+    );
+  });
+
   it("does not override manual soak template selection on later report refreshes", async () => {
     const phase0Report = buildSoakReport();
     phase0Report.manual_evidence = [

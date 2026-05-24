@@ -57,6 +57,8 @@ type AutoBaselineFields = {
 };
 
 type BaselineForm = {
+  soakType: SoakType;
+  soakPurpose: string;
   startedBy: string;
   startedAt: string;
   eaSymbols: string;
@@ -99,6 +101,7 @@ export function AdminPage() {
         notes: "",
       },
       health: null,
+      soakType: "PHASE_3_STABILITY_72H",
     }),
   );
   const [evidenceForm, setEvidenceForm] = useState<SoakEvidencePayload>({
@@ -173,7 +176,7 @@ export function AdminPage() {
           return;
         }
         const message = formatSoakReportError(error, "load");
-        console.error("[PHASE0_SOAK] Failed to load soak report", error);
+        console.error("[SOAK] Failed to load soak report", error);
         setSoakState({
           kind: "error",
           message,
@@ -326,6 +329,7 @@ export function AdminPage() {
           pageAccessedAt,
           autoBaselineFields,
           health: state.kind === "ready" ? state.health : null,
+          soakType: nextType,
         }),
         soakState.kind === "ready" ? soakState.report.manual_evidence : [],
       ),
@@ -351,7 +355,7 @@ export function AdminPage() {
           return null;
         }
         const message = formatSoakReportError(error, "refresh");
-        console.error("[PHASE0_SOAK] Failed to refresh soak report", error);
+        console.error("[SOAK] Failed to refresh soak report", error);
         setSoakState({ kind: "error", message });
         setPanelError(null);
         return null;
@@ -381,7 +385,7 @@ export function AdminPage() {
     try {
       const operator = baselineForm.startedBy.trim() || resolveOperatorIdentifier();
       const baselineEntries = buildBaselineEvidenceEntries(baselineForm, operator);
-      console.debug("[PHASE0_SOAK] Baseline evidence entries", baselineEntries);
+      console.debug("[SOAK] Baseline evidence entries", baselineEntries);
       await saveEvidenceEntries(baselineEntries);
 
       if (!baselineCheckpoint) {
@@ -466,13 +470,14 @@ export function AdminPage() {
     if (soakState.kind !== "ready") return;
 
     const datePart = (soakState.report.generated_at || new Date().toISOString()).slice(0, 10);
-    const blob = new Blob([buildSoakReportMarkdown(soakState.report)], {
+    const fileName = `${selectedSoakTemplate.soakType.toLowerCase().replace(/_/g, "-")}-${datePart}.md`;
+    const blob = new Blob([buildSoakReportMarkdown(soakState.report, selectedSoakTemplate)], {
       type: "text/markdown;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `phase0-soak-${datePart}.md`;
+    link.download = fileName;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -982,7 +987,7 @@ export function AdminPage() {
                       </p>
                       <p className="mt-1 text-[11px] text-dim">
                         Auto-prefilled where current data already exists: page access start time,
-                        frontend watchlist, live watchlist symbols, and baseline notes summary.
+                        frontend watchlist, live watchlist symbols, and notes summary.
                       </p>
                     </div>
                   </div>
@@ -1080,6 +1085,17 @@ export function AdminPage() {
                           }))
                         }
                         placeholder="ok"
+                      />
+                      <Field
+                        label="Soak objective"
+                        value={baselineForm.soakPurpose}
+                        onChange={(value) =>
+                          setBaselineForm((current) => ({
+                            ...current,
+                            soakPurpose: value,
+                          }))
+                        }
+                        placeholder="Stability soak for live feed parity and dashboard diagnostics"
                       />
                     </div>
 
@@ -1207,7 +1223,7 @@ export function AdminPage() {
                         onChange={(value) =>
                           setEvidenceForm((current) => ({ ...current, evidence_key: value }))
                         }
-                        placeholder="phase0-feed-window-2026-05-10"
+                        placeholder="soak-feed-window-2026-05-10"
                       />
 
                       <div className="space-y-1.5">
@@ -1699,12 +1715,16 @@ function createBaselineFormDefaults({
   pageAccessedAt,
   autoBaselineFields,
   health,
+  soakType,
 }: {
   pageAccessedAt: string;
   autoBaselineFields: AutoBaselineFields;
   health: AdminHealthResponse | null;
+  soakType: SoakType;
 }): BaselineForm {
   return {
+    soakType,
+    soakPurpose: "",
     startedBy: resolveOperatorIdentifier(),
     startedAt: pageAccessedAt,
     eaSymbols: "",
@@ -1721,8 +1741,22 @@ function createBaselineFormDefaults({
 
 function hydrateBaselineForm(form: BaselineForm, rows: SoakEvidenceRow[]): BaselineForm {
   const evidenceMap = indexEvidenceByKey(rows);
+  const hydratedSoakType = (
+    evidenceMap["baseline.soak_type"] ??
+    evidenceMap["soak.type"] ??
+    evidenceMap["soak_type"] ??
+    form.soakType
+  )
+    .trim()
+    .toUpperCase();
+
   return {
     ...form,
+    soakType:
+      hydratedSoakType === "PHASE_0_RESTART_72H" || hydratedSoakType === "PHASE_3_STABILITY_72H"
+        ? hydratedSoakType
+        : form.soakType,
+    soakPurpose: evidenceMap["baseline.soak_purpose"] ?? form.soakPurpose,
     startedBy: evidenceMap["baseline.started_by"] ?? form.startedBy,
     startedAt: evidenceMap["baseline.started_at"] ?? form.startedAt,
     eaSymbols: evidenceMap["baseline.ea_symbols"] ?? form.eaSymbols,
@@ -1794,6 +1828,8 @@ function formatCheckpointHour(value: number): string {
 
 function buildBaselineEvidenceEntries(form: BaselineForm, operator: string): SoakEvidencePayload[] {
   return [
+    evidenceEntry("baseline.soak_type", "baseline_metadata", form.soakType, operator),
+    evidenceEntry("baseline.soak_purpose", "baseline_metadata", form.soakPurpose, operator),
     evidenceEntry("baseline.started_by", "baseline_metadata", form.startedBy, operator),
     evidenceEntry("baseline.started_at", "baseline_metadata", form.startedAt, operator),
     evidenceEntry("baseline.ea_symbols", "baseline_metadata", form.eaSymbols, operator),
@@ -1975,7 +2011,8 @@ function toneForStatus(value: string | undefined): "positive" | "warning" | "cri
   }
 }
 
-function buildSoakReportMarkdown(report: SoakReport): string {
+function buildSoakReportMarkdown(report: SoakReport, template: { label: string; soakType: string }): string {
+  const evidenceMap = indexEvidenceByKey(report.manual_evidence);
   const evidenceLines =
     report.manual_evidence.length === 0
       ? ["- None recorded"]
@@ -1996,14 +2033,31 @@ function buildSoakReportMarkdown(report: SoakReport): string {
     ? `- ${formatTimestamp(report.baseline_checkpoint.created_at)} | ${report.baseline_checkpoint.operator_notes ?? "No operator notes"}`
     : "- Pending";
 
-  return [
-    "# Phase 0 Soak Report",
+  const soakPurpose =
+    evidenceMap["baseline.soak_purpose"] ?? evidenceMap["soak.purpose"] ?? "";
+
+  const reportLines = [
+    `# ${template.label}`,
     "",
+    `Soak type: ${template.soakType}`,
+  ];
+
+  if (soakPurpose) {
+    reportLines.push(`Soak objective: ${soakPurpose}`, "");
+  } else {
+    reportLines.push("");
+  }
+
+  reportLines.push(
     `Generated at: ${report.generated_at}`,
     "",
     "## Baseline",
     baselineLine,
     "",
+  );
+
+  return [
+    ...reportLines,
     "## Health",
     `- Feed status: ${report.health.feedStatus ?? report.health.priceFeed}`,
     `- Backend sync: ${report.health.backendSync}`,
