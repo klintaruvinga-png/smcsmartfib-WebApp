@@ -1,0 +1,125 @@
+{
+  "snapshot_type": "FINDINGS",
+  "workflow_id": "stabilize-ea-2026-05-24",
+  "timestamp": "2026-05-24T00:01:00Z",
+  "confirmed_issues": [
+    {
+      "id": "BUG-001",
+      "severity": "LOW",
+      "system": "Build / Lint",
+      "description": "Missing trailing comma in pipeline-watcher.js line 1542 causes Prettier/ESLint error.",
+      "root_cause": "A log() call inside an async block in scripts/pipeline-watcher.js line 1542 is missing the trailing comma required by the project's Prettier config.",
+      "impact_zones": ["CI lint gate"],
+      "proposed_fix": "Insert trailing comma at end of the string literal on line 1542."
+    }
+  ],
+  "migration_blockers": [
+    {
+      "id": "MIGRATION-P3-001",
+      "phase": "Phase 3",
+      "description": "72-hour stability soak window open since 2026-05-22. Required before Phase 3 gate closes.",
+      "status": "IN-PROGRESS — soak active",
+      "validation_required": true
+    },
+    {
+      "id": "MIGRATION-P3-002",
+      "phase": "Phase 3",
+      "description": "NAS100/US30 not added to EA Properties → Inputs → Symbols. Code handles them correctly; this is a trader-side config item only.",
+      "status": "NON-BLOCKING — no code change required",
+      "validation_required": false
+    }
+  ],
+  "audit_results": {
+    "ea_auth": {
+      "status": "PASS",
+      "notes": [
+        "permission_ea_market_stream() delegates to permission_ea_bridge()",
+        "X-EA-API-Key read via get_ea_api_key() accepting all 4 header aliases",
+        "SMC_SF_EA_API_KEY read from PHP constant with getenv() fallback",
+        "hash_equals() used — no == or === comparison",
+        "Missing token → 401 smc_sf_api_key_missing",
+        "Unconfigured secret → 503 smc_sf_api_key_unconfigured with error_log",
+        "Invalid token → 403 smc_sf_api_key_invalid",
+        "Missing user_id → 400 smc_sf_user_required",
+        "Invalid user_id → 403 smc_sf_user_invalid",
+        "wp_set_current_user() called before returning true"
+      ]
+    },
+    "ea_payload_validation": {
+      "status": "PASS",
+      "notes": [
+        "symbol required — 400 invalid_payload if absent",
+        "bid/ask required — 400 missing_prices if absent",
+        "is_finite() + > 0 + bid <= ask guard on snapshot insert",
+        "quote_time and timestamp both accepted; quote_time takes precedence",
+        "Stale timestamp > 300s → 422 stale_data",
+        "Unparseable timestamp → 422 stale_data",
+        "Warn (no reject) at 120–300s drift",
+        "OHLC: high >= max(open,close), low <= min(open,close) enforced",
+        "tick_volume: negative clamped to 0; non-numeric clamped to 0",
+        "Epoch/pre-2000 candle timestamps rejected",
+        "Phase 3 payloads validated via validate_phase3_market_stream_payload()",
+        "candles[] array promoted to candle object (candles[0]); tick_volume → volume mapped"
+      ]
+    },
+    "freshness_authority": {
+      "status": "PASS",
+      "notes": [
+        "FreshnessBadge.tsx reads state from backend — no local derivation",
+        "STYLES lookup has fallback to 'stale' for unknown states — no crash",
+        "VerdictBadge.tsx renders backend verdict directly",
+        "useSniperData.ts polls backend; no local live-state injection",
+        "useSnapshot() and useLiveSignals() gates: backendReady AND pollMs !== null",
+        "useEngineHealth() has staleTime:0 — always reflects backend state"
+      ]
+    },
+    "signal_engine_integrity": {
+      "status": "PASS",
+      "notes": [
+        "Stale candle guard in insert_mt5_candle() — 180s max age",
+        "Signal engine runs only after fresh data confirmed by backend",
+        "Frontend does not override backend signal truth",
+        "Dashboard verdict flows from backend snapshot only"
+      ]
+    },
+    "wiring_audit": {
+      "status": "PASS",
+      "notes": [
+        "MT5 EA → POST /ea/market-stream → permission_ea_market_stream → post_ea_market_stream → class-market-data-service.php → signal engine → GET /snapshot → sniperClient.ts → useSnapshot → React render",
+        "No broken consumers or producers detected",
+        "sniperClient.ts call() function attaches X-WP-Nonce / Basic auth via getAuthHeader()",
+        "EA route uses separate X-EA-API-Key — no cookie/session dependency",
+        "TD rate-limit transients cleared on every MT5 push",
+        "Engine heartbeat row written on each EA push"
+      ]
+    },
+    "parity_status": {
+      "status": "PASS",
+      "notes": [
+        "Fib parity: test-fib-parity.php PASS",
+        "Session anchors: test-session-anchors.php PASS",
+        "HTF anchor: test-htf-authority-anchor.php PASS",
+        "MT5 snapshot contract: test-mt5-snapshot-contract.php PASS",
+        "Watchlist regression: test-watchlist-snapshot-regression.php PASS",
+        "Source filter: test-market-data-service-source-filter.php PASS",
+        "SuperFIB weighting: test-superfib-weighting.php PASS",
+        "CORS regression: test-cors-regression.php PASS",
+        "EA market stream: test-ea-market-stream.php — 14/14 tests PASS"
+      ]
+    },
+    "migration_blockers_status": {
+      "phase_0": "COMPLETE — gate passed 2026-05-15",
+      "phase_1": "COMPLETE — gate passed 2026-05-20",
+      "phase_2": "COMPLETE — gate passed 2026-05-22",
+      "phase_3": "IN-PROGRESS — 72h soak open since 2026-05-22; NAS100/US30 config item (non-blocking)"
+    }
+  },
+  "statistics": {
+    "total_issues": 1,
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 1,
+    "migration_blockers": 1
+  }
+}

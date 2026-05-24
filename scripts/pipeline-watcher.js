@@ -1539,7 +1539,7 @@ function evaluatePipeline() {
 
       if (!Number.isFinite(researchMtime) || researchMtime < cycleStartedAt) {
         log(
-          "RESEARCHING - research artifact predates current cycle start, waiting for fresh research write"
+          "RESEARCHING - research artifact predates current cycle start, waiting for fresh research write",
         );
         return;
       }

@@ -1,0 +1,32 @@
+{
+  "workflow_id": "stabilize-ea-2026-05-24",
+  "created_at": "2026-05-24T00:00:00Z",
+  "branch": "claude/nice-fermat-DXM43",
+  "initial_commit": "505ddaed9ea125b1aad2df1e7f2c021006145845",
+  "rollback_points": [
+    {
+      "name": "Initial state",
+      "tag": "snapshot/stabilize-ea-2026-05-24-start-20260524T000000Z",
+      "commit_hash": "505ddaed9ea125b1aad2df1e7f2c021006145845",
+      "snapshot_file": "INITIAL-20260524T000000Z.json",
+      "command": "git reset --hard 505ddaed9ea125b1aad2df1e7f2c021006145845"
+    },
+    {
+      "name": "Before patches",
+      "tag": "rollback/stabilize-ea-2026-05-24-before-patches",
+      "commit_hash": "505ddaed9ea125b1aad2df1e7f2c021006145845",
+      "snapshot_file": "PRE-PATCH-20260524T000200Z.json",
+      "command": "git reset --hard 505ddaed9ea125b1aad2df1e7f2c021006145845"
+    },
+    {
+      "name": "After patch 1 (lint fix)",
+      "tag": "rollback/stabilize-ea-2026-05-24-after-patch-1",
+      "commit_hash": "6b113d0b692acfcd316910f535aa4906118d8a94",
+      "snapshot_file": "AFTER-PATCH-1-20260524T000300Z.json",
+      "command": "git reset --hard 6b113d0b692acfcd316910f535aa4906118d8a94"
+    }
+  ],
+  "emergency_rollback": {
+    "command": "git checkout main && git reset --hard origin/main"
+  }
+}
