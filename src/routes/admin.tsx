@@ -1741,10 +1741,21 @@ function createBaselineFormDefaults({
 
 function hydrateBaselineForm(form: BaselineForm, rows: SoakEvidenceRow[]): BaselineForm {
   const evidenceMap = indexEvidenceByKey(rows);
+  const hydratedSoakType = (
+    evidenceMap["baseline.soak_type"] ??
+    evidenceMap["soak.type"] ??
+    evidenceMap["soak_type"] ??
+    form.soakType
+  )
+    .trim()
+    .toUpperCase();
+
   return {
     ...form,
     soakType:
-      (evidenceMap["baseline.soak_type"] as SoakType | undefined) ?? form.soakType,
+      hydratedSoakType === "PHASE_0_RESTART_72H" || hydratedSoakType === "PHASE_3_STABILITY_72H"
+        ? hydratedSoakType
+        : form.soakType,
     soakPurpose: evidenceMap["baseline.soak_purpose"] ?? form.soakPurpose,
     startedBy: evidenceMap["baseline.started_by"] ?? form.startedBy,
     startedAt: evidenceMap["baseline.started_at"] ?? form.startedAt,
