@@ -362,12 +362,23 @@ A fundamental bias score is computed per currency from economic events, normaliz
 
 ### Data Sources
 
-| Feed | Use | Integration |
-|------|-----|-------------|
-| Twelve Data economic calendar | CPI, NFP, rate decisions | REST API, existing TD credentials |
-| Twelve Data cross rates | DXY proxy, currency strength | Existing MT5 + TD pipeline |
-| VIX (via TD or MT5 index) | Risk-on / risk-off regime filter | MT5 `MarketDataEngine.mqh` |
-| Central bank statement parser | Hawkish/dovish policy bias | Backend NLP-light keyword scoring on FOMC/ECB/SARB statement summaries |
+All sources below are **free tier** — no paid subscriptions required for Phase 5B implementation.
+
+| Feed | Data Covered | Cost | Key Required | Status |
+|------|-------------|------|--------------|--------|
+| **Twelve Data `/economic_calendar`** | CPI, NFP, GDP, interest rate decisions, all G10 currencies | Free (800 credits/day) | Existing TD key already in backend | ✅ Ready — same key as `/time_series` + `/quote` already in use |
+| **MT5 EA feed — `DXYUSD`** | US Dollar Index (DXY) for USD conviction | Free | None — already streaming | ✅ Ready — EA symbol already tracked |
+| **MT5 EA feed — `Volatility 75(1s) Index`** | VIX proxy for risk-on/risk-off regime filter | Free | None — already streaming | ✅ Ready — EA symbol already tracked |
+| **MT5 EA feed — `GOLD`** | Commodity driver / safe-haven sentiment | Free | None — already streaming | ✅ Ready — EA symbol already tracked |
+| **MT5 EA feed — equity indices** | `US SP 500`, `US Tech 100`, `Wall Street 30`, `Germany 40` — risk appetite proxy | Free | None — already streaming | ✅ Ready — EA symbols already tracked |
+| **FRED API** (Federal Reserve Economic Data) | US CPI series, Fed Funds Rate history, 10Y Treasury Yield, VIX daily close (`VIXCLS`) — deeper US macro | Free (no rate limits for standard use) | Free API key at fred.stlouisfed.org — new registration required | ⏳ Pending — register key when Phase 5B starts |
+
+**Sources evaluated and ruled out for now (paid or too limited):**
+- Trading Economics — free tier severely limited; revisit if FRED + TD coverage is insufficient
+- Alpha Vantage — 25 req/day free tier; insufficient for real-time event scoring
+- Refinitiv / Bloomberg — paid only
+
+**Coverage gap acknowledged:** ECB, SARB, BoE, RBA central bank *statement text* parsing (for hawkish/dovish NLP scoring beyond rate decision events) is not covered by free feeds. For Phase 5B initial implementation, the Twelve Data economic calendar `interest_rate` event type covers the rate decision outcome (+1/0/−1 bias) for all G10 central banks without requiring statement text parsing. NLP statement parsing is a Phase 5B v2 enhancement.
 
 ### Parity Status
 ```
