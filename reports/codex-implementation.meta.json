@@ -1,5 +1,5 @@
 {
-  "issue": "SMC Intake - Fix offline/weekend times for crypto market currently showing offline during weekend hours(regular market closure) Candles are being sent from EA to dashboard but cryptocurrencies are showing offline",
-  "plan_hash": "7eb26eaffd4a588ff3d9e88485b9b4385be2c5c9f90a21a3e834fa38a7f9f6ea",
-  "written_at": "2026-05-23T04:00:13.298Z"
+  "issue": "Verify and improve the implementation of soakType and soakPurpose to baseline forms and report generation to support multiple soak templates. Ensure correct data is collected per soak type and improve UI for ease of use and clarity",
+  "plan_hash": "f6c0323460156ac69bd7f6baa92ddd33f1ed1c17244fc216dc846a4c1f8c9f16",
+  "written_at": "2026-05-23T09:20:22.412Z"
 }
