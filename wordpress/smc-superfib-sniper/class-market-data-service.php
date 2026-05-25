@@ -190,14 +190,31 @@ class SMC_MarketData_Service
         if (!$row)
             return null;
 
+        $freshness = $this->get_freshness($user_id, $row['symbol']);
+        $state = (string) ($row['state'] ?? 'offline');
+        if ($state === 'offline' && $freshness === 'CLOSED') {
+            $reference_timestamp = $this->latest_mt5_broker_timestamp($user_id);
+            if ($reference_timestamp !== null && $this->is_market_expected_open($row['symbol'], $reference_timestamp)) {
+                $state = 'stale';
+                error_log(sprintf(
+                    '[SMC_MT5_REOPEN_OVERRIDE] symbol=%s freshness=%s stored_at=%s reference_at=%s',
+                    $row['symbol'],
+                    $freshness,
+                    (string) $row['updated_at'],
+                    $reference_timestamp
+                ));
+            }
+        }
+
         return array(
             'symbol' => $row['symbol'],
             'bid' => (float) $row['bid'],
             'ask' => (float) $row['ask'],
             'mid' => (float) $row['mid'],
             'spread' => (int) $row['spread'],
-            'freshness' => $this->get_freshness($user_id, $row['symbol']),
+            'freshness' => $freshness,
             'session' => $this->get_session($user_id, $row['symbol']),
+            'state' => $state,
             'updated_at' => $this->to_iso($row['updated_at']),
         );
     }
@@ -539,5 +556,108 @@ class SMC_MarketData_Service
         );
 
         return $map[$value] ?? '';
+    }
+
+    private function latest_mt5_broker_timestamp($user_id)
+    {
+        $latest = $this->wpdb->get_var($this->wpdb->prepare(
+            "SELECT MAX(updated_at) FROM {$this->table_prefix}snapshots WHERE user_id = %d AND source = %s",
+            $user_id,
+            'mt5'
+        ));
+
+        return is_string($latest) && $latest !== '' ? $latest : null;
+    }
+
+    private function is_market_expected_open($symbol, $broker_timestamp)
+    {
+        $timestamp = strtotime((string) $broker_timestamp . ' UTC');
+        if ($timestamp === false) {
+            return false;
+        }
+
+        $upper = strtoupper(sanitize_text_field($symbol));
+        if ($this->is_crypto_symbol($upper)) {
+            return true;
+        }
+
+        if ($this->is_equity_index_symbol($upper)) {
+            return $this->is_us_equity_session_open($timestamp);
+        }
+
+        $dow = (int) gmdate('w', $timestamp);
+        $hour = (int) gmdate('G', $timestamp);
+
+        if ($dow === 6) {
+            return false;
+        }
+
+        if ($dow === 0) {
+            return $hour >= 21;
+        }
+
+        if ($dow === 5 && $hour >= 21) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function is_crypto_symbol($symbol)
+    {
+        foreach (array('BTC', 'ETH', 'LTC', 'XRP', 'BNB', 'SOL', 'ADA', 'DOGE') as $prefix) {
+            if (strpos($symbol, $prefix) === 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function is_equity_index_symbol($symbol)
+    {
+        return strpos($symbol, 'NAS100') !== false || strpos($symbol, 'US30') !== false;
+    }
+
+    private function is_us_equity_session_open($timestamp)
+    {
+        $dow = (int) gmdate('w', $timestamp);
+        if ($dow === 0 || $dow === 6) {
+            return false;
+        }
+
+        $minutes_utc = ((int) gmdate('G', $timestamp) * 60) + (int) gmdate('i', $timestamp);
+        if ($this->is_us_dst_active($timestamp)) {
+            return $minutes_utc >= 810 && $minutes_utc < 1200;
+        }
+
+        return $minutes_utc >= 870 && $minutes_utc < 1260;
+    }
+
+    private function is_us_dst_active($timestamp)
+    {
+        $month = (int) gmdate('n', $timestamp);
+        $day = (int) gmdate('j', $timestamp);
+        $hour = (int) gmdate('G', $timestamp);
+        $year = (int) gmdate('Y', $timestamp);
+
+        if ($month < 3 || $month > 11) {
+            return false;
+        }
+        if ($month > 3 && $month < 11) {
+            return true;
+        }
+
+        $first_of_month = gmmktime(0, 0, 0, $month, 1, $year);
+        $first_sunday = (int) gmdate('w', $first_of_month) === 0
+            ? 1
+            : 1 + (7 - (int) gmdate('w', $first_of_month));
+
+        if ($month === 3) {
+            $second_sunday = $first_sunday + 7;
+            return $day > $second_sunday || ($day === $second_sunday && $hour >= 7);
+        }
+
+        return $day < $first_sunday || ($day === $first_sunday && $hour < 6);
     }
 }

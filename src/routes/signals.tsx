@@ -4,6 +4,7 @@ import {
   useEngineBatch,
   useLiveSignals,
   useCanonicalWatchlist,
+  normalizeSymbolForWatchlistComparison,
   usePollingUiState,
 } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
@@ -13,7 +14,7 @@ import { DivergenceBanner } from "@/components/sniper/Warnings";
 import { relTime } from "@/lib/format";
 import { cn, deduplicateById } from "@/lib/utils";
 import { CheckCircle2, AlertTriangle, XCircle, RefreshCw } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { EngineBlocker, FreshnessState } from "@/types/sniper";
 
 export const Route = createFileRoute("/signals")({
@@ -51,7 +52,8 @@ function blockerSeverity(b: EngineBlocker | undefined): "warn" | "sell" {
   return b === "KEY_MISSING" || b === "KEY_INVALID" || b === "RATE_LIMITED" ? "sell" : "warn";
 }
 
-function SignalsPage() {
+export function SignalsPage() {
+  const isVitestRuntime = import.meta.env.MODE === "test";
   const { data: signals } = useLiveSignals();
   const { data: h } = useEngineHealth();
   const {
@@ -68,11 +70,40 @@ function SignalsPage() {
   // Deduplicate signals by ID and preserve backend unconfirmed candidates so the UI reflects
   // actual engine output, even when some candidates are still waiting on backend confirmation.
   const allUnique = useMemo(() => (signals ? deduplicateById(signals) : []), [signals]);
+  const { watchlistFilteredSignals, unmatchedSignalSymbols } = useMemo(() => {
+    const filtered: typeof allUnique = [];
+    const unmatched: string[] = [];
+
+    for (const signal of allUnique) {
+      if (watchlistSet.has(normalizeSymbolForWatchlistComparison(signal.symbol))) {
+        filtered.push(signal);
+      } else if (unmatched.length < 5) {
+        unmatched.push(signal.symbol);
+      }
+    }
+
+    return { watchlistFilteredSignals: filtered, unmatchedSignalSymbols: unmatched };
+  }, [allUnique, watchlistSet]);
   const uniqueSignals = useMemo(
-    () =>
-      watchlistOnly ? allUnique.filter((signal) => watchlistSet.has(signal.symbol)) : allUnique,
-    [allUnique, watchlistOnly, watchlistSet],
+    () => (watchlistOnly ? watchlistFilteredSignals : allUnique),
+    [allUnique, watchlistFilteredSignals, watchlistOnly],
   );
+
+  useEffect(() => {
+    if (!import.meta.env.DEV || isVitestRuntime) return;
+    console.debug("[SignalsPage] watchlist filter", {
+      watchlistSetSize: watchlistSet.size,
+      totalSignals: allUnique.length,
+      filteredSignals: watchlistFilteredSignals.length,
+      unmatchedSample: unmatchedSignalSymbols,
+    });
+  }, [
+    allUnique.length,
+    isVitestRuntime,
+    unmatchedSignalSymbols,
+    watchlistFilteredSignals.length,
+    watchlistSet.size,
+  ]);
 
   const divergent = uniqueSignals.filter((s) => s.computedBy === "frontend" && !s.backendConfirmed);
 

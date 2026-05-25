@@ -155,7 +155,67 @@ assert_same(1, count($snapshot_rows), 'CLOSED freshness payload must still persi
 assert_same('offline', $snapshot_rows[0]['state'] ?? null, 'CLOSED freshness payload must persist an offline snapshot state');
 assert_same('CLOSED', $GLOBALS['test_transients']['smc_sf_freshness_7_EURUSD'] ?? null, 'CLOSED freshness payload must store CLOSED freshness');
 
-// 7. Duplicate candle upsert.
+// 7. get_price_snapshot must reinterpret stale CLOSED state as stale once broker time shows Monday open.
+reset_ea_bridge_test_state();
+$service = new SMC_MarketData_Service();
+assert_true(
+    $service->store_tick_snapshot(7, 'EURUSD', array(
+        'bid' => 1.08450,
+        'ask' => 1.08470,
+        'spread' => 2,
+        'timestamp' => '2026-05-24T20:59:00Z',
+        'freshness' => 'CLOSED',
+    )),
+    'Market data service must store a pre-open CLOSED EURUSD snapshot'
+);
+set_transient('smc_sf_freshness_7_EURUSD', 'CLOSED', 300);
+set_transient('smc_sf_session_7_EURUSD', 'Closed', 300);
+assert_true(
+    $service->store_tick_snapshot(7, 'BTCUSD', array(
+        'bid' => 103250.10,
+        'ask' => 103250.90,
+        'spread' => 80,
+        'timestamp' => '2026-05-25T00:05:00Z',
+        'freshness' => 'LIVE',
+    )),
+    'Market data service must store a Monday-open broker reference snapshot'
+);
+$reopenedSnapshot = $service->get_price_snapshot(7, 'EURUSD');
+assert_true(is_array($reopenedSnapshot), 'Market data service must return the CLOSED EURUSD snapshot after service-level setup');
+assert_same('CLOSED', $reopenedSnapshot['freshness'] ?? null, 'Market data service must preserve CLOSED freshness on the stale override path');
+assert_same('stale', $reopenedSnapshot['state'] ?? null, 'Market data service must reinterpret stale CLOSED snapshots as stale after market reopen');
+
+// 8. DISCONNECTED freshness must remain offline even after a Monday-open reference tick arrives.
+reset_ea_bridge_test_state();
+$service = new SMC_MarketData_Service();
+assert_true(
+    $service->store_tick_snapshot(7, 'EURUSD', array(
+        'bid' => 1.08450,
+        'ask' => 1.08470,
+        'spread' => 2,
+        'timestamp' => '2026-05-24T20:59:00Z',
+        'freshness' => 'DISCONNECTED',
+    )),
+    'Market data service must store a DISCONNECTED EURUSD snapshot'
+);
+set_transient('smc_sf_freshness_7_EURUSD', 'DISCONNECTED', 300);
+set_transient('smc_sf_session_7_EURUSD', 'Closed', 300);
+assert_true(
+    $service->store_tick_snapshot(7, 'BTCUSD', array(
+        'bid' => 103250.10,
+        'ask' => 103250.90,
+        'spread' => 80,
+        'timestamp' => '2026-05-25T00:05:00Z',
+        'freshness' => 'LIVE',
+    )),
+    'Market data service must store a Monday-open broker reference snapshot for the DISCONNECTED path'
+);
+$disconnectedSnapshot = $service->get_price_snapshot(7, 'EURUSD');
+assert_true(is_array($disconnectedSnapshot), 'Market data service must return the DISCONNECTED EURUSD snapshot after service-level setup');
+assert_same('DISCONNECTED', $disconnectedSnapshot['freshness'] ?? null, 'Market data service must preserve DISCONNECTED freshness');
+assert_same('offline', $disconnectedSnapshot['state'] ?? null, 'Market data service must keep DISCONNECTED snapshots offline after market reopen');
+
+// 9. Duplicate candle upsert.
 reset_ea_bridge_test_state();
 $plugin = new SMC_SuperFib_Sniper_REST();
 $payload = phase3_base_payload();
@@ -168,7 +228,7 @@ assert_true($response instanceof WP_REST_Response && !empty($response->data['ok'
 assert_same(1, count(phase3_candle_rows(7, 'EURUSD', '1min', $duplicate_m1_time)), 'Duplicate Phase 3 M1 candle payloads must upsert to one row');
 assert_same(1, count(phase3_candle_rows(7, 'EURUSD', '15min', $duplicate_m15_time)), 'Duplicate Phase 3 M15 candle payloads must upsert to one row');
 
-// 8. Legacy M15-only payload remains accepted.
+// 10. Legacy M15-only payload remains accepted.
 reset_ea_bridge_test_state();
 $plugin = new SMC_SuperFib_Sniper_REST();
 $payload = phase3_base_payload();
@@ -182,7 +242,7 @@ $m15_only_time = gmdate('Y-m-d H:i:s', strtotime($payload['candle_m15']['time'])
 assert_same(0, count(phase3_candle_rows(7, 'EURUSD', '1min')), 'M15-only payload must not require or insert an M1 candle row');
 assert_same(1, count(phase3_candle_rows(7, 'EURUSD', '15min', $m15_only_time)), 'M15-only payload must persist exactly one MT5 M15 candle row');
 
-// 9. Explicit null M1 candle must be treated as present and rejected.
+// 11. Explicit null M1 candle must be treated as present and rejected.
 reset_ea_bridge_test_state();
 $plugin = new SMC_SuperFib_Sniper_REST();
 $payload = phase3_base_payload();

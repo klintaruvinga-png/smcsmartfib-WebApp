@@ -148,12 +148,12 @@ private:
             return SESSION_WEEKEND;
 
         if (dow == 0)
-            return (hour >= 22) ? SESSION_SYDNEY : SESSION_WEEKEND;
+            return (hour >= 21) ? SESSION_SYDNEY : SESSION_WEEKEND;
 
-        if (dow == 5 && hour >= 22)
+        if (dow == 5 && hour >= 21)
             return SESSION_WEEKEND;
 
-        bool sydney  = (hour >= 22) || (hour < 6);
+        bool sydney  = (hour >= 21) || (hour < 6);
         bool tokyo   = (hour >= 0)  && (hour < 8);
         bool london  = (hour >= 7)  && (hour < 15);
         bool newYork = (hour >= 12) && (hour < 20);

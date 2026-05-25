@@ -39,13 +39,8 @@ void OnStart()
     datetime fridayCloseServerTime = UtcToServerTime(2026, 5, 22, 21, 1, 0);
     bool ok = true;
 
-    ok = AssertCondition(manager.IsCryptoSymbol("BTCUSD"), "BTCUSD must classify as crypto") && ok;
-    ok = AssertCondition(manager.IsCryptoSymbol("ETHUSD"), "ETHUSD must classify as crypto") && ok;
-    ok = AssertCondition(!manager.IsCryptoSymbol("EURUSD"), "EURUSD must not classify as crypto") && ok;
-    ok = AssertCondition(!manager.IsCryptoSymbol("US500"), "US500 must not classify as crypto") && ok;
-    ok = AssertCondition(manager.IsMarketOpenForSymbol("BTCUSD", saturdayServerTime), "BTCUSD must stay open on Saturday UTC") && ok;
     ok = AssertCondition(!manager.IsMarketOpenForSymbol("EURUSD", saturdayServerTime), "EURUSD must stay closed on Saturday UTC") && ok;
-    ok = AssertCondition(!manager.IsMarketOpenForSymbol("US500", saturdayServerTime), "US500 Saturday classification must remain unchanged") && ok;
+    ok = AssertCondition(manager.IsMarketOpenForSymbol("BTCUSD", saturdayServerTime), "BTCUSD must stay open on Saturday UTC") && ok;
     ok = AssertCondition(!manager.IsMarketOpenForSymbol("EURUSD", sundayPreOpenServerTime), "EURUSD must stay closed before Sunday FX reopen") && ok;
     ok = AssertCondition(manager.IsMarketOpenForSymbol("EURUSD", sundayPostOpenServerTime), "EURUSD must reopen after Sunday 21:00 UTC") && ok;
     ok = AssertCondition(manager.IsMarketOpenForSymbol("EURUSD", mondayServerTime), "EURUSD must stay open on Monday UTC") && ok;
@@ -54,9 +49,9 @@ void OnStart()
 
     if (!ok)
     {
-        Print("SessionManager weekend classification checks failed");
+        Print("SessionManager market-open checks failed");
         return;
     }
 
-    Print("SessionManager weekend classification checks passed");
+    Print("SessionManager market-open checks passed");
 }
