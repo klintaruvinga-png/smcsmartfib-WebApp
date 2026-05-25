@@ -63,6 +63,12 @@ public:
         AddAlias("DOW30",           "US30");
         AddAlias("US500",           "SPX500");   // S&P 500 alias
         AddAlias("SPX",             "SPX500");
+        // Deriv broker multi-word display names (additional to GT Markets aliases above)
+        AddAlias("GERMANY 40",      "GER40");    // Deriv: "Germany 40"
+        AddAlias("GERMANY40",       "GER40");    // stripped variant
+        AddAlias("US SP 500",       "SPX500");   // Deriv: "US SP 500"
+        AddAlias("USSP500",         "SPX500");   // stripped variant
+        AddAlias("US SP500",        "SPX500");   // compact variant
 
         // FX majors / crosses
         AddKnownSymbol("EURUSD");
@@ -99,9 +105,14 @@ public:
         // Crypto
         AddKnownSymbol("BTCUSD");
         AddKnownSymbol("ETHUSD");
+        AddKnownSymbol("SOLUSD");   // Solana — present on user watchlist (Deriv)
+        AddKnownSymbol("XRPUSD");
+        AddKnownSymbol("BNBUSD");
         // Oil
         AddKnownSymbol("USOIL");
         AddKnownSymbol("UKOIL");
+        // Macro / reference
+        AddKnownSymbol("DXYUSD");   // US Dollar Index — present in EA Symbols (Deriv)
     }
 
     ~SymbolNormalizer() {}

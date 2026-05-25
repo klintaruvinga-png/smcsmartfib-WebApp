@@ -33,7 +33,7 @@ Phase 3 closed on 2026-05-25 following a successful 72-hour stability soak (2026
 | Weekend FX/equity CLOSED, crypto LIVE | PASS — confirmed 2026-05-24/25 |
 | EA reconnect on Sunday open | PASS — confirmed 2026-05-25 |
 | No false LIVE states during off-session | PASS — offline root cause = broker session, not code |
-| MT5-live symbol freshness | 22/24 live; NAS100/US30 offline = EA Symbols config gap (non-blocking) |
+| MT5-live symbol freshness | 22/24 live during equity session; NAS100/US30 offline in closeout snapshot (04:17 UTC) = expected pre-market behaviour; present in EA as Deriv names `US Tech 100`/`Wall Street 30`; normalization alias resolves correctly |
 
 **Gate decision**: CONDITIONAL PASS — Phase 4 authorized  
 **Condition**: T0 admin baseline capture (operator action) still pending

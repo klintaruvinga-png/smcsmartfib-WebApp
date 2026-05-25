@@ -220,7 +220,7 @@ Market-Stream Auth:
 - ~~EA candle engine (Track A)~~ — **CLEARED 2026-05-22**: All modules verified; parity tests passing
 - ~~Backend freshness layer (Track B)~~ — **CLEARED 2026-05-22**: All storage paths confirmed
 - ~~Live browser verification~~ — **CLEARED 2026-05-22**: MT5 authority Live ✅ · BACKEND LIVE ✅ · London session ✅ · 10/12 symbols live ✅ · Streak 8d LIVE ✅
-- **NAS100/US30 config item** — Not in EA Symbols input; fix: add `NAS100,US30` to EA Properties → Inputs → Symbols. Non-blocking (code correct, engine guard working as designed)
+- ~~NAS100/US30 config item~~ — **RESOLVED**: NAS100/US30 ARE present in EA as Deriv broker names (`US Tech 100`, `Wall Street 30`). SymbolNormalizer alias map correctly resolves both to canonical symbols. Offline status in closeout snapshot (04:17 UTC) is expected pre-market behaviour — equities open at 13:30 UTC.
 - **72-hour stability soak** — Soak window opened 2026-05-22; required before Phase 3 gate closes
 
 ---

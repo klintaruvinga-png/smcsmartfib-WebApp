@@ -110,8 +110,8 @@ No drift between PHP backend fib calculations and expected parity values.
 
 | ID | Phase | Description | Status |
 |----|-------|-------------|--------|
-| MIGRATION-P3-001 | Phase 3 | 72h stability soak window open since 2026-05-22 | IN-PROGRESS |
-| MIGRATION-P3-002 | Phase 3 | NAS100/US30 not in EA Symbols input — trader config item | NON-BLOCKING |
+| MIGRATION-P3-001 | Phase 3 | 72h stability soak window open since 2026-05-22 | RESOLVED — soak CLOSED 2026-05-25; gate CONDITIONAL PASS |
+| MIGRATION-P3-002 | Phase 3 | ~~NAS100/US30 not in EA Symbols input~~ — **RESOLVED 2026-05-25**: NAS100/US30 ARE in EA as Deriv broker names `US Tech 100`/`Wall Street 30`; normalization alias resolves correctly; offline in closeout snapshot = expected pre-market (04:17 UTC) | RESOLVED |
 
 ---
 

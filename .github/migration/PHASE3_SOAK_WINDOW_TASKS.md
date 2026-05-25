@@ -17,12 +17,13 @@
   - Re-enable path: add `CLAUDE_CODE_OAUTH_TOKEN` to repo secrets + restore `pull_request_review` trigger
   - **Status**: ✅ Complete (2026-05-22)
 
-- [ ] **TASK 2 — Capture Phase 3 T0 baseline** in the admin soak workspace
+- [x] **TASK 2 — Capture Phase 3 T0 baseline** in the admin soak workspace
   - Open `/admin` → Soak Workspace → Capture Baseline
   - Record: EA symbols active, health endpoint status, MT5 authority confirmed
   - This is the reference point used to compare against soak closeout numbers
   - **Admin workspace ready**: `soakType` / `soakPurpose` fields, `PHASE_3_STABILITY_72H` template, and evidence hydration implemented (PR #231, `3a5881d`). Select "Phase 3 - Stability Soak" from the soak type dropdown before capturing.
-  - **Status**: ⏳ Pending (operator action required — soak workspace is ready)
+  - **Status**: ✅ Complete (2026-05-24, retroactive baseline captured at 19:23 UTC by admin)
+  - **Baseline artifact**: `phase-3-stability-72h-2026-05-24.md` — soak started 2026-05-22T08:47, all 13 watchlist symbols LIVE at soak start; EA symbols confirmed including `US Tech 100` (NAS100) and `Wall Street 30` (US30); 53,517 engine runs / 0 errors in 24h at capture time
 
 ---
 
