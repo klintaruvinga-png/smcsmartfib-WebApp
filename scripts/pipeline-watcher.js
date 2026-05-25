@@ -335,7 +335,7 @@ function checkMergedPR(issueSlug, cycleStartedAt) {
         (pr) => Number.isFinite(Date.parse(pr.mergedAt)) && Date.parse(pr.mergedAt) >= cycleStartMs,
       ) || null
     );
-  } catch {
+  } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log(`checkMergedPR error: ${msg}`);
     return null;
