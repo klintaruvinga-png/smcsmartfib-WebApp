@@ -1,27 +1,35 @@
-# Issue summary
+## Issue summary
 
-Stopped — the runtime context requests a soakType/soakPurpose implementation, but the attached implementation contract and research artifacts are for an unrelated crypto weekend session-classification defect, and that contract also requires human broker confirmation before any MT5 code change.
+Created the Phase 3 closeout artifact required by the implementation contract and kept the patch doc-only.
 
-# Root cause implemented
+## Root cause implemented
 
-Not implemented — Codex stopped before code changes. The provided contract is internally mismatched and explicitly blocks the MT5 patch until a human verifies broker weekend crypto behavior.
+No runtime defect was patched. The missing closeout record was added as a new standalone report so the verified Phase 3 soak, SQL resume evidence, compile result, artifact registry, and carried coverage gaps are captured in one audit artifact.
 
-# Exact files changed
+## Exact files changed
 
-None — no files changed.
+- `reports/phase3-closeout.md` - new Phase 3 closeout record with the six required sections
+- `reports/codex-implementation.md` - required implementation summary for this contract
 
-# Tests run
+## Tests run
 
-None — stopped before code changes.
+- Verified `reports/phase3-closeout.md` exists, contains all six required sections, and includes the required engine-run and coverage-gap values.
+- Verified the working-tree change set for this patch remains under `reports/` only; no source code files were touched by this implementation.
+- Verified `scripts/pipeline-watcher.js` references `reports/codex-implementation.md` but does not key off `reports/phase3-closeout.md`, so the new artifact should not trigger watcher misclassification.
 
-# Reports generated
+## Reports generated
 
-None — stopped before code changes.
+- `reports/phase3-closeout.md`
+- `reports/codex-implementation.md`
+- Bug sweep report not required by contract scope.
+- Parity audit not required by contract scope.
 
-# Remaining risks
+## Remaining risks
 
-The task cannot be safely implemented from the provided artifacts because the verified contract does not match the runtime issue, and applying the MT5 crypto patch without broker confirmation would risk weakening stale-data protections and backend authority.
+- The contract references attached source artifact filenames that are not obviously present under the repo by exact tracked filename; the closeout registry was recorded exactly as specified instead of inferring alternate paths.
+- The existing workspace already had unrelated unstaged changes in `reports/`; this patch does not modify or revert them.
 
-# Any contract ambiguities resolved during implementation
+## Any contract ambiguities resolved during implementation
 
-Resolved to stop rather than patch: when runtime context and the attached contract diverged, I treated the mismatch plus the contract’s hard precondition as a blocker requiring the mandated stop report.
+- Interpreted the watcher check narrowly: `scripts/pipeline-watcher.js` exists, but no additional status marker update to `reports/copilot-research.md` was required, so that file was left untouched.
+- Used the runtime-provided branch name instead of the plan's branch naming recommendation.
