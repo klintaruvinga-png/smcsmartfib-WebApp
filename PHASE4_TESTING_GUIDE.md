@@ -150,12 +150,12 @@ These tests define the parity target. MT5 fib output must produce identical resu
 
 ## Gate Checklist
 
-- [ ] Parity validator implemented and producing JSON report
-- [ ] Historical replay corpus captured (EURUSD + USDJPY + XAUUSD minimum)
-- [ ] Replay run across M15, H1, D1 for each corpus pair
-- [ ] Overall parity ≥99% per pair/timeframe
-- [ ] Zero critical mismatches (drift >0.001) on any pair/timeframe
-- [ ] All 16 ratios present for both LTF_SF and HTF_AF families
-- [ ] Scenario 3 (weekend gap) and Scenario 4 (sparse data) tested and passing
-- [ ] All existing PHP fib parity tests remain green (no regression in Pine-authoritative path)
-- [ ] Phase 3 regression suite passes unchanged (`npx vitest run`, PHP sweep)
+- [x] Parity validator implemented and producing JSON report — `scripts/parity-validator.php` (self-test 100% PASS 2026-05-25)
+- [ ] **[MANUAL]** Historical replay corpus captured (EURUSD + USDJPY + XAUUSD minimum) — requires 30-day live MT5 data
+- [ ] **[MANUAL]** Replay run across M15, H1, D1 for each corpus pair
+- [ ] **[MANUAL]** Overall parity ≥99% per pair/timeframe
+- [ ] **[MANUAL]** Zero critical mismatches (drift >0.001) on any pair/timeframe
+- [x] All 16 ratios present for both LTF_SF and HTF_AF families — verified in PHP contract tests and parity tests
+- [ ] **[MANUAL]** Scenario 3 (weekend gap) and Scenario 4 (sparse data) tested and passing
+- [x] All existing PHP fib parity tests remain green (no regression in Pine-authoritative path) — 5/5 PASS 2026-05-25
+- [x] Phase 3 regression suite passes unchanged (`npx vitest run`, PHP sweep) — confirmed no regressions 2026-05-25

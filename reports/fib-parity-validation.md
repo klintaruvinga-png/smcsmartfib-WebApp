@@ -1,6 +1,7 @@
 # Fib Parity Validation
 
-Date: 2026-05-14
+Date: 2026-05-25 (updated — Phase 4 code complete)  
+Previous date: 2026-05-14
 
 ## Fixture comparison table
 
@@ -24,7 +25,21 @@ Date: 2026-05-14
 
 ## Validation source
 
-- `wordpress/smc-superfib-sniper/tests/php/test-fib-parity.php`
-- `wordpress/smc-superfib-sniper/tests/php/test-superfib-weighting.php`
-- `wordpress/smc-superfib-sniper/tests/php/test-session-anchors.php`
-- `wordpress/smc-superfib-sniper/tests/php/test-htf-authority-anchor.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-fib-parity.php` — PASS ✅ (2026-05-25)
+- `wordpress/smc-superfib-sniper/tests/php/test-superfib-weighting.php` — PASS ✅ (2026-05-25)
+- `wordpress/smc-superfib-sniper/tests/php/test-session-anchors.php` — PASS ✅ (2026-05-25)
+- `wordpress/smc-superfib-sniper/tests/php/test-htf-authority-anchor.php` — PASS ✅ (2026-05-25)
+- `wordpress/smc-superfib-sniper/tests/php/test-fib-ingestion.php` — PASS ✅ (2026-05-25 — new Phase 4 contract tests)
+
+## Phase 4 Parity Validator
+
+- `scripts/parity-validator.php` — self-test: 100% parity, 288/288 exact matches, 0 critical mismatches
+
+## Phase 4 Live Corpus Status
+
+```
+Status: PENDING — operator action required
+Action: Let MT5 EA run against live market data; capture Pine snapshots; run:
+  php scripts/parity-validator.php --mt5-file mt5-levels.json --pine-file pine-levels.json --out reports/phase4-gate.json
+Gate: PASS requires overall_parity_pct >= 99 AND critical_mismatches_count = 0
+```
