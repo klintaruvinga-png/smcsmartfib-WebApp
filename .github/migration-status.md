@@ -1,9 +1,9 @@
 # SMC SuperFIB → MT5 Migration Status Board
 
 **Last Updated**: 2026-05-25  
-**Current Phase**: 4 (Fib Engine Migration — NOT-STARTED; awaiting Track A lead assignment)  
-**Overall Progress**: 75% (recalculated: Phase 5B added; 3/12 phases complete — Phase 3 gate PASSED 2026-05-25)  
-**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 COMPLETE (2026-05-25, gate CONDITIONAL PASS; T0 admin baseline capture pending operator action) — Phase 4 authorized to start
+**Current Phase**: 4 (Fib Engine Migration — IN-PROGRESS; code complete 2026-05-25; live replay corpus pending operator)  
+**Overall Progress**: 78% (Phase 4 code implementation complete; gate validation pending live data)  
+**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 COMPLETE (2026-05-25, gate CONDITIONAL PASS; T0 admin baseline capture pending operator action) — Phase 4 IN-PROGRESS (code complete; live parity corpus pending)
 
 > Snapshot: Phase 0 gate passed 2026-05-15. Post-fix validation soak at 16:37 UTC confirmed NAS100 (29,263.70) and US30 (49,756.00) both LIVE during active US equity session; XAUUSD (4,556.34) LIVE with candle-history gate cleared. Backend soak: 259,464 engine runs / 0 errors / 69,262 candles over 24h. Frontend feed-status chip lag (BUG-001 staleTime:0) resolved. Watchlist persistence 100% parity. AUDUSD/ETHUSD chop-gate classified as correct live behavior — not a blocker. Full closeout evidence: `.github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md`.
 
@@ -17,7 +17,7 @@
 | 1 | MT5 bridge infrastructure | **COMPLETE** | 100% | None — gate passed 2026-05-20 | 2026-06-01 ✅ |
 | 2 | Read-only trade telemetry | **COMPLETE** | 100% | None — gate passed 2026-05-22 | 2026-05-22 ✅ |
 | 3 | MT5 market data engine | **COMPLETE** | 100% | None — gate CONDITIONAL PASS 2026-05-25; T0 admin baseline capture pending (operator action, non-blocking) | 2026-05-25 ✅ |
-| 4 | Fib engine migration | NOT-STARTED | 0% | Phase 3 complete | 2026-08-15 |
+| 4 | Fib engine migration | **IN-PROGRESS** | 60% | Live parity corpus (operator) | 2026-08-15 |
 | 5 | Regime & chop engine | NOT-STARTED | 0% | Phase 4 complete | 2026-09-15 |
 | 5B | Fundamentals regime feed | NOT-STARTED | 0% | Phase 5 complete | 2026-10-01 |
 | 6 | Signal engine dual-run | NOT-STARTED | 0% | Phase 5B complete | 2026-10-15 |
@@ -228,34 +228,52 @@ Market-Stream Auth:
 ## Phase 4: Fib Engine Migration
 
 **Objective**: Port fib calculations into MT5, validate against Pine  
-**Owner**: Track A  
-**Status**: NOT-STARTED  
-**Prerequisites**: Phase 3 complete  
-**Completion Target**: 2026-08-15
+**Owner**: Track A + Track B (both admin)  
+**Status**: IN-PROGRESS — code implementation complete 2026-05-25; live parity corpus pending operator  
+**Prerequisites**: Phase 3 complete ✅  
+**Completion Target**: 2026-08-15  
+**Branch**: `Phase-4-Implementation` — [PR #239](https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/239)
 
 ### Deliverables
-- [ ] MT5 Fib Engine: Swap Fib 1, Bull Run Fib, Swap Fib 2, extensions, premium/discount zones
-- [ ] Fib Parity Validator comparing anchors, levels, zones, extensions
+- [x] `mt5/FibEngine.mqh` — LTF_SF (recency-weighted) + HTF_AF (raw-extreme) fib levels, all 16 ratios, M15/H1/D1 *(2026-05-25)*
+- [x] `FibEngine` integrated into `MarketDataEngine.mqh` — dispatches `/ea/fib-levels` every ~60s *(2026-05-25)*
+- [x] `wp_smc_sf_fib_levels` DB table — UNIQUE upsert on (user_id, symbol, timeframe, family, ratio) *(2026-05-25)*
+- [x] `POST /ea/fib-levels` + ingestion handler — validates against canonical 16-ratio whitelist *(2026-05-25)*
+- [x] `GET /market-data/fib-levels` — grouped response for dashboard consumption *(2026-05-25)*
+- [x] `scripts/parity-validator.php` — machine-readable JSON gate report; self-test 100% PASS *(2026-05-25)*
+- [x] `test-fib-ingestion.php` — 7 contract tests all PASS *(2026-05-25)*
+- [ ] **[MANUAL]** Historical replay corpus (EURUSD + USDJPY + XAUUSD, 30-day, M15/H1/D1)
+- [ ] **[MANUAL]** Live parity validator run — MT5 output vs. Pine reference snapshots
+- [ ] **[MANUAL]** Weekend gap + sparse data scenario validation
 
 ### Success Criteria
-- [ ] 99%+ fib parity across all supported pairs/timeframes
+- [x] 16-ratio completeness — verified in PHP contract tests
+- [x] Price accuracy ≤0.00001 — verified in PHP parity fixture tests (delta max 0.00000)
+- [ ] **[MANUAL]** 99%+ fib parity across EURUSD/USDJPY/XAUUSD live data
+- [ ] **[MANUAL]** Zero critical mismatches (drift >0.001) on any pair/timeframe
 
 ### Test Checklist
-- [ ] Historical replay
-- [ ] Volatile markets
-- [ ] Weekend gaps
-- [ ] Missing candles
-- [ ] Broker suffix normalization
+- [x] PHP parity fixture tests (all 5 pass green)
+- [x] Fib ingestion contract tests (7/7 pass)
+- [x] Parity validator self-test (100% PASS, 288/288 exact matches)
+- [ ] **[MANUAL]** Historical replay (30-day corpus)
+- [ ] **[MANUAL]** Volatile markets (XAUUSD NFP/CPI scenario)
+- [ ] **[MANUAL]** Weekend gaps (EURUSD D1 Friday→Monday)
+- [ ] **[MANUAL]** Missing candles (sparse data fallback)
+- [x] Broker suffix normalization — handled by `SymbolNormalizer.mqh` (existing; no regression)
 
 ### Parity Status
 ```
-MT5 Fib vs Pine Fib: [PENDING]
-Anchor Consistency: [PENDING]
-Zone Accuracy: [PENDING]
+PHP Fixture Parity:        PASS (100%, 0.00000 delta max all 9 fixtures)
+Ingestion Contract Tests:  PASS (7/7)
+Parity Validator Self-Test: PASS (100%, 288/288 tuples)
+MT5 Live vs Pine Live:     PENDING (requires live MT5 corpus — operator action)
 ```
 
 ### Blockers
-- *Phase 3 not complete*
+- ~~Phase 3 not complete~~ — **CLEARED 2026-05-25**
+- ~~Track leads unassigned~~ — **CLEARED 2026-05-25** (both tracks: admin)
+- **[OPERATOR]** Live parity corpus not yet captured — MT5 must run against real market data for 30 days before the gate can be validated
 
 ---
 
