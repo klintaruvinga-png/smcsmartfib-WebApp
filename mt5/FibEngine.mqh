@@ -107,7 +107,7 @@ public:
         }
 
         // Compression threshold
-        double compression = CompressionThreshold(normSymbol);
+        double compression = CompressionThreshold(symbol);
 
         // Session grouping
         string session_tf   = GetSessionTF(chart_tf_seconds);

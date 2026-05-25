@@ -2855,6 +2855,7 @@ final class SMC_SuperFib_Sniper_REST {
         $valid_ratios    = array(-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300);
         $calculated_at   = $this->now_mysql();
         $inserted        = 0;
+        $failed          = 0;
         $table           = $wpdb->prefix . 'smc_sf_fib_levels';
 
         foreach ($levels_payload as $tf_entry) {
@@ -2889,7 +2890,7 @@ final class SMC_SuperFib_Sniper_REST {
                         continue;
                     }
 
-                    $wpdb->replace(
+                    $result = $wpdb->replace(
                         $table,
                         array(
                             'user_id'       => $user_id,
@@ -2903,18 +2904,27 @@ final class SMC_SuperFib_Sniper_REST {
                         ),
                         array('%d', '%s', '%s', '%s', '%f', '%f', '%s', '%s')
                     );
-                    $inserted++;
+                    if ($result === false) {
+                        $failed++;
+                        if (!empty($wpdb->last_error)) {
+                            error_log(sprintf('[SMC_SF] ea/fib-levels upsert failed symbol=%s tf=%s family=%s ratio=%s err=%s',
+                                $symbol, $timeframe, $family, $ratio, $wpdb->last_error));
+                        }
+                    } else {
+                        $inserted++;
+                    }
                 }
             }
         }
 
-        error_log(sprintf('[SMC_SF] ea/fib-levels ingested symbol=%s levels_written=%d user_id=%d',
-            $symbol, $inserted, $user_id));
+        error_log(sprintf('[SMC_SF] ea/fib-levels ingested symbol=%s levels_written=%d failed=%d user_id=%d',
+            $symbol, $inserted, $failed, $user_id));
 
         return rest_ensure_response(array(
-            'ok'             => true,
+            'ok'             => $failed === 0,
             'symbol'         => $symbol,
             'levels_written' => $inserted,
+            'levels_failed'  => $failed,
         ));
     }
 

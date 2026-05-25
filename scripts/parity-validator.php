@@ -207,6 +207,27 @@ function run_parity_comparison(array $mt5Levels, array $pineLevels, $runDate) {
         }
     }
 
+    // Second pass: Pine-only tuples that MT5 never emitted
+    $mt5Keys = array();
+    foreach ($mt5Levels as $entry) {
+        $mt5Keys[entry_key($entry)] = true;
+    }
+    foreach ($pineLevels as $entry) {
+        $key = entry_key($entry);
+        if (!isset($mt5Keys[$key])) {
+            $sym = (string) ($entry['symbol']    ?? '');
+            $tf  = (string) ($entry['timeframe'] ?? '');
+            $fam = (string) ($entry['family']    ?? '');
+            $rat = (float)  ($entry['ratio']     ?? 0);
+            $criticalMismatches[] = array(
+                'symbol' => $sym, 'timeframe' => $tf, 'family' => $fam, 'ratio' => $rat,
+                'mt5_price' => null, 'pine_price' => (float) ($entry['price'] ?? 0), 'drift' => null,
+                'reason' => 'missing_mt5_output',
+            );
+            $totalTuples++;
+        }
+    }
+
     // Compute per-symbol/timeframe parity_pct
     foreach ($bySymbol as $sym => &$tfs) {
         foreach ($tfs as $tf => &$data) {
