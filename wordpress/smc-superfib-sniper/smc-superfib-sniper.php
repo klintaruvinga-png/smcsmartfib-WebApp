@@ -94,6 +94,43 @@ final class SMC_SuperFib_Sniper_REST {
         if (!wp_next_scheduled('smc_sf_prune_tables')) {
             wp_schedule_event(time(), 'daily', 'smc_sf_prune_tables');
         }
+
+        // Phase 5B: refresh fundamental bias every 30 min (uses Twelve Data free tier).
+        add_action('smc_sf_refresh_fundamentals', array($instance, 'cron_refresh_fundamentals'));
+        if (!wp_next_scheduled('smc_sf_refresh_fundamentals')) {
+            wp_schedule_event(time(), 'twicehourly', 'smc_sf_refresh_fundamentals');
+        }
+        // Register the twicehourly cron interval if not already present.
+        add_filter('cron_schedules', array(__CLASS__, 'add_twicehourly_cron_schedule'));
+    }
+
+    public static function add_twicehourly_cron_schedule($schedules) {
+        if (!isset($schedules['twicehourly'])) {
+            $schedules['twicehourly'] = array(
+                'interval' => 1800,
+                'display'  => __('Twice Hourly'),
+            );
+        }
+        return $schedules;
+    }
+
+    // Cron callback: refresh fundamentals for all users who have a TD key configured.
+    public function cron_refresh_fundamentals() {
+        global $wpdb;
+
+        $users = $wpdb->get_col(
+            "SELECT DISTINCT user_id FROM {$wpdb->prefix}smc_sf_integrations WHERE provider = 'twelve_data' AND key_status = 'ok'"
+        );
+
+        foreach ((array) $users as $user_id) {
+            $td_key = $this->get_twelve_key((int) $user_id);
+            if (!$td_key) continue;
+            $ingested = $this->ingest_economic_calendar($td_key);
+            error_log(sprintf('[SMC_SF] cron fundamentals user_id=%d ingested=%d', (int) $user_id, $ingested));
+        }
+
+        // Bias recomputed once after all user calendars ingested (data is global by currency).
+        $this->recompute_fundamental_bias();
     }
 
     public static function enqueue_rest_api_settings() {
@@ -626,6 +663,141 @@ final class SMC_SuperFib_Sniper_REST {
             KEY symbol_time (user_id, symbol, calculated_at)
         ) $charset;";
 
+        // Phase 5: MT5 regime snapshots
+        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_regime_snapshots (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT UNSIGNED NOT NULL,
+            symbol VARCHAR(24) NOT NULL,
+            htf_bias VARCHAR(16) NOT NULL DEFAULT 'TRANSITIONAL',
+            ltf_regime VARCHAR(16) NOT NULL DEFAULT 'RANGING',
+            chop_score DECIMAL(5,4) NOT NULL DEFAULT 0.5000,
+            ema20_d1 DECIMAL(20,8) DEFAULT NULL,
+            atr14_h1 DECIMAL(20,8) DEFAULT NULL,
+            source VARCHAR(20) NOT NULL DEFAULT 'mt5',
+            calculated_at DATETIME NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY regime_lookup (user_id, symbol),
+            KEY user_updated (user_id, calculated_at)
+        ) $charset;";
+
+        // Phase 5B: Economic fundamental events
+        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_fundamental_events (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            currency VARCHAR(8) NOT NULL,
+            event_type VARCHAR(32) NOT NULL,
+            event_name VARCHAR(128) NOT NULL,
+            event_date DATE NOT NULL,
+            actual DECIMAL(10,4) DEFAULT NULL,
+            forecast DECIMAL(10,4) DEFAULT NULL,
+            previous DECIMAL(10,4) DEFAULT NULL,
+            raw_score DECIMAL(5,2) NOT NULL DEFAULT 0,
+            source VARCHAR(32) NOT NULL DEFAULT 'twelve_data',
+            created_at DATETIME NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY event_lookup (currency, event_type, event_date),
+            KEY currency_date (currency, event_date)
+        ) $charset;";
+
+        // Phase 5B: Composite currency bias cache (recomputed every 30 min)
+        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_fundamental_bias (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            currency VARCHAR(8) NOT NULL,
+            composite_score DECIMAL(5,2) NOT NULL DEFAULT 0,
+            category VARCHAR(16) NOT NULL DEFAULT 'NEUTRAL',
+            event_count INT UNSIGNED NOT NULL DEFAULT 0,
+            computed_at DATETIME NOT NULL,
+            expires_at DATETIME NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY currency_lookup (currency),
+            KEY expires (expires_at)
+        ) $charset;";
+
+        // Phase 6: MT5 signal candidates (dual-run — Pine still authoritative)
+        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_mt5_signal_candidates (
+            id VARCHAR(64) NOT NULL,
+            user_id BIGINT UNSIGNED NOT NULL,
+            symbol VARCHAR(24) NOT NULL,
+            direction VARCHAR(8) NOT NULL,
+            status VARCHAR(8) NOT NULL DEFAULT 'WATCH',
+            verdict VARCHAR(4) NOT NULL DEFAULT 'C',
+            entry_price DECIMAL(20,8) NOT NULL,
+            sl_price DECIMAL(20,8) DEFAULT NULL,
+            tp_price DECIMAL(20,8) DEFAULT NULL,
+            fib_level DECIMAL(20,8) DEFAULT NULL,
+            fib_ratio DECIMAL(10,4) DEFAULT NULL,
+            fib_family VARCHAR(16) DEFAULT NULL,
+            htf_bias VARCHAR(16) DEFAULT NULL,
+            ltf_regime VARCHAR(16) DEFAULT NULL,
+            confidence DECIMAL(5,4) NOT NULL DEFAULT 0.0000,
+            pine_match VARCHAR(16) DEFAULT NULL,
+            drift_pips DECIMAL(10,4) DEFAULT NULL,
+            source VARCHAR(8) NOT NULL DEFAULT 'mt5',
+            created_at DATETIME NOT NULL,
+            PRIMARY KEY  (id),
+            KEY user_symbol (user_id, symbol),
+            KEY user_created (user_id, created_at)
+        ) $charset;";
+
+        // Phase 7: Execution audit trail
+        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_execution_audit (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT UNSIGNED NOT NULL,
+            signal_id VARCHAR(64) DEFAULT NULL,
+            symbol VARCHAR(24) NOT NULL,
+            direction VARCHAR(8) NOT NULL,
+            order_type VARCHAR(16) NOT NULL DEFAULT 'MARKET',
+            lots DECIMAL(10,4) NOT NULL,
+            entry_price DECIMAL(20,8) DEFAULT NULL,
+            sl_price DECIMAL(20,8) DEFAULT NULL,
+            tp_price DECIMAL(20,8) DEFAULT NULL,
+            mt5_ticket BIGINT DEFAULT NULL,
+            status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+            reject_reason VARCHAR(256) DEFAULT NULL,
+            risk_check_passed TINYINT(1) NOT NULL DEFAULT 0,
+            requested_at DATETIME NOT NULL,
+            executed_at DATETIME DEFAULT NULL,
+            ack_at DATETIME DEFAULT NULL,
+            created_at DATETIME NOT NULL,
+            PRIMARY KEY  (id),
+            KEY user_signal (user_id, signal_id(48)),
+            KEY user_status (user_id, status)
+        ) $charset;";
+
+        // Phase 8: Signal approval queue (semi-automation layer)
+        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_approval_queue (
+            id VARCHAR(64) NOT NULL,
+            user_id BIGINT UNSIGNED NOT NULL,
+            signal_id VARCHAR(64) DEFAULT NULL,
+            signal_data LONGTEXT NOT NULL,
+            regime_data LONGTEXT DEFAULT NULL,
+            fundamental_data LONGTEXT DEFAULT NULL,
+            risk_data LONGTEXT DEFAULT NULL,
+            status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+            operator_note VARCHAR(512) DEFAULT NULL,
+            created_at DATETIME NOT NULL,
+            reviewed_at DATETIME DEFAULT NULL,
+            expires_at DATETIME NOT NULL,
+            PRIMARY KEY  (id),
+            KEY user_status (user_id, status),
+            KEY expires (expires_at)
+        ) $charset;";
+
+        // Phase 9: License tier assignments per user
+        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_license_tiers (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT UNSIGNED NOT NULL,
+            tier VARCHAR(20) NOT NULL DEFAULT 'Basic',
+            max_symbols INT UNSIGNED NOT NULL DEFAULT 5,
+            max_ea_sessions TINYINT UNSIGNED NOT NULL DEFAULT 1,
+            execution_enabled TINYINT(1) NOT NULL DEFAULT 0,
+            api_access_enabled TINYINT(1) NOT NULL DEFAULT 0,
+            expires_at DATETIME DEFAULT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY user_license (user_id)
+        ) $charset;";
+
         foreach ($tables as $sql) {
             dbDelta($sql);
             if (is_object($wpdb) && property_exists($wpdb, 'last_error') && $wpdb->last_error !== '') {
@@ -734,6 +906,100 @@ final class SMC_SuperFib_Sniper_REST {
             'methods' => WP_REST_Server::READABLE,
             'callback' => array($this, 'get_market_data_fib_levels'),
             'permission_callback' => array($this, 'permission_user'),
+        ));
+
+        // Phase 5: regime snapshot ingestion from MT5 EA
+        register_rest_route(self::NAMESPACE, '/ea/regime-snapshot', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($this, 'post_ea_regime_snapshot'),
+            'permission_callback' => array($this, 'permission_ea_bridge'),
+        ));
+
+        // Phase 5: regime data retrieval for dashboard
+        register_rest_route(self::NAMESPACE, '/market-data/regime', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => array($this, 'get_market_data_regime'),
+            'permission_callback' => array($this, 'permission_user'),
+        ));
+
+        // Phase 5B: fundamentals bias refresh (admin or user-triggered)
+        register_rest_route(self::NAMESPACE, '/fundamentals/refresh', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($this, 'post_fundamentals_refresh'),
+            'permission_callback' => array($this, 'permission_user'),
+        ));
+
+        // Phase 5B: fundamentals bias retrieval for dashboard
+        register_rest_route(self::NAMESPACE, '/fundamentals/bias', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => array($this, 'get_fundamentals_bias'),
+            'permission_callback' => array($this, 'permission_user'),
+        ));
+
+        // Phase 6: MT5 signal candidates ingestion (dual-run)
+        register_rest_route(self::NAMESPACE, '/ea/signal-candidates', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($this, 'post_ea_signal_candidates'),
+            'permission_callback' => array($this, 'permission_ea_bridge'),
+        ));
+
+        // Phase 6: Signal drift report for dashboard
+        register_rest_route(self::NAMESPACE, '/market-data/signal-drift', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => array($this, 'get_market_data_signal_drift'),
+            'permission_callback' => array($this, 'permission_user'),
+        ));
+
+        // Phase 7: Execution queue polling by MT5 EA
+        register_rest_route(self::NAMESPACE, '/ea/execution-queue', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => array($this, 'get_ea_execution_queue'),
+            'permission_callback' => array($this, 'permission_ea_bridge'),
+        ));
+
+        // Phase 7: Execution acknowledgement from MT5 EA
+        register_rest_route(self::NAMESPACE, '/ea/execution-ack', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($this, 'post_ea_execution_ack'),
+            'permission_callback' => array($this, 'permission_ea_bridge'),
+        ));
+
+        // Phase 7: Operator execution request from dashboard
+        register_rest_route(self::NAMESPACE, '/user/execution-request', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($this, 'post_user_execution_request'),
+            'permission_callback' => array($this, 'permission_user'),
+        ));
+
+        // Phase 7: Execution audit trail for dashboard
+        register_rest_route(self::NAMESPACE, '/user/execution-audit', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => array($this, 'get_user_execution_audit'),
+            'permission_callback' => array($this, 'permission_user'),
+        ));
+
+        // Phase 8: Approval queue read/review
+        register_rest_route(self::NAMESPACE, '/user/approval-queue', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => array($this, 'get_user_approval_queue'),
+            'permission_callback' => array($this, 'permission_user'),
+        ));
+        register_rest_route(self::NAMESPACE, '/user/approval-queue/review', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($this, 'post_approval_queue_review'),
+            'permission_callback' => array($this, 'permission_user'),
+        ));
+
+        // Phase 9: License tier read (user) and management (admin)
+        register_rest_route(self::NAMESPACE, '/user/license', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => array($this, 'get_user_license'),
+            'permission_callback' => array($this, 'permission_user'),
+        ));
+        register_rest_route(self::NAMESPACE, '/admin/license/set-tier', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($this, 'post_admin_set_license_tier'),
+            'permission_callback' => array($this, 'permission_admin'),
         ));
     }
 
@@ -2985,6 +3251,1037 @@ final class SMC_SuperFib_Sniper_REST {
             'ok'     => true,
             'symbol' => $symbol,
             'fibs'   => $result,
+        ));
+    }
+
+    // =========================================================================
+    // Phase 5: Regime & Chop Engine handlers
+    // =========================================================================
+
+    // POST /ea/regime-snapshot — ingest regime batch from MT5 EA.
+    // Payload: { regimes: [ { user_id, symbol, htf_bias, ltf_regime,
+    //                         chop_score, ema20_d1, atr14_h1 }, ... ] }
+    public function post_ea_regime_snapshot(WP_REST_Request $request) {
+        global $wpdb;
+
+        $payload = $request->get_json_params();
+        if (!is_array($payload) || !isset($payload['regimes']) || !is_array($payload['regimes'])) {
+            return new WP_Error('invalid_payload', 'regimes array required', array('status' => 400));
+        }
+
+        $user_id       = get_current_user_id();
+        $table         = $wpdb->prefix . 'smc_sf_regime_snapshots';
+        $valid_bias    = array('BULL', 'BEAR', 'TRANSITIONAL');
+        $valid_regimes = array('TRENDING', 'RANGING', 'CHOP');
+        $calculated_at = $this->now_mysql();
+        $written       = 0;
+        $failed        = 0;
+
+        foreach ($payload['regimes'] as $entry) {
+            if (!is_array($entry) || empty($entry['symbol'])) {
+                $failed++;
+                continue;
+            }
+
+            $symbol     = preg_replace('/[^A-Z0-9]/', '', strtoupper(sanitize_text_field($entry['symbol'])));
+            $htf_bias   = sanitize_text_field(strtoupper((string) ($entry['htf_bias'] ?? 'TRANSITIONAL')));
+            $ltf_regime = sanitize_text_field(strtoupper((string) ($entry['ltf_regime'] ?? 'RANGING')));
+            $chop_score = max(0.0, min(1.0, (float) ($entry['chop_score'] ?? 0.5)));
+            $ema20_d1   = isset($entry['ema20_d1']) && is_numeric($entry['ema20_d1']) ? (float) $entry['ema20_d1'] : null;
+            $atr14_h1   = isset($entry['atr14_h1']) && is_numeric($entry['atr14_h1']) ? (float) $entry['atr14_h1'] : null;
+
+            if ($symbol === '' || !in_array($htf_bias, $valid_bias, true) || !in_array($ltf_regime, $valid_regimes, true)) {
+                $failed++;
+                continue;
+            }
+
+            $result = $wpdb->replace(
+                $table,
+                array(
+                    'user_id'       => $user_id,
+                    'symbol'        => $symbol,
+                    'htf_bias'      => $htf_bias,
+                    'ltf_regime'    => $ltf_regime,
+                    'chop_score'    => $chop_score,
+                    'ema20_d1'      => $ema20_d1,
+                    'atr14_h1'      => $atr14_h1,
+                    'source'        => 'mt5',
+                    'calculated_at' => $calculated_at,
+                ),
+                array('%d', '%s', '%s', '%s', '%f', $ema20_d1 !== null ? '%f' : 'NULL', $atr14_h1 !== null ? '%f' : 'NULL', '%s', '%s')
+            );
+
+            if ($result !== false) {
+                $written++;
+            } else {
+                $failed++;
+                if (!empty($wpdb->last_error)) {
+                    error_log(sprintf('[SMC_SF] ea/regime-snapshot upsert failed symbol=%s err=%s', $symbol, $wpdb->last_error));
+                }
+            }
+        }
+
+        error_log(sprintf('[SMC_SF] ea/regime-snapshot written=%d failed=%d user_id=%d', $written, $failed, $user_id));
+
+        return rest_ensure_response(array(
+            'ok'      => $failed === 0,
+            'written' => $written,
+            'failed'  => $failed,
+        ));
+    }
+
+    // GET /market-data/regime?symbol=EURUSD — retrieve regime snapshot for dashboard.
+    // Optional: omit symbol to return all symbols for the user.
+    public function get_market_data_regime(WP_REST_Request $request) {
+        global $wpdb;
+
+        $user_id = get_current_user_id();
+        $symbol  = sanitize_text_field((string) ($request->get_param('symbol') ?? ''));
+        $symbol  = preg_replace('/[^A-Z0-9]/', '', strtoupper($symbol));
+
+        $table  = $wpdb->prefix . 'smc_sf_regime_snapshots';
+        $where  = 'WHERE user_id = %d';
+        $values = array($user_id);
+
+        if ($symbol !== '') {
+            $where   .= ' AND symbol = %s';
+            $values[] = $symbol;
+        }
+
+        $sql  = $wpdb->prepare("SELECT symbol, htf_bias, ltf_regime, chop_score, ema20_d1, atr14_h1, calculated_at FROM {$table} {$where} ORDER BY symbol", ...$values);
+        $rows = $wpdb->get_results($sql, ARRAY_A);
+
+        $regimes = array();
+        foreach ((array) $rows as $row) {
+            $regimes[] = array(
+                'symbol'        => $row['symbol'],
+                'htfBias'       => $row['htf_bias'],
+                'ltfRegime'     => $row['ltf_regime'],
+                'chopScore'     => (float) $row['chop_score'],
+                'ema20D1'       => $row['ema20_d1'] !== null ? (float) $row['ema20_d1'] : null,
+                'atr14H1'       => $row['atr14_h1'] !== null ? (float) $row['atr14_h1'] : null,
+                'calculatedAt'  => $this->to_iso((string) $row['calculated_at']),
+                'source'        => 'mt5',
+            );
+        }
+
+        return rest_ensure_response(array(
+            'ok'      => true,
+            'regimes' => $regimes,
+        ));
+    }
+
+    // =========================================================================
+    // Phase 5B: Fundamentals Regime Feed handlers
+    // =========================================================================
+
+    // POST /fundamentals/refresh — pull economic calendar from Twelve Data,
+    // score events, recompute composite bias per currency.
+    public function post_fundamentals_refresh(WP_REST_Request $request) {
+        $user_id = get_current_user_id();
+
+        $td_key = $this->get_twelve_key($user_id);
+        if (!$td_key) {
+            return new WP_Error('no_td_key', 'Twelve Data API key required for fundamentals refresh', array('status' => 422));
+        }
+
+        $ingested = $this->ingest_economic_calendar($td_key);
+        $biases   = $this->recompute_fundamental_bias();
+
+        error_log(sprintf('[SMC_SF] fundamentals/refresh ingested=%d currencies_updated=%d user_id=%d',
+            $ingested, $biases, $user_id));
+
+        return rest_ensure_response(array(
+            'ok'                => true,
+            'events_ingested'   => $ingested,
+            'currencies_updated' => $biases,
+        ));
+    }
+
+    // GET /fundamentals/bias?currency=USD — retrieve composite bias per currency.
+    // Returns all currencies if no filter provided.
+    public function get_fundamentals_bias(WP_REST_Request $request) {
+        global $wpdb;
+
+        $currency = sanitize_text_field(strtoupper((string) ($request->get_param('currency') ?? '')));
+        $currency = preg_replace('/[^A-Z]/', '', $currency);
+        $table    = $wpdb->prefix . 'smc_sf_fundamental_bias';
+
+        if ($currency !== '') {
+            $row = $wpdb->get_row($wpdb->prepare(
+                "SELECT currency, composite_score, category, event_count, computed_at, expires_at FROM {$table} WHERE currency = %s",
+                $currency
+            ), ARRAY_A);
+
+            if (!$row) {
+                return rest_ensure_response(array(
+                    'ok'       => true,
+                    'currency' => $currency,
+                    'bias'     => null,
+                    'note'     => 'No fundamental data available. Run /fundamentals/refresh.',
+                ));
+            }
+
+            return rest_ensure_response(array(
+                'ok'   => true,
+                'bias' => $this->format_bias_row($row),
+            ));
+        }
+
+        $rows  = $wpdb->get_results("SELECT currency, composite_score, category, event_count, computed_at, expires_at FROM {$table} ORDER BY currency", ARRAY_A);
+        $biases = array();
+        foreach ((array) $rows as $row) {
+            $biases[] = $this->format_bias_row($row);
+        }
+
+        return rest_ensure_response(array(
+            'ok'    => true,
+            'biases' => $biases,
+        ));
+    }
+
+    private function format_bias_row(array $row) {
+        return array(
+            'currency'       => $row['currency'],
+            'compositeScore' => (float) $row['composite_score'],
+            'category'       => $row['category'],
+            'eventCount'     => (int) $row['event_count'],
+            'computedAt'     => $this->to_iso((string) $row['computed_at']),
+            'expiresAt'      => $this->to_iso((string) $row['expires_at']),
+        );
+    }
+
+    // Pull economic calendar from Twelve Data /economic_calendar and score events.
+    // Returns count of new/updated events inserted.
+    private function ingest_economic_calendar($td_key) {
+        global $wpdb;
+
+        // Fetch the next 7 days of events (within the API free tier).
+        $start = gmdate('Y-m-d');
+        $end   = gmdate('Y-m-d', strtotime('+7 days'));
+        $url   = "https://api.twelvedata.com/economic_calendar?start_date={$start}&end_date={$end}&apikey={$td_key}";
+
+        $response = wp_remote_get($url, array('timeout' => 15));
+        if (is_wp_error($response)) {
+            error_log('[SMC_SF] fundamentals: TD calendar fetch error: ' . $response->get_error_message());
+            return 0;
+        }
+
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+
+        if (!is_array($data) || empty($data['result']) || !is_array($data['result'])) {
+            error_log('[SMC_SF] fundamentals: TD calendar unexpected response: ' . substr($body, 0, 200));
+            return 0;
+        }
+
+        $table   = $wpdb->prefix . 'smc_sf_fundamental_events';
+        $written = 0;
+
+        foreach ($data['result'] as $event) {
+            if (!isset($event['currency'], $event['date'])) {
+                continue;
+            }
+
+            $currency   = preg_replace('/[^A-Z]/', '', strtoupper(sanitize_text_field((string) $event['currency'])));
+            $event_date = sanitize_text_field((string) $event['date']);
+            $event_name = sanitize_text_field((string) ($event['event'] ?? 'Unknown'));
+            $event_type = $this->classify_event_type($event_name);
+            $actual     = isset($event['actual'])   && is_numeric($event['actual'])   ? (float) $event['actual']   : null;
+            $forecast   = isset($event['estimate'])  && is_numeric($event['estimate'])  ? (float) $event['estimate']  : null;
+            $previous   = isset($event['previous']) && is_numeric($event['previous']) ? (float) $event['previous'] : null;
+            $raw_score  = $this->score_fundamental_event($event_type, $actual, $forecast, $previous);
+
+            if (strlen($currency) < 2 || strlen($currency) > 8) {
+                continue;
+            }
+
+            $result = $wpdb->replace(
+                $table,
+                array(
+                    'currency'   => $currency,
+                    'event_type' => $event_type,
+                    'event_name' => substr($event_name, 0, 128),
+                    'event_date' => substr($event_date, 0, 10),
+                    'actual'     => $actual,
+                    'forecast'   => $forecast,
+                    'previous'   => $previous,
+                    'raw_score'  => $raw_score,
+                    'source'     => 'twelve_data',
+                    'created_at' => $this->now_mysql(),
+                ),
+                array('%s', '%s', '%s', '%s',
+                      $actual   !== null ? '%f' : 'NULL',
+                      $forecast !== null ? '%f' : 'NULL',
+                      $previous !== null ? '%f' : 'NULL',
+                      '%f', '%s', '%s')
+            );
+
+            if ($result !== false) {
+                $written++;
+            }
+        }
+
+        return $written;
+    }
+
+    // Classify event name into a canonical event_type slug.
+    private function classify_event_type($event_name) {
+        $name = strtolower($event_name);
+        if (strpos($name, 'cpi') !== false || strpos($name, 'inflation') !== false) return 'cpi';
+        if (strpos($name, 'interest rate') !== false || strpos($name, 'rate decision') !== false) return 'rate_decision';
+        if (strpos($name, 'nonfarm') !== false || strpos($name, 'non-farm') !== false || strpos($name, 'nfp') !== false) return 'nfp';
+        if (strpos($name, 'gdp') !== false) return 'gdp';
+        if (strpos($name, 'unemployment') !== false || strpos($name, 'jobless') !== false) return 'unemployment';
+        if (strpos($name, 'pmi') !== false) return 'pmi';
+        if (strpos($name, 'retail sales') !== false) return 'retail_sales';
+        if (strpos($name, 'trade balance') !== false) return 'trade_balance';
+        return 'other';
+    }
+
+    // Score a fundamental event: returns -2.0 to +2.0.
+    // Positive = bullish for currency. Negative = bearish.
+    private function score_fundamental_event($event_type, $actual, $forecast, $previous) {
+        if ($event_type === 'rate_decision') {
+            // Rate hike = bullish (+1), cut = bearish (-1), hold = neutral (0).
+            if ($actual !== null && $previous !== null) {
+                if ($actual > $previous) return 1.0;
+                if ($actual < $previous) return -1.0;
+            }
+            return 0.0;
+        }
+
+        // For data releases: score by surprise magnitude relative to forecast.
+        if ($actual === null || $forecast === null || abs($forecast) < 1e-9) {
+            return 0.0;
+        }
+
+        $surprise = ($actual - $forecast) / abs($forecast);
+
+        // Map surprise to -2..+2 scale.
+        // Nonfarm payrolls and unemployment have inverted polarity for some directions:
+        // unemployment: higher = bearish, NFP: higher = bullish.
+        $polarity = ($event_type === 'unemployment') ? -1.0 : 1.0;
+        $scored   = $surprise * $polarity;
+
+        if ($scored >= 0.10)  return 2.0;
+        if ($scored >= 0.03)  return 1.0;
+        if ($scored <= -0.10) return -2.0;
+        if ($scored <= -0.03) return -1.0;
+        return 0.0;
+    }
+
+    // Recompute composite bias per currency from recent events with time decay.
+    // Events older than 30 days → 0.25x weight; older than 90 days → excluded.
+    // Returns count of currencies updated.
+    private function recompute_fundamental_bias() {
+        global $wpdb;
+
+        $events_table = $wpdb->prefix . 'smc_sf_fundamental_events';
+        $bias_table   = $wpdb->prefix . 'smc_sf_fundamental_bias';
+        $cutoff_90d   = gmdate('Y-m-d', strtotime('-90 days'));
+        $cutoff_30d   = gmdate('Y-m-d', strtotime('-30 days'));
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT currency, event_date, raw_score FROM {$events_table} WHERE event_date >= %s ORDER BY currency, event_date DESC",
+            $cutoff_90d
+        ), ARRAY_A);
+
+        // Aggregate per currency.
+        $aggregated = array();
+        foreach ((array) $rows as $row) {
+            $cur   = $row['currency'];
+            $date  = $row['event_date'];
+            $score = (float) $row['raw_score'];
+            $weight = ($date < $cutoff_30d) ? 0.25 : 1.0;
+
+            if (!isset($aggregated[$cur])) {
+                $aggregated[$cur] = array('sum' => 0.0, 'count' => 0);
+            }
+            $aggregated[$cur]['sum']   += $score * $weight;
+            $aggregated[$cur]['count'] += 1;
+        }
+
+        $updated = 0;
+        $now     = $this->now_mysql();
+        $expires = gmdate('Y-m-d H:i:s', strtotime('+30 minutes'));
+
+        foreach ($aggregated as $currency => $data) {
+            $composite = $data['count'] > 0 ? ($data['sum'] / $data['count']) : 0.0;
+            $composite = max(-2.0, min(2.0, $composite));
+
+            $category = 'NEUTRAL';
+            if ($composite >= 0.5)  $category = 'BULLISH';
+            if ($composite <= -0.5) $category = 'BEARISH';
+
+            $wpdb->replace(
+                $bias_table,
+                array(
+                    'currency'        => $currency,
+                    'composite_score' => round($composite, 2),
+                    'category'        => $category,
+                    'event_count'     => $data['count'],
+                    'computed_at'     => $now,
+                    'expires_at'      => $expires,
+                ),
+                array('%s', '%f', '%s', '%d', '%s', '%s')
+            );
+            $updated++;
+        }
+
+        return $updated;
+    }
+
+    // =========================================================================
+    // Phase 6: Signal Engine Dual-Run handlers
+    // =========================================================================
+
+    // POST /ea/signal-candidates — ingest MT5-generated signal candidates.
+    // Payload: { candidates: [ { id, symbol, direction, status, verdict,
+    //           entry_price, sl_price, tp_price, fib_level, fib_ratio,
+    //           fib_family, htf_bias, ltf_regime, confidence, created_at }, ... ] }
+    public function post_ea_signal_candidates(WP_REST_Request $request) {
+        global $wpdb;
+
+        $payload = $request->get_json_params();
+        if (!is_array($payload) || !isset($payload['candidates']) || !is_array($payload['candidates'])) {
+            return new WP_Error('invalid_payload', 'candidates array required', array('status' => 400));
+        }
+
+        $user_id         = get_current_user_id();
+        $table           = $wpdb->prefix . 'smc_sf_mt5_signal_candidates';
+        $valid_directions = array('LONG', 'SHORT');
+        $valid_status    = array('WATCH', 'ARMED', 'READY');
+        $valid_verdicts  = array('A+', 'A', 'B', 'C');
+        $written         = 0;
+        $failed          = 0;
+
+        foreach ($payload['candidates'] as $cand) {
+            if (!is_array($cand) || empty($cand['id']) || empty($cand['symbol'])) {
+                $failed++;
+                continue;
+            }
+
+            $id        = sanitize_text_field((string) $cand['id']);
+            $symbol    = preg_replace('/[^A-Z0-9]/', '', strtoupper(sanitize_text_field((string) $cand['symbol'])));
+            $direction = strtoupper(sanitize_text_field((string) ($cand['direction'] ?? 'LONG')));
+            $status    = strtoupper(sanitize_text_field((string) ($cand['status']    ?? 'WATCH')));
+            $verdict   = strtoupper(sanitize_text_field((string) ($cand['verdict']   ?? 'C')));
+
+            if (!in_array($direction, $valid_directions, true) ||
+                !in_array($status, $valid_status, true) ||
+                !in_array($verdict, $valid_verdicts, true)) {
+                $failed++;
+                continue;
+            }
+
+            $entry_price = isset($cand['entry_price']) && is_numeric($cand['entry_price']) ? (float) $cand['entry_price'] : 0.0;
+            $sl_price    = isset($cand['sl_price'])    && is_numeric($cand['sl_price'])    ? (float) $cand['sl_price']    : null;
+            $tp_price    = isset($cand['tp_price'])    && is_numeric($cand['tp_price'])    ? (float) $cand['tp_price']    : null;
+            $fib_level   = isset($cand['fib_level'])   && is_numeric($cand['fib_level'])   ? (float) $cand['fib_level']   : null;
+            $fib_ratio   = isset($cand['fib_ratio'])   && is_numeric($cand['fib_ratio'])   ? (float) $cand['fib_ratio']   : null;
+            $fib_family  = sanitize_text_field((string) ($cand['fib_family']  ?? ''));
+            $htf_bias    = sanitize_text_field((string) ($cand['htf_bias']    ?? ''));
+            $ltf_regime  = sanitize_text_field((string) ($cand['ltf_regime']  ?? ''));
+            $confidence  = max(0.0, min(1.0, (float) ($cand['confidence'] ?? 0.0)));
+            $created_at  = $this->now_mysql();
+
+            // Compare against Pine signals to classify drift.
+            $pine_match  = $this->classify_signal_drift($user_id, $symbol, $direction, $entry_price);
+
+            $result = $wpdb->replace(
+                $table,
+                array(
+                    'id'          => substr($id, 0, 64),
+                    'user_id'     => $user_id,
+                    'symbol'      => $symbol,
+                    'direction'   => $direction,
+                    'status'      => $status,
+                    'verdict'     => $verdict,
+                    'entry_price' => $entry_price,
+                    'sl_price'    => $sl_price,
+                    'tp_price'    => $tp_price,
+                    'fib_level'   => $fib_level,
+                    'fib_ratio'   => $fib_ratio,
+                    'fib_family'  => $fib_family,
+                    'htf_bias'    => $htf_bias,
+                    'ltf_regime'  => $ltf_regime,
+                    'confidence'  => $confidence,
+                    'pine_match'  => $pine_match,
+                    'source'      => 'mt5',
+                    'created_at'  => $created_at,
+                ),
+                array('%s', '%d', '%s', '%s', '%s', '%s', '%f',
+                      $sl_price   !== null ? '%f' : 'NULL',
+                      $tp_price   !== null ? '%f' : 'NULL',
+                      $fib_level  !== null ? '%f' : 'NULL',
+                      $fib_ratio  !== null ? '%f' : 'NULL',
+                      '%s', '%s', '%s', '%f', '%s', '%s', '%s')
+            );
+
+            if ($result !== false) {
+                $written++;
+            } else {
+                $failed++;
+            }
+        }
+
+        error_log(sprintf('[SMC_SF] ea/signal-candidates written=%d failed=%d user_id=%d', $written, $failed, $user_id));
+
+        return rest_ensure_response(array(
+            'ok'      => $failed === 0,
+            'written' => $written,
+            'failed'  => $failed,
+        ));
+    }
+
+    // Determine pine_match classification by comparing MT5 candidate against
+    // existing Pine-sourced signals in smc_sf_signals.
+    // Returns: EXACT / DRIFT / MISMATCH / NO_PINE
+    private function classify_signal_drift($user_id, $symbol, $direction, $mt5_entry) {
+        global $wpdb;
+
+        $pine_signal = $wpdb->get_row($wpdb->prepare(
+            "SELECT direction, engine FROM {$this->table('signals')} WHERE user_id = %d AND symbol = %s AND status != 'CLOSED' ORDER BY created_at DESC LIMIT 1",
+            $user_id, $symbol
+        ), ARRAY_A);
+
+        if (!$pine_signal) {
+            return 'NO_PINE';
+        }
+
+        if ($pine_signal['direction'] !== $direction) {
+            return 'MISMATCH';
+        }
+
+        // Extract Pine entry price from engine JSON to compute drift.
+        $engine = json_decode((string) ($pine_signal['engine'] ?? '{}'), true);
+        $pine_entry = isset($engine['ltfLevel']['price']) ? (float) $engine['ltfLevel']['price'] : null;
+
+        if ($pine_entry === null || $pine_entry <= 0) {
+            return 'DRIFT'; // direction matches but can't compute exact price drift
+        }
+
+        // Drift in pips: tolerate ≤ 20 pips for EXACT, up to 100 for DRIFT.
+        $pip_size   = (strpos($symbol, 'JPY') !== false) ? 0.01 : 0.0001;
+        $drift_pips = abs($mt5_entry - $pine_entry) / $pip_size;
+
+        if ($drift_pips <= 20.0)  return 'EXACT';
+        if ($drift_pips <= 100.0) return 'DRIFT';
+        return 'MISMATCH';
+    }
+
+    // GET /market-data/signal-drift — drift analysis report for dashboard.
+    // Shows MT5 vs Pine signal comparison for Phase 6 parity tracking.
+    public function get_market_data_signal_drift(WP_REST_Request $request) {
+        global $wpdb;
+
+        $user_id = get_current_user_id();
+        $table   = $wpdb->prefix . 'smc_sf_mt5_signal_candidates';
+
+        // Last 200 candidates, newest first.
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT symbol, direction, status, verdict, entry_price, sl_price, tp_price,
+                    fib_ratio, htf_bias, ltf_regime, confidence, pine_match, drift_pips, created_at
+             FROM {$table} WHERE user_id = %d ORDER BY created_at DESC LIMIT 200",
+            $user_id
+        ), ARRAY_A);
+
+        // Aggregate parity stats.
+        $total    = count($rows);
+        $exact    = 0; $drift = 0; $mismatch = 0; $no_pine = 0;
+        foreach ((array) $rows as $r) {
+            switch ($r['pine_match']) {
+                case 'EXACT':    $exact++;    break;
+                case 'DRIFT':    $drift++;    break;
+                case 'MISMATCH': $mismatch++; break;
+                default:         $no_pine++;  break;
+            }
+        }
+
+        $parity_pct = ($total > 0 && ($total - $no_pine) > 0)
+            ? round(($exact / ($total - $no_pine)) * 100, 1)
+            : null;
+
+        $candidates = array();
+        foreach ((array) $rows as $r) {
+            $candidates[] = array(
+                'symbol'      => $r['symbol'],
+                'direction'   => $r['direction'],
+                'status'      => $r['status'],
+                'verdict'     => $r['verdict'],
+                'entryPrice'  => (float) $r['entry_price'],
+                'slPrice'     => $r['sl_price'] !== null ? (float) $r['sl_price'] : null,
+                'tpPrice'     => $r['tp_price'] !== null ? (float) $r['tp_price'] : null,
+                'fibRatio'    => $r['fib_ratio'] !== null ? (float) $r['fib_ratio'] : null,
+                'htfBias'     => $r['htf_bias'],
+                'ltfRegime'   => $r['ltf_regime'],
+                'confidence'  => (float) $r['confidence'],
+                'pineMatch'   => $r['pine_match'],
+                'driftPips'   => $r['drift_pips'] !== null ? (float) $r['drift_pips'] : null,
+                'createdAt'   => $this->to_iso((string) $r['created_at']),
+            );
+        }
+
+        return rest_ensure_response(array(
+            'ok'          => true,
+            'parity' => array(
+                'total'      => $total,
+                'exact'      => $exact,
+                'drift'      => $drift,
+                'mismatch'   => $mismatch,
+                'no_pine'    => $no_pine,
+                'parity_pct' => $parity_pct,
+                'gate_target' => 95.0,
+                'gate_status' => ($parity_pct !== null && $parity_pct >= 95.0) ? 'PASS' : 'PENDING',
+            ),
+            'candidates'  => $candidates,
+        ));
+    }
+
+    // =========================================================================
+    // Phase 7: Controlled Manual Execution handlers (gated behind Phase 6)
+    // =========================================================================
+
+    // GET /ea/execution-queue — return approved execution requests for MT5 EA.
+    // Only returns PENDING requests that have passed risk checks.
+    // GATE: returns empty until Phase 6 parity ≥ 95% is confirmed in the DB.
+    public function get_ea_execution_queue(WP_REST_Request $request) {
+        global $wpdb;
+
+        $user_id = get_current_user_id();
+
+        // Phase 6 gate: block execution queue until parity requirement is met.
+        if (!$this->is_phase6_gate_cleared($user_id)) {
+            return rest_ensure_response(array(
+                'ok'       => true,
+                'gated'    => true,
+                'reason'   => 'Phase 6 parity gate not yet cleared (target: 95%)',
+                'requests' => array(),
+            ));
+        }
+
+        $table = $wpdb->prefix . 'smc_sf_execution_audit';
+        $rows  = $wpdb->get_results($wpdb->prepare(
+            "SELECT id, signal_id, symbol, direction, order_type, lots, entry_price, sl_price, tp_price
+             FROM {$table} WHERE user_id = %d AND status = 'PENDING' AND risk_check_passed = 1
+             ORDER BY requested_at ASC LIMIT 10",
+            $user_id
+        ), ARRAY_A);
+
+        $requests = array();
+        foreach ((array) $rows as $row) {
+            $requests[] = array(
+                'requestId'  => (int) $row['id'],
+                'signalId'   => $row['signal_id'],
+                'symbol'     => $row['symbol'],
+                'direction'  => $row['direction'],
+                'orderType'  => $row['order_type'],
+                'lots'       => (float) $row['lots'],
+                'entryPrice' => $row['entry_price'] !== null ? (float) $row['entry_price'] : null,
+                'slPrice'    => $row['sl_price']    !== null ? (float) $row['sl_price']    : null,
+                'tpPrice'    => $row['tp_price']    !== null ? (float) $row['tp_price']    : null,
+            );
+        }
+
+        return rest_ensure_response(array(
+            'ok'       => true,
+            'gated'    => false,
+            'requests' => $requests,
+        ));
+    }
+
+    // POST /ea/execution-ack — MT5 EA acknowledges execution result.
+    public function post_ea_execution_ack(WP_REST_Request $request) {
+        global $wpdb;
+
+        $payload = $request->get_json_params();
+        if (!is_array($payload) || !isset($payload['request_id'])) {
+            return new WP_Error('invalid_payload', 'request_id required', array('status' => 400));
+        }
+
+        $user_id    = get_current_user_id();
+        $request_id = (int) $payload['request_id'];
+        $status     = sanitize_text_field(strtoupper((string) ($payload['status'] ?? 'REJECTED')));
+        $mt5_ticket = isset($payload['mt5_ticket']) ? (int) $payload['mt5_ticket'] : null;
+        $exec_price = isset($payload['executed_price']) && is_numeric($payload['executed_price']) ? (float) $payload['executed_price'] : null;
+        $exec_lots  = isset($payload['executed_lots'])  && is_numeric($payload['executed_lots'])  ? (float) $payload['executed_lots']  : null;
+        $reject_rsn = sanitize_text_field((string) ($payload['reject_reason'] ?? ''));
+        $ack_at     = $this->now_mysql();
+
+        $table = $wpdb->prefix . 'smc_sf_execution_audit';
+
+        $updated = $wpdb->update(
+            $table,
+            array(
+                'status'        => $status,
+                'mt5_ticket'    => $mt5_ticket,
+                'executed_at'   => ($status === 'FILLED') ? $ack_at : null,
+                'ack_at'        => $ack_at,
+                'reject_reason' => $reject_rsn !== '' ? $reject_rsn : null,
+            ),
+            array('id' => $request_id, 'user_id' => $user_id),
+            array('%s', $mt5_ticket !== null ? '%d' : 'NULL', '%s', '%s', '%s'),
+            array('%d', '%d')
+        );
+
+        error_log(sprintf('[SMC_SF] ea/execution-ack request_id=%d status=%s mt5_ticket=%s user_id=%d',
+            $request_id, $status, (string) $mt5_ticket, $user_id));
+
+        return rest_ensure_response(array(
+            'ok'      => $updated !== false,
+            'updated' => (int) $updated,
+        ));
+    }
+
+    // POST /user/execution-request — operator submits an execution request from dashboard.
+    // Risk guardrails validated here before the request enters the queue.
+    public function post_user_execution_request(WP_REST_Request $request) {
+        global $wpdb;
+
+        $payload = $request->get_json_params();
+        if (!is_array($payload)) {
+            return new WP_Error('invalid_payload', 'JSON body required', array('status' => 400));
+        }
+
+        $user_id = get_current_user_id();
+
+        // Phase 6 gate.
+        if (!$this->is_phase6_gate_cleared($user_id)) {
+            return new WP_Error('phase6_gate', 'Execution is gated behind Phase 6 parity ≥ 95%', array('status' => 403));
+        }
+
+        $signal_id  = sanitize_text_field((string) ($payload['signal_id']  ?? ''));
+        $symbol     = preg_replace('/[^A-Z0-9]/', '', strtoupper(sanitize_text_field((string) ($payload['symbol'] ?? ''))));
+        $direction  = strtoupper(sanitize_text_field((string) ($payload['direction'] ?? '')));
+        $order_type = strtoupper(sanitize_text_field((string) ($payload['order_type'] ?? 'MARKET')));
+        $lots       = isset($payload['lots']) && is_numeric($payload['lots']) ? (float) $payload['lots'] : 0.0;
+        $entry      = isset($payload['entry_price']) && is_numeric($payload['entry_price']) ? (float) $payload['entry_price'] : null;
+        $sl         = isset($payload['sl_price']) && is_numeric($payload['sl_price']) ? (float) $payload['sl_price'] : null;
+        $tp         = isset($payload['tp_price']) && is_numeric($payload['tp_price']) ? (float) $payload['tp_price'] : null;
+
+        // Guardrail 1: SL is mandatory.
+        if ($sl === null || $sl <= 0) {
+            return new WP_Error('sl_required', 'sl_price is required for all execution requests', array('status' => 422));
+        }
+
+        // Guardrail 2: valid direction.
+        if (!in_array($direction, array('LONG', 'SHORT'), true)) {
+            return new WP_Error('invalid_direction', 'direction must be LONG or SHORT', array('status' => 422));
+        }
+
+        // Guardrail 3: lots > 0.
+        if ($lots <= 0.0 || $lots > 10.0) {
+            return new WP_Error('invalid_lots', 'lots must be between 0.01 and 10.0', array('status' => 422));
+        }
+
+        $table = $wpdb->prefix . 'smc_sf_execution_audit';
+        $now   = $this->now_mysql();
+
+        $result = $wpdb->insert(
+            $table,
+            array(
+                'user_id'          => $user_id,
+                'signal_id'        => $signal_id !== '' ? $signal_id : null,
+                'symbol'           => $symbol,
+                'direction'        => $direction,
+                'order_type'       => $order_type,
+                'lots'             => $lots,
+                'entry_price'      => $entry,
+                'sl_price'         => $sl,
+                'tp_price'         => $tp,
+                'status'           => 'PENDING',
+                'risk_check_passed' => 1,
+                'requested_at'     => $now,
+                'created_at'       => $now,
+            ),
+            array('%d', '%s', '%s', '%s', '%s', '%f',
+                  $entry !== null ? '%f' : 'NULL', '%f',
+                  $tp    !== null ? '%f' : 'NULL',
+                  '%s', '%d', '%s', '%s')
+        );
+
+        $this->audit($user_id, 'execution.request.created', array(
+            'signal_id' => $signal_id, 'symbol' => $symbol,
+            'direction' => $direction, 'lots' => $lots,
+        ));
+
+        return rest_ensure_response(array(
+            'ok'         => $result !== false,
+            'request_id' => $wpdb->insert_id,
+        ));
+    }
+
+    // GET /user/execution-audit — return execution audit trail for dashboard.
+    public function get_user_execution_audit(WP_REST_Request $request) {
+        global $wpdb;
+
+        $user_id = get_current_user_id();
+        $limit   = min(200, max(1, (int) ($request->get_param('limit') ?? 50)));
+        $table   = $wpdb->prefix . 'smc_sf_execution_audit';
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT id, signal_id, symbol, direction, order_type, lots, entry_price, sl_price, tp_price,
+                    mt5_ticket, status, reject_reason, risk_check_passed, requested_at, executed_at, ack_at
+             FROM {$table} WHERE user_id = %d ORDER BY requested_at DESC LIMIT %d",
+            $user_id, $limit
+        ), ARRAY_A);
+
+        $records = array();
+        foreach ((array) $rows as $r) {
+            $records[] = array(
+                'id'              => (int) $r['id'],
+                'signalId'        => $r['signal_id'],
+                'symbol'          => $r['symbol'],
+                'direction'       => $r['direction'],
+                'orderType'       => $r['order_type'],
+                'lots'            => (float) $r['lots'],
+                'entryPrice'      => $r['entry_price'] !== null ? (float) $r['entry_price'] : null,
+                'slPrice'         => $r['sl_price']    !== null ? (float) $r['sl_price']    : null,
+                'tpPrice'         => $r['tp_price']    !== null ? (float) $r['tp_price']    : null,
+                'mt5Ticket'       => $r['mt5_ticket']  !== null ? (int)   $r['mt5_ticket']  : null,
+                'status'          => $r['status'],
+                'rejectReason'    => $r['reject_reason'],
+                'riskCheckPassed' => (bool) $r['risk_check_passed'],
+                'requestedAt'     => $this->to_iso((string) $r['requested_at']),
+                'executedAt'      => $r['executed_at'] ? $this->to_iso((string) $r['executed_at']) : null,
+                'ackAt'           => $r['ack_at']      ? $this->to_iso((string) $r['ack_at'])      : null,
+            );
+        }
+
+        return rest_ensure_response(array(
+            'ok'      => true,
+            'records' => $records,
+        ));
+    }
+
+    // Check if Phase 6 parity gate is cleared (>= 95% parity in signal drift table).
+    private function is_phase6_gate_cleared($user_id) {
+        global $wpdb;
+
+        $table = $wpdb->prefix . 'smc_sf_mt5_signal_candidates';
+        $count = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} WHERE user_id = %d AND pine_match IS NOT NULL",
+            $user_id
+        ));
+
+        if ($count < 50) {
+            // Not enough data yet.
+            return false;
+        }
+
+        $exact = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} WHERE user_id = %d AND pine_match = 'EXACT'",
+            $user_id
+        ));
+
+        $comparable = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} WHERE user_id = %d AND pine_match != 'NO_PINE'",
+            $user_id
+        ));
+
+        if ($comparable === 0) return false;
+
+        $parity_pct = ($exact / $comparable) * 100.0;
+        return $parity_pct >= 95.0;
+    }
+
+    // =========================================================================
+    // Phase 8: Semi-Automation Approval Queue handlers
+    // =========================================================================
+
+    // GET /user/approval-queue — return pending signal approvals.
+    public function get_user_approval_queue(WP_REST_Request $request) {
+        global $wpdb;
+
+        $user_id = get_current_user_id();
+        $status  = sanitize_text_field((string) ($request->get_param('status') ?? 'PENDING'));
+        $table   = $wpdb->prefix . 'smc_sf_approval_queue';
+
+        // Expire old pending items automatically.
+        $wpdb->query($wpdb->prepare(
+            "UPDATE {$table} SET status = 'EXPIRED' WHERE user_id = %d AND status = 'PENDING' AND expires_at < %s",
+            $user_id, $this->now_mysql()
+        ));
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT id, signal_id, signal_data, regime_data, fundamental_data, risk_data,
+                    status, operator_note, created_at, reviewed_at, expires_at
+             FROM {$table} WHERE user_id = %d AND status = %s ORDER BY created_at DESC LIMIT 50",
+            $user_id, $status
+        ), ARRAY_A);
+
+        $items = array();
+        foreach ((array) $rows as $r) {
+            $items[] = array(
+                'id'              => $r['id'],
+                'signalId'        => $r['signal_id'],
+                'signal'          => json_decode((string) $r['signal_data'], true),
+                'regime'          => $r['regime_data']      ? json_decode((string) $r['regime_data'], true) : null,
+                'fundamentals'    => $r['fundamental_data'] ? json_decode((string) $r['fundamental_data'], true) : null,
+                'risk'            => $r['risk_data']        ? json_decode((string) $r['risk_data'], true) : null,
+                'status'          => $r['status'],
+                'operatorNote'    => $r['operator_note'],
+                'createdAt'       => $this->to_iso((string) $r['created_at']),
+                'reviewedAt'      => $r['reviewed_at'] ? $this->to_iso((string) $r['reviewed_at']) : null,
+                'expiresAt'       => $this->to_iso((string) $r['expires_at']),
+            );
+        }
+
+        return rest_ensure_response(array(
+            'ok'    => true,
+            'items' => $items,
+        ));
+    }
+
+    // POST /user/approval-queue/review — approve or reject a queued signal.
+    public function post_approval_queue_review(WP_REST_Request $request) {
+        global $wpdb;
+
+        $payload = $request->get_json_params();
+        if (!is_array($payload) || empty($payload['id'])) {
+            return new WP_Error('invalid_payload', 'id required', array('status' => 400));
+        }
+
+        $user_id  = get_current_user_id();
+        $id       = sanitize_text_field((string) $payload['id']);
+        $decision = strtoupper(sanitize_text_field((string) ($payload['decision'] ?? '')));
+        $note     = sanitize_text_field((string) ($payload['note'] ?? ''));
+
+        if (!in_array($decision, array('APPROVED', 'REJECTED'), true)) {
+            return new WP_Error('invalid_decision', 'decision must be APPROVED or REJECTED', array('status' => 422));
+        }
+
+        $table = $wpdb->prefix . 'smc_sf_approval_queue';
+
+        $updated = $wpdb->update(
+            $table,
+            array(
+                'status'        => $decision,
+                'operator_note' => substr($note, 0, 512),
+                'reviewed_at'   => $this->now_mysql(),
+            ),
+            array('id' => $id, 'user_id' => $user_id, 'status' => 'PENDING'),
+            array('%s', '%s', '%s'),
+            array('%s', '%d', '%s')
+        );
+
+        $this->audit($user_id, 'approval_queue.reviewed', array(
+            'id' => $id, 'decision' => $decision,
+        ));
+
+        return rest_ensure_response(array(
+            'ok'      => $updated !== false && $updated > 0,
+            'updated' => (int) $updated,
+        ));
+    }
+
+    // =========================================================================
+    // Phase 9: SaaS & Licensing System handlers
+    // =========================================================================
+
+    // GET /user/license — return current license tier for the requesting user.
+    public function get_user_license(WP_REST_Request $request) {
+        global $wpdb;
+
+        $user_id = get_current_user_id();
+        $table   = $wpdb->prefix . 'smc_sf_license_tiers';
+
+        $row = $wpdb->get_row($wpdb->prepare(
+            "SELECT tier, max_symbols, max_ea_sessions, execution_enabled, api_access_enabled, expires_at, updated_at
+             FROM {$table} WHERE user_id = %d",
+            $user_id
+        ), ARRAY_A);
+
+        // Return a default free-tier record if none exists yet.
+        if (!$row) {
+            return rest_ensure_response(array(
+                'ok'     => true,
+                'source' => 'default',
+                'license' => array(
+                    'tier'              => 'Basic',
+                    'maxSymbols'        => 5,
+                    'maxEaSessions'     => 1,
+                    'executionEnabled'  => false,
+                    'apiAccessEnabled'  => false,
+                    'expiresAt'         => null,
+                    'updatedAt'         => null,
+                ),
+            ));
+        }
+
+        $expired = $row['expires_at'] && strtotime($row['expires_at']) < time();
+
+        return rest_ensure_response(array(
+            'ok'     => true,
+            'source' => 'db',
+            'license' => array(
+                'tier'              => $expired ? 'Basic' : $row['tier'],
+                'maxSymbols'        => $expired ? 5  : (int)  $row['max_symbols'],
+                'maxEaSessions'     => $expired ? 1  : (int)  $row['max_ea_sessions'],
+                'executionEnabled'  => $expired ? false : (bool) $row['execution_enabled'],
+                'apiAccessEnabled'  => $expired ? false : (bool) $row['api_access_enabled'],
+                'expiresAt'         => $row['expires_at'] ? $this->to_iso((string) $row['expires_at']) : null,
+                'updatedAt'         => $row['updated_at'] ? $this->to_iso((string) $row['updated_at']) : null,
+                'expired'           => $expired,
+            ),
+        ));
+    }
+
+    // POST /admin/license/set-tier — set license tier for a user (admin only).
+    public function post_admin_set_license_tier(WP_REST_Request $request) {
+        global $wpdb;
+
+        $payload = $request->get_json_params();
+        if (!is_array($payload) || !isset($payload['user_id'], $payload['tier'])) {
+            return new WP_Error('invalid_payload', 'user_id and tier required', array('status' => 400));
+        }
+
+        $target_user  = (int) $payload['user_id'];
+        $tier         = sanitize_text_field((string) $payload['tier']);
+        $valid_tiers  = array('Basic', 'Pro', 'Elite', 'Institutional');
+
+        if (!in_array($tier, $valid_tiers, true)) {
+            return new WP_Error('invalid_tier', 'tier must be one of: ' . implode(', ', $valid_tiers), array('status' => 422));
+        }
+
+        $tier_config = array(
+            'Basic'         => array('max_symbols' => 5,  'max_ea_sessions' => 1, 'execution' => 0, 'api' => 0),
+            'Pro'           => array('max_symbols' => 15, 'max_ea_sessions' => 2, 'execution' => 0, 'api' => 0),
+            'Elite'         => array('max_symbols' => 30, 'max_ea_sessions' => 3, 'execution' => 1, 'api' => 0),
+            'Institutional' => array('max_symbols' => 60, 'max_ea_sessions' => 5, 'execution' => 1, 'api' => 1),
+        );
+
+        $cfg     = $tier_config[$tier];
+        $expires = isset($payload['expires_at']) ? sanitize_text_field((string) $payload['expires_at']) : null;
+        $now     = $this->now_mysql();
+        $table   = $wpdb->prefix . 'smc_sf_license_tiers';
+
+        $wpdb->replace(
+            $table,
+            array(
+                'user_id'           => $target_user,
+                'tier'              => $tier,
+                'max_symbols'       => $cfg['max_symbols'],
+                'max_ea_sessions'   => $cfg['max_ea_sessions'],
+                'execution_enabled' => $cfg['execution'],
+                'api_access_enabled' => $cfg['api'],
+                'expires_at'        => $expires,
+                'created_at'        => $now,
+                'updated_at'        => $now,
+            ),
+            array('%d', '%s', '%d', '%d', '%d', '%d', '%s', '%s', '%s')
+        );
+
+        $this->audit(get_current_user_id(), 'license.tier.set', array(
+            'target_user' => $target_user, 'tier' => $tier, 'expires_at' => $expires,
+        ));
+
+        return rest_ensure_response(array(
+            'ok'          => true,
+            'user_id'     => $target_user,
+            'tier'        => $tier,
+            'expires_at'  => $expires,
         ));
     }
 
