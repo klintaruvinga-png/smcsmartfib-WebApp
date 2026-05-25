@@ -1,9 +1,9 @@
 # SMC SuperFIB → MT5 Migration Status Board
 
-**Last Updated**: 2026-05-24  
-**Current Phase**: 3 (MT5 Market Data Engine — 72h stability soak in progress)  
-**Overall Progress**: 75% (recalculated: Phase 5B added; 3/12 phases complete)  
-**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 browser verification PASSED (2026-05-22); 72h soak window open — Phase 5B (Fundamentals Regime Feed) added to plan
+**Last Updated**: 2026-05-25  
+**Current Phase**: 4 (Fib Engine Migration — NOT-STARTED; awaiting Track A lead assignment)  
+**Overall Progress**: 75% (recalculated: Phase 5B added; 3/12 phases complete — Phase 3 gate PASSED 2026-05-25)  
+**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 COMPLETE (2026-05-25, gate CONDITIONAL PASS; T0 admin baseline capture pending operator action) — Phase 4 authorized to start
 
 > Snapshot: Phase 0 gate passed 2026-05-15. Post-fix validation soak at 16:37 UTC confirmed NAS100 (29,263.70) and US30 (49,756.00) both LIVE during active US equity session; XAUUSD (4,556.34) LIVE with candle-history gate cleared. Backend soak: 259,464 engine runs / 0 errors / 69,262 candles over 24h. Frontend feed-status chip lag (BUG-001 staleTime:0) resolved. Watchlist persistence 100% parity. AUDUSD/ETHUSD chop-gate classified as correct live behavior — not a blocker. Full closeout evidence: `.github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md`.
 
@@ -16,7 +16,7 @@
 | 0 | Stabilize existing platform | **COMPLETE** | 100% | None — gate passed 2026-05-15 | 2026-05-15 ✅ |
 | 1 | MT5 bridge infrastructure | **COMPLETE** | 100% | None — gate passed 2026-05-20 | 2026-06-01 ✅ |
 | 2 | Read-only trade telemetry | **COMPLETE** | 100% | None — gate passed 2026-05-22 | 2026-05-22 ✅ |
-| 3 | MT5 market data engine | IN-PROGRESS | 90% | 72h stability soak pending (soak window opened 2026-05-22); NAS100/US30 EA config item (non-blocking) | 2026-07-15 |
+| 3 | MT5 market data engine | **COMPLETE** | 100% | None — gate CONDITIONAL PASS 2026-05-25; T0 admin baseline capture pending (operator action, non-blocking) | 2026-05-25 ✅ |
 | 4 | Fib engine migration | NOT-STARTED | 0% | Phase 3 complete | 2026-08-15 |
 | 5 | Regime & chop engine | NOT-STARTED | 0% | Phase 4 complete | 2026-09-15 |
 | 5B | Fundamentals regime feed | NOT-STARTED | 0% | Phase 5 complete | 2026-10-01 |
@@ -194,7 +194,7 @@ Market-Stream Auth:
 
 **Objective**: EA becomes authoritative market-data collector  
 **Owner**: Track A + Track B  
-**Status**: IN-PROGRESS (75%) — Track A EA candle engine COMPLETE; Track B backend freshness layer COMPLETE; live browser verification + 72h soak pending
+**Status**: COMPLETE — Track A EA candle engine COMPLETE; Track B backend freshness layer COMPLETE; browser verification PASSED 2026-05-22; 72h stability soak CLOSED 2026-05-25; gate CONDITIONAL PASS
 **Prerequisites**: Phase 2 complete ✅ (gate passed 2026-05-22)  
 **Planning Branch**: `codex/smc-intake-create-phase3-implementation-md-and-o`
 **Readiness Package Target**: [PHASE3_IMPLEMENTATION.md](../PHASE3_IMPLEMENTATION.md)
@@ -206,12 +206,12 @@ Market-Stream Auth:
 
 ### Success Criteria
 - [x] No fake-live states — TD rate-limit transients cleared on every MT5 push; freshness gated by broker timestamp age; synthetic `updatedAt` fabrication in `build_symbol_state()` patched 2026-05-24 (commit `6f3c835`)
-- [ ] No frozen live feeds — 72h soak window OPEN from 2026-05-22
+- [x] No frozen live feeds — 72h soak CLOSED 2026-05-25; 97,262 engine runs / 0 errors in final 24h; no frozen feeds detected
 - [x] Fresh/stale detection accurate — LIVE/DELAYED/STALE/CLOSED enforced in EA + backend; parity audit PASS; browser confirmed 2026-05-22
 
 ### Test Checklist
 - [x] Low/high volatility — FreshnessEngine thresholds handle tick gaps correctly
-- [ ] Weekend freeze — pending live weekend session observation
+- [x] Weekend freeze — CONFIRMED 2026-05-25: FX/equity CLOSED, crypto LIVE, EA resumed Sunday open; offline root cause = broker session availability, not code failure
 - [x] Broker lag — staleness guard rejects payloads >300s; warns at 120–300s with audit trail
 - [x] Symbol suffix handling — `SymbolNormalizer.mqh` + `ResolveBrokerSymbol()` resolve broker-specific suffixes
 
@@ -537,6 +537,7 @@ Confluence Detection: [PENDING]
 
 | Report | Date | Phase | Issues Found | Status |
 |--------|------|-------|--------------|--------|
+| `BUG_SWEEP_REPORT_2026-05-25.md` | 2026-05-25 | 3 | 3 confirmed (2 HIGH, 1 MEDIUM) — all in regression harness, not production logic; admin soak DOM restored, Vitest scope hardened, streak fixture corrected | Verified |
 | `BUG_SWEEP_REPORT_2026-05-24.md` | 2026-05-24 | 2/3 | 1 confirmed (HIGH synthetic quote timestamp in `build_symbol_state()`) — patched; `updatedAt=null` for missing-price path; GBPUSD candle-only regression added | Verified |
 | `BUG_SWEEP_REPORT_2026-05-22.md` | 2026-05-22 | 2 | 1 confirmed (LOW lint/Prettier) — patched; 0 critical/high; all core systems confirmed correct | Verified |
 | `BUG_SWEEP_REPORT_2026-05-10.md` | 2026-05-10 | 0 | 3 confirmed (1 high DB growth, 2 low dead methods) — all patched | Verified |
@@ -554,6 +555,7 @@ Confluence Detection: [PENDING]
 | Week | Generated | Phases On-Track | Phases At-Risk | Phases Blocked | Action Items |
 |------|-----------|-----------------|----------------|----------------|--------------|
 | 2026-W20 | 2026-05-14 | Phase 1 groundwork | Phase 0 signal/freshness parity closeout | Phase 0 | Fix NAS100/US30 freshness, XAUUSD candle history, and chop-gate blockers before any phase advance |
+| 2026-W21 | 2026-05-25 | Phase 3 COMPLETE — Phase 4 authorized | Phase 4 Track A lead unassigned | None | 72h soak CLOSED. Gate CONDITIONAL PASS. Bug sweep harness repaired. Phase 4 docs created. T0 admin baseline pending operator. |
 | 2026-W20 | 2026-05-15 | Phase 0 COMPLETE — Phase 1 active | Phase 1 live bridge validation | None | NAS100/US30/XAUUSD live validated. Frontend fixed. Watchlist persistence 100%. Phase 0 gate PASSED. |
 
 > **Auto-generated**: Every Sunday by migration project manager agent
@@ -587,7 +589,7 @@ Confluence Detection: [PENDING]
 - Parity Audit Archives: `.github/migration/audits/`
 - Phase Checklists / Updates: `.github/migration/phase-updates/`
 - Test Logs: `.github/migration/test-logs/`
-- Risk Register: Not yet created; track active blockers in this board and in phase closeout artifacts
+- Risk Register: `.github/migration/RISK_REGISTER.md` (created 2026-05-25)
 
 ---
 

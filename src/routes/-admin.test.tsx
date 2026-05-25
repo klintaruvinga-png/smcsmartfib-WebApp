@@ -1,3 +1,4 @@
+/* @vitest-environment jsdom */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { EngineHealth, SoakReport } from "@/types/sniper";
@@ -532,11 +533,12 @@ describe("AdminPage", () => {
     await waitFor(() => {
       expect(apiMocks.upsertSoakEvidence).toHaveBeenCalled();
     });
-    const payload = apiMocks.upsertSoakEvidence.mock.calls.at(-1)?.[0] as
-      | Array<{ evidence_key: string; evidence_value: string }>
-      | undefined;
-    expect(payload).toBeDefined();
-    expect(payload).toEqual(
+    const payloads = apiMocks.upsertSoakEvidence.mock.calls.map((call) => call[0]) as Array<{
+      evidence_key: string;
+      evidence_value: string;
+    }>;
+    expect(payloads).not.toHaveLength(0);
+    expect(payloads).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           evidence_key: "baseline.soak_type",
@@ -562,6 +564,7 @@ describe("AdminPage", () => {
     apiMocks.fetchSoakReport
       .mockResolvedValueOnce(phase0Report)
       .mockResolvedValueOnce(phase0Report);
+    apiMocks.upsertSoakEvidence.mockResolvedValue([]);
 
     render(<AdminPage />);
 
@@ -569,10 +572,25 @@ describe("AdminPage", () => {
     selectSoakType("PHASE_3_STABILITY_72H");
     expect(screen.getByRole("heading", { name: "Phase 3 - Stability Soak" })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Refresh soak report" }));
+    fireEvent.change(screen.getByPlaceholderText("soak-feed-window-2026-05-10"), {
+      target: { value: "phase3-manual-refresh" },
+    });
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        "Describe the observation, pasted log lines, screenshot reference, or SQL result.",
+      ),
+      { target: { value: "Verify manual soak type selection survives a report refresh." } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save Evidence" }));
+
     await waitFor(() => {
       expect(apiMocks.fetchSoakReport).toHaveBeenCalledTimes(2);
     });
+    expect(apiMocks.upsertSoakEvidence).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evidence_key: "phase3-manual-refresh",
+      }),
+    );
     expect(screen.getByRole("heading", { name: "Phase 3 - Stability Soak" })).toBeTruthy();
   });
 

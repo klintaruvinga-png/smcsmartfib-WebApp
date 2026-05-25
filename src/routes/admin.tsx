@@ -2011,7 +2011,10 @@ function toneForStatus(value: string | undefined): "positive" | "warning" | "cri
   }
 }
 
-function buildSoakReportMarkdown(report: SoakReport, template: { label: string; soakType: string }): string {
+function buildSoakReportMarkdown(
+  report: SoakReport,
+  template: { label: string; soakType: string },
+): string {
   const evidenceMap = indexEvidenceByKey(report.manual_evidence);
   const evidenceLines =
     report.manual_evidence.length === 0
@@ -2033,14 +2036,9 @@ function buildSoakReportMarkdown(report: SoakReport, template: { label: string; 
     ? `- ${formatTimestamp(report.baseline_checkpoint.created_at)} | ${report.baseline_checkpoint.operator_notes ?? "No operator notes"}`
     : "- Pending";
 
-  const soakPurpose =
-    evidenceMap["baseline.soak_purpose"] ?? evidenceMap["soak.purpose"] ?? "";
+  const soakPurpose = evidenceMap["baseline.soak_purpose"] ?? evidenceMap["soak.purpose"] ?? "";
 
-  const reportLines = [
-    `# ${template.label}`,
-    "",
-    `Soak type: ${template.soakType}`,
-  ];
+  const reportLines = [`# ${template.label}`, "", `Soak type: ${template.soakType}`];
 
   if (soakPurpose) {
     reportLines.push(`Soak objective: ${soakPurpose}`, "");
@@ -2048,13 +2046,7 @@ function buildSoakReportMarkdown(report: SoakReport, template: { label: string; 
     reportLines.push("");
   }
 
-  reportLines.push(
-    `Generated at: ${report.generated_at}`,
-    "",
-    "## Baseline",
-    baselineLine,
-    "",
-  );
+  reportLines.push(`Generated at: ${report.generated_at}`, "", "## Baseline", baselineLine, "");
 
   return [
     ...reportLines,

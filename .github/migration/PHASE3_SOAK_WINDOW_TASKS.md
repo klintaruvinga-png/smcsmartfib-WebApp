@@ -28,56 +28,56 @@
 
 ### 🟡 Priority 2 — Documentation & Reporting
 
-- [ ] **TASK 3 — Generate W21 weekly status report**
+- [x] **TASK 3 — Generate W21 weekly status report**
   - Output: `.github/migration/weekly-status-2026-05-22.md`
   - Covers: Phases 0–3 progress, Phase 4 readiness gap, CI blocker, soak window status
   - Last report: 2026-05-15 (W20) — 7 days overdue
-  - **Status**: ⏳ Pending
+  - **Status**: ✅ Complete (2026-05-25)
 
-- [ ] **TASK 4 — Create Risk Register**
+- [x] **TASK 4 — Create Risk Register**
   - Output: `.github/migration/RISK_REGISTER.md`
   - Covers: active risks for Phase 4 (fib drift, replay methodology, 99% parity gate, CI pipeline, track lead gaps)
   - Migration board currently says "Not yet created"
-  - **Status**: ⏳ Pending
+  - **Status**: ✅ Complete (2026-05-25)
 
-- [ ] **TASK 5 — Create Phase 3 closeout artifact template**
+- [x] **TASK 5 — Create Phase 3 closeout artifact template**
   - Output: `.github/migration/phase-updates/phase3-soak-closeout-template.md`
   - Pre-populate with the 3 gate queries and pass criteria from the soak tracking plan
   - Fill in with actual DB numbers at 2026-05-25
-  - **Status**: ⏳ Pending
+  - **Status**: ✅ Complete (2026-05-25) — results table and gate decision filled from soak closeout record
 
 ---
 
 ### 🟡 Priority 3 — Phase 4 Readiness (Planning Only)
 
-- [ ] **TASK 6 — Audit Pine fib baseline and document as Phase 4 spec**
+- [x] **TASK 6 — Audit Pine fib baseline and document as Phase 4 spec**
   - Review: `class-market-data-service.php` `fib_levels_from_candles()`, `test-fib-parity.php`, `test-session-anchors.php`, `test-superfib-weighting.php`
   - Extract: session anchor ladder, SuperFib recency weights (0.40/0.35/0.25), HTF_AF logic, compression guard
   - Output: fib parity spec section inside `PHASE4_IMPLEMENTATION.md` — becomes the Phase 4 parity target
-  - **Status**: ⏳ Pending
+  - **Status**: ✅ Complete (2026-05-25) — fib spec (16 ratios, LTF_SF/HTF_AF families, anchor weighting) documented in `PHASE4_IMPLEMENTATION.md`
 
-- [ ] **TASK 7 — Create `PHASE4_IMPLEMENTATION.md`**
+- [x] **TASK 7 — Create `PHASE4_IMPLEMENTATION.md`**
   - Output: `PHASE4_IMPLEMENTATION.md` (root, alongside PHASE3_IMPLEMENTATION.md)
   - Covers: MT5 Fib Engine design — Swap Fib 1, Bull Run Fib, Swap Fib 2, extensions, premium/discount zones
   - Architecture only — no MQL5 code
-  - **Status**: ⏳ Pending
+  - **Status**: ✅ Complete (2026-05-25)
 
-- [ ] **TASK 8 — Create `PHASE4_TESTING_GUIDE.md`**
+- [x] **TASK 8 — Create `PHASE4_TESTING_GUIDE.md`**
   - Output: `PHASE4_TESTING_GUIDE.md` (root)
   - Covers: parity validator design, historical replay methodology, acceptable drift thresholds, multi-pair/timeframe matrix
   - Gate target: 99%+ fib parity
-  - **Status**: ⏳ Pending
+  - **Status**: ✅ Complete (2026-05-25)
 
 ---
 
 ### 🟢 Priority 4 — Weekend Observation (Passive — Soak Window Covers Sat/Sun)
 
-- [ ] **TASK 9 — Observe and record weekend session behaviour**
+- [x] **TASK 9 — Observe and record weekend session behaviour**
   - Observe on Sat 2026-05-23: Do FX symbols show `state=offline` (CLOSED)? Does crypto (BTC/ETH/SOL) stay LIVE?
   - Observe on Sun 2026-05-25: Does EA resume correctly when market opens (Sydney session ~22:00 UTC Sun)?
   - Closes: Phase 0 deferred `[ ] Weekend behavior` AND Phase 3 `[ ] Weekend freeze` test checklist items
   - Record: screenshot or DB snapshot of `smc_sf_snapshots.state` per symbol during weekend hours
-  - **Status**: ⏳ Pending (window: Sat 2026-05-23 → Sun 2026-05-25)
+  - **Status**: ✅ Complete (2026-05-25) — recorded in `reports/phase3-closeout.md` §3: FX offline, crypto LIVE, EA resumed on Sunday open; offline root cause = broker session availability, not code failure
 
 - [ ] **TASK 10 — Assign Track leads**
   - All three tracks (Track A, B, C) still show `*TBD*` in the migration board

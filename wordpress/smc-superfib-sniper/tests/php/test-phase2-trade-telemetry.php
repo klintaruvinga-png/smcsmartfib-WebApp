@@ -729,6 +729,12 @@ function test_phase2_trade_telemetry() {
         'summary' => wp_json_encode(array('source' => 'explicit_heartbeat')),
         'created_at' => gmdate('Y-m-d H:i:s', time() - 5),
     ));
+    $wpdb->insert('wp_smc_sf_engine_runs', array(
+        'user_id' => 7,
+        'status' => 'complete',
+        'summary' => wp_json_encode(array('source' => 'engine_batch', 'symbols' => array('EURUSD'), 'signals' => 1)),
+        'created_at' => gmdate('Y-m-d H:i:s', time() - 5),
+    ));
     $progress_response = $plugin->get_user_progress();
     phase2_assert_true($progress_response instanceof WP_REST_Response, 'GET /user/progress must return a REST response');
     phase2_assert_same(10125.0, (float) ($progress_response->data['equity_pulse']['equity_usc'] ?? 0), 'Progress equity must mirror account telemetry equity');
@@ -920,9 +926,10 @@ function test_progress_streak_live_state_with_consecutive_run_fixtures() {
     $today     = gmdate('Y-m-d H:i:s');
     $yesterday = gmdate('Y-m-d H:i:s', strtotime('-1 day'));
     $two_ago   = gmdate('Y-m-d H:i:s', strtotime('-2 days'));
-    $wpdb->insert('wp_smc_sf_engine_runs', array('user_id' => 7, 'status' => 'heartbeat', 'summary' => '{}', 'created_at' => $today));
-    $wpdb->insert('wp_smc_sf_engine_runs', array('user_id' => 7, 'status' => 'heartbeat', 'summary' => '{}', 'created_at' => $yesterday));
-    $wpdb->insert('wp_smc_sf_engine_runs', array('user_id' => 7, 'status' => 'heartbeat', 'summary' => '{}', 'created_at' => $two_ago));
+    $complete_summary = wp_json_encode(array('source' => 'engine_batch', 'symbols' => array('EURUSD'), 'signals' => 1));
+    $wpdb->insert('wp_smc_sf_engine_runs', array('user_id' => 7, 'status' => 'complete', 'summary' => $complete_summary, 'created_at' => $today));
+    $wpdb->insert('wp_smc_sf_engine_runs', array('user_id' => 7, 'status' => 'complete', 'summary' => $complete_summary, 'created_at' => $yesterday));
+    $wpdb->insert('wp_smc_sf_engine_runs', array('user_id' => 7, 'status' => 'complete', 'summary' => $complete_summary, 'created_at' => $two_ago));
 
     // Seed account telemetry so equity_pulse resolves.
     $wpdb->replace('wp_smc_sf_account_telemetry', array(
