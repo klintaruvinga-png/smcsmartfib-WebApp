@@ -29,7 +29,7 @@ private:
     datetime brokerUtcOffset;
 
     // Session store — parallel arrays acting as a keyed map (max 2048 sessions)
-    static const int MAX_SESSIONS = 2048;
+    enum { MAX_SESSIONS = 2048 };
     long   sessionKeys[2048];
     double sessionHighs[2048];
     double sessionLows[2048];
