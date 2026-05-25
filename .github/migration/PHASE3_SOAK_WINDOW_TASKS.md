@@ -80,11 +80,11 @@
   - Record: screenshot or DB snapshot of `smc_sf_snapshots.state` per symbol during weekend hours
   - **Status**: ✅ Complete (2026-05-25) — recorded in `reports/phase3-closeout.md` §3: FX offline, crypto LIVE, EA resumed on Sunday open; offline root cause = broker session availability, not code failure
 
-- [ ] **TASK 10 — Assign Track leads**
+- [x] **TASK 10 — Assign Track leads**
   - All three tracks (Track A, B, C) still show `*TBD*` in the migration board
   - Update `.github/migration-status.md` Track Assignments table with actual names
   - Required before Phase 4 starts (Track A owns all of Phase 4)
-  - **Status**: ⏳ Pending
+  - **Status**: ✅ Complete (2026-05-25) — all three tracks assigned to admin (klintaruvinga@gmail.com)
 
 ---
 

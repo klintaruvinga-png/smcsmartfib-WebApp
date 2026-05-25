@@ -10,7 +10,7 @@
 
 | ID | Risk | Severity | Probability | Phase Impact | Owner | Mitigation | Status |
 |----|------|----------|-------------|--------------|-------|-----------|--------|
-| RISK-01 | No track leads assigned — Track A owns all of Phase 4; no assigned owner means no accountability for fib engine delivery | HIGH | HIGH | Phase 4 blocked in practice without Track A lead | Project | Assign Track A/B/C leads before Phase 4 work starts | OPEN |
+| RISK-01 | ~~No track leads assigned~~ — **RESOLVED 2026-05-25**: all three tracks (A/B/C) assigned to admin (klintaruvinga@gmail.com) | HIGH | RESOLVED | None | — | — | RESOLVED |
 | RISK-02 | 99% fib parity gate is stricter than any prior phase (Phase 5/6 used 95%) — MT5 fib calculation may drift from Pine at edge anchors or sparse candle datasets | HIGH | MEDIUM | Phase 4 gate may fail on first attempt; extends timeline | Track A | Build parity validator before fib engine; replay against known Pine outputs as spec | OPEN |
 | RISK-03 | Regime and signal replay suites are absent from the focused regression command — parity regressions in those paths will not be caught by the daily CI run | MEDIUM | HIGH | Covered-path regression may miss drift in regime/signal authority | Track B | Add dedicated regime replay suite; add multi-case signal replay suite (GAP-01, GAP-02) | OPEN |
 | RISK-04 | ~~NAS100/US30 not in EA Symbols~~ — **RESOLVED 2026-05-25**: NAS100/US30 ARE present in EA as Deriv broker names `US Tech 100` and `Wall Street 30`. SymbolNormalizer alias map correctly resolves both to canonical symbols. Offline status in closeout snapshot (04:17 UTC) is expected pre-market behaviour (equities open 13:30 UTC EDT). No action required. | LOW | RESOLVED | None | — | — | RESOLVED |

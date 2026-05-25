@@ -32,9 +32,9 @@
 
 | Track | Lead | Phase Focus | Status |
 |-------|------|------------|--------|
-| **Track A — MT5 EA** | *TBD* | Phases 1–7 (bridge, telemetry, candle engine, fib, regime, signal, execution) | Phase 1 COMPLETE (2026-05-20) — Phase 2 implementation validated by Track A signoff |
-| **Track B — Backend** | *TBD* | Phases 1–9 (APIs, freshness, telemetry, licensing) | Phase 1 COMPLETE (2026-05-20) — Phase 2 implementation validated by Track B signoff |
-| **Track C — Dashboard** | *TBD* | Phases 2–9 (visualization, execution console, analytics) | Phase 0 complete — Phase 2 dashboard read-only implementation validated by Track C signoff |
+| **Track A — MT5 EA** | admin | Phases 1–7 (bridge, telemetry, candle engine, fib, regime, signal, execution) | Phase 1 COMPLETE (2026-05-20) — Phase 2 implementation validated by Track A signoff |
+| **Track B — Backend** | admin | Phases 1–9 (APIs, freshness, telemetry, licensing) | Phase 1 COMPLETE (2026-05-20) — Phase 2 implementation validated by Track B signoff |
+| **Track C — Dashboard** | admin | Phases 2–9 (visualization, execution console, analytics) | Phase 0 complete — Phase 2 dashboard read-only implementation validated by Track C signoff |
 
 ---
 
@@ -630,6 +630,6 @@ Confluence Detection: [PENDING]
 
 | Track | Lead | Email | Scope | Status |
 |-------|------|-------|-------|--------|
-| Track A — MT5 EA | *TBD* | *TBD* | Phases 1–7 | Phase 1 COMPLETE (2026-05-20) — Phase 2 telemetry contract sign-off pending |
-| Track B — Backend | *TBD* | *TBD* | Phases 1–9 | Phase 1 COMPLETE (2026-05-20) — Phase 2 planning in progress |
-| Track C — Dashboard | *TBD* | *TBD* | Phases 2–9 | Phase 0 complete — Phase 1 unblocked |
+| Track A — MT5 EA | admin | klintaruvinga@gmail.com | Phases 1–7 | Phase 1 COMPLETE (2026-05-20) — Phase 2 telemetry contract sign-off pending |
+| Track B — Backend | admin | klintaruvinga@gmail.com | Phases 1–9 | Phase 1 COMPLETE (2026-05-20) — Phase 2 planning in progress |
+| Track C — Dashboard | admin | klintaruvinga@gmail.com | Phases 2–9 | Phase 0 complete — Phase 1 unblocked |

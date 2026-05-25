@@ -63,7 +63,7 @@ CPU:            AVX2 + FMA3
 ```text
 GAP-01: Dedicated regime replay parity suite - NOT YET EXECUTED
 GAP-02: Dedicated signal replay parity suite (multi-case, multi-pair) - NOT YET EXECUTED
-GAP-03: Track lead assignments (TASK 10) - all three tracks remain TBD
+GAP-03: Track lead assignments (TASK 10) - RESOLVED 2026-05-25: all three tracks assigned to admin
 Disposition: These gaps do not block the Phase 3 gate. They are recorded as
              known open items and must be addressed in Phase 4 planning.
 ```
