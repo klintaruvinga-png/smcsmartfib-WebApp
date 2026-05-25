@@ -11,7 +11,7 @@
 - **File**: INITIAL-20260525T000000Z.json
 - **Timestamp**: 2026-05-25T00:00:00Z
 - **Branch**: claude/nice-fermat-V4m6G
-- **Commit**: 81ebb4f7045b7a34e7961d52a6d5649cd8c9d2e8
+- **Commit**: 81ebb4f7045b7a34e7961d52a6d5649cd8c9d2e8 (pre-workflow state)
 
 ## Findings
 - **File**: FINDINGS-20260525T000100Z.json
@@ -27,7 +27,7 @@
 
 ## Final State
 - **File**: FINAL-20260525T000300Z.json
-- **Commit**: 81ebb4f7045b7a34e7961d52a6d5649cd8c9d2e8 (unchanged — documentation additions only)
+- **Commit**: a5899e1e5d1d29300809fb242ed3324bfb4d84cf (contains all workflow artifacts)
 - **Ready for deployment**: N/A — no code changes; Phase 3 gate requires operator DB evidence
 
 ## Rollback Points
