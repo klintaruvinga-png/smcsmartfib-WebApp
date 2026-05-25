@@ -201,6 +201,47 @@ function normalizeWatchlist(watchlist: readonly Symbol[] | undefined | null): Sy
   return canonical;
 }
 
+const COMPARISON_SUFFIXES = [
+  ".MICRO",
+  ".PRO",
+  ".ECN",
+  ".STP",
+  ".RAW",
+  ".M",
+  ".R",
+  "-MICRO",
+  "-PRO",
+  "-ECN",
+  "-STP",
+  "-RAW",
+  "+",
+] as const;
+
+const COMPACT_COMPARISON_SUFFIXES = ["MICRO", "PRO", "ECN", "RAW", "M", "R", "C"] as const;
+
+export function normalizeSymbolForWatchlistComparison(
+  symbol: string | null | undefined,
+): string {
+  let normalized = typeof symbol === "string" ? symbol.trim().toUpperCase() : "";
+  if (!normalized) return "";
+
+  for (const suffix of COMPARISON_SUFFIXES) {
+    if (normalized.endsWith(suffix) && normalized.length > suffix.length) {
+      normalized = normalized.slice(0, -suffix.length);
+      break;
+    }
+  }
+
+  for (const suffix of COMPACT_COMPARISON_SUFFIXES) {
+    if (normalized.endsWith(suffix) && normalized.length > suffix.length) {
+      normalized = normalized.slice(0, -suffix.length);
+      break;
+    }
+  }
+
+  return normalized;
+}
+
 function normalizeDashboardSettings(settings: DashboardSettings): DashboardSettings {
   return {
     ...settings,
@@ -264,7 +305,10 @@ export function useWatchlist() {
 
 export function useCanonicalWatchlist() {
   const watchlist = useWatchlist();
-  const watchlistSet = useMemo(() => new Set<Symbol>(watchlist), [watchlist]);
+  const watchlistSet = useMemo(
+    () => new Set(watchlist.map((symbol) => normalizeSymbolForWatchlistComparison(symbol))),
+    [watchlist],
+  );
   return { watchlist, watchlistSet };
 }
 

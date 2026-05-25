@@ -237,6 +237,32 @@ if (!class_exists('TestWpdb')) {
         }
 
         public function get_row($query, $output = ARRAY_A) {
+            if (preg_match("/SELECT \\* FROM ([^ ]+) WHERE user_id = (\\d+) AND symbol = '([^']+)' AND source = '([^']+)' ORDER BY updated_at DESC LIMIT 1/", $query, $m)) {
+                $table = $m[1];
+                $user_id = (int) $m[2];
+                $symbol = $m[3];
+                $source = $m[4];
+                $matches = array();
+                foreach ($this->tables[$table] ?? array() as $row) {
+                    if ((int) ($row['user_id'] ?? 0) !== $user_id
+                        || ($row['symbol'] ?? '') !== $symbol
+                        || ($row['source'] ?? '') !== $source) {
+                        continue;
+                    }
+                    $matches[] = $row;
+                }
+
+                if ($matches === array()) {
+                    return null;
+                }
+
+                usort($matches, function ($a, $b) {
+                    return strcmp((string) ($b['updated_at'] ?? ''), (string) ($a['updated_at'] ?? ''));
+                });
+
+                return $matches[0];
+            }
+
             return null;
         }
 
