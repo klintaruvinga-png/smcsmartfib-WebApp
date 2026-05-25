@@ -1,0 +1,97 @@
+{
+  "snapshot_type": "FINDINGS",
+  "workflow_id": "stabilize-ea-2026-05-25",
+  "timestamp": "2026-05-25T00:01:00Z",
+  "confirmed_issues": [],
+  "migration_blockers": [
+    {
+      "id": "MIGRATION-001",
+      "phase": "Phase 3",
+      "description": "72h stability soak window opened 2026-05-22; gate assessment requires soak completion evidence and operator T0 baseline capture (Task 2 — admin dashboard action)",
+      "status": "IN_PROGRESS",
+      "validation_required": true,
+      "validation_action": "Operator must capture T0 baseline in admin soak workspace; gate requires 72h of engine-run evidence, 0 errors, candle accumulation across all watchlist symbols"
+    },
+    {
+      "id": "MIGRATION-002",
+      "phase": "Phase 3",
+      "description": "NAS100/US30 EA Properties config — trader must update MT5 EA Symbols input list to include NAS100 and US30 broker alias names. No code blocker.",
+      "status": "TRADER_ACTION_REQUIRED",
+      "validation_required": false,
+      "validation_action": "Trader updates Symbols= input in MT5 EA Properties. Backend symbol alias mapping (NASDAQ→NAS100, WALLSTREET→US30) already in place."
+    },
+    {
+      "id": "MIGRATION-003",
+      "phase": "Phase 3",
+      "description": "Weekend freeze / disconnect behaviour observation (Task 9) — passive soak window covers Sat 2026-05-23 to Sun 2026-05-25. No code change required.",
+      "status": "OBSERVATION_WINDOW",
+      "validation_required": false,
+      "validation_action": "Observe smc_sf_snapshots.state per symbol during weekend hours and confirm EA resumes on Sunday open (~22:00 UTC)"
+    }
+  ],
+  "audit_results": {
+    "ea_route_auth": {
+      "status": "PASS",
+      "details": "permission_ea_market_stream → permission_ea_bridge: X-EA-API-Key header required, hash_equals() comparison, unconfigured key → 503, invalid key → 403, missing user_id → 400, invalid user_id → 403, wp_set_current_user() called"
+    },
+    "ea_payload_validation": {
+      "status": "PASS",
+      "details": "symbol required (map_symbol_aliases), timeframe normalized, quote_time/timestamp staleness guard (>300s → 422), bid/ask is_finite + >0 + bid≤ask, OHLC high≥max(O,C) + low≤min(O,C), candle epoch guard (pre-2000 rejected), candle staleness (>180s at insert_mt5_candle), tick_volume clamped ≥0"
+    },
+    "authority_diagnostics_protection": {
+      "status": "PASS",
+      "details": "GET /sniper/v1/authority-diagnostics uses permission_user → 401 for unauthenticated requests. Not exposed publicly. Confirmed."
+    },
+    "admin_route_protection": {
+      "status": "PASS",
+      "details": "All /admin/* routes use permission_admin (manage_options capability). 401 for unauthenticated, 403 for non-admin."
+    },
+    "frontend_freshness_truth": {
+      "status": "PASS",
+      "details": "FreshnessBadge renders backend state prop directly. useStreamingTicks interpolates intermediate ticks for UI feel but final sub-tick snaps to exact backend target — does not fabricate live status. VerdictBadge renders backend verdict prop."
+    },
+    "signal_engine_stale_guard": {
+      "status": "PASS",
+      "details": "ensure_engine_snapshot() checks price freshness via staleThresholdSec, is_equity_index_off_session() correctly gates NAS100/US30 off-hours, is_chart_candle_fresh() validates candle age with 2h-4h threshold window."
+    },
+    "symbol_alias_mapping": {
+      "status": "PASS",
+      "details": "map_symbol_aliases(): GOLD→XAUUSD, SILVER→XAGUSD, NASDAQ/NASDAQ100/USTECH100/USTECH→NAS100, WALLSTREET/WALLSTREET30/DOW30/DJ30→US30. EA SymbolNormalizer.mqh also handles broker aliases on MT5 side."
+    },
+    "dashboard_data_flow": {
+      "status": "PASS",
+      "details": "sniperClient.ts call() attaches Authorization or X-WP-Nonce headers for authenticated endpoints. age_sec is populated from backend quote_time, not fetch time. useSnapshot() gated on backendReady && pollMs !== null."
+    },
+    "ea_duplicate_routes": {
+      "status": "PASS",
+      "details": "No duplicate ea/market-stream route found. Single registration at line 683."
+    },
+    "php_regression_tests": {
+      "status": "PASS",
+      "tests_run": [
+        "test-ea-market-stream.php: 14/14 PASS",
+        "test-fib-parity.php: PASS",
+        "test-session-anchors.php: PASS",
+        "test-htf-authority-anchor.php: PASS",
+        "test-mt5-snapshot-contract.php: PASS",
+        "test-watchlist-snapshot-regression.php: PASS",
+        "test-market-data-service-source-filter.php: PASS",
+        "test-superfib-weighting.php: PASS",
+        "test-cors-regression.php: PASS",
+        "test-pip-value-parity.php: PASS",
+        "test-settings-risk-fallbacks.php: PASS"
+      ]
+    }
+  },
+  "statistics": {
+    "total_issues": 0,
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0,
+    "migration_blockers": 3,
+    "migration_blockers_code_changes_required": 0,
+    "migration_blockers_operator_actions_required": 2,
+    "migration_blockers_passive_observation": 1
+  }
+}
