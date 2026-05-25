@@ -305,10 +305,14 @@ export function useWatchlist() {
 
 export function useCanonicalWatchlist() {
   const watchlist = useWatchlist();
-  const watchlistSet = useMemo(
-    () => new Set(watchlist.map((symbol) => normalizeSymbolForWatchlistComparison(symbol))),
-    [watchlist],
-  );
+  const watchlistSet = useMemo(() => {
+    const members = new Set<string>();
+    for (const symbol of watchlist) {
+      members.add(symbol);
+      members.add(normalizeSymbolForWatchlistComparison(symbol));
+    }
+    return members;
+  }, [watchlist]);
   return { watchlist, watchlistSet };
 }
 
