@@ -610,6 +610,22 @@ final class SMC_SuperFib_Sniper_REST {
             KEY checkpoint_type_created_at (checkpoint_type, created_at)
         ) $charset;";
 
+        // Phase 4: MT5 fib levels storage
+        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_fib_levels (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT UNSIGNED NOT NULL,
+            symbol VARCHAR(24) NOT NULL,
+            timeframe VARCHAR(16) NOT NULL,
+            family VARCHAR(16) NOT NULL,
+            ratio DECIMAL(10,4) NOT NULL,
+            price DECIMAL(20,8) NOT NULL,
+            source VARCHAR(20) NOT NULL DEFAULT 'mt5',
+            calculated_at DATETIME NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY fib_lookup (user_id, symbol, timeframe, family, ratio),
+            KEY symbol_time (user_id, symbol, calculated_at)
+        ) $charset;";
+
         foreach ($tables as $sql) {
             dbDelta($sql);
             if (is_object($wpdb) && property_exists($wpdb, 'last_error') && $wpdb->last_error !== '') {
@@ -704,6 +720,20 @@ final class SMC_SuperFib_Sniper_REST {
             'methods' => WP_REST_Server::READABLE,
             'callback' => array($this, 'get_ea_license_check'),
             'permission_callback' => array($this, 'permission_ea_bridge'),
+        ));
+
+        // Phase 4: fib level ingestion from MT5 EA
+        register_rest_route(self::NAMESPACE, '/ea/fib-levels', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($this, 'post_ea_fib_levels'),
+            'permission_callback' => array($this, 'permission_ea_bridge'),
+        ));
+
+        // Phase 4: fib level retrieval for dashboard
+        register_rest_route(self::NAMESPACE, '/market-data/fib-levels', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => array($this, 'get_market_data_fib_levels'),
+            'permission_callback' => array($this, 'permission_user'),
         ));
     }
 
@@ -2789,6 +2819,162 @@ final class SMC_SuperFib_Sniper_REST {
             'plan' => $license['plan'],
             'reason' => null,
             'server_time' => $server_time,
+        ));
+    }
+
+    // ---- Phase 4: POST /ea/fib-levels ----
+    // Receives fib level payload from MT5 EA. Payload structure:
+    // { user_id, symbol, levels: [ { timeframe, chart_tf_seconds, ltf_sf: [...], htf_af: [...] }, ... ] }
+    // Each level entry: { family, ratio, price }
+    public function post_ea_fib_levels(WP_REST_Request $request) {
+        global $wpdb;
+
+        $payload = $request->get_json_params();
+        if (!is_array($payload)) {
+            return new WP_Error('invalid_payload', 'JSON body required', array('status' => 400));
+        }
+
+        $user_id = get_current_user_id();
+
+        if (!isset($payload['symbol']) || !isset($payload['levels'])) {
+            return new WP_Error('missing_fields', 'symbol and levels are required', array('status' => 400));
+        }
+
+        $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper(sanitize_text_field($payload['symbol'])));
+        if ($symbol === '') {
+            return new WP_Error('invalid_symbol', 'symbol must be a non-empty alphanumeric string', array('status' => 400));
+        }
+
+        $levels_payload = $payload['levels'];
+        if (!is_array($levels_payload)) {
+            return new WP_Error('invalid_levels', 'levels must be an array', array('status' => 400));
+        }
+
+        $valid_families  = array('LTF_SF', 'HTF_AF');
+        $valid_timeframes = array('M15', 'H1', 'D1');
+        $valid_ratios    = array(-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300);
+        $calculated_at   = $this->now_mysql();
+        $inserted        = 0;
+        $table           = $wpdb->prefix . 'smc_sf_fib_levels';
+
+        foreach ($levels_payload as $tf_entry) {
+            if (!is_array($tf_entry) || !isset($tf_entry['timeframe'])) {
+                continue;
+            }
+
+            $timeframe = sanitize_text_field(strtoupper((string) $tf_entry['timeframe']));
+            if (!in_array($timeframe, $valid_timeframes, true)) {
+                continue;
+            }
+
+            $families_map = array(
+                'LTF_SF' => isset($tf_entry['ltf_sf']) && is_array($tf_entry['ltf_sf']) ? $tf_entry['ltf_sf'] : array(),
+                'HTF_AF' => isset($tf_entry['htf_af']) && is_array($tf_entry['htf_af']) ? $tf_entry['htf_af'] : array(),
+            );
+
+            foreach ($families_map as $family => $levels) {
+                if (!in_array($family, $valid_families, true)) {
+                    continue;
+                }
+
+                foreach ($levels as $level) {
+                    if (!is_array($level) || !isset($level['ratio'], $level['price'])) {
+                        continue;
+                    }
+
+                    $ratio = (float) $level['ratio'];
+                    $price = (float) $level['price'];
+
+                    if (!in_array($ratio, $valid_ratios, false)) {
+                        continue;
+                    }
+
+                    $wpdb->replace(
+                        $table,
+                        array(
+                            'user_id'       => $user_id,
+                            'symbol'        => $symbol,
+                            'timeframe'     => $timeframe,
+                            'family'        => $family,
+                            'ratio'         => $ratio,
+                            'price'         => $price,
+                            'source'        => 'mt5',
+                            'calculated_at' => $calculated_at,
+                        ),
+                        array('%d', '%s', '%s', '%s', '%f', '%f', '%s', '%s')
+                    );
+                    $inserted++;
+                }
+            }
+        }
+
+        error_log(sprintf('[SMC_SF] ea/fib-levels ingested symbol=%s levels_written=%d user_id=%d',
+            $symbol, $inserted, $user_id));
+
+        return rest_ensure_response(array(
+            'ok'             => true,
+            'symbol'         => $symbol,
+            'levels_written' => $inserted,
+        ));
+    }
+
+    // ---- Phase 4: GET /market-data/fib-levels ----
+    // Query params: symbol (required), timeframe (optional), family (optional)
+    // Returns all stored fib levels for the requesting user.
+    public function get_market_data_fib_levels(WP_REST_Request $request) {
+        global $wpdb;
+
+        $user_id = get_current_user_id();
+        $symbol  = preg_replace('/[^A-Z0-9]/', '', strtoupper(sanitize_text_field((string) $request->get_param('symbol'))));
+
+        if ($symbol === '') {
+            return new WP_Error('missing_symbol', 'symbol query parameter is required', array('status' => 400));
+        }
+
+        $timeframe = $request->get_param('timeframe');
+        $family    = $request->get_param('family');
+        $table     = $wpdb->prefix . 'smc_sf_fib_levels';
+
+        $where  = 'WHERE user_id = %d AND symbol = %s';
+        $values = array($user_id, $symbol);
+
+        if (!empty($timeframe)) {
+            $where  .= ' AND timeframe = %s';
+            $values[] = strtoupper(sanitize_text_field((string) $timeframe));
+        }
+
+        if (!empty($family)) {
+            $where  .= ' AND family = %s';
+            $values[] = strtoupper(sanitize_text_field((string) $family));
+        }
+
+        $sql  = $wpdb->prepare("SELECT timeframe, family, ratio, price, calculated_at FROM {$table} {$where} ORDER BY timeframe, family, ratio", ...$values);
+        $rows = $wpdb->get_results($sql, ARRAY_A);
+
+        // Group by timeframe → family → levels[]
+        $result = array();
+        foreach ((array) $rows as $row) {
+            $tf  = (string) $row['timeframe'];
+            $fam = (string) $row['family'];
+
+            if (!isset($result[$tf])) {
+                $result[$tf] = array();
+            }
+            if (!isset($result[$tf][$fam])) {
+                $result[$tf][$fam] = array();
+            }
+
+            $result[$tf][$fam][] = array(
+                'ratio'         => (float) $row['ratio'],
+                'price'         => (float) $row['price'],
+                'calculated_at' => $this->to_iso((string) $row['calculated_at']),
+            );
+        }
+
+        return rest_ensure_response(array(
+            'ok'     => true,
+            'symbol' => $symbol,
+            'fibs'   => $result,
         ));
     }
 

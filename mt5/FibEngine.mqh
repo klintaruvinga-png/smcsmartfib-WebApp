@@ -1,0 +1,434 @@
+#ifndef FIB_ENGINE_MQH
+#define FIB_ENGINE_MQH
+
+// Canonical 16-ratio fib set — must match PHP $ratios array exactly.
+// Defined as a preprocessor constant array pattern using a struct.
+struct FibLevelOut
+{
+    string   family;
+    double   ratio;
+    double   price;
+};
+
+//+------------------------------------------------------------------+
+//| FibEngine                                                        |
+//|                                                                  |
+//| Computes LTF_SF (recency-weighted composite) and HTF_AF         |
+//| (raw-extreme authority anchor) fib levels from CopyRates data.  |
+//|                                                                  |
+//| Session grouping mirrors the PHP fib_levels_from_candles()      |
+//| implementation in smc-superfib-sniper.php for parity compliance.|
+//+------------------------------------------------------------------+
+class FibEngine
+{
+private:
+    // 16 canonical ratios — matches PHP $ratios exactly
+    double   ratios[16];
+
+    // Broker UTC offset cached per dispatch cycle
+    datetime brokerUtcOffset;
+
+    // Session store — parallel arrays acting as a keyed map (max 2048 sessions)
+    static const int MAX_SESSIONS = 2048;
+    long   sessionKeys[2048];
+    double sessionHighs[2048];
+    double sessionLows[2048];
+    int    sessionCount;
+
+public:
+    FibEngine()
+    {
+        double r[16] = {-200, -162.5, -100, -62.5, -25, 0,
+                        25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300};
+        for (int i = 0; i < 16; i++)
+            ratios[i] = r[i];
+        brokerUtcOffset = 0;
+        sessionCount    = 0;
+        ArrayInitialize(sessionKeys,  0);
+        ArrayInitialize(sessionHighs, 0.0);
+        ArrayInitialize(sessionLows,  0.0);
+    }
+
+    ~FibEngine() {}
+
+    // Refresh broker UTC offset — call once per dispatch cycle before computing fibs.
+    void RefreshBrokerOffset()
+    {
+        brokerUtcOffset = TimeCurrent() - TimeGMT();
+    }
+
+    // Build JSON payload containing LTF_SF and HTF_AF levels for a symbol across
+    // the three required timeframes (M15, H1, D1).  Returns "" on fatal error.
+    //
+    // symbol           — raw broker symbol (will be normalized by caller)
+    // normalizedSymbol — canonical symbol (e.g. "EURUSD")
+    // userId           — WordPress user_id to include in payload
+    string BuildFibPayload(string symbol, string normalizedSymbol, int userId)
+    {
+        string json = "";
+
+        int tfs[3]    = {900, 3600, 86400};
+        string names[3] = {"M15", "H1", "D1"};
+        ENUM_TIMEFRAMES mql_tfs[3] = {PERIOD_M15, PERIOD_H1, PERIOD_D1};
+
+        json += "[";
+        bool first = true;
+        for (int i = 0; i < 3; i++)
+        {
+            string tfJson = ComputeFibJson(symbol, normalizedSymbol, userId,
+                                           mql_tfs[i], tfs[i], names[i]);
+            if (StringLen(tfJson) == 0)
+                continue;
+
+            if (!first) json += ",";
+            json += tfJson;
+            first = false;
+        }
+        json += "]";
+
+        return json;
+    }
+
+    // Compute fib levels for a single timeframe and return as a JSON object.
+    string ComputeFibJson(string symbol, string normSymbol, int userId,
+                          ENUM_TIMEFRAMES mql_tf, int chart_tf_seconds, string tfName)
+    {
+        // Determine lookback size: matches PHP fib_history_window_size()
+        int lookback = FibHistoryWindowSize(chart_tf_seconds);
+
+        MqlRates rates[];
+        int copied = CopyRates(symbol, mql_tf, 1, lookback, rates);
+        // index 1 = last closed bar; read <lookback> bars from there
+        if (copied <= 0)
+        {
+            Print("[FibEngine] CopyRates returned 0 for symbol=", symbol,
+                  " tf=", tfName, " — skipping.");
+            return "";
+        }
+
+        // Compression threshold
+        double compression = CompressionThreshold(normSymbol);
+
+        // Session grouping
+        string session_tf   = GetSessionTF(chart_tf_seconds);
+        string authority_tf = GetAuthorityTF(session_tf);
+
+        // ---- LTF_SF anchor ----
+        double ltf_high, ltf_low;
+        bool   ltf_valid = ComputeLTFAnchor(rates, copied, chart_tf_seconds,
+                                             session_tf, compression,
+                                             ltf_high, ltf_low);
+
+        // ---- HTF_AF anchor ----
+        double htf_high, htf_low;
+        bool   htf_valid = ComputeHTFAnchor(rates, copied, chart_tf_seconds,
+                                             authority_tf, compression,
+                                             htf_high, htf_low);
+
+        if (!ltf_valid && !htf_valid)
+            return "";
+
+        string json = "{";
+        json += "\"user_id\":"         + IntegerToString(userId)   + ",";
+        json += "\"symbol\":\""        + normSymbol                 + "\",";
+        json += "\"timeframe\":\""     + tfName                     + "\",";
+        json += "\"chart_tf_seconds\":" + IntegerToString(chart_tf_seconds) + ",";
+        json += "\"ltf_sf\":"          + BuildLevelsJson(ltf_valid, ltf_high, ltf_low, "LTF_SF") + ",";
+        json += "\"htf_af\":"          + BuildLevelsJson(htf_valid, htf_high, htf_low, "HTF_AF");
+        json += "}";
+
+        return json;
+    }
+
+    // ---- Session TF helpers ----
+
+    string GetSessionTF(int chart_tf_seconds)
+    {
+        if (chart_tf_seconds <= 1800) return "Daily";
+        if (chart_tf_seconds <= 3600) return "Weekly";
+        if (chart_tf_seconds <= 14400) return "Monthly";
+        if (chart_tf_seconds <= 86400) return "Quarterly";
+        return "Yearly";
+    }
+
+    string GetAuthorityTF(string session_tf)
+    {
+        if (session_tf == "Daily")   return "Weekly";
+        if (session_tf == "Weekly")  return "Monthly";
+        if (session_tf == "Monthly") return "Quarterly";
+        return "Yearly";
+    }
+
+    // ---- Session key computation (UTC) ----
+
+    // Convert broker-local datetime to UTC
+    datetime ToUTC(datetime t)
+    {
+        return t - brokerUtcOffset;
+    }
+
+    long GetSessionKey(datetime t, string session_tf)
+    {
+        datetime utc = ToUTC(t);
+        MqlDateTime dt;
+        TimeToStruct(utc, dt);
+
+        if (session_tf == "Daily")
+            return (long)dt.year * 10000 + (long)dt.mon * 100 + (long)dt.day;
+
+        if (session_tf == "Weekly")
+        {
+            int isoWeek = GetISOWeek(dt);
+            int isoYear = dt.year;
+            if (isoWeek > 50 && dt.mon == 1)  isoYear--;
+            if (isoWeek < 3  && dt.mon == 12) isoYear++;
+            return (long)isoYear * 100 + (long)isoWeek;
+        }
+
+        if (session_tf == "Monthly")
+            return (long)dt.year * 100 + (long)dt.mon;
+
+        if (session_tf == "Quarterly")
+        {
+            int quarter = (dt.mon - 1) / 3 + 1;
+            return (long)dt.year * 10 + (long)quarter;
+        }
+
+        // Yearly
+        return (long)dt.year;
+    }
+
+    // Approximate ISO week number matching PHP's gmdate('W')
+    int GetISOWeek(MqlDateTime& dt)
+    {
+        // Day of year
+        int monthDays[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+        bool leap = (dt.year % 4 == 0 && (dt.year % 100 != 0 || dt.year % 400 == 0));
+        int dayOfYear = dt.day;
+        for (int m = 1; m < dt.mon; m++)
+            dayOfYear += (m == 2 && leap) ? 29 : monthDays[m - 1];
+
+        // ISO: week starts Monday; day_of_week: 0=Sun,1=Mon,...,6=Sat
+        int dow = dt.day_of_week;
+        int monDow = (dow == 0) ? 6 : (dow - 1);  // 0=Mon, 6=Sun
+        int week = (dayOfYear + 6 - monDow) / 7;
+        if (week < 1)  week = 52;
+        if (week > 52) week = 1;
+        return week;
+    }
+
+    // ---- Session store helpers ----
+
+    void ClearSessions()
+    {
+        sessionCount = 0;
+    }
+
+    int FindSession(long key)
+    {
+        for (int i = 0; i < sessionCount; i++)
+            if (sessionKeys[i] == key) return i;
+        return -1;
+    }
+
+    void AddOrUpdateSession(long key, double high, double low)
+    {
+        int idx = FindSession(key);
+        if (idx >= 0)
+        {
+            if (high > sessionHighs[idx]) sessionHighs[idx] = high;
+            if (low  < sessionLows[idx])  sessionLows[idx]  = low;
+        }
+        else if (sessionCount < MAX_SESSIONS)
+        {
+            sessionKeys[sessionCount]  = key;
+            sessionHighs[sessionCount] = high;
+            sessionLows[sessionCount]  = low;
+            sessionCount++;
+        }
+    }
+
+    // ---- LTF_SF anchor computation ----
+    //
+    // Mirrors PHP: resolve_session_anchors() + superfib_composite_anchor()
+    // Session TF groups candles into completed sessions; most recent 3 get
+    // recency weights (F1=0.40/0.35/0.25 for 3, 0.55/0.45 for 2, 1.0 for 1).
+    bool ComputeLTFAnchor(MqlRates& rates[], int count, int chart_tf_seconds,
+                          string session_tf, double compression,
+                          double& out_high, double& out_low)
+    {
+        ClearSessions();
+
+        for (int i = 0; i < count; i++)
+        {
+            long key = GetSessionKey(rates[i].time, session_tf);
+            AddOrUpdateSession(key, rates[i].high, rates[i].low);
+        }
+
+        if (sessionCount <= 1)
+            return false;
+
+        // completed sessions = all but the last key (current forming session)
+        // sessions were added in chronological order (CopyRates: oldest→newest)
+        int completedCount = sessionCount - 1;
+        if (completedCount < 1)
+            return false;
+
+        // completed sessions in reverse (most recent first) = [completedCount-1 .. 0]
+        // F1 = completedCount-1, F2 = completedCount-2, F3 = completedCount-3
+        int f1 = completedCount - 1;
+        int f2 = completedCount - 2;
+        int f3 = completedCount - 3;
+
+        bool f1v = (f1 >= 0) && ((sessionHighs[f1] - sessionLows[f1]) >= compression);
+        bool f2v = (f2 >= 0) && ((sessionHighs[f2] - sessionLows[f2]) >= compression);
+        bool f3v = (f3 >= 0) && ((sessionHighs[f3] - sessionLows[f3]) >= compression);
+
+        int valid_count = (f1v ? 1 : 0) + (f2v ? 1 : 0) + (f3v ? 1 : 0);
+        if (valid_count < 1)
+            return false;
+
+        double wf1, wf2, wf3;
+        if (valid_count == 3)
+        {
+            wf1 = 0.40; wf2 = 0.35; wf3 = 0.25;
+        }
+        else if (valid_count == 2)
+        {
+            if (f1v)
+            {
+                wf1 = 0.55;
+                wf2 = f2v ? 0.45 : 0.0;
+                wf3 = f3v ? 0.45 : 0.0;
+            }
+            else
+            {
+                wf1 = 0.0; wf2 = 0.55; wf3 = 0.45;
+            }
+        }
+        else // valid_count == 1
+        {
+            wf1 = f1v ? 1.0 : 0.0;
+            wf2 = f2v ? 1.0 : 0.0;
+            wf3 = f3v ? 1.0 : 0.0;
+        }
+
+        double weight_total = wf1 + wf2 + wf3;
+        if (weight_total <= 0.0)
+            return false;
+
+        double sum_high = 0.0, sum_low = 0.0;
+        if (f1v && wf1 > 0.0) { sum_high += sessionHighs[f1] * wf1; sum_low += sessionLows[f1] * wf1; }
+        if (f2v && wf2 > 0.0) { sum_high += sessionHighs[f2] * wf2; sum_low += sessionLows[f2] * wf2; }
+        if (f3v && wf3 > 0.0) { sum_high += sessionHighs[f3] * wf3; sum_low += sessionLows[f3] * wf3; }
+
+        out_high = sum_high / weight_total;
+        out_low  = sum_low  / weight_total;
+
+        if ((out_high - out_low) < compression)
+            return false;
+
+        return true;
+    }
+
+    // ---- HTF_AF anchor computation ----
+    //
+    // Mirrors PHP: resolve_htf_authority_anchor()
+    // Groups candles by authority_tf; needs >3 completed sessions;
+    // anchor = the 3rd most recent completed session's raw extremes.
+    bool ComputeHTFAnchor(MqlRates& rates[], int count, int chart_tf_seconds,
+                          string authority_tf, double compression,
+                          double& out_high, double& out_low)
+    {
+        ClearSessions();
+
+        for (int i = 0; i < count; i++)
+        {
+            long key = GetSessionKey(rates[i].time, authority_tf);
+            AddOrUpdateSession(key, rates[i].high, rates[i].low);
+        }
+
+        // Need > 3 sessions (PHP: count($sessions) <= 3 → return invalid)
+        if (sessionCount <= 3)
+            return false;
+
+        // completed = all except last
+        int completedCount = sessionCount - 1;
+        if (completedCount < 3)
+            return false;
+
+        // recent_sessions[2] = 3rd most recent = index completedCount-3
+        int idx3 = completedCount - 3;
+        if (idx3 < 0)
+            return false;
+
+        out_high = sessionHighs[idx3];
+        out_low  = sessionLows[idx3];
+
+        if ((out_high - out_low) < compression)
+            return false;
+
+        return true;
+    }
+
+    // ---- Fib price formula ----
+    // price = H + (L - H) * (r / 100)  — matches PHP price_for_ratio()
+    double PriceForRatio(double high, double low, double ratio)
+    {
+        double raw = high - ((ratio / 100.0) * (high - low));
+        // Round to 8 decimal places matching PHP round(..., 8)
+        return MathRound(raw * 100000000.0) / 100000000.0;
+    }
+
+    // ---- Build JSON levels array ----
+    string BuildLevelsJson(bool valid, double high, double low, string family)
+    {
+        if (!valid)
+            return "[]";
+
+        string json = "[";
+        for (int i = 0; i < 16; i++)
+        {
+            if (i > 0) json += ",";
+            double price = PriceForRatio(high, low, ratios[i]);
+            json += "{";
+            json += "\"family\":\"" + family + "\",";
+            json += "\"ratio\":"    + DoubleToString(ratios[i], 4) + ",";
+            json += "\"price\":"    + DoubleToString(price, 8);
+            json += "}";
+        }
+        json += "]";
+        return json;
+    }
+
+    // ---- Compression threshold ----
+    // Matches PHP fib_compression_threshold(): pip_size * min_pips
+    double CompressionThreshold(string symbol)
+    {
+        bool isJPY = (StringLen(symbol) >= 6 &&
+                      StringSubstr(symbol, 3, 3) == "JPY");
+        double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+        if (point <= 0.0) point = 0.00001;
+
+        // Derive pip size: JPY pairs use 2dp so pip = 100*point; others 5dp so pip = 10*point
+        double pip_size = isJPY ? (point * 100.0) : (point * 10.0);
+        double min_pips = isJPY ? 40.0 : 20.0;
+        return min_pips * pip_size;
+    }
+
+    // ---- Lookback window ----
+    // Matches PHP fib_history_window_size()
+    int FibHistoryWindowSize(int chart_tf_seconds)
+    {
+        int authority_span;
+        if      (chart_tf_seconds <= 1800)  authority_span = 28   * 86400;
+        else if (chart_tf_seconds <= 3600)  authority_span = 124  * 86400;
+        else if (chart_tf_seconds <= 14400) authority_span = 366  * 86400;
+        else                                authority_span = 1462 * 86400;
+
+        int bars = (int)MathCeil((double)authority_span / (double)chart_tf_seconds) + 8;
+        return MathMax(120, bars);
+    }
+};
+
+#endif // FIB_ENGINE_MQH

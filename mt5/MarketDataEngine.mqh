@@ -6,6 +6,7 @@
 #include "SessionManager.mqh"
 #include "FreshnessEngine.mqh"
 #include "SymbolNormalizer.mqh"
+#include "FibEngine.mqh"
 
 //+------------------------------------------------------------------+
 //| MarketDataEngine                                                  |
@@ -22,6 +23,7 @@ private:
     SessionManager*   sessionManager;
     FreshnessEngine*  freshnessEngine;
     SymbolNormalizer* symbolNormalizer;
+    FibEngine*        fibEngine;
 
     string   symbols[100];
     int      symbolCount;
@@ -40,6 +42,10 @@ private:
     string   baseUrl;
     string   eaVersion;
 
+    // Fib dispatch is throttled: one full-symbol sweep every fibCycleInterval periodic cycles.
+    int      fibCycleCounter;
+    int      fibCycleInterval;  // default 6 (every ~60s on a 10s timer)
+
 public:
     MarketDataEngine()
     {
@@ -48,6 +54,7 @@ public:
         sessionManager   = new SessionManager();
         freshnessEngine  = new FreshnessEngine();
         symbolNormalizer = new SymbolNormalizer();
+        fibEngine        = new FibEngine();
         symbolCount      = 0;
         webhookUrl       = "";
         authHeader       = "";
@@ -55,6 +62,8 @@ public:
         cachedHeaders    = "";
         baseUrl          = "";
         eaVersion        = "1.00";
+        fibCycleCounter  = 0;
+        fibCycleInterval = 6;
         ArrayInitialize(lastSentCandleM1, 0);
     }
 
@@ -63,6 +72,7 @@ public:
         delete tickProcessor;
         delete candleBuilder;
         delete sessionManager;
+        delete fibEngine;
         delete freshnessEngine;
         delete symbolNormalizer;
     }
@@ -138,6 +148,63 @@ public:
             bool isMarketOpen = sessionManager.IsMarketOpenForSymbol(normalized, now);
             freshnessEngine.UpdateSymbolPeriodic(normalized, isMarketOpen, now);
             SendToBackend(symbols[i]);
+        }
+
+        // Fib dispatch: run once per fibCycleInterval periodic cycles (~every minute
+        // on a 10s timer) to avoid blocking the main symbol loop on every tick.
+        fibCycleCounter++;
+        if (fibCycleCounter >= fibCycleInterval)
+        {
+            fibCycleCounter = 0;
+            fibEngine.RefreshBrokerOffset();
+            SendFibToBackend();
+        }
+    }
+
+    // POST fib levels for all tracked symbols to /ea/fib-levels.
+    // Called once per fib cycle (every fibCycleInterval periodic cycles).
+    void SendFibToBackend()
+    {
+        if (StringLen(baseUrl) == 0)
+            return;
+
+        string url = baseUrl + "/ea/fib-levels";
+
+        for (int i = 0; i < symbolCount; i++)
+        {
+            string normalized = symbolNormalizer.NormalizeSymbol(symbols[i]);
+            string fibJson = fibEngine.BuildFibPayload(symbols[i], normalized, wpUserId);
+
+            if (StringLen(fibJson) <= 2)  // "[]" = empty
+            {
+                Print("[FibEngine] No fib payload for symbol=", symbols[i], " — skipping.");
+                continue;
+            }
+
+            string payload = "{";
+            payload += "\"user_id\":"  + IntegerToString(wpUserId) + ",";
+            payload += "\"symbol\":\"" + normalized                + "\",";
+            payload += "\"levels\":"   + fibJson;
+            payload += "}";
+
+            char   postData[];
+            char   result[];
+            string responseHeaders;
+            StringToCharArray(payload, postData, 0, StringLen(payload));
+
+            int httpStatus = WebRequest("POST", url, cachedHeaders, 8000,
+                                        postData, result, responseHeaders);
+            if (httpStatus == 200 || httpStatus == 201)
+            {
+                Print("[FibEngine] POST OK symbol=", symbols[i]);
+            }
+            else
+            {
+                string body = CharArrayToString(result, 0, -1, CP_UTF8);
+                Print("[FibEngine] POST FAILED symbol=", symbols[i],
+                      " status=", httpStatus,
+                      " resp=", StringLen(body) > 0 ? body : "(empty)");
+            }
         }
     }
 
