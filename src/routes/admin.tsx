@@ -411,7 +411,6 @@ export function AdminPage() {
       const operator = baselineForm.startedBy.trim() || resolveOperatorIdentifier();
       const baselineEntries = buildBaselineEvidenceEntries(baselineForm, operator);
       console.debug("[SOAK] Baseline evidence entries", baselineEntries);
-      await saveEvidenceEntries(baselineEntries);
 
       if (creatingNewBaseline) {
         await createSoakCheckpoint({
@@ -419,6 +418,7 @@ export function AdminPage() {
           operatorNotes: baselineForm.notes,
         });
       }
+      await saveEvidenceEntries(baselineEntries);
 
       const refreshed = await refreshSoakReport();
       if (!refreshed) return;
