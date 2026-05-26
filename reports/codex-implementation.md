@@ -1,35 +1,35 @@
 # Issue summary
 
-SMC Intake MT5 compilation was blocked by illegal inline initialization of class-scope `static const int` members in `mt5/RegimeEngine.mqh` and `mt5/SignalEngine.mqh`.
+Admin soak baseline flow was hardcoded around Phase 0 and Phase 3 templates and treated baseline capture as a single-shot action. This blocked Phase 4 30-day soak selection and prevented operators from re-arming baseline capture for a new soak cycle from `/admin`.
 
 # Root cause implemented
 
-Replaced the unsupported MQL5 class-scope inline `static const int` declarations with anonymous class-scope `enum` constants, preserving the original integer values exactly and leaving all runtime logic and `static const double` definitions unchanged.
+Added `PHASE_4_30_DAY` to the typed soak registry and preserved that value through report inference and baseline hydration. Replaced the baseline lock with a local reset state that unlocks a new baseline capture without deleting the persisted prior baseline checkpoint from backend-owned report data.
 
 # Exact files changed
 
-- `mt5/RegimeEngine.mqh`
-- `mt5/SignalEngine.mqh`
-- `reports/codex-implementation.md`
+- `src/types/sniper.ts`: added `PHASE_4_30_DAY`, extended `SoakTemplateConfig` with `durationDays` and `symbols`, and registered the Phase 4 30-day live soak template.
+- `src/routes/admin.tsx`: added Phase 4 inference and hydration handling, exported the two pure helpers for direct test coverage, and introduced the admin-only local reset/new-soak baseline unlock flow.
+- `src/routes/-admin.test.tsx`: added Phase 4 picker, inference, hydration, reset-render, reset-absence, and reset-unlock coverage.
 
 # Tests run
 
-- `rg -n "static const int\\s+\\w+\\s*=\\s*" mt5 -g "*.mqh"` before patch confirmed only `mt5/RegimeEngine.mqh` and `mt5/SignalEngine.mqh` matched the unsupported pattern.
-- `rg -n "static const int\\s+\\w+\\s*=\\s*" mt5 -g "*.mqh"` after patch returned no matches.
-- `node mt5/check-mql-includes.mjs` — passed.
-- MetaEditor CLI compile attempt for `mt5/SMC_MarketDataEA.mq5` via `MetaEditor64.exe /compile` — inconclusive; the process exited `0` but produced no repo-local compiler log and no `.ex5` artifact.
+- `npx vitest run src/routes/-admin.test.tsx` - passed (24 tests).
+- `npm run build` - passed.
+- `npx tsc --noEmit` - failed in existing `vite.config.ts` typing (`test` property rejected by `@lovable.dev/vite-tanstack-config` options). This failure is outside the patched files.
 
 # Reports generated
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-26_smc-intake-fix-ea-compile-errors.md`
-- `.github/migration/audits/phase-6-mt5-parity-2026-05-26.md`
+- `reports/codex-implementation.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-26_admin-phase4-soak-baseline-reset.md`
+- `.github/migration/audits/phase-4-dashboard-parity-2026-05-26.md`
 
 # Remaining risks
 
-- A clean zero-error / zero-warning MetaEditor rebuild of `mt5/SMC_MarketDataEA.mq5` is still required because the local CLI path did not emit authoritative compile evidence in this workspace.
-- `MIN_BARS=25` remains documented as an MT5-side minimum-history guard; the current workspace search did not expose a direct named Pine counterpart for that constant.
-- Phase 5/6 live parity validation is still pending operator review even though the MT5 threshold values were preserved exactly.
+Backend soak evidence acceptance for `PHASE_4_30_DAY` remains an external dependency. If the backend rejects that string, the first live Phase 4 baseline submission will fail at the API layer even though the admin UI now supports the flow. Phase 4 checkpoint schedule labels also remain intentionally unset pending operator confirmation.
 
 # Any contract ambiguities resolved during implementation
 
-No code-scope ambiguity remained after source inspection. The only matching unsupported pattern under `mt5/*.mqh` was in `RegimeEngine.mqh` and `SignalEngine.mqh`, so scope was kept to those files. I also resolved the validation ambiguity conservatively: the MetaEditor CLI run was recorded as inconclusive rather than treated as a compile pass because it emitted no compiler log or artifact.
+- `SoakTemplateConfig` did not previously include `durationDays` or `symbols`; I extended the existing shape consistently across all templates instead of special-casing Phase 4.
+- The contract requires Phase 4 support without authorizing new checkpoint schedule labels, so the Phase 4 template uses `defaultDurationHours=720` with `defaultCheckpointCount=0` and empty `checkpointLabels`.
+- The reset contract required a new baseline capture path without deleting backend baseline data. I implemented reset as local UI state that unlocks capture while preserving the previous baseline checkpoint in view until a new baseline is submitted or reset is cancelled.

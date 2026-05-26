@@ -114,6 +114,9 @@ export function AdminPage() {
   const [baselineSaving, setBaselineSaving] = useState(false);
   const [evidenceSaving, setEvidenceSaving] = useState(false);
   const [checkpointSaving, setCheckpointSaving] = useState(false);
+  const [baselineResetRequested, setBaselineResetRequested] = useState(false);
+  const [previousBaselineCheckpoint, setPreviousBaselineCheckpoint] =
+    useState<SoakCheckpointRow | null>(null);
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
   const [soakRefreshing, setSoakRefreshing] = useState(false);
@@ -307,7 +310,8 @@ export function AdminPage() {
   const nextCheckpointLabel =
     derivedCheckpointLabels[soakState.kind === "ready" ? soakState.report.checkpoints.length : 0] ??
     null;
-  const baselineCaptureLocked = baselineCheckpoint !== null;
+  const baselineCaptureLocked = baselineCheckpoint !== null && !baselineResetRequested;
+  const preservedBaselineCheckpoint = previousBaselineCheckpoint ?? baselineCheckpoint;
   const evidenceRows = soakState.kind === "ready" ? soakState.report.manual_evidence : [];
   const baselineAge = formatSoakAge(baselineCheckpoint?.created_at ?? null);
   const checkpointAge = formatSoakAge(
@@ -334,6 +338,22 @@ export function AdminPage() {
         soakState.kind === "ready" ? soakState.report.manual_evidence : [],
       ),
     );
+  }
+
+  function handleStartNewSoak() {
+    if (!baselineCheckpoint) return;
+
+    setPreviousBaselineCheckpoint(baselineCheckpoint);
+    setBaselineResetRequested(true);
+    setPanelMessage(null);
+    setPanelError(null);
+  }
+
+  function handleKeepCurrentBaseline() {
+    setBaselineResetRequested(false);
+    setPreviousBaselineCheckpoint(null);
+    setPanelMessage(null);
+    setPanelError(null);
   }
 
   async function refreshSoakReport() {
@@ -383,12 +403,13 @@ export function AdminPage() {
     setPanelError(null);
 
     try {
+      const creatingNewBaseline = !baselineCheckpoint || baselineResetRequested;
       const operator = baselineForm.startedBy.trim() || resolveOperatorIdentifier();
       const baselineEntries = buildBaselineEvidenceEntries(baselineForm, operator);
       console.debug("[SOAK] Baseline evidence entries", baselineEntries);
       await saveEvidenceEntries(baselineEntries);
 
-      if (!baselineCheckpoint) {
+      if (creatingNewBaseline) {
         await createSoakCheckpoint({
           checkpointType: "baseline",
           operatorNotes: baselineForm.notes,
@@ -397,10 +418,14 @@ export function AdminPage() {
 
       const refreshed = await refreshSoakReport();
       if (!refreshed) return;
+      if (creatingNewBaseline) {
+        setBaselineResetRequested(false);
+        setPreviousBaselineCheckpoint(null);
+      }
       setPanelMessage(
-        baselineCheckpoint
-          ? "Baseline metadata updated."
-          : "Baseline captured. The first soak snapshot is now marked as baseline.",
+        creatingNewBaseline
+          ? "Baseline captured. The first soak snapshot is now marked as baseline."
+          : "Baseline metadata updated.",
       );
     } catch (error) {
       if (error instanceof AuthError) {
@@ -1006,16 +1031,32 @@ export function AdminPage() {
                         </div>
                       </div>
 
-                      <div className="soak-report-print-block rounded-md border border-warn/40 bg-warn/10 px-3 py-3 text-xs text-warn">
-                        <div className="flex items-center gap-2 font-semibold">
-                          <AlertTriangle className="h-4 w-4" />
-                          Baseline already captured - do not replace
+                      {baselineResetRequested ? (
+                        <div className="soak-report-print-block rounded-md border border-accent/40 bg-accent/10 px-3 py-3 text-xs text-accent">
+                          <div className="flex items-center gap-2 font-semibold">
+                            <Flag className="h-4 w-4" />
+                            New soak baseline armed
+                          </div>
+                          <div className="mt-1 text-dim">
+                            {preservedBaselineCheckpoint
+                              ? `Previous baseline from ${formatTimestamp(
+                                  preservedBaselineCheckpoint.created_at,
+                                )} remains preserved until a new baseline snapshot is captured.`
+                              : "Previous baseline remains preserved until a new baseline snapshot is captured."}
+                          </div>
                         </div>
-                        <div className="mt-1 text-dim">
-                          The preserved baseline snapshot remains the soak reference point. A new
-                          baseline capture is locked on this admin session.
+                      ) : (
+                        <div className="soak-report-print-block rounded-md border border-warn/40 bg-warn/10 px-3 py-3 text-xs text-warn">
+                          <div className="flex items-center gap-2 font-semibold">
+                            <AlertTriangle className="h-4 w-4" />
+                            Baseline already captured - do not replace
+                          </div>
+                          <div className="mt-1 text-dim">
+                            The preserved baseline snapshot remains the soak reference point. A new
+                            baseline capture is locked on this admin session.
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   )}
 
@@ -1152,11 +1193,25 @@ export function AdminPage() {
                         <Button type="submit" disabled={baselineSaving}>
                           {baselineSaving ? "Saving..." : "Update Baseline Evidence"}
                         </Button>
+                        <Button type="button" variant="outline" onClick={handleStartNewSoak}>
+                          Start New Soak
+                        </Button>
                       </div>
                     ) : (
-                      <Button type="submit" disabled={baselineSaving}>
-                        {baselineSaving ? "Saving..." : "Capture Baseline & Start Soak"}
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="submit" disabled={baselineSaving}>
+                          {baselineSaving ? "Saving..." : "Capture Baseline & Start Soak"}
+                        </Button>
+                        {baselineCheckpoint ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleKeepCurrentBaseline}
+                          >
+                            Keep Current Baseline
+                          </Button>
+                        ) : null}
+                      </div>
                     )}
                   </form>
                 </div>
@@ -1739,7 +1794,7 @@ function createBaselineFormDefaults({
   };
 }
 
-function hydrateBaselineForm(form: BaselineForm, rows: SoakEvidenceRow[]): BaselineForm {
+export function hydrateBaselineForm(form: BaselineForm, rows: SoakEvidenceRow[]): BaselineForm {
   const evidenceMap = indexEvidenceByKey(rows);
   const hydratedSoakType = (
     evidenceMap["baseline.soak_type"] ??
@@ -1753,7 +1808,9 @@ function hydrateBaselineForm(form: BaselineForm, rows: SoakEvidenceRow[]): Basel
   return {
     ...form,
     soakType:
-      hydratedSoakType === "PHASE_0_RESTART_72H" || hydratedSoakType === "PHASE_3_STABILITY_72H"
+      hydratedSoakType === "PHASE_0_RESTART_72H" ||
+      hydratedSoakType === "PHASE_3_STABILITY_72H" ||
+      hydratedSoakType === "PHASE_4_30_DAY"
         ? hydratedSoakType
         : form.soakType,
     soakPurpose: evidenceMap["baseline.soak_purpose"] ?? form.soakPurpose,
@@ -1800,7 +1857,7 @@ function deriveCheckpointLabels(
   });
 }
 
-function inferSoakTypeFromReport(report: SoakReport): SoakType | null {
+export function inferSoakTypeFromReport(report: SoakReport): SoakType | null {
   const evidenceMap = indexEvidenceByKey(report.manual_evidence);
   const persistedType = (
     evidenceMap["baseline.soak_type"] ??
@@ -1811,7 +1868,11 @@ function inferSoakTypeFromReport(report: SoakReport): SoakType | null {
     .trim()
     .toUpperCase();
 
-  if (persistedType === "PHASE_0_RESTART_72H" || persistedType === "PHASE_3_STABILITY_72H") {
+  if (
+    persistedType === "PHASE_0_RESTART_72H" ||
+    persistedType === "PHASE_3_STABILITY_72H" ||
+    persistedType === "PHASE_4_30_DAY"
+  ) {
     return persistedType;
   }
 

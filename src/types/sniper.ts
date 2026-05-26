@@ -395,12 +395,18 @@ export interface SoakReport {
   seeded?: boolean;
 }
 
-export type SoakType = "PHASE_0_RESTART_72H" | "PHASE_3_STABILITY_72H" | "CUSTOM";
+export type SoakType =
+  | "PHASE_0_RESTART_72H"
+  | "PHASE_3_STABILITY_72H"
+  | "PHASE_4_30_DAY"
+  | "CUSTOM";
 
 export interface SoakTemplateConfig {
   soakType: SoakType;
   label: string;
   description: string;
+  durationDays: number;
+  symbols: Symbol[];
   defaultDurationHours: number;
   defaultCheckpointCount: number;
   checkpointLabels: string[];
@@ -411,6 +417,8 @@ export const SOAK_TEMPLATES: Record<SoakType, SoakTemplateConfig> = {
     soakType: "PHASE_0_RESTART_72H",
     label: "Phase 0 - Restart Soak",
     description: "72h restart soak with fixed Phase 0 checkpoint intervals.",
+    durationDays: 3,
+    symbols: [],
     defaultDurationHours: 72,
     defaultCheckpointCount: 4,
     checkpointLabels: ["T+12h", "T+24h", "T+48h", "T+72h"],
@@ -419,14 +427,28 @@ export const SOAK_TEMPLATES: Record<SoakType, SoakTemplateConfig> = {
     soakType: "PHASE_3_STABILITY_72H",
     label: "Phase 3 - Stability Soak",
     description: "72h stability soak pending operator-confirmed checkpoint naming.",
+    durationDays: 3,
+    symbols: [],
     defaultDurationHours: 72,
     defaultCheckpointCount: 3,
     checkpointLabels: ["T+24h", "T+48h", "T+72h"],
+  },
+  PHASE_4_30_DAY: {
+    soakType: "PHASE_4_30_DAY",
+    label: "Phase 4 - 30-Day Live Soak",
+    description: "30-day live parity soak for EURUSD, USDJPY, and XAUUSD corpus capture.",
+    durationDays: 30,
+    symbols: ["EURUSD", "USDJPY", "XAUUSD"],
+    defaultDurationHours: 720,
+    defaultCheckpointCount: 0,
+    checkpointLabels: [],
   },
   CUSTOM: {
     soakType: "CUSTOM",
     label: "Custom Soak",
     description: "Operator-defined soak duration and checkpoint schedule.",
+    durationDays: 0,
+    symbols: [],
     defaultDurationHours: 0,
     defaultCheckpointCount: 0,
     checkpointLabels: [],
