@@ -17,14 +17,15 @@
 class RegimeEngine
 {
 private:
-    // EMA lookback for D1 bias computation.
-    static const int EMA_PERIOD = 20;
-
-    // ATR lookback for H1 chop score.
-    static const int ATR_PERIOD = 14;
-
-    // Minimum bars required to compute a valid result.
-    static const int MIN_BARS = 25;
+    enum
+    {
+        // EMA lookback for D1 bias computation.
+        EMA_PERIOD = 20,
+        // ATR lookback for H1 chop score.
+        ATR_PERIOD = 14,
+        // Minimum bars required to compute a valid result.
+        MIN_BARS = 25
+    };
 
     // ATR-multiple threshold that separates TRENDING from RANGING.
     // A bar whose range > ATR * TREND_THRESHOLD is classified as directional.
