@@ -11,7 +11,7 @@ and the permanent guard installed to prevent recurrence. New entries are prepend
 - **Failure:** Prior-cycle `reports/codex-plan.md` (issue: crypto weekend session classification, PR #228) remained in the working directory when the "Fix EA compile errors" task was queued. Codex read the stale contract and halted with a conflict error.
 - **Frequency:** Recurring — triggers on every new research-and-plan intake that encounters an artifact from a prior incomplete or completed-but-not-archived cycle.
 - **Root cause:** RESEARCHING state handler does not clean up prior-cycle artifacts. `archiveCycleArtifacts()` fires only at cycle END, not at cycle START.
-- **Guard installed:** Stale-artifact cleanup added to the RESEARCHING entry handler in `scripts/pipeline-watcher.js`. Archive-on-reset added to `scripts/reset-pipeline.js`. See PR #TBD.
+- **Guard installed:** Stale-artifact cleanup added to the RESEARCHING entry handler in `scripts/pipeline-watcher.js`. Archive-on-reset added to `scripts/reset-pipeline.js`. See PR #248.
 - **Recurrence indicator:** If `reports/codex-plan.md` issue slug does not match `.smc-workflow-state.json` current issue at RESEARCHING entry, the watcher must archive it before PLANNING proceeds.
 
 ## 2026-05-16 — Codex finishes without writing `reports/codex-implementation.md`
