@@ -96,12 +96,15 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         // Phase 5B: refresh fundamental bias every 30 min (uses Twelve Data free tier).
+        // IMPORTANT: the cron_schedules filter MUST be registered before wp_next_scheduled /
+        // wp_schedule_event so WordPress knows the 'twicehourly' interval when it validates
+        // the recurrence. Registering it afterwards (as was done previously) leaves the
+        // interval unknown at schedule time, causing WordPress to silently skip scheduling.
+        add_filter('cron_schedules', array(__CLASS__, 'add_twicehourly_cron_schedule'));
         add_action('smc_sf_refresh_fundamentals', array($instance, 'cron_refresh_fundamentals'));
         if (!wp_next_scheduled('smc_sf_refresh_fundamentals')) {
             wp_schedule_event(time(), 'twicehourly', 'smc_sf_refresh_fundamentals');
         }
-        // Register the twicehourly cron interval if not already present.
-        add_filter('cron_schedules', array(__CLASS__, 'add_twicehourly_cron_schedule'));
     }
 
     public static function add_twicehourly_cron_schedule($schedules) {
@@ -694,7 +697,7 @@ final class SMC_SuperFib_Sniper_REST {
             source VARCHAR(32) NOT NULL DEFAULT 'twelve_data',
             created_at DATETIME NOT NULL,
             PRIMARY KEY  (id),
-            UNIQUE KEY event_lookup (currency, event_type, event_date),
+            UNIQUE KEY event_lookup (currency, event_date, event_name(64)),
             KEY currency_date (currency, event_date)
         ) $charset;";
 
@@ -797,6 +800,27 @@ final class SMC_SuperFib_Sniper_REST {
             PRIMARY KEY  (id),
             UNIQUE KEY user_license (user_id)
         ) $charset;";
+
+        $fundamentals_table = $wpdb->prefix . 'smc_sf_fundamental_events';
+        $event_lookup_index = $wpdb->get_results("SHOW INDEX FROM {$fundamentals_table} WHERE Key_name = 'event_lookup'");
+        if (is_array($event_lookup_index) && !empty($event_lookup_index)) {
+            $event_lookup_columns = array();
+            foreach ($event_lookup_index as $index_part) {
+                if (is_object($index_part) && isset($index_part->Seq_in_index, $index_part->Column_name)) {
+                    $event_lookup_columns[(int) $index_part->Seq_in_index] = $index_part->Column_name;
+                }
+            }
+            ksort($event_lookup_columns);
+            $event_lookup_columns = array_values($event_lookup_columns);
+            $expected_event_lookup = array('currency', 'event_date', 'event_name');
+            if ($event_lookup_columns !== $expected_event_lookup) {
+                $wpdb->query("ALTER TABLE {$fundamentals_table} DROP KEY event_lookup");
+                $wpdb->query("ALTER TABLE {$fundamentals_table} ADD UNIQUE KEY event_lookup (currency, event_date, event_name(64))");
+                if (is_object($wpdb) && property_exists($wpdb, 'last_error') && $wpdb->last_error !== '') {
+                    return false;
+                }
+            }
+        }
 
         foreach ($tables as $sql) {
             dbDelta($sql);
@@ -4060,13 +4084,20 @@ final class SMC_SuperFib_Sniper_REST {
         global $wpdb;
 
         $table = $wpdb->prefix . 'smc_sf_mt5_signal_candidates';
-        $count = (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$table} WHERE user_id = %d AND pine_match IS NOT NULL",
+        // Count only comparable rows (EXACT / DRIFT / MISMATCH) — rows where a Pine
+        // signal exists for the same symbol so a meaningful parity judgement can be made.
+        // NO_PINE rows are excluded from both the minimum-sample check and the parity ratio
+        // because they carry no signal quality information about MT5 vs Pine agreement.
+        // Counting IS NOT NULL (which includes NO_PINE) was the pre-fix bug: it let many
+        // NO_PINE rows pad the sample to ≥50 while the actual comparable set was tiny,
+        // enabling the Phase 7 execution gate to clear prematurely.
+        $comparable = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} WHERE user_id = %d AND pine_match NOT IN ('NO_PINE') AND pine_match IS NOT NULL",
             $user_id
         ));
 
-        if ($count < 50) {
-            // Not enough data yet.
+        if ($comparable < 50) {
+            // Not enough comparable MT5↔Pine pairs yet — keep gate closed.
             return false;
         }
 
@@ -4074,13 +4105,6 @@ final class SMC_SuperFib_Sniper_REST {
             "SELECT COUNT(*) FROM {$table} WHERE user_id = %d AND pine_match = 'EXACT'",
             $user_id
         ));
-
-        $comparable = (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$table} WHERE user_id = %d AND pine_match != 'NO_PINE'",
-            $user_id
-        ));
-
-        if ($comparable === 0) return false;
 
         $parity_pct = ($exact / $comparable) * 100.0;
         return $parity_pct >= 95.0;
