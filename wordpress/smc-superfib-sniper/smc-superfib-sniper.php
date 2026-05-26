@@ -801,6 +801,27 @@ final class SMC_SuperFib_Sniper_REST {
             UNIQUE KEY user_license (user_id)
         ) $charset;";
 
+        $fundamentals_table = $wpdb->prefix . 'smc_sf_fundamental_events';
+        $event_lookup_index = $wpdb->get_results("SHOW INDEX FROM {$fundamentals_table} WHERE Key_name = 'event_lookup'");
+        if (is_array($event_lookup_index) && !empty($event_lookup_index)) {
+            $event_lookup_columns = array();
+            foreach ($event_lookup_index as $index_part) {
+                if (is_object($index_part) && isset($index_part->Seq_in_index, $index_part->Column_name)) {
+                    $event_lookup_columns[(int) $index_part->Seq_in_index] = $index_part->Column_name;
+                }
+            }
+            ksort($event_lookup_columns);
+            $event_lookup_columns = array_values($event_lookup_columns);
+            $expected_event_lookup = array('currency', 'event_date', 'event_name');
+            if ($event_lookup_columns !== $expected_event_lookup) {
+                $wpdb->query("ALTER TABLE {$fundamentals_table} DROP KEY event_lookup");
+                $wpdb->query("ALTER TABLE {$fundamentals_table} ADD UNIQUE KEY event_lookup (currency, event_date, event_name(64))");
+                if (is_object($wpdb) && property_exists($wpdb, 'last_error') && $wpdb->last_error !== '') {
+                    return false;
+                }
+            }
+        }
+
         foreach ($tables as $sql) {
             dbDelta($sql);
             if (is_object($wpdb) && property_exists($wpdb, 'last_error') && $wpdb->last_error !== '') {
