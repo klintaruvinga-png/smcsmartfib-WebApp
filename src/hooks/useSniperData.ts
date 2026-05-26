@@ -219,9 +219,7 @@ const COMPARISON_SUFFIXES = [
 
 const COMPACT_COMPARISON_SUFFIXES = ["MICRO", "PRO", "ECN", "RAW", "M", "R", "C"] as const;
 
-export function normalizeSymbolForWatchlistComparison(
-  symbol: string | null | undefined,
-): string {
+export function normalizeSymbolForWatchlistComparison(symbol: string | null | undefined): string {
   let normalized = typeof symbol === "string" ? symbol.trim().toUpperCase() : "";
   if (!normalized) return "";
 

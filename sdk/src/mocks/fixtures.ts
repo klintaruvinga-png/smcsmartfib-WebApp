@@ -120,14 +120,63 @@ export const mockPrices: PairPrice[] = [
 // ─── Regimes ──────────────────────────────────────────────────────────────────
 
 export const mockRegimes: RegimeState[] = [
-  { symbol: "GBPUSD", bias: "BULL", chop: 0.22, nearestFib: 1.267, updatedAt: now(), state: "mock" },
-  { symbol: "AUDUSD", bias: "BEAR", chop: 0.34, nearestFib: 0.658, updatedAt: now(), state: "mock" },
-  { symbol: "EURUSD", bias: "RANGING", chop: 0.71, nearestFib: 1.082, updatedAt: now(), state: "mock" },
-  { symbol: "NZDUSD", bias: "BEAR", chop: 0.45, nearestFib: 0.6, updatedAt: minutesAgo(4), state: "stale" },
-  { symbol: "USDJPY", bias: "BULL", chop: 0.18, nearestFib: 156.2, updatedAt: now(), state: "mock" },
-  { symbol: "AUDJPY", bias: "BULL", chop: 0.28, nearestFib: 102.8, updatedAt: minutesAgo(6), state: "stale" },
+  {
+    symbol: "GBPUSD",
+    bias: "BULL",
+    chop: 0.22,
+    nearestFib: 1.267,
+    updatedAt: now(),
+    state: "mock",
+  },
+  {
+    symbol: "AUDUSD",
+    bias: "BEAR",
+    chop: 0.34,
+    nearestFib: 0.658,
+    updatedAt: now(),
+    state: "mock",
+  },
+  {
+    symbol: "EURUSD",
+    bias: "RANGING",
+    chop: 0.71,
+    nearestFib: 1.082,
+    updatedAt: now(),
+    state: "mock",
+  },
+  {
+    symbol: "NZDUSD",
+    bias: "BEAR",
+    chop: 0.45,
+    nearestFib: 0.6,
+    updatedAt: minutesAgo(4),
+    state: "stale",
+  },
+  {
+    symbol: "USDJPY",
+    bias: "BULL",
+    chop: 0.18,
+    nearestFib: 156.2,
+    updatedAt: now(),
+    state: "mock",
+  },
+  {
+    symbol: "AUDJPY",
+    bias: "BULL",
+    chop: 0.28,
+    nearestFib: 102.8,
+    updatedAt: minutesAgo(6),
+    state: "stale",
+  },
   { symbol: "EURJPY", bias: "BULL", chop: 0.2, nearestFib: 169.1, updatedAt: now(), state: "mock" },
-  { symbol: "XAUUSD", bias: "RANGING", chop: 0.62, nearestFib: null, updatedAt: now(), state: "unavailable" },
+  {
+    symbol: "XAUUSD",
+    bias: "RANGING",
+    chop: 0.62,
+    nearestFib: null,
+    updatedAt: now(),
+    state: "unavailable",
+  },
 ];
 
 // ─── Gates ────────────────────────────────────────────────────────────────────
@@ -392,7 +441,7 @@ export const mockUserProgress: UserProgress = {
 // ─── Synthetic price series ───────────────────────────────────────────────────
 
 function xorshift32(seed: number): () => number {
-  let s = (seed >>> 0) || 1;
+  let s = seed >>> 0 || 1;
   return () => {
     s ^= s << 13;
     s ^= s >> 17;

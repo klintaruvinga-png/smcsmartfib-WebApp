@@ -1,0 +1,18 @@
+{
+  "workflow_id": "stabilize-ea-2026-05-26",
+  "created_at": "2026-05-26T00:00:00Z",
+  "branch": "claude/nice-fermat-28hKb",
+  "initial_commit": "6a5262058670d2aa1fac56a249236f8666156515",
+  "rollback_points": [
+    {
+      "name": "Initial state",
+      "tag": "snapshot/stabilize-ea-2026-05-26-start-20260526T000000Z",
+      "commit_hash": "6a5262058670d2aa1fac56a249236f8666156515",
+      "snapshot_file": "INITIAL-20260526T000000Z.json",
+      "command": "git reset --hard 6a5262058670d2aa1fac56a249236f8666156515"
+    }
+  ],
+  "emergency_rollback": {
+    "command": "git checkout main && git reset --hard origin/main"
+  }
+}

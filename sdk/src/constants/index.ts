@@ -11,11 +11,7 @@ export {
   isMetal,
 } from "./symbols.js";
 
-export {
-  TRADING_SESSIONS,
-  activeSession,
-  currentSessionName,
-} from "./sessions.js";
+export { TRADING_SESSIONS, activeSession, currentSessionName } from "./sessions.js";
 
 export type { TradingSession } from "./sessions.js";
 

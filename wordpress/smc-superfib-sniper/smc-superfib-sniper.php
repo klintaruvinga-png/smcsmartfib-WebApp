@@ -2710,24 +2710,26 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         // Insert price snapshot (bid/ask required).
-        if (isset($payload['bid'], $payload['ask'])) {
-            $bid = (float) $payload['bid'];
-            $ask = (float) $payload['ask'];
-            
-            if (is_finite($bid) && is_finite($ask) && $bid > 0 && $ask > 0 && $bid <= $ask) {
-                $result = $this->upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $snapshot_updated_at, $phase3_freshness);
-                if ($result) {
-                    $inserted_snapshots = 1;
-                    delete_transient('smc_sf_qt_' . $user_id . '_' . md5($symbol));
-                    delete_transient($this->rl_transient_key($user_id, $symbol));
-                }
-            } else {
-                $this->audit($user_id, 'ea.market_stream.invalid_prices', array(
-                    'symbol' => $symbol,
-                    'bid' => $bid,
-                    'ask' => $ask
-                ));
-            }
+        // BUG-001 patch: invalid bid/ask values now return a structured 422 so the
+        // EA gets a non-2xx signal and can log the failure instead of silently succeeding.
+        $bid = (float) $payload['bid'];
+        $ask = (float) $payload['ask'];
+
+        if (!is_finite($bid) || !is_finite($ask) || $bid <= 0 || $ask <= 0 || $bid > $ask) {
+            $this->audit($user_id, 'ea.market_stream.invalid_prices', array(
+                'symbol' => $symbol,
+                'bid'    => $bid,
+                'ask'    => $ask,
+                'reason' => !is_finite($bid) || !is_finite($ask) ? 'non_finite' : ($bid <= 0 || $ask <= 0 ? 'non_positive' : 'bid_exceeds_ask'),
+            ));
+            return new WP_Error('invalid_prices', 'bid and ask must be finite positive numbers with bid <= ask.', array('status' => 422));
+        }
+
+        $result = $this->upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $snapshot_updated_at, $phase3_freshness);
+        if ($result) {
+            $inserted_snapshots = 1;
+            delete_transient('smc_sf_qt_' . $user_id . '_' . md5($symbol));
+            delete_transient($this->rl_transient_key($user_id, $symbol));
         }
 
         // Insert candle if provided (closed candle only, dedupe via UNIQUE candle key).

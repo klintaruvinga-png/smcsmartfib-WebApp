@@ -42,12 +42,7 @@ export const INDICES: KnownSymbol[] = ["US30", "NAS100"];
 export const CRYPTO: KnownSymbol[] = ["BTCUSD", "ETHUSD", "XRPUSD", "BNBUSD", "SOLUSD"];
 
 /** All known symbols across all asset classes. */
-export const ALL_KNOWN_SYMBOLS: KnownSymbol[] = [
-  ...FOREX_PAIRS,
-  ...METALS,
-  ...INDICES,
-  ...CRYPTO,
-];
+export const ALL_KNOWN_SYMBOLS: KnownSymbol[] = [...FOREX_PAIRS, ...METALS, ...INDICES, ...CRYPTO];
 
 /** Default watchlist used in the dashboard UI and mocks. */
 export const DEFAULT_WATCHLIST: KnownSymbol[] = [
