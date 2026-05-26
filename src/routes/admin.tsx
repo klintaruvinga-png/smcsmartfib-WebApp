@@ -416,11 +416,13 @@ export function AdminPage() {
       if (creatingNewBaseline) {
         if (baselineResetRequested) {
           await resetSoak();
+          await refreshSoakReport();
+        } else {
+          await createSoakCheckpoint({
+            checkpointType: "baseline",
+            operatorNotes: baselineForm.notes,
+          });
         }
-        await createSoakCheckpoint({
-          checkpointType: "baseline",
-          operatorNotes: baselineForm.notes,
-        });
       }
       await saveEvidenceEntries(baselineEntries);
 
