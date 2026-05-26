@@ -545,8 +545,8 @@ function test_ea_market_stream() {
 
     echo "\n";
 
-    // Test 7: is_finite() guard — INF bid/ask rejected (BUG-001 regression)
-    echo "Test 8: INF bid rejected by is_finite() guard (snapshot NOT inserted)\n";
+    // Test 7: is_finite() guard — INF bid/ask now returns WP_Error 422 (BUG-001 patch)
+    echo "Test 8: INF bid rejected with HTTP 422 (BUG-001 patch: structured error response)\n";
     $inf_bid_payload = array(
         'user_id' => 7,
         'symbol' => 'GBPUSD',
@@ -557,13 +557,38 @@ function test_ea_market_stream() {
 
     $inf_bid_response = dispatch_ea_market_stream($plugin, $inf_bid_payload);
 
-    if ($inf_bid_response instanceof WP_REST_Response
-        && $inf_bid_response->data['ok'] === true
-        && $inf_bid_response->data['snapshots_inserted'] === 0) {
-        echo "✓ SUCCESS: INF bid correctly rejected by is_finite() guard\n";
+    if ($inf_bid_response instanceof WP_Error
+        && $inf_bid_response->code === 'invalid_prices'
+        && isset($inf_bid_response->data['status'])
+        && (int) $inf_bid_response->data['status'] === 422) {
+        echo "✓ SUCCESS: INF bid correctly returns WP_Error invalid_prices HTTP 422\n";
     } else {
-        echo "✗ FAILED: INF bid was not rejected\n";
+        echo "✗ FAILED: INF bid was not rejected with structured 422\n";
         var_dump($inf_bid_response);
+    }
+
+    echo "\n";
+
+    // Test 7b: bid > ask now returns WP_Error 422 (BUG-001 patch)
+    echo "Test 8b: bid > ask rejected with HTTP 422 (BUG-001 patch)\n";
+    $bid_gt_ask_payload = array(
+        'user_id' => 7,
+        'symbol' => 'GBPUSD',
+        'timestamp' => gmdate('c', time() - 5),
+        'bid' => 1.27600,
+        'ask' => 1.27515  // bid > ask
+    );
+
+    $bid_gt_ask_response = dispatch_ea_market_stream($plugin, $bid_gt_ask_payload);
+
+    if ($bid_gt_ask_response instanceof WP_Error
+        && $bid_gt_ask_response->code === 'invalid_prices'
+        && isset($bid_gt_ask_response->data['status'])
+        && (int) $bid_gt_ask_response->data['status'] === 422) {
+        echo "✓ SUCCESS: bid > ask correctly returns WP_Error invalid_prices HTTP 422\n";
+    } else {
+        echo "✗ FAILED: bid > ask was not rejected with structured 422\n";
+        var_dump($bid_gt_ask_response);
     }
 
     echo "\n";

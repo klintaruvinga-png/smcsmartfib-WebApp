@@ -17,7 +17,13 @@
 // Client
 export { SniperClient } from "./client/SniperClient.js";
 export type { SniperClientConfig } from "./client/SniperClient.js";
-export { AuthError, ApiError, NetworkError, ValidationError, isSniperError } from "./client/errors.js";
+export {
+  AuthError,
+  ApiError,
+  NetworkError,
+  ValidationError,
+  isSniperError,
+} from "./client/errors.js";
 export type { SniperError } from "./client/errors.js";
 
 // Auth

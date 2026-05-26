@@ -1,0 +1,20 @@
+{
+  "snapshot_type": "PRE-PATCH",
+  "workflow_id": "stabilize-ea-2026-05-26",
+  "timestamp": "2026-05-26T00:01:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-28hKb",
+    "commit_hash": "6a5262058670d2aa1fac56a249236f8666156515",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-26-before-patches"
+  },
+  "pre_patch_checks": {
+    "php_syntax_main_plugin": "PASS",
+    "php_syntax_market_data_service": "PASS",
+    "npm_build": "PASS",
+    "npm_lint_errors": 12,
+    "npm_lint_errors_after_autofix": 0,
+    "npm_lint_warnings": 9,
+    "check_mql": "PASS"
+  },
+  "note": "Lint errors fixed (all Prettier formatting) before any logic patches."
+}

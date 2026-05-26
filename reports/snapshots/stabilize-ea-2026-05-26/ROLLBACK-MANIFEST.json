@@ -1,5 +1,27 @@
 {
   "workflow_id": "stabilize-ea-2026-05-26",
+  "created_at": "2026-05-26T00:00:00Z",
+  "branch": "claude/nice-fermat-28hKb",
+  "initial_commit": "6a5262058670d2aa1fac56a249236f8666156515",
+  "note": "Rollback commands use commit hashes only. Local git tags exist for these points but could not be pushed to the remote (environment permission restriction) and must not be relied upon as remote refs.",
+  "rollback_points": [
+    {
+      "name": "Initial state",
+      "commit_hash": "6a5262058670d2aa1fac56a249236f8666156515",
+      "snapshot_file": "INITIAL-20260526T000000Z.json",
+      "command": "git reset --hard 6a5262058670d2aa1fac56a249236f8666156515"
+    },
+    {
+      "name": "Before patches (lint fixes applied, no logic changes)",
+      "commit_hash": "6a5262058670d2aa1fac56a249236f8666156515",
+      "snapshot_file": "PRE-PATCH-20260526T000100Z.json",
+      "command": "git reset --hard 6a5262058670d2aa1fac56a249236f8666156515"
+    },
+    {
+      "name": "After Patch 1 (BUG-001 + BUG-002 applied)",
+      "commit_hash": "41db480bd2dcf3e6ea3c9b9b985a27d79aaf2e06",
+      "snapshot_file": "AFTER-PATCH-1-20260526T001000Z.json",
+      "command": "git reset --hard 41db480bd2dcf3e6ea3c9b9b985a27d79aaf2e06"
   "created_at": "2026-05-26T00:02:30Z",
   "branch": "claude/nice-fermat-r0HWw",
   "initial_commit": "6b4c544d69188e6f7602933165b220d1c5a69864",
@@ -21,6 +43,7 @@
   ],
   "emergency_rollback": {
     "command": "git checkout main && git reset --hard origin/main"
+  }
   },
   "notes": "No patches were applied in this workflow run. Both rollback points reference the same commit. The branch state is identical at workflow start and end."
 }

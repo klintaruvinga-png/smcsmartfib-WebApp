@@ -1,0 +1,175 @@
+{
+  "snapshot_type": "FINDINGS",
+  "workflow_id": "stabilize-ea-2026-05-26",
+  "timestamp": "2026-05-26T00:02:00Z",
+
+  "rest_route_audit": {
+    "namespace": "sniper/v1",
+    "public_routes": [
+      "GET /session — __return_true (public)",
+      "GET /health — __return_true (public)"
+    ],
+    "permission_user_routes": [
+      "GET /snapshot",
+      "POST /snapshot",
+      "GET /charts",
+      "GET /regimes",
+      "POST /regime",
+      "GET /live-signals",
+      "POST /signal",
+      "GET /ladders",
+      "POST /user/engine-batch",
+      "POST /user/market-data",
+      "GET /user/trades",
+      "POST /user/trades",
+      "GET /user/account",
+      "POST /user/account",
+      "GET /user/progress",
+      "GET /user/settings",
+      "POST /user/settings",
+      "GET /user/risk-profile",
+      "POST /user/risk-profile",
+      "GET /user/trade-queue",
+      "POST /user/trade-queue",
+      "POST /user/execute-signals",
+      "POST /user/twelve-data-key",
+      "DELETE /user/twelve-data-key",
+      "GET /user/watchlist",
+      "POST /user/watchlist",
+      "POST /user/watchlist/add",
+      "POST /user/watchlist/remove",
+      "GET /instruments",
+      "GET /account-telemetry",
+      "GET /positions",
+      "GET /orders",
+      "GET /market-data-authority",
+      "GET /authority-diagnostics",
+      "GET /market-data/fib-levels",
+      "GET /market-data/regime",
+      "POST /fundamentals/refresh",
+      "GET /fundamentals/bias",
+      "GET /market-data/signal-drift",
+      "GET /user/execution-audit",
+      "GET /user/approval-queue",
+      "POST /user/approval-queue/review",
+      "GET /user/license"
+    ],
+    "permission_admin_routes": [
+      "GET /admin/health",
+      "GET /admin/soak-report",
+      "POST /admin/soak-evidence",
+      "POST /admin/soak-checkpoint",
+      "POST /admin/license/set-tier"
+    ],
+    "permission_ea_bridge_routes": [
+      "POST /ea/market-stream — permission_ea_market_stream (delegates to permission_ea_bridge)",
+      "POST /ea/heartbeat",
+      "POST /ea/account-sync",
+      "POST /ea/symbol-sync",
+      "GET /ea/license-check",
+      "POST /ea/fib-levels",
+      "POST /ea/regime-snapshot",
+      "POST /ea/signal-candidates",
+      "GET /ea/execution-queue",
+      "POST /ea/execution-ack"
+    ],
+    "authority_diagnostics_status": "PROTECTED — returns 401 for unauthenticated (expected, not a bug)"
+  },
+
+  "ea_auth_audit": {
+    "permission_ea_bridge_correct": true,
+    "header_aliases_checked": ["x-ea-api-key", "x_ea_api_key", "x-api-key", "x_api_key"],
+    "uses_hash_equals": true,
+    "missing_key_returns_401": true,
+    "unconfigured_secret_returns_503": true,
+    "invalid_key_returns_403": true,
+    "missing_user_id_returns_400": true,
+    "invalid_user_id_returns_403": true,
+    "wp_set_current_user_called": true,
+    "token_not_exposed_in_frontend": true
+  },
+
+  "payload_validation_audit": {
+    "symbol_required_validated": true,
+    "bid_ask_required_validated": true,
+    "bid_ask_finite_positive_validated": true,
+    "bid_leq_ask_validated": true,
+    "quote_time_staleness_rejected_at_300s": true,
+    "quote_time_warn_between_120_300s": true,
+    "candle_timestamp_epoch_guard": true,
+    "ohlc_ordering_validated": true,
+    "tick_volume_non_negative_guarded": true,
+    "phase3_freshness_session_validated": true
+  },
+
+  "confirmed_issues": [
+    {
+      "id": "BUG-001",
+      "severity": "MEDIUM",
+      "system": "EA Market Stream — bid/ask invalid value response",
+      "description": "When bid/ask are present but invalid (zero, negative, infinite, or bid > ask), the handler audits but returns HTTP 200 with snapshots_inserted=0. The EA cannot distinguish a successful push from a price-validation failure.",
+      "root_cause": "The `is_finite && $bid > 0 && $ask > 0 && $bid <= $ask` guard logs an audit but falls through without returning a structured error response.",
+      "impact_zones": ["REST API /ea/market-stream", "EA feedback loop"],
+      "proposed_fix": "Return WP_Error with code 'invalid_prices' and HTTP 422 when bid/ask validation fails, so the EA gets a non-2xx signal and can log or retry correctly.",
+      "files_affected": ["wordpress/smc-superfib-sniper/smc-superfib-sniper.php"],
+      "lines": "2713-2730"
+    },
+    {
+      "id": "BUG-002",
+      "severity": "LOW",
+      "system": "Frontend — Prettier formatting drift in lint",
+      "description": "12 Prettier formatting errors across sdk/src/constants/symbols.ts, sdk/src/index.ts, sdk/src/mocks/fixtures.ts, src/mocks/sniperData.ts, src/hooks/useSniperData.ts, src/hooks/useStreamingTicks.ts. These are purely cosmetic and do not affect runtime behavior.",
+      "root_cause": "Prettier config drift on recently added SDK files and minor edits not run through formatter.",
+      "impact_zones": ["CI lint gate"],
+      "proposed_fix": "Apply eslint --fix (Prettier auto-format). Already applied in Stage 10.",
+      "files_affected": [
+        "sdk/src/constants/symbols.ts",
+        "sdk/src/index.ts",
+        "sdk/src/mocks/fixtures.ts",
+        "src/mocks/sniperData.ts",
+        "src/hooks/useSniperData.ts",
+        "src/hooks/useStreamingTicks.ts"
+      ]
+    }
+  ],
+
+  "confirmed_correct": [
+    "EA auth model: complete, uses hash_equals, all 4 header aliases, correct error codes/statuses",
+    "authority-diagnostics protected (401 for unauthenticated) — by design",
+    "Admin routes require manage_options — by design",
+    "EA market-stream stale rejection at 300s with 422 status code",
+    "OHLC validation: high >= max(open,close), low <= min(open,close)",
+    "Candle timestamp epoch guard (pre-2000 timestamps rejected)",
+    "tick_volume guard_tick_volume clamped to non-negative integer",
+    "FreshnessBadge renders backend-provided state (not locally derived)",
+    "VerdictBadge renders backend-provided verdict (not locally derived)",
+    "useSnapshot gated on backendReady && pollMs !== null (no orphaned polls)",
+    "quote_time takes precedence over timestamp via !empty() (not ??)",
+    "symbol alias map: GOLD→XAUUSD, USTECH100→NAS100, WALLSTREET30→US30 all correct",
+    "sniperClient.call() attaches Authorization or X-WP-Nonce; no EA token in frontend",
+    "Signal truth lives in backend (ensure_engine_snapshot), not frontend",
+    "Phase 4 fib engine: 100% fixture parity, 7/7 ingestion tests pass, 288/288 parity validator pass",
+    "Migration Phase 0-3: all COMPLETE with gate validation evidence"
+  ],
+
+  "migration_blockers": [
+    {
+      "id": "MIGRATION-P4-001",
+      "phase": "Phase 4",
+      "description": "Live MT5 parity corpus (EURUSD/USDJPY/XAUUSD, 30-day, M15/H1/D1) not yet captured",
+      "status": "PENDING — operator action required",
+      "validation_required": true,
+      "blocking_advancement": "Phase 4 gate cannot close without live corpus"
+    }
+  ],
+
+  "statistics": {
+    "total_issues": 2,
+    "critical": 0,
+    "high": 0,
+    "medium": 1,
+    "low": 1,
+    "migration_blockers": 1,
+    "confirmed_correct_items": 18
+  }
+}

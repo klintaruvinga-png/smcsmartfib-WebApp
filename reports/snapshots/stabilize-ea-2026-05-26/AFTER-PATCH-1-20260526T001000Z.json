@@ -1,0 +1,42 @@
+{
+  "snapshot_type": "AFTER-PATCH-1",
+  "workflow_id": "stabilize-ea-2026-05-26",
+  "timestamp": "2026-05-26T00:10:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-28hKb",
+    "commit_hash": "41db480bd2dcf3e6ea3c9b9b985a27d79aaf2e06",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-26-after-patch-1"
+  },
+  "patches_applied": [
+    {
+      "id": "BUG-001",
+      "description": "EA market-stream: invalid bid/ask values now return WP_Error invalid_prices HTTP 422 instead of 200 OK with snapshots_inserted=0.",
+      "file": "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "lines_changed": "2712-2731",
+      "regression_test": "test-ea-market-stream.php Test 8 + Test 8b",
+      "rollback_tag_before": "rollback/stabilize-ea-2026-05-26-before-patches"
+    },
+    {
+      "id": "BUG-002",
+      "description": "Prettier formatting drift fixed in SDK and frontend files. No logic change.",
+      "files": [
+        "sdk/src/constants/index.ts",
+        "sdk/src/constants/symbols.ts",
+        "sdk/src/index.ts",
+        "sdk/src/mocks/fixtures.ts",
+        "src/mocks/sniperData.ts",
+        "src/hooks/useSniperData.ts",
+        "src/hooks/useStreamingTicks.ts"
+      ]
+    }
+  ],
+  "checks_post_patch": {
+    "php_syntax_main_plugin": "PASS",
+    "php_syntax_market_data_service": "PASS",
+    "npm_build": "PASS",
+    "npm_lint_errors": 0,
+    "npm_lint_warnings": 9,
+    "check_mql": "PASS",
+    "ea_market_stream_regression_tests": "15/15 PASS"
+  }
+}
