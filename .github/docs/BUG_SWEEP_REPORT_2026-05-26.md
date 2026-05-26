@@ -267,9 +267,10 @@ curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-st
 ## Rollback Procedure
 
 ```bash
-# Rollback to pre-patch state
+# Rollback to pre-patch state (commit hash — authoritative)
 git reset --hard 6a5262058670d2aa1fac56a249236f8666156515
-
-# Or via tag
-git checkout snapshot/stabilize-ea-2026-05-26-start-20260526T000000Z
 ```
+
+> **Note**: Git tags for this workflow (`snapshot/stabilize-ea-2026-05-26-*`,
+> `rollback/stabilize-ea-2026-05-26-*`) exist locally only — a permission restriction
+> prevented pushing them to the remote. Use commit hashes for all rollback operations.

@@ -5,11 +5,13 @@
   "git": {
     "branch": "claude/nice-fermat-28hKb",
     "commit_hash": "41db480bd2dcf3e6ea3c9b9b985a27d79aaf2e06",
-    "tags_created": [
+    "local_tags_only": [
       "snapshot/stabilize-ea-2026-05-26-start-20260526T000000Z",
       "rollback/stabilize-ea-2026-05-26-before-patches",
       "rollback/stabilize-ea-2026-05-26-after-patch-1"
-    ]
+    ],
+    "tags_pushed_to_remote": false,
+    "tags_note": "Tags exist locally only; environment permission restriction prevented push. Use commit hashes from ROLLBACK-MANIFEST.json for all rollback operations."
   },
   "patches_applied": [
     "BUG-001: EA market-stream invalid bid/ask → HTTP 422 with structured error",
