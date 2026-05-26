@@ -1,0 +1,33 @@
+{
+  "snapshot_type": "PRE-PATCH",
+  "workflow_id": "stabilize-ea-2026-05-26",
+  "timestamp": "2026-05-26T00:02:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-r0HWw",
+    "commit_hash": "6b4c544d69188e6f7602933165b220d1c5a69864",
+    "rollback_tag": "rollback/stabilize-ea-2026-05-26-before-patches"
+  },
+  "patch_decision": "NO_PATCHES_REQUIRED",
+  "reason": "Full audit pass — 0 confirmed bugs. All authentication, payload validation, signal engine, freshness, and parity checks verified correct. System is in stable, hardened state as of Phase 4 code completion (2026-05-25).",
+  "findings_summary": {
+    "confirmed_bugs": 0,
+    "observations_only": 4,
+    "all_are_non_issues_or_env_limitations": true
+  },
+  "confirmed_stable_components": [
+    "EA auth: permission_ea_market_stream → permission_ea_bridge — all 4 error cases correct",
+    "EA payload validation: symbol, timeframe, quote_time, bid/ask, OHLC, tick_volume, staleness rejection",
+    "Stale data rejection: age > 300s → 422, unparseable → 422, warning at 120-300s",
+    "Candle validation: epoch guard (pre-2000 rejection), OHLC ordering check, stream-timestamp staleness",
+    "Signal engine guard: rejects non-mt5, non-live, age > staleThresholdSec",
+    "age_sec derivation: from stored updated_at (sourced from quote_time) — not from fetch time",
+    "FreshnessBadge: uses backend state prop, never derives from local time",
+    "VerdictBadge: renders backend verdict only",
+    "authority-diagnostics: 401 for unauthenticated — correctly protected",
+    "Admin routes: manage_options required",
+    "FibEngine.mqh: MAX_SESSIONS enum change (commit 6b4c544) is non-functional",
+    "Symbol normalization: map_symbol_aliases handles broker variants across PHP and MQL5",
+    "NAS100/US30 equity session handling: is_equity_index_off_session correct (EDT/EST DST-aware)",
+    "XAUUSD/GOLD alias: handled in both PHP map_symbol_aliases and MQL5 SymbolNormalizer"
+  ]
+}
