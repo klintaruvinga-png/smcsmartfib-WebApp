@@ -345,6 +345,10 @@ export function AdminPage() {
 
     setPreviousBaselineCheckpoint(baselineCheckpoint);
     setBaselineResetRequested(true);
+    setBaselineForm((current) => ({
+      ...current,
+      soakType,
+    }));
     setPanelMessage(null);
     setPanelError(null);
   }
