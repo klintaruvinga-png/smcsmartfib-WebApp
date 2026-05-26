@@ -23,7 +23,7 @@ vi.mock("@/hooks/useSniperData", () => ({
   usePollingUiState: hookMocks.usePollingUiState,
 }));
 
-import { BookPage } from "./book";
+import { BookPage } from "./-book.page";
 
 describe("BookPage", () => {
   beforeEach(() => {

@@ -23,7 +23,7 @@ vi.mock("@/hooks/useSniperData", () => ({
   useUserRiskProfile: hookMocks.useUserRiskProfile,
 }));
 
-import { ProgressPage } from "./progress";
+import { ProgressPage } from "./-progress.page";
 
 describe("ProgressPage", () => {
   afterEach(() => {
