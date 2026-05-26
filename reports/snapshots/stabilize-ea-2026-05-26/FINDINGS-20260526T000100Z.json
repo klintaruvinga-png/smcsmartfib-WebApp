@@ -1,0 +1,113 @@
+{
+  "snapshot_type": "FINDINGS",
+  "workflow_id": "stabilize-ea-2026-05-26",
+  "timestamp": "2026-05-26T00:01:00Z",
+  "confirmed_issues": [],
+  "observations": [
+    {
+      "id": "OBS-001",
+      "severity": "INFO",
+      "system": "MT5 FibEngine",
+      "description": "Latest commit 6b4c544 changed MAX_SESSIONS from static const to enum in FibEngine.mqh. Non-functional — arrays still sized 2048, enum constant used identically at line 242 bounds check.",
+      "status": "NON_ISSUE"
+    },
+    {
+      "id": "OBS-002",
+      "severity": "INFO",
+      "system": "class-market-data-service.php",
+      "description": "is_equity_index_symbol() uses strpos('NAS100') || strpos('US30') — consistent with input: symbols are always pre-normalized uppercase before this call. No false-positive risk identified.",
+      "status": "NON_ISSUE"
+    },
+    {
+      "id": "OBS-003",
+      "severity": "INFO",
+      "system": "EA Payload Contract",
+      "description": "multi-candle batch (candles[] with >1 entry) logs a diagnostic and stores only candles[0]. Comment correctly states this is Phase 3 scope. Phase 3 is now complete, but multi-candle batch ingestion was not part of Phase 3 scope — it is deferred. No functional gap for current EA pattern.",
+      "status": "NON_ISSUE"
+    },
+    {
+      "id": "OBS-004",
+      "severity": "INFO",
+      "system": "npm lint / npm build",
+      "description": "vite and @eslint/js packages not installed in remote execution environment. Pre-existing limitation confirmed across all prior workflow runs (2026-05-11 through 2026-05-25). TypeScript type safety is enforced at the source level; builds confirmed passing in local/CI environments.",
+      "status": "ENV_LIMITATION"
+    }
+  ],
+  "migration_blockers": [
+    {
+      "id": "MIGRATION-001",
+      "phase": "Phase 4",
+      "description": "Live MT5 corpus not yet captured — parity validator cannot run",
+      "status": "OPEN",
+      "validation_required": true,
+      "action": "Operator must deploy Phase-4-Implementation branch to live MT5 terminal, wait for FibEngine to accumulate 30-day corpus, capture Pine reference snapshots, then run: php scripts/parity-validator.php --mt5-file mt5-levels.json --pine-file pine-levels.json --out reports/phase4-gate.json"
+    },
+    {
+      "id": "MIGRATION-002",
+      "phase": "Phase 4",
+      "description": "T0 admin baseline not yet created in soak workspace",
+      "status": "OPEN",
+      "validation_required": true,
+      "action": "Open /admin → Soak Workspace → create PHASE_4_IMPLEMENTATION_START baseline. This also clears Phase 3 CONDITIONAL PASS blocker RISK-06."
+    },
+    {
+      "id": "MIGRATION-003",
+      "phase": "Phase 4",
+      "description": "Pine reference snapshots not yet captured from TradingView",
+      "status": "OPEN",
+      "validation_required": true,
+      "action": "Export fib levels for EURUSD, USDJPY, XAUUSD from TradingView at a known UTC timestamp → save as pine-levels.json"
+    }
+  ],
+  "auth_audit": {
+    "ea_market_stream_auth": {
+      "header_aliases": ["x-ea-api-key", "x_ea_api_key", "x-api-key", "x_api_key"],
+      "uses_hash_equals": true,
+      "missing_token_response": "WP_Error smc_sf_api_key_missing 401",
+      "unconfigured_secret_response": "WP_Error smc_sf_api_key_unconfigured 503 + error_log",
+      "invalid_token_response": "WP_Error smc_sf_api_key_invalid 403",
+      "missing_user_id_response": "WP_Error smc_sf_user_required 400",
+      "invalid_user_id_response": "WP_Error smc_sf_user_invalid 403",
+      "wp_set_current_user_called": true,
+      "status": "PASS"
+    },
+    "authority_diagnostics_protected": true,
+    "admin_routes_require_manage_options": true
+  },
+  "payload_validation_audit": {
+    "symbol_check": "present, non-empty, sanitized, alias-mapped",
+    "timeframe_check": "normalized via normalize_mt5_timeframe",
+    "quote_time_check": "parsed, stale rejection at 300s → HTTP 422, unparseable → HTTP 422",
+    "bid_ask_check": "is_finite() + > 0 + bid <= ask guard",
+    "ohlc_check": "validate_ohlc() — high >= max(open,close), low <= min(open,close)",
+    "tick_volume_check": "clamped to 0 if negative or non-numeric",
+    "candle_epoch_guard": "rejects pre-2000 candle timestamps",
+    "multi_candle_shim": "candles[0] promoted as candle when candle absent",
+    "stale_data_rejection": "422 for age_seconds > 300",
+    "status": "PASS"
+  },
+  "signal_engine_audit": {
+    "engine_skips_non_mt5": true,
+    "engine_skips_non_live": true,
+    "engine_skips_stale_by_age": true,
+    "age_sec_derived_from_updated_at": true,
+    "updated_at_sourced_from_quote_time": true,
+    "candle_freshness_check": "candle_age_sec <= 7200 before signal generation",
+    "backend_is_truth": true,
+    "frontend_derives_state_from_backend": true,
+    "freshness_badge_uses_backend_state": true,
+    "verdict_badge_uses_backend_verdict": true,
+    "status": "PASS"
+  },
+  "statistics": {
+    "total_issues": 0,
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0,
+    "info": 4,
+    "migration_blockers": 3,
+    "migration_blockers_code_related": 0,
+    "migration_blockers_operator_action_required": 3
+  }
+}

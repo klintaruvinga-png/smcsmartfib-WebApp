@@ -1,0 +1,135 @@
+{
+  "snapshot_type": "INITIAL",
+  "workflow_id": "stabilize-ea-2026-05-26",
+  "timestamp": "2026-05-26T00:00:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-28hKb",
+    "commit_hash": "6a5262058670d2aa1fac56a249236f8666156515",
+    "remote": "origin",
+    "uncommitted_changes_count": 0
+    "branch": "claude/nice-fermat-r0HWw",
+    "commit_hash": "6b4c544d69188e6f7602933165b220d1c5a69864",
+    "remote": "origin",
+    "uncommitted_changes_count": 0,
+    "last_commit_message": "Use enum for MAX_SESSIONS constant"
+  },
+  "repo_structure": {
+    "plugin_root": "wordpress/smc-superfib-sniper",
+    "plugin_files": [
+      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "wordpress/smc-superfib-sniper/class-market-data-service.php"
+      "wordpress/smc-superfib-sniper/class-market-data-service.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-fib-parity.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-session-anchors.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-htf-authority-anchor.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-superfib-weighting.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-cors-regression.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-settings-risk-fallbacks.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-fib-ingestion.php",
+      "wordpress/smc-superfib-sniper/tests/php/phase3_mt5_simulation_test.php"
+    ],
+    "rest_route_files": [
+      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php"
+    ],
+    "frontend_api_client": "src/lib/api/sniperClient.ts",
+    "frontend_auth": "src/lib/auth.ts",
+    "frontend_types": "src/types/sniper.ts",
+    "frontend_mocks": "src/mocks/sniperData.ts",
+    "frontend_hooks": [
+      "src/hooks/useSniperData.ts",
+      "src/hooks/useStreamingTicks.ts",
+      "src/hooks/useTickFlash.ts"
+    ],
+    "frontend_components": [
+      "src/components/sniper/FreshnessBadge.tsx",
+      "src/components/sniper/VerdictBadge.tsx"
+    ],
+    "mt5_ea_files": [
+      "mt5/SMC_MarketDataEA.mq5",
+      "mt5/MarketDataEngine.mqh",
+      "mt5/CandleBuilder.mqh",
+      "mt5/FreshnessEngine.mqh",
+      "mt5/SessionManager.mqh",
+      "mt5/SymbolNormalizer.mqh",
+      "mt5/TickProcessor.mqh",
+      "mt5/FibEngine.mqh"
+    ],
+    "migration_files": [
+      ".github/migration-status.md",
+      ".github/migration/PHASE0_SOAK_TRACKER.md",
+      ".github/migration/PHASE1_BRIDGE_ROADMAP.md",
+      ".github/migration/phase-updates/phase4-implementation-started-2026-05-25.md"
+    ],
+    "test_files": [
+      "wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-fib-ingestion.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-fib-parity.php",
+      "wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php"
+    "mt5_ea_files": [
+      "mt5/SMC_MarketDataEA.mq5",
+      "mt5/CandleBuilder.mqh",
+      "mt5/FibEngine.mqh",
+      "mt5/FreshnessEngine.mqh",
+      "mt5/MarketDataEngine.mqh",
+      "mt5/SessionManager.mqh",
+      "mt5/SymbolNormalizer.mqh",
+      "mt5/TickProcessor.mqh"
+    ],
+    "migration_files": [
+      ".github/migration/README.md",
+      ".github/migration/PHASE0_SOAK_TRACKER.md",
+      ".github/migration/PHASE1_BRIDGE_ROADMAP.md",
+      ".github/migration/PHASE1_CHECKLIST.md",
+      ".github/migration/PHASE1_TRACKER.md",
+      ".github/migration/RISK_REGISTER.md",
+      ".github/migration/audits/phase-4-fib-engine-parity-2026-05-25.md",
+      ".github/migration/phase-updates/phase4-implementation-started-2026-05-25.md"
+    ]
+  },
+  "app_state": {
+    "workflow_state_file_exists": false,
+    "workflow_state": {},
+    "migration_status": {
+      "current_phase": "4 — Fib Engine Migration",
+      "overall_progress": "78%",
+      "phase_4_status": "IN-PROGRESS — code complete 2026-05-25; live parity corpus pending operator",
+      "blockers": [
+        "OPERATOR: Live parity corpus (EURUSD/USDJPY/XAUUSD 30-day MT5 vs Pine) not yet captured"
+      ],
+      "phases_complete": ["0", "1", "2", "3"]
+      "current_phase": "Phase 4 — Fib Engine Migration",
+      "overall_progress": "Code complete 2026-05-25. Live corpus pending. Phase 3 closed.",
+      "blockers": [
+        "Phase 4 gate: Live MT5 corpus not yet captured (operator action required)",
+        "Phase 4 gate: Pine reference snapshots not yet captured (operator action required)",
+        "Phase 4 gate: T0 admin baseline not yet created in soak workspace (operator action required)"
+      ]
+    }
+  },
+  "known_dev_status": {
+    "authority_diagnostics_requires_wp_session": true,
+    "ea_market_stream_route_exists": true,
+    "ea_auth_header": "X-EA-API-Key",
+    "ea_auth_secret_env": "SMC_SF_EA_API_KEY",
+    "ea_payload_requires_user_id": true,
+    "migration_phase": "Phase 4 — Fib Engine Migration (code complete; live corpus pending operator)",
+    "rest_namespace": "sniper/v1",
+    "backend_base_url": "https://trader.stokvelsociety.co.za/wp-json",
+    "stale_rejection_threshold_seconds": 300,
+    "stale_warn_threshold_seconds": 120,
+    "ea_route_full_url": "POST https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream"
+    "migration_phase": "Phase 4 — Fib Engine Migration (code complete, live corpus pending)",
+    "last_workflow_date": "2026-05-25",
+    "last_workflow_bugs_found": 0,
+    "last_workflow_patches_applied": 0,
+    "since_last_workflow": [
+      "commit 6b4c544: Use enum for MAX_SESSIONS constant in mt5/FibEngine.mqh (non-functional)"
+    ]
+  }
+}

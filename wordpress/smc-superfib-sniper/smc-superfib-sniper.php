@@ -684,6 +684,11 @@ final class SMC_SuperFib_Sniper_REST {
         ) $charset;";
 
         // Phase 5B: Economic fundamental events
+        // UNIQUE KEY uses (currency, event_date, event_name(64)) — not event_type — so that
+        // multiple distinct releases that map to the same event_type on the same day
+        // (e.g. "CPI m/m" and "Core CPI m/m") are stored as separate rows rather than
+        // collapsing into one, which would bias event_count and composite scoring.
+        // event_name is the source identifier; the same event re-ingested updates the row.
         $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_fundamental_events (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             currency VARCHAR(8) NOT NULL,
@@ -822,11 +827,37 @@ final class SMC_SuperFib_Sniper_REST {
             }
         }
 
+
         foreach ($tables as $sql) {
             dbDelta($sql);
             if (is_object($wpdb) && property_exists($wpdb, 'last_error') && $wpdb->last_error !== '') {
                 return false;
             }
+        }
+
+        // ---- Phase 5B migration: fix fundamental_events unique key on existing installs ----
+        // dbDelta cannot drop or rename existing UNIQUE keys, so we handle it explicitly.
+        // The old key was (currency, event_type, event_date) — it collapsed distinct same-day
+        // same-type events (e.g. "CPI m/m" vs "Core CPI m/m") into a single row.
+        // The correct key is (currency, event_date, event_name(64)) so every distinct event
+        // release is preserved separately.
+        // This ALTER only runs when the old key is still present; it is a no-op on fresh installs
+        // (where the table was created with the correct key from the start).
+        $events_table = $wpdb->prefix . 'smc_sf_fundamental_events';
+        $old_key_exists = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME   = %s
+               AND INDEX_NAME   = 'event_lookup'
+               AND COLUMN_NAME  = 'event_type'",
+            $events_table
+        ));
+        if ((int) $old_key_exists > 0) {
+            // Drop the stale key and add the corrected one in a single ALTER TABLE.
+            $wpdb->query("ALTER TABLE `{$events_table}`
+                DROP INDEX `event_lookup`,
+                ADD UNIQUE KEY `event_lookup` (`currency`, `event_date`, `event_name`(64))");
+            error_log('[SMC_SF] fundamental_events: migrated event_lookup key to (currency, event_date, event_name(64))');
         }
 
         return true;
@@ -2701,24 +2732,26 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         // Insert price snapshot (bid/ask required).
-        if (isset($payload['bid'], $payload['ask'])) {
-            $bid = (float) $payload['bid'];
-            $ask = (float) $payload['ask'];
-            
-            if (is_finite($bid) && is_finite($ask) && $bid > 0 && $ask > 0 && $bid <= $ask) {
-                $result = $this->upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $snapshot_updated_at, $phase3_freshness);
-                if ($result) {
-                    $inserted_snapshots = 1;
-                    delete_transient('smc_sf_qt_' . $user_id . '_' . md5($symbol));
-                    delete_transient($this->rl_transient_key($user_id, $symbol));
-                }
-            } else {
-                $this->audit($user_id, 'ea.market_stream.invalid_prices', array(
-                    'symbol' => $symbol,
-                    'bid' => $bid,
-                    'ask' => $ask
-                ));
-            }
+        // BUG-001 patch: invalid bid/ask values now return a structured 422 so the
+        // EA gets a non-2xx signal and can log the failure instead of silently succeeding.
+        $bid = (float) $payload['bid'];
+        $ask = (float) $payload['ask'];
+
+        if (!is_finite($bid) || !is_finite($ask) || $bid <= 0 || $ask <= 0 || $bid > $ask) {
+            $this->audit($user_id, 'ea.market_stream.invalid_prices', array(
+                'symbol' => $symbol,
+                'bid'    => $bid,
+                'ask'    => $ask,
+                'reason' => !is_finite($bid) || !is_finite($ask) ? 'non_finite' : ($bid <= 0 || $ask <= 0 ? 'non_positive' : 'bid_exceeds_ask'),
+            ));
+            return new WP_Error('invalid_prices', 'bid and ask must be finite positive numbers with bid <= ask.', array('status' => 422));
+        }
+
+        $result = $this->upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $snapshot_updated_at, $phase3_freshness);
+        if ($result) {
+            $inserted_snapshots = 1;
+            delete_transient('smc_sf_qt_' . $user_id . '_' . md5($symbol));
+            delete_transient($this->rl_transient_key($user_id, $symbol));
         }
 
         // Insert candle if provided (closed candle only, dedupe via UNIQUE candle key).
@@ -4084,6 +4117,7 @@ final class SMC_SuperFib_Sniper_REST {
         global $wpdb;
 
         $table = $wpdb->prefix . 'smc_sf_mt5_signal_candidates';
+
         // Count only comparable rows (EXACT / DRIFT / MISMATCH) — rows where a Pine
         // signal exists for the same symbol so a meaningful parity judgement can be made.
         // NO_PINE rows are excluded from both the minimum-sample check and the parity ratio
