@@ -70,6 +70,7 @@ Before performing ANY file edit, code generation, apply_patch, or write operatio
 - Never advance to implementation unless BOTH of these files exist:
   - `reports/copilot-research.md`
   - `reports/codex-plan.md`
+- Before advancing to PLANNING, the pipeline watcher must verify that `reports/codex-plan.md` (if present) belongs to the current issue. If the plan metadata issue slug does not match the current issue slug in `.smc-workflow-state.json`, the stale plan must be archived and must not be used. The RESEARCHING state handler is responsible for this check.
 - `.smc-workflow-state.json` is a local runtime file. Never stage or commit it.
 - If `state` is `IMPLEMENTATION_FAILED`, inspect `reports/.codex-implementation-failed.json` and `reports/codex-last-message.txt` before starting a new cycle.
 - Once `IMPLEMENTATION_COMPLETE`, the pipeline watcher polls GitHub every ~60 s for the merged PR on `codex/<issue-slug>`. When the PR is merged it archives the cycle artifacts to `reports/archive/` and resets state to `IDLE` automatically.
@@ -78,11 +79,11 @@ Before performing ANY file edit, code generation, apply_patch, or write operatio
 
 ## Workflow States Reference
 
-| State                    | Editing Allowed | Notes |
-| ------------------------ | --------------- | ----- |
-| IDLE                     | Yes             | No active issue. Pipeline waiting for new trigger. |
-| RESEARCHING              | No              | Copilot writing research artifact. |
-| PLANNING                 | No (locked)     | Pipeline calling Claude to harden the plan. |
-| READY_FOR_IMPLEMENTATION | Yes             | Plan hardened. Pipeline calling Codex. |
+| State                    | Editing Allowed | Notes                                                                                                       |
+| ------------------------ | --------------- | ----------------------------------------------------------------------------------------------------------- |
+| IDLE                     | Yes             | No active issue. Pipeline waiting for new trigger.                                                          |
+| RESEARCHING              | No              | Copilot writing research artifact.                                                                          |
+| PLANNING                 | No (locked)     | Pipeline calling Claude to harden the plan.                                                                 |
+| READY_FOR_IMPLEMENTATION | Yes             | Plan hardened. Pipeline calling Codex.                                                                      |
 | IMPLEMENTATION_FAILED    | Yes             | Codex stopped. Inspect `.codex-implementation-failed.json`. Run `npm run pipeline:reset` to return to IDLE. |
-| IMPLEMENTATION_COMPLETE  | Yes             | Codex opened PR. Pipeline polling for merge to close cycle. |
+| IMPLEMENTATION_COMPLETE  | Yes             | Codex opened PR. Pipeline polling for merge to close cycle.                                                 |

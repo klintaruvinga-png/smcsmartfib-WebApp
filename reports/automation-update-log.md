@@ -6,6 +6,14 @@ and the permanent guard installed to prevent recurrence. New entries are prepend
 
 ---
 
+## [2026-05-26] Stale pipeline artifacts block new research cycles
+
+- **Failure:** Prior-cycle `reports/codex-plan.md` (issue: crypto weekend session classification, PR #228) remained in the working directory when the "Fix EA compile errors" task was queued. Codex read the stale contract and halted with a conflict error.
+- **Frequency:** Recurring — triggers on every new research-and-plan intake that encounters an artifact from a prior incomplete or completed-but-not-archived cycle.
+- **Root cause:** RESEARCHING state handler does not clean up prior-cycle artifacts. `archiveCycleArtifacts()` fires only at cycle END, not at cycle START.
+- **Guard installed:** Stale-artifact cleanup added to the RESEARCHING entry handler in `scripts/pipeline-watcher.js`. Archive-on-reset added to `scripts/reset-pipeline.js`. See PR #248.
+- **Recurrence indicator:** If `reports/codex-plan.md` issue slug does not match `.smc-workflow-state.json` current issue at RESEARCHING entry, the watcher must archive it before PLANNING proceeds.
+
 ## 2026-05-16 — Codex finishes without writing `reports/codex-implementation.md`
 
 **Failure sentinel:** `reports/.codex-implementation-failed.json`
@@ -18,7 +26,7 @@ and the permanent guard installed to prevent recurrence. New entries are prepend
 Codex CLI exits with code 0 (no error), and `codex-last-message.txt` is refreshed, so the
 pipeline watcher does not classify the run as a crash. However, `validateImplementationRun()`
 in `scripts/pipeline-watcher.js` (line 686) checks for the existence of `codex-implementation.md`
-as a distinct step *after* verifying the exit message. When Codex finishes the code changes,
+as a distinct step _after_ verifying the exit message. When Codex finishes the code changes,
 pushes the branch, and opens the PR, but does not execute step 9 of the implement prompt
 ("Write the implementation summary to: reports/codex-implementation.md"), the watcher records
 `IMPLEMENTATION_FAILED` with the reason above.
@@ -38,9 +46,11 @@ failure to persist.
 1. **`scripts/validate-implementation.mjs`** — standalone regression guard script that
    replicates the exact `isUsableImplementation()` and `validateImplementationRun()` checks
    from `pipeline-watcher.js`. Run it manually to diagnose any `IMPLEMENTATION_FAILED` state:
+
    ```
    node scripts/validate-implementation.mjs
    ```
+
    It exits 0 if all artifacts are valid, 1 with a specific diagnostic if not.
 
 2. **Codex implement prompt section order verified** — `reports/codex-implementation.md` step

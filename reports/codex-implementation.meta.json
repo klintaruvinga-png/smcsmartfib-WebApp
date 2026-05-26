@@ -1,5 +1,5 @@
 {
-  "issue": "SMC Intake - Fix EA compile errors",
-  "plan_hash": "4d73372e9586e0e47f10e841c5d090c104f183770b673e7d3c4fd7ccbb6f2f87",
-  "written_at": "2026-05-26T10:00:00.000Z"
+  "issue": "fix local automation pipeline to avoid recurring error where stale artefacts are blocking the pipeline from continuing tasks, lock this as a known error and create permanent fixes so this does not happen again in future",
+  "plan_hash": "180d36a2f80e77d13b8bc44dfacbca5a261192c855839430c7aafa1332277010",
+  "written_at": "2026-05-26T10:08:21.0282459Z"
 }

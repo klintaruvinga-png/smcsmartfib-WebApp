@@ -220,7 +220,7 @@ function buildObservedKey() {
 }
 
 function readTextFile(filePath) {
-  return fs.readFileSync(filePath, "utf8").replace(/^ï»¿/, "");
+  return fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
 }
 
 function readJson(filePath) {
@@ -340,6 +340,151 @@ function checkMergedPR(issueSlug, cycleStartedAt) {
     log(`checkMergedPR error: ${msg}`);
     return null;
   }
+}
+
+function buildArchiveTimestamp() {
+  return new Date().toISOString().replace(/[:.]/g, "-");
+}
+
+function archiveFileWithCopyDelete(src, destDir, name, warningPrefix) {
+  if (!fs.existsSync(src)) {
+    return false;
+  }
+
+  fs.mkdirSync(destDir, { recursive: true });
+
+  try {
+    fs.copyFileSync(src, path.join(destDir, name));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log(`${warningPrefix}: failed to archive reports/${name} (${message})`);
+    return false;
+  }
+
+  try {
+    fs.unlinkSync(src);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log(
+      `${warningPrefix}: archived copy created for reports/${name} but source removal failed (${message})`,
+    );
+  }
+
+  return true;
+}
+
+function isCurrentCycleResearchArtifact(state) {
+  if (!fs.existsSync(RESEARCH_FILE)) {
+    return false;
+  }
+
+  const cycleStartedAt = Date.parse(state?.started_at ?? "");
+  if (!Number.isFinite(cycleStartedAt)) {
+    return true;
+  }
+
+  try {
+    return fs.statSync(RESEARCH_FILE).mtimeMs >= cycleStartedAt;
+  } catch {
+    return false;
+  }
+}
+
+function shouldArchiveResearchOnManualReset(state) {
+  if (!fs.existsSync(RESEARCH_FILE)) {
+    return false;
+  }
+
+  const cycleStartedAt = Date.parse(state?.started_at ?? "");
+  if (!Number.isFinite(cycleStartedAt)) {
+    return false;
+  }
+
+  try {
+    return fs.statSync(RESEARCH_FILE).mtimeMs >= cycleStartedAt;
+  } catch {
+    return false;
+  }
+}
+
+function archiveArtifactsToDirectory(artifacts, destDir, warningPrefix, onArchived) {
+  let archivedAny = false;
+
+  for (const [src, name] of artifacts) {
+    if (!fs.existsSync(src)) {
+      continue;
+    }
+
+    if (archiveFileWithCopyDelete(src, destDir, name, warningPrefix)) {
+      archivedAny = true;
+      onArchived?.(name);
+    }
+  }
+
+  return archivedAny;
+}
+
+function archiveStaleArtifactGroup(priorIssue, currentIssue, artifacts) {
+  const priorSlug = slugifyIssue(priorIssue || "unknown-issue") || "unknown-issue";
+  const dest = path.join(ARCHIVE_DIR, `stale-${priorSlug}-${buildArchiveTimestamp()}`);
+
+  return archiveArtifactsToDirectory(artifacts, dest, "Stale artifact cleanup warning", (name) => {
+    log(
+      `Stale artifact archived: reports/${name} (prior issue: ${priorIssue || "unknown"}, current issue: ${currentIssue || "unknown"})`,
+    );
+  });
+}
+
+function archiveStaleCycleArtifacts(state) {
+  const currentIssue = state.issue ?? "";
+
+  const planMetadata = readPlanMetadata();
+  const planIssue = planMetadata?.issue ?? "";
+  const shouldArchivePlan =
+    fs.existsSync(PLAN_FILE) && (!planMetadata || planIssue !== currentIssue);
+
+  if (
+    shouldArchivePlan ||
+    (!fs.existsSync(PLAN_FILE) && fs.existsSync(PLAN_METADATA_FILE) && planIssue !== currentIssue)
+  ) {
+    archiveStaleArtifactGroup(planIssue, currentIssue, [
+      [PLAN_FILE, "codex-plan.md"],
+      [PLAN_METADATA_FILE, "codex-plan.meta.json"],
+    ]);
+  }
+
+  const implementationMetadata = readImplementationMetadata();
+  const implementationIssue = implementationMetadata?.issue ?? "";
+  const shouldArchiveImplementation =
+    fs.existsSync(IMPLEMENTATION_FILE) &&
+    (!implementationMetadata || implementationIssue !== currentIssue);
+
+  if (
+    shouldArchiveImplementation ||
+    (!fs.existsSync(IMPLEMENTATION_FILE) &&
+      fs.existsSync(IMPLEMENTATION_METADATA_FILE) &&
+      implementationIssue !== currentIssue)
+  ) {
+    archiveStaleArtifactGroup(implementationIssue, currentIssue, [
+      [IMPLEMENTATION_FILE, "codex-implementation.md"],
+      [IMPLEMENTATION_METADATA_FILE, "codex-implementation.meta.json"],
+    ]);
+  }
+}
+
+function archiveArtifactsForManualReset(state) {
+  const dest = path.join(ARCHIVE_DIR, `manual-reset-${buildArchiveTimestamp()}`);
+  const artifacts = [
+    ...(shouldArchiveResearchOnManualReset(state) ? [[RESEARCH_FILE, "copilot-research.md"]] : []),
+    [PLAN_FILE, "codex-plan.md"],
+    [PLAN_METADATA_FILE, "codex-plan.meta.json"],
+    [IMPLEMENTATION_FILE, "codex-implementation.md"],
+    [IMPLEMENTATION_METADATA_FILE, "codex-implementation.meta.json"],
+  ];
+
+  return archiveArtifactsToDirectory(artifacts, dest, "Manual reset archive warning", (name) => {
+    log(`Manual reset archived: reports/${name}`);
+  });
 }
 
 // Copies completed cycle artifacts to reports/archive/<slug>-<ts>/ then removes
@@ -1490,10 +1635,7 @@ function evaluatePipeline() {
   if (fs.existsSync(PIPELINE_RESET_FILE)) {
     removeFileIfExists(PIPELINE_RESET_FILE);
     const state = readState();
-    if (state?.issue) {
-      const issueSlug = slugifyIssue(state.issue);
-      archiveCycleArtifacts(issueSlug);
-    }
+    archiveArtifactsForManualReset(state);
     clearImplementationFailedState();
     clearHardeningBlockedState();
     markIdle("Manual pipeline reset requested via reports/.pipeline-reset-requested");
@@ -1527,24 +1669,14 @@ function evaluatePipeline() {
       return;
     }
 
-    const cycleStartedAt = Date.parse(state.started_at ?? "");
-    if (Number.isFinite(cycleStartedAt)) {
-      const researchMtime = (() => {
-        try {
-          return fs.statSync(RESEARCH_FILE).mtimeMs;
-        } catch {
-          return NaN;
-        }
-      })();
-
-      if (!Number.isFinite(researchMtime) || researchMtime < cycleStartedAt) {
-        log(
-          "RESEARCHING - research artifact predates current cycle start, waiting for fresh research write",
-        );
-        return;
-      }
+    if (!isCurrentCycleResearchArtifact(state)) {
+      log(
+        "RESEARCHING - research artifact predates current cycle start, waiting for fresh research write",
+      );
+      return;
     }
 
+    archiveStaleCycleArtifacts(state);
     log("RESEARCHING complete - current-cycle research artifact detected, advancing to PLANNING");
     writeJson(STATE_FILE, {
       ...state,
