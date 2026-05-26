@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import type { EngineHealth, SoakReport } from "@/types/sniper";
+import { SOAK_TEMPLATES, type EngineHealth, type SoakReport } from "@/types/sniper";
 
 const routerMocks = vi.hoisted(() => ({
   instance: { navigate: vi.fn() },
@@ -55,11 +55,12 @@ vi.mock("@/lib/api/sniperClient", () => ({
   upsertSoakEvidence: apiMocks.upsertSoakEvidence,
 }));
 
-import { AdminPage } from "./admin";
+import { AdminPage, hydrateBaselineForm, inferSoakTypeFromReport } from "./admin";
 
 const BASELINE_EXISTS_WARNING = "Baseline already captured - do not replace";
 const BASELINE_CAPTURE_LOCK_MESSAGE =
   "Baseline already captured. Saving a new baseline is not permitted.";
+const START_NEW_SOAK_BUTTON = "Start New Soak";
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 function buildHealth(): EngineHealth {
@@ -144,7 +145,9 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
-function selectSoakType(value: "PHASE_0_RESTART_72H" | "PHASE_3_STABILITY_72H" | "CUSTOM") {
+function selectSoakType(
+  value: "PHASE_0_RESTART_72H" | "PHASE_3_STABILITY_72H" | "PHASE_4_30_DAY" | "CUSTOM",
+) {
   fireEvent.change(screen.getByLabelText("Soak type"), { target: { value } });
 }
 
@@ -476,6 +479,94 @@ describe("AdminPage", () => {
     expect(screen.getAllByText("T+24h").length).toBeGreaterThan(0);
   });
 
+  it("renders the Phase 4 soak option in the picker and applies its template label", async () => {
+    apiMocks.fetchSoakReport.mockResolvedValue(buildSoakReport());
+
+    render(<AdminPage />);
+
+    expect(await screen.findByRole("heading", { name: "Phase 3 - Stability Soak" })).toBeTruthy();
+    expect(
+      screen.getByRole("option", { name: SOAK_TEMPLATES.PHASE_4_30_DAY.label }),
+    ).toBeTruthy();
+
+    selectSoakType("PHASE_4_30_DAY");
+
+    expect(screen.getByRole("heading", { name: "Phase 4 - 30-Day Live Soak" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Phase 4 - 30-Day Live Soak - Operator Baseline" }),
+    ).toBeTruthy();
+  });
+
+  it("inferSoakTypeFromReport returns PHASE_4_30_DAY", () => {
+    const report = buildSoakReport();
+    report.manual_evidence = [
+      {
+        id: 1,
+        evidence_key: "baseline.soak_type",
+        evidence_type: "baseline_metadata",
+        evidence_value: "PHASE_4_30_DAY",
+        operator: "tester",
+        created_at: "2026-05-12T08:05:00Z",
+        updated_at: "2026-05-12T08:05:00Z",
+      },
+    ];
+
+    expect(inferSoakTypeFromReport(report)).toBe("PHASE_4_30_DAY");
+  });
+
+  it("hydrateBaselineForm preserves baseline keys for a Phase 4 soak report", () => {
+    const hydrated = hydrateBaselineForm(
+      {
+        soakType: "PHASE_3_STABILITY_72H",
+        soakPurpose: "",
+        startedBy: "",
+        startedAt: "2026-05-12T08:05",
+        eaSymbols: "",
+        frontendWatchlist: "",
+        mt5TerminalStatus: "",
+        backendHealthEndpoint: "",
+        t0HealthSummary: "",
+        authConfirmed: "",
+        twelveDataKeyStatus: "",
+        watchlistLiveSymbols: "",
+        notes: "",
+      },
+      [
+        {
+          id: 1,
+          evidence_key: "baseline.soak_type",
+          evidence_type: "baseline_metadata",
+          evidence_value: "PHASE_4_30_DAY",
+          operator: "tester",
+          created_at: "2026-05-12T08:05:00Z",
+          updated_at: "2026-05-12T08:05:00Z",
+        },
+        {
+          id: 2,
+          evidence_key: "baseline.started_by",
+          evidence_type: "baseline_metadata",
+          evidence_value: "phase4-operator",
+          operator: "tester",
+          created_at: "2026-05-12T08:05:00Z",
+          updated_at: "2026-05-12T08:05:00Z",
+        },
+        {
+          id: 3,
+          evidence_key: "baseline.notes",
+          evidence_type: "baseline_metadata",
+          evidence_value: "Phase 4 baseline restored.",
+          operator: "tester",
+          created_at: "2026-05-12T08:05:00Z",
+          updated_at: "2026-05-12T08:05:00Z",
+        },
+      ],
+    );
+
+    expect(hydrated.soakType).toBe("PHASE_4_30_DAY");
+    expect(hydrated.startedBy).toBe("phase4-operator");
+    expect(hydrated.notes).toBe("Phase 4 baseline restored.");
+  });
+
   it("initializes soak template from persisted soak-type evidence on first load", async () => {
     const report = buildSoakReport();
     report.baseline_checkpoint = buildCheckpoint(
@@ -633,5 +724,57 @@ describe("AdminPage", () => {
     expect(
       (screen.getByPlaceholderText("EURUSD, USDJPY, GBPUSD...") as HTMLTextAreaElement).value,
     ).toBe("");
+  });
+
+  it("renders the reset control when a baseline checkpoint exists", async () => {
+    const report = buildSoakReport();
+    report.baseline_checkpoint = buildCheckpoint(
+      1,
+      "baseline",
+      "2026-05-12T08:05:00Z",
+      "Initial soak capture.",
+    );
+    apiMocks.fetchSoakReport.mockResolvedValue(report);
+
+    render(<AdminPage />);
+
+    expect(await screen.findByText(BASELINE_EXISTS_WARNING)).toBeTruthy();
+    expect(screen.getByRole("button", { name: START_NEW_SOAK_BUTTON })).toBeTruthy();
+  });
+
+  it("does not render the reset control when no baseline checkpoint exists", async () => {
+    apiMocks.fetchSoakReport.mockResolvedValue(buildSoakReport());
+
+    render(<AdminPage />);
+
+    expect(await screen.findByRole("button", { name: "Capture Baseline & Start Soak" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: START_NEW_SOAK_BUTTON })).toBeNull();
+  });
+
+  it("clicking reset enables baseline capture without clearing the previous checkpoint view", async () => {
+    const report = buildSoakReport();
+    report.baseline_checkpoint = buildCheckpoint(
+      1,
+      "baseline",
+      "2026-05-12T08:05:00Z",
+      "Initial soak capture.",
+    );
+    apiMocks.fetchSoakReport.mockResolvedValue(report);
+
+    render(<AdminPage />);
+
+    expect(await screen.findByText(BASELINE_EXISTS_WARNING)).toBeTruthy();
+    const lockedCaptureButton = screen.getByRole("button", { name: BASELINE_CAPTURE_LOCK_MESSAGE });
+    expect((lockedCaptureButton as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: START_NEW_SOAK_BUTTON }));
+
+    const enabledCaptureButton = screen.getByRole("button", {
+      name: "Capture Baseline & Start Soak",
+    });
+    expect((enabledCaptureButton as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getByText("New soak baseline armed")).toBeTruthy();
+    expect(screen.getByText(/Previous baseline from/)).toBeTruthy();
+    expect(screen.getByText(/Saved at /)).toBeTruthy();
   });
 });
