@@ -51,7 +51,7 @@ vi.mock("@/components/sniper/Warnings", () => ({
   DivergenceBanner: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
-import { SignalsPage } from "./signals";
+import { SignalsPage } from "./-signals.page";
 
 function buildSignal(overrides: Partial<SignalCandidate> = {}): SignalCandidate {
   return {
