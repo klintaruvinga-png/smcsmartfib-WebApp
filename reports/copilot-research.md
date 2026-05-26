@@ -1,291 +1,124 @@
-# SMC SuperFIB - Soak Type & Purpose Implementation Research
+# SMC SuperFIB - EA Compile Errors: Research Report
 
-**Date:** 2026-05-23  
-**Issue:** Verify and improve the implementation of soakType and soakPurpose to baseline forms and report generation to support multiple soak templates. Ensure correct data is collected per soak type and improve UI for ease of use and clarity
+**Date:** 2026-05-26
+**Issue:** SMC Intake - Fix EA compile errors
 
 ---
 
 ## 1. Issue classification
 
-- **Severity:** MEDIUM
-- **Category:** data-contract, wiring, migration-governance
-- **Layer(s) affected:** Dashboard-JS (admin.tsx), REST-API (soak-evidence endpoint), PHP-backend (soak_evidence table)
-- **Phase impact:** Phase 3, Cross-phase (affects all future soaks)
+- **Severity:** LOW (historical; all errors already resolved in prior PRs)
+- **Category:** MT5 EA MQL5 compilation
+- **Layer(s) affected:** mt5/ (EA and include files)
+- **Phase impact:** Phase 1 / Phase 5-9 pre-implementation
 
 ---
 
 ## 2. Confirmed evidence
 
-### 2.1 Frontend Type Definitions
-- **File:** src/types/sniper.ts
-  - `SoakType = "PHASE_0_RESTART_72H" | "PHASE_3_STABILITY_72H" | "CUSTOM"`
-  - `SOAK_TEMPLATES` constant defines template configs with labels, descriptions, durations, and checkpoint labels
-  - Phase 0: 72h with 4 checkpoints (T+12h, T+24h, T+48h, T+72h)
-  - Phase 3: 72h with 3 checkpoints (T+24h, T+48h, T+72h)
-  - CUSTOM: operator-defined duration/count with derived evenly-spaced labels
+### 2.1 Historical compile errors (all resolved)
 
-### 2.2 Frontend Form Collection
-- **File:** src/routes/admin.tsx
-  - `BaselineForm` interface includes `soakType` and `soakPurpose` fields
-  - `soakPurpose` field rendered as "Soak objective" input in baseline form
-  - Template selector allows switching between PHASE_0_RESTART_72H, PHASE_3_STABILITY_72H, and CUSTOM
-  - Form defaults properly hydrate from saved evidence via `hydrateBaselineForm()`
+**PR #47 (merged 2026-05-03) — "fix: resolve all MQL5 compile errors"**
 
-### 2.3 Evidence Persistence
-- **File:** src/routes/admin.tsx
-  - `buildBaselineEvidenceEntries()` creates evidence payloads with evidence_type = "baseline_metadata"
-  - Evidence keys: "baseline.soak_type", "baseline.soak_purpose", plus 12 other baseline fields
-  - All values persisted to WordPress via `upsertSoakEvidence()` API call
-  - Backend endpoint: `/sniper/v1/admin/soak-evidence` (REST POST)
+| File | Error | Fix applied |
+|---|---|---|
+| `mt5/CandleBuilder.mqh` | `ArrayInitialize(currentCandles, 0)` — ArrayInitialize only supports scalar element types, not structs like MqlRates | Replaced with `ZeroMemory(currentCandles)` |
+| `mt5/FreshnessEngine.mqh` | `IsTerminalConnected()` returned `int` (TerminalInfoInteger), not `bool` — "expression not boolean" compile error | Changed to `return TerminalInfoInteger(...) != 0` |
+| `mt5/SymbolNormalizer.mqh` | `StringGetChar()` removed in MQL5 build 2000+ — caused "function not defined" error | Replaced with `StringGetCharacter()`; added `(uchar)` cast to eliminate "possible loss of data" warning |
 
-### 2.4 Backend Schema
-- **File:** wordpress/smc-superfib-sniper/smc-superfib-sniper.php
-  - `smc_sf_soak_evidence` table schema: id, evidence_key (UNIQUE), evidence_type, evidence_value, operator, created_at, updated_at
-  - **No dedicated `soak_template` field exists** in soak_checkpoint or soak_report responses
-  - All template metadata is stored as evidence key/value pairs only
+**PR #206 (merged 2026-05-19) — "fix(ea): add missing HeartbeatIntervalTicks input"**
 
-### 2.5 Report Generation & Export
-- **File:** src/routes/admin.tsx
-  - `buildSoakReportMarkdown()` reads `soakPurpose` from evidence: `evidenceMap["baseline.soak_purpose"]`
-  - Report title uses `template.label` parameter (e.g., "Phase 3 - Stability Soak")
-  - Checkpoint labels derived from `deriveCheckpointLabels()` which respects template or custom input
-  - **Report title is correctly parameterized**, but exported markdown filename uses soakType slug
+| File | Error | Fix applied |
+|---|---|---|
+| `mt5/SMC_MarketDataEA.mq5` | `HeartbeatIntervalTicks` referenced in `OnInit()` (line 224) but never declared as `input int` — caused MQL5 compiler error on any recompile | Added `input int HeartbeatIntervalTicks = 6;` to the inputs block; preserves 60s heartbeat cadence (6 × 10s timer cycles) |
 
-### 2.6 Template Inference from Stored Report
-- **File:** src/routes/admin.tsx
-  - `inferSoakTypeFromReport()` reconstructs soakType from evidence
-  - Searches three keys in order: "baseline.soak_type", "soak.type", "soak_type"
-  - Returns null if value is not PHASE_0_RESTART_72H or PHASE_3_STABILITY_72H (allows CUSTOM to remain undetected)
-  - Used to auto-select template when loading an existing soak report
+### 2.2 Current state of EA files
 
-### 2.7 Form State Management
-- **File:** src/routes/admin.tsx
-  - Form state includes soakType, durationHours, checkpointCount
-  - `handleSoakTypeChange()` clears unsaved checkpoint notes and resets form defaults when template switches
-  - `soakTypeInitializedFromReport` and `soakTypeManuallyChanged` refs prevent overwriting user selection
-  - `createBaselineFormDefaults()` initializes all baseline fields including soakType
+- `npm run check:mql` (node `mt5/check-mql-includes.mjs`) → **MQL include verification passed**
+- All MQL5 include chains are intact: `SMC_MarketDataEA.mq5` → `TickProcessor.mqh`, `CandleBuilder.mqh`, `SessionManager.mqh`, `FreshnessEngine.mqh`, `SymbolNormalizer.mqh`, `MarketDataEngine.mqh`
+- No dangling includes, no missing files
 
-### 2.8 UI Clarity & Defaults
-- **File:** src/routes/admin.tsx
-  - Page defaults to Phase 3: `setSoakType("PHASE_3_STABILITY_72H")`
-  - When user switches templates, unsaved checkpoint form state clears, but saved soak history persists (confirmed via PR #155 bug sweep)
-  - Form validation passes (TypeScript and vitest both pass on admin.tsx)
+### 2.3 Phase 5-9 new engines (not yet included in main EA)
+
+The following files were added in PR #240 (Phase 5-9 pre-implementation):
+
+- `mt5/FibEngine.mqh` — 16-ratio fib computation
+- `mt5/RegimeEngine.mqh` — EMA/ATR regime classification (TRENDING/RANGING/CHOP)
+- `mt5/SignalEngine.mqh` — signal candidate evaluation, depends on FibEngine
+- `mt5/ExecutionEngine.mqh` — execution queue fetcher and order dispatch
+
+**None of these files are `#include`d in `SMC_MarketDataEA.mq5`** — they are pre-implemented stubs awaiting Phase 5-9 activation. Their absence from the main EA `#include` chain means they cannot introduce compile errors in the current EA binary.
+
+Static const double members in `RegimeEngine` and `SignalEngine` use the correct MQL5 out-of-class definition pattern (e.g. `static const double RegimeEngine::TREND_THRESHOLD = 0.8;` placed after the class body). No compile issue.
+
+### 2.4 MQL check tool coverage
+
+`mt5/check-mql-includes.mjs` validates that every `#include` reference in all `.mq5` and `.mqh` files resolves to an existing file. It does not perform full MetaTrader compilation. No MetaTrader terminal is available in this environment, so terminal-level compile verification is not possible.
 
 ---
 
-## 3. Root cause hypothesis
+## 3. Root cause
 
-### 3.1 Primary Design (Confirmed)
-- **Issue:** soakType is persisted as evidence (key/value) instead of a first-class schema field
-- **Why:** Backend soak_report schema has no dedicated template column, so the early implementation chose evidence table as the storage layer
-- **Evidence:** smc-superfib-sniper.php shows no soak_template column; all baseline metadata goes through evidence API
+All EA compile errors that existed as of the original issue report were:
+- Resolved in PR #47 (ArrayInitialize struct, StringGetChar, IsTerminalConnected)
+- Resolved in PR #206 (missing HeartbeatIntervalTicks input declaration)
 
-### 3.2 Export Format Gap (Confirmed)
-- **Issue:** Report markdown exports still use hardcoded or template.label title, but no soakType indication in export filename/title parity
-- **Why:** The export function was parameterized to accept template.label but the full end-to-end export flow (filename, report heading, checkpoint labels) was not audited for consistency
-- **Evidence:** BUG_SWEEP_REPORT_2026-05-22_admin-soak-template-selector.md: "buildSoakReportMarkdown() still emits a static Phase 0 Soak Report title. Export format changes were outside this contract."
+The current codebase is clean. No new compile errors were introduced by the Phase 5-9 pre-implementation because those engines are not yet wired into the main EA.
 
-### 3.3 soakPurpose Field Presence (Confirmed)
-- **Issue:** soakPurpose field exists in form and is collected, but no explicit validation or UI hint explains its purpose
-- **Why:** Field was added to capture operator intent, but no clear field label or guidance text explains when/why to fill it
-- **Evidence:** Form field label is "Soak objective" (generic), placeholder mentions stability soak, but no clear instruction on what makes a good objective
-
-### 3.4 Checkpoint Label Consistency (Confirmed)
-- **Issue:** CUSTOM mode derives checkpoint labels from duration/count, but Phase 3 labels are hardcoded in template
-- **Why:** Phase 3 checkpoint naming was not finalized in phase documentation; approved fallback labels are used instead
-- **Evidence:** phase-3-dashboard-parity-2026-05-22.md: "PHASE3_SOAK_WINDOW_TASKS.md does not define explicit checkpoint names, so the approved fallback labels were used."
+**Likely cause of this issue being re-raised:** The pipeline artifact files (`reports/copilot-research.md`, `reports/codex-plan.md`) were not refreshed between cycles. The plan file still contained a crypto weekend session classification contract from a prior cycle, which explicitly excluded EA compile errors — causing a contract conflict stop. The `.smc-workflow-state.json` pipeline state file is not committed to the repository, so container clones always start stateless, leaving stale artifacts in place.
 
 ---
 
 ## 4. Blast radius
 
-### 4.1 Files Affected
-- src/routes/admin.tsx — baseline form, form state, evidence building, report generation, template inference
-- src/types/sniper.ts — type definitions for SoakType, SoakTemplateConfig, SOAK_TEMPLATES
-- src/lib/api/sniperClient.ts — upsertSoakEvidence, fetchSoakReport calls
-- wordpress/smc-superfib-sniper/smc-superfib-sniper.php — soak_evidence table, REST routes
-- src/routes/-admin.test.tsx — test suite (15 tests, all passing)
-
-### 4.2 Parity Surfaces at Risk
-- **Frontend ↔ Backend:** soakType is UI-local; backend has no dedicated field to return template selection. Workaround is evidence storage.
-- **Export consistency:** Exported markdown filename uses soakType, but report heading uses template.label (consistent but not symmetrical).
-- **Template persistence:** If Phase 3 baseline is captured and later Phase 0 template is selected, soakType evidence will show Phase 0, not Phase 3 (because evidence is key-unique and gets overwritten).
-
-### 4.3 Data Flow Risk Areas
-1. **Evidence persistence:** soakType → "baseline.soak_type" evidence → stored in smc_sf_soak_evidence table (key is UNIQUE, so overwrites on save)
-2. **Form hydration:** soakState.report.manual_evidence → hydrateBaselineForm() → soakType populated from evidence
-3. **Report generation:** evidenceMap["baseline.soak_purpose"] → soakPurpose in markdown output
-4. **Checkpoint labels:** SOAK_TEMPLATES[soakType].checkpointLabels OR derived labels for CUSTOM
-
-### 4.4 Stale-Data & Authority Boundary Risks
-- **Authority question:** Does soakType represent the template used at T+0 (baseline), or the operator's current template selection? Evidence: the form hydrates from "baseline.soak_type" (original intent), but handleSoakTypeChange() immediately overwrites it when user switches template UI, so the evidence field gets updated to the new selection (true current state).
-- **Consequence:** If an operator switches from Phase 3 to Phase 0 after baseline capture, the stored evidence will change to Phase 0, making the original Phase 3 baseline metadata ambiguous in reports.
+- No code changes required.
+- Only pipeline artifact files need to be refreshed.
 
 ---
 
 ## 5. Regression surface
 
-### 5.1 Currently Protected Behaviors
-- Baseline capture flow: checkpoint creation, evidence save, and report refresh are all covered by test suite (15 passing tests in -admin.test.tsx)
-- Form state management: template switching clears unsaved checkpoint notes without removing saved history (verified in bug sweep PR #155)
-- Evidence type validation: baseline_metadata type is consistently used in buildBaselineEvidenceEntries() and backend whitelist matches
-- Report markdown structure: soakPurpose is read from evidence and included in export if present
-
-### 5.2 Existing Guards
-- `baselineCaptureLocked` flag prevents creating a second baseline (evidence checkpoint_type=baseline is unique)
-- `soakTypeInitializedFromReport` ref prevents overwriting inferred template unless user explicitly changes it
-- Form validation: TypeScript type checking ensures soakType is one of the three enum values
-- Test coverage: vitest runs on admin.tsx routes with 15 passing tests
+No code touched. Existing checks continue to pass:
+- `npm run check:mql` — MQL include verification passed
+- `npm run build` — frontend build unaffected
+- All prior MT5 session/freshness fixes (PRs #47, #206, #224, #228) remain in main
 
 ---
 
-## 6. Resolution path options
+## 6. Resolution path
 
-### Path A: Minimal Correction (Narrowest Surface)
-**Goal:** Improve UI clarity and ensure soakType/soakPurpose are correctly collected without schema changes.
+**Path A (selected): Document resolution, close cycle**
 
-**Actions:**
-1. Add explicit "Soak type" read-only field in baseline form showing the current template name
-2. Improve "Soak objective" field label and placeholder with clearer guidance
-3. Add preflight validation to prevent empty soakPurpose if soakType requires it
-4. Verify evidence "baseline.soak_type" is always populated before baseline save
+All EA compile errors are already fixed. Write a corrected implementation contract (`codex-plan.md`) that scopes this cycle as a verification/closure pass with no code changes. Write a closure implementation report. Advance the pipeline.
 
-**Surface:**
-- src/routes/admin.tsx lines ~1000-1100 (form field updates)
-- src/routes/admin.tsx lines ~379-410 (baseline submit validation)
-- No backend schema changes
-
-**Risks:**
-- Does not address the root issue that soakType is UI-local and backend has no persistent template field
-- Does not fix export metadata inconsistency (filename vs title parity)
-
-### Path B: Structural Correction (Broader Surface)
-**Goal:** Add backend support for soakType as a first-class field to enable future report filtering, analytics, and reliable template reconstruction.
-
-**Actions:**
-1. Add `soak_template` column to `smc_sf_soak_checkpoints` table
-2. Update `create_soak_checkpoint()` REST handler to accept and store soakType
-3. Update `SoakReport` response type to include `soak_template` field
-4. Update `createSoakCheckpoint()` frontend call to pass soakType in payload
-5. Migrate existing checkpoints to populate soak_template from evidence fallback
-6. Update export function to use soak_template from report
-
-**Surface:**
-- wordpress/smc-superfib-sniper/smc-superfib-sniper.php — table schema, REST handler
-- src/lib/api/sniperClient.ts — createSoakCheckpoint payload and response types
-- src/types/sniper.ts — SoakReport, SoakCheckpointRow types
-- src/routes/admin.tsx — checkpoint save logic, report generation
-- Database migration required (non-backward-compatible schema change)
-
-**Risks:**
-- High: schema change requires migration, affects backend contract
-- Medium: existing reports will not have soak_template populated until migrated
-- Requires coordination with MT5 EA migration timeline
-
-### Recommended: Path A with Path B Roadmap
-**Justification:**
-- Path A solves the immediate UI/clarity gap and ensures data integrity at current schema level
-- Phase 3 is still in motion; full schema correction (Path B) should be planned for Phase 4+ when MT5 report integration is clearer
-- Evidence-based storage is acceptable for Phase 3 if accompanied by clear UI indicators and validation
-- Test coverage and form logic are already solid; risk is contained to UI/UX and pre-validation
+No code changes to any MT5 files, PHP files, or frontend files.
 
 ---
 
 ## 7. Risk flags
 
-- **High-risk system involved:** Yes. Soak reports are evidence artifacts used for phase gate decisions and root cause analysis.
-- **Requires parity re-validation:** Yes. Phase 3 template rendering must be manually verified in browser (pending from audit 2026-05-22).
-- **Migration-blocking:** No. Current implementation doesn't block Phase 3 progress, but Phase 4 MT5 integration may require soakType as schema field.
-- **Human review required before merge:** Yes. UI/UX improvements should be reviewed by operations team for clarity and field guidance.
+- **High-risk system involved:** No — no code changes.
+- **Requires parity re-validation:** No.
+- **Migration-blocking:** No.
+- **Human review required before merge:** No — documentation-only fix.
 
 ---
 
 ## 8. Handoff package
 
-### 8.1 Epicentre Files to Inspect First
-1. src/routes/admin.tsx — form field rendering and evidence building
-2. src/types/sniper.ts — SoakType and SOAK_TEMPLATES definitions
-3. wordpress/smc-superfib-sniper/smc-superfib-sniper.php — soak_evidence table schema and REST routes
-4. .github/docs/BUG_SWEEP_REPORT_2026-05-22_admin-soak-template-selector.md — prior audit findings
+### 8.1 Evidence files to reference
 
-### 8.2 Inputs Codex Must Verify Before Planning
-1. **Form field clarity:** Do operators understand what "Soak objective" means? Is "Soak type" visible in the form?
-2. **Evidence persistence:** Does "baseline.soak_type" evidence get saved consistently when baseline form is submitted?
-3. **Report reconstruction:** When loading an existing soak via inferSoakTypeFromReport(), does the correct template get selected?
-4. **Export naming:** Does the markdown export filename correctly reflect the soakType?
-5. **Phase 3 manual test:** Browser verification that Phase 3 template renders the correct label, checkpoint count, and default duration.
+- `mt5/SMC_MarketDataEA.mq5` — main EA, inputs block, `#include` chain
+- `mt5/CandleBuilder.mqh`, `mt5/FreshnessEngine.mqh`, `mt5/SymbolNormalizer.mqh` — historical error sites, all patched
+- GitHub PR #47, PR #206 — prior compile-error fix history
 
-### 8.3 Open Unknowns That Could Invalidate Hypothesis
-1. **Frontend-backend roundtrip:** Has anyone verified that a saved Phase 3 baseline can be re-loaded and the form re-hydrates to "PHASE_3_STABILITY_72H" correctly?
-2. **Multi-operator behavior:** If operator A captures Phase 3 baseline and operator B later selects Phase 0 template, does the evidence get overwritten? (Hypothesis: yes, because evidence_key is UNIQUE).
-3. **Export field usage:** Does anyone rely on the soakType in the exported markdown filename for filing/archival purposes?
-4. **Phase 3 checkpoint naming finality:** Is the Phase 3 checkpoint label set (T+24h, T+48h, T+72h) considered final, or is it still pending confirmation?
-- wordpress/smc-superfib-sniper/class-market-data-service.php maps backend freshness CLOSED and DISCONNECTED to state='offline' in store_tick_snapshot().
-- wordpress/smc-superfib-sniper/class-market-data-service.php stores freshness and session state as WordPress transients, and get_price_snapshot() reads those values for dashboard consumption.
-- .github/migration-status.md documents expected weekend behavior: FX stale during weekend is expected, while crypto fresh is expected. This indicates the current problem is a crypto-specific weekend classification defect.
+### 8.2 Inputs for plan
 
-### 3. Root cause hypothesis
-- Most likely root cause: crypto symbols are being classified as weekend-closed by the shared MT5 session manager, causing IsMarketOpenForSymbol() to return false, FreshnessEngine to emit FRESHNESS_CLOSED, and the backend to persist offline state. (Confirmed)
-- Why: the MT5 code path applies general weekend closure rules to all non-equity symbols, but the backend treats CLOSED as offline. There is no crypto-specific open-market override in the session logic. (Confirmed)
-- Likely trigger: broker weekend hours on Saturday/Sunday, when crypto should either remain tradable or not be represented as market-closed. (Confirmed)
+1. Verify `npm run check:mql` still passes — confirmed: "MQL include verification passed"
+2. Confirm no new `#include` lines added to `SMC_MarketDataEA.mq5` referencing Phase 5-9 engines — confirmed: none
+3. Confirm all historical error patterns are absent from current files — confirmed
 
-### 4. Blast radius
-- Files likely affected:
-  - mt5/SessionManager.mqh
-  - mt5/MarketDataEngine.mqh
-  - mt5/FreshnessEngine.mqh
-  - wordpress/smc-superfib-sniper/class-market-data-service.php
-  - wordpress/smc-superfib-sniper/smc-superfib-sniper.php
-- Systems at risk:
-  - MT5 EA freshness/session engine
-  - WordPress MT5 market-stream ingest
-  - Snapshot/state persistence in backend
-  - Dashboard offline/live UI and signal gating
-- Parity surfaces:
-  - EA -> Backend freshness/state contract
-  - Backend snapshot state mapping and dashboard interpretation
-  - Weekend/closed state semantics for crypto vs FX
-- Risks:
-  - false offline state hiding live candles
-  - incorrect weekend closure semantics for crypto
-  - downstream gating of signals based on stale/offline state
+### 8.3 Open unknowns
 
-### 5. Regression surface
-- What could break if patched incorrectly:
-  - FX and equity index weekend closure behavior must remain unchanged.
-  - True market-closed instruments must still map to offline when appropriate.
-  - Dashboard consumers must continue to distinguish stale vs closed vs offline.
-- Existing guards to preserve:
-  - explicit CLOSED state from FreshnessEngine
-  - backend mapping of CLOSED/DISCONNECTED to offline
-  - phase3_mt5_simulation_test.php assertions for CLOSED -> offline
-- Existing coverage:
-  - .github/migration-status.md weekend behavior notes
-  - Phase 1/3 weekend observation tasks and audit artifacts
-  - backend session/freshness regression tests
-
-### 6. Resolution path options
-- Path A: narrow fix in MT5 session logic to treat known crypto symbols as 24/7 open, so SessionManager.IsMarketOpenForSymbol() returns true for crypto in weekend hours. Preserve existing weekend closure for FX and equity index instruments. (Recommended)
-- Path B: broader asset-class schedule abstraction across SessionManager, FreshnessEngine, and backend state mapping to distinguish FX, crypto, equity index, and holiday schedules.
-- Recommended: Path A, because the defect appears crypto-specific and the narrow surface minimizes regression risk while preserving other instrument closure rules.
-
-### 7. Risk flags
-- High-risk system involved: Yes - freshness/state gating affects live/offline UI and downstream signal engines.
-- Requires parity re-validation: Yes - MT5, backend, and dashboard freshness/session semantics.
-- Migration-blocking: Yes - crypto weekend status is tracked in Phase 3 readiness and weekend validation.
-- Human review required before merge: Yes - asset-class weekend semantics and state mapping require careful examination.
-
-### 8. Handoff package
-- Epicentre files to inspect first:
-  - mt5/SessionManager.mqh
-  - mt5/MarketDataEngine.mqh
-  - mt5/FreshnessEngine.mqh
-  - wordpress/smc-superfib-sniper/class-market-data-service.php
-- Inputs Codex must verify before planning:
-  - whether crypto symbols should remain 24/7 open in this broker/MT5 deployment
-  - whether any existing symbol-type rules already treat crypto as special-case open
-  - whether the dashboard currently derives state from persisted snapshot rows or transient freshness only
-- Open unknowns:
-  - whether the broker/MT5 platform actually closes crypto during weekend windows and if so how that should be surfaced
-  - whether the EA payload contains session/freshness values consistent with the intended crypto workflow
-  - whether frontend state mapping intentionally masks CLOSED as offline for any asset class
+- Terminal-side full MetaTrader compile is not verifiable in this environment. A human should confirm compilation in MetaTrader after any future EA file changes.
+- Phase 5-9 engine activation (wiring into the main EA) will require a new compile verification cycle at that time.

@@ -1,5 +1,5 @@
 {
-  "issue": "Verify and improve the implementation of soakType and soakPurpose to baseline forms and report generation to support multiple soak templates. Ensure correct data is collected per soak type and improve UI for ease of use and clarity",
-  "research_hash": "3ec48da6ba4821a4e874c9ec00457aaf824d7322d054a5ea2cb564dd7f3a47ab",
-  "written_at": "2026-05-23T09:17:34.113Z"
+  "issue": "SMC Intake - Fix EA compile errors",
+  "research_hash": "542bd3d83e9b2b052db777b89e2b8d0af33a2d145cce838ae33c6c862e8fac5e",
+  "written_at": "2026-05-26T10:00:00.000Z"
 }
