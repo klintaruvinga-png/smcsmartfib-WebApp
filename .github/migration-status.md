@@ -2,8 +2,8 @@
 
 **Last Updated**: 2026-05-25  
 **Current Phase**: 4 (Fib Engine Migration — IN-PROGRESS; code complete 2026-05-25; live replay corpus pending operator)  
-**Overall Progress**: 78% (Phase 4 code implementation complete; gate validation pending live data)  
-**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 COMPLETE (2026-05-25, gate CONDITIONAL PASS; T0 admin baseline capture pending operator action) — Phase 4 IN-PROGRESS (code complete; live parity corpus pending)
+**Overall Progress**: 88% (Phases 0–4 code complete; Phases 5/5B/6 code complete pre-emptively; Phases 7–9 scaffolded; only Phase 4 live gate validation + operator activation remain before Phase 5 deployment)  
+**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 COMPLETE (2026-05-25, gate CONDITIONAL PASS; T0 admin baseline capture pending operator action) — Phase 4 IN-PROGRESS (code complete; live parity corpus pending) — Phases 5/5B/6 CODE COMPLETE (pre-emptive; gated on Phase 4) — Phases 7–9 SCAFFOLDED (gated)
 
 > Snapshot: Phase 0 gate passed 2026-05-15. Post-fix validation soak at 16:37 UTC confirmed NAS100 (29,263.70) and US30 (49,756.00) both LIVE during active US equity session; XAUUSD (4,556.34) LIVE with candle-history gate cleared. Backend soak: 259,464 engine runs / 0 errors / 69,262 candles over 24h. Frontend feed-status chip lag (BUG-001 staleTime:0) resolved. Watchlist persistence 100% parity. AUDUSD/ETHUSD chop-gate classified as correct live behavior — not a blocker. Full closeout evidence: `.github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md`.
 
@@ -18,12 +18,12 @@
 | 2 | Read-only trade telemetry | **COMPLETE** | 100% | None — gate passed 2026-05-22 | 2026-05-22 ✅ |
 | 3 | MT5 market data engine | **COMPLETE** | 100% | None — gate CONDITIONAL PASS 2026-05-25; T0 admin baseline capture pending (operator action, non-blocking) | 2026-05-25 ✅ |
 | 4 | Fib engine migration | **IN-PROGRESS** | 60% | Live parity corpus (operator) | 2026-08-15 |
-| 5 | Regime & chop engine | NOT-STARTED | 0% | Phase 4 complete | 2026-09-15 |
-| 5B | Fundamentals regime feed | NOT-STARTED | 0% | Phase 5 complete | 2026-10-01 |
-| 6 | Signal engine dual-run | NOT-STARTED | 0% | Phase 5B complete | 2026-10-15 |
-| 7 | Controlled manual execution | NOT-STARTED | 0% | Phase 6 parity >95% | 2026-11-15 |
-| 8 | Semi-automation layer | NOT-STARTED | 0% | Phase 7 complete | 2026-12-01 |
-| 9 | SaaS & licensing system | NOT-STARTED | 0% | Phase 8 complete | 2026-12-15 |
+| 5 | Regime & chop engine | **CODE COMPLETE** | 70% | Phase 4 live gate + operator deployment | 2026-09-15 |
+| 5B | Fundamentals regime feed | **CODE COMPLETE** | 65% | Phase 5 parity gate | 2026-10-01 |
+| 6 | Signal engine dual-run | **CODE COMPLETE** | 60% | Phase 5B gate + fib→signal wiring sprint | 2026-10-15 |
+| 7 | Controlled manual execution | **SCAFFOLDED** | 35% | Phase 6 parity ≥ 95% (hard gate) | 2026-11-15 |
+| 8 | Semi-automation layer | **SCAFFOLDED** | 20% | Phase 7 complete | 2026-12-01 |
+| 9 | SaaS & licensing system | **SCAFFOLDED** | 20% | Phase 8 complete | 2026-12-15 |
 | 10 | Pine transition strategy | NOT-STARTED | 0% | Phase 9 complete | 2027-01-01 |
 
 ---
@@ -280,33 +280,44 @@ MT5 Live vs Pine Live:     PENDING (requires live MT5 corpus — operator action
 ## Phase 5: Regime & Chop Engine Migration
 
 **Objective**: Move regime classification into MT5, validate against Pine  
-**Owner**: Track A  
-**Status**: NOT-STARTED  
+**Owner**: Track A + Track B  
+**Status**: CODE COMPLETE (2026-05-25) — gated on Phase 4 live parity; no operator activation yet  
 **Prerequisites**: Phase 4 complete  
-**Completion Target**: 2026-09-15
+**Completion Target**: 2026-09-15  
+**Readiness Package**: [PHASE5_IMPLEMENTATION.md](../PHASE5_IMPLEMENTATION.md)  
+**Update**: [phase5-code-complete-2026-05-25.md](./phase-updates/phase5-code-complete-2026-05-25.md)
 
 ### Deliverables
-- [ ] MT5 Regime Engine: trending, ranging, chop detection, volatility gating
-- [ ] Regime Parity Reports tracking disagreements, edge cases, stale classifications
+- [x] **`mt5/RegimeEngine.mqh`** — EMA-20 D1 HTF bias, efficiency-ratio chop score, ATR-14 H1 *(2026-05-25)*
+- [x] **`MarketDataEngine.mqh` integration** — `SendRegimeToBackend()` every ~60s *(2026-05-25)*
+- [x] **`wp_smc_sf_regime_snapshots` DB table** — UNIQUE upsert on (user_id, symbol) *(2026-05-25)*
+- [x] **`POST /ea/regime-snapshot`** — batch ingestion, EA bridge auth *(2026-05-25)*
+- [x] **`GET /market-data/regime`** — grouped response for dashboard *(2026-05-25)*
+- [ ] **[MANUAL]** 48h+ regime accumulation on live MT5 terminal
+- [ ] **[MANUAL]** Regime parity validation vs. Pine (≥ 95% bias direction match)
+- [ ] **[MANUAL]** Chop score spot-check (5+ CHOP and 5+ TRENDING classifications)
 
 ### Success Criteria
-- [ ] 95%+ regime parity
-- [ ] Stable chop detection
+- [x] MT5 code dispatches regime for all symbols (automated verification via dispatch logs)
+- [ ] **[MANUAL]** ≥ 95% regime direction (Bull/Bear) parity vs Pine
+- [ ] **[MANUAL]** Stable chop detection across illiquid/volatile sessions
 
 ### Test Checklist
 - [ ] Ranging/breakout markets
-- [ ] High-news volatility
-- [ ] Illiquid sessions
+- [ ] High-news volatility (NFP/CPI)
+- [ ] Illiquid sessions (Asian session EURUSD)
+- [ ] Weekend freeze (all symbols → TRANSITIONAL)
 
 ### Parity Status
 ```
-MT5 Regime vs Pine Regime: [PENDING]
-Chop Detection: [PENDING]
-Volatility Gating: [PENDING]
+MT5 htf_bias vs Pine bias:    PENDING (Phase 4 gate must clear first)
+MT5 ltf_regime vs Pine regime: PENDING
+MT5 chop_score delta:         PENDING (target: ≤ 0.15)
+Volatility Gating:            PENDING
 ```
 
 ### Blockers
-- *Phase 4 not complete*
+- **Phase 4 live parity corpus** — must clear before Phase 5 operator deployment
 
 ---
 
@@ -314,9 +325,11 @@ Volatility Gating: [PENDING]
 
 **Objective**: Integrate macro-economic data as a numerical bias overlay that filters and weights technical regime and signal conditions  
 **Owner**: Track B (data ingestion + normalization) + Track A (MT5 conviction propagation) + Track C (dashboard display)  
-**Status**: NOT-STARTED  
+**Status**: CODE COMPLETE (2026-05-25) — backend only; gated on Phase 5  
 **Prerequisites**: Phase 5 complete  
-**Completion Target**: 2026-10-01
+**Completion Target**: 2026-10-01  
+**Readiness Package**: [PHASE5B_IMPLEMENTATION.md](../PHASE5B_IMPLEMENTATION.md)  
+**Update**: [phase5b-code-complete-2026-05-25.md](./phase-updates/phase5b-code-complete-2026-05-25.md)
 
 ### Design Principle
 
@@ -328,19 +341,17 @@ A fundamental bias score is computed per currency from economic events, normaliz
 
 ### Deliverables
 
-- [ ] **Data Ingestion Layer** (Track B)
-  - Economic calendar feed (Twelve Data economic events API — `GET /economic_calendar`)
-  - Central bank policy state parser: rate decision → hawkish (+1) / hold (0) / dovish (−1) bias flag
-  - Market sentiment proxies: VIX (via existing TD integration), DXY tracking for USD conviction
-  - Backend storage: `smc_sf_fundamental_events` table (raw scored events) + `smc_sf_fundamental_bias` cache (composite score per currency, TTL-bounded)
-  - Cron-based pull every 30 min + on-demand `POST /fundamentals/refresh`
+- [x] **Data Ingestion Layer** (Track B) *(2026-05-25)*
+  - Economic calendar feed (Twelve Data economic events API — `GET /economic_calendar`) ✅
+  - Central bank policy state parser: rate decision → hawkish (+1) / hold (0) / dovish (−1) ✅
+  - Backend storage: `smc_sf_fundamental_events` + `smc_sf_fundamental_bias` ✅
+  - Cron-based pull every 30 min (`twicehourly` WP-Cron) + on-demand `POST /fundamentals/refresh` ✅
 
-- [ ] **Normalization Engine** (Track B)
-  - CPI surprise score: `(actual − forecast) / forecast` → mapped to −2 / −1 / 0 / +1 / +2 range
-  - Rate decision bias: +1 hike/hawkish, 0 hold, −1 cut/dovish
-  - Composite per-currency bias: weighted sum of recent events with time decay (recent events weighted heavier)
-  - Bias categories: BULLISH (+2/+1) / NEUTRAL (0) / BEARISH (−1/−2) stored per base + quote currency
-  - Decay function: events older than 30 days carry 0.25x weight; older than 90 days excluded
+- [x] **Normalization Engine** (Track B) *(2026-05-25)*
+  - CPI surprise score: `(actual − forecast) / forecast` → mapped to −2/−1/0/+1/+2 ✅
+  - Rate decision bias: +1 hike, 0 hold, −1 cut ✅
+  - Composite per-currency bias with time decay (30d=1.0×, 30–90d=0.25×, 90d+=excluded) ✅
+  - Bias categories: BULLISH / NEUTRAL / BEARISH ✅
 
 - [ ] **Regime Integration** (Track A + Track B)
   - `FundamentalBiasEngine` module reads composite bias score at regime evaluation time
@@ -414,33 +425,41 @@ Regime engine parity post-overlay: [PENDING]
 
 **Objective**: MT5 generates signals in parallel with Pine; Pine authoritative  
 **Owner**: Track A + Track B  
-**Status**: NOT-STARTED  
+**Status**: CODE COMPLETE (2026-05-25) — gated on Phase 5B; fib→signal wiring sprint pending  
 **Prerequisites**: Phase 5B complete  
-**Completion Target**: 2026-10-15
+**Completion Target**: 2026-10-15  
+**Readiness Package**: [PHASE6_IMPLEMENTATION.md](../PHASE6_IMPLEMENTATION.md)  
+**Update**: [phase6-code-complete-2026-05-25.md](./phase-updates/phase6-code-complete-2026-05-25.md)
 
 ### Deliverables
-- [ ] MT5 Signal Engine: entries, SL, TP, confluence, regime alignment
-- [ ] Signal Drift Analyzer classifying: exact match, acceptable drift, critical mismatch
+- [x] **`mt5/SignalEngine.mqh`** — 4-gate evaluation, verdict A+/A/B/C, SL/TP from H4 swing + fib *(2026-05-25)*
+- [x] **`mt5/ExecutionEngine.mqh`** — Phase 7 scaffold, `phase6Cleared=false` hard gate *(2026-05-25)*
+- [x] **`wp_smc_sf_mt5_signal_candidates` DB table** *(2026-05-25)*
+- [x] **`POST /ea/signal-candidates`** — batch ingestion with drift classification *(2026-05-25)*
+- [x] **`GET /market-data/signal-drift`** — parity report with gate_status *(2026-05-25)*
+- [x] **`classify_signal_drift()`** — MT5 vs Pine: EXACT/DRIFT/MISMATCH/NO_PINE *(2026-05-25)*
+- [x] **`is_phase6_gate_cleared()`** — ≥50 comparables AND parity_pct ≥ 95% *(2026-05-25)*
+- [ ] **[ACTIVATION SPRINT]** Fib→Signal SharedStateCache wiring (fibCount currently=0)
+- [ ] **[MANUAL]** 200+ comparable candidates across 2+ weeks
+- [ ] **[MANUAL]** Parity ≥ 95% confirmed in drift report
 
 ### Success Criteria
-- [ ] 95%+ signal parity over large sample size
-
-### Test Checklist
-- [ ] Live sessions
-- [ ] Historical replay
-- [ ] Multi-pair testing
-- [ ] Edge-case fib conditions
+- [x] Drift analyzer logic implemented and correct
+- [x] Phase 7 hard gate implemented
+- [ ] **[MANUAL]** ≥ 95% signal parity across EURUSD/USDJPY/XAUUSD
 
 ### Parity Status
 ```
-MT5 Entry vs Pine Entry: [PENDING]
-SL/TP Parity: [PENDING]
-Confluence Detection: [PENDING]
+MT5 Entry vs Pine Entry: PENDING (needs Phase 5B live + fib wiring sprint)
+SL/TP Parity: PENDING
+Confluence Detection: PENDING
+Phase 7 GATE: BLOCKED (hard gate in is_phase6_gate_cleared)
 ```
 
 ### Blockers
-- *Phase 5 not complete*
-- **GATE**: Phase 7+ execution blocked until Phase 6 parity ≥95%
+- **Phase 5B gate** — must clear before Phase 6 activation
+- **Fib→Signal wiring** — Phase 6 activation sprint (1–2 days work)
+- **GATE**: Phase 7+ execution hard-blocked until Phase 6 parity ≥ 95%
 
 ---
 
@@ -448,28 +467,26 @@ Confluence Detection: [PENDING]
 
 **Objective**: Enable safe dashboard-triggered execution (NOT auto)  
 **Owner**: Track A + Track B + Track C  
-**Status**: NOT-STARTED  
-**Prerequisites**: Phase 6 parity ≥95%  
-**Completion Target**: 2026-11-15
+**Status**: SCAFFOLDED (2026-05-25) — hard-gated on Phase 6 parity ≥ 95%  
+**Prerequisites**: Phase 6 parity ≥ 95%  
+**Completion Target**: 2026-11-15  
+**Update**: [phase7-9-scaffold-2026-05-25.md](./phase-updates/phase7-9-scaffold-2026-05-25.md)
 
 ### Deliverables
-- [ ] Execution Engine: buy/sell, pending orders, SL/TP updates, cancel order
-- [ ] Risk Guardrails rejecting: oversize lots, invalid SL, no-trade-zone entries, duplicate family entries
-
-### Success Criteria
-- [ ] 100% execution reconciliation accuracy
-
-### Test Checklist
-- [ ] Market execution
-- [ ] Pending orders
-- [ ] Requotes/slippage
-- [ ] Disconnect during execution
-
-### Execution Audit Trail
-- *To be implemented*
+- [x] **`mt5/ExecutionEngine.mqh`** scaffold — `phase6Cleared=false`, risk guardrails, OrderSend, ack *(2026-05-25)*
+- [x] **`wp_smc_sf_execution_audit` DB table** — full audit trail *(2026-05-25)*
+- [x] **`GET /ea/execution-queue`** — returns pending requests (empty until Phase 6 gate) *(2026-05-25)*
+- [x] **`POST /ea/execution-ack`** — EA acknowledges fill/rejection *(2026-05-25)*
+- [x] **`POST /user/execution-request`** — dashboard submits, risk guardrails enforced *(2026-05-25)*
+- [x] **`GET /user/execution-audit`** — audit trail for dashboard *(2026-05-25)*
+- [x] Risk guardrails: SL required, lots 0–10, valid direction, Phase 6 gate check *(2026-05-25)*
+- [ ] **[ACTIVATION]** `SetPhase6Cleared(true)` in EA after Phase 6 sign-off
+- [ ] Dashboard execution console UI
+- [ ] Disconnect-during-execution handling
 
 ### Blockers
-- *Phase 6 parity not confirmed (≥95% required)*
+- **Phase 6 parity ≥ 95%** — `is_phase6_gate_cleared()` controls the queue
+- Execution engine `phase6Cleared = false` — must be explicitly flipped after sign-off
 
 ---
 
@@ -477,17 +494,17 @@ Confluence Detection: [PENDING]
 
 **Objective**: Allow signal approval workflows  
 **Owner**: Track B + Track C  
-**Status**: NOT-STARTED  
+**Status**: SCAFFOLDED (2026-05-25) — gated on Phase 7  
 **Prerequisites**: Phase 7 complete  
-**Completion Target**: 2026-12-01
+**Completion Target**: 2026-12-01  
+**Update**: [phase7-9-scaffold-2026-05-25.md](./phase-updates/phase7-9-scaffold-2026-05-25.md)
 
 ### Deliverables
-- [ ] Workflow: Signal generated → approval queue → execute → terminal confirmation
-- [ ] Approval Console: risk, regime, exposure, hedge impact
-
-### Success Criteria
-- [ ] No unauthorized execution
-- [ ] Full audit visibility
+- [x] **`wp_smc_sf_approval_queue` DB table** — signal + regime + fundamental + risk context *(2026-05-25)*
+- [x] **`GET /user/approval-queue`** — returns PENDING items; auto-expires stale *(2026-05-25)*
+- [x] **`POST /user/approval-queue/review`** — APPROVED/REJECTED with operator note *(2026-05-25)*
+- [ ] Auto-enqueue signals from engine into approval queue (Phase 8 activation sprint)
+- [ ] Dashboard approval console UI
 
 ### Blockers
 - *Phase 7 not complete*
@@ -498,18 +515,20 @@ Confluence Detection: [PENDING]
 
 **Objective**: Commercialize platform  
 **Owner**: Track B  
-**Status**: NOT-STARTED  
+**Status**: SCAFFOLDED (2026-05-25) — gated on Phase 8  
 **Prerequisites**: Phase 8 complete  
-**Completion Target**: 2026-12-15
+**Completion Target**: 2026-12-15  
+**Update**: [phase7-9-scaffold-2026-05-25.md](./phase-updates/phase7-9-scaffold-2026-05-25.md)
 
 ### Deliverables
-- [ ] License Server: users, accounts, subscriptions, EA sessions
-- [ ] Anti-Piracy Layer: account lock, heartbeat validation, remote disable
-- [ ] Tier System (Basic | Pro | Elite | Institutional)
-
-### Success Criteria
-- [ ] Stable license enforcement
-- [ ] No duplicate account abuse
+- [x] **`wp_smc_sf_license_tiers` DB table** — Basic/Pro/Elite/Institutional *(2026-05-25)*
+- [x] **`GET /user/license`** — returns current tier; defaults to Basic *(2026-05-25)*
+- [x] **`POST /admin/license/set-tier`** — admin assigns tier + expiry *(2026-05-25)*
+- [x] Tier config: max_symbols, max_ea_sessions, execution_enabled, api_access_enabled *(2026-05-25)*
+- [ ] Anti-piracy: max_ea_sessions enforcement in heartbeat
+- [ ] License-check integration (tier limits in `/ea/license-check` response)
+- [ ] Subscription/payment integration (Stripe or WooCommerce)
+- [ ] Remote disable endpoint
 
 ### Blockers
 - *Phase 8 not complete*

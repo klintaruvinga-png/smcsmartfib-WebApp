@@ -7,6 +7,9 @@
 #include "FreshnessEngine.mqh"
 #include "SymbolNormalizer.mqh"
 #include "FibEngine.mqh"
+#include "RegimeEngine.mqh"   // Phase 5
+#include "SignalEngine.mqh"   // Phase 6
+#include "ExecutionEngine.mqh" // Phase 7 scaffold
 
 //+------------------------------------------------------------------+
 //| MarketDataEngine                                                  |
@@ -24,6 +27,9 @@ private:
     FreshnessEngine*  freshnessEngine;
     SymbolNormalizer* symbolNormalizer;
     FibEngine*        fibEngine;
+    RegimeEngine*     regimeEngine;    // Phase 5
+    SignalEngine*     signalEngine;    // Phase 6
+    ExecutionEngine*  executionEngine; // Phase 7 scaffold
 
     string   symbols[100];
     int      symbolCount;
@@ -47,6 +53,12 @@ private:
     int      fibCycleInterval;  // default 6 (every ~60s on a 10s timer)
 
 public:
+    // Phase 5/6 dispatch shares the same cycle interval as fib (every ~60s).
+    int      regimeCycleCounter;
+    int      regimeCycleInterval;  // default 6 (every ~60s on a 10s timer)
+    int      signalCycleCounter;
+    int      signalCycleInterval;  // default 12 (every ~120s — less frequent than regime)
+
     MarketDataEngine()
     {
         tickProcessor    = new TickProcessor();
@@ -55,6 +67,9 @@ public:
         freshnessEngine  = new FreshnessEngine();
         symbolNormalizer = new SymbolNormalizer();
         fibEngine        = new FibEngine();
+        regimeEngine     = new RegimeEngine();
+        signalEngine     = new SignalEngine();
+        executionEngine  = new ExecutionEngine();
         symbolCount      = 0;
         webhookUrl       = "";
         authHeader       = "";
@@ -64,6 +79,10 @@ public:
         eaVersion        = "1.00";
         fibCycleCounter  = 0;
         fibCycleInterval = 6;
+        regimeCycleCounter  = 0;
+        regimeCycleInterval = 6;   // Phase 5: same cadence as fib
+        signalCycleCounter  = 0;
+        signalCycleInterval = 12;  // Phase 6: every ~120s
         ArrayInitialize(lastSentCandleM1, 0);
     }
 
@@ -75,6 +94,9 @@ public:
         delete fibEngine;
         delete freshnessEngine;
         delete symbolNormalizer;
+        delete regimeEngine;
+        delete signalEngine;
+        delete executionEngine;
     }
 
     // url  = full webhook endpoint URL
@@ -159,6 +181,25 @@ public:
             fibEngine.RefreshBrokerOffset();
             SendFibToBackend();
         }
+
+        // Phase 5 — Regime dispatch: same cadence as fib (~every 60s).
+        regimeCycleCounter++;
+        if (regimeCycleCounter >= regimeCycleInterval)
+        {
+            regimeCycleCounter = 0;
+            SendRegimeToBackend();
+        }
+
+        // Phase 6 — Signal dispatch: every ~120s (less frequent than regime).
+        signalCycleCounter++;
+        if (signalCycleCounter >= signalCycleInterval)
+        {
+            signalCycleCounter = 0;
+            SendSignalCandidatesToBackend();
+        }
+
+        // Phase 7 scaffold — execution polling (no-op until Phase 6 gate cleared).
+        executionEngine.OnPeriodic();
     }
 
     // POST fib levels for all tracked symbols to /ea/fib-levels.
@@ -205,6 +246,127 @@ public:
                       " status=", httpStatus,
                       " resp=", StringLen(body) > 0 ? body : "(empty)");
             }
+        }
+    }
+
+    // ---- Phase 5: Regime dispatch ----
+
+    // POST regime snapshots for all tracked symbols to /ea/regime-snapshot.
+    // Batches all symbols into a single JSON array payload.
+    void SendRegimeToBackend()
+    {
+        if (StringLen(baseUrl) == 0)
+            return;
+
+        string url = baseUrl + "/ea/regime-snapshot";
+
+        string normSymbols[100];
+        for (int i = 0; i < symbolCount; i++)
+            normSymbols[i] = symbolNormalizer.NormalizeSymbol(symbols[i]);
+
+        string batchJson = regimeEngine.BuildBatchPayload(symbols, normSymbols,
+                                                          symbolCount, wpUserId);
+
+        if (StringLen(batchJson) <= 2)  // "[]" = empty
+        {
+            Print("[RegimeEngine] No regime payload — skipping dispatch.");
+            return;
+        }
+
+        string payload = "{\"regimes\":" + batchJson + "}";
+
+        char   postData[];
+        char   result[];
+        string responseHeaders;
+        StringToCharArray(payload, postData, 0, StringLen(payload));
+
+        int httpStatus = WebRequest("POST", url, cachedHeaders, 10000,
+                                    postData, result, responseHeaders);
+        if (httpStatus == 200 || httpStatus == 201)
+            Print("[RegimeEngine] POST OK symbols=", symbolCount);
+        else
+        {
+            string body = CharArrayToString(result, 0, -1, CP_UTF8);
+            Print("[RegimeEngine] POST FAILED status=", httpStatus,
+                  " resp=", StringLen(body) > 0 ? body : "(empty)");
+        }
+    }
+
+    // ---- Phase 6: Signal candidates dispatch ----
+
+    // Evaluate signal candidates for all symbols using the most recent
+    // fib + regime state and POST to /ea/signal-candidates.
+    void SendSignalCandidatesToBackend()
+    {
+        if (StringLen(baseUrl) == 0)
+            return;
+
+        string url      = baseUrl + "/ea/signal-candidates";
+        string arr      = "[";
+        bool   first    = true;
+        int    candCount = 0;
+
+        for (int i = 0; i < symbolCount; i++)
+        {
+            string norm = symbolNormalizer.NormalizeSymbol(symbols[i]);
+
+            // Fetch fib levels for this symbol across three timeframes.
+            // We use M15 fib levels (LTF_SF) for signal evaluation.
+            FibLevelOut fibLevels[];
+            int fibCount = 0;
+
+            // Build fib levels from engine for M15 only (Signal evaluation TF).
+            string fibJson = fibEngine.BuildFibPayload(symbols[i], norm, wpUserId);
+            // FibLevelOut array is not directly accessible from fibJson string —
+            // so we compute regime json and extract what we need from regime engine output.
+            // For now, use the regime engine's last computed regime state and pass
+            // default regime values (TRANSITIONAL/RANGING) to signal engine.
+            // Phase 6 full parity will wire regime state through a shared state cache.
+            string htfBias    = "TRANSITIONAL";
+            string ltfRegime  = "RANGING";
+            double chopScore  = 0.5;
+
+            SignalCandidate cand;
+            // With fibCount=0 the signal engine will return false (no candidate).
+            // Full evaluation wires in deserialized fib levels — scaffold for now.
+            bool found = signalEngine.EvaluateSymbol(
+                symbols[i], norm, htfBias, ltfRegime, chopScore,
+                fibLevels, fibCount, cand);
+
+            if (!found)
+                continue;
+
+            string candJson = signalEngine.SignalToJson(cand, wpUserId);
+            if (!first) arr += ",";
+            arr   += candJson;
+            first  = false;
+            candCount++;
+        }
+
+        arr += "]";
+
+        if (candCount == 0)
+        {
+            Print("[SignalEngine] No candidates this cycle.");
+            return;
+        }
+
+        string payload = "{\"candidates\":" + arr + "}";
+
+        char   postData[];
+        char   result[];
+        string responseHeaders;
+        StringToCharArray(payload, postData, 0, StringLen(payload));
+
+        int httpStatus = WebRequest("POST", url, cachedHeaders, 10000,
+                                    postData, result, responseHeaders);
+        if (httpStatus == 200 || httpStatus == 201)
+            Print("[SignalEngine] POST OK candidates=", candCount);
+        else
+        {
+            string body = CharArrayToString(result, 0, -1, CP_UTF8);
+            Print("[SignalEngine] POST FAILED status=", httpStatus,
+                  " resp=", StringLen(body) > 0 ? body : "(empty)");
         }
     }
 
