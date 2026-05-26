@@ -53,13 +53,15 @@ private:
         return 0.0001;
     }
 
-    // Proximity band: price within this many pips of a fib level
-    // counts as "in the zone."
-    static const int PROXIMITY_PIPS = 15;
-
-    // Displacement threshold: the signal candle must close at least
-    // this many pips through the fib level.
-    static const int DISPLACEMENT_PIPS = 8;
+    enum
+    {
+        // Proximity band: price within this many pips of a fib level
+        // counts as "in the zone."
+        PROXIMITY_PIPS = 15,
+        // Displacement threshold: the signal candle must close at least
+        // this many pips through the fib level.
+        DISPLACEMENT_PIPS = 8
+    };
 
     // HTF alignment multiplier applied to confidence.
     static const double HTF_ALIGNED_BOOST;   // = 0.15

@@ -1,40 +1,35 @@
-# Implementation Report
+# Issue summary
 
-## Issue summary
+SMC Intake MT5 compilation was blocked by illegal inline initialization of class-scope `static const int` members in `mt5/RegimeEngine.mqh` and `mt5/SignalEngine.mqh`.
 
-Local pipeline cycles could inherit stale `reports/codex-plan.md` and implementation artifacts from a prior issue, causing the next Codex run to stop on a contract conflict before new work began.
+# Root cause implemented
 
-## Root cause implemented
+Replaced the unsupported MQL5 class-scope inline `static const int` declarations with anonymous class-scope `enum` constants, preserving the original integer values exactly and leaving all runtime logic and `static const double` definitions unchanged.
 
-Added an early stale-artifact archive step in the watcher's `RESEARCHING` handler and added manual-reset archiving so prior-cycle plan and implementation artifacts are moved out of `reports/` before a new cycle or reset continues.
+# Exact files changed
 
-## Exact files changed
+- `mt5/RegimeEngine.mqh`
+- `mt5/SignalEngine.mqh`
+- `reports/codex-implementation.md`
 
-- `scripts/pipeline-watcher.js` — added stale-artifact archive helpers, RESEARCHING-entry cleanup, and manual-reset archiving in the sentinel handler.
-- `scripts/reset-pipeline.js` — added manual-reset archive logic for plan and implementation artifacts, plus direct reset-to-IDLE behavior while preserving the sentinel flow.
-- `reports/automation-update-log.md` — recorded the stale-artifact failure pattern and the permanent guards installed.
-- `.github/copilot-instructions.md` — documented the required issue-ownership check before PLANNING.
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-26_pipeline-stale-artifacts.md` — recorded the runtime-integrity sweep for the stale-artifact failure path and the remaining reset-path risk.
-- `reports/codex-implementation.md` — added the required implementation summary before validation per contract, then updated it with the final verification results.
-- `reports/codex-implementation.meta.json` — added the companion implementation metadata so watcher and validation tooling can confirm artifact freshness.
+# Tests run
 
-## Tests run
+- `rg -n "static const int\\s+\\w+\\s*=\\s*" mt5 -g "*.mqh"` before patch confirmed only `mt5/RegimeEngine.mqh` and `mt5/SignalEngine.mqh` matched the unsupported pattern.
+- `rg -n "static const int\\s+\\w+\\s*=\\s*" mt5 -g "*.mqh"` after patch returned no matches.
+- `node mt5/check-mql-includes.mjs` — passed.
+- MetaEditor CLI compile attempt for `mt5/SMC_MarketDataEA.mq5` via `MetaEditor64.exe /compile` — inconclusive; the process exited `0` but produced no repo-local compiler log and no `.ex5` artifact.
 
-- Scenario harness: stale prior-issue plan at `RESEARCHING` archived into `reports/archive/stale-validation-prior-issue-*/` before `PLANNING`.
-- Scenario harness: matching current-cycle plan preserved across repeated watcher starts.
-- Scenario harness: `node scripts/reset-pipeline.js` archived plan and implementation artifacts into `reports/archive/manual-reset-*/` and reset the workflow state to `IDLE`.
-- `node scripts/validate-implementation.mjs`
-- `npx eslint scripts/pipeline-watcher.js scripts/reset-pipeline.js`
+# Reports generated
 
-## Reports generated
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-26_smc-intake-fix-ea-compile-errors.md`
+- `.github/migration/audits/phase-6-mt5-parity-2026-05-26.md`
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-26_pipeline-stale-artifacts.md`
-- No parity audit required by the contract for this pipeline-only patch.
+# Remaining risks
 
-## Remaining risks
+- A clean zero-error / zero-warning MetaEditor rebuild of `mt5/SMC_MarketDataEA.mq5` is still required because the local CLI path did not emit authoritative compile evidence in this workspace.
+- `MIN_BARS=25` remains documented as an MT5-side minimum-history guard; the current workspace search did not expose a direct named Pine counterpart for that constant.
+- Phase 5/6 live parity validation is still pending operator review even though the MT5 threshold values were preserved exactly.
 
-The reset contract assumes `pipeline:reset` directly stops the watcher, but the repository currently uses a sentinel-driven reset. The patch keeps the sentinel path intact and adds local archive/reset behavior in the reset script; this needs verification against a live watcher to confirm there is no race on active manual resets.
+# Any contract ambiguities resolved during implementation
 
-## Any contract ambiguities resolved during implementation
-
-The contract described `pipeline:reset` as if it performed the reset after watcher termination, but the repository actually delegates reset completion to `scripts/pipeline-watcher.js` via `reports/.pipeline-reset-requested`. I kept that architecture and added archive/reset behavior in both the reset script and the watcher's sentinel path. I also treated missing implementation metadata during a new `RESEARCHING` cycle as stale because ownership could not be proven for the current issue.
+No code-scope ambiguity remained after source inspection. The only matching unsupported pattern under `mt5/*.mqh` was in `RegimeEngine.mqh` and `SignalEngine.mqh`, so scope was kept to those files. I also resolved the validation ambiguity conservatively: the MetaEditor CLI run was recorded as inconclusive rather than treated as a compile pass because it emitted no compiler log or artifact.
