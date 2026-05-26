@@ -220,7 +220,7 @@ function buildObservedKey() {
 }
 
 function readTextFile(filePath) {
-  return fs.readFileSync(filePath, "utf8").replace(/^ï»¿/, "");
+  return fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
 }
 
 function readJson(filePath) {

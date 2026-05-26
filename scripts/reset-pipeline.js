@@ -18,7 +18,7 @@ const IMPLEMENTATION_METADATA_FILE = path.join(REPORTS_DIR, "codex-implementatio
 
 function readJson(filePath) {
   try {
-    const raw = fs.readFileSync(filePath, "utf8").replace(/^ï»¿/, "");
+    const raw = fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
     return JSON.parse(raw);
   } catch {
     return null;
