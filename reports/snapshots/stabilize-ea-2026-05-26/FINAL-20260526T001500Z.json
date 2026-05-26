@@ -1,0 +1,71 @@
+{
+  "snapshot_type": "FINAL",
+  "workflow_id": "stabilize-ea-2026-05-26",
+  "timestamp": "2026-05-26T00:15:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-28hKb",
+    "commit_hash": "41db480bd2dcf3e6ea3c9b9b985a27d79aaf2e06",
+    "tags_created": [
+      "snapshot/stabilize-ea-2026-05-26-start-20260526T000000Z",
+      "rollback/stabilize-ea-2026-05-26-before-patches",
+      "rollback/stabilize-ea-2026-05-26-after-patch-1"
+    ]
+  },
+  "patches_applied": [
+    "BUG-001: EA market-stream invalid bid/ask → HTTP 422 with structured error",
+    "BUG-002: Prettier formatting drift fixed in SDK and frontend files"
+  ],
+  "migration_status_post_patch": {
+    "phases_complete": ["0", "1", "2", "3"],
+    "current_phase": "4 — Fib Engine Migration",
+    "blockers_addressed": [
+      "BUG-001 bid/ask validation gap now returns structured error (EA reliability improvement)"
+    ],
+    "remaining_blockers": [
+      "MIGRATION-P4-001: Live MT5 parity corpus (EURUSD/USDJPY/XAUUSD 30-day) not yet captured — operator action required"
+    ],
+    "phase_readiness": "Phase 4 code complete. Gate pending live operator parity corpus. No code blockers remain."
+  },
+  "tests": {
+    "commands_run": [
+      "npm run lint",
+      "npm run build",
+      "npm run check:mql",
+      "php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "php -l wordpress/smc-superfib-sniper/class-market-data-service.php",
+      "php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php"
+    ],
+    "passing": true,
+    "results": {
+      "php_lint_main_plugin": "PASS",
+      "php_lint_market_data_service": "PASS",
+      "npm_lint": "PASS (0 errors, 9 pre-existing warnings)",
+      "npm_build": "PASS",
+      "check_mql": "PASS",
+      "ea_market_stream_regression": "15/15 PASS"
+    },
+    "failures": []
+  },
+  "ea_integration_status": {
+    "market_stream_route": "POST /wp-json/sniper/v1/ea/market-stream",
+    "auth_required": true,
+    "auth_header": "X-EA-API-Key",
+    "auth_aliases": ["X-EA-API-Key", "X_EA-API-Key", "X-API-KEY", "X_API_KEY"],
+    "secret_env": "SMC_SF_EA_API_KEY",
+    "user_id_required": true,
+    "payload_validation": true,
+    "stale_rejection": true,
+    "stale_threshold_seconds": 300,
+    "stale_warn_threshold_seconds": 120,
+    "invalid_bid_ask_now_returns_422": true,
+    "ohlc_validation": true,
+    "candle_epoch_guard": true,
+    "tick_volume_guard": true,
+    "symbol_alias_map": true,
+    "phase3_m15_candle_support": true
+  },
+  "rollback": {
+    "manifest": "ROLLBACK-MANIFEST.json",
+    "rollback_points_count": 3
+  }
+}

@@ -10,6 +10,20 @@
       "commit_hash": "6a5262058670d2aa1fac56a249236f8666156515",
       "snapshot_file": "INITIAL-20260526T000000Z.json",
       "command": "git reset --hard 6a5262058670d2aa1fac56a249236f8666156515"
+    },
+    {
+      "name": "Before patches (lint fixes applied, no logic changes)",
+      "tag": "rollback/stabilize-ea-2026-05-26-before-patches",
+      "commit_hash": "6a5262058670d2aa1fac56a249236f8666156515",
+      "snapshot_file": "PRE-PATCH-20260526T000100Z.json",
+      "command": "git reset --hard 6a5262058670d2aa1fac56a249236f8666156515"
+    },
+    {
+      "name": "After Patch 1 (BUG-001 + BUG-002 applied)",
+      "tag": "rollback/stabilize-ea-2026-05-26-after-patch-1",
+      "commit_hash": "41db480bd2dcf3e6ea3c9b9b985a27d79aaf2e06",
+      "snapshot_file": "AFTER-PATCH-1-20260526T001000Z.json",
+      "command": "git reset --hard 41db480bd2dcf3e6ea3c9b9b985a27d79aaf2e06"
     }
   ],
   "emergency_rollback": {
