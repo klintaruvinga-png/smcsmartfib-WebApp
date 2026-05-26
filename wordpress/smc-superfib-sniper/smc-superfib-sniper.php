@@ -885,6 +885,11 @@ final class SMC_SuperFib_Sniper_REST {
             'callback' => array($this, 'create_soak_checkpoint'),
             'permission_callback' => array($this, 'permission_admin'),
         ));
+        register_rest_route(self::NAMESPACE, '/admin/soak-reset', array(
+            'methods' => WP_REST_Server::DELETABLE,
+            'callback' => array($this, 'reset_soak'),
+            'permission_callback' => array($this, 'permission_admin'),
+        ));
         $this->route('/session', WP_REST_Server::READABLE, 'get_session', false);
         $this->route('/snapshot', WP_REST_Server::READABLE, 'get_snapshot', true);
         $this->route('/snapshot', WP_REST_Server::CREATABLE, 'post_snapshot', true);
@@ -1739,6 +1744,33 @@ final class SMC_SuperFib_Sniper_REST {
             'snapshot_data' => $snapshot_report,
             'operator_notes' => $operator_notes !== '' ? $operator_notes : null,
             'created_at' => $this->to_iso($created_at),
+        ));
+    }
+
+    public function reset_soak(WP_REST_Request $request) {
+        self::ensure_soak_tables();
+        global $wpdb;
+
+        $wpdb->query('START TRANSACTION');
+
+        $deleted_checkpoints = $wpdb->query("DELETE FROM {$this->table('soak_checkpoints')}");
+        if ($deleted_checkpoints === false) {
+            $wpdb->query('ROLLBACK');
+            return new WP_Error('smc_sf_soak_reset_checkpoints_failed', 'Could not clear soak checkpoints.', array('status' => 500));
+        }
+
+        $deleted_evidence = $wpdb->query("DELETE FROM {$this->table('soak_evidence')}");
+        if ($deleted_evidence === false) {
+            $wpdb->query('ROLLBACK');
+            return new WP_Error('smc_sf_soak_reset_evidence_failed', 'Could not clear soak evidence.', array('status' => 500));
+        }
+
+        $wpdb->query('COMMIT');
+
+        return rest_ensure_response(array(
+            'reset' => true,
+            'deleted_checkpoints' => (int) $deleted_checkpoints,
+            'deleted_evidence' => (int) $deleted_evidence,
         ));
     }
 

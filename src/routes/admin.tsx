@@ -6,6 +6,7 @@ import {
   createSoakCheckpoint,
   fetchAdminHealth,
   fetchSoakReport,
+  resetSoak,
   type AdminHealthResponse,
   AuthError,
   upsertSoakEvidence,
@@ -413,10 +414,15 @@ export function AdminPage() {
       console.debug("[SOAK] Baseline evidence entries", baselineEntries);
 
       if (creatingNewBaseline) {
-        await createSoakCheckpoint({
-          checkpointType: "baseline",
-          operatorNotes: baselineForm.notes,
-        });
+        if (baselineResetRequested) {
+          await resetSoak();
+          await refreshSoakReport();
+        } else {
+          await createSoakCheckpoint({
+            checkpointType: "baseline",
+            operatorNotes: baselineForm.notes,
+          });
+        }
       }
       await saveEvidenceEntries(baselineEntries);
 
