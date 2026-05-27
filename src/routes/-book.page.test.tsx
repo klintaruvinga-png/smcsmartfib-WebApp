@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const hookMocks = vi.hoisted(() => ({
-  useUserTrades: vi.fn(),
+  useStableUserTrades: vi.fn(),
   useSnapshot: vi.fn(),
   usePollingUiState: vi.fn(),
 }));
@@ -18,7 +18,7 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
 });
 
 vi.mock("@/hooks/useSniperData", () => ({
-  useUserTrades: hookMocks.useUserTrades,
+  useStableUserTrades: hookMocks.useStableUserTrades,
   useSnapshot: hookMocks.useSnapshot,
   usePollingUiState: hookMocks.usePollingUiState,
 }));
@@ -38,7 +38,7 @@ describe("BookPage", () => {
   });
 
   it("shows a degraded state when backend trade telemetry is unreachable", () => {
-    hookMocks.useUserTrades.mockReturnValue({
+    hookMocks.useStableUserTrades.mockReturnValue({
       data: undefined,
       isLoading: false,
       error: new Error("positions unavailable"),
@@ -52,7 +52,7 @@ describe("BookPage", () => {
   });
 
   it("groups live positions by symbol and direction", () => {
-    hookMocks.useUserTrades.mockReturnValue({
+    hookMocks.useStableUserTrades.mockReturnValue({
       data: {
         positions: [
           {
@@ -91,5 +91,39 @@ describe("BookPage", () => {
     expect(screen.getAllByText("EURUSD")).toHaveLength(2);
     expect(screen.getAllByText("LONG").length).toBeGreaterThan(0);
     expect(screen.getAllByText("SHORT").length).toBeGreaterThan(0);
+  });
+
+  it("keeps rendering carried-forward stale positions instead of flashing empty", () => {
+    hookMocks.useSnapshot.mockReturnValue({
+      data: {
+        prices: [{ symbol: "EURUSD", state: "live", updatedAt: "2026-05-27T10:10:00Z" }],
+      },
+    });
+    hookMocks.useStableUserTrades.mockReturnValue({
+      data: {
+        positions: [
+          {
+            id: "1",
+            symbol: "EURUSD",
+            direction: "LONG",
+            entry: 1.08,
+            current: 1.081,
+            lots: 0.5,
+            pnlUSC: 25,
+            pnlPct: 2,
+            openedAt: "2026-05-20T10:00:00Z",
+            state: "stale",
+          },
+        ],
+        orders: [],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    render(<BookPage />);
+
+    expect(screen.queryByText("No open positions.")).toBeNull();
+    expect(screen.getByText("STALE")).toBeTruthy();
   });
 });

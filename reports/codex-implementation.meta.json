@@ -1,5 +1,5 @@
 {
-  "issue": "SMC Intake - Fix EA compile errors",
-  "plan_hash": "2db678303ca2a4b5bd9484ceea89a7b7c40366a0fbee8331e8ae72172cf1170a",
-  "written_at": "2026-05-26T14:44:51.3406123Z"
+  "issue": "Active Book stream is causing flickers and position/book persistance issues in between polls/refreshes",
+  "plan_hash": "f8b162e9be98d5135b7b869a44b04232330a84898df912841618f2e9c500351c",
+  "written_at": "2026-05-27T13:40:13.7533457+02:00"
 }
