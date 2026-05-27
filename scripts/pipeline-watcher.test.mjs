@@ -1,13 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
-<<<<<<< Updated upstream
+  extractUsablePlanFromCodexOutput,
   buildCodexExecCommand,
   buildCodexVersionCommand,
-=======
-  buildClaudeShellCommand,
-  extractUsablePlanFromCodexOutput,
->>>>>>> Stashed changes
   isActivePhaseUpdatePath,
 } from "./pipeline-watcher.js";
 
@@ -60,7 +56,7 @@ describe("pipeline watcher Codex commands", () => {
     expect(command).toContain("exec");
     expect(command).toContain("--json");
     expect(command).toContain("--dangerously-bypass-approvals-and-sandbox");
-    expect(command).toContain("\"C:\\temp\\codex prompt.tmp.md\"");
+    expect(command).toContain('"C:\\temp\\codex prompt.tmp.md"');
     expect(command.toLowerCase()).toContain("codex");
     expect(command.toLowerCase()).not.toContain("claude");
   });

@@ -5,155 +5,94 @@
 
 ---
 
-## 1. Issue classification
+### 1. Issue classification
 
-- **Severity:** HIGH
-- **Category:** runtime-bug
-- **Layer(s) affected:** Dashboard-JS / React-Query polling / Position persistence
-- **Phase impact:** Phase 0 (production stabilization)
+- Severity: HIGH
+- Category: runtime-bug
+- Layer(s) affected: Dashboard-JS / PHP-backend
+- Phase impact: Phase 0 / Cross-phase
 
----
+### 2. Confirmed evidence
 
-## 2. Confirmed evidence
+- Runtime error reported (console): `TypeError: Cannot read properties of undefined (reading 'feedStatus')` from compiled client bundle `index-HU_NwOvP.js` (user-provided stack trace).
+- Frontend: `src/routes/admin.tsx` reads `health.feedStatus` and `aggregate.health.feedStatus` without guarding that `health` (or `aggregate.health`) exists (examples: lines where `value={health.feedStatus ?? health.priceFeed}` and `Feed: {aggregate.health.feedStatus ?? aggregate.health.priceFeed}`).
+- API client: `src/lib/api/sniperClient.ts` exposes `getAdminHealth()` / `fetchAdminHealth()` and expects backend `/admin/health` payload shape including `feedStatus`.
+- Backend: `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` provides `build_health_payload($user_id)` which returns `feedStatus` and is used by `/admin/health` and by the soak report payload (`get_soak_report()` includes `health => build_health_payload(...)`).
+- Persisted snapshots / soak checkpoints: `src/routes/admin.tsx` renders checkpoint `snapshot_data` (`checkpoint.snapshot_data`) as `aggregate` and accesses `aggregate.health.*` without defensive checks — if a saved checkpoint row lacks `health`, the UI will throw.
+- Repository evidence of `feedStatus` being backend-authoritative and heavily referenced in migration audits and soak reports (`.github/migration/...`, `.github/migration/audits/*`, reports mentioning `feedStatus`), indicating frontend assumes backend-provided health shape.
 
-### 2.1 Polling Architecture
-- **Trigger:** `useSniperData.ts` (lines 1-150) controls all polling queries
-- **Poll interval:** `DEFAULT_POLL_MS = 2_000` (2 seconds)
-- **Query endpoints:**
-  - `useUserTrades()` → `/user/trades` endpoint (line ~120)
-  - `useSnapshot()` → `/snapshot` endpoint (line ~110)
-- **Refetch strategy:** `refetchInterval: enabled ? pollMs : false` (TanStack React Query)
-- **Enable condition:** `enabled = backendReady && pollMs !== null` (line ~91)
+### 3. Root cause hypothesis
 
-### 2.2 Book Page Position Rendering
-- **File:** `src/routes/-book.page.tsx` (lines 1-150)
-- **Data source:** `const { data: trades, isLoading, error } = useUserTrades()` (line ~15)
-- **Position list:** `const positions = trades?.positions ?? []` (line ~28)
-- **Grouping logic:** `reduce()` to group by `symbol:direction` (lines ~61-65)
-- **Rendering:** Maps `Object.entries(grouped)` to render position groups (line ~74+)
+- Most likely root cause: The Admin/Soak UI assumes the saved checkpoint snapshot includes a `health` object; when `checkpoint.snapshot_data` or its `health` field is missing (e.g., a persisted snapshot row without `health` or a transient backend response), the UI attempts to read `feedStatus` from `undefined` and throws a TypeError (Confirmed: unguarded property access in `admin.tsx`).
 
-### 2.3 Position State Tracking
-- **Freshness field:** Each position has `state: "live" | "stale" | "unavailable"` (sniperClient.ts line ~436)
-- **Book page rendering:** Checks `stale = posList.some((p) => p.state === "stale") || snapPair?.state === "stale"` (line ~77)
-- **Stale warning:** Conditionally rendered when `stale === true` (lines ~104-108)
+- Why it fits: The stacktrace references compiled client code accessing `.feedStatus`; source shows multiple unguarded accesses (`health.feedStatus`, `aggregate.health.feedStatus`). Backend and snapshot persistence paths can produce objects lacking `health` (e.g., older snapshots or partial snapshot writes), which would make `aggregate.health` undefined at render time.
 
-### 2.4 Streaming Animation Layers
-- **File:** `useStreamingTicks.ts` (lines 1-100)
-  - Creates intermediate ticks between poll updates
-  - Generates 4-9 sub-ticks over ~85% of `pollMs` interval
-  - Uses Brownian motion/GBM path for smooth price interpolation
-  - Applies per-instance random seed for desynchronization
-- **File:** `useTickFlash.ts` (lines 1-50)
-  - Emits transient direction ("up" | "down") on numeric value change
-  - Auto-clears after `durationMs` (default 700ms)
-  - Used in charts.tsx for visual flash on price updates (line ~95)
+- Trigger/hypothesis: A saved checkpoint or a soaked snapshot in the DB missing the `health` key (either due to an earlier persistence bug, a partial save, or schema change during migration) surfaced when `AdminPage` attempted to render the soak checkpoints.
 
-### 2.5 Position Persistence Issues
-- **No explicit position deduplication:** `useUserTrades()` query returns `trades?.positions` array without diffing
-- **Array identity volatility:** Each poll refetch may produce a new array reference even if positions are unchanged
-- **React re-render trigger:** Position list mapping depends on array identity, not semantic equality
-- **Streaming scope:** `useStreamingTicks()` only animates single numeric values (price), not position list lifecycle
-- **Cache invalidation:** TanStack React Query default behavior may aggressively invalidate on any refetch response
+### 4. Blast radius
 
-### 2.6 WordPress Backend Position Data Flow
-- **Storage:** `wp_smc_sf_trade_positions` table with `deterministic_key` UNIQUE constraint (smc-superfib-sniper.php line ~6100)
-- **Telemetry handler:** `post_user_trades()` endpoint writes positions from EA telemetry (implied via route at line ~6220)
-- **Normalization:** `normalizeTelemetryPositions()` in sniperClient.ts (line ~436) reads from API response
-- **Freshness field:** Mapped from backend `freshness` field to position `state` property
+- Files likely affected:
+  - src/routes/admin.tsx (HealthCard render and CheckpointCard render)
+  - src/hooks/useSniperData.ts and other places that render `health.*` or use `engine-health` query
+  - src/lib/api/sniperClient.ts (AdminHealthResponse contract)
+  - wordpress/smc-superfib-sniper/smc-superfib-sniper.php (build_health_payload and snapshot persistence)
+  - wordpress/class-market-data-service.php (snapshot insertion and shape)
 
-### 2.7 Market Authority Switching
-- **File:** `get_market_data_authority()` endpoint (smc-superfib-sniper.php line ~6180)
-- **Authority source:** MT5 (live) vs Twelve Data (fallback)
-- **Authority state:** Read from `snapshots` table `source` field
-- **Impact on book:** Authority switching may trigger cache invalidation if used as part of query key
+- Systems at risk:
+  - Dashboard Admin Health page (runtime crash / Engine Fault overlay)
+  - Soak report export and checkpoint viewing
+  - Any UI component that reads `health.*` without optional chaining
 
----
+- Parity surfaces at risk: Pine <-> Backend <-> Dashboard health contract, soak-report snapshots, checkpoint persistence
 
-## 3. Root cause hypothesis
+- Stale-state / caching risks: If backend sometimes saves incomplete snapshot blobs, any replay of those blobs in UI may crash pages that render snapshot fields unguarded.
 
-### 3.1 Primary Root Cause: Position Array Volatility
-**Most likely:** React component re-renders and positions disappear/flicker because the `positions` array reference changes on every poll, even when the underlying position data is semantically identical.
+### 5. Regression surface
 
-**Why this fits:**
-- `useUserTrades()` returns a new `trades` object on every successful poll refetch
-- Each `trades` object contains a new `positions[]` array reference (even if data is the same)
-- React's diffing algorithm uses referential equality for arrays in JSX `.map()`
-- When array reference changes, React unmounts/remounts position components
-- Unmount/remount causes visual flicker and resets any transient animation state
+- What to preserve:
+  - Backend remains the source-of-truth for `feedStatus` and related fields
+  - Soak/checkpoint snapshots should include consistent, discoverable health payloads
+  - UI must not crash on malformed or partial persisted snapshot data
 
-### 3.2 Secondary Root Cause: Position List Mutation on Freshness Transitions
-**Likely:** When backend position state transitions from `live` → `stale` or back, the position list is re-fetched and produces a different array identity.
+- Existing guards to respect:
+  - The backend `build_health_payload()` is the canonical payload generator (do not weaken server-side validation without replacing UI guards)
+  - Tests and migration audits assume health contract exists — add tests for missing/partial snapshot_data handling rather than removing contract checks
 
-**Why this fits:**
-- Position freshness depends on MT5 EA push frequency and backend snapshot staleness
-- Between polls, a position's `state` field can transition (e.g., if MT5 push gap exceeds threshold)
-- Backend returns a new positions array on next poll with updated `state` values
-- Frontend treats this as a complete list change, not a targeted state update
-- Positions visually disappear/reappear during freshness transitions
+### 6. Resolution path options
 
-### 3.3 Tertiary Root Cause: Lack of Position Persistence Cache
-**Confirmed:** There is no client-side deduplication or diffing of position data between polls.
+- Path A (narrow, recommended): Add defensive checks in the Dashboard UI where `health` or `aggregate.health` is read. Replace direct property access with safe access and fallbacks, e.g. `health?.feedStatus ?? health?.priceFeed ?? 'unknown'` and in checkpoint render `aggregate?.health?.feedStatus ?? aggregate?.health?.priceFeed ?? 'unknown'`. Low-risk, immediate fix that prevents runtime crash.
 
-**Why:**
-- `useSniperData.ts` uses TanStack React Query with default cache behavior
-- No custom `structuralSharing` or diffing logic in the query configuration
-- `useUserTrades()` query at line ~120 does not implement diff-based caching
-- Each poll response is treated atomically; no tracking of which positions changed
+- Path B (broader): Harden server-side persistence to guarantee that `snapshot_data` and checkpoint blobs always include a `health` object when a checkpoint is saved. Add validation on save and a migration to repair existing DB rows that lack `health`. Medium risk (DB migration + runtime coordination).
 
-### 3.4 Streaming Animation Does Not Address Position List Lifecycle
-**Confirmed:** Streaming animations (`useStreamingTicks`, `useTickFlash`) only target individual numeric fields (price), not the position list itself.
+- Path C (comprehensive): Do both: deploy UI defensive checks (Path A) immediately, then deploy a backend migration and validation (Path B) to restore contract integrity and prevent future occurrences.
 
-**Why this is relevant:**
-- Streaming creates the illusion of smooth updates for a single value
-- But if the position list (`trades.positions[]`) is unmounted/remounted, all animations reset
-- The position list itself has no fade-in/fade-out or smooth persistence layer
-- New positions from a poll appear instantly; disappeared positions vanish instantly
+### 7. Risk flags
 
----
+- High-risk system involved: Yes — health/feed status touches engine and market-data surfaces used across admin and signal surfaces.
+- Requires parity re-validation: Yes — validate feedStatus / engine health parity across backend, soak-reports, and frontend after fixes.
+- Migration-blocking: No — this is a stabilization/runtime hardening issue (Phase 0) rather than a migration gate stop.
+- Human review required before merge: Yes — backend DB changes or contract changes require review; UI defensive changes should be reviewed for UX clarity.
 
-## 4. Blast radius
+### 8. Handoff package
 
-- **Epicentre files:**
-  - `src/hooks/useSniperData.ts` — polling query configuration without structural sharing
-  - `src/routes/-book.page.tsx` — position list rendering without deduplication
-  - `src/lib/api/sniperClient.ts` — API response normalization without change tracking
-  - `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` — backend position telemetry handler
+- Epicentre files to inspect first:
+  - src/routes/admin.tsx (CheckpointCard + HealthCard usages)
+  - src/hooks/useSniperData.ts (engine-health / admin health queries)
+  - src/lib/api/sniperClient.ts (AdminHealthResponse contract)
+  - wordpress/smc-superfib-sniper/smc-superfib-sniper.php (build_health_payload, get_soak_report, checkpoint persistence)
+  - wordpress/class-market-data-service.php (snapshot insertion and shape)
 
-- **Affected systems:**
-  - Active Book dashboard (position list flickering)
-  - Position state transitions (live/stale/unavailable)
-  - MT5 position telemetry ingestion (backend write side)
-  - Position freshness tracking on frontend
+- Inputs Codex must verify before planning:
+  1. Provide one or more failing checkpoint rows (DB snapshot blob) that caused the UI crash (raw JSON from `wp_smc_sf_snapshots` or `soak_checkpoints` table).
+  2. Confirm whether missing `health` is transient (a backend call returned partial object) or permanent (persisted without `health`).
+  3. Confirm whether the frontend bundle version that threw is the latest source (stack trace references `index-HU_NwOvP.js`).
+  4. Verify any recent changes to snapshot persistence or soak checkpoint writing that could have removed `health` from persisted blobs.
 
-- **Parity surfaces at risk:**
-  - Position list consistency between React dashboard and WordPress backend
-  - Freshness state tracking (if cache invalidation causes stale transitions to re-apply)
-  - Position ID deduplication (if `deterministic_key` is not aligned with frontend key strategy)
+- Open unknowns that could invalidate the hypothesis:
+  - Are there checkpoint rows that intentionally omit `health` for size or privacy reasons?
+  - Did a recent migration alter the snapshot shape stored in the DB?
+  - Is the client rendering an aggregated/rolled-up checkpoint blob that changed schema unexpectedly?
 
-- **Stale-state risks:**
-  - If a position is briefly marked `stale` during a poll, it may disappear from the UI
-  - Then reappear when next poll marks it `live` again
-  - User may think position was closed, when in reality it was just a freshness flicker
-  - No audit trail of these transient visibility changes
-
----
-
-## 5. Regression surface
-
-- **Behavior to preserve:**
-  - Position list updates reflect actual position changes from MT5 EA, not cache artifacts
-  - Stale positions are visually indicated (badge/warning) but remain in the list
-  - Position entry price, current price, P&L calculations are accurate and do not drift
-  - Positions do not disappear when they transition between freshness states
-  - Position identity is stable across polls (same position should not re-render if data unchanged)
-
-- **Existing guards:**
-  - Backend `deterministic_key` prevents position duplicates in the database
-  - Position `state` field tracks freshness (LIVE/STALE/UNAVAILABLE)
-  - `WarningLine` component renders when position or snapshot is stale (lines ~104-108 of book page)
-  - `FreshnessBadge` displays freshness state visually
-
-- **Tests or audits:**
   - Phase 0 soak test harness includes position persistence checks (implied in `build_health_payload()` at smc-superfib-sniper.php)
   - No explicit regression test for position list identity across polls (currently absent)
 

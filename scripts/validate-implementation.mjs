@@ -19,13 +19,14 @@
  *   node scripts/validate-implementation.mjs
  *
  * Exit codes:
- *   0 — all checks pass
- *   1 — one or more checks failed (details printed to stderr)
+ *   0 - all checks pass
+ *   1 - one or more checks failed (details printed to stderr)
  */
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readWorkflowState, readJsonFile } from "./workflow-state.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,11 +51,13 @@ const REQUIRED_SECTIONS = [
 ];
 
 function pass(msg) {
-  console.log(`  ✔ ${msg}`);
+  console.log(`  OK ${msg}`);
 }
+
 function fail(msg) {
-  console.error(`  ✘ ${msg}`);
+  console.error(`  FAIL ${msg}`);
 }
+
 function header(msg) {
   console.log(`\n${msg}`);
 }
@@ -70,12 +73,10 @@ function check(condition, passMsg, failMsg) {
   }
 }
 
-// ── 1. reports/codex-implementation.md ───────────────────────────────────────
-
 header("1. reports/codex-implementation.md");
 
 const implExists = fs.existsSync(IMPLEMENTATION_FILE);
-check(implExists, "File exists", "File MISSING — Codex did not write the implementation report");
+check(implExists, "File exists", "File missing - Codex did not write the implementation report");
 
 if (implExists) {
   const implText = fs.readFileSync(IMPLEMENTATION_FILE, "utf8").trim();
@@ -85,25 +86,23 @@ if (implExists) {
     check(
       implText.includes(section),
       `Contains required section: "${section}"`,
-      `MISSING required section: "${section}" — pipeline-watcher will reject this report`,
+      `Missing required section: "${section}" - pipeline-watcher will reject this report`,
     );
   }
 }
 
-// ── 2. reports/codex-implementation.meta.json ────────────────────────────────
-
 header("2. reports/codex-implementation.meta.json");
 
 const metaExists = fs.existsSync(IMPLEMENTATION_META_FILE);
-check(metaExists, "File exists", "File MISSING — pipeline will re-run Codex on next watcher tick");
+check(metaExists, "File exists", "File missing - pipeline will re-run Codex on next watcher tick");
 
 if (metaExists) {
   let meta;
   try {
-    meta = JSON.parse(fs.readFileSync(IMPLEMENTATION_META_FILE, "utf8").replace(/^﻿/, ""));
+    meta = readJsonFile(IMPLEMENTATION_META_FILE);
     check(true, "Valid JSON", "");
   } catch {
-    fail("Invalid JSON — file is corrupt");
+    fail("Invalid JSON - file is corrupt");
     failCount++;
     meta = null;
   }
@@ -125,45 +124,40 @@ if (metaExists) {
       "Missing 'written_at'",
     );
 
-    // Verify plan_hash matches the current plan file.
     if (fs.existsSync(PLAN_FILE)) {
       const { createHash } = await import("node:crypto");
       const planHash = createHash("sha256").update(fs.readFileSync(PLAN_FILE)).digest("hex");
       check(
         meta.plan_hash === planHash,
         "plan_hash matches current reports/codex-plan.md",
-        `plan_hash MISMATCH — meta has ${meta.plan_hash.slice(0, 8)}… but plan is ${planHash.slice(0, 8)}…`,
+        `plan_hash mismatch - meta has ${meta.plan_hash.slice(0, 8)}... but plan is ${planHash.slice(0, 8)}...`,
       );
     }
   }
 }
-
-// ── 3. reports/.codex-implementation-failed.json (should NOT exist) ──────────
 
 header("3. reports/.codex-implementation-failed.json (must be absent for success)");
 
 const failedExists = fs.existsSync(FAILED_FILE);
 check(
   !failedExists,
-  "Failure sentinel absent — no recorded failure",
-  "Failure sentinel present — pipeline recorded a failure: " +
+  "Failure sentinel absent - no recorded failure",
+  "Failure sentinel present - pipeline recorded a failure: " +
     (failedExists ? JSON.parse(fs.readFileSync(FAILED_FILE, "utf8")).reason : ""),
 );
-
-// ── 4. Workflow state ─────────────────────────────────────────────────────────
 
 header("4. .smc-workflow-state.json");
 
 const stateExists = fs.existsSync(STATE_FILE);
-check(stateExists, "Workflow state file exists", "Workflow state file MISSING");
+check(stateExists, "Workflow state file exists", "Workflow state file missing");
 
 if (stateExists) {
   let state;
   try {
-    state = JSON.parse(fs.readFileSync(STATE_FILE, "utf8").replace(/^﻿/, ""));
+    state = readWorkflowState(STATE_FILE, { autoRepair: true });
     check(true, "Valid JSON", "");
   } catch {
-    fail("Invalid JSON — self-repair required");
+    fail("Invalid JSON - self-repair required");
     failCount++;
     state = null;
   }
@@ -178,27 +172,26 @@ if (stateExists) {
   }
 }
 
-// ── Summary ───────────────────────────────────────────────────────────────────
-
 console.log("");
 if (failCount === 0) {
-  console.log("All checks passed — implementation artifacts are valid.");
+  console.log("All checks passed - implementation artifacts are valid.");
   process.exit(0);
-} else {
-  console.error(`${failCount} check(s) failed.`);
-  console.error("");
-  console.error("Common causes and fixes:");
-  console.error("  • 'Codex implementation finished without reports/codex-implementation.md'");
-  console.error("    → Codex ran successfully but skipped step 9 (write implementation summary).");
-  console.error("    → Fix: write reports/codex-implementation.md manually with all 7 required");
-  console.error(
-    "      sections, then set .smc-workflow-state.json state to IMPLEMENTATION_COMPLETE.",
-  );
-  console.error("  • plan_hash mismatch");
-  console.error("    → The plan was modified after Codex wrote its meta. Re-run validation or");
-  console.error("      delete reports/codex-implementation.meta.json and let the watcher retry.");
-  console.error("  • Failure sentinel present");
-  console.error("    → Delete reports/.codex-implementation-failed.json to allow the watcher to");
-  console.error("      retry, or advance the state manually after confirming the work is done.");
-  process.exit(1);
 }
+
+console.error(`${failCount} check(s) failed.`);
+console.error("");
+console.error("Common causes and fixes:");
+console.error("  - 'Codex implementation finished without reports/codex-implementation.md'");
+console.error("    Fix: write reports/codex-implementation.md with all 7 required sections.");
+console.error(
+  "    Then let the watcher advance state from READY_FOR_IMPLEMENTATION automatically.",
+);
+console.error("  - plan_hash mismatch");
+console.error(
+  "    Fix: re-run validation or delete reports/codex-implementation.meta.json and let the watcher retry.",
+);
+console.error("  - Failure sentinel present");
+console.error(
+  "    Fix: delete reports/.codex-implementation-failed.json or let the watcher observe the next valid implementation cycle.",
+);
+process.exit(1);

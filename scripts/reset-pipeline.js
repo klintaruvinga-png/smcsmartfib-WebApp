@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readWorkflowState, writeWorkflowState } from "./workflow-state.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,19 +16,6 @@ const PLAN_FILE = path.join(REPORTS_DIR, "codex-plan.md");
 const PLAN_METADATA_FILE = path.join(REPORTS_DIR, "codex-plan.meta.json");
 const IMPLEMENTATION_FILE = path.join(REPORTS_DIR, "codex-implementation.md");
 const IMPLEMENTATION_METADATA_FILE = path.join(REPORTS_DIR, "codex-implementation.meta.json");
-
-function readJson(filePath) {
-  try {
-    const raw = fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-function writeJson(filePath, value) {
-  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
-}
 
 function buildArchiveTimestamp() {
   return new Date().toISOString().replace(/[:.]/g, "-");
@@ -99,7 +87,7 @@ function archiveArtifactsForManualReset(state) {
 }
 
 function markIdle(reason) {
-  writeJson(STATE_FILE, {
+  writeWorkflowState(STATE_FILE, {
     state: "IDLE",
     idled_at: new Date().toISOString(),
     idle_reason: reason,
@@ -110,7 +98,9 @@ function main() {
   fs.mkdirSync(REPORTS_DIR, { recursive: true });
   fs.mkdirSync(ARCHIVE_DIR, { recursive: true });
 
-  const state = readJson(STATE_FILE);
+  const state = fs.existsSync(STATE_FILE)
+    ? readWorkflowState(STATE_FILE, { autoRepair: true, snapshotDir: ARCHIVE_DIR })
+    : null;
   if (state) {
     console.log(`[reset-pipeline] Current state: ${state.state}`);
     if (state.issue) {
