@@ -109,7 +109,7 @@ The fix relies on `SymbolInfoTick()` returning the most recent market tick from 
 - [x] Module-level `g_symArray[]` / `g_symCount` populated in `OnInit()`
 - [x] `OnTimer()` iterates all non-chart symbols and calls `engine.OnTick()` via `SymbolInfoTick()`
 - [x] Chart symbol excluded from `OnTimer()` loop (already handled by `OnTick()`)
-- [ ] All `Symbols[]` subscribed via `SymbolSelect()` in `OnInit()` (recommended follow-up)
+- [x] All `Symbols[]` subscribed via `SymbolSelect()` in `OnInit()` (implemented 2026-05-27 in `SMC_MarketDataEA.mq5`; live Journal verification still tracked separately)
 - [ ] Live EA deployment confirms LIVE state for all 6 default symbols
 - [ ] PHP `/health` endpoint shows `priceFeed: 'live'` with all symbols fresh
 - [ ] Dashboard Live Radar shows correct freshness for all watched symbols

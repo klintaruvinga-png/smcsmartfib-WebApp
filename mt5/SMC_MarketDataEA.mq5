@@ -197,6 +197,20 @@ int OnInit()
         return INIT_FAILED;
     }
 
+    for (int i = 0; i < g_symCount; i++)
+    {
+        ResetLastError();
+        bool selected = SymbolSelect(g_symArray[i], true);
+        if (selected)
+        {
+            Print("[SymbolSelect] ", g_symArray[i], ": OK");
+        }
+        else
+        {
+            Print("[SymbolSelect] ", g_symArray[i], ": WARN broker unavailable | error=", GetLastError());
+        }
+    }
+
     // Build the full auth header line - engine stores and reuses it.
     // Header name MUST match what PHP reads: get_header('x_ea_api_key')
     string auth = "";
