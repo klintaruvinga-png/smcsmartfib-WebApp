@@ -142,10 +142,12 @@ export function useStableUserTrades() {
     source: typeof tradesQuery.data;
     pollMs: number | null;
     data: typeof tradesQuery.data;
+    dataUpdatedAt: number;
   }>({
     source: undefined,
     pollMs: null,
     data: undefined,
+    dataUpdatedAt: 0,
   });
 
   if (tradesQuery.data == null) {
@@ -156,10 +158,12 @@ export function useStableUserTrades() {
       source: tradesQuery.data,
       pollMs,
       data: tradesQuery.data,
+      dataUpdatedAt: tradesQuery.dataUpdatedAt,
     };
   } else if (
     continuitySnapshotRef.current.source !== tradesQuery.data ||
-    continuitySnapshotRef.current.pollMs !== pollMs
+    continuitySnapshotRef.current.pollMs !== pollMs ||
+    continuitySnapshotRef.current.dataUpdatedAt !== tradesQuery.dataUpdatedAt
   ) {
     const reconciled = reconcileUserTrades(
       continuityRef.current,
@@ -172,6 +176,7 @@ export function useStableUserTrades() {
       source: tradesQuery.data,
       pollMs,
       data: reconciled.data,
+      dataUpdatedAt: tradesQuery.dataUpdatedAt,
     };
   }
 
