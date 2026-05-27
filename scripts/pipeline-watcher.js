@@ -960,22 +960,37 @@ function readState() {
     const message = error instanceof Error ? error.message : String(error);
     log(`Invalid workflow state file: ${message}`);
 
-    // Self-repair: strip trailing garbage after the last closing brace.
-    // Known corruption pattern: tool-call XML or editor artefacts (e.g.
-    // "</content><parameter ...>") written after the valid JSON object —
-    // causes SyntaxError at position N and stalls the watcher indefinitely.
+    // Self-repair: extract the first complete JSON object from the file.
+    //
+    // Known corruption pattern 1: tool-call XML or editor artefacts (e.g.
+    // "</content><parameter ...>") written after the valid JSON object.
+    //
+    // Known corruption pattern 2: multiple JSON objects concatenated in one file —
+    // e.g. when Copilot prepends a new PLANNING/RESEARCHING block without fully
+    // overwriting the previous IDLE block. lastIndexOf("}") would include both
+    // objects and JSON.parse would still fail. Brace-depth extraction reliably
+    // captures only the first object regardless of what follows it.
     try {
       const raw = fs.readFileSync(STATE_FILE, "utf8").replace(/^﻿/, "");
-      const lastBrace = raw.lastIndexOf("}");
-      if (lastBrace !== -1) {
-        const trimmed = raw.slice(0, lastBrace + 1);
-        const recovered = JSON.parse(trimmed);
-        const trailingBytes = raw.length - lastBrace - 1;
-        log(
-          `Workflow state self-repaired: removed ${trailingBytes} bytes of trailing garbage — rewriting clean JSON`,
-        );
-        writeJson(STATE_FILE, recovered);
-        return recovered;
+      const start = raw.indexOf("{");
+      if (start !== -1) {
+        let depth = 0;
+        for (let i = start; i < raw.length; i++) {
+          if (raw[i] === "{") depth++;
+          else if (raw[i] === "}") {
+            depth--;
+            if (depth === 0) {
+              const firstObject = raw.slice(start, i + 1);
+              const recovered = JSON.parse(firstObject);
+              const trailingBytes = raw.length - (i + 1);
+              log(
+                `Workflow state self-repaired: extracted first JSON object (${trailingBytes} trailing bytes discarded) — rewriting clean JSON`,
+              );
+              writeJson(STATE_FILE, recovered);
+              return recovered;
+            }
+          }
+        }
       }
     } catch {
       // Recovery failed — original error already logged above
@@ -1629,6 +1644,61 @@ function cleanupStopBranch(issueSlug) {
   }
 }
 
+// Detects when Copilot has written a new research file while the pipeline is already
+// past the planning phase (READY_FOR_IMPLEMENTATION / IMPLEMENTATION_COMPLETE /
+// IMPLEMENTATION_FAILED). A changed research hash compared to what plan metadata
+// recorded means a new issue cycle started — the old cycle should be treated as
+// complete. Archives old artifacts and resets state to RESEARCHING so the fresh
+// research flows cleanly through plan hardening and implementation.
+//
+// NOT triggered for IDLE, RESEARCHING, or PLANNING states:
+//   IDLE        — the pipeline is already waiting for a new cycle.
+//   RESEARCHING — a new research write is expected and normal.
+//   PLANNING    — hasUsablePlanArtifactForState() already detects hash mismatches
+//                 and re-runs Claude plan hardening automatically.
+function checkForResearchCycleChange(state) {
+  if (!state || !fs.existsSync(RESEARCH_FILE)) {
+    return false;
+  }
+
+  if (
+    state.state === "IDLE" ||
+    state.state === "RESEARCHING" ||
+    state.state === "PLANNING"
+  ) {
+    return false;
+  }
+
+  const planMeta = readPlanMetadata();
+  if (!planMeta || planMeta.issue !== (state.issue ?? "")) {
+    return false;
+  }
+
+  let currentResearchHash;
+  try {
+    currentResearchHash = hashFile(RESEARCH_FILE);
+  } catch {
+    return false;
+  }
+
+  if (planMeta.research_hash === currentResearchHash) {
+    return false;
+  }
+
+  log(
+    `New research cycle detected for issue "${state.issue}": research hash changed — archiving old cycle and restarting from RESEARCHING`,
+  );
+  const issueSlug = slugifyIssue(state.issue || "pipeline-issue");
+  archiveCycleArtifacts(issueSlug);
+  clearImplementationFailedState();
+  writeJson(STATE_FILE, {
+    state: "RESEARCHING",
+    issue: state.issue,
+    started_at: new Date().toISOString(),
+  });
+  return true;
+}
+
 function evaluatePipeline() {
   // Check for a manual reset request first — this takes priority over all other
   // state handling so that a stuck IMPLEMENTATION_FAILED cycle can always be cleared.
@@ -1644,6 +1714,12 @@ function evaluatePipeline() {
 
   const state = readState();
   if (!state) {
+    return;
+  }
+
+  // If Copilot has written a new research file while we are in a post-planning state,
+  // the previous cycle is implicitly complete. Archive it and restart from RESEARCHING.
+  if (checkForResearchCycleChange(state)) {
     return;
   }
 
@@ -1741,6 +1817,19 @@ function evaluatePipeline() {
   }
 
   if (state.state === "IDLE") {
+    // If a fresh research file appeared after we idled, log a hint. The pipeline cannot
+    // auto-advance without a known issue title — that requires the state file to be
+    // updated externally (by Copilot or the user) with state RESEARCHING and the new issue.
+    if (fs.existsSync(RESEARCH_FILE)) {
+      const idledAt = Date.parse(state.idled_at ?? "");
+      const researchMtime = statMtime(RESEARCH_FILE);
+      if (!Number.isFinite(idledAt) || researchMtime > idledAt) {
+        log(
+          "IDLE — fresh research file detected (newer than last idle timestamp); waiting for workflow state to advance to RESEARCHING",
+        );
+        return;
+      }
+    }
     log("Pipeline idle - waiting for new /research-and-plan issue");
     return;
   }

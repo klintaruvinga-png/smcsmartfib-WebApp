@@ -1,124 +1,62 @@
-# SMC SuperFIB - EA Compile Errors: Research Report
+# SMC Intake — Active Book stream flicker research
 
-**Date:** 2026-05-26
-**Issue:** SMC Intake - Fix EA compile errors
+**Date:** 2026-05-27
 
----
+### 1. Issue classification
+- Severity: HIGH
+- Category: stale-data / wiring
+- Layer(s) affected: Dashboard-JS / REST-API / PHP-backend
+- Phase impact: Phase 0
 
-## 1. Issue classification
+### 2. Confirmed evidence
+- `src/hooks/useSniperData.ts` — separate queries: `useSnapshot()` (calls `apiClient.getSnapshot()`) and `useUserTrades()` (calls `apiClient.getUserTrades()`). Code contains explicit comments and logic that attempt to prevent flicker (e.g. `alignWatchlist`, `invalidateWatchlistQueries`) and a noted comment: "Account chip to flicker off and back on." (see watchlist mutation/invalidation logic).
+- `src/lib/api/sniperClient.ts` and `sdk/src/client/SniperClient.ts` — backend surface shows distinct endpoints: `/snapshot` and `/user/trades` (internally `/positions` + `/orders`). Both use `cacheBust: true` on GETs; responses are normalized independently.
+- `src/hooks/useStreamingTicks.ts` — UI-level mitigation that desynchronizes polled numeric values into sub-ticks (intended to reduce poll strobe), indicating the UI already compensates for coarse polling cadence.
+- `src/routes/-book.page.tsx` — rendering of the Active Book derives `positions` from `useUserTrades()` while also consulting `snap?.prices.find(...)` and marking groups `stale` when snapshot data is stale; the page will show/hide pieces based on these two sources.
+- Tests: `src/hooks/useSniperData.test.tsx` contains polling tests and explicit expectations about refresh cadence and canonical settings behaviour.
 
-- **Severity:** LOW (historical; all errors already resolved in prior PRs)
-- **Category:** MT5 EA MQL5 compilation
-- **Layer(s) affected:** mt5/ (EA and include files)
-- **Phase impact:** Phase 1 / Phase 5-9 pre-implementation
+### 3. Root cause hypothesis
+- Most likely root cause: UI and backend use separate, independently-updated endpoints (`/snapshot` vs `/user/trades`), and the UI logic mixes them as joint signals for rendering the Active Book. When one endpoint's response set (prices/snapshot) does not include a symbol immediately while the trades endpoint does (or vice versa), components briefly treat the symbol as missing/stale and re-render, producing visible flicker or transient disappearance.
+  - Confirmed: endpoints are distinct and normalized separately in the client code (`Confirmed`).
+  - Hypothesis: backend responses are sparse or returned in different sequences/timings for different symbols (e.g. snapshot may omit a recently-updated symbol while positions endpoint includes it), creating a small race window where UI will hide then show the symbol (`Hypothesis`).
+  - Hypothesis: UI invalidation/refetch ordering (cancel -> setQueryData -> invalidate -> refetch) introduces short states where canonical data is replaced or missing, especially around watchlist mutations and rapid poll cycles (`Hypothesis`).
 
----
+### 4. Blast radius
+- Frontend files: `src/hooks/useSniperData.ts`, `src/hooks/useStreamingTicks.ts`, `src/routes/-book.page.tsx`, `src/components/sniper/*` (FreshnessBadge, Warnings, Account chip UI).
+- API client surfaces: `src/lib/api/sniperClient.ts`, `sdk/src/client/SniperClient.ts` and server endpoints `/snapshot`, `/positions` (or `/user/trades`).
+- Systems: Dashboard UI, Backend REST API (trade telemetry & market snapshot producers), any reconciliation jobs that assemble snapshots.
+- Parity surfaces at risk: Dashboard <-> Backend signal integrity (stale/live state propagation). Any downstream features that depend on snapshot presence for UI visibility (watchlist, chips, charts).
 
-## 2. Confirmed evidence
+### 5. Regression surface
+- Changing the canonical source-of-truth (e.g. making snapshot authoritative) could hide legitimate positions if backend snapshots intentionally omit symbols under load.
+- Weakening the existing watchlist mutation guards (which deliberately avoid immediately refetching `user-settings`) risks overwriting freshly-updated watchlist state and making UI flip symbols.
+- Streaming/animation code (`useStreamingTicks`) and motion-related UI rely on sampled values; altering their timing could harm perceived responsiveness.
+- Existing tests in `src/hooks/useSniperData.test.tsx` assert poll behaviour; they may fail if polling semantics change.
 
-### 2.1 Historical compile errors (all resolved)
+### 6. Resolution path options
+- Path A (narrow): Treat `user-trades` (positions) as the canonical source for the Active Book UI. Render positions directly from `useUserTrades()` without gating visibility on `snapshot` membership; keep `snapshot` only for price/freshness decoration and stale warnings. This preserves numeric thresholds and is minimal frontend change surface.
+- Path B (broader): Unify backend contract so `/snapshot` includes every symbol currently present in `/positions` (or provide a merged `/market-stream` that guarantees per-symbol coherence), or introduce a single server-driven stream (WebSocket/SSE) that merges trades + snapshot with per-symbol timestamps. This is larger but more robust.
+- Recommended: Path A — minimal, low-risk frontend change (render positions independent of snapshot presence) while asking backend to consider Path B for longer-term stream coherence.
 
-**PR #47 (merged 2026-05-03) — "fix: resolve all MQL5 compile errors"**
+### 7. Risk flags
+- High-risk system involved: Yes — dashboard/telemetry freshness affects user decisioning and perceived system health.
+- Requires parity re-validation: Yes — ensure dashboard visuals still match backend authority after change (validate engine snapshots and trades alignment).
+- Migration-blocking: No — this is a frontend/contract stability issue, not a migration gate.
+- Human review required before merge: Yes — reviewer should confirm which endpoint must be canonical and verify backend semantics for omitted symbols.
 
-| File | Error | Fix applied |
-|---|---|---|
-| `mt5/CandleBuilder.mqh` | `ArrayInitialize(currentCandles, 0)` — ArrayInitialize only supports scalar element types, not structs like MqlRates | Replaced with `ZeroMemory(currentCandles)` |
-| `mt5/FreshnessEngine.mqh` | `IsTerminalConnected()` returned `int` (TerminalInfoInteger), not `bool` — "expression not boolean" compile error | Changed to `return TerminalInfoInteger(...) != 0` |
-| `mt5/SymbolNormalizer.mqh` | `StringGetChar()` removed in MQL5 build 2000+ — caused "function not defined" error | Replaced with `StringGetCharacter()`; added `(uchar)` cast to eliminate "possible loss of data" warning |
-
-**PR #206 (merged 2026-05-19) — "fix(ea): add missing HeartbeatIntervalTicks input"**
-
-| File | Error | Fix applied |
-|---|---|---|
-| `mt5/SMC_MarketDataEA.mq5` | `HeartbeatIntervalTicks` referenced in `OnInit()` (line 224) but never declared as `input int` — caused MQL5 compiler error on any recompile | Added `input int HeartbeatIntervalTicks = 6;` to the inputs block; preserves 60s heartbeat cadence (6 × 10s timer cycles) |
-
-### 2.2 Current state of EA files
-
-- `npm run check:mql` (node `mt5/check-mql-includes.mjs`) → **MQL include verification passed**
-- All MQL5 include chains are intact: `SMC_MarketDataEA.mq5` → `TickProcessor.mqh`, `CandleBuilder.mqh`, `SessionManager.mqh`, `FreshnessEngine.mqh`, `SymbolNormalizer.mqh`, `MarketDataEngine.mqh`
-- No dangling includes, no missing files
-
-### 2.3 Phase 5-9 new engines (not yet included in main EA)
-
-The following files were added in PR #240 (Phase 5-9 pre-implementation):
-
-- `mt5/FibEngine.mqh` — 16-ratio fib computation
-- `mt5/RegimeEngine.mqh` — EMA/ATR regime classification (TRENDING/RANGING/CHOP)
-- `mt5/SignalEngine.mqh` — signal candidate evaluation, depends on FibEngine
-- `mt5/ExecutionEngine.mqh` — execution queue fetcher and order dispatch
-
-**None of these files are `#include`d in `SMC_MarketDataEA.mq5`** — they are pre-implemented stubs awaiting Phase 5-9 activation. Their absence from the main EA `#include` chain means they cannot introduce compile errors in the current EA binary.
-
-Static const double members in `RegimeEngine` and `SignalEngine` use the correct MQL5 out-of-class definition pattern (e.g. `static const double RegimeEngine::TREND_THRESHOLD = 0.8;` placed after the class body). No compile issue.
-
-### 2.4 MQL check tool coverage
-
-`mt5/check-mql-includes.mjs` validates that every `#include` reference in all `.mq5` and `.mqh` files resolves to an existing file. It does not perform full MetaTrader compilation. No MetaTrader terminal is available in this environment, so terminal-level compile verification is not possible.
-
----
-
-## 3. Root cause
-
-All EA compile errors that existed as of the original issue report were:
-- Resolved in PR #47 (ArrayInitialize struct, StringGetChar, IsTerminalConnected)
-- Resolved in PR #206 (missing HeartbeatIntervalTicks input declaration)
-
-The current codebase is clean. No new compile errors were introduced by the Phase 5-9 pre-implementation because those engines are not yet wired into the main EA.
-
-**Likely cause of this issue being re-raised:** The pipeline artifact files (`reports/copilot-research.md`, `reports/codex-plan.md`) were not refreshed between cycles. The plan file still contained a crypto weekend session classification contract from a prior cycle, which explicitly excluded EA compile errors — causing a contract conflict stop. The `.smc-workflow-state.json` pipeline state file is not committed to the repository, so container clones always start stateless, leaving stale artifacts in place.
-
----
-
-## 4. Blast radius
-
-- No code changes required.
-- Only pipeline artifact files need to be refreshed.
-
----
-
-## 5. Regression surface
-
-No code touched. Existing checks continue to pass:
-- `npm run check:mql` — MQL include verification passed
-- `npm run build` — frontend build unaffected
-- All prior MT5 session/freshness fixes (PRs #47, #206, #224, #228) remain in main
-
----
-
-## 6. Resolution path
-
-**Path A (selected): Document resolution, close cycle**
-
-All EA compile errors are already fixed. Write a corrected implementation contract (`codex-plan.md`) that scopes this cycle as a verification/closure pass with no code changes. Write a closure implementation report. Advance the pipeline.
-
-No code changes to any MT5 files, PHP files, or frontend files.
-
----
-
-## 7. Risk flags
-
-- **High-risk system involved:** No — no code changes.
-- **Requires parity re-validation:** No.
-- **Migration-blocking:** No.
-- **Human review required before merge:** No — documentation-only fix.
-
----
-
-## 8. Handoff package
-
-### 8.1 Evidence files to reference
-
-- `mt5/SMC_MarketDataEA.mq5` — main EA, inputs block, `#include` chain
-- `mt5/CandleBuilder.mqh`, `mt5/FreshnessEngine.mqh`, `mt5/SymbolNormalizer.mqh` — historical error sites, all patched
-- GitHub PR #47, PR #206 — prior compile-error fix history
-
-### 8.2 Inputs for plan
-
-1. Verify `npm run check:mql` still passes — confirmed: "MQL include verification passed"
-2. Confirm no new `#include` lines added to `SMC_MarketDataEA.mq5` referencing Phase 5-9 engines — confirmed: none
-3. Confirm all historical error patterns are absent from current files — confirmed
-
-### 8.3 Open unknowns
-
-- Terminal-side full MetaTrader compile is not verifiable in this environment. A human should confirm compilation in MetaTrader after any future EA file changes.
-- Phase 5-9 engine activation (wiring into the main EA) will require a new compile verification cycle at that time.
+### 8. Handoff package
+- Epicentre files to inspect first:
+  - `src/hooks/useSniperData.ts`
+  - `src/routes/-book.page.tsx`
+  - `src/lib/api/sniperClient.ts`
+  - `sdk/src/client/SniperClient.ts`
+  - `src/hooks/useStreamingTicks.ts`
+- Inputs Codex must verify before planning:
+  1. Backend behaviour for `/snapshot` and `/user/trades` — can `/snapshot` intentionally omit symbols and under what conditions?
+  2. Timestamps/freshness semantics returned by both endpoints (per-symbol `updated_at` / `freshness` fields).
+  3. Any server-side aggregation that could cause `/positions` to lag `/snapshot` or vice versa.
+  4. Reproduction logs showing a poll timeline (ordered request/response times) for `/snapshot` and `/user/trades` during a flicker event.
+- Open unknowns that could invalidate the hypothesis:
+  - Whether the backend deliberately prunes snapshot symbol lists under load (if so, Path A might be required).
+  - Whether client-side cache or query cancellation timing produces the visible gaps independent of backend content.
+  - Whether there are other UI components mutating the watchlist or query cache concurrently (race conditions).
