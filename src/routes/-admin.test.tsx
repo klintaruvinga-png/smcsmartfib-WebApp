@@ -352,6 +352,21 @@ describe("AdminPage", () => {
     apiMocks.fetchAdminHealth.mockResolvedValue(partialHealth);
     apiMocks.fetchSoakReport.mockResolvedValue(report);
 
+    if (!("createObjectURL" in URL)) {
+      Object.defineProperty(URL, "createObjectURL", {
+        writable: true,
+        configurable: true,
+        value: vi.fn(),
+      });
+    }
+    if (!("revokeObjectURL" in URL)) {
+      Object.defineProperty(URL, "revokeObjectURL", {
+        writable: true,
+        configurable: true,
+        value: vi.fn(),
+      });
+    }
+
     const createObjectURLSpy = vi
       .spyOn(URL, "createObjectURL")
       .mockReturnValue("blob:smc-admin-health-report");
