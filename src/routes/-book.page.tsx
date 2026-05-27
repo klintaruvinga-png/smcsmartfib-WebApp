@@ -1,4 +1,4 @@
-import { useUserTrades, useSnapshot, usePollingUiState } from "@/hooks/useSniperData";
+import { useStableUserTrades, useSnapshot, usePollingUiState } from "@/hooks/useSniperData";
 import { SettingsQueryErrorState } from "@/components/sniper/SettingsQueryErrorState";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { WarningLine } from "@/components/sniper/Warnings";
@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import type { Position } from "@/types/sniper";
 
 export function BookPage() {
-  const { data: trades, isLoading, error } = useUserTrades();
+  const { data: trades, isLoading, error } = useStableUserTrades();
   const { data: snap } = useSnapshot();
   const {
     pendingSettingsLoad,
@@ -80,7 +80,9 @@ export function BookPage() {
           const symbol = posList[0]?.symbol ?? groupKey;
           const direction = posList[0]?.direction ?? "LONG";
           const snapPair = snap?.prices.find((p) => p.symbol === symbol);
-          const stale = posList.some((p) => p.state === "stale") || snapPair?.state === "stale";
+          const tradeStale = posList.some((p) => p.state === "stale");
+          const stale = tradeStale || snapPair?.state === "stale";
+          const groupState = tradeStale ? "stale" : (snapPair?.state ?? "unavailable");
           const groupPnl = posList.reduce((s, p) => s + p.pnlUSC, 0);
           return (
             <div key={groupKey} className="rounded-lg border border-bd bg-bg1/60 overflow-hidden">
@@ -105,7 +107,7 @@ export function BookPage() {
                   >
                     {fmtUSC(groupPnl, true)}
                   </span>
-                  {snapPair && <FreshnessBadge state={snapPair.state} />}
+                  <FreshnessBadge state={groupState} />
                 </div>
               </div>
               {stale && (

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useUserTrades } from "@/hooks/useSniperData";
+import { useStableUserTrades } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { WarningLine } from "@/components/sniper/Warnings";
 import { fmtPrice, relTime } from "@/lib/format";
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/orders")({
 });
 
 export function OrdersPage() {
-  const { data: trades, isLoading, error } = useUserTrades();
+  const { data: trades, isLoading, error } = useStableUserTrades();
   const orders = trades?.orders ?? [];
 
   if (isLoading) {
@@ -55,6 +55,12 @@ export function OrdersPage() {
       <div className="space-y-4">
         {Object.entries(grouped).map(([symbol, list]) => {
           const pending = list.some((o) => o.state === "pending-sync");
+          const stale = list.some((o) => o.state === "stale");
+          const groupState = pending
+            ? "pending-sync"
+            : stale
+              ? "stale"
+              : (list[0]?.state ?? "unavailable");
           return (
             <div key={symbol} className="rounded-lg border border-bd bg-bg1/60 overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2.5 border-b border-bd bg-bg2/30">
@@ -64,12 +70,14 @@ export function OrdersPage() {
                     {list.length} order{list.length > 1 ? "s" : ""}
                   </span>
                 </div>
-                <FreshnessBadge state={pending ? "pending-sync" : list[0].state} />
+                <FreshnessBadge state={groupState} />
               </div>
-              {pending && (
+              {(pending || stale) && (
                 <div className="px-4 py-2 border-b border-bd">
                   <WarningLine level="warn">
-                    {symbol} has orders not yet acknowledged by backend.
+                    {pending
+                      ? `${symbol} has orders not yet acknowledged by backend.`
+                      : `${symbol} order telemetry is being carried forward while backend confirmation catches up.`}
                   </WarningLine>
                 </div>
               )}

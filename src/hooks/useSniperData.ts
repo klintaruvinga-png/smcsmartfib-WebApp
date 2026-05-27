@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 import { apiClient, normalizeBackendUrl, setBackendUrl } from "@/lib/api/sniperClient";
+import { reconcileUserTrades, type TradeContinuityState } from "@/lib/tradeContinuity";
 import type { DashboardSettings, Symbol, SymbolDiagnostic, TradePlan } from "@/types/sniper";
 
 const DEFAULT_POLL_MS = 2_000;
@@ -131,6 +132,53 @@ export function useUserTrades() {
     enabled,
     refetchInterval: enabled ? pollMs : false,
   });
+}
+
+export function useStableUserTrades() {
+  const tradesQuery = useUserTrades();
+  const pollMs = usePollMs();
+  const continuityRef = useRef<TradeContinuityState | null>(null);
+  const continuitySnapshotRef = useRef<{
+    source: typeof tradesQuery.data;
+    pollMs: number | null;
+    data: typeof tradesQuery.data;
+  }>({
+    source: undefined,
+    pollMs: null,
+    data: undefined,
+  });
+
+  if (tradesQuery.data == null) {
+    if (tradesQuery.error) {
+      continuityRef.current = null;
+    }
+    continuitySnapshotRef.current = {
+      source: tradesQuery.data,
+      pollMs,
+      data: tradesQuery.data,
+    };
+  } else if (
+    continuitySnapshotRef.current.source !== tradesQuery.data ||
+    continuitySnapshotRef.current.pollMs !== pollMs
+  ) {
+    const reconciled = reconcileUserTrades(
+      continuityRef.current,
+      tradesQuery.data,
+      Date.now(),
+      pollMs ?? DEFAULT_POLL_MS,
+    );
+    continuityRef.current = reconciled.state;
+    continuitySnapshotRef.current = {
+      source: tradesQuery.data,
+      pollMs,
+      data: reconciled.data,
+    };
+  }
+
+  return {
+    ...tradesQuery,
+    data: continuitySnapshotRef.current.data,
+  };
 }
 
 export function useUserAccount() {

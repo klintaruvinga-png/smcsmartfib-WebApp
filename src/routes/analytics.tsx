@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   useAccountTelemetry,
   useUserAccount,
-  useUserTrades,
+  useStableUserTrades,
   useUserRiskProfile,
 } from "@/hooks/useSniperData";
 import { mockEquityCurve } from "@/mocks/sniperData";
@@ -30,13 +30,16 @@ export const Route = createFileRoute("/analytics")({
 export function AnalyticsPage() {
   const { data: accountTelemetry, error: accountTelemetryError } = useAccountTelemetry();
   const { data: account } = useUserAccount();
-  const { data: trades, error: tradesError } = useUserTrades();
+  const { data: trades, error: tradesError } = useStableUserTrades();
   const { data: risk } = useUserRiskProfile();
 
   if (!risk) return null;
 
   const positions = trades?.positions ?? [];
   const floatingPnl = positions.reduce((s, p) => s + p.pnlUSC, 0);
+  const tradeTelemetryState = positions.some((position) => position.state === "stale")
+    ? "stale"
+    : (accountTelemetry?.state ?? "unavailable");
   const ddRatio = (account?.drawdownPct ?? 0) / risk.ddCapPct;
   const equityCurveData = MOCK_MODE ? mockEquityCurve : null;
   const telemetryUnavailable =
@@ -131,7 +134,7 @@ export function AnalyticsPage() {
               : `${positions.length} positions`
           }
           tone={floatingPnl >= 0 ? "buy" : "sell"}
-          state={accountFreshness}
+          state={telemetryUnavailable ? "unavailable" : tradeTelemetryState}
         />
         <Stat
           label="Margin used"

@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const hookMocks = vi.hoisted(() => ({
-  useUserTrades: vi.fn(),
+  useStableUserTrades: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-router", async (importOriginal) => {
@@ -16,7 +16,7 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
 });
 
 vi.mock("@/hooks/useSniperData", () => ({
-  useUserTrades: hookMocks.useUserTrades,
+  useStableUserTrades: hookMocks.useStableUserTrades,
 }));
 
 import { OrdersPage } from "./orders";
@@ -27,7 +27,7 @@ describe("OrdersPage", () => {
   });
 
   it("shows a degraded state when backend order telemetry is unreachable", () => {
-    hookMocks.useUserTrades.mockReturnValue({
+    hookMocks.useStableUserTrades.mockReturnValue({
       data: undefined,
       isLoading: false,
       error: new Error("orders unavailable"),
@@ -41,7 +41,7 @@ describe("OrdersPage", () => {
   });
 
   it("renders backend-owned pending orders from the positions/orders telemetry feed", () => {
-    hookMocks.useUserTrades.mockReturnValue({
+    hookMocks.useStableUserTrades.mockReturnValue({
       data: {
         positions: [],
         orders: [
@@ -69,5 +69,34 @@ describe("OrdersPage", () => {
     expect(screen.getByText("EURUSD")).toBeTruthy();
     expect(screen.getByText("LONG")).toBeTruthy();
     expect(screen.getByText("LIMIT")).toBeTruthy();
+  });
+
+  it("keeps stale carried-forward orders visible through a transient gap", () => {
+    hookMocks.useStableUserTrades.mockReturnValue({
+      data: {
+        positions: [],
+        orders: [
+          {
+            id: "ord-1",
+            symbol: "EURUSD",
+            direction: "LONG",
+            type: "LIMIT",
+            price: 1.08,
+            lots: 0.25,
+            sl: 1.075,
+            tp: 1.09,
+            placedAt: "2026-05-20T10:00:00Z",
+            state: "stale",
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    render(<OrdersPage />);
+
+    expect(screen.queryByText("No pending orders.")).toBeNull();
+    expect(screen.getByText("STALE")).toBeTruthy();
   });
 });
