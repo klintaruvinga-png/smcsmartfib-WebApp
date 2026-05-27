@@ -1,0 +1,21 @@
+{
+  "snapshot_type": "PRE-PATCH",
+  "workflow_id": "stabilize-ea-2026-05-27",
+  "timestamp": "2026-05-27T00:02:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-nah1v",
+    "commit_hash": "477a5acdd2b7988944a5f9480e1fecf41207e828"
+  },
+  "patches_planned": [
+    {
+      "id": "PATCH-001",
+      "description": "Fix 3 prettier formatting errors: sniperClient.ts inline return type, -admin.test.tsx trailing comma inconsistencies",
+      "files": [
+        "src/lib/api/sniperClient.ts",
+        "src/routes/-admin.test.tsx"
+      ],
+      "method": "npx eslint --fix",
+      "risk": "LOW — formatting only, no logic change"
+    }
+  ]
+}
