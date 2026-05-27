@@ -72,12 +72,34 @@ const STOP_BEFORE_PATCH_PATTERNS = [
 const MAX_HARDENING_RETRIES = 3;
 const HARDENING_RETRY_INTERVAL_MS = 5 * 60 * 1000; // 5 min
 
-// On Windows, execSync with shell:true spawns cmd.exe which is blocked with EPERM
-// in detached background processes (the job object created by start-pipeline-runner.js
-// restricts child process creation for cmd.exe). This function finds the native
-// Codex CLI binary so it can be called directly via execFileSync — no shell required.
+// Centralize the Codex executable name so the watcher health check and runtime
+// invocations cannot drift. The implementation/report flows still use shell
+// commands because they rely on stdin redirection from a temp prompt file.
 function getCodexBinary() {
   return process.platform === "win32" ? "codex.cmd" : "codex";
+}
+
+function buildCodexCommand(args) {
+  return [`"${getCodexBinary()}"`, ...args].join(" ");
+}
+
+function buildCodexExecCommand(promptFile) {
+  return buildCodexCommand([
+    "exec",
+    "--json",
+    "--dangerously-bypass-approvals-and-sandbox",
+    "-C",
+    `"${REPO_ROOT}"`,
+    "-o",
+    `"${CODEX_OUTPUT_FILE}"`,
+    "-",
+    "<",
+    `"${promptFile}"`,
+  ]);
+}
+
+function buildCodexVersionCommand() {
+  return buildCodexCommand(["--version"]);
 }
 
 function isActivePhaseUpdatePath(filePath) {
@@ -1067,20 +1089,7 @@ function runCodexPlanHardening(state) {
     fs.writeFileSync(promptFile, prompt, "utf8");
 
     try {
-      const codexBin = getCodexBinary();
-      const cmd = [
-        `"${codexBin}"`,
-        "exec",
-        "--json",
-        "--dangerously-bypass-approvals-and-sandbox",
-        "-C",
-        `"${REPO_ROOT}"`,
-        "-o",
-        `"${CODEX_OUTPUT_FILE}"`,
-        "-",
-        "<",
-        `"${promptFile}"`,
-      ].join(" ");
+      const cmd = buildCodexExecCommand(promptFile);
 
       execSync(cmd, {
         cwd: REPO_ROOT,
@@ -1214,25 +1223,12 @@ function runCodexImplementation(state) {
     try {
       // execSync with shell:true lets Windows resolve codex.cmd and handle
       // the stdin redirect operator (<) without needing inheritable file descriptors.
-      const codexBin = process.platform === "win32" ? "codex.cmd" : "codex";
       // --json disables the interactive TUI so codex can run in a detached
       // background process (no console attached). Without it, codex crashes
       // immediately with STATUS_CONTROL_C_EXIT (0xC000013A) on Windows.
       // --dangerously-bypass-approvals-and-sandbox already disables the sandbox,
       // so --sandbox workspace-write is redundant and removed to avoid conflict.
-      const cmd = [
-        `"${codexBin}"`,
-        "exec",
-        "--json",
-        "--dangerously-bypass-approvals-and-sandbox",
-        "-C",
-        `"${REPO_ROOT}"`,
-        "-o",
-        `"${CODEX_OUTPUT_FILE}"`,
-        "-",
-        "<",
-        `"${promptFile}"`,
-      ].join(" ");
+      const cmd = buildCodexExecCommand(promptFile);
 
       execSync(cmd, {
         cwd: REPO_ROOT,
@@ -1347,20 +1343,7 @@ function runReportRecovery(state, issueSlug, prNumber) {
     const previousOutputMtime = statMtime(CODEX_OUTPUT_FILE);
 
     try {
-      const codexBin = process.platform === "win32" ? "codex.cmd" : "codex";
-      const cmd = [
-        `"${codexBin}"`,
-        "exec",
-        "--json",
-        "--dangerously-bypass-approvals-and-sandbox",
-        "-C",
-        `"${REPO_ROOT}"`,
-        "-o",
-        `"${CODEX_OUTPUT_FILE}"`,
-        "-",
-        "<",
-        `"${promptFile}"`,
-      ].join(" ");
+      const cmd = buildCodexExecCommand(promptFile);
 
       execSync(cmd, {
         cwd: REPO_ROOT,
@@ -1857,27 +1840,21 @@ function pollPipeline() {
 }
 
 function checkCodexAvailability() {
-  const testFile = path.join(REPO_ROOT, "reports", ".codex-invocation-test.tmp");
   try {
-    fs.writeFileSync(testFile, "", "utf8");
-    const codexBin = getCodexBinary();
-    const cmd = [`"${codexBin}"`, "--version"].join(" ");
-    execSync(cmd, {
+    const output = execSync(buildCodexVersionCommand(), {
       cwd: REPO_ROOT,
       shell: true,
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 10000,
       encoding: "utf8",
-    });
-    log(`Codex CLI health check passed (${codexBin})`);
+    }).trim();
+    log(`Codex CLI health check passed (${output || getCodexBinary()})`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log(`WARNING: Codex CLI health check failed - plan hardening will be blocked on PLANNING state`);
     log(`  Reason: ${message}`);
     log(`  Fix: ensure 'codex' CLI is installed and available on PATH`);
-  } finally {
-    removeFileIfExists(testFile);
   }
 }
 
@@ -1888,6 +1865,8 @@ function startPipelineWatcher() {
 }
 
 export {
+  buildCodexExecCommand,
+  buildCodexVersionCommand,
   isActivePhaseUpdatePath,
 };
 
