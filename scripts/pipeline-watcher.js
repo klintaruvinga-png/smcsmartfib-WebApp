@@ -489,13 +489,14 @@ function archiveArtifactsForManualReset(state) {
 
 // Copies completed cycle artifacts to reports/archive/<slug>-<ts>/ then removes
 // the originals so the next cycle starts with a clean slate.
-function archiveCycleArtifacts(issueSlug) {
+function archiveCycleArtifacts(issueSlug, options = {}) {
+  const { includeResearch = true } = options;
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
   const dest = path.join(ARCHIVE_DIR, `${issueSlug}-${ts}`);
   fs.mkdirSync(dest, { recursive: true });
 
   const artifacts = [
-    [RESEARCH_FILE, "copilot-research.md"],
+    ...(includeResearch ? [[RESEARCH_FILE, "copilot-research.md"]] : []),
     [PLAN_FILE, "codex-plan.md"],
     [PLAN_METADATA_FILE, "codex-plan.meta.json"],
     [IMPLEMENTATION_FILE, "codex-implementation.md"],
@@ -1689,7 +1690,7 @@ function checkForResearchCycleChange(state) {
     `New research cycle detected for issue "${state.issue}": research hash changed — archiving old cycle and restarting from RESEARCHING`,
   );
   const issueSlug = slugifyIssue(state.issue || "pipeline-issue");
-  archiveCycleArtifacts(issueSlug);
+  archiveCycleArtifacts(issueSlug, { includeResearch: false });
   clearImplementationFailedState();
   const researchMtimeIso = (() => {
     try {
