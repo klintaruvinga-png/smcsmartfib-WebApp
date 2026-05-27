@@ -1,35 +1,27 @@
 # Issue summary
 
-Admin soak baseline flow was hardcoded around Phase 0 and Phase 3 templates and treated baseline capture as a single-shot action. This blocked Phase 4 30-day soak selection and prevented operators from re-arming baseline capture for a new soak cycle from `/admin`.
+Stopped — the contract assumes a missing code-level route registration fix, but this repository already registers `DELETE /sniper/v1/admin/soak-reset` unconditionally while the live WordPress REST index still does not expose that route.
 
 # Root cause implemented
 
-Added `PHASE_4_30_DAY` to the typed soak registry and preserved that value through report inference and baseline hydration. Replaced the baseline lock with a local reset state that unlocks a new baseline capture without deleting the persisted prior baseline checkpoint from backend-owned report data.
+Not implemented — Codex stopped before code changes. The checked-in backend already hooks `register_routes` on `rest_api_init` without an admin/capability guard, and the live backend at `https://trader.stokvelsociety.co.za/wp-json/sniper/v1` still omits `/admin/soak-reset`, which indicates deployment/runtime drift rather than a patchable source defect in this repo.
 
 # Exact files changed
 
-- `src/types/sniper.ts`: added `PHASE_4_30_DAY`, extended `SoakTemplateConfig` with `durationDays` and `symbols`, and registered the Phase 4 30-day live soak template.
-- `src/routes/admin.tsx`: added Phase 4 inference and hydration handling, exported the two pure helpers for direct test coverage, and introduced the admin-only local reset/new-soak baseline unlock flow.
-- `src/routes/-admin.test.tsx`: added Phase 4 picker, inference, hydration, reset-render, reset-absence, and reset-unlock coverage.
+None — no files changed.
 
 # Tests run
 
-- `npx vitest run src/routes/-admin.test.tsx` - passed (24 tests).
-- `npm run build` - passed.
-- `npx tsc --noEmit` - failed in existing `vite.config.ts` typing (`test` property rejected by `@lovable.dev/vite-tanstack-config` options). This failure is outside the patched files.
+None — stopped before code changes.
 
 # Reports generated
 
-- `reports/codex-implementation.md`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-26_admin-phase4-soak-baseline-reset.md`
-- `.github/migration/audits/phase-4-dashboard-parity-2026-05-26.md`
+None — stopped before code changes.
 
 # Remaining risks
 
-Backend soak evidence acceptance for `PHASE_4_30_DAY` remains an external dependency. If the backend rejects that string, the first live Phase 4 baseline submission will fail at the API layer even though the admin UI now supports the flow. Phase 4 checkpoint schedule labels also remain intentionally unset pending operator confirmation.
+The active WordPress instance is not serving the soak-reset route even though the repo already contains it, so the real blocker is likely an undeployed plugin build, a different plugin copy, or another runtime/environment mismatch outside this repository.
 
 # Any contract ambiguities resolved during implementation
 
-- `SoakTemplateConfig` did not previously include `durationDays` or `symbols`; I extended the existing shape consistently across all templates instead of special-casing Phase 4.
-- The contract requires Phase 4 support without authorizing new checkpoint schedule labels, so the Phase 4 template uses `defaultDurationHours=720` with `defaultCheckpointCount=0` and empty `checkpointLabels`.
-- The reset contract required a new baseline capture path without deleting backend baseline data. I implemented reset as local UI state that unlocks capture while preserving the previous baseline checkpoint in view until a new baseline is submitted or reset is cancelled.
+The smallest safe resolution was to treat this as a contract/repository conflict: the required backend hook fix is already present in `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`, the remote namespace index still excludes `/admin/soak-reset`, and changing local source further would not logically restore the missing live route.
