@@ -3,6 +3,7 @@ import path from "node:path";
 import { execFileSync, execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { readWorkflowState } from "./workflow-state.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -708,7 +709,7 @@ function sendHardeningFailureNotification(state, reason) {
     "**To unblock:**",
     "1. Fix the Codex CLI: install or configure codex on PATH.",
     "2. Delete `reports/.codex-plan-hardening-blocked.json` — the pipeline restarts automatically.",
-    "   OR manually write `reports/codex-plan.md` and set workflow state to `READY_FOR_IMPLEMENTATION`.",
+    "   OR write `reports/codex-plan.md`; the watcher will advance state automatically when the artifact is valid.",
   ].join("\n");
 
   try {
@@ -941,48 +942,15 @@ function readState() {
   }
 
   try {
-    return readJson(STATE_FILE);
+    return readWorkflowState(STATE_FILE, {
+      autoRepair: true,
+      logger: log,
+      snapshotDir: ARCHIVE_DIR,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     log(`Invalid workflow state file: ${message}`);
-
-    // Self-repair: extract the first complete JSON object from the file.
-    //
-    // Known corruption pattern 1: tool-call XML or editor artefacts (e.g.
-    // "</content><parameter ...>") written after the valid JSON object.
-    //
-    // Known corruption pattern 2: multiple JSON objects concatenated in one file —
-    // e.g. when Copilot prepends a new PLANNING/RESEARCHING block without fully
-    // overwriting the previous IDLE block. lastIndexOf("}") would include both
-    // objects and JSON.parse would still fail. Brace-depth extraction reliably
-    // captures only the first object regardless of what follows it.
-    try {
-      const raw = fs.readFileSync(STATE_FILE, "utf8").replace(/^﻿/, "");
-      const start = raw.indexOf("{");
-      if (start !== -1) {
-        let depth = 0;
-        for (let i = start; i < raw.length; i++) {
-          if (raw[i] === "{") depth++;
-          else if (raw[i] === "}") {
-            depth--;
-            if (depth === 0) {
-              const firstObject = raw.slice(start, i + 1);
-              const recovered = JSON.parse(firstObject);
-              const trailingBytes = raw.length - (i + 1);
-              log(
-                `Workflow state self-repaired: extracted first JSON object (${trailingBytes} trailing bytes discarded) — rewriting clean JSON`,
-              );
-              writeJson(STATE_FILE, recovered);
-              return recovered;
-            }
-          }
-        }
-      }
-    } catch {
-      // Recovery failed — original error already logged above
-    }
-
-    log("Workflow state file is unrecoverable — manual intervention required");
+    log("Workflow state file is unrecoverable - manual intervention required");
     return null;
   }
 }
@@ -1099,19 +1067,8 @@ function runCodexPlanHardening(state) {
   withPipelineLock("codex-plan-hardening", () => {
     log("PLANNING detected - running Codex plan hardening");
 
-<<<<<<< Updated upstream
     const prompt = [
       "Produce a hardened implementation contract. Follow all instructions in the TEMPLATE section exactly. Return only the plan markdown; no preamble and no prose outside the numbered sections.",
-=======
-    // The entire input — instructions, runtime context, and research — is written
-    // to stdin as one stream. claude --print (boolean flag, no value) reads the
-    // prompt from stdin. This avoids the two failure modes seen with -p / --print:
-    //   1. Non-ASCII characters (em dashes) in the argument are mangled by cmd.exe.
-    //   2. When -p "value" is provided, the CLI does not read stdin as supplementary
-    //      context, so the template and research content never reach the model.
-    const stdinInput = [
-      "Produce a hardened implementation contract. Follow all instructions in the TEMPLATE section exactly. Return only the plan markdown as your final response - no preamble, no prose outside the numbered sections.",
->>>>>>> Stashed changes
       "",
       "# TEMPLATE",
       "",
@@ -1122,13 +1079,8 @@ function runCodexPlanHardening(state) {
       `Issue: ${state.issue}`,
       "Input artifact: reports/copilot-research.md",
       "Output artifact: reports/codex-plan.md",
-<<<<<<< Updated upstream
       "Write the exact artifact file reports/codex-plan.md.",
       "Do not attempt to edit any other files.",
-=======
-      "The watcher will persist your final response to reports/codex-plan.md.",
-      "Do not attempt to edit files or use any tools.",
->>>>>>> Stashed changes
       "Do not implement code.",
       "Stop after writing reports/codex-plan.md.",
       "",
@@ -1172,7 +1124,11 @@ function runCodexPlanHardening(state) {
     }
 
     if (!fs.existsSync(PLAN_FILE)) {
-      writeHardeningBlockedState(state, "Codex failed to produce reports/codex-plan.md", nextRetryCount);
+      writeHardeningBlockedState(
+        state,
+        "Codex failed to produce reports/codex-plan.md",
+        nextRetryCount,
+      );
       if (nextRetryCount >= MAX_HARDENING_RETRIES) {
         sendHardeningFailureNotification(state, "Codex failed to produce reports/codex-plan.md");
       }
@@ -1204,10 +1160,6 @@ function runCodexPlanHardening(state) {
     }
 
     clearHardeningBlockedState();
-<<<<<<< Updated upstream
-=======
-    persistPlanArtifact(planText);
->>>>>>> Stashed changes
     writePlanMetadata(state);
     markReadyForImplementation(state, "codex");
     log("Codex plan hardening complete - state READY_FOR_IMPLEMENTATION");
@@ -1605,11 +1557,7 @@ function checkForResearchCycleChange(state) {
     return false;
   }
 
-  if (
-    state.state === "IDLE" ||
-    state.state === "RESEARCHING" ||
-    state.state === "PLANNING"
-  ) {
+  if (state.state === "IDLE" || state.state === "RESEARCHING" || state.state === "PLANNING") {
     return false;
   }
 
@@ -1911,7 +1859,9 @@ function checkCodexAvailability() {
     log(`Codex CLI health check passed (${output || getCodexBinary()})`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    log(`WARNING: Codex CLI health check failed - plan hardening will be blocked on PLANNING state`);
+    log(
+      `WARNING: Codex CLI health check failed - plan hardening will be blocked on PLANNING state`,
+    );
     log(`  Reason: ${message}`);
     log(`  Fix: ensure 'codex' CLI is installed and available on PATH`);
   }
@@ -1924,14 +1874,9 @@ function startPipelineWatcher() {
 }
 
 export {
-<<<<<<< Updated upstream
+  extractUsablePlanFromCodexOutput,
   buildCodexExecCommand,
   buildCodexVersionCommand,
-=======
-  extractUsablePlanFromCodexOutput,
-  buildClaudeShellCommand,
-  execClaudeSync,
->>>>>>> Stashed changes
   isActivePhaseUpdatePath,
 };
 

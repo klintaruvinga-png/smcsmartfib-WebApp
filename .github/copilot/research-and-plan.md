@@ -35,16 +35,10 @@ Do NOT proceed without it.
 
 ## Step 2 - Create Workflow Lock
 
-Create `.smc-workflow-state.json` in the repository root:
+Run this exact command from the repository root:
 
-```json
-{
-  "workflow": "research-and-plan",
-  "state": "RESEARCHING",
-  "issue": "[the SMC_ISSUE value]",
-  "editing_locked": true,
-  "started_at": "[current ISO timestamp]"
-}
+```bash
+node scripts/workflow-state.js research-start --issue "[the SMC_ISSUE value]"
 ```
 
 Confirm to the user:
@@ -64,15 +58,10 @@ Follow the research contract in `.github/prompts/copilot-research-prompt.md` exa
 
 Save findings to `reports/copilot-research.md` (overwrite if exists).
 
-Update `.smc-workflow-state.json` to:
+Run this exact command from the repository root:
 
-```json
-{
-  "workflow": "research-and-plan",
-  "state": "PLANNING",
-  "issue": "[the SMC_ISSUE value]",
-  "editing_locked": true
-}
+```bash
+node scripts/workflow-state.js planning-start --issue "[the SMC_ISSUE value]"
 ```
 
 ## Step 4 - Handoff

@@ -33,16 +33,10 @@ SMC_ISSUE: [describe the issue]
 
 ## STEP 1 - CREATE WORKFLOW LOCK
 
-Create or overwrite `.smc-workflow-state.json` in the repository root with:
+Run this exact command from the repository root to create the workflow lock:
 
-```json
-{
-  "workflow": "research-and-plan",
-  "state": "RESEARCHING",
-  "issue": "[normalized SMC_ISSUE value]",
-  "editing_locked": true,
-  "started_at": "[current ISO timestamp]"
-}
+```bash
+node scripts/workflow-state.js research-start --issue "[normalized SMC_ISSUE value]"
 ```
 
 Do not stage or commit `.smc-workflow-state.json`.
@@ -60,16 +54,10 @@ Overwrite if the file already exists.
 
 ## STEP 3 - HAND OFF TO CODEX PLAN HARDENING
 
-After saving `reports/copilot-research.md`, update `.smc-workflow-state.json` to:
+After saving `reports/copilot-research.md`, run this exact command from the repository root:
 
-```json
-{
-  "workflow": "research-and-plan",
-  "state": "PLANNING",
-  "issue": "[normalized SMC_ISSUE value]",
-  "editing_locked": true,
-  "started_at": "[original ISO timestamp]"
-}
+```bash
+node scripts/workflow-state.js planning-start --issue "[normalized SMC_ISSUE value]"
 ```
 
 Do not write `reports/codex-plan.md`.
