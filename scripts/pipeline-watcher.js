@@ -495,6 +495,15 @@ function isUsablePlan(text) {
   return requiredSections.every((section) => text.includes(section));
 }
 
+function extractUsablePlanFromCodexOutput(outputText) {
+  const planText = outputText.trim();
+  return isUsablePlan(planText) ? planText : null;
+}
+
+function persistPlanArtifact(planText) {
+  fs.writeFileSync(PLAN_FILE, `${planText.trim()}\n`, "utf8");
+}
+
 function isUsableImplementation(text) {
   if (!text || isPermissionStub(text)) {
     return false;
@@ -777,8 +786,38 @@ function clearImplementationRunArtifacts() {
   removeFileIfExists(CODEX_OUTPUT_FILE);
 }
 
+function recoverPlanArtifactFromCodexOutput(state) {
+  if (!fs.existsSync(RESEARCH_FILE) || !fs.existsSync(CODEX_OUTPUT_FILE)) {
+    return false;
+  }
+
+  // Only trust captured plan output that is at least as new as the current
+  // research artifact; this avoids rehydrating a stale plan from a prior cycle.
+  if (statMtime(CODEX_OUTPUT_FILE) < statMtime(RESEARCH_FILE)) {
+    return false;
+  }
+
+  try {
+    const recoveredPlan = extractUsablePlanFromCodexOutput(readTextFile(CODEX_OUTPUT_FILE));
+    if (!recoveredPlan) {
+      return false;
+    }
+
+    persistPlanArtifact(recoveredPlan);
+    writePlanMetadata(state);
+    log("Recovered reports/codex-plan.md from reports/codex-last-message.txt");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function hasUsablePlanArtifactForState(state) {
-  if (!fs.existsSync(RESEARCH_FILE) || !fs.existsSync(PLAN_FILE)) {
+  if (!fs.existsSync(RESEARCH_FILE)) {
+    return false;
+  }
+
+  if (!fs.existsSync(PLAN_FILE) && !recoverPlanArtifactFromCodexOutput(state)) {
     return false;
   }
 
@@ -1060,8 +1099,19 @@ function runCodexPlanHardening(state) {
   withPipelineLock("codex-plan-hardening", () => {
     log("PLANNING detected - running Codex plan hardening");
 
+<<<<<<< Updated upstream
     const prompt = [
       "Produce a hardened implementation contract. Follow all instructions in the TEMPLATE section exactly. Return only the plan markdown; no preamble and no prose outside the numbered sections.",
+=======
+    // The entire input — instructions, runtime context, and research — is written
+    // to stdin as one stream. claude --print (boolean flag, no value) reads the
+    // prompt from stdin. This avoids the two failure modes seen with -p / --print:
+    //   1. Non-ASCII characters (em dashes) in the argument are mangled by cmd.exe.
+    //   2. When -p "value" is provided, the CLI does not read stdin as supplementary
+    //      context, so the template and research content never reach the model.
+    const stdinInput = [
+      "Produce a hardened implementation contract. Follow all instructions in the TEMPLATE section exactly. Return only the plan markdown as your final response - no preamble, no prose outside the numbered sections.",
+>>>>>>> Stashed changes
       "",
       "# TEMPLATE",
       "",
@@ -1072,8 +1122,13 @@ function runCodexPlanHardening(state) {
       `Issue: ${state.issue}`,
       "Input artifact: reports/copilot-research.md",
       "Output artifact: reports/codex-plan.md",
+<<<<<<< Updated upstream
       "Write the exact artifact file reports/codex-plan.md.",
       "Do not attempt to edit any other files.",
+=======
+      "The watcher will persist your final response to reports/codex-plan.md.",
+      "Do not attempt to edit files or use any tools.",
+>>>>>>> Stashed changes
       "Do not implement code.",
       "Stop after writing reports/codex-plan.md.",
       "",
@@ -1149,6 +1204,10 @@ function runCodexPlanHardening(state) {
     }
 
     clearHardeningBlockedState();
+<<<<<<< Updated upstream
+=======
+    persistPlanArtifact(planText);
+>>>>>>> Stashed changes
     writePlanMetadata(state);
     markReadyForImplementation(state, "codex");
     log("Codex plan hardening complete - state READY_FOR_IMPLEMENTATION");
@@ -1865,8 +1924,14 @@ function startPipelineWatcher() {
 }
 
 export {
+<<<<<<< Updated upstream
   buildCodexExecCommand,
   buildCodexVersionCommand,
+=======
+  extractUsablePlanFromCodexOutput,
+  buildClaudeShellCommand,
+  execClaudeSync,
+>>>>>>> Stashed changes
   isActivePhaseUpdatePath,
 };
 

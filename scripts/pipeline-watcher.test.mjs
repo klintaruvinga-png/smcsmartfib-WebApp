@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+<<<<<<< Updated upstream
   buildCodexExecCommand,
   buildCodexVersionCommand,
+=======
+  buildClaudeShellCommand,
+  extractUsablePlanFromCodexOutput,
+>>>>>>> Stashed changes
   isActivePhaseUpdatePath,
 } from "./pipeline-watcher.js";
 
@@ -18,6 +23,25 @@ describe("pipeline watcher state detection", () => {
         ".github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-completion-2026-05-14.md",
       ),
     ).toBe(false);
+  });
+
+  it("extracts a valid plan from captured Codex output", () => {
+    const output = `
+1. Issue validation
+2. Implementation contract
+3. Patch sequence
+4. Regression guards
+5. Non-goals
+6. Risk assessment
+7. Test requirements
+8. Implementation handoff
+`;
+
+    expect(extractUsablePlanFromCodexOutput(output)).toContain("1. Issue validation");
+  });
+
+  it("rejects captured Codex output that is not a usable plan", () => {
+    expect(extractUsablePlanFromCodexOutput("Stopped\nNo patch was applied")).toBeNull();
   });
 });
 
