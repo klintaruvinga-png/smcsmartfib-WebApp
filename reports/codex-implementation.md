@@ -1,38 +1,33 @@
 ## Issue summary
 
-Active Book, Pending Orders, and Analytics were rendering the latest `user-trades` payload as immediately authoritative, so a one-poll empty or partial backend response caused visible trade rows to disappear and then reappear on the next good poll.
+Admin Health crashed when the route rendered a checkpoint snapshot or helper path that assumed a `health` container existed and then dereferenced `feedStatus`/related fields from `undefined`.
 
 ## Root cause implemented
 
-Added a frontend continuity layer around raw trade telemetry that preserves last known positions and orders for one poll-length grace window, reconciles by stable row `id`, reuses unchanged row objects, downgrades carried-forward rows to `stale`, and expires them deterministically once the grace window is exceeded.
+Added a private display resolver in `src/routes/admin.tsx` so backend-health cards, baseline hydration/defaults, checkpoint summaries, and soak markdown/export all read optional or partial health payloads through one conservative fallback policy instead of directly dereferencing nested fields.
 
 ## Exact files changed
 
-- `src/lib/tradeContinuity.ts` - added pure trade row reconciliation and continuity state handling.
-- `src/lib/tradeContinuity.test.ts` - added deterministic continuity regression coverage.
-- `src/hooks/useSniperData.ts` - added `useStableUserTrades()` wrapper over the existing raw trade query.
-- `src/routes/-book.page.tsx` - switched Active Book to stable trade telemetry and surfaced stale carried rows in the freshness badge.
-- `src/routes/orders.tsx` - switched Pending Orders to stable trade telemetry and surfaced stale carried rows in the freshness badge and warning line.
-- `src/routes/analytics.tsx` - switched floating P/L inputs to stable trade telemetry and marks the stat stale when positions are carried forward.
-- `src/routes/-book.page.test.tsx` - added route coverage for stale carried positions remaining visible.
-- `src/routes/-orders.page.test.tsx` - added route coverage for stale carried orders remaining visible.
-- `src/routes/-analytics.page.test.tsx` - added route coverage for stale carried positions affecting analytics state.
+- `src/routes/admin.tsx`
+- `src/routes/-admin.test.tsx`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-27_admin-health-feedstatus-typeerror.md`
+- `reports/codex-implementation.md`
+- `reports/codex-implementation.meta.json`
 
 ## Tests run
 
-- `npx vitest run src/lib/tradeContinuity.test.ts src/routes/-book.page.test.tsx src/routes/-orders.page.test.tsx src/routes/-analytics.page.test.tsx`
-- `npx eslint src/lib/tradeContinuity.ts src/lib/tradeContinuity.test.ts src/hooks/useSniperData.ts src/routes/-book.page.tsx src/routes/orders.tsx src/routes/analytics.tsx src/routes/-book.page.test.tsx src/routes/-orders.page.test.tsx src/routes/-analytics.page.test.tsx`
-- `npm run validate:impl` pending final rerun after implementation metadata and workflow-state updates are written.
+- `npx vitest run src/routes/-admin.test.tsx src/lib/api/sniperClient.test.ts`
+- `npm run validate:impl`
 
 ## Reports generated
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-27_active-book-stream-flicker-continuity.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-27_admin-health-feedstatus-typeerror.md`
 - No parity audit required by this contract.
 
 ## Remaining risks
 
-Manual live verification is still required to confirm the chosen one-poll grace window smooths transient backend gaps without making legitimate closes linger longer than intended in production conditions.
+Manual browser verification against a known malformed checkpoint row is still pending, and the patch intentionally does not backfill historical snapshot rows or change backend payload contracts.
 
 ## Any contract ambiguities resolved during implementation
 
-Interpreted "short grace window tied to the current poll interval" as exactly one active polling interval (`pollMs`), which preserves one missed trade poll without weakening backend authority by carrying rows indefinitely.
+Used the smallest safe interpretation that the production crash is caused by a missing parent `health` container, not by a missing `feedStatus` field alone, so the patch stays limited to frontend null guards in `src/routes/admin.tsx` plus targeted route regressions.

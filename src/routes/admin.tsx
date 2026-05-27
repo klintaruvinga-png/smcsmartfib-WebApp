@@ -73,6 +73,19 @@ type BaselineForm = {
   notes: string;
 };
 
+type OptionalAdminHealth = Partial<AdminHealthResponse> | null | undefined;
+
+type ResolvedAdminHealthDisplay = {
+  feedStatus: string;
+  backendSync: string;
+  engineRunState: string;
+  priceFeed: string;
+  twelveDataKeyStatus: string;
+  lastBatchAt: string | null;
+  lastEngineRunAt: string | null;
+  perSymbolDiagnostics: SymbolDiagnostic[];
+};
+
 const SOAK_EVIDENCE_TYPES: SoakEvidenceType[] = [
   "baseline_metadata",
   "signal_parity_confirm",
@@ -239,6 +252,7 @@ export function AdminPage() {
 
   useEffect(() => {
     if (state.kind !== "ready") return;
+    const resolvedHealth = resolveDisplayHealth(state.health);
     setBaselineForm((current) => ({
       ...current,
       t0HealthSummary:
@@ -246,7 +260,7 @@ export function AdminPage() {
       twelveDataKeyStatus:
         current.twelveDataKeyStatus !== ""
           ? current.twelveDataKeyStatus
-          : (state.health.twelveDataKeyStatus ?? state.health.twelveDataKey),
+          : resolvedHealth.twelveDataKeyStatus,
     }));
   }, [state]);
 
@@ -298,6 +312,7 @@ export function AdminPage() {
   }
 
   const health = state.health;
+  const resolvedHealth = resolveDisplayHealth(health);
   const baselineCheckpoint =
     soakState.kind === "ready" ? soakState.report.baseline_checkpoint : null;
   const latestCheckpoint =
@@ -651,41 +666,41 @@ export function AdminPage() {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <HealthCard
             label="System status"
-            value={health.feedStatus ?? health.priceFeed}
-            tone={toneForStatus(health.feedStatus ?? health.priceFeed)}
+            value={resolvedHealth.feedStatus}
+            tone={toneForStatus(resolvedHealth.feedStatus)}
           />
           <HealthCard
             label="Backend sync"
-            value={health.backendSync}
-            tone={toneForStatus(health.backendSync)}
+            value={resolvedHealth.backendSync}
+            tone={toneForStatus(resolvedHealth.backendSync)}
           />
           <HealthCard
             label="Engine run"
-            value={health.engineRunState ?? "unknown"}
-            tone={toneForStatus(health.engineRunState)}
+            value={resolvedHealth.engineRunState}
+            tone={toneForStatus(resolvedHealth.engineRunState)}
           />
           <HealthCard
             label="Price feed"
-            value={health.priceFeed}
-            tone={toneForStatus(health.priceFeed)}
+            value={resolvedHealth.priceFeed}
+            tone={toneForStatus(resolvedHealth.priceFeed)}
           />
           <HealthCard
             label="Twelve Data key"
-            value={health.twelveDataKeyStatus ?? health.twelveDataKey}
-            tone={toneForStatus(health.twelveDataKeyStatus ?? health.twelveDataKey)}
+            value={resolvedHealth.twelveDataKeyStatus}
+            tone={toneForStatus(resolvedHealth.twelveDataKeyStatus)}
           />
           <HealthCard
             label="Per-symbol diagnostics"
-            value={String(health.perSymbolDiagnostics?.length ?? 0)}
+            value={String(resolvedHealth.perSymbolDiagnostics.length)}
           />
         </div>
 
         <div className="grid gap-3 lg:grid-cols-2">
-          <TimestampCard label="Last batch" value={health.lastBatchAt} />
-          <TimestampCard label="Last engine run" value={health.lastEngineRunAt} />
+          <TimestampCard label="Last batch" value={resolvedHealth.lastBatchAt} />
+          <TimestampCard label="Last engine run" value={resolvedHealth.lastEngineRunAt} />
         </div>
 
-        {health.perSymbolDiagnostics && health.perSymbolDiagnostics.length > 0 && (
+        {resolvedHealth.perSymbolDiagnostics.length > 0 && (
           <div className="rounded-lg border border-bd bg-bg1/60 p-4 space-y-3">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-accent" />
@@ -708,7 +723,7 @@ export function AdminPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {health.perSymbolDiagnostics.map((diagnostic) => (
+                  {resolvedHealth.perSymbolDiagnostics.map((diagnostic) => (
                     <tr key={diagnostic.symbol} className="border-b border-bd/50 last:border-b-0">
                       <td className="px-2 py-2 font-mono text-tx">{diagnostic.symbol}</td>
                       <td className="px-2 py-2 text-dim">{diagnostic.priceState}</td>
@@ -1628,7 +1643,8 @@ function TimestampCard({ label, value }: { label: string; value: string | null }
 }
 
 function CheckpointCard({ checkpoint, title }: { checkpoint: SoakCheckpointRow; title: string }) {
-  const aggregate = checkpoint.snapshot_data;
+  const aggregate = checkpoint.snapshot_data as Partial<SoakCheckpointRow["snapshot_data"]> | null;
+  const health = resolveDisplayHealth(aggregate?.health);
   const isBaseline = checkpoint.checkpoint_type === "baseline";
   return (
     <div
@@ -1665,10 +1681,10 @@ function CheckpointCard({ checkpoint, title }: { checkpoint: SoakCheckpointRow; 
         {checkpoint.operator_notes || "No operator notes recorded."}
       </div>
       <div className="grid gap-1 text-[11px] text-dim sm:grid-cols-2">
-        <div>Feed: {aggregate.health.feedStatus ?? aggregate.health.priceFeed}</div>
-        <div>Backend: {aggregate.health.backendSync}</div>
-        <div>Snapshots 24h: {stringOrUnavailable(aggregate.snapshots_24h)}</div>
-        <div>Candles 24h: {stringOrUnavailable(aggregate.candles_24h)}</div>
+        <div>Feed: {health.feedStatus}</div>
+        <div>Backend: {health.backendSync}</div>
+        <div>Snapshots 24h: {stringOrUnavailable(aggregate?.snapshots_24h ?? null)}</div>
+        <div>Candles 24h: {stringOrUnavailable(aggregate?.candles_24h ?? null)}</div>
       </div>
     </div>
   );
@@ -1784,9 +1800,10 @@ function createBaselineFormDefaults({
 }: {
   pageAccessedAt: string;
   autoBaselineFields: AutoBaselineFields;
-  health: AdminHealthResponse | null;
+  health: OptionalAdminHealth;
   soakType: SoakType;
 }): BaselineForm {
+  const resolvedHealth = resolveDisplayHealth(health);
   return {
     soakType,
     soakPurpose: "",
@@ -1798,7 +1815,7 @@ function createBaselineFormDefaults({
     backendHealthEndpoint: resolveHealthEndpointHint(),
     t0HealthSummary: health ? buildHealthSummary(health) : "",
     authConfirmed: "YES",
-    twelveDataKeyStatus: health ? (health.twelveDataKeyStatus ?? health.twelveDataKey) : "",
+    twelveDataKeyStatus: health ? resolvedHealth.twelveDataKeyStatus : "",
     watchlistLiveSymbols: autoBaselineFields.watchlistLiveSymbols,
     notes: autoBaselineFields.notes,
   };
@@ -1840,11 +1857,12 @@ export function hydrateBaselineForm(form: BaselineForm, rows: SoakEvidenceRow[])
   };
 }
 
-function buildHealthSummary(health: AdminHealthResponse): string {
+function buildHealthSummary(health: OptionalAdminHealth): string {
+  const resolvedHealth = resolveDisplayHealth(health);
   return [
-    `feedStatus=${health.feedStatus ?? health.priceFeed}`,
-    `backendSync=${health.backendSync}`,
-    `twelveDataKeyStatus=${health.twelveDataKeyStatus ?? health.twelveDataKey}`,
+    `feedStatus=${resolvedHealth.feedStatus}`,
+    `backendSync=${resolvedHealth.backendSync}`,
+    `twelveDataKeyStatus=${resolvedHealth.twelveDataKeyStatus}`,
   ].join(", ");
 }
 
@@ -2082,10 +2100,26 @@ function toneForStatus(value: string | undefined): "positive" | "warning" | "cri
   }
 }
 
+function resolveDisplayHealth(health: OptionalAdminHealth): ResolvedAdminHealthDisplay {
+  return {
+    feedStatus: health?.feedStatus ?? health?.priceFeed ?? "unknown",
+    backendSync: health?.backendSync ?? "unknown",
+    engineRunState: health?.engineRunState ?? "unknown",
+    priceFeed: health?.priceFeed ?? "unknown",
+    twelveDataKeyStatus: health?.twelveDataKeyStatus ?? health?.twelveDataKey ?? "unknown",
+    lastBatchAt: health?.lastBatchAt ?? null,
+    lastEngineRunAt: health?.lastEngineRunAt ?? null,
+    perSymbolDiagnostics: Array.isArray(health?.perSymbolDiagnostics)
+      ? health.perSymbolDiagnostics
+      : [],
+  };
+}
+
 function buildSoakReportMarkdown(
   report: SoakReport,
   template: { label: string; soakType: string },
 ): string {
+  const health = resolveDisplayHealth(report.health);
   const evidenceMap = indexEvidenceByKey(report.manual_evidence);
   const evidenceLines =
     report.manual_evidence.length === 0
@@ -2122,11 +2156,11 @@ function buildSoakReportMarkdown(
   return [
     ...reportLines,
     "## Health",
-    `- Feed status: ${report.health.feedStatus ?? report.health.priceFeed}`,
-    `- Backend sync: ${report.health.backendSync}`,
-    `- Engine run state: ${report.health.engineRunState ?? "unknown"}`,
-    `- Last batch: ${formatTimestamp(report.health.lastBatchAt)}`,
-    `- Last engine run: ${formatTimestamp(report.health.lastEngineRunAt)}`,
+    `- Feed status: ${health.feedStatus}`,
+    `- Backend sync: ${health.backendSync}`,
+    `- Engine run state: ${health.engineRunState}`,
+    `- Last batch: ${formatTimestamp(health.lastBatchAt)}`,
+    `- Last engine run: ${formatTimestamp(health.lastEngineRunAt)}`,
     "",
     "## Aggregates",
     `- Watchlist count: ${report.watchlist_count === null ? "Unavailable" : report.watchlist_count}`,

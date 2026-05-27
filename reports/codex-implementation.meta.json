@@ -1,5 +1,5 @@
 {
-  "issue": "Active Book stream is causing flickers and position/book persistance issues in between polls/refreshes",
-  "plan_hash": "f8b162e9be98d5135b7b869a44b04232330a84898df912841618f2e9c500351c",
-  "written_at": "2026-05-27T13:40:13.7533457+02:00"
+  "issue": "SMC Intake - Fix admin Health page issue: TypeError reading 'feedStatus' in index-HU_NwOvP.js",
+  "plan_hash": "08f7a2cc27bd2ff84b5452db93b942c7cab105af4a4cebca9bf84574b371b0b9",
+  "written_at": "2026-05-27T18:21:34.7220297+02:00"
 }

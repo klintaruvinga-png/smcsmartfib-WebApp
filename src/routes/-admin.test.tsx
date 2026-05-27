@@ -77,6 +77,13 @@ function buildHealth(): EngineHealth {
   };
 }
 
+function buildPartialHealth(): EngineHealth {
+  return {
+    lastBatchAt: null,
+    lastEngineRunAt: null,
+  } as EngineHealth;
+}
+
 function buildSoakReport(): SoakReport {
   return {
     health: buildHealth(),
@@ -309,6 +316,80 @@ describe("AdminPage", () => {
     expect(within(checkpointSection).getByText("CHECKPOINT")).toBeTruthy();
     expect(screen.getByText("Baseline Snapshot")).toBeTruthy();
     expect(screen.getByText("Checkpoint History")).toBeTruthy();
+  });
+
+  it("renders checkpoint summaries with conservative fallbacks when snapshot health is missing", async () => {
+    const report = buildSoakReport();
+    report.baseline_checkpoint = {
+      ...buildCheckpoint(1, "baseline", "2026-05-12T08:05:00Z", "Initial soak capture."),
+      snapshot_data: {} as SoakReport["checkpoints"][number]["snapshot_data"],
+    };
+    report.checkpoints = [
+      {
+        ...buildCheckpoint(2, "checkpoint", "2026-05-12T20:05:00Z", "T+12h checkpoint."),
+        snapshot_data: {} as SoakReport["checkpoints"][number]["snapshot_data"],
+      },
+    ];
+    apiMocks.fetchSoakReport.mockResolvedValue(report);
+
+    render(<AdminPage />);
+
+    const baselineSection = await screen.findByRole("region", { name: "Baseline Snapshot" });
+    const checkpointSection = screen.getByRole("region", { name: "Checkpoint History" });
+
+    expect(within(baselineSection).getByText("Feed: unknown")).toBeTruthy();
+    expect(within(baselineSection).getByText("Backend: unknown")).toBeTruthy();
+    expect(within(baselineSection).getByText("Snapshots 24h: Unavailable")).toBeTruthy();
+    expect(within(checkpointSection).getByText("Feed: unknown")).toBeTruthy();
+    expect(within(checkpointSection).getByText("Backend: unknown")).toBeTruthy();
+    expect(within(checkpointSection).getByText("Candles 24h: Unavailable")).toBeTruthy();
+  });
+
+  it("renders partial health payloads conservatively and exports markdown without throwing", async () => {
+    const partialHealth = buildPartialHealth();
+    const report = buildSoakReport();
+    report.health = partialHealth;
+    apiMocks.fetchAdminHealth.mockResolvedValue(partialHealth);
+    apiMocks.fetchSoakReport.mockResolvedValue(report);
+
+    const createObjectURLSpy = vi
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue("blob:smc-admin-health-report");
+    const revokeObjectURLSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+
+    try {
+      render(<AdminPage />);
+
+      expect(await screen.findByText("Backend Health Status")).toBeTruthy();
+
+      const healthSection = document.querySelector(
+        '[data-section="backend-health-readonly"]',
+      ) as HTMLElement | null;
+      expect(healthSection).toBeTruthy();
+      expect(within(healthSection as HTMLElement).getAllByText("unknown").length).toBeGreaterThan(
+        0,
+      );
+
+      const summaryField = screen.getByPlaceholderText(
+        "feedStatus=stale, backendSync=live, twelveDataKeyStatus=ok",
+      ) as HTMLInputElement;
+      const keyStatusField = screen.getByPlaceholderText("ok") as HTMLInputElement;
+
+      await waitFor(() => {
+        expect(summaryField.value).toBe(
+          "feedStatus=unknown, backendSync=unknown, twelveDataKeyStatus=unknown",
+        );
+        expect(keyStatusField.value).toBe("unknown");
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Export Markdown" }));
+
+      expect(createObjectURLSpy).toHaveBeenCalledTimes(1);
+      expect(revokeObjectURLSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      createObjectURLSpy.mockRestore();
+      revokeObjectURLSpy.mockRestore();
+    }
   });
 
   it("promotes a ready soak report back to error state when refresh fails", async () => {
