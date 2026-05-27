@@ -98,9 +98,18 @@ function main() {
   fs.mkdirSync(REPORTS_DIR, { recursive: true });
   fs.mkdirSync(ARCHIVE_DIR, { recursive: true });
 
-  const state = fs.existsSync(STATE_FILE)
-    ? readWorkflowState(STATE_FILE, { autoRepair: true, snapshotDir: ARCHIVE_DIR })
-    : null;
+  let state = null;
+  if (fs.existsSync(STATE_FILE)) {
+    try {
+      state = readWorkflowState(STATE_FILE, { autoRepair: true, snapshotDir: ARCHIVE_DIR });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(
+        `[reset-pipeline] WARNING: Failed to read ${path.basename(STATE_FILE)} (${message}). Continuing with manual reset.`,
+      );
+      state = null;
+    }
+  }
   if (state) {
     console.log(`[reset-pipeline] Current state: ${state.state}`);
     if (state.issue) {
