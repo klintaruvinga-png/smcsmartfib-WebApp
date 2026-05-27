@@ -81,7 +81,7 @@ Do NOT write `reports/codex-plan.md` yourself.
 
 The local `npm run pipeline` runner owns the next two stages:
 
-- Claude hardens `reports/copilot-research.md` into `reports/codex-plan.md`
+- Codex hardens `reports/copilot-research.md` into `reports/codex-plan.md`
 - Codex implements from `reports/codex-plan.md`, pushes a branch, and opens a normal PR
 
 Before handoff is considered complete, start or confirm the detached local runner:
@@ -98,7 +98,7 @@ reports/copilot-research.md - saved
 Workflow state - PLANNING
 Copilot editing remains locked
 Local pipeline runner started or already active
-Claude should now harden the plan into reports/codex-plan.md
+Codex should now harden the plan into reports/codex-plan.md
 Codex will implement and open a normal PR after the plan is ready
 
 Do not edit source files or planning artifacts after this point.

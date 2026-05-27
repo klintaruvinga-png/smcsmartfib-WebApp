@@ -83,7 +83,7 @@ Before performing ANY file edit, code generation, apply_patch, or write operatio
 | ------------------------ | --------------- | ----------------------------------------------------------------------------------------------------------- |
 | IDLE                     | Yes             | No active issue. Pipeline waiting for new trigger.                                                          |
 | RESEARCHING              | No              | Copilot writing research artifact.                                                                          |
-| PLANNING                 | No (locked)     | Pipeline calling Claude to harden the plan.                                                                 |
+| PLANNING                 | No (locked)     | Pipeline calling Codex to harden the plan.                                                                 |
 | READY_FOR_IMPLEMENTATION | Yes             | Plan hardened. Pipeline calling Codex.                                                                      |
 | IMPLEMENTATION_FAILED    | Yes             | Codex stopped. Inspect `.codex-implementation-failed.json`. Run `npm run pipeline:reset` to return to IDLE. |
 | IMPLEMENTATION_COMPLETE  | Yes             | Codex opened PR. Pipeline polling for merge to close cycle.                                                 |
