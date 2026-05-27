@@ -89,6 +89,71 @@ public:
         return json;
     }
 
+    // Build structured M15 fib levels for signal evaluation so the signal engine
+    // consumes the same anchor calculations as the fib dispatch path.
+    int BuildSignalFibLevels(string symbol, FibLevelOut& outLevels[])
+    {
+        const int chartTfSeconds = 900;
+        int lookback = FibHistoryWindowSize(chartTfSeconds);
+
+        MqlRates rates[];
+        int copied = CopyRates(symbol, PERIOD_M15, 1, lookback, rates);
+        if (copied <= 0)
+        {
+            Print("[FibEngine] CopyRates returned 0 for signal levels symbol=", symbol, " tf=M15");
+            return 0;
+        }
+
+        double compression = CompressionThreshold(symbol);
+        string sessionTf = GetSessionTF(chartTfSeconds);
+        string authorityTf = GetAuthorityTF(sessionTf);
+
+        double ltfHigh, ltfLow;
+        bool ltfValid = ComputeLTFAnchor(rates, copied, chartTfSeconds,
+                                         sessionTf, compression,
+                                         ltfHigh, ltfLow);
+
+        double htfHigh, htfLow;
+        bool htfValid = ComputeHTFAnchor(rates, copied, chartTfSeconds,
+                                         authorityTf, compression,
+                                         htfHigh, htfLow);
+
+        int levelCount = 0;
+        if (ltfValid)
+            levelCount += ArraySize(ratios);
+        if (htfValid)
+            levelCount += ArraySize(ratios);
+        if (levelCount == 0)
+            return 0;
+
+        ArrayResize(outLevels, levelCount);
+        int outIndex = 0;
+
+        if (ltfValid)
+        {
+            for (int i = 0; i < ArraySize(ratios); i++)
+            {
+                outLevels[outIndex].family = "LTF_SF";
+                outLevels[outIndex].ratio = ratios[i];
+                outLevels[outIndex].price = PriceForRatio(ltfHigh, ltfLow, ratios[i]);
+                outIndex++;
+            }
+        }
+
+        if (htfValid)
+        {
+            for (int i = 0; i < ArraySize(ratios); i++)
+            {
+                outLevels[outIndex].family = "HTF_AF";
+                outLevels[outIndex].ratio = ratios[i];
+                outLevels[outIndex].price = PriceForRatio(htfHigh, htfLow, ratios[i]);
+                outIndex++;
+            }
+        }
+
+        return outIndex;
+    }
+
     // Compute fib levels for a single timeframe and return as a JSON object.
     string ComputeFibJson(string symbol, string normSymbol, int userId,
                           ENUM_TIMEFRAMES mql_tf, int chart_tf_seconds, string tfName)
