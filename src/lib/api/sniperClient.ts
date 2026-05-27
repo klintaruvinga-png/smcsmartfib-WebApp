@@ -255,7 +255,11 @@ export async function createSoakCheckpoint(opts?: {
   });
 }
 
-export async function resetSoak(): Promise<{ reset: boolean; deleted_checkpoints: number; deleted_evidence: number }> {
+export async function resetSoak(): Promise<{
+  reset: boolean;
+  deleted_checkpoints: number;
+  deleted_evidence: number;
+}> {
   return call("/admin/soak-reset", { method: "DELETE" });
 }
 

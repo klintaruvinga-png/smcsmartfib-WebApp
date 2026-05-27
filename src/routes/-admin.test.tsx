@@ -485,9 +485,7 @@ describe("AdminPage", () => {
     render(<AdminPage />);
 
     expect(await screen.findByRole("heading", { name: "Phase 3 - Stability Soak" })).toBeTruthy();
-    expect(
-      screen.getByRole("option", { name: SOAK_TEMPLATES.PHASE_4_30_DAY.label }),
-    ).toBeTruthy();
+    expect(screen.getByRole("option", { name: SOAK_TEMPLATES.PHASE_4_30_DAY.label })).toBeTruthy();
 
     selectSoakType("PHASE_4_30_DAY");
 
@@ -747,7 +745,9 @@ describe("AdminPage", () => {
 
     render(<AdminPage />);
 
-    expect(await screen.findByRole("button", { name: "Capture Baseline & Start Soak" })).toBeTruthy();
+    expect(
+      await screen.findByRole("button", { name: "Capture Baseline & Start Soak" }),
+    ).toBeTruthy();
     expect(screen.queryByRole("button", { name: START_NEW_SOAK_BUTTON })).toBeNull();
   });
 

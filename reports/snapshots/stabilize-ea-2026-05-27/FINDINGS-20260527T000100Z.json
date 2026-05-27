@@ -1,0 +1,135 @@
+{
+  "snapshot_type": "FINDINGS",
+  "workflow_id": "stabilize-ea-2026-05-27",
+  "timestamp": "2026-05-27T00:01:00Z",
+  "confirmed_issues": [
+    {
+      "id": "BUG-2026-05-27-001",
+      "severity": "LOW",
+      "system": "Frontend Lint / CI",
+      "description": "Three prettier formatting errors in sniperClient.ts (line 258: inline return type object should be multi-line) and -admin.test.tsx (lines 488, 750: trailing comma/newline inconsistencies). Pre-existing; npx eslint --fix resolves all three.",
+      "root_cause": "Prettier formatting rules require multi-line object types for inline return types with 3+ members. Two test-file locations have inconsistent trailing comma placement.",
+      "impact_zones": ["CI Lint Gate"],
+      "proposed_fix": "Run npx eslint --fix on the three affected files. No logic change."
+    }
+  ],
+  "no_new_critical_issues": true,
+  "audit_summary": {
+    "stage_2_rest_api_auth": {
+      "namespace": "sniper/v1",
+      "ea_market_stream_route": "POST /sniper/v1/ea/market-stream",
+      "ea_market_stream_permission": "permission_ea_market_stream → delegates to permission_ea_bridge",
+      "auth_model": "X-EA-API-Key shared secret via hash_equals against SMC_SF_EA_API_KEY",
+      "header_aliases_supported": ["x-ea-api-key", "x_ea_api_key", "x-api-key", "x_api_key"],
+      "missing_token_returns": "WP_Error smc_sf_api_key_missing 401",
+      "unconfigured_secret_returns": "WP_Error smc_sf_api_key_unconfigured 503",
+      "invalid_token_returns": "WP_Error smc_sf_api_key_invalid 403",
+      "missing_user_id_returns": "WP_Error smc_sf_user_required 400",
+      "invalid_user_id_returns": "WP_Error smc_sf_user_invalid 403",
+      "wp_set_current_user_called": true,
+      "authority_diagnostics_protected": "permission_user (WP session required → 401 for unauthenticated)",
+      "admin_routes_protected": "permission_admin (manage_options → 403 for non-admin)",
+      "result": "PASS — all auth paths correctly implemented"
+    },
+    "stage_3_payload_contract": {
+      "user_id_required": true,
+      "symbol_required": true,
+      "symbol_alias_mapping": true,
+      "timeframe_normalized": true,
+      "quote_time_takes_precedence_over_timestamp": true,
+      "stale_rejection_threshold_sec": 300,
+      "stale_rejection_status": 422,
+      "unparseable_timestamp_rejection_status": 422,
+      "drift_warning_threshold_sec": 120,
+      "bid_ask_required": true,
+      "bid_ask_finite_positive_enforced": true,
+      "bid_leq_ask_enforced": true,
+      "invalid_bid_ask_status": 422,
+      "ohlc_consistency_enforced": true,
+      "epoch_timestamp_guard": "2000-01-01 minimum",
+      "future_candle_guard": "candle_time must be < stream_timestamp",
+      "candle_staleness_guard": "M1 max 180s, M15 max 1800s",
+      "tick_volume_clamped_non_negative": true,
+      "multi_candle_batch_note": "only candles[0] stored; Phase 3 multi-batch is future scope",
+      "result": "PASS — comprehensive validation in place"
+    },
+    "stage_4_ea_auth_verification": {
+      "all_4_header_aliases": true,
+      "hash_equals_used": true,
+      "not_double_equals": true,
+      "user_id_validated_against_wp_user": true,
+      "wp_set_current_user_before_return": true,
+      "all_error_paths_return_wp_error": true,
+      "result": "PASS — implementation complete and correct"
+    },
+    "stage_5_data_flow": {
+      "mt5_to_php_route": "POST /sniper/v1/ea/market-stream → permission_ea_market_stream → post_ea_market_stream",
+      "php_to_db_snapshot": "upsert_mt5_snapshot() → smc_sf_snapshots table",
+      "php_to_db_candle": "insert_mt5_candle() → smc_sf_candles table",
+      "freshness_persistence": "set_transient smc_sf_freshness_{user_id}_{symbol} TTL 300s",
+      "session_persistence": "set_transient smc_sf_session_{user_id}_{symbol} TTL 300s",
+      "dashboard_polling": "useSniperData.ts → apiClient.getSnapshot() every pollMs (2s default)",
+      "dashboard_poll_gated_on_settings": true,
+      "sniperClient_auth": "Authorization header (JWT/Basic) + X-WP-Nonce fallback",
+      "cache_bust_on_snapshot": true,
+      "audit_trail_on_ingest": true,
+      "silent_failures_present": false,
+      "result": "PASS — wiring intact end-to-end"
+    },
+    "stage_6_freshness_audit": {
+      "age_sec_from_quote_time": true,
+      "not_from_fetch_time": true,
+      "stale_rejection_server_side": true,
+      "freshness_transient_ttl_sec": 300,
+      "nonstale_during_session": "live state set when freshness=LIVE",
+      "post_weekend_reopen_guard": "class-market-data-service.php is_market_expected_open() + stale override",
+      "equity_index_session_handling": "NAS100/US30 via is_us_equity_session_open() with DST-aware UTC windows",
+      "crypto_always_live": true,
+      "result": "PASS — freshness is set from broker timestamp, not fetch time"
+    },
+    "stage_7_signal_engine": {
+      "engine_requires_candles": true,
+      "chop_gating_present": true,
+      "stale_price_blocks_signal": true,
+      "backend_is_source_of_truth": true,
+      "frontend_does_not_override_is_live": true,
+      "result": "PASS — signal engine integrity maintained"
+    },
+    "stage_8_parity": {
+      "symbol_normalization_php_vs_mql5": "Aligned — PHP map_symbol_aliases mirrors SymbolNormalizer.mqh",
+      "ohlc_validation_present_both_sides": true,
+      "timestamp_utc_both_sides": true,
+      "session_classification_aligned": "SessionManager.mqh → PHP normalize_mt5_session_value()",
+      "freshness_states_aligned": "LIVE/DELAYED/STALE/CLOSED/DISCONNECTED consistent",
+      "no_parity_drift_detected": true,
+      "result": "PASS — no parity drift found"
+    }
+  },
+  "migration_blockers": [
+    {
+      "id": "MIGRATION-001",
+      "phase": "Phase 3",
+      "description": "T0 admin baseline capture in /admin soak workspace still pending",
+      "status": "NOT_BLOCKING_CODE",
+      "validation_required": true,
+      "notes": "Operator action required — no code change needed"
+    },
+    {
+      "id": "MIGRATION-002",
+      "phase": "Phase 4",
+      "description": "Track A/B/C lead assignments before Phase 4 implementation begins",
+      "status": "NOT_BLOCKING_CODE",
+      "validation_required": false,
+      "notes": "Human/team decision — no code change needed"
+    }
+  ],
+  "statistics": {
+    "total_issues": 1,
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 1,
+    "migration_blockers": 2,
+    "migration_blockers_requiring_code_change": 0
+  }
+}
