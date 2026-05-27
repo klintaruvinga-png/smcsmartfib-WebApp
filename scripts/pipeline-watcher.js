@@ -28,7 +28,7 @@ const STATE_FILE = path.join(REPO_ROOT, ".smc-workflow-state.json");
 // This avoids EPERM failures from OneDrive holding a sync lock on the file.
 const LOCK_FILE = path.join(REPO_ROOT, "reports", ".pipeline-lock.json");
 const ARCHIVE_DIR = path.join(REPO_ROOT, "reports", "archive");
-const CLAUDE_PLAN_PROMPT_FILE = path.join(REPO_ROOT, ".github", "prompts", "codex-plan-prompt.md");
+const PLAN_PROMPT_FILE = path.join(REPO_ROOT, ".github", "prompts", "codex-plan-prompt.md");
 const CODEX_IMPLEMENT_PROMPT_FILE = path.join(
   REPO_ROOT,
   ".github",
@@ -41,15 +41,15 @@ const CODEX_OUTPUT_FILE = path.join(REPO_ROOT, "reports", "codex-last-message.tx
 // artifacts, deletes the sentinel, and resets state to IDLE. This is the safe
 // programmatic escape from IMPLEMENTATION_FAILED without direct state file edits.
 const PIPELINE_RESET_FILE = path.join(REPO_ROOT, "reports", ".pipeline-reset-requested");
-// Written when the Claude CLI invocation fails so the watcher stops retrying until
+// Written when Codex plan hardening fails so the watcher stops retrying until
 // the research/issue changes or the file is manually deleted.
-const CLAUDE_HARDENING_BLOCKED_FILE = path.join(
+const PLAN_HARDENING_BLOCKED_FILE = path.join(
   REPO_ROOT,
   "reports",
-  ".claude-hardening-blocked.json",
+  ".codex-plan-hardening-blocked.json",
 );
 const POLL_INTERVAL_MS = 5000;
-const CLAUDE_TIMEOUT_MS = 900000; // 15 min — larger research reports need more time
+const PLAN_TIMEOUT_MS = 900000; // 15 min — larger research reports need more time
 const CODEX_TIMEOUT_MS = 1800000; // 30 min — complex implementations regularly exceed 15 min
 const LOCK_STALE_MS = 30 * 60 * 1000;
 
@@ -75,62 +75,9 @@ const HARDENING_RETRY_INTERVAL_MS = 5 * 60 * 1000; // 5 min
 // On Windows, execSync with shell:true spawns cmd.exe which is blocked with EPERM
 // in detached background processes (the job object created by start-pipeline-runner.js
 // restricts child process creation for cmd.exe). This function finds the native
-// claude.exe so it can be called directly via execFileSync — no shell required.
-function resolveClaudeExe() {
-  if (process.platform !== "win32") {
-    return null; // Non-Windows uses normal PATH lookup via execFileSync.
-  }
-
-  const npmRoot = process.env.APPDATA ? path.join(process.env.APPDATA, "npm") : null;
-
-  const candidates = [];
-
-  if (npmRoot) {
-    // Primary: the .exe bundled inside the npm global package (what claude.cmd delegates to)
-    candidates.push(
-      path.join(npmRoot, "node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe"),
-    );
-    // Also parse the claude.cmd shim — it embeds the delegated exe path on the last exec line.
-    const cmdShim = path.join(npmRoot, "claude.cmd");
-    if (fs.existsSync(cmdShim)) {
-      try {
-        const content = fs.readFileSync(cmdShim, "utf8");
-        // Shim line: "%dp0%\node_modules\...\claude.exe"   %*
-        // %dp0% is the batch file's own directory (the npm bin dir).
-        const match = content.match(/"(%dp0%[^"]+claude\.exe)"/i);
-        if (match) {
-          const resolved = match[1].replace(/%dp0%/gi, npmRoot + path.sep);
-          candidates.unshift(resolved);
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-  }
-
-  // Fallback: standalone installation under the user profile
-  if (process.env.USERPROFILE) {
-    candidates.push(path.join(process.env.USERPROFILE, ".local", "bin", "claude.exe"));
-  }
-
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) return candidate;
-  }
-
-  return null;
-}
-
-function formatClaudeDisplayName(claudeExe) {
-  return claudeExe
-    ? `${path.basename(path.dirname(claudeExe))}/${path.basename(claudeExe)}`
-    : "claude";
-}
-
-function buildClaudeShellCommand(args) {
-  // Only static CLI flags are passed through this helper. Keep the executable name
-  // unresolved so cmd.exe can discover claude.cmd on PATH when no native
-  // claude.exe could be located.
-  return ["claude", ...args].join(" ");
+// Codex CLI binary so it can be called directly via execFileSync — no shell required.
+function getCodexBinary() {
+  return process.platform === "win32" ? "codex.cmd" : "codex";
 }
 
 function isActivePhaseUpdatePath(filePath) {
@@ -142,24 +89,6 @@ function isActivePhaseUpdatePath(filePath) {
   );
 
   return resolvedPath.startsWith(activePhaseUpdateDir);
-}
-
-function shouldUseClaudeShellFallback(claudeExe) {
-  return process.platform === "win32" && !claudeExe;
-}
-
-function execClaudeSync(args, options, claudeExe) {
-  if (shouldUseClaudeShellFallback(claudeExe)) {
-    // Windows .cmd/.bat shims cannot be launched with execFileSync. If the
-    // hardened native claude.exe resolution fails, intentionally preserve the
-    // legacy shell fallback so PATH-only claude.cmd installs still work.
-    return execSync(buildClaudeShellCommand(args), {
-      ...options,
-      shell: true,
-    });
-  }
-
-  return execFileSync(claudeExe ?? "claude", args, options);
 }
 
 let lastObservedKey = null;
@@ -194,7 +123,7 @@ function buildObservedKey() {
       // minute while a non-permanent retry block exists so retries fire without
       // requiring unrelated file changes.
       try {
-        const blocked = readJson(CLAUDE_HARDENING_BLOCKED_FILE);
+        const blocked = readJson(PLAN_HARDENING_BLOCKED_FILE);
         if (!blocked?.permanent && blocked?.next_retry_at) {
           timeBucket = Math.floor(Date.now() / 60000);
         }
@@ -213,7 +142,7 @@ function buildObservedKey() {
     statMtime(STATE_FILE),
     statMtime(IMPLEMENTATION_FILE),
     statMtime(IMPLEMENTATION_FAILED_FILE),
-    statMtime(CLAUDE_HARDENING_BLOCKED_FILE),
+    statMtime(PLAN_HARDENING_BLOCKED_FILE),
     statMtime(PIPELINE_RESET_FILE),
     timeBucket,
   ].join(":");
@@ -650,7 +579,7 @@ function writeHardeningBlockedState(state, reason, retryCount = 0) {
     ? null
     : new Date(Date.now() + HARDENING_RETRY_INTERVAL_MS).toISOString();
 
-  writeJson(CLAUDE_HARDENING_BLOCKED_FILE, {
+  writeJson(PLAN_HARDENING_BLOCKED_FILE, {
     blocked_at: new Date().toISOString(),
     reason,
     issue: state.issue ?? "",
@@ -666,18 +595,13 @@ function writeHardeningBlockedState(state, reason, retryCount = 0) {
     resolution: permanent
       ? [
           "All automatic retries exhausted. Manual intervention required.",
-          "Option A: open Claude Code and harden the plan manually:",
-          "  reports/copilot-research.md -> .github/prompts/codex-plan-prompt.md",
-          "  save output to reports/codex-plan.md, write reports/codex-plan.meta.json,",
-          "  and set .smc-workflow-state.json state to READY_FOR_IMPLEMENTATION.",
-          "Option B: fix the Claude CLI (npm install -g @anthropic-ai/claude-code && claude auth)",
-          "  then delete this file — the pipeline will restart automatically.",
+          "Option A: run Codex plan hardening manually by writing reports/codex-plan.md.",
+          "Option B: fix the Codex CLI installation or PATH and delete this file.",
         ]
       : [
           `Retry ${retryCount}/${MAX_HARDENING_RETRIES} scheduled at ${nextRetryAt}.`,
           "Option A (automatic): the pipeline will retry automatically — no action needed.",
-          "Option B (fix now): ensure 'claude' CLI is installed and authenticated:",
-          "  npm install -g @anthropic-ai/claude-code && claude auth",
+          "Option B (fix now): ensure 'codex' CLI is installed and available on PATH.",
           "  then delete this file to skip the wait.",
         ],
   });
@@ -685,7 +609,7 @@ function writeHardeningBlockedState(state, reason, retryCount = 0) {
 
 function clearHardeningBlockedState() {
   try {
-    fs.unlinkSync(CLAUDE_HARDENING_BLOCKED_FILE);
+    fs.unlinkSync(PLAN_HARDENING_BLOCKED_FILE);
   } catch {
     /* ignore */
   }
@@ -694,7 +618,7 @@ function clearHardeningBlockedState() {
 function isHardeningBlockedForCurrentState(state) {
   let blocked;
   try {
-    blocked = readJson(CLAUDE_HARDENING_BLOCKED_FILE);
+    blocked = readJson(PLAN_HARDENING_BLOCKED_FILE);
   } catch {
     return false;
   }
@@ -724,7 +648,7 @@ function isHardeningBlockedForCurrentState(state) {
     }
     const secsRemaining = Math.max(0, Math.round((due - Date.now()) / 1000));
     log(
-      `Claude plan hardening retry in ${secsRemaining}s (attempt ${(blocked.retry_count ?? 0) + 1}/${MAX_HARDENING_RETRIES})`,
+      `Codex plan hardening retry in ${secsRemaining}s (attempt ${(blocked.retry_count ?? 0) + 1}/${MAX_HARDENING_RETRIES})`,
     );
     return true;
   }
@@ -735,7 +659,7 @@ function isHardeningBlockedForCurrentState(state) {
 
 function readHardeningRetryCount() {
   try {
-    const blocked = readJson(CLAUDE_HARDENING_BLOCKED_FILE);
+    const blocked = readJson(PLAN_HARDENING_BLOCKED_FILE);
     return typeof blocked.retry_count === "number" ? blocked.retry_count : 0;
   } catch {
     return 0;
@@ -743,7 +667,7 @@ function readHardeningRetryCount() {
 }
 
 function sendHardeningFailureNotification(state, reason) {
-  const title = `[pipeline-watcher] Claude plan hardening permanently blocked`;
+  const title = `[pipeline-watcher] Codex plan hardening permanently blocked`;
   const body = [
     `All ${MAX_HARDENING_RETRIES} automatic retries for the plan-hardening step have failed.`,
     "",
@@ -751,8 +675,8 @@ function sendHardeningFailureNotification(state, reason) {
     `**Last failure reason:** ${reason}`,
     "",
     "**To unblock:**",
-    "1. Fix the Claude CLI: `npm install -g @anthropic-ai/claude-code && claude auth`",
-    "2. Delete `reports/.claude-hardening-blocked.json` — the pipeline restarts automatically.",
+    "1. Fix the Codex CLI: install or configure codex on PATH.",
+    "2. Delete `reports/.codex-plan-hardening-blocked.json` — the pipeline restarts automatically.",
     "   OR manually write `reports/codex-plan.md` and set workflow state to `READY_FOR_IMPLEMENTATION`.",
   ].join("\n");
 
@@ -1098,7 +1022,7 @@ function withPipelineLock(label, fn) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-function runClaudePlanHardening(state) {
+function runCodexPlanHardening(state) {
   if (!fs.existsSync(RESEARCH_FILE)) {
     log("State is PLANNING but reports/copilot-research.md is missing");
     return;
@@ -1106,142 +1030,119 @@ function runClaudePlanHardening(state) {
 
   if (isHardeningBlockedForCurrentState(state)) {
     log(
-      "Claude plan hardening blocked - see reports/.claude-hardening-blocked.json for resolution steps",
+      "Codex plan hardening blocked - see reports/.codex-plan-hardening-blocked.json for resolution steps",
     );
     return;
   }
 
-  withPipelineLock("claude-plan-hardening", () => {
-    log("PLANNING detected - running Claude plan hardening");
+  withPipelineLock("codex-plan-hardening", () => {
+    log("PLANNING detected - running Codex plan hardening");
 
-    // The entire input — instructions, runtime context, and research — is written
-    // to stdin as one stream. claude --print (boolean flag, no value) reads the
-    // prompt from stdin. This avoids the two failure modes seen with -p / --print:
-    //   1. Non-ASCII characters (em dashes) in the argument are mangled by cmd.exe.
-    //   2. When -p "value" is provided, the CLI does not read stdin as supplementary
-    //      context, so the template and research content never reach the model.
-    const stdinInput = [
-      "Produce a hardened implementation contract. Follow all instructions in the TEMPLATE section exactly. Return only the plan markdown - no preamble, no prose outside the numbered sections.",
+    const prompt = [
+      "Produce a hardened implementation contract. Follow all instructions in the TEMPLATE section exactly. Return only the plan markdown; no preamble and no prose outside the numbered sections.",
       "",
       "# TEMPLATE",
       "",
-      fs.readFileSync(CLAUDE_PLAN_PROMPT_FILE, "utf8").trim(),
+      fs.readFileSync(PLAN_PROMPT_FILE, "utf8").trim(),
       "",
       "# RUNTIME CONTEXT",
       "",
       `Issue: ${state.issue}`,
       "Input artifact: reports/copilot-research.md",
       "Output artifact: reports/codex-plan.md",
-      "Return the plan as plain markdown on stdout only.",
-      "Do not attempt to edit files or use any tools.",
+      "Write the exact artifact file reports/codex-plan.md.",
+      "Do not attempt to edit any other files.",
       "Do not implement code.",
-      "Stop after the plan is written.",
+      "Stop after writing reports/codex-plan.md.",
       "",
       "# RESEARCH REPORT",
       "",
       fs.readFileSync(RESEARCH_FILE, "utf8").trim(),
     ].join("\n");
 
-    const claudeExe = resolveClaudeExe();
-
     const currentRetryCount = readHardeningRetryCount();
     const nextRetryCount = currentRetryCount + 1;
 
-    let planText;
-    // Write the prompt to a temp file and open it as a regular file descriptor for
-    // stdin. This fixes two persistent EPERM failure modes in the detached watcher:
-    //
-    //   1. execFileSync with `input:` creates an anonymous pipe for stdin. On Windows,
-    //      a Job Object with JOB_OBJECT_UILIMIT_HANDLES blocks pipe-handle inheritance
-    //      across process boundaries in a detached (console-less) process — EPERM at
-    //      spawn time. Regular file handles are NOT subject to this restriction.
-    //
-    //   2. execSync with shell:true spawns cmd.exe as an intermediary. cmd.exe also
-    //      fails EPERM in the same Job Object context.
-    //
-    // Passing stdio: [stdinFd, "pipe", "pipe"] — where stdinFd is an open file
-    // descriptor, not a pipe end — succeeds because the OS treats inheritable file
-    // handles differently from anonymous pipe handles under Job Object restrictions.
-    //
-    // NOTE: do NOT add --tools "" — an empty string causes a non-zero exit. Omit the
-    // flag entirely; --print mode already prevents interactive tool use.
-    const contextFile = path.join(REPO_ROOT, "reports", "claude-plan-context.tmp.md");
-    fs.writeFileSync(contextFile, stdinInput, "utf8");
-    let stdinFd = -1;
+    const promptFile = path.join(REPO_ROOT, "reports", "codex-plan-prompt.tmp.md");
+    fs.writeFileSync(promptFile, prompt, "utf8");
+
     try {
-      stdinFd = fs.openSync(contextFile, "r");
-      log(
-        `Claude CLI resolved to ${formatClaudeDisplayName(claudeExe)} - using file-based stdin invocation`,
-      );
-      if (process.platform === "win32" && !claudeExe) {
-        log("Claude native exe was not found - using shell fallback for PATH claude.cmd");
-      }
-      planText = execClaudeSync(
-        ["--print", "--output-format", "text"],
-        {
-          cwd: REPO_ROOT,
-          stdio: [stdinFd, "pipe", "pipe"],
-          timeout: CLAUDE_TIMEOUT_MS,
-          encoding: "utf8",
-          maxBuffer: 10 * 1024 * 1024,
-          windowsHide: true,
-        },
-        claudeExe,
-      );
+      const codexBin = getCodexBinary();
+      const cmd = [
+        `"${codexBin}"`,
+        "exec",
+        "--json",
+        "--dangerously-bypass-approvals-and-sandbox",
+        "-C",
+        `"${REPO_ROOT}"`,
+        "-o",
+        `"${CODEX_OUTPUT_FILE}"`,
+        "-",
+        "<",
+        `"${promptFile}"`,
+      ].join(" ");
+
+      execSync(cmd, {
+        cwd: REPO_ROOT,
+        shell: true,
+        windowsHide: true,
+        timeout: PLAN_TIMEOUT_MS,
+        stdio: ["ignore", "inherit", "inherit"],
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       writeHardeningBlockedState(state, message, nextRetryCount);
       if (nextRetryCount >= MAX_HARDENING_RETRIES) {
         log(
-          `Claude CLI invocation failed after ${MAX_HARDENING_RETRIES} attempts - permanent block. Sending notification.`,
+          `Codex plan hardening failed after ${MAX_HARDENING_RETRIES} attempts - permanent block. Sending notification.`,
         );
         sendHardeningFailureNotification(state, message);
       } else {
         log(
-          `Claude CLI invocation failed (attempt ${nextRetryCount}/${MAX_HARDENING_RETRIES}) - retry in 5 min. See reports/.claude-hardening-blocked.json`,
+          `Codex plan hardening failed (attempt ${nextRetryCount}/${MAX_HARDENING_RETRIES}) - retry in 5 min. See reports/.codex-plan-hardening-blocked.json`,
         );
       }
       throw err;
     } finally {
-      if (stdinFd !== -1) {
-        try {
-          fs.closeSync(stdinFd);
-        } catch {
-          /* ignore */
-        }
-      }
-      removeFileIfExists(contextFile);
+      removeFileIfExists(promptFile);
     }
 
-    planText = planText.trim();
-    if (!planText) {
-      writeHardeningBlockedState(state, "Claude returned an empty response", nextRetryCount);
+    if (!fs.existsSync(PLAN_FILE)) {
+      writeHardeningBlockedState(state, "Codex failed to produce reports/codex-plan.md", nextRetryCount);
       if (nextRetryCount >= MAX_HARDENING_RETRIES) {
-        sendHardeningFailureNotification(state, "Claude returned an empty response");
+        sendHardeningFailureNotification(state, "Codex failed to produce reports/codex-plan.md");
       }
-      throw new Error("Claude plan hardening returned an empty plan");
+      throw new Error("Codex plan hardening failed to write reports/codex-plan.md");
+    }
+
+    const planText = readTextFile(PLAN_FILE).trim();
+    if (!planText) {
+      writeHardeningBlockedState(state, "Codex wrote an empty plan", nextRetryCount);
+      if (nextRetryCount >= MAX_HARDENING_RETRIES) {
+        sendHardeningFailureNotification(state, "Codex wrote an empty plan");
+      }
+      throw new Error("Codex plan hardening returned an empty plan");
     }
 
     if (!isUsablePlan(planText)) {
       writeHardeningBlockedState(
         state,
-        "Claude returned a response missing required plan sections",
+        "Codex returned a plan missing required plan sections",
         nextRetryCount,
       );
       if (nextRetryCount >= MAX_HARDENING_RETRIES) {
         sendHardeningFailureNotification(
           state,
-          "Claude returned a response missing required plan sections",
+          "Codex returned a plan missing required plan sections",
         );
       }
-      throw new Error("Claude plan hardening returned invalid plan output");
+      throw new Error("Codex plan hardening returned invalid plan output");
     }
 
     clearHardeningBlockedState();
-    fs.writeFileSync(PLAN_FILE, `${planText}\n`, "utf8");
     writePlanMetadata(state);
-    markReadyForImplementation(state, "claude");
-    log("Claude plan hardening complete - state READY_FOR_IMPLEMENTATION");
+    markReadyForImplementation(state, "codex");
+    log("Codex plan hardening complete - state READY_FOR_IMPLEMENTATION");
   });
 }
 
@@ -1296,7 +1197,7 @@ function runCodexImplementation(state) {
 - Required branch: codex/${issueSlug}
 - Implementation summary target: reports/codex-implementation.md
 - Open a normal PR, not a draft PR.
-- After PR creation, apply review fixes locally via Claude Code (see CLAUDE.md — PR Review Fix Stage).
+- After PR creation, apply review fixes locally via the repository review process.
 `;
   const previousImplementationMtime = statMtime(IMPLEMENTATION_FILE);
   const previousOutputMtime = statMtime(CODEX_OUTPUT_FILE);
@@ -1401,7 +1302,7 @@ function runCodexImplementation(state) {
 }
 
 // Recovery path: Codex created a branch + PR but exited before writing the report.
-// Runs a targeted Claude session on the existing branch to write only the report,
+// Runs a targeted Codex session on the existing branch to write only the report,
 // then commits and pushes it so the watcher can advance to IMPLEMENTATION_COMPLETE.
 // Called from evaluatePipeline() when state is IMPLEMENTATION_FAILED with the
 // specific REASON_NO_IMPL_REPORT reason and an open PR is confirmed.
@@ -1656,7 +1557,7 @@ function cleanupStopBranch(issueSlug) {
 //   IDLE        — the pipeline is already waiting for a new cycle.
 //   RESEARCHING — a new research write is expected and normal.
 //   PLANNING    — hasUsablePlanArtifactForState() already detects hash mismatches
-//                 and re-runs Claude plan hardening automatically.
+//                 and re-runs Codex plan hardening automatically.
 function checkForResearchCycleChange(state) {
   if (!state || !fs.existsSync(RESEARCH_FILE)) {
     return false;
@@ -1733,7 +1634,7 @@ function evaluatePipeline() {
 
   // RESEARCHING is set by Copilot while it writes the research artifact. The watcher
   // has no role during that window — but once copilot-research.md exists and is non-empty
-  // it must advance the state to PLANNING so Claude plan hardening can run. Without this
+  // it must advance the state to PLANNING so Codex plan hardening can run. Without this
   // handler the pipeline stalls silently: the watcher falls through all branches,
   // logs nothing, and never triggers hardening. (Bug surfaced 2026-05-23.)
   if (state.state === "RESEARCHING") {
@@ -1781,10 +1682,10 @@ function evaluatePipeline() {
     // IMPORTANT: do not delete a matching timed retry block when its retry window
     // elapses; preserving retry_count allows failures to accumulate to permanent
     // block and notification after MAX_HARDENING_RETRIES.
-    if (fs.existsSync(CLAUDE_HARDENING_BLOCKED_FILE)) {
+    if (fs.existsSync(PLAN_HARDENING_BLOCKED_FILE)) {
       let shouldClearStaleBlock = false;
       try {
-        const blocked = readJson(CLAUDE_HARDENING_BLOCKED_FILE);
+        const blocked = readJson(PLAN_HARDENING_BLOCKED_FILE);
         if (blocked.issue !== (state.issue ?? "")) {
           shouldClearStaleBlock = true;
         } else {
@@ -1805,7 +1706,7 @@ function evaluatePipeline() {
     }
 
     if (!hasUsablePlanArtifactForState(state)) {
-      runClaudePlanHardening(state);
+      runCodexPlanHardening(state);
       return;
     }
 
@@ -1955,73 +1856,39 @@ function pollPipeline() {
   }
 }
 
-function checkClaudeAvailability() {
-  const claudeExe = resolveClaudeExe();
-
-  // Regression guard: assert the production invocation args are sane before the
-  // watcher ever tries a real run. Specifically: --tools must never be an empty
-  // string — passing ["--tools", ""] causes the CLI to exit non-zero.
-  // This check catches any future edit that accidentally reintroduces that pattern.
-  const PROD_ARGS = ["--print", "--output-format", "text"];
-  const badToolsArg = PROD_ARGS.findIndex((a, i) => a === "--tools" && PROD_ARGS[i + 1] === "");
-  if (badToolsArg !== -1) {
-    log(
-      "STARTUP ERROR: PROD_ARGS contains --tools with an empty string value — this will always fail. Fix scripts/pipeline-watcher.js immediately.",
-    );
-    process.exit(1);
-  }
-
-  // Regression guard: test the EXACT invocation pattern used in plan hardening —
-  // execFileSync with a file-descriptor for stdin, not an anonymous pipe (input:).
-  // A plain --version with stdio:"ignore" passes even when the fd path is broken.
-  const testFile = path.join(REPO_ROOT, "reports", ".claude-invocation-test.tmp");
-  let testFd = -1;
+function checkCodexAvailability() {
+  const testFile = path.join(REPO_ROOT, "reports", ".codex-invocation-test.tmp");
   try {
     fs.writeFileSync(testFile, "", "utf8");
-    testFd = fs.openSync(testFile, "r");
-    execClaudeSync(
-      ["--version"],
-      {
-        stdio: [testFd, "pipe", "pipe"],
-        timeout: 10000,
-        encoding: "utf8",
-        windowsHide: true,
-      },
-      claudeExe,
-    );
-    log(
-      `Claude CLI health check passed (file-based stdio verified, ${formatClaudeDisplayName(claudeExe)})`,
-    );
+    const codexBin = getCodexBinary();
+    const cmd = [`"${codexBin}"`, "--version"].join(" ");
+    execSync(cmd, {
+      cwd: REPO_ROOT,
+      shell: true,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 10000,
+      encoding: "utf8",
+    });
+    log(`Codex CLI health check passed (${codexBin})`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    log(
-      `WARNING: Claude CLI health check failed - plan hardening will be blocked on PLANNING state`,
-    );
+    log(`WARNING: Codex CLI health check failed - plan hardening will be blocked on PLANNING state`);
     log(`  Reason: ${message}`);
-    log(`  Fix:    npm install -g @anthropic-ai/claude-code  then  claude auth`);
+    log(`  Fix: ensure 'codex' CLI is installed and available on PATH`);
   } finally {
-    if (testFd !== -1) {
-      try {
-        fs.closeSync(testFd);
-      } catch {
-        /* ignore */
-      }
-    }
     removeFileIfExists(testFile);
   }
 }
 
 function startPipelineWatcher() {
   log("Pipeline watcher started");
-  checkClaudeAvailability();
+  checkCodexAvailability();
   setInterval(pollPipeline, POLL_INTERVAL_MS);
 }
 
 export {
-  buildClaudeShellCommand,
-  execClaudeSync,
   isActivePhaseUpdatePath,
-  shouldUseClaudeShellFallback,
 };
 
 if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {

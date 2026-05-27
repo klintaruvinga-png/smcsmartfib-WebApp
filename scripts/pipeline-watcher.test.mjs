@@ -1,43 +1,8 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import {
-  buildClaudeShellCommand,
-  isActivePhaseUpdatePath,
-  shouldUseClaudeShellFallback,
-} from "./pipeline-watcher.js";
+import { isActivePhaseUpdatePath } from "./pipeline-watcher.js";
 
-const originalPlatform = process.platform;
-
-afterEach(() => {
-  Object.defineProperty(process, "platform", { value: originalPlatform });
-});
-
-describe("pipeline watcher Claude shell fallback", () => {
-  it("uses shell fallback on Windows when no native Claude executable was resolved", () => {
-    Object.defineProperty(process, "platform", { value: "win32" });
-
-    expect(shouldUseClaudeShellFallback(null)).toBe(true);
-    expect(buildClaudeShellCommand(["--print", "--output-format", "text"])).toBe(
-      "claude --print --output-format text",
-    );
-  });
-
-  it("does not use shell fallback when a native Claude executable is available", () => {
-    Object.defineProperty(process, "platform", { value: "win32" });
-
-    expect(
-      shouldUseClaudeShellFallback(
-        "C:\\Users\\me\\AppData\\Roaming\\npm\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe",
-      ),
-    ).toBe(false);
-  });
-
-  it("does not use shell fallback on non-Windows platforms", () => {
-    Object.defineProperty(process, "platform", { value: "linux" });
-
-    expect(shouldUseClaudeShellFallback(null)).toBe(false);
-  });
-
+describe("pipeline watcher state detection", () => {
   it("treats migration archive paths as non-active phase updates", () => {
     expect(
       isActivePhaseUpdatePath(

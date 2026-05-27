@@ -58,7 +58,7 @@ Overwrite if the file already exists.
 
 ---
 
-## STEP 3 - HAND OFF TO CLAUDE PLAN HARDENING
+## STEP 3 - HAND OFF TO CODEX PLAN HARDENING
 
 After saving `reports/copilot-research.md`, update `.smc-workflow-state.json` to:
 
@@ -95,6 +95,6 @@ reports/copilot-research.md - saved
 Copilot intake complete
 Local pipeline runner started or already active
 Local pipeline runner now owns:
-1. Claude plan hardening -> reports/codex-plan.md
+1. Codex plan hardening -> reports/codex-plan.md
 2. Codex implementation -> branch + normal PR
 ```
