@@ -1691,10 +1691,17 @@ function checkForResearchCycleChange(state) {
   const issueSlug = slugifyIssue(state.issue || "pipeline-issue");
   archiveCycleArtifacts(issueSlug);
   clearImplementationFailedState();
+  const researchMtimeIso = (() => {
+    try {
+      return fs.statSync(RESEARCH_FILE).mtime.toISOString();
+    } catch {
+      return new Date().toISOString();
+    }
+  })();
   writeJson(STATE_FILE, {
     state: "RESEARCHING",
     issue: state.issue,
-    started_at: new Date().toISOString(),
+    started_at: researchMtimeIso,
   });
   return true;
 }
