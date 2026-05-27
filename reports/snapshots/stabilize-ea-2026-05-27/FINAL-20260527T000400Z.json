@@ -1,0 +1,86 @@
+{
+  "snapshot_type": "FINAL",
+  "workflow_id": "stabilize-ea-2026-05-27",
+  "timestamp": "2026-05-27T00:04:00Z",
+  "git": {
+    "branch": "claude/nice-fermat-nah1v",
+    "commit_hash": "1e8a24a1c10d088c31923ec74e934d8a50e13d94",
+    "tags_created": [
+      "snapshot/stabilize-ea-2026-05-27-start-20260527T000000Z",
+      "rollback/stabilize-ea-2026-05-27-before-patches",
+      "rollback/stabilize-ea-2026-05-27-after-patch-1"
+    ]
+  },
+  "patches_applied": [
+    {
+      "id": "PATCH-001",
+      "description": "Fix 3 prettier formatting errors (sniperClient.ts + -admin.test.tsx)",
+      "files": ["src/lib/api/sniperClient.ts", "src/routes/-admin.test.tsx"],
+      "commit": "1e8a24a1c10d088c31923ec74e934d8a50e13d94",
+      "severity": "LOW",
+      "logic_change": false
+    }
+  ],
+  "migration_status_post_patch": {
+    "current_phase": "Phase 4 — Fib Engine Migration",
+    "phase_3_status": "COMPLETE — 72h soak closed PASS (2026-05-25)",
+    "blockers_addressed": [
+      "BUG-2026-05-27-001: Prettier formatting errors resolved (lint CI gate now clear)"
+    ],
+    "remaining_blockers": [
+      "MIGRATION-001: T0 admin baseline capture — operator action required",
+      "MIGRATION-002: Track A/B/C lead assignments — human decision required"
+    ],
+    "phase_readiness": "Phase 4 code implementation can begin when Track leads assigned and T0 baseline captured"
+  },
+  "tests": {
+    "commands_run": [
+      "npx eslint .",
+      "npx vite build",
+      "npm run check:mql",
+      "php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
+      "php -l wordpress/smc-superfib-sniper/class-market-data-service.php"
+    ],
+    "passing": true,
+    "failures": [],
+    "warnings": [
+      "11 pre-existing ESLint warnings (react-refresh/only-export-components x9, react-hooks/exhaustive-deps x2) — architectural, non-blocking",
+      "npm run lint fails with ERR_MODULE_NOT_FOUND for @eslint/js in remote environment — use npx eslint as workaround"
+    ]
+  },
+  "ea_integration_status": {
+    "market_stream_route": "POST /wp-json/sniper/v1/ea/market-stream",
+    "auth_required": true,
+    "auth_header": "X-EA-API-Key",
+    "header_aliases": ["x-ea-api-key", "x_ea_api_key", "x-api-key", "x_api_key"],
+    "secret_env": "SMC_SF_EA_API_KEY",
+    "user_id_required": true,
+    "payload_validation": true,
+    "stale_rejection": true,
+    "stale_threshold_sec": 300,
+    "drift_warning_threshold_sec": 120,
+    "ohlc_validation": true,
+    "epoch_guard": true,
+    "future_candle_guard": true,
+    "tick_volume_clamp": true,
+    "symbol_alias_mapping": true,
+    "audit_trail": true
+  },
+  "rollback": {
+    "manifest": "ROLLBACK-MANIFEST.json",
+    "rollback_points_count": 3
+  },
+  "regression_checklist": {
+    "authority_diagnostics_returns_401_unauthenticated": "CONFIRMED — permission_user callback",
+    "admin_routes_require_manage_options": "CONFIRMED — permission_admin callback",
+    "ea_route_rejects_missing_token": "CONFIRMED — WP_Error 401",
+    "ea_route_rejects_invalid_token": "CONFIRMED — WP_Error 403",
+    "ea_route_rejects_missing_user_id": "CONFIRMED — WP_Error 400",
+    "ea_route_rejects_malformed_payload": "CONFIRMED — WP_Error 400",
+    "ea_route_rejects_stale_quote_time": "CONFIRMED — WP_Error 422 at >300s",
+    "ea_route_rejects_invalid_ohlc": "CONFIRMED — validate_ohlc() guard",
+    "dashboard_uses_backend_age_sec": "CONFIRMED — sniperClient.ts normalizeSnapshot()",
+    "signal_engine_requires_fresh_candles": "CONFIRMED — insert_mt5_candle() age guard",
+    "backend_is_source_of_truth": "CONFIRMED — no frontend signal override"
+  }
+}

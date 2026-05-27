@@ -1,0 +1,23 @@
+{
+  "snapshot_type": "AFTER-PATCH-1",
+  "workflow_id": "stabilize-ea-2026-05-27",
+  "timestamp": "2026-05-27T00:03:00Z",
+  "patch_applied": "PATCH-001",
+  "patch_description": "Fix 3 prettier formatting errors: sniperClient.ts resetSoak() return type, -admin.test.tsx lines 488 and 750 trailing comma/newline",
+  "files_changed": [
+    "src/lib/api/sniperClient.ts",
+    "src/routes/-admin.test.tsx"
+  ],
+  "git": {
+    "branch": "claude/nice-fermat-nah1v",
+    "commit_hash": "1e8a24a1c10d088c31923ec74e934d8a50e13d94",
+    "tag": "rollback/stabilize-ea-2026-05-27-after-patch-1"
+  },
+  "tests": {
+    "npm_run_lint": "PASS (0 errors, 11 pre-existing warnings)",
+    "npm_run_build": "PASS",
+    "npm_run_check_mql": "PASS",
+    "php_syntax_main_plugin": "PASS",
+    "php_syntax_market_data_service": "PASS"
+  }
+}
