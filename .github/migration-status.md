@@ -222,7 +222,7 @@ Market-Stream Auth:
 - ~~Live browser verification~~ — **CLEARED 2026-05-22**: MT5 authority Live ✅ · BACKEND LIVE ✅ · London session ✅ · 10/12 symbols live ✅ · Streak 8d LIVE ✅
 - ~~NAS100/US30 config item~~ — **RESOLVED**: NAS100/US30 ARE present in EA as Deriv broker names (`US Tech 100`, `Wall Street 30`). SymbolNormalizer alias map correctly resolves both to canonical symbols. Offline status in closeout snapshot (04:17 UTC) is expected pre-market behaviour — equities open at 13:30 UTC.
 - ~~72-hour stability soak~~ — **CLEARED 2026-05-25**: Soak window closed with 0 engine errors in final 24h
-- ~~T0 admin baseline capture~~ — **CLEARED 2026-05-27**: Phase 4 soak workspace baseline captured and exported (`phase-4-30-day-2026-05-27.md`)
+- ~~T0 admin baseline capture~~ — **CLEARED 2026-05-27**: Phase 4 soak workspace baseline captured and exported (`.github/migration/phase-updates/phase-4-30-day-2026-05-27.md`)
 
 ---
 
@@ -245,7 +245,7 @@ Market-Stream Auth:
 - [x] `scripts/parity-validator.php` — machine-readable JSON gate report; self-test 100% PASS *(2026-05-25)*
 - [x] `test-fib-ingestion.php` — 7 contract tests all PASS *(2026-05-25)*
 - [x] **[MANUAL]** Live EA deployment to MT5 terminal completed *(operator confirmed 2026-05-27; 30-day corpus accumulation started)*
-- [x] **[MANUAL]** T0 admin soak baseline captured for `PHASE_4_30_DAY` *(baseline checkpoint exported 2026-05-27; see `phase-4-30-day-2026-05-27.md`)*
+- [x] **[MANUAL]** T0 admin soak baseline captured for `PHASE_4_30_DAY` *(baseline checkpoint exported 2026-05-27; see `.github/migration/phase-updates/phase-4-30-day-2026-05-27.md`)*
 - [x] **[MANUAL]** Live runtime verification completed *(2026-05-27 — EA reattached; license-check `ea_version=1.00`; fib POST OK for EURUSD/USDJPY/XAUUSD; plugin `13.0.3`; backend ingest confirmed `levels_written=96`)*
 - [ ] **[MANUAL]** Historical replay corpus (EURUSD + USDJPY + XAUUSD, 30-day, M15/H1/D1)
 - [ ] **[MANUAL]** Live parity validator run — MT5 output vs. Pine reference snapshots
