@@ -306,8 +306,98 @@ function run_parity_comparison(array $mt5Levels, array $pineLevels, $runDate) {
         ));
     }
 
-    foreach ($bySymbol as $sym => &$tfs) {
-        foreach ($tfs as $tf => &$data) {
+
+    $nonRequiredKeys = array_unique(array_merge(array_keys($mt5Index), array_keys($pineIndex)));
+    foreach ($nonRequiredKeys as $key) {
+        if (isset($requiredTuples[$key])) {
+            continue;
+        }
+
+        $mt5Present = isset($mt5Index[$key]);
+        $pinePresent = isset($pineIndex[$key]);
+        $tuple = $mt5Present ? $mt5Index[$key] : $pineIndex[$key];
+
+        $sym = strtoupper((string) ($tuple['symbol'] ?? ''));
+        $tf  = strtoupper((string) ($tuple['timeframe'] ?? ''));
+        $fam = strtoupper((string) ($tuple['family'] ?? ''));
+        $rat = (float) ($tuple['ratio'] ?? 0);
+
+        ensure_symbol_timeframe_bucket($bySymbol, $sym, $tf);
+        $totalTuples++;
+
+        if (!$mt5Present || !$pinePresent) {
+            $reason = (!$mt5Present && !$pinePresent)
+                ? 'missing_tuple_in_both_sources'
+                : (!$mt5Present ? 'missing_mt5_output' : 'missing_pine_reference');
+            $criticalMismatches[] = array(
+                'symbol' => $sym,
+                'timeframe' => $tf,
+                'family' => $fam,
+                'ratio' => $rat,
+                'mt5_price' => $mt5Present ? $mt5Index[$key]['price'] : null,
+                'pine_price' => $pinePresent ? $pineIndex[$key]['price'] : null,
+                'drift' => null,
+                'reason' => $reason,
+            );
+            record_bucket_mismatch($bySymbol, $sym, $tf, array(
+                'family' => $fam,
+                'ratio' => $rat,
+                'mt5_price' => $mt5Present ? $mt5Index[$key]['price'] : null,
+                'pine_price' => $pinePresent ? $pineIndex[$key]['price'] : null,
+                'drift' => null,
+                'reason' => $reason,
+            ));
+            continue;
+        }
+
+        $mt5Price = $mt5Index[$key]['price'];
+        $pinePrice = $pineIndex[$key]['price'];
+        $drift = abs($mt5Price - $pinePrice);
+
+        $bySymbol[$sym][$tf]['total']++;
+
+        if ($drift <= EXACT_MATCH_TOLERANCE) {
+            $exactMatches++;
+            $bySymbol[$sym][$tf]['exact']++;
+            continue;
+        }
+
+        if ($drift <= ACCEPTABLE_DRIFT) {
+            $acceptableDrift++;
+            $bySymbol[$sym][$tf]['acceptable']++;
+            $driftDetails[] = array(
+                'symbol' => $sym,
+                'timeframe' => $tf,
+                'family' => $fam,
+                'ratio' => $rat,
+                'mt5_price' => $mt5Price,
+                'pine_price' => $pinePrice,
+                'drift' => $drift,
+            );
+            continue;
+        }
+
+        $criticalMismatches[] = array(
+            'symbol' => $sym,
+            'timeframe' => $tf,
+            'family' => $fam,
+            'ratio' => $rat,
+            'mt5_price' => $mt5Price,
+            'pine_price' => $pinePrice,
+            'drift' => $drift,
+            'reason' => 'price_drift_exceeds_0.001',
+        );
+        record_bucket_mismatch($bySymbol, $sym, $tf, array(
+            'family' => $fam,
+            'ratio' => $rat,
+            'mt5_price' => $mt5Price,
+            'pine_price' => $pinePrice,
+            'drift' => $drift,
+            'reason' => 'price_drift_exceeds_0.001',
+        ));
+    }
+
+    foreach ($bySymbol as $sym => &$tfs) {        foreach ($tfs as $tf => &$data) {
             $passing = $data['exact'] + $data['acceptable'];
             $data['parity_pct'] = $data['total'] > 0
                 ? round($passing / $data['total'] * 100, 2)
