@@ -269,6 +269,22 @@ describe("PlanPage ranking and execution guards", () => {
     ).toBe(false);
   });
 
+  it("mirrors backend-authored stage lot sizes without recomputing or flattening them", () => {
+    renderPlanPage({
+      signals: [buildSignal()],
+      ladders: [
+        buildPlan({
+          lotSize: { e1: 0.13, e2: 0.29, e3: 0.47 },
+        }),
+      ],
+    });
+
+    const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
+    expect(cardText).toContain("0.13 lot");
+    expect(cardText).toContain("0.29 lot");
+    expect(cardText).toContain("0.47 lot");
+  });
+
   it("shows a retryable settings error instead of the backend URL guard when settings fail", () => {
     hookMocks.usePollingUiState.mockReturnValue({
       backendReady: false,
