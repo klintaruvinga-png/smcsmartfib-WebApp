@@ -1,5 +1,5 @@
 {
-  "issue": "SMC Intake - I am currently unable to make a soak snapshot because the admin page says 'Configure duration and checkpoint count before saving snapshots.' However I have no way to configure via front end and the checkpoint button is disabled",
-  "plan_hash": "8ec902ff3c725225615569c2982486a043e66dc9c3cda623f1696c0ab350d224",
-  "written_at": "2026-05-28T14:13:40.9248672+02:00"
+  "issue": "SMC Intake - Progressive Entry Lot Sizing patch",
+  "plan_hash": "4dc9bf16a52f18253d377f54539a578effa28939692f6bfbfe6e13a9ab15efda",
+  "written_at": "2026-05-28T21:13:49.923Z"
 }
