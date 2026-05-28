@@ -301,6 +301,8 @@ public:
         if (StringLen(baseUrl) == 0)
             return;
 
+        fibEngine.RefreshBrokerOffset();
+
         string url      = baseUrl + "/ea/signal-candidates";
         string arr      = "[";
         bool   first    = true;
@@ -313,24 +315,26 @@ public:
             // Fetch fib levels for this symbol across three timeframes.
             // We use M15 fib levels (LTF_SF) for signal evaluation.
             FibLevelOut fibLevels[];
-            int fibCount = 0;
+            int fibCount = fibEngine.BuildSignalFibLevels(symbols[i], fibLevels);
+            if (fibCount <= 0)
+            {
+                Print("[SignalEngine] No fib levels available symbol=", symbols[i],
+                      " — skipping candidate evaluation.");
+                continue;
+            }
 
-            // Build fib levels from engine for M15 only (Signal evaluation TF).
-            string fibJson = fibEngine.BuildFibPayload(symbols[i], norm, wpUserId);
-            // FibLevelOut array is not directly accessible from fibJson string —
-            // so we compute regime json and extract what we need from regime engine output.
-            // For now, use the regime engine's last computed regime state and pass
-            // default regime values (TRANSITIONAL/RANGING) to signal engine.
-            // Phase 6 full parity will wire regime state through a shared state cache.
-            string htfBias    = "TRANSITIONAL";
-            string ltfRegime  = "RANGING";
-            double chopScore  = 0.5;
+            RegimeSnapshotOut regimeState;
+            if (!regimeEngine.ComputeRegimeState(symbols[i], regimeState))
+            {
+                Print("[SignalEngine] No regime state available symbol=", symbols[i],
+                      " — skipping candidate evaluation.");
+                continue;
+            }
 
             SignalCandidate cand;
-            // With fibCount=0 the signal engine will return false (no candidate).
-            // Full evaluation wires in deserialized fib levels — scaffold for now.
             bool found = signalEngine.EvaluateSymbol(
-                symbols[i], norm, htfBias, ltfRegime, chopScore,
+                symbols[i], norm,
+                regimeState.htfBias, regimeState.ltfRegime, regimeState.chopScore,
                 fibLevels, fibCount, cand);
 
             if (!found)

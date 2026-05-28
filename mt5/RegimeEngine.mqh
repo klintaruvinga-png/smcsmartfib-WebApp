@@ -1,6 +1,15 @@
 #ifndef REGIME_ENGINE_MQH
 #define REGIME_ENGINE_MQH
 
+struct RegimeSnapshotOut
+{
+    string htfBias;
+    string ltfRegime;
+    double chopScore;
+    double ema20D1;
+    double atr14H1;
+};
+
 //+------------------------------------------------------------------+
 //| RegimeEngine — Phase 5: Regime & Chop Engine                    |
 //|                                                                  |
@@ -54,7 +63,7 @@ public:
     //
     // Returns JSON object string, or "" on fatal error.
     // ----------------------------------------------------------------
-    string ComputeRegimeJson(string symbol, string normalizedSymbol, int userId)
+    bool ComputeRegimeState(string symbol, RegimeSnapshotOut& out)
     {
         // --- 1. D1 EMA-20 for HTF bias ---
         double d1Close[];
@@ -62,14 +71,14 @@ public:
         if (d1Bars < MIN_BARS - 10)
         {
             Print("[RegimeEngine] Insufficient D1 bars symbol=", symbol, " got=", d1Bars);
-            return "";
+            return false;
         }
 
         ArraySetAsSeries(d1Close, true); // index 0 = most recent
 
         double ema20 = ComputeEMA(d1Close, d1Bars, EMA_PERIOD);
         if (ema20 <= 0.0)
-            return "";
+            return false;
 
         double currentD1Close = d1Close[0];
         string htfBias;
@@ -86,7 +95,7 @@ public:
         if (h1Bars < ATR_PERIOD + 1)
         {
             Print("[RegimeEngine] Insufficient H1 bars symbol=", symbol, " got=", h1Bars);
-            return "";
+            return false;
         }
 
         ArraySetAsSeries(h1Rates, true);
@@ -95,7 +104,7 @@ public:
         if (atr14 <= 0.0)
         {
             Print("[RegimeEngine] ATR computation failed symbol=", symbol);
-            return "";
+            return false;
         }
 
         // --- 3. Chop score from H1 directional efficiency ---
@@ -113,15 +122,30 @@ public:
         else
             ltfRegime = "CHOP";
 
+        out.htfBias = htfBias;
+        out.ltfRegime = ltfRegime;
+        out.chopScore = chopScore;
+        out.ema20D1 = ema20;
+        out.atr14H1 = atr14;
+
+        return true;
+    }
+
+    string ComputeRegimeJson(string symbol, string normalizedSymbol, int userId)
+    {
+        RegimeSnapshotOut state;
+        if (!ComputeRegimeState(symbol, state))
+            return "";
+
         // --- 5. Build JSON ---
         string json = "{";
         json += "\"user_id\":"       + IntegerToString(userId)            + ",";
         json += "\"symbol\":\""      + normalizedSymbol                   + "\",";
-        json += "\"htf_bias\":\""    + htfBias                            + "\",";
-        json += "\"ltf_regime\":\""  + ltfRegime                          + "\",";
-        json += "\"chop_score\":"    + DoubleToString(chopScore, 4)        + ",";
-        json += "\"ema20_d1\":"      + DoubleToString(ema20, 8)            + ",";
-        json += "\"atr14_h1\":"      + DoubleToString(atr14, 8);
+        json += "\"htf_bias\":\""    + state.htfBias                      + "\",";
+        json += "\"ltf_regime\":\""  + state.ltfRegime                    + "\",";
+        json += "\"chop_score\":"    + DoubleToString(state.chopScore, 4) + ",";
+        json += "\"ema20_d1\":"      + DoubleToString(state.ema20D1, 8)   + ",";
+        json += "\"atr14_h1\":"      + DoubleToString(state.atr14H1, 8);
         json += "}";
 
         return json;
