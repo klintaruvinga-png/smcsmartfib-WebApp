@@ -58,7 +58,7 @@ public:
     }
 
     // Build JSON payload containing LTF_SF and HTF_AF levels for a symbol across
-    // the three required timeframes (M15, H1, D1).  Returns "" on fatal error.
+    // the four required timeframes (M15, H1, H4, D1).  Returns "" on fatal error.
     //
     // symbol           — raw broker symbol (will be normalized by caller)
     // normalizedSymbol — canonical symbol (e.g. "EURUSD")
@@ -67,13 +67,13 @@ public:
     {
         string json = "";
 
-        int tfs[3]    = {900, 3600, 86400};
-        string names[3] = {"M15", "H1", "D1"};
-        ENUM_TIMEFRAMES mql_tfs[3] = {PERIOD_M15, PERIOD_H1, PERIOD_D1};
+        int tfs[4]    = {900, 3600, 14400, 86400};
+        string names[4] = {"M15", "H1", "H4", "D1"};
+        ENUM_TIMEFRAMES mql_tfs[4] = {PERIOD_M15, PERIOD_H1, PERIOD_H4, PERIOD_D1};
 
         json += "[";
         bool first = true;
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < 4; i++)
         {
             string tfJson = ComputeFibJson(symbol, normalizedSymbol, userId,
                                            mql_tfs[i], tfs[i], names[i]);

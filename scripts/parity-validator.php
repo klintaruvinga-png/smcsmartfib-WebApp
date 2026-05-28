@@ -17,8 +17,8 @@
  * validator logic itself is correct (gate should PASS at 100%).
  *
  * Exit codes:
- *   0 — gate PASS
- *   1 — gate FAIL or input error
+ *   0 - gate PASS
+ *   1 - gate FAIL or input error
  */
 
 // ---- Thresholds (from PHASE4_TESTING_GUIDE.md) ----
@@ -36,7 +36,7 @@ $runDate = gmdate('Y-m-d');
 
 if ($mt5File === null && $pineFile === null) {
     // ---- Self-test mode: use PHP engine as both source and target ----
-    fwrite(STDOUT, "[parity-validator] No input files provided — running synthetic self-test.\n");
+    fwrite(STDOUT, "[parity-validator] No input files provided - running synthetic self-test.\n");
     list($mt5Levels, $pineLevels) = generate_synthetic_levels();
 } else {
     if ($mt5File === null || $pineFile === null) {
@@ -81,16 +81,90 @@ function load_levels_file($path) {
     return $data;
 }
 
+function phase4_required_symbols() {
+    return array('EURUSD', 'USDJPY', 'XAUUSD');
+}
+
+function phase4_required_timeframes() {
+    return array('M15', 'H1', 'H4', 'D1');
+}
+
+function phase4_required_families() {
+    return array('LTF_SF', 'HTF_AF');
+}
+
+function phase4_required_ratios() {
+    return array(-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300);
+}
+
+function phase4_required_tuples() {
+    $required = array();
+    foreach (phase4_required_symbols() as $symbol) {
+        foreach (phase4_required_timeframes() as $timeframe) {
+            foreach (phase4_required_families() as $family) {
+                foreach (phase4_required_ratios() as $ratio) {
+                    $entry = array(
+                        'symbol' => $symbol,
+                        'timeframe' => $timeframe,
+                        'family' => $family,
+                        'ratio' => $ratio,
+                    );
+                    $required[entry_key($entry)] = $entry;
+                }
+            }
+        }
+    }
+    return $required;
+}
+
+function build_levels_index(array $levels) {
+    $index = array();
+    foreach ($levels as $entry) {
+        $key = entry_key($entry);
+        $index[$key] = array(
+            'symbol' => (string) ($entry['symbol'] ?? ''),
+            'timeframe' => (string) ($entry['timeframe'] ?? ''),
+            'family' => (string) ($entry['family'] ?? ''),
+            'ratio' => (float) ($entry['ratio'] ?? 0),
+            'price' => isset($entry['price']) ? (float) $entry['price'] : null,
+        );
+    }
+    return $index;
+}
+
+function ensure_symbol_timeframe_bucket(array &$bySymbol, $symbol, $timeframe) {
+    if (!isset($bySymbol[$symbol])) {
+        $bySymbol[$symbol] = array();
+    }
+    if (!isset($bySymbol[$symbol][$timeframe])) {
+        $bySymbol[$symbol][$timeframe] = array(
+            'total' => 0,
+            'exact' => 0,
+            'acceptable' => 0,
+            'critical' => 0,
+            'parity_pct' => 0.0,
+            'mismatches' => array(),
+        );
+    }
+}
+
+function record_bucket_mismatch(array &$bySymbol, $symbol, $timeframe, array $mismatch) {
+    ensure_symbol_timeframe_bucket($bySymbol, $symbol, $timeframe);
+    $bySymbol[$symbol][$timeframe]['total']++;
+    $bySymbol[$symbol][$timeframe]['critical']++;
+    $bySymbol[$symbol][$timeframe]['mismatches'][] = $mismatch;
+}
+
 /**
  * Generate synthetic test levels using the PHP fib engine itself.
  * Both MT5 and Pine levels are identical (self-test), so parity should be 100%.
  * This validates the comparator logic is correct before live data is available.
  */
 function generate_synthetic_levels() {
-    $ratios    = array(-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300);
-    $symbols   = array('EURUSD', 'USDJPY', 'XAUUSD');
-    $timeframes = array('M15', 'H1', 'D1');
-    $families  = array('LTF_SF', 'HTF_AF');
+    $ratios    = phase4_required_ratios();
+    $symbols   = phase4_required_symbols();
+    $timeframes = phase4_required_timeframes();
+    $families  = phase4_required_families();
 
     // Deterministic anchor values for synthetic test
     $anchors = array(
@@ -119,7 +193,6 @@ function generate_synthetic_levels() {
         }
     }
 
-    // MT5 levels = Pine levels in self-test (perfect parity)
     return array($levels, $levels);
 }
 
@@ -128,148 +201,262 @@ function generate_synthetic_levels() {
  * Returns the gate report array.
  */
 function run_parity_comparison(array $mt5Levels, array $pineLevels, $runDate) {
-    // Index Pine levels by (symbol, timeframe, family, ratio)
-    $pineIndex = array();
-    foreach ($pineLevels as $entry) {
-        $key = entry_key($entry);
-        $pineIndex[$key] = (float) $entry['price'];
-    }
+    $requiredTuples = phase4_required_tuples();
+    $mt5Index = build_levels_index($mt5Levels);
+    $pineIndex = build_levels_index($pineLevels);
 
-    $totalTuples   = 0;
-    $exactMatches  = 0;
+    $totalTuples = 0;
+    $exactMatches = 0;
     $acceptableDrift = 0;
     $criticalMismatches = array();
-    $driftDetails  = array();
-    $bySymbol      = array();
+    $driftDetails = array();
+    $bySymbol = array();
+    $mt5PresentGroups = array();
+    $pinePresentGroups = array();
 
-    foreach ($mt5Levels as $entry) {
-        $sym = (string) ($entry['symbol']    ?? '');
-        $tf  = (string) ($entry['timeframe'] ?? '');
-        $fam = (string) ($entry['family']    ?? '');
-        $rat = (float)  ($entry['ratio']     ?? 0);
-        $mt5Price = (float) ($entry['price'] ?? 0);
+    foreach ($requiredTuples as $key => $required) {
+        $sym = $required['symbol'];
+        $tf  = $required['timeframe'];
+        $fam = $required['family'];
+        $rat = (float) $required['ratio'];
+        $groupKey = $sym . '|' . $tf . '|' . $fam;
 
-        $key = entry_key($entry);
-        if (!isset($pineIndex[$key])) {
-            // Missing Pine reference — critical mismatch
+        ensure_symbol_timeframe_bucket($bySymbol, $sym, $tf);
+        $totalTuples++;
+
+        $mt5Present = isset($mt5Index[$key]);
+        $pinePresent = isset($pineIndex[$key]);
+
+        if ($mt5Present) {
+            $mt5PresentGroups[$groupKey] = true;
+        }
+        if ($pinePresent) {
+            $pinePresentGroups[$groupKey] = true;
+        }
+
+        if (!$mt5Present || !$pinePresent) {
+            $reason = (!$mt5Present && !$pinePresent)
+                ? 'missing_required_tuple_in_both_sources'
+                : (!$mt5Present ? 'missing_required_mt5_output' : 'missing_required_pine_reference');
             $criticalMismatches[] = array(
-                'symbol' => $sym, 'timeframe' => $tf, 'family' => $fam, 'ratio' => $rat,
-                'mt5_price' => $mt5Price, 'pine_price' => null, 'drift' => null,
-                'reason' => 'missing_pine_reference',
+                'symbol' => $sym,
+                'timeframe' => $tf,
+                'family' => $fam,
+                'ratio' => $rat,
+                'mt5_price' => $mt5Present ? $mt5Index[$key]['price'] : null,
+                'pine_price' => $pinePresent ? $pineIndex[$key]['price'] : null,
+                'drift' => null,
+                'reason' => $reason,
             );
-            $totalTuples++;
+            record_bucket_mismatch($bySymbol, $sym, $tf, array(
+                'family' => $fam,
+                'ratio' => $rat,
+                'mt5_price' => $mt5Present ? $mt5Index[$key]['price'] : null,
+                'pine_price' => $pinePresent ? $pineIndex[$key]['price'] : null,
+                'drift' => null,
+                'reason' => $reason,
+            ));
             continue;
         }
 
-        $pinePrice = $pineIndex[$key];
-        $drift     = abs($mt5Price - $pinePrice);
-        $totalTuples++;
+        $mt5Price = $mt5Index[$key]['price'];
+        $pinePrice = $pineIndex[$key]['price'];
+        $drift = abs($mt5Price - $pinePrice);
+
+        $bySymbol[$sym][$tf]['total']++;
 
         if ($drift <= EXACT_MATCH_TOLERANCE) {
             $exactMatches++;
-            $classification = 'EXACT_MATCH';
-        } elseif ($drift <= ACCEPTABLE_DRIFT) {
-            $acceptableDrift++;
-            $classification = 'ACCEPTABLE_DRIFT';
-            $driftDetails[] = array(
-                'symbol' => $sym, 'timeframe' => $tf, 'family' => $fam, 'ratio' => $rat,
-                'mt5_price' => $mt5Price, 'pine_price' => $pinePrice, 'drift' => $drift,
-            );
-        } else {
-            $criticalMismatches[] = array(
-                'symbol' => $sym, 'timeframe' => $tf, 'family' => $fam, 'ratio' => $rat,
-                'mt5_price' => $mt5Price, 'pine_price' => $pinePrice, 'drift' => $drift,
-                'reason' => 'price_drift_exceeds_0.001',
-            );
-            $classification = 'CRITICAL_MISMATCH';
+            $bySymbol[$sym][$tf]['exact']++;
+            continue;
         }
 
-        // Aggregate by symbol/timeframe
-        if (!isset($bySymbol[$sym])) {
-            $bySymbol[$sym] = array();
-        }
-        if (!isset($bySymbol[$sym][$tf])) {
-            $bySymbol[$sym][$tf] = array(
-                'total'    => 0, 'exact' => 0, 'acceptable' => 0,
-                'critical' => 0, 'parity_pct' => 0.0, 'mismatches' => array(),
+        if ($drift <= ACCEPTABLE_DRIFT) {
+            $acceptableDrift++;
+            $bySymbol[$sym][$tf]['acceptable']++;
+            $driftDetails[] = array(
+                'symbol' => $sym,
+                'timeframe' => $tf,
+                'family' => $fam,
+                'ratio' => $rat,
+                'mt5_price' => $mt5Price,
+                'pine_price' => $pinePrice,
+                'drift' => $drift,
             );
+            continue;
         }
+
+        $criticalMismatches[] = array(
+            'symbol' => $sym,
+            'timeframe' => $tf,
+            'family' => $fam,
+            'ratio' => $rat,
+            'mt5_price' => $mt5Price,
+            'pine_price' => $pinePrice,
+            'drift' => $drift,
+            'reason' => 'price_drift_exceeds_0.001',
+        );
+        record_bucket_mismatch($bySymbol, $sym, $tf, array(
+            'family' => $fam,
+            'ratio' => $rat,
+            'mt5_price' => $mt5Price,
+            'pine_price' => $pinePrice,
+            'drift' => $drift,
+            'reason' => 'price_drift_exceeds_0.001',
+        ));
+    }
+
+
+    $nonRequiredKeys = array_unique(array_merge(array_keys($mt5Index), array_keys($pineIndex)));
+    foreach ($nonRequiredKeys as $key) {
+        if (isset($requiredTuples[$key])) {
+            continue;
+        }
+
+        $mt5Present = isset($mt5Index[$key]);
+        $pinePresent = isset($pineIndex[$key]);
+        $tuple = $mt5Present ? $mt5Index[$key] : $pineIndex[$key];
+
+        $sym = strtoupper((string) ($tuple['symbol'] ?? ''));
+        $tf  = strtoupper((string) ($tuple['timeframe'] ?? ''));
+        $fam = strtoupper((string) ($tuple['family'] ?? ''));
+        $rat = (float) ($tuple['ratio'] ?? 0);
+
+        ensure_symbol_timeframe_bucket($bySymbol, $sym, $tf);
+        $totalTuples++;
+
+        if (!$mt5Present || !$pinePresent) {
+            $reason = (!$mt5Present && !$pinePresent)
+                ? 'missing_tuple_in_both_sources'
+                : (!$mt5Present ? 'missing_mt5_output' : 'missing_pine_reference');
+            $criticalMismatches[] = array(
+                'symbol' => $sym,
+                'timeframe' => $tf,
+                'family' => $fam,
+                'ratio' => $rat,
+                'mt5_price' => $mt5Present ? $mt5Index[$key]['price'] : null,
+                'pine_price' => $pinePresent ? $pineIndex[$key]['price'] : null,
+                'drift' => null,
+                'reason' => $reason,
+            );
+            record_bucket_mismatch($bySymbol, $sym, $tf, array(
+                'family' => $fam,
+                'ratio' => $rat,
+                'mt5_price' => $mt5Present ? $mt5Index[$key]['price'] : null,
+                'pine_price' => $pinePresent ? $pineIndex[$key]['price'] : null,
+                'drift' => null,
+                'reason' => $reason,
+            ));
+            continue;
+        }
+
+        $mt5Price = $mt5Index[$key]['price'];
+        $pinePrice = $pineIndex[$key]['price'];
+        $drift = abs($mt5Price - $pinePrice);
 
         $bySymbol[$sym][$tf]['total']++;
-        if ($classification === 'EXACT_MATCH')      $bySymbol[$sym][$tf]['exact']++;
-        elseif ($classification === 'ACCEPTABLE_DRIFT') $bySymbol[$sym][$tf]['acceptable']++;
-        else {
-            $bySymbol[$sym][$tf]['critical']++;
-            $bySymbol[$sym][$tf]['mismatches'][] = array(
-                'family' => $fam, 'ratio' => $rat,
-                'mt5_price' => $mt5Price, 'pine_price' => $pinePrice, 'drift' => $drift,
-            );
+
+        if ($drift <= EXACT_MATCH_TOLERANCE) {
+            $exactMatches++;
+            $bySymbol[$sym][$tf]['exact']++;
+            continue;
         }
+
+        if ($drift <= ACCEPTABLE_DRIFT) {
+            $acceptableDrift++;
+            $bySymbol[$sym][$tf]['acceptable']++;
+            $driftDetails[] = array(
+                'symbol' => $sym,
+                'timeframe' => $tf,
+                'family' => $fam,
+                'ratio' => $rat,
+                'mt5_price' => $mt5Price,
+                'pine_price' => $pinePrice,
+                'drift' => $drift,
+            );
+            continue;
+        }
+
+        $criticalMismatches[] = array(
+            'symbol' => $sym,
+            'timeframe' => $tf,
+            'family' => $fam,
+            'ratio' => $rat,
+            'mt5_price' => $mt5Price,
+            'pine_price' => $pinePrice,
+            'drift' => $drift,
+            'reason' => 'price_drift_exceeds_0.001',
+        );
+        record_bucket_mismatch($bySymbol, $sym, $tf, array(
+            'family' => $fam,
+            'ratio' => $rat,
+            'mt5_price' => $mt5Price,
+            'pine_price' => $pinePrice,
+            'drift' => $drift,
+            'reason' => 'price_drift_exceeds_0.001',
+        ));
     }
 
-    // Second pass: Pine-only tuples that MT5 never emitted
-    $mt5Keys = array();
-    foreach ($mt5Levels as $entry) {
-        $mt5Keys[entry_key($entry)] = true;
-    }
-    foreach ($pineLevels as $entry) {
-        $key = entry_key($entry);
-        if (!isset($mt5Keys[$key])) {
-            $sym = (string) ($entry['symbol']    ?? '');
-            $tf  = (string) ($entry['timeframe'] ?? '');
-            $fam = (string) ($entry['family']    ?? '');
-            $rat = (float)  ($entry['ratio']     ?? 0);
-            $criticalMismatches[] = array(
-                'symbol' => $sym, 'timeframe' => $tf, 'family' => $fam, 'ratio' => $rat,
-                'mt5_price' => null, 'pine_price' => (float) ($entry['price'] ?? 0), 'drift' => null,
-                'reason' => 'missing_mt5_output',
-            );
-            $totalTuples++;
-        }
-    }
-
-    // Compute per-symbol/timeframe parity_pct
-    foreach ($bySymbol as $sym => &$tfs) {
-        foreach ($tfs as $tf => &$data) {
+    foreach ($bySymbol as $sym => &$tfs) {        foreach ($tfs as $tf => &$data) {
             $passing = $data['exact'] + $data['acceptable'];
             $data['parity_pct'] = $data['total'] > 0
                 ? round($passing / $data['total'] * 100, 2)
                 : 0.0;
         }
     }
+    unset($data, $tfs);
 
-    // Overall parity
     $passing = $exactMatches + $acceptableDrift;
     $overallParity = $totalTuples > 0 ? round($passing / $totalTuples * 100, 2) : 0.0;
 
-    // Gate decision: overall_parity >= 99% AND zero critical mismatches on any single pair/tf
     $hasCritical = count($criticalMismatches) > 0;
     $gate = (!$hasCritical && $overallParity >= PARITY_GATE_PCT) ? 'PASS' : 'FAIL';
 
+    $mt5RequiredMatches = count(array_intersect_key($requiredTuples, $mt5Index));
+    $pineRequiredMatches = count(array_intersect_key($requiredTuples, $pineIndex));
+
     return array(
-        'run_date'           => $runDate,
+        'run_date' => $runDate,
         'overall_parity_pct' => $overallParity,
-        'gate'               => $gate,
-        'total_tuples'       => $totalTuples,
-        'exact_matches'      => $exactMatches,
-        'acceptable_drift'   => $acceptableDrift,
+        'gate' => $gate,
+        'total_tuples' => $totalTuples,
+        'exact_matches' => $exactMatches,
+        'acceptable_drift' => $acceptableDrift,
         'critical_mismatches_count' => count($criticalMismatches),
-        'by_symbol'          => $bySymbol,
+        'by_symbol' => $bySymbol,
         'critical_mismatches' => $criticalMismatches,
         'acceptable_drift_detail' => $driftDetails,
-        'thresholds'         => array(
-            'exact_match'    => EXACT_MATCH_TOLERANCE,
-            'acceptable'     => ACCEPTABLE_DRIFT,
-            'gate_pct'       => PARITY_GATE_PCT,
+        'required_coverage' => array(
+            'symbols' => phase4_required_symbols(),
+            'timeframes' => phase4_required_timeframes(),
+            'families' => phase4_required_families(),
+            'ratios_per_group' => count(phase4_required_ratios()),
+            'expected_tuple_count' => count($requiredTuples),
+            'expected_group_count' => count(phase4_required_symbols()) * count(phase4_required_timeframes()) * count(phase4_required_families()),
+            'mt5_present_tuple_count' => $mt5RequiredMatches,
+            'pine_present_tuple_count' => $pineRequiredMatches,
+            'mt5_present_group_count' => count($mt5PresentGroups),
+            'pine_present_group_count' => count($pinePresentGroups),
+            'mt5_missing_tuple_count' => count($requiredTuples) - $mt5RequiredMatches,
+            'pine_missing_tuple_count' => count($requiredTuples) - $pineRequiredMatches,
+        ),
+        'ignored_non_phase4_tuples' => array(
+            'mt5_count' => count(array_diff_key($mt5Index, $requiredTuples)),
+            'pine_count' => count(array_diff_key($pineIndex, $requiredTuples)),
+        ),
+        'thresholds' => array(
+            'exact_match' => EXACT_MATCH_TOLERANCE,
+            'acceptable' => ACCEPTABLE_DRIFT,
+            'gate_pct' => PARITY_GATE_PCT,
         ),
     );
 }
 
 function entry_key($entry) {
     return implode('|', array(
-        strtoupper((string) ($entry['symbol']    ?? '')),
+        strtoupper((string) ($entry['symbol'] ?? '')),
         strtoupper((string) ($entry['timeframe'] ?? '')),
-        strtoupper((string) ($entry['family']    ?? '')),
+        strtoupper((string) ($entry['family'] ?? '')),
         (string) ((float) ($entry['ratio'] ?? 0)),
     ));
 }

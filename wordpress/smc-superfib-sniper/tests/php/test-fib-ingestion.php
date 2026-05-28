@@ -250,19 +250,20 @@ fib_ingest_assert(isset($result['ok']) && $result['ok'] === true, 'POST ok must 
 fib_ingest_assert_eq(32, (int) $result['levels_written'], 'M15 levels_written should be 32');
 fib_ingest_assert_eq('EURUSD', $result['symbol'], 'symbol should be EURUSD');
 
-// ---- Test 2: POST with M15 + H1 + D1 payload ----
+// ---- Test 2: POST with M15 + H1 + H4 + D1 payload ----
 $post_req_multi = new FibTestWPRestRequest(array(
     'symbol' => 'XAUUSD',
     'levels' => array(
         array('timeframe' => 'M15', 'ltf_sf' => fib_build_levels(2000, 1980, 'LTF_SF'), 'htf_af' => fib_build_levels(2010, 1970, 'HTF_AF')),
         array('timeframe' => 'H1',  'ltf_sf' => fib_build_levels(2005, 1975, 'LTF_SF'), 'htf_af' => fib_build_levels(2020, 1960, 'HTF_AF')),
+        array('timeframe' => 'H4',  'ltf_sf' => fib_build_levels(2015, 1965, 'LTF_SF'), 'htf_af' => fib_build_levels(2035, 1945, 'HTF_AF')),
         array('timeframe' => 'D1',  'ltf_sf' => fib_build_levels(2050, 1950, 'LTF_SF'), 'htf_af' => fib_build_levels(2100, 1900, 'HTF_AF')),
     ),
 ));
 $result_multi = $post_method->invoke($inst, $post_req_multi);
 fib_ingest_assert(!($result_multi instanceof WP_Error), 'Multi-TF POST should succeed');
-// 3 timeframes * 32 each = 96
-fib_ingest_assert_eq(96, (int) $result_multi['levels_written'], 'Multi-TF levels_written should be 96');
+// 4 timeframes * 32 each = 128
+fib_ingest_assert_eq(128, (int) $result_multi['levels_written'], 'Multi-TF levels_written should be 128');
 
 // ---- Test 3: POST with missing symbol → 400 ----
 $bad_req = new FibTestWPRestRequest(array('levels' => array()));
@@ -299,6 +300,15 @@ fib_ingest_assert(isset($get_result['fibs']['M15']['LTF_SF']), 'GET fibs M15 mus
 fib_ingest_assert(isset($get_result['fibs']['M15']['HTF_AF']), 'GET fibs M15 must include HTF_AF');
 fib_ingest_assert_eq(16, count($get_result['fibs']['M15']['LTF_SF']), 'GET M15 LTF_SF must have 16 levels');
 fib_ingest_assert_eq(16, count($get_result['fibs']['M15']['HTF_AF']), 'GET M15 HTF_AF must have 16 levels');
+
+$get_multi_req = new FibTestWPRestRequest(array(), array('symbol' => 'XAUUSD'));
+$get_multi_result = $get_method->invoke($inst, $get_multi_req);
+fib_ingest_assert(!($get_multi_result instanceof WP_Error), 'GET should return XAUUSD fib payload');
+fib_ingest_assert(isset($get_multi_result['fibs']['H4']), 'GET fibs must include H4 for multi-timeframe payloads');
+fib_ingest_assert(isset($get_multi_result['fibs']['H4']['LTF_SF']), 'GET fibs H4 must include LTF_SF');
+fib_ingest_assert(isset($get_multi_result['fibs']['H4']['HTF_AF']), 'GET fibs H4 must include HTF_AF');
+fib_ingest_assert_eq(16, count($get_multi_result['fibs']['H4']['LTF_SF']), 'GET H4 LTF_SF must have 16 levels');
+fib_ingest_assert_eq(16, count($get_multi_result['fibs']['H4']['HTF_AF']), 'GET H4 HTF_AF must have 16 levels');
 
 // ---- Test 6: GET with missing symbol → 400 ----
 $no_sym_req = new FibTestWPRestRequest(array(), array());
