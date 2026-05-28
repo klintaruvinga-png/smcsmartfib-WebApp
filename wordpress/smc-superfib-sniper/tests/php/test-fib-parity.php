@@ -34,17 +34,35 @@ $dataset1d = array(
     fib_test_make_candle('2024-10-15 12:00:00 UTC', 70, 7),
     fib_test_make_candle('2025-01-15 12:00:00 UTC', 80, 8),
 );
+$dataset4h = array(
+    fib_test_make_candle('2025-01-15 12:00:00 UTC', 10, 1),
+    fib_test_make_candle('2025-02-15 12:00:00 UTC', 20, 2),
+    fib_test_make_candle('2025-03-15 12:00:00 UTC', 30, 3),
+    fib_test_make_candle('2025-04-15 12:00:00 UTC', 40, 4),
+    fib_test_make_candle('2025-05-15 12:00:00 UTC', 50, 5),
+    fib_test_make_candle('2025-06-15 12:00:00 UTC', 60, 6),
+    fib_test_make_candle('2025-07-15 12:00:00 UTC', 70, 7),
+    fib_test_make_candle('2025-08-15 12:00:00 UTC', 80, 8),
+    fib_test_make_candle('2025-09-15 12:00:00 UTC', 90, 9),
+    fib_test_make_candle('2025-10-15 12:00:00 UTC', 100, 10),
+    fib_test_make_candle('2025-11-15 12:00:00 UTC', 110, 11),
+    fib_test_make_candle('2025-12-15 12:00:00 UTC', 120, 12),
+    fib_test_make_candle('2026-01-15 12:00:00 UTC', 130, 13),
+);
 
 $expectedLtf = fib_test_expected_prices(61.5, 6.15, $ratios);
+$expectedLtf4h = fib_test_expected_prices(111.5, 11.15, $ratios);
 $expectedHtf15m = fib_test_expected_prices(20.0, 2.0, $ratios);
 $expectedHtf1h = fib_test_expected_prices(20.0, 2.0, $ratios);
+$expectedHtf4h = fib_test_expected_prices(60.0, 4.0, $ratios);
 $expectedHtf1d = fib_test_expected_prices(30.0, 3.0, $ratios);
 
 $cases = array();
 foreach (array('EURUSD', 'USDJPY', 'XAUUSD') as $symbol) {
-    $cases[] = array('symbol' => $symbol, 'timeframe' => '15min', 'seconds' => 900, 'candles' => $dataset15m, 'expected_htf' => $expectedHtf15m);
-    $cases[] = array('symbol' => $symbol, 'timeframe' => '1h', 'seconds' => 3600, 'candles' => $dataset1h, 'expected_htf' => $expectedHtf1h);
-    $cases[] = array('symbol' => $symbol, 'timeframe' => '1day', 'seconds' => 86400, 'candles' => $dataset1d, 'expected_htf' => $expectedHtf1d);
+    $cases[] = array('symbol' => $symbol, 'timeframe' => '15min', 'seconds' => 900, 'candles' => $dataset15m, 'expected_ltf' => $expectedLtf, 'expected_htf' => $expectedHtf15m);
+    $cases[] = array('symbol' => $symbol, 'timeframe' => '1h', 'seconds' => 3600, 'candles' => $dataset1h, 'expected_ltf' => $expectedLtf, 'expected_htf' => $expectedHtf1h);
+    $cases[] = array('symbol' => $symbol, 'timeframe' => '4h', 'seconds' => 14400, 'candles' => $dataset4h, 'expected_ltf' => $expectedLtf4h, 'expected_htf' => $expectedHtf4h);
+    $cases[] = array('symbol' => $symbol, 'timeframe' => '1day', 'seconds' => 86400, 'candles' => $dataset1d, 'expected_ltf' => $expectedLtf, 'expected_htf' => $expectedHtf1d);
 }
 
 foreach ($cases as $case) {
@@ -58,7 +76,7 @@ foreach ($cases as $case) {
 
     foreach ($ratios as $ratio) {
         $ltfLevel = fib_test_find_level($result['LTF_SF'], $ratio);
-        fib_test_assert_near($expectedLtf[(string) $ratio], $ltfLevel['price'], 0.00001, $case['symbol'] . ' ' . $case['timeframe'] . ' LTF ratio ' . $ratio . ' mismatch');
+        fib_test_assert_near($case['expected_ltf'][(string) $ratio], $ltfLevel['price'], 0.00001, $case['symbol'] . ' ' . $case['timeframe'] . ' LTF ratio ' . $ratio . ' mismatch');
         fib_test_assert_same('LTF_SF', $ltfLevel['family'], $case['symbol'] . ' ' . $case['timeframe'] . ' LTF family mismatch');
 
         $htfLevel = fib_test_find_level($result['HTF_AF'], $ratio);

@@ -3206,7 +3206,7 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         $valid_families  = array('LTF_SF', 'HTF_AF');
-        $valid_timeframes = array('M15', 'H1', 'D1');
+        $valid_timeframes = array('M15', 'H1', 'H4', 'D1');
         $valid_ratios    = array(-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300);
         $calculated_at   = $this->now_mysql();
         $inserted        = 0;
