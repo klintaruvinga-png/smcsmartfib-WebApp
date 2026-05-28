@@ -310,10 +310,21 @@ if (!class_exists('TestWpdb')) {
 
             if (strpos($query, 'FROM ' . $this->prefix . 'smc_sf_soak_checkpoints') !== false
                 && strpos($query, "checkpoint_type <> 'baseline'") !== false) {
+                $since = null;
+                if (preg_match("/created_at >= '([^']+)'/", $query, $matches)) {
+                    $since = $matches[1];
+                }
+
                 $rows = array_values(array_filter(
                     $this->tables[$this->prefix . 'smc_sf_soak_checkpoints'] ?? array(),
-                    function ($row) {
-                        return ($row['checkpoint_type'] ?? '') !== 'baseline';
+                    function ($row) use ($since) {
+                        if (($row['checkpoint_type'] ?? '') === 'baseline') {
+                            return false;
+                        }
+                        if ($since !== null) {
+                            return isset($row['created_at']) && strcmp((string) $row['created_at'], $since) >= 0;
+                        }
+                        return true;
                     }
                 ));
                 usort($rows, function ($left, $right) {
@@ -643,6 +654,141 @@ class Test_Get_Soak_Report {
         assert_same('Operator baseline', $data['baseline_checkpoint']['operator_notes'] ?? null, 'Existing baseline notes should be preserved');
     }
 
+    public function case_phase4_report_keeps_weekly_checkpoints_beyond_72_hours() {
+        global $wpdb;
+
+        $this->reset_environment();
+        $old_checkpoint_at = gmdate('Y-m-d H:i:s', strtotime('-8 days'));
+        $wpdb->tables[$wpdb->prefix . 'smc_sf_soak_evidence'] = array(
+            array(
+                'id' => 1,
+                'evidence_key' => 'baseline.soak_type',
+                'evidence_type' => 'baseline_metadata',
+                'evidence_value' => 'PHASE_4_30_DAY',
+                'operator' => 'tester',
+                'created_at' => $old_checkpoint_at,
+                'updated_at' => $old_checkpoint_at,
+            ),
+        );
+        $wpdb->tables[$wpdb->prefix . 'smc_sf_soak_checkpoints'] = array(
+            array(
+                'id' => 7,
+                'checkpoint_type' => 'baseline',
+                'snapshot_data' => json_encode(array('status' => 'baseline')),
+                'operator_notes' => 'Operator baseline',
+                'created_at' => gmdate('Y-m-d H:i:s', strtotime('-9 days')),
+            ),
+            array(
+                'id' => 8,
+                'checkpoint_type' => 'checkpoint',
+                'snapshot_data' => json_encode(array('status' => 'weekly')),
+                'operator_notes' => 'T+7d checkpoint',
+                'created_at' => $old_checkpoint_at,
+            ),
+        );
+
+        $instance = new SMC_SuperFib_Sniper_REST();
+        $data = $this->response_data($instance->get_soak_report(), 200, 'Phase 4 soak report');
+
+        assert_same(1, count($data['checkpoints'] ?? array()), 'Phase 4 report must keep older weekly checkpoints visible');
+        assert_same(8, $data['checkpoints'][0]['id'] ?? null, 'Phase 4 report should include the older weekly checkpoint id');
+    }
+
+    public function case_non_phase4_report_keeps_72_hour_checkpoint_window() {
+        global $wpdb;
+
+        $this->reset_environment();
+        $wpdb->tables[$wpdb->prefix . 'smc_sf_soak_evidence'] = array(
+            array(
+                'id' => 1,
+                'evidence_key' => 'baseline.soak_type',
+                'evidence_type' => 'baseline_metadata',
+                'evidence_value' => 'PHASE_3_STABILITY_72H',
+                'operator' => 'tester',
+                'created_at' => gmdate('Y-m-d H:i:s', strtotime('-8 days')),
+                'updated_at' => gmdate('Y-m-d H:i:s', strtotime('-8 days')),
+            ),
+        );
+        $wpdb->tables[$wpdb->prefix . 'smc_sf_soak_checkpoints'] = array(
+            array(
+                'id' => 7,
+                'checkpoint_type' => 'baseline',
+                'snapshot_data' => json_encode(array('status' => 'baseline')),
+                'operator_notes' => 'Operator baseline',
+                'created_at' => gmdate('Y-m-d H:i:s', strtotime('-9 days')),
+            ),
+            array(
+                'id' => 8,
+                'checkpoint_type' => 'checkpoint',
+                'snapshot_data' => json_encode(array('status' => 'old')),
+                'operator_notes' => 'Old checkpoint',
+                'created_at' => gmdate('Y-m-d H:i:s', strtotime('-8 days')),
+            ),
+            array(
+                'id' => 9,
+                'checkpoint_type' => 'checkpoint',
+                'snapshot_data' => json_encode(array('status' => 'fresh')),
+                'operator_notes' => 'Fresh checkpoint',
+                'created_at' => gmdate('Y-m-d H:i:s', strtotime('-1 day')),
+            ),
+        );
+
+        $instance = new SMC_SuperFib_Sniper_REST();
+        $data = $this->response_data($instance->get_soak_report(), 200, 'Phase 3 soak report');
+
+        assert_same(1, count($data['checkpoints'] ?? array()), 'Non-Phase 4 report should only expose recent checkpoints');
+        assert_same(9, $data['checkpoints'][0]['id'] ?? null, 'Non-Phase 4 report should keep the fresh checkpoint');
+    }
+
+    public function case_phase4_checkpoint_creation_does_not_prune_weekly_history() {
+        global $wpdb;
+
+        $this->reset_environment();
+        $wpdb->tables[$wpdb->prefix . 'smc_sf_soak_evidence'] = array(
+            array(
+                'id' => 1,
+                'evidence_key' => 'baseline.soak_type',
+                'evidence_type' => 'baseline_metadata',
+                'evidence_value' => 'PHASE_4_30_DAY',
+                'operator' => 'tester',
+                'created_at' => gmdate('Y-m-d H:i:s', strtotime('-8 days')),
+                'updated_at' => gmdate('Y-m-d H:i:s', strtotime('-8 days')),
+            ),
+        );
+        $wpdb->tables[$wpdb->prefix . 'smc_sf_soak_checkpoints'] = array(
+            array(
+                'id' => 7,
+                'checkpoint_type' => 'baseline',
+                'snapshot_data' => json_encode(array('status' => 'baseline')),
+                'operator_notes' => 'Operator baseline',
+                'created_at' => gmdate('Y-m-d H:i:s', strtotime('-9 days')),
+            ),
+            array(
+                'id' => 8,
+                'checkpoint_type' => 'checkpoint',
+                'snapshot_data' => json_encode(array('status' => 'weekly')),
+                'operator_notes' => 'T+7d checkpoint',
+                'created_at' => gmdate('Y-m-d H:i:s', strtotime('-8 days')),
+            ),
+        );
+
+        $instance = new SMC_SuperFib_Sniper_REST();
+        $response = $instance->create_soak_checkpoint(new WP_REST_Request(array(
+            'operator_notes' => 'T+14d checkpoint',
+            'checkpoint_type' => 'checkpoint',
+        )));
+
+        assert_true(!($response instanceof WP_Error), 'Phase 4 checkpoint creation should succeed');
+
+        $checkpoint_rows = array_values(array_filter(
+            $wpdb->tables[$wpdb->prefix . 'smc_sf_soak_checkpoints'] ?? array(),
+            function ($row) {
+                return ($row['checkpoint_type'] ?? '') !== 'baseline';
+            }
+        ));
+        assert_same(2, count($checkpoint_rows), 'Phase 4 checkpoint creation must not prune prior weekly checkpoints');
+    }
+
     public function case_returns_structured_500_on_lookup_failure() {
         global $wpdb;
 
@@ -736,6 +882,9 @@ class Test_Get_Soak_Report {
     public function run() {
         $this->case_seeds_baseline_when_missing();
         $this->case_returns_existing_baseline_without_seeding();
+        $this->case_phase4_report_keeps_weekly_checkpoints_beyond_72_hours();
+        $this->case_non_phase4_report_keeps_72_hour_checkpoint_window();
+        $this->case_phase4_checkpoint_creation_does_not_prune_weekly_history();
         $this->case_returns_structured_500_on_lookup_failure();
         $this->case_create_checkpoint_aborts_on_soak_report_lookup_failure();
         $this->case_create_checkpoint_aborts_on_soak_report_table_init_failure();

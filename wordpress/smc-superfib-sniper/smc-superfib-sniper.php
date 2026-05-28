@@ -1533,10 +1533,17 @@ final class SMC_SuperFib_Sniper_REST {
 
             $report['baseline_checkpoint'] = $this->map_soak_checkpoint_row($baseline_checkpoint_row['value']);
 
-            $checkpoints_rows = $this->soak_get_results($wpdb->prepare(
-                "SELECT * FROM {$this->table('soak_checkpoints')} WHERE checkpoint_type <> 'baseline' AND created_at >= %s ORDER BY created_at DESC",
-                $since_72h
-            ));
+            $active_soak_type = $this->infer_soak_type_from_evidence_rows($report['manual_evidence']);
+            if ($active_soak_type === 'PHASE_4_30_DAY') {
+                $checkpoints_rows = $this->soak_get_results(
+                    "SELECT * FROM {$this->table('soak_checkpoints')} WHERE checkpoint_type <> 'baseline' ORDER BY created_at DESC"
+                );
+            } else {
+                $checkpoints_rows = $this->soak_get_results($wpdb->prepare(
+                    "SELECT * FROM {$this->table('soak_checkpoints')} WHERE checkpoint_type <> 'baseline' AND created_at >= %s ORDER BY created_at DESC",
+                    $since_72h
+                ));
+            }
             if ($checkpoints_rows['error'] !== null) {
                 $report['checkpoints_error'] = $checkpoints_rows['error'];
             } else {
@@ -1709,6 +1716,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         $created_at = $this->now_mysql();
         $snapshot_data = wp_json_encode($snapshot_report);
+        $active_soak_type = $this->infer_soak_type_from_evidence_rows($snapshot_report['manual_evidence'] ?? array());
         $cutoff = gmdate('Y-m-d H:i:s', strtotime('-72 hours'));
 
         $wpdb->query('START TRANSACTION');
@@ -1727,13 +1735,16 @@ final class SMC_SuperFib_Sniper_REST {
             return new WP_Error('smc_sf_soak_checkpoint_insert_failed', 'Could not create soak checkpoint.', array('status' => 500));
         }
 
-        $pruned = $wpdb->query($wpdb->prepare(
-            "DELETE FROM {$this->table('soak_checkpoints')} WHERE checkpoint_type <> 'baseline' AND created_at < %s",
-            $cutoff
-        ));
-        if ($pruned === false) {
-            $wpdb->query('ROLLBACK');
-            return new WP_Error('smc_sf_soak_checkpoint_prune_failed', 'Could not prune old soak checkpoints.', array('status' => 500));
+        $pruned = 0;
+        if ($active_soak_type !== 'PHASE_4_30_DAY') {
+            $pruned = $wpdb->query($wpdb->prepare(
+                "DELETE FROM {$this->table('soak_checkpoints')} WHERE checkpoint_type <> 'baseline' AND created_at < %s",
+                $cutoff
+            ));
+            if ($pruned === false) {
+                $wpdb->query('ROLLBACK');
+                return new WP_Error('smc_sf_soak_checkpoint_prune_failed', 'Could not prune old soak checkpoints.', array('status' => 500));
+            }
         }
 
         $wpdb->query('COMMIT');
@@ -7973,6 +7984,31 @@ final class SMC_SuperFib_Sniper_REST {
         } finally {
             $wpdb->query("SELECT RELEASE_LOCK('smc_sf_baseline_seed')");
         }
+    }
+
+    private function infer_soak_type_from_evidence_rows($rows) {
+        if (!is_array($rows)) {
+            return null;
+        }
+
+        $accepted_keys = array('baseline.soak_type', 'soak.type', 'soak_type');
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $evidence_key = (string) ($row['evidence_key'] ?? '');
+            if (!in_array($evidence_key, $accepted_keys, true)) {
+                continue;
+            }
+
+            $soak_type = strtoupper(trim((string) ($row['evidence_value'] ?? '')));
+            if (in_array($soak_type, array('PHASE_0_RESTART_72H', 'PHASE_3_STABILITY_72H', 'PHASE_4_30_DAY'), true)) {
+                return $soak_type;
+            }
+        }
+
+        return null;
     }
 
     private function map_soak_evidence_row($row) {
