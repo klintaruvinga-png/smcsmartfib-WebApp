@@ -589,6 +589,32 @@ describe("AdminPage", () => {
     expect(
       screen.getByRole("heading", { name: "Phase 4 - 30-Day Live Soak - Operator Baseline" }),
     ).toBeTruthy();
+    expect(screen.getAllByText("T+7d").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("T+14d").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("T+21d").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("T+30d").length).toBeGreaterThan(0);
+  });
+
+  it("keeps the Phase 4 checkpoint flow actionable when a baseline already exists", async () => {
+    const report = buildSoakReport();
+    report.baseline_checkpoint = buildCheckpoint(
+      1,
+      "baseline",
+      "2026-05-27T07:00:02Z",
+      "Phase 4 baseline captured.",
+    );
+    apiMocks.fetchSoakReport.mockResolvedValue(report);
+
+    render(<AdminPage />);
+
+    expect(await screen.findByText(BASELINE_EXISTS_WARNING)).toBeTruthy();
+
+    selectSoakType("PHASE_4_30_DAY");
+
+    expect(screen.queryByText("Configure duration and checkpoint count before saving snapshots.")).toBeNull();
+
+    const checkpointButton = screen.getByRole("button", { name: "Save T+7d Snapshot" });
+    expect((checkpointButton as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("inferSoakTypeFromReport returns PHASE_4_30_DAY", () => {
@@ -799,6 +825,34 @@ describe("AdminPage", () => {
     expect(screen.getAllByText("T+16h").length).toBeGreaterThan(0);
     expect(screen.getAllByText("T+32h").length).toBeGreaterThan(0);
     expect(screen.getAllByText("T+48h").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Save T+16h Snapshot" })).toBeTruthy();
+  });
+
+  it("keeps invalid custom schedules blocked until duration and checkpoint count are set", async () => {
+    const report = buildSoakReport();
+    report.baseline_checkpoint = buildCheckpoint(
+      1,
+      "baseline",
+      "2026-05-12T08:05:00Z",
+      "Initial soak capture.",
+    );
+    apiMocks.fetchSoakReport.mockResolvedValue(report);
+
+    render(<AdminPage />);
+
+    expect(await screen.findByText(BASELINE_EXISTS_WARNING)).toBeTruthy();
+
+    selectSoakType("CUSTOM");
+
+    const checkpointButton = screen.getByRole("button", { name: "Save Checkpoint Snapshot" });
+    expect((checkpointButton as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      screen.getByText("Configure duration and checkpoint count before saving snapshots."),
+    ).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Duration (hours)"), { target: { value: "48" } });
+    fireEvent.change(screen.getByLabelText("Checkpoint count"), { target: { value: "3" } });
+
     expect(screen.getByRole("button", { name: "Save T+16h Snapshot" })).toBeTruthy();
   });
 

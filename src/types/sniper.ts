@@ -440,8 +440,8 @@ export const SOAK_TEMPLATES: Record<SoakType, SoakTemplateConfig> = {
     durationDays: 30,
     symbols: ["EURUSD", "USDJPY", "XAUUSD"],
     defaultDurationHours: 720,
-    defaultCheckpointCount: 0,
-    checkpointLabels: [],
+    defaultCheckpointCount: 4,
+    checkpointLabels: ["T+7d", "T+14d", "T+21d", "T+30d"],
   },
   CUSTOM: {
     soakType: "CUSTOM",
