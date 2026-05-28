@@ -3,7 +3,7 @@
 **Created**: 2026-05-27  
 **Updated**: 2026-05-28  
 **Phase**: 4 - Fib Engine Migration  
-**Status**: Live soak active; timeframe contract corrected; parity gate pending  
+**Status**: Live soak active; corrected H4 runtime verified; parity gate pending  
 **Primary tracker**: `.github/migration-status.md`  
 **Companion log**: `.github/migration/phase-updates/phase4-live-soak-started-2026-05-27.md`  
 **Contract correction addendum**: `.github/migration/phase-updates/phase4-timeframe-contract-correction-2026-05-28.md`
@@ -22,6 +22,10 @@
   - Plugin version `13.0.3`
   - Backend ingest confirmed `levels_written=96`
 - That `levels_written=96` observation is pre-correction evidence only and is superseded for the active gate by the 2026-05-28 addendum above.
+- Corrected runtime verification captured on 2026-05-28:
+  - Corrected EA deployed
+  - Backend ingest confirmed `levels_written=128`
+  - Evidence: `[28-May-2026 15:14:35 UTC] [SMC_SF] ea/fib-levels ingested symbol=XAUUSD levels_written=128 failed=0 user_id=1`
 
 ---
 
@@ -34,6 +38,8 @@
 | [x] | Verify correct EA and plugin build were live at T0 | `ea_version=1.00`, plugin `13.0.3` | 2026-05-27 |
 | [x] | Verify backend fib ingestion was live at T0 | `[SMC_SF] ea/fib-levels ingested ... levels_written=96` *(pre-correction evidence only)* | 2026-05-27 |
 | [x] | Clear Phase 3 `RISK-06` conditional-closeout blocker | Risk register + status board updated | 2026-05-27 |
+| [x] | Redeploy the corrected H4 fib build | Operator confirmation: corrected EA deployed | 2026-05-28 |
+| [x] | Reconfirm backend fib ingestion after redeploy | `[28-May-2026 15:14:35 UTC] [SMC_SF] ea/fib-levels ingested symbol=XAUUSD levels_written=128 failed=0 user_id=1` | 2026-05-28 |
 
 ---
 
@@ -41,8 +47,6 @@
 
 | Status | Task | Owner | Target | Evidence to capture | Notes |
 |--------|------|-------|--------|---------------------|-------|
-| [ ] | Redeploy the corrected H4 fib build | Operator | Next session | MT5 journal showing M15/H1/H4/D1 dispatch | 2026-05-27 runtime evidence is pre-correction only |
-| [ ] | Reconfirm backend fib ingestion after redeploy | Operator | Same session | `[SMC_SF] ea/fib-levels ingested ... levels_written=128` | `128` is now the minimum complete-symbol ingest count |
 | [ ] | Confirm authenticated export path for `/market-data/fib-levels` | Operator | Next session | Successful authenticated response for `EURUSD` | Direct unauthenticated GET returns `401 smc_sf_auth_required` by design |
 | [ ] | Export `mt5-levels.json` in flat validator format for `EURUSD`, `USDJPY`, `XAUUSD` | Operator | After auth path confirmed | Saved `mt5-levels.json` with `384` rows | Must include M15/H1/H4/D1 and both families |
 | [ ] | Capture `pine-levels.json` at the same UTC snapshot as MT5 export | Operator | Same session as MT5 export | Saved `pine-levels.json` with `384` rows | Use closed candles only |
@@ -79,5 +83,6 @@ php scripts/parity-validator.php --mt5-file mt5-levels.json --pine-file pine-lev
 
 | Date | Update |
 |------|--------|
+| 2026-05-28 | Corrected H4 redeploy and runtime verification recorded: `levels_written=128` confirmed at `15:14:35 UTC`; next open step is authenticated export-path confirmation. |
 | 2026-05-28 | Checklist corrected to require the M15/H1/H4/D1 matrix, `levels_written=128`, and `384` rows across `24` groups. |
 | 2026-05-27 | Checklist created from confirmed live deployment, T0 baseline capture, and runtime verification evidence. |

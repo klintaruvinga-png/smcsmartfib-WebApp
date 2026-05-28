@@ -91,7 +91,7 @@ Minimum viable corpus for gate: EURUSD + USDJPY + XAUUSD across M15/H1/H4/D1.
 - [x] Parity validator implemented and producing JSON report - `scripts/parity-validator.php` (self-test 100% PASS on `384/384` 2026-05-28)
 - [x] **[MANUAL]** Live MT5 deployment confirmed for `Phase-4-Implementation` - live soak active 2026-05-27
 - [x] **[MANUAL]** T0 admin baseline captured/exported for `PHASE_4_30_DAY` - `.github/migration/phase-updates/phase-4-30-day-2026-05-27.md`
-- [ ] **[MANUAL]** Runtime verification re-run after the 2026-05-28 contract correction - backend must confirm `levels_written=128` for a complete symbol payload
+- [x] **[MANUAL]** Runtime verification re-run after the 2026-05-28 contract correction - backend confirmed `levels_written=128` for `XAUUSD` at `15:14:35 UTC`
 - [ ] **[MANUAL]** Historical replay corpus captured (EURUSD + USDJPY + XAUUSD minimum) - requires 30-day live MT5 data
 - [ ] **[MANUAL]** Replay run across M15, H1, H4, D1 for each corpus pair
 - [ ] **[MANUAL]** Overall parity >=99% per pair/timeframe

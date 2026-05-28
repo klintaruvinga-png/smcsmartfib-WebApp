@@ -3,7 +3,7 @@
 **Last Updated**: 2026-05-28  
 **Current Phase**: 4 (Fib Engine Migration — IN-PROGRESS; code complete 2026-05-25; timeframe contract corrected 2026-05-28; live soak active from 2026-05-27 T0 baseline capture; parity corpus still accumulating)  
 **Overall Progress**: 88% (Phases 0–4 code complete; Phases 5/5B/6 code complete pre-emptively; Phases 7–9 scaffolded; only Phase 4 live gate validation + operator activation remain before Phase 5 deployment)  
-**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 COMPLETE (2026-05-25; T0 admin baseline captured 2026-05-27, conditional closeout cleared) — Phase 4 IN-PROGRESS (code complete; live soak started; live parity corpus pending) — Phases 5/5B/6 CODE COMPLETE (pre-emptive; gated on Phase 4) — Phases 7–9 SCAFFOLDED (gated)
+**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 COMPLETE (2026-05-25; T0 admin baseline captured 2026-05-27, conditional closeout cleared) — Phase 4 IN-PROGRESS (code complete; corrected H4 runtime verified 2026-05-28; live parity corpus pending) — Phases 5/5B/6 CODE COMPLETE (pre-emptive; gated on Phase 4) — Phases 7–9 SCAFFOLDED (gated)
 
 > Snapshot: Phase 0 gate passed 2026-05-15. Post-fix validation soak at 16:37 UTC confirmed NAS100 (29,263.70) and US30 (49,756.00) both LIVE during active US equity session; XAUUSD (4,556.34) LIVE with candle-history gate cleared. Backend soak: 259,464 engine runs / 0 errors / 69,262 candles over 24h. Frontend feed-status chip lag (BUG-001 staleTime:0) resolved. Watchlist persistence 100% parity. AUDUSD/ETHUSD chop-gate classified as correct live behavior — not a blocker. Full closeout evidence: `.github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md`.
 
@@ -230,7 +230,7 @@ Market-Stream Auth:
 
 **Objective**: Port fib calculations into MT5, validate against Pine  
 **Owner**: Track A + Track B (both admin)  
-**Status**: IN-PROGRESS — code implementation complete 2026-05-25; timeframe contract corrected 2026-05-28; EA deployed live and T0 soak baseline captured 2026-05-27; parity corpus accumulating  
+**Status**: IN-PROGRESS — code implementation complete 2026-05-25; timeframe contract corrected 2026-05-28; EA deployed live and T0 soak baseline captured 2026-05-27; corrected runtime verification confirmed 2026-05-28; parity corpus accumulating  
 **Prerequisites**: Phase 3 complete ✅  
 **Completion Target**: 2026-08-15  
 **Branch**: `Phase-4-Implementation` — [PR #239](https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/239)
@@ -248,7 +248,7 @@ Market-Stream Auth:
 - [x] **[MANUAL]** Live EA deployment to MT5 terminal completed *(operator confirmed 2026-05-27; 30-day corpus accumulation started)*
 - [x] **[MANUAL]** T0 admin soak baseline captured for `PHASE_4_30_DAY` *(baseline checkpoint exported 2026-05-27; see `.github/migration/phase-updates/phase-4-30-day-2026-05-27.md`)*
 - [x] **[MANUAL]** Historical runtime verification captured *(2026-05-27 — pre-correction evidence only; backend ingest confirmed `levels_written=96` before H4 was added)*
-- [ ] **[MANUAL]** Redeploy the corrected H4 build and confirm backend ingest `levels_written=128`
+- [x] **[MANUAL]** Redeploy the corrected H4 build and confirm backend ingest `levels_written=128` *(confirmed 2026-05-28; `XAUUSD` ingest logged at `15:14:35 UTC`)*
 - [ ] **[MANUAL]** Historical replay corpus (EURUSD + USDJPY + XAUUSD, 30-day, M15/H1/H4/D1)
 - [ ] **[MANUAL]** Live parity validator run — MT5 output vs. Pine reference snapshots
 - [ ] **[MANUAL]** Weekend gap + sparse data scenario validation
@@ -283,7 +283,7 @@ MT5 Live vs Pine Live:     PENDING (requires corrected live H4 corpus and operat
 - ~~Track leads unassigned~~ — **CLEARED 2026-05-25** (both tracks: admin)
 - ~~T0 admin baseline missing~~ — **CLEARED 2026-05-27**
 - ~~Live EA/plugin build verification pending~~ — **CLEARED 2026-05-27**
-- **[OPERATOR]** Corrected H4 MT5 build not yet redeployed — 2026-05-27 evidence is pre-correction only
+- ~~**[OPERATOR]** Corrected H4 MT5 build not yet redeployed~~ — **CLEARED 2026-05-28**: corrected EA deployed; backend ingest confirmed `levels_written=128` for `XAUUSD` at `15:14:35 UTC`
 - **[OPERATOR]** Authenticated MT5 fib export path not yet confirmed — direct anonymous/userless GET to `/market-data/fib-levels` returns `smc_sf_auth_required` (401) by design
 - **[OPERATOR]** Live parity corpus not yet complete — MT5 must continue running against real market data until the 30-day capture window is complete before the gate can be validated
 

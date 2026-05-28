@@ -77,7 +77,7 @@ At ratio `100` -> price = `L`
 - [x] Add per-symbol fib payload to the market-stream POST body *(done 2026-05-25 - dispatched to `/ea/fib-levels`)*
 - [x] **[MANUAL]** Deploy `Phase-4-Implementation` to the live MT5 terminal *(operator confirmed 2026-05-27; live corpus accumulation started)*
 - [x] **[MANUAL]** Capture Phase 4 T0 admin baseline (`PHASE_4_30_DAY`) *(operator confirmed 2026-05-27; export committed at `.github/migration/phase-updates/phase-4-30-day-2026-05-27.md`)*
-- [ ] **[MANUAL]** Redeploy the corrected H4 build and confirm `levels_written=128` for a complete symbol payload
+- [x] **[MANUAL]** Redeploy the corrected H4 build and confirm `levels_written=128` for a complete symbol payload *(confirmed 2026-05-28; `XAUUSD` ingest logged at `15:14:35 UTC`)*
 - [ ] **[MANUAL]** Validate output against PHP fib parity test dataset - requires live MT5 terminal run + Pine snapshot capture
 
 ### Track B - Backend
