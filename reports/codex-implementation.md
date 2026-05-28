@@ -1,30 +1,40 @@
 # Issue summary
 
-Phase 4 soak checkpoints were blocked on `/admin` because `PHASE_4_30_DAY` was configured as a fixed template with zero checkpoint metadata while the page only exposes duration/checkpoint controls for `CUSTOM`. With a baseline present, Phase 4 therefore fell into the same zero-label warning path as an invalid custom schedule and left the checkpoint action disabled.
+Implemented the Area of Value authority patch in `mt5/SignalEngine.mqh` so MT5 candidate emission is blocked unless the nearest trigger respects the HTF authority dealing range, avoids equilibrium, and clears the Pine baseline risk/reward floor.
 
 # Root cause implemented
 
-Updated the fixed Phase 4 soak template in `src/types/sniper.ts` to carry the approved weekly/final 30-day checkpoint cadence instead of zero labels, which restores a non-empty `derivedCheckpointLabels` path without changing backend contracts, stale-data protections, or `CUSTOM` validation guards.
+`SignalEngine::EvaluateSymbol()` previously emitted candidates from the nearest fib trigger with no institutional value-zone authority gate and no Pine-aligned minimum RR check. The patch reconstructs the HTF authority range from the existing `HTF_AF` `FibLevelOut[]` set, classifies `PREMIUM` / `DISCOUNT` / `EQUILIBRIUM`, blocks invalid triggers before lifecycle scoring continues, then suppresses candidates when computed RR is below the Pine `min_rr = 2.0` baseline.
 
 # Exact files changed
 
-- `src/types/sniper.ts`
-- `src/routes/-admin.test.tsx`
-- `reports/codex-implementation.md`
+- `mt5/SignalEngine.mqh` — added HTF authority range reconstruction, AOV state classification, equilibrium and wrong-side blocking, RR computation, and MT5-local diagnostics.
+- `reports/codex-implementation.md` — implementation summary required by the contract.
+- `reports/phase4-gate.json` — parity-validator machine-readable gate output from the available synthetic self-test path.
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-28_aov-authority-patch.md` — runtime-integrity bug sweep for the patch surface.
+- `.github/migration/audits/phase-6-mt5-signal-parity-2026-05-28.md` — parity audit separating repo-level pass evidence from pending live MT5 proof.
 
 # Tests run
 
-- `npx vitest run src/routes/-admin.test.tsx` - PASS (`28/28`)
-- `npm run build` - PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-fib-parity.php` -> PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-fib-ingestion.php` -> PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-superfib-weighting.php` -> PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-htf-authority-anchor.php` -> PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-session-anchors.php` -> PASS
+- `php scripts/parity-validator.php` -> PASS, synthetic self-test `384/384` exact matches
+- `php scripts/parity-validator.php --out reports/phase4-gate.json` -> PASS, synthetic self-test gate artifact written
 
 # Reports generated
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-28_phase4-soak-checkpoint-template.md`
+- `reports/codex-implementation.md`
+- `reports/phase4-gate.json`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-28_aov-authority-patch.md`
+- `.github/migration/audits/phase-6-mt5-signal-parity-2026-05-28.md`
 
 # Remaining risks
 
-The approved repo artifact defines the Phase 4 cadence as three weekly checkpoints plus the final 30-day checkpoint, but it does not prescribe exact UI label strings. This patch maps that cadence to `T+7d`, `T+14d`, `T+21d`, and `T+30d` to preserve the existing `T+…` label convention; human review should confirm that wording is acceptable for live operator evidence. Manual authenticated `/admin` verification against a baseline-backed Phase 4 soak is still pending from this workspace.
+Manual MT5 or Strategy Tester evidence is still required to prove one allowed discount-long, one allowed premium-short, one blocked equilibrium case, and one blocked RR-below-minimum case. `reports/phase4-gate.json` was produced from the validator's documented synthetic self-test because no fresh MT5/Pine export pair was available in the repo, so operational parity closeout remains pending.
 
 # Any contract ambiguities resolved during implementation
 
-The contract required an approved existing Phase 4 checkpoint schedule and prohibited inventing cadence. The smallest safe interpretation was taken from `.github/migration/phase-updates/phase4-next-actions-checklist-2026-05-27.md`, which explicitly schedules weekly checkpoint snapshots #1-#3 and a final 30-day checkpoint. Because that artifact defines cadence but not exact UI labels, the implementation encoded those milestones as `T+7d`, `T+14d`, `T+21d`, and `T+30d`.
+The contract did not explicitly say whether to skip past an invalid nearest trigger and search for a farther valid level. I applied the narrowest safe interpretation: preserve nearest-trigger selection, then block emission when that nearest trigger is equilibrium, in the wrong value zone, or below the Pine RR floor.
