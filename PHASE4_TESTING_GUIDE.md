@@ -151,6 +151,9 @@ These tests define the parity target. MT5 fib output must produce identical resu
 ## Gate Checklist
 
 - [x] Parity validator implemented and producing JSON report — `scripts/parity-validator.php` (self-test 100% PASS 2026-05-25)
+- [x] **[MANUAL]** Live MT5 deployment confirmed for `Phase-4-Implementation` — live soak active 2026-05-27
+- [x] **[MANUAL]** T0 admin baseline captured/exported for `PHASE_4_30_DAY` — `.github/migration/phase-updates/phase-4-30-day-2026-05-27.md`
+- [x] **[MANUAL]** Runtime verification completed — `ea_version=1.00`, fib POST OK for EURUSD/USDJPY/XAUUSD, plugin `13.0.3`, backend ingest confirmed
 - [ ] **[MANUAL]** Historical replay corpus captured (EURUSD + USDJPY + XAUUSD minimum) — requires 30-day live MT5 data
 - [ ] **[MANUAL]** Replay run across M15, H1, D1 for each corpus pair
 - [ ] **[MANUAL]** Overall parity ≥99% per pair/timeframe
