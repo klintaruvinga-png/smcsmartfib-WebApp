@@ -27,7 +27,7 @@
 | Status | Task | Evidence | Completed |
 |--------|------|----------|-----------|
 | [x] | Deploy `Phase-4-Implementation` to live MT5 terminal | MT5 journal + operator confirmation | 2026-05-27 |
-| [x] | Capture T0 admin baseline for `PHASE_4_30_DAY` | `phase-4-30-day-2026-05-27.md` | 2026-05-27 |
+| [x] | Capture T0 admin baseline for `PHASE_4_30_DAY` | `.github/migration/phase-updates/phase-4-30-day-2026-05-27.md` | 2026-05-27 |
 | [x] | Verify correct EA and plugin build are live | `ea_version=1.00`, plugin `13.0.3` | 2026-05-27 |
 | [x] | Verify backend fib ingestion is live | `[SMC_SF] ea/fib-levels ingested ... levels_written=96` | 2026-05-27 |
 | [x] | Clear Phase 3 `RISK-06` conditional-closeout blocker | Risk register + status board updated | 2026-05-27 |

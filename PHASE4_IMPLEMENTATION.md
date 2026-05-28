@@ -99,7 +99,7 @@ All 16 ratios must be present in every output. Price must match to 5 decimal pla
 - [x] Integrate `FibEngine.mqh` into `MarketDataEngine.mqh` dispatch cycle *(done 2026-05-25 — throttled every 6 cycles)*
 - [x] Add per-symbol fib payload to the market-stream POST body *(done 2026-05-25 — dispatched to `/ea/fib-levels`)*
 - [x] **[MANUAL]** Deploy `Phase-4-Implementation` to the live MT5 terminal *(operator confirmed 2026-05-27; live corpus accumulation started)*
-- [x] **[MANUAL]** Capture Phase 4 T0 admin baseline (`PHASE_4_30_DAY`) *(operator confirmed 2026-05-27; export saved as `phase-4-30-day-2026-05-27.md`)*
+- [x] **[MANUAL]** Capture Phase 4 T0 admin baseline (`PHASE_4_30_DAY`) *(operator confirmed 2026-05-27; export committed at `.github/migration/phase-updates/phase-4-30-day-2026-05-27.md`)*
 - [ ] **[MANUAL]** Validate output against PHP fib parity test dataset — requires live MT5 terminal run + Pine snapshot capture
 
 ### Track B — Backend
