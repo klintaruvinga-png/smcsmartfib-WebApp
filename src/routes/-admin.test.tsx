@@ -593,28 +593,38 @@ describe("AdminPage", () => {
     expect(screen.getAllByText("T+14d").length).toBeGreaterThan(0);
     expect(screen.getAllByText("T+21d").length).toBeGreaterThan(0);
     expect(screen.getAllByText("T+30d").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Save T+7d Snapshot" })).toBeTruthy();
   });
 
-  it("keeps the Phase 4 checkpoint flow actionable when a baseline already exists", async () => {
+  it("uses preserved Phase 4 checkpoints to advance the next weekly label", async () => {
     const report = buildSoakReport();
     report.baseline_checkpoint = buildCheckpoint(
       1,
       "baseline",
-      "2026-05-27T07:00:02Z",
-      "Phase 4 baseline captured.",
+      "2026-05-12T08:05:00Z",
+      "Initial Phase 4 capture.",
     );
+    report.checkpoints = [
+      buildCheckpoint(2, "checkpoint", "2026-05-19T08:05:00Z", "T+7d checkpoint."),
+    ];
+    report.manual_evidence = [
+      {
+        id: 1,
+        evidence_key: "baseline.soak_type",
+        evidence_type: "baseline_metadata",
+        evidence_value: "PHASE_4_30_DAY",
+        operator: "tester",
+        created_at: "2026-05-12T08:05:00Z",
+        updated_at: "2026-05-12T08:05:00Z",
+      },
+    ];
     apiMocks.fetchSoakReport.mockResolvedValue(report);
 
     render(<AdminPage />);
 
-    expect(await screen.findByText(BASELINE_EXISTS_WARNING)).toBeTruthy();
-
-    selectSoakType("PHASE_4_30_DAY");
-
-    expect(screen.queryByText("Configure duration and checkpoint count before saving snapshots.")).toBeNull();
-
-    const checkpointButton = screen.getByRole("button", { name: "Save T+7d Snapshot" });
-    expect((checkpointButton as HTMLButtonElement).disabled).toBe(false);
+    expect(await screen.findByRole("heading", { name: "Phase 4 - 30-Day Live Soak" })).toBeTruthy();
+    expect(screen.getAllByText("T+14d").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Save T+14d Snapshot" })).toBeTruthy();
   });
 
   it("inferSoakTypeFromReport returns PHASE_4_30_DAY", () => {
