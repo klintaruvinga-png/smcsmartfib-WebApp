@@ -63,9 +63,20 @@ private:
         DISPLACEMENT_PIPS = 8
     };
 
+    enum ValueZoneState
+    {
+        VALUE_ZONE_UNKNOWN = 0,
+        VALUE_ZONE_DISCOUNT,
+        VALUE_ZONE_PREMIUM,
+        VALUE_ZONE_EQUILIBRIUM
+    };
+
     // HTF alignment multiplier applied to confidence.
     static const double HTF_ALIGNED_BOOST;   // = 0.15
     static const double HTF_OPPOSED_PENALTY; // = -0.30
+    static const double AOV_EQ_BUFFER_PCT;   // = 0.03 (Pine ict_eq_buffer_pct baseline)
+    static const double MIN_RR;              // = 2.0  (Pine min_rr baseline)
+    static const double RATIO_TOLERANCE;     // = 0.0001
 
 public:
     SignalEngine() {}
@@ -103,6 +114,15 @@ public:
         if (ltfRegime == "CHOP" && chopScore > 0.72)
             return false;
 
+        double authorityHigh = 0.0;
+        double authorityLow  = 0.0;
+        if (!TryGetAuthorityRange(fibLevels, fibCount, authorityHigh, authorityLow))
+        {
+            Print("[SignalEngine] Blocked candidate symbol=", normalizedSymbol,
+                  " reason=AUTHORITY_RANGE_MISSING");
+            return false;
+        }
+
         // --- Find the nearest fib level to current price ---
         int    nearestIdx  = -1;
         double nearestDist = DBL_MAX;
@@ -120,17 +140,30 @@ public:
             return false;
 
         FibLevelOut trig = fibLevels[nearestIdx];
+        int zoneState = ResolveValueZoneState(mid, authorityHigh, authorityLow);
+        string zoneLabel = ValueZoneStateToString(zoneState);
 
         // --- Direction from HTF bias and price relative to fib ---
-        string direction;
-        if (htfBias == "BULL")
-            direction = (mid < trig.price) ? "LONG" : "SHORT";
-        else if (htfBias == "BEAR")
-            direction = (mid > trig.price) ? "SHORT" : "LONG";
-        else
+        string direction = DetermineDirection(htfBias, mid, trig.price);
+
+        if (zoneState == VALUE_ZONE_EQUILIBRIUM)
         {
-            // TRANSITIONAL: direction from price side relative to 50 fib
-            direction = (mid < trig.price) ? "LONG" : "SHORT";
+            LogCandidateDecision(normalizedSymbol, trig, zoneLabel, 0.0, "AOV_EQUILIBRIUM_ZONE");
+            return false;
+        }
+
+        if (IsRatioMatch(trig.ratio, 50.0))
+        {
+            LogCandidateDecision(normalizedSymbol, trig, zoneLabel, 0.0, "AOV_EQUILIBRIUM_LEVEL");
+            return false;
+        }
+
+        bool directionMatchesZone = (direction == "LONG"  && zoneState == VALUE_ZONE_DISCOUNT) ||
+                                    (direction == "SHORT" && zoneState == VALUE_ZONE_PREMIUM);
+        if (!directionMatchesZone)
+        {
+            LogCandidateDecision(normalizedSymbol, trig, zoneLabel, 0.0, "AOV_DIRECTIONAL_MISMATCH");
+            return false;
         }
 
         // --- Status determination ---
@@ -204,6 +237,15 @@ public:
         // TP: next fib level in direction of trade.
         double tp = ComputeFibTP(fibLevels, fibCount, trig, direction, pipSize);
 
+        double rr = ComputeRiskReward(mid, sl, tp, direction);
+        if (rr < MIN_RR)
+        {
+            LogCandidateDecision(normalizedSymbol, trig, zoneLabel, rr, "RR_BELOW_MIN");
+            return false;
+        }
+
+        LogCandidateDecision(normalizedSymbol, trig, zoneLabel, rr, "PASSED");
+
         // --- Populate output ---
         out.id        = normalizedSymbol + "_" + direction + "_" +
                         DoubleToString(trig.ratio, 1) + "_" +
@@ -253,6 +295,108 @@ public:
     }
 
 private:
+    bool IsRatioMatch(double actual, double expected)
+    {
+        return MathAbs(actual - expected) <= RATIO_TOLERANCE;
+    }
+
+    bool TryGetAuthorityRange(FibLevelOut& fibLevels[], int fibCount,
+                              double& outHigh, double& outLow)
+    {
+        bool foundHigh = false;
+        bool foundLow  = false;
+
+        for (int i = 0; i < fibCount; i++)
+        {
+            if (fibLevels[i].family != "HTF_AF")
+                continue;
+
+            if (IsRatioMatch(fibLevels[i].ratio, 0.0))
+            {
+                outHigh = fibLevels[i].price;
+                foundHigh = true;
+            }
+            else if (IsRatioMatch(fibLevels[i].ratio, 100.0))
+            {
+                outLow = fibLevels[i].price;
+                foundLow = true;
+            }
+        }
+
+        return foundHigh && foundLow && outHigh > outLow;
+    }
+
+    string DetermineDirection(string htfBias, double mid, double fibPrice)
+    {
+        if (htfBias == "BULL")
+            return (mid < fibPrice) ? "LONG" : "SHORT";
+        if (htfBias == "BEAR")
+            return (mid > fibPrice) ? "SHORT" : "LONG";
+
+        // TRANSITIONAL: direction from price side relative to the trigger level.
+        return (mid < fibPrice) ? "LONG" : "SHORT";
+    }
+
+    int ResolveValueZoneState(double price, double high, double low)
+    {
+        if (high <= low)
+            return VALUE_ZONE_UNKNOWN;
+
+        double range = high - low;
+        double midpoint = low + range * 0.5;
+        double eqBuffer = range * AOV_EQ_BUFFER_PCT;
+
+        if (price > midpoint + eqBuffer)
+            return VALUE_ZONE_PREMIUM;
+        if (price < midpoint - eqBuffer)
+            return VALUE_ZONE_DISCOUNT;
+        return VALUE_ZONE_EQUILIBRIUM;
+    }
+
+    string ValueZoneStateToString(int zoneState)
+    {
+        if (zoneState == VALUE_ZONE_DISCOUNT)
+            return "DISCOUNT";
+        if (zoneState == VALUE_ZONE_PREMIUM)
+            return "PREMIUM";
+        if (zoneState == VALUE_ZONE_EQUILIBRIUM)
+            return "EQUILIBRIUM";
+        return "UNKNOWN";
+    }
+
+    double ComputeRiskReward(double entryPrice, double slPrice, double tpPrice, string direction)
+    {
+        double slDist = 0.0;
+        double tpDist = 0.0;
+
+        if (direction == "LONG")
+        {
+            slDist = entryPrice - slPrice;
+            tpDist = tpPrice - entryPrice;
+        }
+        else
+        {
+            slDist = slPrice - entryPrice;
+            tpDist = entryPrice - tpPrice;
+        }
+
+        if (slDist <= 0.0 || tpDist <= 0.0)
+            return 0.0;
+
+        return tpDist / slDist;
+    }
+
+    void LogCandidateDecision(string symbol, const FibLevelOut& trigger,
+                              string zoneLabel, double rr, string reason)
+    {
+        Print("[SignalEngine] ", reason,
+              " symbol=", symbol,
+              " family=", trigger.family,
+              " ratio=", DoubleToString(trigger.ratio, 4),
+              " zone=", zoneLabel,
+              " rr=", DoubleToString(rr, 2));
+    }
+
     // ----------------------------------------------------------------
     // ComputeSwingSL — H4 3-bar swing fractal for stop-loss placement.
     // LONG SL: below nearest swing low in past 10 H4 bars.
@@ -327,5 +471,8 @@ private:
 
 static const double SignalEngine::HTF_ALIGNED_BOOST   = 0.15;
 static const double SignalEngine::HTF_OPPOSED_PENALTY = -0.30;
+static const double SignalEngine::AOV_EQ_BUFFER_PCT   = 0.03;
+static const double SignalEngine::MIN_RR              = 2.0;
+static const double SignalEngine::RATIO_TOLERANCE     = 0.0001;
 
 #endif // SIGNAL_ENGINE_MQH
