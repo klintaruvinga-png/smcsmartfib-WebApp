@@ -838,6 +838,34 @@ describe("AdminPage", () => {
     expect(screen.getByRole("button", { name: "Save T+16h Snapshot" })).toBeTruthy();
   });
 
+  it("keeps invalid custom schedules blocked until duration and checkpoint count are set", async () => {
+    const report = buildSoakReport();
+    report.baseline_checkpoint = buildCheckpoint(
+      1,
+      "baseline",
+      "2026-05-12T08:05:00Z",
+      "Initial soak capture.",
+    );
+    apiMocks.fetchSoakReport.mockResolvedValue(report);
+
+    render(<AdminPage />);
+
+    expect(await screen.findByText(BASELINE_EXISTS_WARNING)).toBeTruthy();
+
+    selectSoakType("CUSTOM");
+
+    const checkpointButton = screen.getByRole("button", { name: "Save Checkpoint Snapshot" });
+    expect((checkpointButton as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      screen.getByText("Configure duration and checkpoint count before saving snapshots."),
+    ).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Duration (hours)"), { target: { value: "48" } });
+    fireEvent.change(screen.getByLabelText("Checkpoint count"), { target: { value: "3" } });
+
+    expect(screen.getByRole("button", { name: "Save T+16h Snapshot" })).toBeTruthy();
+  });
+
   it("clears unsaved baseline form state when switching templates", async () => {
     apiMocks.fetchSoakReport.mockResolvedValue(buildSoakReport());
 

@@ -1,5 +1,5 @@
 {
-  "issue": "SMC Intake - Fix admin Health page issue: TypeError reading 'feedStatus' in index-HU_NwOvP.js",
-  "plan_hash": "08f7a2cc27bd2ff84b5452db93b942c7cab105af4a4cebca9bf84574b371b0b9",
-  "written_at": "2026-05-27T18:21:34.7220297+02:00"
+  "issue": "SMC Intake - I am currently unable to make a soak snapshot because the admin page says 'Configure duration and checkpoint count before saving snapshots.' However I have no way to configure via front end and the checkpoint button is disabled",
+  "plan_hash": "8ec902ff3c725225615569c2982486a043e66dc9c3cda623f1696c0ab350d224",
+  "written_at": "2026-05-28T14:13:40.9248672+02:00"
 }
