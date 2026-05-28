@@ -1,9 +1,9 @@
 # SMC SuperFIB → MT5 Migration Status Board
 
-**Last Updated**: 2026-05-25  
-**Current Phase**: 4 (Fib Engine Migration — IN-PROGRESS; code complete 2026-05-25; live replay corpus pending operator)  
+**Last Updated**: 2026-05-27  
+**Current Phase**: 4 (Fib Engine Migration — IN-PROGRESS; code complete 2026-05-25; live soak active from 2026-05-27 T0 baseline capture; parity corpus still accumulating)  
 **Overall Progress**: 88% (Phases 0–4 code complete; Phases 5/5B/6 code complete pre-emptively; Phases 7–9 scaffolded; only Phase 4 live gate validation + operator activation remain before Phase 5 deployment)  
-**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 COMPLETE (2026-05-25, gate CONDITIONAL PASS; T0 admin baseline capture pending operator action) — Phase 4 IN-PROGRESS (code complete; live parity corpus pending) — Phases 5/5B/6 CODE COMPLETE (pre-emptive; gated on Phase 4) — Phases 7–9 SCAFFOLDED (gated)
+**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 COMPLETE (2026-05-25; T0 admin baseline captured 2026-05-27, conditional closeout cleared) — Phase 4 IN-PROGRESS (code complete; live soak started; live parity corpus pending) — Phases 5/5B/6 CODE COMPLETE (pre-emptive; gated on Phase 4) — Phases 7–9 SCAFFOLDED (gated)
 
 > Snapshot: Phase 0 gate passed 2026-05-15. Post-fix validation soak at 16:37 UTC confirmed NAS100 (29,263.70) and US30 (49,756.00) both LIVE during active US equity session; XAUUSD (4,556.34) LIVE with candle-history gate cleared. Backend soak: 259,464 engine runs / 0 errors / 69,262 candles over 24h. Frontend feed-status chip lag (BUG-001 staleTime:0) resolved. Watchlist persistence 100% parity. AUDUSD/ETHUSD chop-gate classified as correct live behavior — not a blocker. Full closeout evidence: `.github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md`.
 
@@ -16,8 +16,8 @@
 | 0 | Stabilize existing platform | **COMPLETE** | 100% | None — gate passed 2026-05-15 | 2026-05-15 ✅ |
 | 1 | MT5 bridge infrastructure | **COMPLETE** | 100% | None — gate passed 2026-05-20 | 2026-06-01 ✅ |
 | 2 | Read-only trade telemetry | **COMPLETE** | 100% | None — gate passed 2026-05-22 | 2026-05-22 ✅ |
-| 3 | MT5 market data engine | **COMPLETE** | 100% | None — gate CONDITIONAL PASS 2026-05-25; T0 admin baseline capture pending (operator action, non-blocking) | 2026-05-25 ✅ |
-| 4 | Fib engine migration | **IN-PROGRESS** | 60% | Live parity corpus (operator) | 2026-08-15 |
+| 3 | MT5 market data engine | **COMPLETE** | 100% | None — gate cleared; T0 admin baseline captured 2026-05-27 | 2026-05-25 ✅ |
+| 4 | Fib engine migration | **IN-PROGRESS** | 75% | Live parity corpus accumulation + authenticated MT5 export path + final validator gate | 2026-08-15 |
 | 5 | Regime & chop engine | **CODE COMPLETE** | 70% | Phase 4 live gate + operator deployment | 2026-09-15 |
 | 5B | Fundamentals regime feed | **CODE COMPLETE** | 65% | Phase 5 parity gate | 2026-10-01 |
 | 6 | Signal engine dual-run | **CODE COMPLETE** | 60% | Phase 5B gate + fib→signal wiring sprint | 2026-10-15 |
@@ -194,7 +194,7 @@ Market-Stream Auth:
 
 **Objective**: EA becomes authoritative market-data collector  
 **Owner**: Track A + Track B  
-**Status**: COMPLETE — Track A EA candle engine COMPLETE; Track B backend freshness layer COMPLETE; browser verification PASSED 2026-05-22; 72h stability soak CLOSED 2026-05-25; gate CONDITIONAL PASS
+**Status**: COMPLETE — Track A EA candle engine COMPLETE; Track B backend freshness layer COMPLETE; browser verification PASSED 2026-05-22; 72h stability soak CLOSED 2026-05-25; T0 admin baseline captured 2026-05-27; gate fully closed
 **Prerequisites**: Phase 2 complete ✅ (gate passed 2026-05-22)  
 **Planning Branch**: `codex/smc-intake-create-phase3-implementation-md-and-o`
 **Readiness Package Target**: [PHASE3_IMPLEMENTATION.md](../PHASE3_IMPLEMENTATION.md)
@@ -221,7 +221,8 @@ Market-Stream Auth:
 - ~~Backend freshness layer (Track B)~~ — **CLEARED 2026-05-22**: All storage paths confirmed
 - ~~Live browser verification~~ — **CLEARED 2026-05-22**: MT5 authority Live ✅ · BACKEND LIVE ✅ · London session ✅ · 10/12 symbols live ✅ · Streak 8d LIVE ✅
 - ~~NAS100/US30 config item~~ — **RESOLVED**: NAS100/US30 ARE present in EA as Deriv broker names (`US Tech 100`, `Wall Street 30`). SymbolNormalizer alias map correctly resolves both to canonical symbols. Offline status in closeout snapshot (04:17 UTC) is expected pre-market behaviour — equities open at 13:30 UTC.
-- **72-hour stability soak** — Soak window opened 2026-05-22; required before Phase 3 gate closes
+- ~~72-hour stability soak~~ — **CLEARED 2026-05-25**: Soak window closed with 0 engine errors in final 24h
+- ~~T0 admin baseline capture~~ — **CLEARED 2026-05-27**: Phase 4 soak workspace baseline captured and exported (`phase-4-30-day-2026-05-27.md`)
 
 ---
 
@@ -229,10 +230,11 @@ Market-Stream Auth:
 
 **Objective**: Port fib calculations into MT5, validate against Pine  
 **Owner**: Track A + Track B (both admin)  
-**Status**: IN-PROGRESS — code implementation complete 2026-05-25; live parity corpus pending operator  
+**Status**: IN-PROGRESS — code implementation complete 2026-05-25; EA deployed live and T0 soak baseline captured 2026-05-27; parity corpus accumulating  
 **Prerequisites**: Phase 3 complete ✅  
 **Completion Target**: 2026-08-15  
 **Branch**: `Phase-4-Implementation` — [PR #239](https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/239)
+**Operator Checklist**: [phase4-next-actions-checklist-2026-05-27.md](./migration/phase-updates/phase4-next-actions-checklist-2026-05-27.md)
 
 ### Deliverables
 - [x] `mt5/FibEngine.mqh` — LTF_SF (recency-weighted) + HTF_AF (raw-extreme) fib levels, all 16 ratios, M15/H1/D1 *(2026-05-25)*
@@ -242,6 +244,9 @@ Market-Stream Auth:
 - [x] `GET /market-data/fib-levels` — grouped response for dashboard consumption *(2026-05-25)*
 - [x] `scripts/parity-validator.php` — machine-readable JSON gate report; self-test 100% PASS *(2026-05-25)*
 - [x] `test-fib-ingestion.php` — 7 contract tests all PASS *(2026-05-25)*
+- [x] **[MANUAL]** Live EA deployment to MT5 terminal completed *(operator confirmed 2026-05-27; 30-day corpus accumulation started)*
+- [x] **[MANUAL]** T0 admin soak baseline captured for `PHASE_4_30_DAY` *(baseline checkpoint exported 2026-05-27; see `phase-4-30-day-2026-05-27.md`)*
+- [x] **[MANUAL]** Live runtime verification completed *(2026-05-27 — EA reattached; license-check `ea_version=1.00`; fib POST OK for EURUSD/USDJPY/XAUUSD; plugin `13.0.3`; backend ingest confirmed `levels_written=96`)*
 - [ ] **[MANUAL]** Historical replay corpus (EURUSD + USDJPY + XAUUSD, 30-day, M15/H1/D1)
 - [ ] **[MANUAL]** Live parity validator run — MT5 output vs. Pine reference snapshots
 - [ ] **[MANUAL]** Weekend gap + sparse data scenario validation
@@ -273,7 +278,10 @@ MT5 Live vs Pine Live:     PENDING (requires live MT5 corpus — operator action
 ### Blockers
 - ~~Phase 3 not complete~~ — **CLEARED 2026-05-25**
 - ~~Track leads unassigned~~ — **CLEARED 2026-05-25** (both tracks: admin)
-- **[OPERATOR]** Live parity corpus not yet captured — MT5 must run against real market data for 30 days before the gate can be validated
+- ~~T0 admin baseline missing~~ — **CLEARED 2026-05-27**
+- ~~Live EA/plugin build verification pending~~ — **CLEARED 2026-05-27**
+- **[OPERATOR]** Authenticated MT5 fib export path not yet confirmed — direct anonymous/userless GET to `/market-data/fib-levels` returns `smc_sf_auth_required` (401) by design
+- **[OPERATOR]** Live parity corpus not yet complete — MT5 must continue running against real market data until the 30-day capture window is complete before the gate can be validated
 
 ---
 
@@ -591,6 +599,7 @@ Phase 7 GATE: BLOCKED (hard gate in is_phase6_gate_cleared)
 
 | Week | Generated | Phases On-Track | Phases At-Risk | Phases Blocked | Action Items |
 |------|-----------|-----------------|----------------|----------------|--------------|
+| 2026-W22 | 2026-05-27 | Phase 3 COMPLETE; Phase 4 live soak active | Phase 4 live parity gate | None | EA deployed live. T0 baseline captured/exported. Await 30-day corpus, Pine snapshots, and validator run. |
 | 2026-W20 | 2026-05-14 | Phase 1 groundwork | Phase 0 signal/freshness parity closeout | Phase 0 | Fix NAS100/US30 freshness, XAUUSD candle history, and chop-gate blockers before any phase advance |
 | 2026-W21 | 2026-05-25 | Phase 3 COMPLETE — Phase 4 authorized | Phase 4 Track A lead unassigned | None | 72h soak CLOSED. Gate CONDITIONAL PASS. Bug sweep harness repaired. Phase 4 docs created. T0 admin baseline pending operator. |
 | 2026-W20 | 2026-05-15 | Phase 0 COMPLETE — Phase 1 active | Phase 1 live bridge validation | None | NAS100/US30/XAUUSD live validated. Frontend fixed. Watchlist persistence 100%. Phase 0 gate PASSED. |

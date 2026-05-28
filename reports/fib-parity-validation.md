@@ -1,6 +1,6 @@
 # Fib Parity Validation
 
-Date: 2026-05-25 (updated — Phase 4 code complete)  
+Date: 2026-05-27 (updated — Phase 4 live soak started)  
 Previous date: 2026-05-14
 
 ## Fixture comparison table
@@ -38,8 +38,8 @@ Previous date: 2026-05-14
 ## Phase 4 Live Corpus Status
 
 ```
-Status: PENDING — operator action required
-Action: Let MT5 EA run against live market data; capture Pine snapshots; run:
+Status: IN PROGRESS — live EA deployed and T0 baseline captured 2026-05-27; corpus accumulation underway
+Action: Continue the 30-day MT5 soak, then capture Pine snapshots and run:
   php scripts/parity-validator.php --mt5-file mt5-levels.json --pine-file pine-levels.json --out reports/phase4-gate.json
 Gate: PASS requires overall_parity_pct >= 99 AND critical_mismatches_count = 0
 ```
