@@ -5320,6 +5320,10 @@ final class SMC_SuperFib_Sniper_REST {
         $equity = max((float) $account['equityUSC'], 1);
         $risk_usc = round($equity * ((float) $risk['perTradePct'] / 100), 2);
         $is_long = $signal['direction'] === 'LONG';
+        $sym = $signal['symbol'];
+        $spec = $this->get_instrument_spec($sym);
+        $pip = $spec ? (float) $spec['pip_size'] : 0.0001;
+        $pip_val = $spec ? $this->pip_value_per_standard_lot($user_id, $sym, $spec) : 10.0;
 
         // Compute swings for SL using the candles already fetched by build_symbol_state().
         if (count($candles) >= 35) {
@@ -5344,6 +5348,7 @@ final class SMC_SuperFib_Sniper_REST {
         $tps     = array();
         $lots    = array();
         $ladder  = array();
+        $legacy_entry_spread = $this->legacy_stage_entry_spread($spec);
 
         foreach (array('e1', 'e2', 'e3') as $idx => $stage) {
             $entries[$stage] = $this->price_for_ratio($high, $low, $ratios[$idx]);
@@ -5351,24 +5356,27 @@ final class SMC_SuperFib_Sniper_REST {
             $ladder[$stage]  = array('ratio' => $ratios[$idx], 'stopRatio' => $stop_ratios[$idx], 'family' => 'LTF_SF');
         }
 
+        // Restore archived pre-stop re-entry behavior so deeper ladder orders trigger before
+        // the prior stage stop is hit, instead of requiring the stop price to trade first.
+        $entries['e2'] = $this->legacy_stage_reentry_from_stop($stops['e1'], $signal['direction'], $legacy_entry_spread);
+        $entries['e3'] = $this->legacy_stage_reentry_from_stop($stops['e2'], $signal['direction'], $legacy_entry_spread);
+
         foreach (array('tp1', 'tp2', 'tp3') as $idx => $tp_key) {
             $tps[$tp_key] = $this->price_for_ratio($high, $low, $target_ratios[$idx]);
         }
 
-        // Compute lot sizes from risk budget. Weights match 1:2:3 so each stage carries a
-        // proportional share; rounding to the nearest micro-lot (0.01) keeps broker precision.
-        $sym = $signal['symbol'];
-        $spec = $this->get_instrument_spec($sym);
-        $pip = $spec ? (float) $spec['pip_size'] : 0.0001;
-        $pip_val = $spec ? $this->pip_value_per_standard_lot($user_id, $sym, $spec) : 10.0;
-        $risk_weights = array('e1' => 1, 'e2' => 2, 'e3' => 3);
+        // Restore archived stage risk allocation: size each ladder leg against its own SL
+        // using the proven 20/30/50 family split without exceeding the family risk budget.
+        $risk_alloc = array('e1' => 0.20, 'e2' => 0.30, 'e3' => 0.50);
         foreach (array('e1', 'e2', 'e3') as $stage) {
             $stop_dist = max(abs($entries[$stage] - $stops[$stage]), $pip);
             $stop_pips = $stop_dist / $pip;
-            $stage_risk = $risk_usc * ($risk_weights[$stage] / 6.0);
+            $stage_risk = $risk_usc * $risk_alloc[$stage];
             $raw_lots = $stage_risk / max($stop_pips * $pip_val, 0.01);
-            $lots[$stage] = max(0.01, round($raw_lots / 0.01) * 0.01);
+            $stage_lot = floor($raw_lots * 100) / 100;
+            $lots[$stage] = $stage_lot >= 0.01 ? round($stage_lot, 2) : 0.0;
         }
+        $lots = $this->enforce_progressive_stage_lots($lots);
 
         $risk_per_unit = max(abs($entries['e1'] - $stops['e1']), 0.00000001);
         $rr = array(
@@ -5409,6 +5417,46 @@ final class SMC_SuperFib_Sniper_REST {
         } else {
             return round($swing_hi + $buffer, 8);
         }
+    }
+
+    private function legacy_stage_entry_spread($spec) {
+        $pip_size = (is_array($spec) && isset($spec['pip_size']) && (float) $spec['pip_size'] > 0)
+            ? (float) $spec['pip_size']
+            : 0.0001;
+
+        return $pip_size >= 0.01 ? 0.15 : 0.00015;
+    }
+
+    private function legacy_stage_reentry_from_stop($stage_stop, $direction, $spread) {
+        $stage_stop = (float) $stage_stop;
+        if ($spread <= 0) {
+            return round($stage_stop, 8);
+        }
+
+        return $direction === 'LONG'
+            ? round($stage_stop + $spread, 8)
+            : round($stage_stop - $spread, 8);
+    }
+
+    private function enforce_progressive_stage_lots(array $lots) {
+        $stages = array('e1', 'e2', 'e3');
+        for ($idx = count($stages) - 2; $idx >= 0; $idx--) {
+            $stage = $stages[$idx];
+            $next_stage = $stages[$idx + 1];
+            $current = isset($lots[$stage]) ? round((float) $lots[$stage], 2) : 0.0;
+            $next = isset($lots[$next_stage]) ? round((float) $lots[$next_stage], 2) : 0.0;
+
+            if ($next <= 0.0) {
+                $lots[$stage] = 0.0;
+                continue;
+            }
+
+            if ($current >= $next) {
+                $lots[$stage] = max(0.0, round($next - 0.01, 2));
+            }
+        }
+
+        return $lots;
     }
 
     private function pip_value_per_standard_lot($user_id, $symbol, $spec) {
