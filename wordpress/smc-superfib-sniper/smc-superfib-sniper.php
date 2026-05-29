@@ -3754,6 +3754,7 @@ final class SMC_SuperFib_Sniper_REST {
         $valid_status    = array('WATCH', 'ARMED', 'READY');
         $valid_verdicts  = array('A+', 'A', 'B', 'C');
         $written         = 0;
+        $suppressed      = 0;
         $failed          = 0;
 
         foreach ($payload['candidates'] as $cand) {
@@ -3763,6 +3764,7 @@ final class SMC_SuperFib_Sniper_REST {
             }
 
             $id        = sanitize_text_field((string) $cand['id']);
+            $stored_id = substr($id, 0, 64);
             $symbol    = preg_replace('/[^A-Z0-9]/', '', strtoupper(sanitize_text_field((string) $cand['symbol'])));
             $direction = strtoupper(sanitize_text_field((string) ($cand['direction'] ?? 'LONG')));
             $status    = strtoupper(sanitize_text_field((string) ($cand['status']    ?? 'WATCH')));
@@ -3787,13 +3789,66 @@ final class SMC_SuperFib_Sniper_REST {
             $created_at  = $this->normalize_market_timestamp($cand['created_at'] ?? null, $this->now_mysql());
             $drift_pips  = null;
 
+            $prior_candidate = $this->find_latest_mt5_candidate_for_range(
+                $user_id,
+                $symbol,
+                $direction,
+                $fib_family,
+                $fib_ratio,
+                $fib_level
+            );
+
+            if (is_array($prior_candidate)) {
+                $lifecycle = $this->get_mt5_candidate_lifecycle_state($user_id, $symbol, $direction, $prior_candidate);
+                $lifecycle_state = (string) ($lifecycle['state'] ?? 'LIFECYCLE_UNRESOLVED');
+                $lifecycle_reason = (string) ($lifecycle['reason'] ?? '');
+                $diagnostic = array(
+                    'prior_candidate_id' => (string) ($prior_candidate['id'] ?? ''),
+                    'incoming_candidate_id' => $stored_id,
+                    'symbol' => $symbol,
+                    'direction' => $direction,
+                    'suppression_basis' => $lifecycle_state,
+                    'reason' => $lifecycle_reason,
+                );
+                if (!empty($lifecycle['matched_id'])) {
+                    $diagnostic['matched_id'] = (string) $lifecycle['matched_id'];
+                }
+
+                if (in_array($lifecycle_state, array('ACTIVE_OPEN_POSITION', 'ACTIVE_PENDING_ORDER', 'ACTIVE_PRE_ENTRY'), true)) {
+                    $this->audit($user_id, 'ea.signal_candidate_suppressed', $diagnostic);
+                    error_log(sprintf(
+                        '[SMC_SF] ea/signal-candidates suppressed prior=%s incoming=%s symbol=%s direction=%s basis=%s reason=%s',
+                        $diagnostic['prior_candidate_id'],
+                        $stored_id,
+                        $symbol,
+                        $direction,
+                        $lifecycle_state,
+                        $lifecycle_reason
+                    ));
+                    $suppressed++;
+                    continue;
+                }
+
+                if ($lifecycle_state === 'LIFECYCLE_UNRESOLVED') {
+                    $this->audit($user_id, 'ea.signal_candidate_lifecycle_unresolved', $diagnostic);
+                    error_log(sprintf(
+                        '[SMC_SF] ea/signal-candidates unresolved prior=%s incoming=%s symbol=%s direction=%s reason=%s',
+                        $diagnostic['prior_candidate_id'],
+                        $stored_id,
+                        $symbol,
+                        $direction,
+                        $lifecycle_reason
+                    ));
+                }
+            }
+
             // Compare against Pine signals to classify drift.
             $pine_match  = $this->classify_signal_drift($user_id, $symbol, $direction, $entry_price, $drift_pips);
 
             $result = $wpdb->replace(
                 $table,
                 array(
-                    'id'          => substr($id, 0, 64),
+                    'id'          => $stored_id,
                     'user_id'     => $user_id,
                     'symbol'      => $symbol,
                     'direction'   => $direction,
@@ -3830,13 +3885,196 @@ final class SMC_SuperFib_Sniper_REST {
             }
         }
 
-        error_log(sprintf('[SMC_SF] ea/signal-candidates written=%d failed=%d user_id=%d', $written, $failed, $user_id));
+        error_log(sprintf('[SMC_SF] ea/signal-candidates written=%d suppressed=%d failed=%d user_id=%d', $written, $suppressed, $failed, $user_id));
 
         return rest_ensure_response(array(
             'ok'      => $failed === 0,
             'written' => $written,
             'failed'  => $failed,
         ));
+    }
+
+    private function find_latest_mt5_candidate_for_range(int $user_id, string $symbol, string $direction, string $fib_family, ?float $fib_ratio, ?float $fib_level) {
+        global $wpdb;
+
+        if ($fib_family === '' || $fib_ratio === null || $fib_level === null) {
+            return null;
+        }
+
+        $row = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM {$this->table('mt5_signal_candidates')}
+             WHERE user_id = %d AND symbol = %s AND direction = %s AND fib_family = %s AND fib_ratio = %f
+             ORDER BY created_at DESC LIMIT 1",
+            $user_id,
+            $symbol,
+            $direction,
+            $fib_family,
+            $fib_ratio
+        ), ARRAY_A);
+
+        if (!is_array($row)) {
+            return null;
+        }
+
+        $stored_fib_level = isset($row['fib_level']) && is_numeric($row['fib_level']) ? (float) $row['fib_level'] : null;
+        if ($stored_fib_level === null) {
+            return null;
+        }
+
+        return abs($stored_fib_level - $fib_level) <= $this->get_mt5_candidate_price_tolerance($symbol)
+            ? $row
+            : null;
+    }
+
+    private function get_mt5_candidate_lifecycle_state(int $user_id, string $symbol, string $direction, array $prior_candidate): array {
+        $price_tolerance = $this->get_mt5_candidate_price_tolerance($symbol);
+
+        foreach ($this->read_trade_positions($user_id) as $position) {
+            if (!$this->candidate_matches_trade_record($prior_candidate, $position, $price_tolerance)) {
+                continue;
+            }
+
+            if (($position['freshness'] ?? '') !== 'live') {
+                return array(
+                    'state' => 'LIFECYCLE_UNRESOLVED',
+                    'reason' => 'matching_open_position_not_live',
+                    'matched_id' => (string) ($position['position_id'] ?? ''),
+                );
+            }
+
+            return array(
+                'state' => 'ACTIVE_OPEN_POSITION',
+                'reason' => 'matching_open_position',
+                'matched_id' => (string) ($position['position_id'] ?? ''),
+            );
+        }
+
+        foreach ($this->read_trade_orders($user_id) as $order) {
+            if (!$this->candidate_matches_trade_record($prior_candidate, $order, $price_tolerance)) {
+                continue;
+            }
+
+            if (($order['freshness'] ?? '') !== 'live') {
+                return array(
+                    'state' => 'LIFECYCLE_UNRESOLVED',
+                    'reason' => 'matching_pending_order_not_live',
+                    'matched_id' => (string) ($order['order_id'] ?? ''),
+                );
+            }
+
+            return array(
+                'state' => 'ACTIVE_PENDING_ORDER',
+                'reason' => 'matching_pending_order',
+                'matched_id' => (string) ($order['order_id'] ?? ''),
+            );
+        }
+
+        $cached_price = $this->get_cached_price($user_id, $symbol, $this->get_settings($user_id)['staleThresholdSec']);
+        if (!is_array($cached_price) || ($cached_price['state'] ?? '') !== 'live') {
+            return array(
+                'state' => 'LIFECYCLE_UNRESOLVED',
+                'reason' => 'snapshot_not_live',
+            );
+        }
+
+        $entry_price = isset($prior_candidate['entry_price']) && is_numeric($prior_candidate['entry_price']) ? (float) $prior_candidate['entry_price'] : 0.0;
+        $sl_price = isset($prior_candidate['sl_price']) && is_numeric($prior_candidate['sl_price']) ? (float) $prior_candidate['sl_price'] : null;
+        $entry_reference_price = $direction === 'LONG'
+            ? (float) ($cached_price['ask'] ?? 0.0)
+            : (float) ($cached_price['bid'] ?? 0.0);
+        $stop_reference_price = $direction === 'LONG'
+            ? (float) ($cached_price['bid'] ?? 0.0)
+            : (float) ($cached_price['ask'] ?? 0.0);
+
+        if ($entry_price <= 0 || $entry_reference_price <= 0 || $stop_reference_price <= 0) {
+            return array(
+                'state' => 'LIFECYCLE_UNRESOLVED',
+                'reason' => 'snapshot_prices_missing',
+            );
+        }
+
+        if (!$this->has_directional_price_crossed($direction, $entry_reference_price, $entry_price)) {
+            return array(
+                'state' => 'ACTIVE_PRE_ENTRY',
+                'reason' => 'entry_not_crossed',
+            );
+        }
+
+        if ($this->has_directional_price_crossed($direction, $stop_reference_price, $sl_price, true)) {
+            return array(
+                'state' => 'INACTIVE_STOPPED_OUT',
+                'reason' => 'stop_loss_crossed',
+            );
+        }
+
+        return array(
+            'state' => 'INACTIVE_ENTRY_PASSED',
+            'reason' => 'entry_crossed_without_matching_trade',
+        );
+    }
+
+    private function candidate_matches_trade_record(array $candidate, array $trade_record, float $price_tolerance): bool {
+        $candidate_symbol = $this->map_symbol_aliases((string) ($candidate['symbol'] ?? ''));
+        $trade_symbol = $this->map_symbol_aliases((string) (($trade_record['normalized_symbol'] ?? '') !== '' ? $trade_record['normalized_symbol'] : ($trade_record['symbol'] ?? '')));
+
+        if ($candidate_symbol === '' || $candidate_symbol !== $trade_symbol) {
+            return false;
+        }
+
+        if (strtoupper((string) ($candidate['direction'] ?? '')) !== strtoupper((string) ($trade_record['direction'] ?? ''))) {
+            return false;
+        }
+
+        $price_checks = array(
+            array('candidate' => 'entry_price', 'trade' => 'entry_price'),
+            array('candidate' => 'sl_price', 'trade' => 'sl'),
+            array('candidate' => 'tp_price', 'trade' => 'tp'),
+        );
+
+        foreach ($price_checks as $check) {
+            $candidate_field = $check['candidate'];
+            $trade_field = $check['trade'];
+            if (!isset($candidate[$candidate_field]) || !is_numeric($candidate[$candidate_field])) {
+                continue;
+            }
+
+            $candidate_price = (float) $candidate[$candidate_field];
+            if ($candidate_price <= 0) {
+                continue;
+            }
+
+            $trade_price = isset($trade_record[$trade_field]) && is_numeric($trade_record[$trade_field]) ? (float) $trade_record[$trade_field] : 0.0;
+            if ($trade_price <= 0 || abs($candidate_price - $trade_price) > $price_tolerance) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function has_directional_price_crossed(string $direction, float $reference_price, ?float $level, bool $adverse = false): bool {
+        if ($reference_price <= 0 || $level === null || $level <= 0) {
+            return false;
+        }
+
+        if ($adverse) {
+            return $direction === 'LONG'
+                ? $reference_price <= $level
+                : $reference_price >= $level;
+        }
+
+        return $direction === 'LONG'
+            ? $reference_price >= $level
+            : $reference_price <= $level;
+    }
+
+    private function get_mt5_candidate_price_tolerance(string $symbol): float {
+        $spec = $this->get_instrument_spec($symbol);
+        if (is_array($spec) && isset($spec['pip_size']) && (float) $spec['pip_size'] > 0) {
+            return (float) $spec['pip_size'];
+        }
+
+        return strpos($symbol, 'JPY') !== false ? 0.01 : 0.0001;
     }
 
     // Determine pine_match classification by comparing MT5 candidate against

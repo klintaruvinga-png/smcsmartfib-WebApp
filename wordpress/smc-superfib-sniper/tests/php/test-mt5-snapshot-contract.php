@@ -217,6 +217,58 @@ if (!class_exists('TestWpdb')) {
                     return $row;
                 }
             }
+            if (preg_match("/SELECT account_id, terminal_id FROM ([^ ]+) WHERE user_id = (\\d+) ORDER BY last_seen_at DESC, updated_at DESC, id DESC LIMIT 1/s", $query, $m)) {
+                $table = $m[1];
+                $user_id = (int) $m[2];
+                $latest = null;
+                foreach ($this->tables[$table] ?? array() as $row) {
+                    if ((int) ($row['user_id'] ?? 0) !== $user_id) {
+                        continue;
+                    }
+                    if ($latest === null) {
+                        $latest = $row;
+                        continue;
+                    }
+                    $row_rank = implode('|', array(
+                        (string) ($row['last_seen_at'] ?? ''),
+                        (string) ($row['updated_at'] ?? ''),
+                        (string) ($row['id'] ?? ''),
+                    ));
+                    $latest_rank = implode('|', array(
+                        (string) ($latest['last_seen_at'] ?? ''),
+                        (string) ($latest['updated_at'] ?? ''),
+                        (string) ($latest['id'] ?? ''),
+                    ));
+                    if (strcmp($row_rank, $latest_rank) > 0) {
+                        $latest = $row;
+                    }
+                }
+                return $latest;
+            }
+            if (preg_match("/SELECT \\* FROM ([^\\s]+)\\s+WHERE user_id = (\\d+) AND symbol = '([^']+)' AND direction = '([^']+)' AND fib_family = '([^']*)' AND fib_ratio = ([0-9.]+)\\s+ORDER BY created_at DESC LIMIT 1/s", $query, $m)) {
+                $table = $m[1];
+                $user_id = (int) $m[2];
+                $symbol = $m[3];
+                $direction = $m[4];
+                $fib_family = $m[5];
+                $fib_ratio = (float) $m[6];
+                $latest = null;
+                foreach ($this->tables[$table] ?? array() as $row) {
+                    if ((int) ($row['user_id'] ?? 0) !== $user_id) {
+                        continue;
+                    }
+                    if (($row['symbol'] ?? '') !== $symbol || ($row['direction'] ?? '') !== $direction || ($row['fib_family'] ?? '') !== $fib_family) {
+                        continue;
+                    }
+                    if (abs((float) ($row['fib_ratio'] ?? 0) - $fib_ratio) > 0.0000001) {
+                        continue;
+                    }
+                    if ($latest === null || strcmp((string) ($row['created_at'] ?? ''), (string) ($latest['created_at'] ?? '')) > 0) {
+                        $latest = $row;
+                    }
+                }
+                return $latest;
+            }
             if (preg_match("/SELECT direction, engine FROM ([^ ]+) WHERE user_id = (\\d+) AND symbol = '([^']+)' AND status != 'CLOSED' ORDER BY created_at DESC LIMIT 1/", $query, $m)) {
                 $table = $m[1];
                 $user_id = (int) $m[2];
@@ -260,6 +312,38 @@ if (!class_exists('TestWpdb')) {
                     $cmp = strcmp($a['candle_time'], $b['candle_time']);
                     return $direction === 'DESC' ? -1 * $cmp : $cmp;
                 });
+                return $rows;
+            }
+            if (preg_match("/SELECT \\* FROM ([^ ]+) WHERE user_id = (\\d+)$/", $query, $m)) {
+                $table = $m[1];
+                $user_id = (int) $m[2];
+                $rows = array();
+                foreach ($this->tables[$table] ?? array() as $row) {
+                    if ((int) ($row['user_id'] ?? 0) === $user_id) {
+                        $rows[] = $row;
+                    }
+                }
+                return $rows;
+            }
+            if (preg_match("/SELECT \\* FROM ([^ ]+) WHERE user_id = (\\d+) AND account_id = '([^']*)' AND terminal_id = '([^']*)' AND state = '([^']+)'/", $query, $m)) {
+                $table = $m[1];
+                $user_id = (int) $m[2];
+                $account_id = $m[3];
+                $terminal_id = $m[4];
+                $state = $m[5];
+                $rows = array();
+                foreach ($this->tables[$table] ?? array() as $row) {
+                    if ((int) ($row['user_id'] ?? 0) !== $user_id) {
+                        continue;
+                    }
+                    if ((string) ($row['account_id'] ?? '') !== $account_id || (string) ($row['terminal_id'] ?? '') !== $terminal_id) {
+                        continue;
+                    }
+                    if ((string) ($row['state'] ?? '') !== $state) {
+                        continue;
+                    }
+                    $rows[] = $row;
+                }
                 return $rows;
             }
             return array();
@@ -314,6 +398,11 @@ if (!function_exists('register_rest_route')) {
             'route' => $route,
             'args' => $args,
         );
+    }
+}
+if (!function_exists('dbDelta')) {
+    function dbDelta(...$args) {
+        return true;
     }
 }
 if (!function_exists('plugin_dir_path')) {
@@ -1074,5 +1163,319 @@ $mismatchRow = $wpdb->tables[$candidateTable]['mt5-eurusd-2'] ?? null;
 assert_true(is_array($mismatchRow), 'Mismatched-direction EA signal candidate row was not stored');
 assert_same('MISMATCH', $mismatchRow['pine_match'], 'Opposite-direction Pine signals must stay classified as MISMATCH even when Pine engine JSON lacks ltfLevel.price');
 assert_same(null, $mismatchRow['drift_pips'], 'Opposite-direction Pine signals without an entry price must not fabricate drift_pips');
+
+$tradeTelemetrySeenAt = gmdate('Y-m-d H:i:s');
+$accountTelemetryTable = $wpdb->prefix . 'smc_sf_account_telemetry';
+$tradePositionsTable = $wpdb->prefix . 'smc_sf_trade_positions';
+$tradeOrdersTable = $wpdb->prefix . 'smc_sf_trade_orders';
+
+$wpdb->replace($accountTelemetryTable, array(
+    'id' => 'acct-telemetry-1',
+    'user_id' => 7,
+    'account_id' => 'acct-1',
+    'terminal_id' => 'term-1',
+    'balance' => 10000,
+    'equity' => 10000,
+    'margin' => 0,
+    'free_margin' => 10000,
+    'margin_level' => 0,
+    'floating_pl' => 0,
+    'currency' => 'USD',
+    'leverage' => 100,
+    'ea_version' => 'test',
+    'last_seen_at' => $tradeTelemetrySeenAt,
+    'updated_at' => $tradeTelemetrySeenAt,
+    'raw_json' => '{}',
+));
+
+$wpdb->replace($snapshotTable, array(
+    'user_id' => 7,
+    'symbol' => 'GBPUSD',
+    'bid' => 1.2498,
+    'ask' => 1.2500,
+    'mid' => 1.2499,
+    'change_pct_1d' => 0.1,
+    'source' => 'mt5',
+    'updated_at' => $tradeTelemetrySeenAt,
+    'state' => 'live',
+));
+
+$preEntryCountBefore = count($wpdb->tables[$candidateTable] ?? array());
+$preEntryFirstResponse = $instance->post_ea_signal_candidates(new WP_REST_Request(array(
+    'candidates' => array(
+        array(
+            'id' => 'mt5-gbpusd-pre-1',
+            'symbol' => 'GBPUSD',
+            'direction' => 'LONG',
+            'status' => 'READY',
+            'verdict' => 'A',
+            'entry_price' => 1.2505,
+            'sl_price' => 1.2480,
+            'tp_price' => 1.2555,
+            'fib_level' => 1.2500,
+            'fib_ratio' => 61.8,
+            'fib_family' => 'LTF_SF',
+            'htf_bias' => 'BULL',
+            'ltf_regime' => 'TRENDING',
+            'confidence' => 0.8,
+            'created_at' => gmdate('Y-m-d H:i:s', time() - 120),
+        ),
+    ),
+)));
+assert_true(is_array($preEntryFirstResponse) && !empty($preEntryFirstResponse['ok']), 'Pre-entry MT5 candidate ingest should accept the first candidate');
+$preEntrySecondResponse = $instance->post_ea_signal_candidates(new WP_REST_Request(array(
+    'candidates' => array(
+        array(
+            'id' => 'mt5-gbpusd-pre-2',
+            'symbol' => 'GBPUSD',
+            'direction' => 'LONG',
+            'status' => 'READY',
+            'verdict' => 'A',
+            'entry_price' => 1.2505,
+            'sl_price' => 1.2480,
+            'tp_price' => 1.2555,
+            'fib_level' => 1.25005,
+            'fib_ratio' => 61.8,
+            'fib_family' => 'LTF_SF',
+            'htf_bias' => 'BULL',
+            'ltf_regime' => 'TRENDING',
+            'confidence' => 0.82,
+            'created_at' => gmdate('Y-m-d H:i:s', time() - 60),
+        ),
+    ),
+)));
+assert_true(is_array($preEntrySecondResponse) && !empty($preEntrySecondResponse['ok']), 'Pre-entry duplicate MT5 candidate should fail open at the response layer');
+assert_true(isset($wpdb->tables[$candidateTable]['mt5-gbpusd-pre-1']), 'Pre-entry baseline candidate row should remain stored');
+assert_true(!isset($wpdb->tables[$candidateTable]['mt5-gbpusd-pre-2']), 'Pre-entry duplicate MT5 candidate must be suppressed while the prior signal remains valid');
+assert_same($preEntryCountBefore + 1, count($wpdb->tables[$candidateTable] ?? array()), 'Pre-entry suppression must keep one stored candidate for the same live range');
+
+$wpdb->replace($snapshotTable, array(
+    'user_id' => 7,
+    'symbol' => 'AUDUSD',
+    'bid' => 0.6610,
+    'ask' => 0.6612,
+    'mid' => 0.6611,
+    'change_pct_1d' => 0.1,
+    'source' => 'mt5',
+    'updated_at' => $tradeTelemetrySeenAt,
+    'state' => 'live',
+));
+$openPositionCountBefore = count($wpdb->tables[$candidateTable] ?? array());
+$openPositionFirstResponse = $instance->post_ea_signal_candidates(new WP_REST_Request(array(
+    'candidates' => array(
+        array(
+            'id' => 'mt5-audusd-pos-1',
+            'symbol' => 'AUDUSD',
+            'direction' => 'LONG',
+            'status' => 'READY',
+            'verdict' => 'A',
+            'entry_price' => 0.6605,
+            'sl_price' => 0.6580,
+            'tp_price' => 0.6655,
+            'fib_level' => 0.6600,
+            'fib_ratio' => 62.5,
+            'fib_family' => 'HTF_AF',
+            'htf_bias' => 'BULL',
+            'ltf_regime' => 'TRENDING',
+            'confidence' => 0.86,
+            'created_at' => gmdate('Y-m-d H:i:s', time() - 50),
+        ),
+    ),
+)));
+assert_true(is_array($openPositionFirstResponse) && !empty($openPositionFirstResponse['ok']), 'Open-position MT5 candidate ingest should accept the first candidate');
+$wpdb->replace($tradePositionsTable, array(
+    'deterministic_key' => 'position:7:acct-1:term-1:pos-1',
+    'user_id' => 7,
+    'account_id' => 'acct-1',
+    'terminal_id' => 'term-1',
+    'position_id' => 'pos-1',
+    'symbol' => 'AUDUSD',
+    'normalized_symbol' => 'AUDUSD',
+    'direction' => 'BUY',
+    'entry_price' => 0.6605,
+    'current_price' => 0.6611,
+    'sl' => 0.6580,
+    'tp' => 0.6655,
+    'volume' => 0.1,
+    'profit' => 0,
+    'swap' => 0,
+    'commission' => 0,
+    'magic' => 123,
+    'comment' => 'test',
+    'opened_at' => $tradeTelemetrySeenAt,
+    'state' => 'open',
+    'ea_version' => 'test',
+    'last_seen_at' => $tradeTelemetrySeenAt,
+    'updated_at' => $tradeTelemetrySeenAt,
+    'raw_json' => '{}',
+));
+$openPositionSecondResponse = $instance->post_ea_signal_candidates(new WP_REST_Request(array(
+    'candidates' => array(
+        array(
+            'id' => 'mt5-audusd-pos-2',
+            'symbol' => 'AUDUSD',
+            'direction' => 'LONG',
+            'status' => 'READY',
+            'verdict' => 'A',
+            'entry_price' => 0.6605,
+            'sl_price' => 0.6580,
+            'tp_price' => 0.6655,
+            'fib_level' => 0.66005,
+            'fib_ratio' => 62.5,
+            'fib_family' => 'HTF_AF',
+            'htf_bias' => 'BULL',
+            'ltf_regime' => 'TRENDING',
+            'confidence' => 0.84,
+            'created_at' => gmdate('Y-m-d H:i:s', time() - 40),
+        ),
+    ),
+)));
+assert_true(is_array($openPositionSecondResponse) && !empty($openPositionSecondResponse['ok']), 'Open-position duplicate MT5 candidate should return a successful response');
+assert_true(isset($wpdb->tables[$candidateTable]['mt5-audusd-pos-1']), 'Open-position baseline candidate row should remain stored');
+assert_true(!isset($wpdb->tables[$candidateTable]['mt5-audusd-pos-2']), 'Duplicate MT5 candidate must be suppressed when a matching live open position exists');
+assert_same($openPositionCountBefore + 1, count($wpdb->tables[$candidateTable] ?? array()), 'Open-position suppression must keep one stored candidate for the same live range');
+
+$wpdb->replace($snapshotTable, array(
+    'user_id' => 7,
+    'symbol' => 'NZDUSD',
+    'bid' => 0.6110,
+    'ask' => 0.6112,
+    'mid' => 0.6111,
+    'change_pct_1d' => 0.1,
+    'source' => 'mt5',
+    'updated_at' => $tradeTelemetrySeenAt,
+    'state' => 'live',
+));
+$pendingOrderCountBefore = count($wpdb->tables[$candidateTable] ?? array());
+$pendingOrderFirstResponse = $instance->post_ea_signal_candidates(new WP_REST_Request(array(
+    'candidates' => array(
+        array(
+            'id' => 'mt5-nzdusd-ord-1',
+            'symbol' => 'NZDUSD',
+            'direction' => 'LONG',
+            'status' => 'READY',
+            'verdict' => 'A',
+            'entry_price' => 0.6105,
+            'sl_price' => 0.6080,
+            'tp_price' => 0.6155,
+            'fib_level' => 0.6100,
+            'fib_ratio' => 50.0,
+            'fib_family' => 'LTF_SF',
+            'htf_bias' => 'BULL',
+            'ltf_regime' => 'RANGING',
+            'confidence' => 0.78,
+            'created_at' => gmdate('Y-m-d H:i:s', time() - 30),
+        ),
+    ),
+)));
+assert_true(is_array($pendingOrderFirstResponse) && !empty($pendingOrderFirstResponse['ok']), 'Pending-order MT5 candidate ingest should accept the first candidate');
+$wpdb->replace($tradeOrdersTable, array(
+    'deterministic_key' => 'order:7:acct-1:term-1:ord-1',
+    'user_id' => 7,
+    'account_id' => 'acct-1',
+    'terminal_id' => 'term-1',
+    'order_id' => 'ord-1',
+    'symbol' => 'NZDUSD',
+    'normalized_symbol' => 'NZDUSD',
+    'order_type' => 'BUY_LIMIT',
+    'direction' => 'BUY',
+    'entry_price' => 0.6105,
+    'sl' => 0.6080,
+    'tp' => 0.6155,
+    'volume' => 0.1,
+    'magic' => 123,
+    'comment' => 'test',
+    'placed_at' => $tradeTelemetrySeenAt,
+    'state' => 'active',
+    'ea_version' => 'test',
+    'last_seen_at' => $tradeTelemetrySeenAt,
+    'updated_at' => $tradeTelemetrySeenAt,
+    'raw_json' => '{}',
+));
+$pendingOrderSecondResponse = $instance->post_ea_signal_candidates(new WP_REST_Request(array(
+    'candidates' => array(
+        array(
+            'id' => 'mt5-nzdusd-ord-2',
+            'symbol' => 'NZDUSD',
+            'direction' => 'LONG',
+            'status' => 'READY',
+            'verdict' => 'A',
+            'entry_price' => 0.6105,
+            'sl_price' => 0.6080,
+            'tp_price' => 0.6155,
+            'fib_level' => 0.61008,
+            'fib_ratio' => 50.0,
+            'fib_family' => 'LTF_SF',
+            'htf_bias' => 'BULL',
+            'ltf_regime' => 'RANGING',
+            'confidence' => 0.79,
+            'created_at' => gmdate('Y-m-d H:i:s', time() - 20),
+        ),
+    ),
+)));
+assert_true(is_array($pendingOrderSecondResponse) && !empty($pendingOrderSecondResponse['ok']), 'Pending-order duplicate MT5 candidate should return a successful response');
+assert_true(isset($wpdb->tables[$candidateTable]['mt5-nzdusd-ord-1']), 'Pending-order baseline candidate row should remain stored');
+assert_true(!isset($wpdb->tables[$candidateTable]['mt5-nzdusd-ord-2']), 'Duplicate MT5 candidate must be suppressed when a matching live pending order exists');
+assert_same($pendingOrderCountBefore + 1, count($wpdb->tables[$candidateTable] ?? array()), 'Pending-order suppression must keep one stored candidate for the same live range');
+
+$wpdb->replace($snapshotTable, array(
+    'user_id' => 7,
+    'symbol' => 'EURGBP',
+    'bid' => 0.8510,
+    'ask' => 0.8512,
+    'mid' => 0.8511,
+    'change_pct_1d' => 0.1,
+    'source' => 'mt5',
+    'updated_at' => $tradeTelemetrySeenAt,
+    'state' => 'live',
+));
+$postEntryCountBefore = count($wpdb->tables[$candidateTable] ?? array());
+$postEntryFirstResponse = $instance->post_ea_signal_candidates(new WP_REST_Request(array(
+    'candidates' => array(
+        array(
+            'id' => 'mt5-eurgbp-release-1',
+            'symbol' => 'EURGBP',
+            'direction' => 'LONG',
+            'status' => 'READY',
+            'verdict' => 'A',
+            'entry_price' => 0.8505,
+            'sl_price' => 0.8480,
+            'tp_price' => 0.8555,
+            'fib_level' => 0.8500,
+            'fib_ratio' => 70.5,
+            'fib_family' => 'HTF_AF',
+            'htf_bias' => 'BULL',
+            'ltf_regime' => 'TRENDING',
+            'confidence' => 0.88,
+            'created_at' => gmdate('Y-m-d H:i:s', time() - 10),
+        ),
+    ),
+)));
+assert_true(is_array($postEntryFirstResponse) && !empty($postEntryFirstResponse['ok']), 'Post-entry MT5 candidate ingest should accept the first candidate');
+$postEntrySecondResponse = $instance->post_ea_signal_candidates(new WP_REST_Request(array(
+    'candidates' => array(
+        array(
+            'id' => 'mt5-eurgbp-release-2',
+            'symbol' => 'EURGBP',
+            'direction' => 'LONG',
+            'status' => 'READY',
+            'verdict' => 'A',
+            'entry_price' => 0.8505,
+            'sl_price' => 0.8480,
+            'tp_price' => 0.8555,
+            'fib_level' => 0.85006,
+            'fib_ratio' => 70.5,
+            'fib_family' => 'HTF_AF',
+            'htf_bias' => 'BULL',
+            'ltf_regime' => 'TRENDING',
+            'confidence' => 0.9,
+            'created_at' => gmdate('Y-m-d H:i:s', time() - 5),
+        ),
+    ),
+)));
+assert_true(is_array($postEntrySecondResponse) && !empty($postEntrySecondResponse['ok']), 'Post-entry replacement MT5 candidate should return a successful response');
+assert_true(isset($wpdb->tables[$candidateTable]['mt5-eurgbp-release-1']), 'Post-entry baseline candidate row should remain stored');
+assert_true(isset($wpdb->tables[$candidateTable]['mt5-eurgbp-release-2']), 'A new MT5 candidate must be accepted after entry is crossed when no fresh matching trade state exists');
+assert_same($postEntryCountBefore + 2, count($wpdb->tables[$candidateTable] ?? array()), 'Post-entry replacement must store a new candidate once the prior lifecycle is no longer active');
 
 fwrite(STDOUT, 'mt5 snapshot contract checks passed' . PHP_EOL);
