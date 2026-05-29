@@ -12,6 +12,7 @@ const reactQueryMocks = vi.hoisted(() => ({
 const apiMocks = vi.hoisted(() => ({
   getAccountTelemetry: vi.fn(),
   getEngineHealth: vi.fn(),
+  getLiveSignals: vi.fn(),
   getUserProgress: vi.fn(),
   getUserSettings: vi.fn(),
   normalizeBackendUrl: vi.fn((value?: string) => (typeof value === "string" ? value.trim() : "")),
@@ -30,6 +31,7 @@ vi.mock("@/lib/api/sniperClient", () => ({
   apiClient: {
     getAccountTelemetry: apiMocks.getAccountTelemetry,
     getEngineHealth: apiMocks.getEngineHealth,
+    getLiveSignals: apiMocks.getLiveSignals,
     getUserProgress: apiMocks.getUserProgress,
     getUserSettings: apiMocks.getUserSettings,
     postWatchlistAdd: apiMocks.postWatchlistAdd,
@@ -42,6 +44,7 @@ vi.mock("@/lib/api/sniperClient", () => ({
 import {
   useAccountTelemetry,
   useEngineHealth,
+  useLiveSignals,
   usePollingUiState,
   useUserProgress,
   useWatchlistAdd,
@@ -53,6 +56,7 @@ describe("useEngineHealth", () => {
     reactQueryMocks.useQuery.mockReset();
     apiMocks.getAccountTelemetry.mockReset();
     apiMocks.getEngineHealth.mockReset();
+    apiMocks.getLiveSignals.mockReset();
     apiMocks.getUserProgress.mockReset();
     apiMocks.getUserSettings.mockReset();
     apiMocks.postWatchlistAdd.mockReset();
@@ -162,6 +166,44 @@ describe("useUserProgress", () => {
 
     expect(progressOptions).toMatchObject({
       queryKey: ["user-progress"],
+      enabled: true,
+      staleTime: 0,
+      refetchInterval: 5_000,
+    });
+  });
+});
+
+describe("useLiveSignals", () => {
+  beforeEach(() => {
+    reactQueryMocks.useQuery.mockReset();
+  });
+
+  it("disables the inherited stale window while preserving the polling cadence", () => {
+    let liveSignalsOptions: Record<string, unknown> | undefined;
+
+    reactQueryMocks.useQuery.mockImplementation((options: { queryKey: string[] }) => {
+      if (options.queryKey[0] === "user-settings") {
+        return {
+          data: {
+            backendUrl: "https://backend.example/wp-json",
+            refreshIntervalSec: 5,
+            watchlist: [],
+          },
+        };
+      }
+
+      if (options.queryKey[0] === "live-signals") {
+        liveSignalsOptions = options;
+        return { data: undefined };
+      }
+
+      return { data: undefined };
+    });
+
+    renderHook(() => useLiveSignals());
+
+    expect(liveSignalsOptions).toMatchObject({
+      queryKey: ["live-signals"],
       enabled: true,
       staleTime: 0,
       refetchInterval: 5_000,

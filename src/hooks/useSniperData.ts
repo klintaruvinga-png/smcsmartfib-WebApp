@@ -117,6 +117,7 @@ export function useLiveSignals() {
     queryKey: ["live-signals"],
     queryFn: () => apiClient.getLiveSignals(),
     enabled,
+    staleTime: 0,
     refetchOnWindowFocus: false,
     refetchInterval: enabled ? pollMs : false,
   });
