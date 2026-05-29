@@ -1,35 +1,40 @@
-## Issue summary
+# Issue summary
 
-`build_trade_plan()` was calculating staged lot sizes from the stale `/user/account` blob via `equityUSC`, then masking missing equity with a fake `1 USC` floor. That let a dead snapshot produce tiny backend-authored plans even while the app wallet showed live telemetry equity.
+Implemented the live-signals freshness contract hardening for SMC Intake. The patch preserves backend snapshot authority while removing transport and query-cache conditions that could leave `/live-signals` stale on the dashboard.
 
-## Root cause implemented
+# Root cause implemented
 
-Updated backend plan sizing to use live `/account-telemetry` equity only when telemetry freshness is `live` and equity is positive. When live telemetry equity is missing, stale, or non-positive, the plan now keeps its existing structure but returns zero risk, zero stage lots, and `state = 'INVALID'` instead of fabricating a tiny valid plan.
+Implemented the confirmed client/origin freshness gaps only: `get_live_signals()` now returns route-local anti-cache headers, `apiClient.getLiveSignals()` now opts into the existing cache-bust plus `no-store` GET path, and `useLiveSignals()` now overrides the global React Query stale window with `staleTime: 0`.
 
-## Exact files changed
+# Exact files changed
 
+- `reports/codex-implementation.meta.json`
+- `reports/implementation-verification.md`
 - `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
-- `wordpress/smc-superfib-sniper/tests/php/fib-test-helpers.php`
-- `wordpress/smc-superfib-sniper/tests/php/test-progressive-lot-sizing.php`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-29_trade-plan-telemetry-authority.md`
-- `.github/migration/audits/phase-4-trade-plan-sizing-parity-2026-05-29.md`
+- `src/lib/api/sniperClient.ts`
+- `src/hooks/useSniperData.ts`
+- `src/lib/api/sniperClient.test.ts`
+- `src/hooks/useSniperData.test.tsx`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-29_live-signals-freshness-contract.md`
+- `.github/migration/audits/phase-2-dashboard-live-signals-freshness-parity-2026-05-29.md`
 - `reports/codex-implementation.md`
 
-## Tests run
+# Tests run
 
-- `php wordpress/smc-superfib-sniper/tests/php/test-progressive-lot-sizing.php`
-- `php wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php`
-- `npx vitest run src/routes/-plan.test.tsx`
+- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+- `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx`
+- `npm run validate:impl`
 
-## Reports generated
+# Reports generated
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-29_trade-plan-telemetry-authority.md`
-- `.github/migration/audits/phase-4-trade-plan-sizing-parity-2026-05-29.md`
+- `reports/implementation-verification.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-29_live-signals-freshness-contract.md`
+- `.github/migration/audits/phase-2-dashboard-live-signals-freshness-parity-2026-05-29.md`
 
-## Remaining risks
+# Remaining risks
 
-Live staging verification is still pending; the endpoint parity evidence captured here was generated from the local PHP harness rather than a running WordPress environment. The patch intentionally does not widen snapshot invalidation, change `/user/account`, or add a balance fallback.
+Manual authenticated network verification is still required to confirm the deployed `/live-signals` origin emits the anti-cache headers and that each poll uses a unique cache-bust token. Intermediary caches may still require operational purge after deploy even when the code contract is correct, and `/snapshot` versus `/live-signals` parity after a real backend update cycle remains unverified from this workspace.
 
-## Any contract ambiguities resolved during implementation
+# Any contract ambiguities resolved during implementation
 
-Applied the smallest safe interpretation of the contract: only live positive telemetry equity is a valid sizing source; stale telemetry, missing telemetry, or non-positive telemetry equity must invalidate sizing. No `balance` fallback was added.
+Applied the PHP anti-cache headers on the successful `WP_REST_Response` returned by `get_live_signals()` only, which is the smallest safe interpretation of “this route only” without changing shared auth/error handling or snapshot recomputation behavior.

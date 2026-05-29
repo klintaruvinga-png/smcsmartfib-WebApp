@@ -452,7 +452,7 @@ export const apiClient = {
       const wl = new Set(mockSettings.watchlist);
       return mockSignals.filter((s) => wl.has(s.symbol));
     }
-    return call<SignalCandidate[]>("/live-signals");
+    return call<SignalCandidate[]>("/live-signals", { cacheBust: true });
   },
   async getLadders(symbol?: Symbol, mock = MOCK_MODE): Promise<TradePlan[]> {
     if (mock) return [mockPlan];

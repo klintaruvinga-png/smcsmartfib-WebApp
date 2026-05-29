@@ -4758,7 +4758,10 @@ final class SMC_SuperFib_Sniper_REST {
     public function get_live_signals() {
         $user_id = get_current_user_id();
         $snapshot = $this->ensure_engine_snapshot($user_id);
-        return rest_ensure_response($snapshot['signals'] ?? array());
+        $response = rest_ensure_response($snapshot['signals'] ?? array());
+        $response->header('Cache-Control', 'no-store, no-cache, must-revalidate');
+        $response->header('Pragma', 'no-cache');
+        return $response;
     }
 
     // Pine webhook stub — intentionally audit-only until Pine alert integration is implemented.
