@@ -3784,10 +3784,11 @@ final class SMC_SuperFib_Sniper_REST {
             $htf_bias    = sanitize_text_field((string) ($cand['htf_bias']    ?? ''));
             $ltf_regime  = sanitize_text_field((string) ($cand['ltf_regime']  ?? ''));
             $confidence  = max(0.0, min(1.0, (float) ($cand['confidence'] ?? 0.0)));
-            $created_at  = $this->now_mysql();
+            $created_at  = $this->normalize_market_timestamp($cand['created_at'] ?? null, $this->now_mysql());
+            $drift_pips  = null;
 
             // Compare against Pine signals to classify drift.
-            $pine_match  = $this->classify_signal_drift($user_id, $symbol, $direction, $entry_price);
+            $pine_match  = $this->classify_signal_drift($user_id, $symbol, $direction, $entry_price, $drift_pips);
 
             $result = $wpdb->replace(
                 $table,
@@ -3808,6 +3809,7 @@ final class SMC_SuperFib_Sniper_REST {
                     'ltf_regime'  => $ltf_regime,
                     'confidence'  => $confidence,
                     'pine_match'  => $pine_match,
+                    'drift_pips'  => $drift_pips,
                     'source'      => 'mt5',
                     'created_at'  => $created_at,
                 ),
@@ -3816,7 +3818,9 @@ final class SMC_SuperFib_Sniper_REST {
                       $tp_price   !== null ? '%f' : 'NULL',
                       $fib_level  !== null ? '%f' : 'NULL',
                       $fib_ratio  !== null ? '%f' : 'NULL',
-                      '%s', '%s', '%s', '%f', '%s', '%s', '%s')
+                      '%s', '%s', '%s', '%f', '%s',
+                      $drift_pips !== null ? '%f' : 'NULL',
+                      '%s', '%s')
             );
 
             if ($result !== false) {
@@ -3838,8 +3842,9 @@ final class SMC_SuperFib_Sniper_REST {
     // Determine pine_match classification by comparing MT5 candidate against
     // existing Pine-sourced signals in smc_sf_signals.
     // Returns: EXACT / DRIFT / MISMATCH / NO_PINE
-    private function classify_signal_drift($user_id, $symbol, $direction, $mt5_entry) {
+    private function classify_signal_drift($user_id, $symbol, $direction, $mt5_entry, &$drift_pips = null) {
         global $wpdb;
+        $drift_pips = null;
 
         $pine_signal = $wpdb->get_row($wpdb->prepare(
             "SELECT direction, engine FROM {$this->table('signals')} WHERE user_id = %d AND symbol = %s AND status != 'CLOSED' ORDER BY created_at DESC LIMIT 1",
@@ -3850,13 +3855,17 @@ final class SMC_SuperFib_Sniper_REST {
             return 'NO_PINE';
         }
 
-        if ($pine_signal['direction'] !== $direction) {
-            return 'MISMATCH';
-        }
-
         // Extract Pine entry price from engine JSON to compute drift.
         $engine = json_decode((string) ($pine_signal['engine'] ?? '{}'), true);
         $pine_entry = isset($engine['ltfLevel']['price']) ? (float) $engine['ltfLevel']['price'] : null;
+
+        if ($pine_signal['direction'] !== $direction) {
+            if ($pine_entry !== null && $pine_entry > 0) {
+                $pip_size   = (strpos($symbol, 'JPY') !== false) ? 0.01 : 0.0001;
+                $drift_pips = abs($mt5_entry - $pine_entry) / $pip_size;
+            }
+            return 'MISMATCH';
+        }
 
         if ($pine_entry === null || $pine_entry <= 0) {
             return 'DRIFT'; // direction matches but can't compute exact price drift
@@ -7887,6 +7896,14 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         $value = trim((string) $raw_time);
+
+        if (preg_match('/^\d{10,13}$/', $value) === 1) {
+            $epoch = (int) $value;
+            if (strlen($value) === 13) {
+                $epoch = (int) floor($epoch / 1000);
+            }
+            return gmdate('Y-m-d H:i:s', $epoch);
+        }
         
         // Convert MQL5 format (2026.05.06 12:34:56) to ISO 8601 (2026-05-06T12:34:56)
         // This regex handles both dot and dash separators for dates
