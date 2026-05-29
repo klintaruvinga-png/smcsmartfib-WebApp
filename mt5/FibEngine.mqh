@@ -6,6 +6,7 @@
 struct FibLevelOut
 {
     string   family;
+    string   timeframe;
     double   ratio;
     double   price;
 };
@@ -89,18 +90,20 @@ public:
         return json;
     }
 
-    // Build structured M15 fib levels for signal evaluation so the signal engine
+    // Build structured fib levels for one timeframe so the signal engine
     // consumes the same anchor calculations as the fib dispatch path.
-    int BuildSignalFibLevels(string symbol, FibLevelOut& outLevels[])
+    int BuildSignalFibLevelsForTF(string symbol, ENUM_TIMEFRAMES mqlTf,
+                                  int chartTfSeconds, string tfName,
+                                  FibLevelOut& outLevels[])
     {
-        const int chartTfSeconds = 900;
         int lookback = FibHistoryWindowSize(chartTfSeconds);
 
         MqlRates rates[];
-        int copied = CopyRates(symbol, PERIOD_M15, 1, lookback, rates);
+        int copied = CopyRates(symbol, mqlTf, 1, lookback, rates);
         if (copied <= 0)
         {
-            Print("[FibEngine] CopyRates returned 0 for signal levels symbol=", symbol, " tf=M15");
+            Print("[FibEngine] CopyRates returned 0 for signal levels symbol=", symbol,
+                  " tf=", tfName);
             return 0;
         }
 
@@ -134,6 +137,7 @@ public:
             for (int i = 0; i < ArraySize(ratios); i++)
             {
                 outLevels[outIndex].family = "LTF_SF";
+                outLevels[outIndex].timeframe = tfName;
                 outLevels[outIndex].ratio = ratios[i];
                 outLevels[outIndex].price = PriceForRatio(ltfHigh, ltfLow, ratios[i]);
                 outIndex++;
@@ -145,6 +149,7 @@ public:
             for (int i = 0; i < ArraySize(ratios); i++)
             {
                 outLevels[outIndex].family = "HTF_AF";
+                outLevels[outIndex].timeframe = tfName;
                 outLevels[outIndex].ratio = ratios[i];
                 outLevels[outIndex].price = PriceForRatio(htfHigh, htfLow, ratios[i]);
                 outIndex++;
@@ -152,6 +157,40 @@ public:
         }
 
         return outIndex;
+    }
+
+    // Build structured M15/H1/H4 fib levels for signal evaluation so the signal engine
+    // consumes the same anchor calculations as the fib dispatch path.
+    int BuildSignalFibLevels(string symbol, FibLevelOut& outLevels[])
+    {
+        ArrayResize(outLevels, 0);
+
+        ENUM_TIMEFRAMES mqlTfs[3] = {PERIOD_M15, PERIOD_H1, PERIOD_H4};
+        int chartTfSeconds[3] = {900, 3600, 14400};
+        string tfNames[3] = {"M15", "H1", "H4"};
+
+        int totalCount = 0;
+        for (int i = 0; i < 3; i++)
+        {
+            FibLevelOut tfLevels[];
+            int tfCount = BuildSignalFibLevelsForTF(symbol, mqlTfs[i],
+                                                    chartTfSeconds[i], tfNames[i],
+                                                    tfLevels);
+            if (tfCount <= 0)
+                continue;
+
+            ArrayResize(outLevels, totalCount + tfCount);
+            for (int j = 0; j < tfCount; j++)
+            {
+                outLevels[totalCount + j].family = tfLevels[j].family;
+                outLevels[totalCount + j].timeframe = tfLevels[j].timeframe;
+                outLevels[totalCount + j].ratio = tfLevels[j].ratio;
+                outLevels[totalCount + j].price = tfLevels[j].price;
+            }
+            totalCount += tfCount;
+        }
+
+        return totalCount;
     }
 
     // Compute fib levels for a single timeframe and return as a JSON object.

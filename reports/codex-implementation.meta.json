@@ -1,5 +1,5 @@
 {
-  "issue": "SMC Intake - Progressive Entry Lot Sizing patch",
-  "plan_hash": "4dc9bf16a52f18253d377f54539a578effa28939692f6bfbfe6e13a9ab15efda",
-  "written_at": "2026-05-28T21:13:49.923Z"
+  "issue": "SMC Intake - verify the AOV authority patch is updated correctly and close any remaining MT5/Pine parity, H1/H4, equilibrium, and RR gating gaps.",
+  "plan_hash": "fb3795138b3ed1e29a42c51fc4eafa581a8cf1c5d572f5f31eba77499599b390",
+  "written_at": "2026-05-29T06:12:06.6502530+02:00"
 }
