@@ -437,7 +437,8 @@ private:
 
     // ----------------------------------------------------------------
     // ComputeFibTP — next fib level in the trade direction.
-    // Scans fibLevels[] for the nearest level beyond the trigger.
+    // Scans only the trigger timeframe/family scope for the nearest level
+    // beyond the trigger so mixed-timeframe arrays cannot cross-pollinate TP.
     // ----------------------------------------------------------------
     double ComputeFibTP(FibLevelOut& fibLevels[], int fibCount,
                         const FibLevelOut& trigger, string direction,
@@ -448,6 +449,10 @@ private:
 
         for (int i = 0; i < fibCount; i++)
         {
+            if (fibLevels[i].timeframe != trigger.timeframe ||
+                fibLevels[i].family != trigger.family)
+                continue;
+
             if (fibLevels[i].price == trigger.price)
                 continue;
 
