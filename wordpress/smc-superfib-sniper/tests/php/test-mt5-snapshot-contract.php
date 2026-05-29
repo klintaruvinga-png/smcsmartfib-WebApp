@@ -202,6 +202,39 @@ if (!class_exists('TestWpdb')) {
         }
 
         public function get_row($query, $output = ARRAY_A) {
+            if (preg_match("/SELECT \\* FROM ([^\\s]+)\\s+WHERE user_id = (\\d+) AND symbol = '([^']+)' AND direction = '([^']+)' AND fib_family = '([^']*)' AND fib_ratio = ([0-9.]+)\\s+AND fib_level IS NOT NULL AND fib_level BETWEEN ([0-9.\\-]+) AND ([0-9.\\-]+)\\s+ORDER BY created_at DESC LIMIT 1/s", $query, $m)) {
+                $table = $m[1];
+                $user_id = (int) $m[2];
+                $symbol = $m[3];
+                $direction = $m[4];
+                $fib_family = $m[5];
+                $fib_ratio = (float) $m[6];
+                $min_fib_level = (float) $m[7];
+                $max_fib_level = (float) $m[8];
+                $latest = null;
+                foreach ($this->tables[$table] ?? array() as $row) {
+                    if ((int) ($row['user_id'] ?? 0) !== $user_id) {
+                        continue;
+                    }
+                    if (($row['symbol'] ?? '') !== $symbol || ($row['direction'] ?? '') !== $direction || ($row['fib_family'] ?? '') !== $fib_family) {
+                        continue;
+                    }
+                    if (abs((float) ($row['fib_ratio'] ?? 0) - $fib_ratio) > 0.0000001) {
+                        continue;
+                    }
+                    if (!isset($row['fib_level']) || !is_numeric($row['fib_level'])) {
+                        continue;
+                    }
+                    $row_fib_level = (float) $row['fib_level'];
+                    if ($row_fib_level < $min_fib_level || $row_fib_level > $max_fib_level) {
+                        continue;
+                    }
+                    if ($latest === null || strcmp((string) ($row['created_at'] ?? ''), (string) ($latest['created_at'] ?? '')) > 0) {
+                        $latest = $row;
+                    }
+                }
+                return $latest;
+            }
             if (preg_match("/SELECT \\* FROM ([^ ]+) WHERE user_id = (\\d+) AND symbol = '([^']+)'(?: AND source = '([^']+)')?/", $query, $m)) {
                 $table = $m[1];
                 $user_id = (int) $m[2];
@@ -1248,6 +1281,89 @@ assert_true(is_array($preEntrySecondResponse) && !empty($preEntrySecondResponse[
 assert_true(isset($wpdb->tables[$candidateTable]['mt5-gbpusd-pre-1']), 'Pre-entry baseline candidate row should remain stored');
 assert_true(!isset($wpdb->tables[$candidateTable]['mt5-gbpusd-pre-2']), 'Pre-entry duplicate MT5 candidate must be suppressed while the prior signal remains valid');
 assert_same($preEntryCountBefore + 1, count($wpdb->tables[$candidateTable] ?? array()), 'Pre-entry suppression must keep one stored candidate for the same live range');
+
+$wpdb->replace($snapshotTable, array(
+    'user_id' => 7,
+    'symbol' => 'USDCAD',
+    'bid' => 1.3498,
+    'ask' => 1.3500,
+    'mid' => 1.3499,
+    'change_pct_1d' => 0.1,
+    'source' => 'mt5',
+    'updated_at' => $tradeTelemetrySeenAt,
+    'state' => 'live',
+));
+$multiRangeCountBefore = count($wpdb->tables[$candidateTable] ?? array());
+$multiRangeFirstResponse = $instance->post_ea_signal_candidates(new WP_REST_Request(array(
+    'candidates' => array(
+        array(
+            'id' => 'mt5-usdcad-range-1',
+            'symbol' => 'USDCAD',
+            'direction' => 'LONG',
+            'status' => 'READY',
+            'verdict' => 'A',
+            'entry_price' => 1.3505,
+            'sl_price' => 1.3480,
+            'tp_price' => 1.3555,
+            'fib_level' => 1.3500,
+            'fib_ratio' => 61.8,
+            'fib_family' => 'LTF_SF',
+            'htf_bias' => 'BULL',
+            'ltf_regime' => 'TRENDING',
+            'confidence' => 0.8,
+            'created_at' => gmdate('Y-m-d H:i:s', time() - 180),
+        ),
+    ),
+)));
+assert_true(is_array($multiRangeFirstResponse) && !empty($multiRangeFirstResponse['ok']), 'Multi-range MT5 candidate ingest should accept the older in-range candidate');
+$multiRangeOtherResponse = $instance->post_ea_signal_candidates(new WP_REST_Request(array(
+    'candidates' => array(
+        array(
+            'id' => 'mt5-usdcad-range-2',
+            'symbol' => 'USDCAD',
+            'direction' => 'LONG',
+            'status' => 'READY',
+            'verdict' => 'A',
+            'entry_price' => 1.3530,
+            'sl_price' => 1.3505,
+            'tp_price' => 1.3580,
+            'fib_level' => 1.3525,
+            'fib_ratio' => 61.8,
+            'fib_family' => 'LTF_SF',
+            'htf_bias' => 'BULL',
+            'ltf_regime' => 'TRENDING',
+            'confidence' => 0.81,
+            'created_at' => gmdate('Y-m-d H:i:s', time() - 120),
+        ),
+    ),
+)));
+assert_true(is_array($multiRangeOtherResponse) && !empty($multiRangeOtherResponse['ok']), 'Multi-range MT5 candidate ingest should accept a newer candidate from a different fib range');
+$multiRangeDuplicateResponse = $instance->post_ea_signal_candidates(new WP_REST_Request(array(
+    'candidates' => array(
+        array(
+            'id' => 'mt5-usdcad-range-3',
+            'symbol' => 'USDCAD',
+            'direction' => 'LONG',
+            'status' => 'READY',
+            'verdict' => 'A',
+            'entry_price' => 1.3505,
+            'sl_price' => 1.3480,
+            'tp_price' => 1.3555,
+            'fib_level' => 1.35005,
+            'fib_ratio' => 61.8,
+            'fib_family' => 'LTF_SF',
+            'htf_bias' => 'BULL',
+            'ltf_regime' => 'TRENDING',
+            'confidence' => 0.82,
+            'created_at' => gmdate('Y-m-d H:i:s', time() - 60),
+        ),
+    ),
+)));
+assert_true(is_array($multiRangeDuplicateResponse) && !empty($multiRangeDuplicateResponse['ok']), 'Multi-range duplicate MT5 candidate should return a successful response');
+assert_true(isset($wpdb->tables[$candidateTable]['mt5-usdcad-range-1']), 'Older in-range multi-range candidate row should remain stored');
+assert_true(isset($wpdb->tables[$candidateTable]['mt5-usdcad-range-2']), 'Newer out-of-range multi-range candidate row should remain stored');
+assert_true(!isset($wpdb->tables[$candidateTable]['mt5-usdcad-range-3']), 'Duplicate MT5 candidate must be suppressed by the older in-range tuple row even when a newer out-of-range tuple row exists');
+assert_same($multiRangeCountBefore + 2, count($wpdb->tables[$candidateTable] ?? array()), 'Multi-range suppression must scan past newer out-of-range tuple rows before releasing duplicates');
 
 $wpdb->replace($snapshotTable, array(
     'user_id' => 7,
