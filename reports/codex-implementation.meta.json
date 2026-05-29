@@ -1,5 +1,5 @@
 {
-  "issue": "SMC Intake - verify the AOV authority patch is updated correctly and close any remaining MT5/Pine parity, H1/H4, equilibrium, and RR gating gaps.",
-  "plan_hash": "fb3795138b3ed1e29a42c51fc4eafa581a8cf1c5d572f5f31eba77499599b390",
-  "written_at": "2026-05-29T06:12:06.6502530+02:00"
+  "issue": "SMC Intake - Fix EA compile errors",
+  "plan_hash": "5bc1ceebcf0cd2b4b602c4adc6e37c905ebab9e5d200ed3f71e2e489467f650e",
+  "written_at": "2026-05-29T07:18:35.3299858+02:00"
 }
