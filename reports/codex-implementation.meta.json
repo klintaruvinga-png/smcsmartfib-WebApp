@@ -1,5 +1,5 @@
 {
-  "issue": "SMC Intake - Fix EA compile errors",
-  "plan_hash": "4dc9bf16a52f18253d377f54539a578effa28939692f6bfbfe6e13a9ab15efda",
-  "written_at": "2026-05-29T05:36:33.602Z"
+  "issue": "SMC Intake - build_trade_plan() is calculating lots using a dead/empty account snapshot (equityUSC) instead of the live account balance visible in the app.",
+  "plan_hash": "705a4ec8f8c6c61880acaff9e7aa2b9051b4f51481bf37b6753ed887994b3204",
+  "written_at": "2026-05-29T08:38:43.0055207Z"
 }

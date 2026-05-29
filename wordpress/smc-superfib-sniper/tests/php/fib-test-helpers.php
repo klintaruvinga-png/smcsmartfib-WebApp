@@ -218,6 +218,10 @@ if (!class_exists('TestWpdb')) {
             return 0;
         }
 
+        public function get_charset_collate() {
+            return '';
+        }
+
         public function reset() {
             $this->tables = array();
             $this->queries = array();
@@ -333,6 +337,19 @@ if (!class_exists('TestWpdb')) {
 
             return 'hash:' . md5(wp_json_encode($data));
         }
+    }
+}
+
+if (!function_exists('dbDelta')) {
+    function dbDelta($sql) {
+        global $wpdb;
+        if (preg_match('/CREATE TABLE ([^ ]+)/', $sql, $matches)) {
+            $table = $matches[1];
+            if (!isset($wpdb->tables[$table])) {
+                $wpdb->tables[$table] = array();
+            }
+        }
+        return true;
     }
 }
 
