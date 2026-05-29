@@ -1,37 +1,35 @@
 ## Issue summary
 
-Frontend plan cards treated backend-authored sub-minimum stage lots as normal lot labels and could leave execution enabled when the backend queue would skip one or more ladder legs below `0.01`.
+`build_trade_plan()` was calculating staged lot sizes from the stale `/user/account` blob via `equityUSC`, then masking missing equity with a fake `1 USC` floor. That let a dead snapshot produce tiny backend-authored plans even while the app wallet showed live telemetry equity.
 
 ## Root cause implemented
 
-Implemented a frontend-only execution-readiness guard that recognizes backend-authored stage lots below the existing backend execution threshold, renders those stages as non-executable instead of valid lot labels, and blocks the execution CTA without changing backend sizing, routing, or payload authority.
+Updated backend plan sizing to use live `/account-telemetry` equity only when telemetry freshness is `live` and equity is positive. When live telemetry equity is missing, stale, or non-positive, the plan now keeps its existing structure but returns zero risk, zero stage lots, and `state = 'INVALID'` instead of fabricating a tiny valid plan.
 
 ## Exact files changed
 
-- `src/routes/-plan.test.tsx`
-- `src/routes/-plan.utils.ts`
-- `src/components/PlanCard.tsx`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-29_smc-intake-front-end-lot-sizing-0-0-lots.md`
-- `.github/migration/audits/phase-0-backend-dashboard-stage-lot-executability-parity-2026-05-29.md`
-- `reports/plan-card-non-executable-stage-lot-dom-2026-05-29.html`
+- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+- `wordpress/smc-superfib-sniper/tests/php/fib-test-helpers.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-progressive-lot-sizing.php`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-29_trade-plan-telemetry-authority.md`
+- `.github/migration/audits/phase-4-trade-plan-sizing-parity-2026-05-29.md`
 - `reports/codex-implementation.md`
 
 ## Tests run
 
+- `php wordpress/smc-superfib-sniper/tests/php/test-progressive-lot-sizing.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php`
 - `npx vitest run src/routes/-plan.test.tsx`
-- `php wordpress/smc-superfib-sniper/tests/php/test-execute-signals-stage-lots.php`
-- `npx vitest run src/routes/_plan-card-dom-capture.test.tsx` (artifact generation only; temporary harness removed after capture)
 
 ## Reports generated
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-29_smc-intake-front-end-lot-sizing-0-0-lots.md`
-- `.github/migration/audits/phase-0-backend-dashboard-stage-lot-executability-parity-2026-05-29.md`
-- `reports/plan-card-non-executable-stage-lot-dom-2026-05-29.html`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-29_trade-plan-telemetry-authority.md`
+- `.github/migration/audits/phase-4-trade-plan-sizing-parity-2026-05-29.md`
 
 ## Remaining risks
 
-The patch is validated in repo-local tests and DOM capture, but a running browser session against a seeded plan page still remains the last manual check for final visual placement and interaction behavior.
+Live staging verification is still pending; the endpoint parity evidence captured here was generated from the local PHP harness rather than a running WordPress environment. The patch intentionally does not widen snapshot invalidation, change `/user/account`, or add a balance fallback.
 
 ## Any contract ambiguities resolved during implementation
 
-`reports/copilot-research.md` claimed a backend `0.01` floor and `1:2:3` weights, but `reports/codex-plan.md` and the code path showed the actionable defect is frontend handling of backend-authored sub-minimum lots. Applied the smaller safe interpretation: frontend gating and display-state only, with no backend risk-model changes.
+Applied the smallest safe interpretation of the contract: only live positive telemetry equity is a valid sizing source; stale telemetry, missing telemetry, or non-positive telemetry equity must invalidate sizing. No `balance` fallback was added.

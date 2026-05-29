@@ -5330,9 +5330,12 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles) {
         $risk = $this->get_risk_profile($user_id);
-        $account = $this->get_account_state($user_id);
-        $equity = max((float) $account['equityUSC'], 1);
-        $risk_usc = round($equity * ((float) $risk['perTradePct'] / 100), 2);
+        $telemetry = $this->read_account_telemetry((int) $user_id);
+        $equity = (float) ($telemetry['equity'] ?? 0);
+        $has_live_sizing_equity = ($telemetry['freshness'] ?? 'unavailable') === 'live' && $equity > 0;
+        $risk_usc = $has_live_sizing_equity
+            ? round($equity * ((float) $risk['perTradePct'] / 100), 2)
+            : 0.0;
         $is_long = $signal['direction'] === 'LONG';
         $sym = $signal['symbol'];
         $spec = $this->get_instrument_spec($sym);
@@ -5383,6 +5386,10 @@ final class SMC_SuperFib_Sniper_REST {
         // using the proven 20/30/50 family split without exceeding the family risk budget.
         $risk_alloc = array('e1' => 0.20, 'e2' => 0.30, 'e3' => 0.50);
         foreach (array('e1', 'e2', 'e3') as $stage) {
+            if (!$has_live_sizing_equity) {
+                $lots[$stage] = 0.0;
+                continue;
+            }
             $stop_dist = max(abs($entries[$stage] - $stops[$stage]), $pip);
             $stop_pips = $stop_dist / $pip;
             $stage_risk = $risk_usc * $risk_alloc[$stage];
@@ -5410,14 +5417,14 @@ final class SMC_SuperFib_Sniper_REST {
             'lotSize' => $lots,
             'ladder' => $ladder,
             'riskUSC' => $risk_usc,
-            'riskZAR' => round($risk_usc * 18.5, 2),
-            'drawdownImpactPct' => round(($risk_usc / $equity) * 100, 4),
+            'riskZAR' => $has_live_sizing_equity ? round($risk_usc * 18.5, 2) : 0.0,
+            'drawdownImpactPct' => $has_live_sizing_equity ? round(($risk_usc / $equity) * 100, 4) : 0.0,
             'source' => 'backend-blueprint',
             'executionSource' => 'LTF_SF',
             'ladderId' => md5($signal['id']),
             'direction' => $signal['direction'],
             'stageFills' => array('e1' => false, 'e2' => false, 'e3' => false),
-            'state' => 'ACTIVE',
+            'state' => $has_live_sizing_equity ? 'ACTIVE' : 'INVALID',
         );
     }
 
