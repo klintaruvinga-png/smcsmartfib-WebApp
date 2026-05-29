@@ -1033,4 +1033,46 @@ assert_same('2026-05-08 10:30:00', $candidateRow['created_at'], 'EA signal candi
 assert_same('EXACT', $candidateRow['pine_match'], 'EA signal candidates must classify Pine drift using the latest Pine signal row');
 assert_true(abs((float) ($candidateRow['drift_pips'] ?? -1) - 15.0) < 0.0001, 'EA signal candidates must persist computed drift_pips for parity diagnostics');
 
+$wpdb->replace($signalsTable, array(
+    'id' => 'pine-eurusd-2',
+    'user_id' => 7,
+    'symbol' => 'EURUSD',
+    'direction' => 'SHORT',
+    'status' => 'READY',
+    'verdict' => 'A',
+    'confluence' => json_encode(array('HTA_SF', 'LTF_SF')),
+    'engine' => json_encode(array()),
+    'backend_confirmed' => 1,
+    'created_at' => '2026-05-08 10:31:00',
+    'updated_at' => '2026-05-08 10:31:00',
+));
+
+$mismatchResponse = $instance->post_ea_signal_candidates(new WP_REST_Request(array(
+    'candidates' => array(
+        array(
+            'id' => 'mt5-eurusd-2',
+            'symbol' => 'EURUSD',
+            'direction' => 'LONG',
+            'status' => 'READY',
+            'verdict' => 'A',
+            'entry_price' => 1.1015,
+            'sl_price' => 1.0990,
+            'tp_price' => 1.1065,
+            'fib_level' => 1.1010,
+            'fib_ratio' => 62.5,
+            'fib_family' => 'LTF_SF',
+            'htf_bias' => 'BULL',
+            'ltf_regime' => 'TRENDING',
+            'confidence' => 0.85,
+            'created_at' => (string) strtotime('2026-05-08 10:32:00 UTC'),
+        ),
+    ),
+)));
+assert_true(is_array($mismatchResponse) && !empty($mismatchResponse['ok']), 'EA signal candidate ingest should accept a mismatched-direction payload');
+
+$mismatchRow = $wpdb->tables[$candidateTable]['mt5-eurusd-2'] ?? null;
+assert_true(is_array($mismatchRow), 'Mismatched-direction EA signal candidate row was not stored');
+assert_same('MISMATCH', $mismatchRow['pine_match'], 'Opposite-direction Pine signals must stay classified as MISMATCH even when Pine engine JSON lacks ltfLevel.price');
+assert_same(null, $mismatchRow['drift_pips'], 'Opposite-direction Pine signals without an entry price must not fabricate drift_pips');
+
 fwrite(STDOUT, 'mt5 snapshot contract checks passed' . PHP_EOL);

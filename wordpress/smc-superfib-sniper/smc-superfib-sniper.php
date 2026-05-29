@@ -3859,6 +3859,14 @@ final class SMC_SuperFib_Sniper_REST {
         $engine = json_decode((string) ($pine_signal['engine'] ?? '{}'), true);
         $pine_entry = isset($engine['ltfLevel']['price']) ? (float) $engine['ltfLevel']['price'] : null;
 
+        if ($pine_signal['direction'] !== $direction) {
+            if ($pine_entry !== null && $pine_entry > 0) {
+                $pip_size   = (strpos($symbol, 'JPY') !== false) ? 0.01 : 0.0001;
+                $drift_pips = abs($mt5_entry - $pine_entry) / $pip_size;
+            }
+            return 'MISMATCH';
+        }
+
         if ($pine_entry === null || $pine_entry <= 0) {
             return 'DRIFT'; // direction matches but can't compute exact price drift
         }
@@ -3866,10 +3874,6 @@ final class SMC_SuperFib_Sniper_REST {
         // Drift in pips: tolerate ≤ 20 pips for EXACT, up to 100 for DRIFT.
         $pip_size   = (strpos($symbol, 'JPY') !== false) ? 0.01 : 0.0001;
         $drift_pips = abs($mt5_entry - $pine_entry) / $pip_size;
-
-        if ($pine_signal['direction'] !== $direction) {
-            return 'MISMATCH';
-        }
 
         if ($drift_pips <= 20.0)  return 'EXACT';
         if ($drift_pips <= 100.0) return 'DRIFT';
