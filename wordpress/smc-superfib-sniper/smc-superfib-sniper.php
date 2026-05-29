@@ -4929,6 +4929,11 @@ final class SMC_SuperFib_Sniper_REST {
 
             $plan = json_decode($plan_row['plan'], true);
             foreach (array('e1', 'e2', 'e3') as $stage) {
+                $stage_lots = isset($plan['lotSize'][$stage]) ? (float) $plan['lotSize'][$stage] : 0.0;
+                if ($stage_lots < 0.01) {
+                    continue;
+                }
+
                 // Deterministic ID: same signal+stage always maps to the same row so that
                 // wpdb::replace deduplicates repeated execute calls instead of inserting extras.
                 $order_id = 'ord-' . substr(md5($signal_id . '|' . $stage), 0, 16);
@@ -4940,7 +4945,7 @@ final class SMC_SuperFib_Sniper_REST {
                     'direction' => $signal['direction'],
                     'type' => 'LIMIT',
                     'price' => $plan['entries'][$stage],
-                    'lots' => $plan['lotSize'][$stage],
+                    'lots' => $stage_lots,
                     'sl' => isset($plan['stops'][$stage]) ? $plan['stops'][$stage] : $plan['sl'],
                     'tp' => isset($plan['tps'][$tp_key]) ? $plan['tps'][$tp_key] : $plan['tps']['tp1'],
                     'placedAt' => gmdate('c'),
