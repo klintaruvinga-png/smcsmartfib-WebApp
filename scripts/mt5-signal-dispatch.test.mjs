@@ -25,6 +25,9 @@ describe("MT5 signal dispatch parity guard", () => {
     expect(fibEngine).toContain('string tfNames[3] = {"M15", "H1", "H4"};');
     expect(regimeEngine).toContain("bool ComputeRegimeState(string symbol, RegimeSnapshotOut& out)");
     expect(signalEngine).toContain("TryGetAuthorityRange(fibLevels, fibCount, trig.timeframe,");
+    expect(signalEngine).toContain("ComputeFibTP(fibLevels, fibCount, trig, direction, pipSize)");
+    expect(signalEngine).toContain("fibLevels[i].timeframe != trigger.timeframe");
+    expect(signalEngine).toContain("fibLevels[i].family != trigger.family");
     expect(signalEngine).toContain("AOV_EQUILIBRIUM_ZONE");
     expect(signalEngine).toContain("AOV_EQUILIBRIUM_LEVEL");
     expect(signalEngine).toContain("RR_BELOW_MIN");
