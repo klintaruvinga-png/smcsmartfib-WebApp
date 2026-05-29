@@ -21,6 +21,14 @@ export function isTradePlanComplete(plan: TradePlan): boolean {
   ].every(isPositiveFinite);
 }
 
+function stageLotValues(plan: TradePlan) {
+  return [plan.lotSize?.e1, plan.lotSize?.e2, plan.lotSize?.e3];
+}
+
 export function hasExecutableStageLots(plan: TradePlan): boolean {
-  return [plan.lotSize?.e1, plan.lotSize?.e2, plan.lotSize?.e3].every(isExecutableStageLotValue);
+  return stageLotValues(plan).some(isExecutableStageLotValue);
+}
+
+export function hasSkippedStageLots(plan: TradePlan): boolean {
+  return stageLotValues(plan).some((value) => !isExecutableStageLotValue(value));
 }
