@@ -10,7 +10,12 @@ import { ArrowDownRight, ArrowUpRight, Send } from "lucide-react";
 import { tickMotionHoldMs, tickMotionStyle, type TickMotionOptions } from "@/lib/tickMotion";
 import type { PairPrice, SignalCandidate, TradePlan } from "@/types/sniper";
 import type { ReactNode } from "react";
-import { hasExecutableStageLots, isExecutableStageLotValue, MIN_EXECUTABLE_STAGE_LOT } from "@/routes/-plan.utils";
+import {
+  hasExecutableStageLots,
+  hasSkippedStageLots,
+  isExecutableStageLotValue,
+  MIN_EXECUTABLE_STAGE_LOT,
+} from "@/routes/-plan.utils";
 
 const PLAN_CARD_TICK_MOTION: TickMotionOptions = {
   baseDurationMs: 280,
@@ -45,6 +50,7 @@ export function PlanCandidateCard({
   );
   const divergence = signal.computedBy === "frontend" && !signal.backendConfirmed;
   const executableStageLots = hasExecutableStageLots(plan);
+  const skippedStageLots = hasSkippedStageLots(plan);
   const familyPill = plan.executionSource ?? plan.ladder?.e1.family;
   const entryRows = [
     {
@@ -159,9 +165,16 @@ export function PlanCandidateCard({
         </WarningLine>
       )}
 
+      {skippedStageLots && (
+        <WarningLine level="warn">
+          Backend plan contains stage lots below {MIN_EXECUTABLE_STAGE_LOT.toFixed(2)}. The backend
+          will skip those stages and queue any remaining executable legs.
+        </WarningLine>
+      )}
+
       {!executableStageLots && (
         <WarningLine level="warn">
-          Backend plan contains non-executable stage lots below {MIN_EXECUTABLE_STAGE_LOT.toFixed(2)}.
+          No backend stage lots meet the {MIN_EXECUTABLE_STAGE_LOT.toFixed(2)} execution minimum.
           Execution blocked until the backend publishes executable sizing.
         </WarningLine>
       )}
