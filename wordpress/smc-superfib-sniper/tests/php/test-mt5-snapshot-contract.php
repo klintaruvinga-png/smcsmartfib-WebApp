@@ -217,6 +217,24 @@ if (!class_exists('TestWpdb')) {
                     return $row;
                 }
             }
+            if (preg_match("/SELECT direction, engine FROM ([^ ]+) WHERE user_id = (\\d+) AND symbol = '([^']+)' AND status != 'CLOSED' ORDER BY created_at DESC LIMIT 1/", $query, $m)) {
+                $table = $m[1];
+                $user_id = (int) $m[2];
+                $symbol = $m[3];
+                $latest = null;
+                foreach ($this->tables[$table] ?? array() as $row) {
+                    if ((int) ($row['user_id'] ?? 0) !== $user_id || ($row['symbol'] ?? null) !== $symbol) {
+                        continue;
+                    }
+                    if (($row['status'] ?? '') === 'CLOSED') {
+                        continue;
+                    }
+                    if ($latest === null || strcmp((string) ($row['created_at'] ?? ''), (string) ($latest['created_at'] ?? '')) > 0) {
+                        $latest = $row;
+                    }
+                }
+                return $latest;
+            }
             return null;
         }
 
@@ -256,6 +274,12 @@ if (!class_exists('TestWpdb')) {
             }
             if (substr($table, -13) === 'user_settings') {
                 return (string) $data['user_id'];
+            }
+            if (substr($table, -7) === 'signals' && isset($data['id'])) {
+                return (string) $data['id'];
+            }
+            if (substr($table, -10) === 'candidates' && isset($data['id'])) {
+                return (string) $data['id'];
             }
             return uniqid('row_', true);
         }
@@ -940,6 +964,10 @@ assert_same('2026-05-08 10:30:00', $normalizeTs->invoke($instance, '2026-05-08T1
 // MQL5 dot-format — must convert dots to dashes and treat as UTC
 assert_same('2026-05-08 10:30:00', $normalizeTs->invoke($instance, '2026.05.08 10:30:00', null), 'MQL5 dot-format must normalize to UTC MySQL format');
 
+// Unix epoch seconds from MT5 SignalToJson() — must normalize without falling back to receipt time
+$epochTs = (string) strtotime('2026-05-08 10:30:00 UTC');
+assert_same('2026-05-08 10:30:00', $normalizeTs->invoke($instance, $epochTs, null), 'Unix epoch timestamps must normalize to UTC MySQL format');
+
 // null input with null fallback — must return null
 assert_same(null, $normalizeTs->invoke($instance, null, null), 'null raw_time with null fallback must return null');
 
@@ -959,5 +987,50 @@ assert_true(count($fetchCandlesBounded) <= 30, 'fetch_candles must cap output at
 $fetchCandlesSmall = $fetchCandles->invoke($instance, 7, 'EURUSD', '1min', 5);
 assert_true(count($fetchCandlesSmall) <= 5, 'fetch_candles with outputsize=5 must return at most 5 candles');
 assert_true(count($fetchCandlesSmall) > 0, 'fetch_candles with outputsize=5 must return at least one candle');
+
+$signalsTable = $wpdb->prefix . 'smc_sf_signals';
+$wpdb->replace($signalsTable, array(
+    'id' => 'pine-eurusd-1',
+    'user_id' => 7,
+    'symbol' => 'EURUSD',
+    'direction' => 'LONG',
+    'status' => 'READY',
+    'verdict' => 'A',
+    'confluence' => json_encode(array('HTA_SF', 'LTF_SF')),
+    'engine' => json_encode(array('ltfLevel' => array('price' => 1.1000))),
+    'backend_confirmed' => 1,
+    'created_at' => '2026-05-08 10:29:00',
+    'updated_at' => '2026-05-08 10:29:00',
+));
+
+$candidateResponse = $instance->post_ea_signal_candidates(new WP_REST_Request(array(
+    'candidates' => array(
+        array(
+            'id' => 'mt5-eurusd-1',
+            'symbol' => 'EURUSD',
+            'direction' => 'LONG',
+            'status' => 'READY',
+            'verdict' => 'A',
+            'entry_price' => 1.1015,
+            'sl_price' => 1.0990,
+            'tp_price' => 1.1065,
+            'fib_level' => 1.1010,
+            'fib_ratio' => 62.5,
+            'fib_family' => 'LTF_SF',
+            'htf_bias' => 'BULL',
+            'ltf_regime' => 'TRENDING',
+            'confidence' => 0.85,
+            'created_at' => $epochTs,
+        ),
+    ),
+)));
+assert_true(is_array($candidateResponse) && !empty($candidateResponse['ok']), 'EA signal candidate ingest should accept a valid MT5 payload');
+
+$candidateTable = $wpdb->prefix . 'smc_sf_mt5_signal_candidates';
+$candidateRow = $wpdb->tables[$candidateTable]['mt5-eurusd-1'] ?? null;
+assert_true(is_array($candidateRow), 'EA signal candidate row was not stored');
+assert_same('2026-05-08 10:30:00', $candidateRow['created_at'], 'EA signal candidates must persist the MT5 created_at timestamp, not receipt time');
+assert_same('EXACT', $candidateRow['pine_match'], 'EA signal candidates must classify Pine drift using the latest Pine signal row');
+assert_true(abs((float) ($candidateRow['drift_pips'] ?? -1) - 15.0) < 0.0001, 'EA signal candidates must persist computed drift_pips for parity diagnostics');
 
 fwrite(STDOUT, 'mt5 snapshot contract checks passed' . PHP_EOL);
