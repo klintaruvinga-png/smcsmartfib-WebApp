@@ -76,7 +76,7 @@ vi.mock("sonner", () => ({
 }));
 
 import { PlanPage } from "./-plan.page";
-import { isTradePlanComplete } from "./-plan.utils";
+import { hasExecutableStageLots, isTradePlanComplete } from "./-plan.utils";
 
 function buildSignal(overrides: Partial<SignalCandidate> = {}): SignalCandidate {
   return {
@@ -190,6 +190,32 @@ describe("isTradePlanComplete", () => {
   });
 });
 
+describe("hasExecutableStageLots", () => {
+  it("returns true when all backend-authored stage lots meet the execution minimum", () => {
+    expect(hasExecutableStageLots(mockPlan)).toBe(true);
+  });
+
+  it("returns true when at least one backend-authored stage lot meets the execution minimum", () => {
+    expect(
+      hasExecutableStageLots(
+        buildPlan({
+          lotSize: { e1: 0, e2: 0.12, e3: 0.009 },
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("returns false when no backend-authored stage lots meet the execution minimum", () => {
+    expect(
+      hasExecutableStageLots(
+        buildPlan({
+          lotSize: { e1: 0, e2: 0.009, e3: 0 },
+        }),
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("PlanPage ranking and execution guards", () => {
   beforeEach(() => {
     hookMocks.useSnapshot.mockReturnValue({
@@ -283,6 +309,52 @@ describe("PlanPage ranking and execution guards", () => {
     expect(cardText).toContain("0.13 lot");
     expect(cardText).toContain("0.29 lot");
     expect(cardText).toContain("0.47 lot");
+  });
+
+  it("keeps execution available and warns when a mixed backend plan has executable stage lots", () => {
+    renderPlanPage({
+      signals: [buildSignal()],
+      ladders: [
+        buildPlan({
+          lotSize: { e1: 0, e2: 0.12, e3: 0.009 },
+        }),
+      ],
+    });
+
+    const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
+    expect(screen.queryByText("0.00 lot")).toBeNull();
+    expect(screen.queryByText("0.01 lot")).toBeNull();
+    expect(cardText).toContain("0.12 lot");
+    expect(cardText).toContain("Below 0.01 lot");
+    expect(
+      screen.getByText(
+        /Backend plan contains stage lots below 0\.01\. The backend will skip those stages and queue any remaining executable legs\./,
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(/No backend stage lots meet the 0\.01 execution minimum\./),
+    ).toBeNull();
+    expect(
+      (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
+    ).toBe(false);
+  });
+
+  it("blocks execution when no backend stage lot meets the execution minimum", () => {
+    renderPlanPage({
+      signals: [buildSignal()],
+      ladders: [
+        buildPlan({
+          lotSize: { e1: 0, e2: 0.009, e3: 0 },
+        }),
+      ],
+    });
+
+    expect(
+      screen.getByText(/No backend stage lots meet the 0\.01 execution minimum\./),
+    ).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
   });
 
   it("shows a retryable settings error instead of the backend URL guard when settings fail", () => {

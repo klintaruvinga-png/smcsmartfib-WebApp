@@ -1,7 +1,13 @@
 import type { TradePlan } from "@/types/sniper";
 
+export const MIN_EXECUTABLE_STAGE_LOT = 0.01;
+
 function isPositiveFinite(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+export function isExecutableStageLotValue(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= MIN_EXECUTABLE_STAGE_LOT;
 }
 
 export function isTradePlanComplete(plan: TradePlan): boolean {
@@ -13,4 +19,16 @@ export function isTradePlanComplete(plan: TradePlan): boolean {
     plan.rr?.tp2,
     plan.rr?.tp3,
   ].every(isPositiveFinite);
+}
+
+function stageLotValues(plan: TradePlan) {
+  return [plan.lotSize?.e1, plan.lotSize?.e2, plan.lotSize?.e3];
+}
+
+export function hasExecutableStageLots(plan: TradePlan): boolean {
+  return stageLotValues(plan).some(isExecutableStageLotValue);
+}
+
+export function hasSkippedStageLots(plan: TradePlan): boolean {
+  return stageLotValues(plan).some((value) => !isExecutableStageLotValue(value));
 }
