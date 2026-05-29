@@ -3901,29 +3901,25 @@ final class SMC_SuperFib_Sniper_REST {
             return null;
         }
 
+        $price_tolerance = $this->get_mt5_candidate_price_tolerance($symbol);
+        $min_fib_level = $fib_level - $price_tolerance;
+        $max_fib_level = $fib_level + $price_tolerance;
+
         $row = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM {$this->table('mt5_signal_candidates')}
              WHERE user_id = %d AND symbol = %s AND direction = %s AND fib_family = %s AND fib_ratio = %f
+               AND fib_level IS NOT NULL AND fib_level BETWEEN %f AND %f
              ORDER BY created_at DESC LIMIT 1",
             $user_id,
             $symbol,
             $direction,
             $fib_family,
-            $fib_ratio
+            $fib_ratio,
+            $min_fib_level,
+            $max_fib_level
         ), ARRAY_A);
 
-        if (!is_array($row)) {
-            return null;
-        }
-
-        $stored_fib_level = isset($row['fib_level']) && is_numeric($row['fib_level']) ? (float) $row['fib_level'] : null;
-        if ($stored_fib_level === null) {
-            return null;
-        }
-
-        return abs($stored_fib_level - $fib_level) <= $this->get_mt5_candidate_price_tolerance($symbol)
-            ? $row
-            : null;
+        return is_array($row) ? $row : null;
     }
 
     private function get_mt5_candidate_lifecycle_state(int $user_id, string $symbol, string $direction, array $prior_candidate): array {
