@@ -312,8 +312,8 @@ public:
         {
             string norm = symbolNormalizer.NormalizeSymbol(symbols[i]);
 
-            // Fetch fib levels for this symbol across three timeframes.
-            // We use M15 fib levels (LTF_SF) for signal evaluation.
+            // Fetch fib levels for this symbol across the signal-selection set.
+            // BuildSignalFibLevels() now aggregates M15, H1, and H4 levels.
             FibLevelOut fibLevels[];
             int fibCount = fibEngine.BuildSignalFibLevels(symbols[i], fibLevels);
             if (fibCount <= 0)

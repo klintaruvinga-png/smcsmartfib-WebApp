@@ -1,40 +1,42 @@
 # Issue summary
 
-Hardened the progressive entry lot-sizing contract with backend and dashboard regression coverage so plan generation, execute-signals queueing, and plan-card rendering all stay pinned to backend-authored stage lots.
+The remaining confirmed MT5 parity gap was not the AOV gate formulas themselves. The live defect was that signal evaluation still consumed an M15-only fib set, so H1/H4 never participated in nearest-trigger selection, and authority-range lookup was not scoped for mixed-timeframe signal inputs.
 
 # Root cause implemented
 
-Implemented missing regression coverage around a high-risk backend-authoritative sizing path. No production PHP change has been applied because the current repository evidence does not yet prove a plan-math or queue-mapping defect; the patch first locks the contract in tests.
+`mt5/FibEngine.mqh` now exposes `BuildSignalFibLevelsForTF(...)` and uses it to aggregate `M15`, `H1`, and `H4` signal fib levels while stamping each `FibLevelOut` with its source timeframe. `mt5/SignalEngine.mqh` now resolves the authority range against the selected trigger timeframe before applying the existing AOV/equilibrium/directional/RR gates, and MT5-local diagnostics now print the trigger timeframe. The source-contract guard in `scripts/mt5-signal-dispatch.test.mjs` now pins the multi-timeframe input contract and the retained AOV/RR block markers.
 
 # Exact files changed
 
-- `wordpress/smc-superfib-sniper/tests/php/fib-test-helpers.php` — extended the shared PHP harness with the minimal REST and wpdb doubles needed to exercise deterministic plan-building and execute-signals queueing.
-- `wordpress/smc-superfib-sniper/tests/php/test-progressive-lot-sizing.php` — added backend regression coverage for risk-derived stage lot sizing, FX pip valuation, and the `0.01` floor.
-- `wordpress/smc-superfib-sniper/tests/php/test-execute-signals-stage-lots.php` — added backend regression coverage for stored-plan to queued-order stage lot, TP, SL, deterministic ID, and authority-gate behavior.
-- `src/routes/-plan.test.tsx` — added a focused assertion that the dashboard mirrors backend `lotSize.e1/e2/e3` values without recomputing them.
+- `mt5/FibEngine.mqh`
+- `mt5/SignalEngine.mqh`
+- `mt5/MarketDataEngine.mqh`
+- `scripts/mt5-signal-dispatch.test.mjs`
 
 # Tests run
 
-- `php wordpress/smc-superfib-sniper/tests/php/test-progressive-lot-sizing.php` -> PASS
-- `php wordpress/smc-superfib-sniper/tests/php/test-execute-signals-stage-lots.php` -> PASS
-- `php wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php` -> PASS
-- `npx vitest run src/routes/-plan.test.tsx` -> PASS (`15/15`)
-- `node scripts/validate-implementation.mjs` -> PASS after adding the required `reports/codex-implementation.meta.json`
+- `npx vitest run scripts/mt5-signal-dispatch.test.mjs` -> PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-fib-parity.php` -> PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-fib-ingestion.php` -> PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-superfib-weighting.php` -> PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-htf-authority-anchor.php` -> PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-session-anchors.php` -> PASS
+- `php scripts/parity-validator.php` -> PASS (`384/384` exact matches, synthetic self-test mode)
+- `php scripts/parity-validator.php --out reports/phase4-gate-2026-05-29.json` -> PASS
+- `npm run validate:impl` -> PASS after writing `reports/codex-implementation.meta.json`
 
 # Reports generated
 
-- `reports/codex-implementation.md` — required implementation summary written before validation per contract.
-- `reports/codex-implementation.meta.json` — required implementation metadata with `plan_hash` for pipeline validation.
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-28_progressive-entry-lot-sizing.md`
-- `.github/migration/audits/phase-0-backend-dashboard-progressive-lot-sizing-parity-2026-05-28.md`
+- `reports/codex-implementation.md`
+- `reports/codex-implementation.meta.json`
+- `reports/phase4-gate-2026-05-29.json`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-29_mt5-multitf-aov-signal-hardening.md`
+- `.github/migration/audits/phase-6-mt5-signal-parity-2026-05-29.md`
 
 # Remaining risks
 
-- No production defect was proven by the contracted regression set, so this patch intentionally does not change `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`. A real future defect in `build_trade_plan()` or `post_execute_signals()` would still require a surgical backend patch against the now-pinned failure path.
-- Broker-specific pip-value assumptions for non-forex instruments remain outside this patch scope.
-- Live broker or MT5 capture for the same staged-lot plan and queued payload is still a manual follow-up, not a repo-local verified fact.
+Repo-level tests can guard the source contract, but they do not behaviorally execute MT5 logic. Final closeout still depends on MT5 Strategy Tester or live replay evidence for one H1/H4 pass case, one equilibrium block case, one RR-below-minimum block case, and one clean `/ea/signal-candidates` dispatch cycle.
 
 # Any contract ambiguities resolved during implementation
 
-- The plan document suggested a branch naming recommendation that differed from runtime context. Resolved by following the required runtime branch `codex/smc-intake-progressive-entry-lot-sizing-patch`.
-- The contract authorized production PHP edits only if a targeted failing test proved a concrete defect. Resolved by implementing test coverage first and deferring any production logic change unless validation proves one is necessary.
+The contract mixed a verification request with broad parity concerns. I applied the smallest safe interpretation: keep Pine formulas, backend payload/schema, WordPress parity tests, and D1 signal selection out of scope unless the MT5 multi-timeframe patch proved they were directly required. I updated only the MT5 signal fib input path, trigger-timeframe authority lookup, and the regression guard that pins those contracts.

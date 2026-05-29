@@ -114,15 +114,6 @@ public:
         if (ltfRegime == "CHOP" && chopScore > 0.72)
             return false;
 
-        double authorityHigh = 0.0;
-        double authorityLow  = 0.0;
-        if (!TryGetAuthorityRange(fibLevels, fibCount, authorityHigh, authorityLow))
-        {
-            Print("[SignalEngine] Blocked candidate symbol=", normalizedSymbol,
-                  " reason=AUTHORITY_RANGE_MISSING");
-            return false;
-        }
-
         // --- Find the nearest fib level to current price ---
         int    nearestIdx  = -1;
         double nearestDist = DBL_MAX;
@@ -140,6 +131,15 @@ public:
             return false;
 
         FibLevelOut trig = fibLevels[nearestIdx];
+        double authorityHigh = 0.0;
+        double authorityLow  = 0.0;
+        if (!TryGetAuthorityRange(fibLevels, fibCount, trig.timeframe,
+                                  authorityHigh, authorityLow))
+        {
+            LogCandidateDecision(normalizedSymbol, trig, "UNKNOWN", 0.0, "AUTHORITY_RANGE_MISSING");
+            return false;
+        }
+
         int zoneState = ResolveValueZoneState(mid, authorityHigh, authorityLow);
         string zoneLabel = ValueZoneStateToString(zoneState);
 
@@ -301,6 +301,7 @@ private:
     }
 
     bool TryGetAuthorityRange(FibLevelOut& fibLevels[], int fibCount,
+                              string timeframe,
                               double& outHigh, double& outLow)
     {
         bool foundHigh = false;
@@ -309,6 +310,8 @@ private:
         for (int i = 0; i < fibCount; i++)
         {
             if (fibLevels[i].family != "HTF_AF")
+                continue;
+            if (StringLen(timeframe) > 0 && fibLevels[i].timeframe != timeframe)
                 continue;
 
             if (IsRatioMatch(fibLevels[i].ratio, 0.0))
@@ -392,6 +395,7 @@ private:
         Print("[SignalEngine] ", reason,
               " symbol=", symbol,
               " family=", trigger.family,
+              " tf=", trigger.timeframe,
               " ratio=", DoubleToString(trigger.ratio, 4),
               " zone=", zoneLabel,
               " rr=", DoubleToString(rr, 2));
