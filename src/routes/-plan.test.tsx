@@ -76,7 +76,7 @@ vi.mock("sonner", () => ({
 }));
 
 import { PlanPage } from "./-plan.page";
-import { isTradePlanComplete } from "./-plan.utils";
+import { hasExecutableStageLots, isTradePlanComplete } from "./-plan.utils";
 
 function buildSignal(overrides: Partial<SignalCandidate> = {}): SignalCandidate {
   return {
@@ -190,6 +190,22 @@ describe("isTradePlanComplete", () => {
   });
 });
 
+describe("hasExecutableStageLots", () => {
+  it("returns true when all backend-authored stage lots meet the execution minimum", () => {
+    expect(hasExecutableStageLots(mockPlan)).toBe(true);
+  });
+
+  it("returns false when any backend-authored stage lot is below 0.01", () => {
+    expect(
+      hasExecutableStageLots(
+        buildPlan({
+          lotSize: { e1: 0, e2: 0.12, e3: 0.009 },
+        }),
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("PlanPage ranking and execution guards", () => {
   beforeEach(() => {
     hookMocks.useSnapshot.mockReturnValue({
@@ -283,6 +299,31 @@ describe("PlanPage ranking and execution guards", () => {
     expect(cardText).toContain("0.13 lot");
     expect(cardText).toContain("0.29 lot");
     expect(cardText).toContain("0.47 lot");
+  });
+
+  it("blocks execution and shows a non-executable warning when any backend stage lot is sub-minimum", () => {
+    renderPlanPage({
+      signals: [buildSignal()],
+      ladders: [
+        buildPlan({
+          lotSize: { e1: 0, e2: 0.12, e3: 0.009 },
+        }),
+      ],
+    });
+
+    const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
+    expect(screen.queryByText("0.00 lot")).toBeNull();
+    expect(screen.queryByText("0.01 lot")).toBeNull();
+    expect(cardText).toContain("0.12 lot");
+    expect(cardText).toContain("Below 0.01 lot");
+    expect(
+      screen.getByText(
+        /Backend plan contains non-executable stage lots below 0\.01\. Execution blocked until the backend publishes executable sizing\./,
+      ),
+    ).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
   });
 
   it("shows a retryable settings error instead of the backend URL guard when settings fail", () => {

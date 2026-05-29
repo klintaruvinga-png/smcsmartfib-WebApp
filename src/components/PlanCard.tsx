@@ -10,6 +10,7 @@ import { ArrowDownRight, ArrowUpRight, Send } from "lucide-react";
 import { tickMotionHoldMs, tickMotionStyle, type TickMotionOptions } from "@/lib/tickMotion";
 import type { PairPrice, SignalCandidate, TradePlan } from "@/types/sniper";
 import type { ReactNode } from "react";
+import { hasExecutableStageLots, isExecutableStageLotValue, MIN_EXECUTABLE_STAGE_LOT } from "@/routes/-plan.utils";
 
 const PLAN_CARD_TICK_MOTION: TickMotionOptions = {
   baseDurationMs: 280,
@@ -43,6 +44,7 @@ export function PlanCandidateCard({
     price && price.mid > 0 && (price.state === "live" || price.state === "mock"),
   );
   const divergence = signal.computedBy === "frontend" && !signal.backendConfirmed;
+  const executableStageLots = hasExecutableStageLots(plan);
   const familyPill = plan.executionSource ?? plan.ladder?.e1.family;
   const entryRows = [
     {
@@ -157,6 +159,13 @@ export function PlanCandidateCard({
         </WarningLine>
       )}
 
+      {!executableStageLots && (
+        <WarningLine level="warn">
+          Backend plan contains non-executable stage lots below {MIN_EXECUTABLE_STAGE_LOT.toFixed(2)}.
+          Execution blocked until the backend publishes executable sizing.
+        </WarningLine>
+      )}
+
       <div className="grid gap-3 xl:grid-cols-[1.8fr_1fr_1fr_1fr]">
         <PlanSection title="Entries" tone="info">
           <div className="grid grid-cols-[auto_repeat(4,minmax(0,1fr))] gap-x-2 gap-y-2 text-[10px] font-mono">
@@ -232,10 +241,10 @@ export function PlanCandidateCard({
               toast.error(err instanceof Error ? err.message : "Execution failed");
             }
           }}
-          disabled={!signal.backendConfirmed || !planComplete}
+          disabled={!signal.backendConfirmed || !planComplete || !executableStageLots}
           className={cn(
             "inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors",
-            signal.backendConfirmed && planComplete
+            signal.backendConfirmed && planComplete && executableStageLots
               ? "bg-buy/15 border border-buy/50 text-buy hover:bg-buy/25"
               : "bg-bg2 border border-bd text-mute cursor-not-allowed",
           )}
@@ -413,7 +422,15 @@ function isFiniteNumber(value: unknown): value is number {
 }
 
 function formatLotSize(value: number | undefined) {
-  return isFiniteNumber(value) ? `${value.toFixed(2)} lot` : "--";
+  if (!isFiniteNumber(value)) {
+    return "--";
+  }
+
+  if (!isExecutableStageLotValue(value)) {
+    return `Below ${MIN_EXECUTABLE_STAGE_LOT.toFixed(2)} lot`;
+  }
+
+  return `${value.toFixed(2)} lot`;
 }
 
 function formatOptionalPrice(value: number | undefined, symbol?: string) {
