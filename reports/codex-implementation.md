@@ -1,35 +1,40 @@
+# Codex Implementation Summary
+
 ## Issue summary
 
-Backend MT5 candidate ingest now suppresses duplicate same-range candidates while the prior candidate is still active by backend authority, so repeated timer-driven submissions do not keep generating fresh rows for a still-valid signal.
+Updated the Phase 4 migration governance docs so they accurately show the current blocker: corrected H4 runtime and a synthetic parity-validator PASS exist, but final live Phase 4 closeout is still blocked on paired MT5/Pine exports and manual scenario evidence.
 
 ## Root cause implemented
 
-Implemented the missing lifecycle gate in `post_ea_signal_candidates()` by checking the latest stored MT5 candidate for the same symbol, direction, fib family, fib ratio, and near-equal fib level, then resolving whether that prior candidate is still active from fresh backend authority only: live matching MT5 positions, live matching MT5 pending orders, or live pre-entry snapshot state. If lifecycle authority is stale or missing, ingest now fails open and preserves existing write behavior.
+Implemented a documentation hardening patch that separates repository-level synthetic validator evidence from final live paired-export gate evidence. This removes the ambiguity that could otherwise cause reviewers to think either that no parity artifact exists or that Phase 4 is already closed.
 
 ## Exact files changed
 
-- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
-- `wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-29_mt5-signal-lifecycle-suppression.md`
-- `.github/migration/audits/phase-6-mt5-parity-2026-05-29.md`
+- `.github/migration/phase-updates/phase4-next-actions-checklist-2026-05-27.md`
+- `.github/migration-status.md`
+- `.github/migration/RISK_REGISTER.md`
 - `reports/codex-implementation.md`
 
 ## Tests run
 
-- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` — passed
-- `npx vitest run scripts/mt5-signal-dispatch.test.mjs` — passed
+- `rg -n "synthetic|paired|final gate|paired-export|self-test" .github/migration/phase-updates/phase4-next-actions-checklist-2026-05-27.md .github/migration-status.md .github/migration/RISK_REGISTER.md`
+- `rg -n '"gate": "PASS"|"overall_parity_pct": 100|"critical_mismatches_count": 0' reports/phase4-gate.json`
+- `rg -n "When --mt5-file and --pine-file are both absent|No input files provided - running synthetic self-test|both --mt5-file and --pine-file must be provided together" scripts/parity-validator.php`
+- `rg -n "mt5-levels\\.json|pine-levels\\.json|384 rows across \`24\`|Weekend gap and sparse-data|30-day" PHASE4_TESTING_GUIDE.md`
+- `git diff --stat -- .github/migration/phase-updates/phase4-next-actions-checklist-2026-05-27.md .github/migration-status.md .github/migration/RISK_REGISTER.md reports/codex-implementation.md`
+- `node scripts/validate-implementation.mjs`
 
 ## Reports generated
 
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-29_mt5-signal-lifecycle-suppression.md`
-- `.github/migration/audits/phase-6-mt5-parity-2026-05-29.md`
 - `reports/codex-implementation.md`
+- `reports/codex-implementation.meta.json`
 
 ## Remaining risks
 
-The post-entry release path treats empty live-trade result sets from `read_trade_positions()` and `read_trade_orders()` as "no matching open/order exists" because the contract constrained lifecycle authority readers to those existing helpers. That preserves the required release path without widening authority surfaces, but it still depends on upstream telemetry freshness discipline to avoid silent stale empties.
+Final Phase 4 closure still depends on authenticated paired `mt5-levels.json` / `pine-levels.json` exports, a paired-input validator run that replaces the synthetic PASS artifact, and manual weekend-gap plus sparse-data validation evidence.
 
 ## Any contract ambiguities resolved during implementation
 
-- The runtime branch name ended with a trailing hyphen. Applied the safest literal interpretation and created `codex/smc-signal-engine-is-producing-too-many-signals-` exactly as provided.
-- The contract did not specify how to distinguish "no matching live trade exists" from "telemetry absent" using only `read_trade_positions()` and `read_trade_orders()`. Resolved this narrowly by treating empty result sets as no authoritative match and failing open only when matching stale authority is explicitly present or the snapshot is not live.
+The contract required a workflow-state transition via command/script, but the repo CLI only exposes `research-start`, `planning-start`, and `print`. The current workflow state was already `READY_FOR_IMPLEMENTATION` with `editing_locked=false`, so no direct state mutation was needed and no manual JSON edit was made.
+
+The worktree already contained unrelated changes in `reports/` before implementation. For the contract's diff-scope validation, the smallest safe interpretation was to check `git diff --stat` against the intended Phase 4 documentation files and implementation artifacts only, rather than the full dirty worktree.
