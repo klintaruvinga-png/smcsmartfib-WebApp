@@ -44,10 +44,24 @@ if (!class_exists('WP_REST_Response')) {
     class WP_REST_Response {
         public $data;
         public $status;
+        private $headers;
 
         public function __construct($data = null, $status = 200) {
             $this->data = $data;
             $this->status = $status;
+            $this->headers = array();
+        }
+
+        public function header($name, $value) {
+            $this->headers[(string) $name] = $value;
+        }
+
+        public function get_headers() {
+            return $this->headers;
+        }
+
+        public function get_data() {
+            return $this->data;
         }
     }
 }
@@ -445,6 +459,12 @@ if (!function_exists('plugin_dir_path')) {
 }
 if (!function_exists('rest_ensure_response')) {
     function rest_ensure_response($value) {
+        if ($value instanceof WP_Error || $value instanceof WP_REST_Response) {
+            return $value;
+        }
+        if (!empty($GLOBALS['test_rest_force_response'])) {
+            return new WP_REST_Response($value);
+        }
         return $value;
     }
 }
@@ -947,6 +967,65 @@ $reducedWatchlistSnapshot = $ensureEngineSnapshot->invoke($instance, 7);
 assert_same(array('EURUSD'), $reducedWatchlistSnapshot['meta']['watchlist'] ?? null, 'Removing a watchlist symbol must bypass the cached engine snapshot and recompute');
 $cachedReplay = $ensureEngineSnapshot->invoke($instance, 7);
 assert_same($reducedWatchlistSnapshot, $cachedReplay, 'Unchanged watchlists must keep the cached engine snapshot current');
+
+$stableLiveSignalsSnapshot = array(
+    'prices' => array(
+        array(
+            'symbol' => 'EURUSD',
+            'updatedAt' => gmdate('c'),
+            'state' => 'live',
+            'source' => 'mt5',
+            'bid' => 1.1010,
+            'ask' => 1.1012,
+            'mid' => 1.1011,
+        ),
+    ),
+    'regimes' => array(),
+    'gates' => array(),
+    'signals' => array(
+        array(
+            'id' => 'sig-eurusd-long-stable',
+            'symbol' => 'EURUSD',
+            'direction' => 'LONG',
+            'status' => 'READY',
+            'confluence' => array('OB', 'FVG'),
+            'verdict' => 'A',
+            'computedBy' => 'backend',
+            'backendConfirmed' => true,
+            'createdAt' => '2026-05-03T08:15:00+00:00',
+        ),
+    ),
+    'plans' => array(),
+    'diagnostics' => array(),
+    'meta' => array(
+        'computedAt' => gmdate('c'),
+        'watchlist' => array('EURUSD'),
+    ),
+);
+update_user_meta(7, 'smc_sf_engine_snapshot', $stableLiveSignalsSnapshot);
+$GLOBALS['test_rest_force_response'] = true;
+$firstLiveSignalsResponse = $instance->get_live_signals();
+assert_true($firstLiveSignalsResponse instanceof WP_REST_Response, 'get_live_signals must return a REST response when header assertions are enabled');
+$firstLiveSignalsHeaders = $firstLiveSignalsResponse->get_headers();
+$firstLiveSignalsPayload = $firstLiveSignalsResponse->get_data();
+sleep(1);
+$secondLiveSignalsResponse = $instance->get_live_signals();
+$secondLiveSignalsHeaders = $secondLiveSignalsResponse->get_headers();
+$secondLiveSignalsPayload = $secondLiveSignalsResponse->get_data();
+unset($GLOBALS['test_rest_force_response']);
+
+assert_same(1, count($firstLiveSignalsPayload), 'get_live_signals must preserve the stable signal count across repeated polls');
+assert_same(1, count($secondLiveSignalsPayload), 'get_live_signals must preserve the stable signal count across repeated polls');
+assert_same($firstLiveSignalsPayload[0]['id'] ?? null, $secondLiveSignalsPayload[0]['id'] ?? null, 'get_live_signals must keep signal identity stable across repeated polls');
+assert_same($firstLiveSignalsPayload[0]['createdAt'] ?? null, $secondLiveSignalsPayload[0]['createdAt'] ?? null, 'get_live_signals must keep createdAt stable across repeated polls');
+assert_same($firstLiveSignalsPayload[0]['backendConfirmed'] ?? null, $secondLiveSignalsPayload[0]['backendConfirmed'] ?? null, 'get_live_signals must keep backendConfirmed stable across repeated polls');
+assert_true(!empty($firstLiveSignalsPayload[0]['polledAt']), 'get_live_signals must stamp polledAt on each returned signal');
+assert_true(!empty($secondLiveSignalsPayload[0]['polledAt']), 'get_live_signals must stamp polledAt on each returned signal');
+assert_true(($firstLiveSignalsPayload[0]['polledAt'] ?? null) !== ($secondLiveSignalsPayload[0]['polledAt'] ?? null), 'get_live_signals must change polledAt across repeated polls even when signal identity is stable');
+assert_same('no-store, no-cache, must-revalidate', $firstLiveSignalsHeaders['Cache-Control'] ?? null, 'get_live_signals must preserve Cache-Control anti-cache headers');
+assert_same('no-cache', $firstLiveSignalsHeaders['Pragma'] ?? null, 'get_live_signals must preserve Pragma anti-cache headers');
+assert_same('no-store, no-cache, must-revalidate', $secondLiveSignalsHeaders['Cache-Control'] ?? null, 'get_live_signals must preserve Cache-Control anti-cache headers');
+assert_same('no-cache', $secondLiveSignalsHeaders['Pragma'] ?? null, 'get_live_signals must preserve Pragma anti-cache headers');
 
 $wpdb->replace($wpdb->prefix . 'smc_sf_user_settings', array(
     'user_id' => 7,

@@ -162,6 +162,7 @@ export interface SignalCandidate {
   backendConfirmed: boolean;
   engineBlocker?: EngineBlocker;
   createdAt: string;
+  polledAt?: string;
   engine?: {
     htfBias: "BULL" | "BEAR" | "TRANSITIONAL";
     pdState: PdState;

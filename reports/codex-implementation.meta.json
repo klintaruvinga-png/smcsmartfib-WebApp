@@ -1,5 +1,5 @@
 {
-  "issue": "SMC Intake - use Migration Project Manager to analyze the codebase and update our progress.",
-  "plan_hash": "4dc9bf16a52f18253d377f54539a578effa28939692f6bfbfe6e13a9ab15efda",
-  "written_at": "2026-05-30T03:26:00.000Z"
+  "issue": "Signal ID is anchored to candle time, not clock time, preventing frontend re-renders when signal ID remains unchanged across poll cycles.",
+  "plan_hash": "532ee2cc382c55ae39b0ff8931886935949a27632dd73b3288dbb43402f06079",
+  "written_at": "2026-05-30T04:22:30.1285159Z"
 }
