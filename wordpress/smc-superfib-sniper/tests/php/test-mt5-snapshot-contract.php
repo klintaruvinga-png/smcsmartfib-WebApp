@@ -84,8 +84,16 @@ if (!class_exists('TestWpdb')) {
     class TestWpdb {
         public $prefix = 'wp_';
         public $tables = array();
+        public $schemas = array();
+        public $last_error = '';
 
         public function replace($table, $data, $formats = array()) {
+            $unknown_columns = $this->find_unknown_columns($table, $data);
+            if (!empty($unknown_columns)) {
+                $this->last_error = 'Unknown column ' . $unknown_columns[0];
+                return false;
+            }
+            $this->last_error = '';
             if (!isset($this->tables[$table])) {
                 $this->tables[$table] = array();
             }
@@ -121,6 +129,29 @@ if (!class_exists('TestWpdb')) {
 
         public function get_charset_collate() {
             return '';
+        }
+
+        public function apply_dbdelta($sql) {
+            if (!preg_match('/CREATE TABLE\s+([^\s(]+)\s*\((.*)\)\s*;?\s*$/is', trim($sql), $matches)) {
+                return true;
+            }
+
+            $table = $matches[1];
+            if (!isset($this->schemas[$table])) {
+                $this->schemas[$table] = array();
+            }
+
+            foreach (preg_split('/\n/', $matches[2]) as $line) {
+                $line = trim($line, " \t\r\n,");
+                if ($line === '' || preg_match('/^(PRIMARY|UNIQUE|KEY)\b/i', $line)) {
+                    continue;
+                }
+                if (preg_match('/^`?([A-Za-z0-9_]+)`?\s+/', $line, $column_match)) {
+                    $this->schemas[$table][$column_match[1]] = true;
+                }
+            }
+            $this->last_error = '';
+            return true;
         }
 
         public function prepare($query, ...$args) {
@@ -396,6 +427,20 @@ if (!class_exists('TestWpdb')) {
             return array();
         }
 
+        private function find_unknown_columns($table, $data) {
+            if (empty($this->schemas[$table])) {
+                return array();
+            }
+
+            $unknown = array();
+            foreach (array_keys($data) as $column) {
+                if (!isset($this->schemas[$table][$column])) {
+                    $unknown[] = $column;
+                }
+            }
+            return $unknown;
+        }
+
         private function row_key($table, $data) {
             if (substr($table, -9) === 'snapshots') {
                 return $data['user_id'] . '|' . $data['symbol'];
@@ -449,6 +494,10 @@ if (!function_exists('register_rest_route')) {
 }
 if (!function_exists('dbDelta')) {
     function dbDelta(...$args) {
+        global $wpdb;
+        if (is_object($wpdb) && method_exists($wpdb, 'apply_dbdelta')) {
+            return $wpdb->apply_dbdelta($args[0] ?? '');
+        }
         return true;
     }
 }
@@ -1154,6 +1203,98 @@ $missingQuoteState = $buildSymbolState->invoke($instance, 7, 'GBPUSD', null);
 assert_same('QUOTE_UNAVAILABLE', $missingQuoteState['diagnostic']['engineBlocker'] ?? null, 'build_symbol_state must keep quote-unavailable diagnostics when candles exist without a quote');
 assert_true(array_key_exists('lastPriceAt', $missingQuoteState['diagnostic']), 'build_symbol_state diagnostics must retain the lastPriceAt field when quotes are missing');
 assert_same(null, $missingQuoteState['diagnostic']['lastPriceAt'], 'build_symbol_state must not fabricate lastPriceAt when no authoritative quote exists');
+
+$htfEquilibriumSymbol = 'AOVTEST';
+$wpdb->replace($snapshotTable, array(
+    'user_id' => 7,
+    'symbol' => $htfEquilibriumSymbol,
+    'bid' => 1.1018,
+    'ask' => 1.1022,
+    'mid' => 1.1020,
+    'spread' => 2,
+    'change_pct_1d' => 0,
+    'source' => 'mt5',
+    'state' => 'live',
+    'updated_at' => gmdate('Y-m-d H:i:s', time() - 5),
+));
+
+$currentWeekStart = strtotime('monday this week 12:00 UTC');
+$candleIndex = 0;
+for ($weekOffset = 5; $weekOffset >= 0; $weekOffset--) {
+    for ($dayOffset = 0; $dayOffset < 5; $dayOffset++) {
+        $timestamp = $currentWeekStart - ($weekOffset * 7 * 86400) + ($dayOffset * 86400);
+        if ($timestamp > time() - 900 || ($weekOffset === 0 && $dayOffset === 4)) {
+            $timestamp = time() - 900;
+        }
+        $isAuthorityWeek = $weekOffset === 3;
+        $open = $candleIndex === 0 ? 1.0000 : 1.0900 + ($candleIndex * 0.0002);
+        $close = ($weekOffset === 0 && $dayOffset === 4) ? 1.1020 : $open + 0.0001;
+        $wpdb->replace($candleTable, array(
+            'user_id' => 7,
+            'symbol' => $htfEquilibriumSymbol,
+            'timeframe' => '15min',
+            'candle_time' => gmdate('Y-m-d H:i:s', $timestamp),
+            'open' => $open,
+            'high' => $isAuthorityWeek ? 1.2000 : max($open, $close) + 0.0010,
+            'low' => $isAuthorityWeek ? 1.0000 : min($open, $close) - 0.0010,
+            'close' => $close,
+            'volume' => '10',
+            'source' => 'mt5',
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ));
+        $candleIndex++;
+    }
+}
+
+$htfEquilibriumState = $buildSymbolState->invoke($instance, 7, $htfEquilibriumSymbol, array(
+    'symbol' => $htfEquilibriumSymbol,
+    'mid' => 1.1020,
+    'updatedAt' => gmdate('c', time() - 5),
+    'state' => 'live',
+));
+assert_same('BLOCKED', $htfEquilibriumState['gate']['allow'] ?? null, 'build_symbol_state must block entries inside the HTF authority equilibrium buffer');
+assert_same('AOV_EQUILIBRIUM_ZONE', $htfEquilibriumState['gate']['reason'] ?? null, 'build_symbol_state must report the AOV equilibrium-zone block reason');
+assert_same('EQUILIBRIUM', $htfEquilibriumState['signal']['engine']['pdState'] ?? null, 'build_symbol_state must derive pdState from HTF authority range, not the local M15 range');
+assert_true(($htfEquilibriumState['signal']['status'] ?? null) !== 'READY', 'AOV equilibrium-blocked signals must not remain READY');
+assert_same(false, $htfEquilibriumState['signal']['backendConfirmed'] ?? null, 'AOV equilibrium-blocked signals must not be backend-confirmed');
+assert_same('AOV_EQUILIBRIUM_ZONE', $htfEquilibriumState['signal']['engineBlocker'] ?? null, 'AOV equilibrium must surface as the signal engine blocker');
+assert_same(null, $htfEquilibriumState['plan'] ?? null, 'AOV equilibrium-blocked signals must not generate executable trade plans');
+
+$regimeTable = $wpdb->prefix . 'smc_sf_regime_snapshots';
+$wpdb->schemas[$regimeTable] = array_fill_keys(array(
+    'id',
+    'user_id',
+    'symbol',
+    'htf_bias',
+    'ltf_regime',
+    'chop_score',
+    'ema20_d1',
+    'atr14_h1',
+    'source',
+    'calculated_at',
+), true);
+
+$regimeResponse = $instance->post_ea_regime_snapshot(new WP_REST_Request(array(
+    'regimes' => array(
+        array(
+            'symbol' => 'EURUSD',
+            'htf_bias' => 'BULL',
+            'ltf_regime' => 'TRENDING',
+            'chop_score' => 0.25,
+            'ema20_d1' => 1.1000,
+            'atr14_h1' => 0.0025,
+            'htf_bias_high' => 1.1500,
+            'htf_bias_low' => 1.0500,
+        ),
+    ),
+)));
+assert_true(is_array($regimeResponse) && !empty($regimeResponse['ok']), 'EA regime snapshot ingest should accept HTF bias range fields');
+assert_true(!empty($wpdb->schemas[$regimeTable]['htf_bias_high']), 'EA regime snapshot ingest must migrate old regime table before writing htf_bias_high');
+assert_true(!empty($wpdb->schemas[$regimeTable]['htf_bias_low']), 'EA regime snapshot ingest must migrate old regime table before writing htf_bias_low');
+$regimeRow = $wpdb->tables[$regimeTable]['7|EURUSD'] ?? null;
+assert_true(is_array($regimeRow), 'EA regime snapshot row was not stored');
+assert_true(abs((float) ($regimeRow['htf_bias_high'] ?? 0) - 1.1500) < 0.0000001, 'EA regime snapshot must persist htf_bias_high');
+assert_true(abs((float) ($regimeRow['htf_bias_low'] ?? 0) - 1.0500) < 0.0000001, 'EA regime snapshot must persist htf_bias_low');
 
 $normalizeTs = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'normalize_market_timestamp');
 $normalizeTs->setAccessible(true);

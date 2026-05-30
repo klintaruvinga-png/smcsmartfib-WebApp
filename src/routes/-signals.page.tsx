@@ -25,7 +25,10 @@ function HealthIcon({ state }: { state: FreshnessState | "ok" | "missing" }) {
 
 function blockerLabel(b: EngineBlocker | undefined): string {
   if (!b || b === "OK") return "";
-  return b.replace(/_/g, " ").toLowerCase();
+  const map: Partial<Record<EngineBlocker, string>> = {
+    AOV_EQUILIBRIUM_ZONE: "AOV equilibrium zone",
+  };
+  return map[b] ?? b.replace(/_/g, " ").toLowerCase();
 }
 
 function blockerSeverity(b: EngineBlocker | undefined): "warn" | "sell" {

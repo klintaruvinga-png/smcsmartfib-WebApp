@@ -88,6 +88,7 @@ export function blockerLabel(blocker: EngineBlocker): string {
     INSUFFICIENT_CANDLE_HISTORY: "Insufficient candle history",
     READY_NOT_CONFIRMED_STALE_DATA: "Ready signal on stale data",
     CHOP_GATE_BLOCKED: "Chop gate blocked",
+    AOV_EQUILIBRIUM_ZONE: "AOV equilibrium zone",
     OK: "OK",
   };
   return labels[blocker] ?? blocker;

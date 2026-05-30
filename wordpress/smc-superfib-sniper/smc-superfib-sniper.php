@@ -610,6 +610,52 @@ final class SMC_SuperFib_Sniper_REST {
         return true;
     }
 
+    private static function get_regime_snapshots_table_sql(string $charset): string {
+        global $wpdb;
+
+        return "CREATE TABLE {$wpdb->prefix}smc_sf_regime_snapshots (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT UNSIGNED NOT NULL,
+            symbol VARCHAR(24) NOT NULL,
+            htf_bias VARCHAR(16) NOT NULL DEFAULT 'TRANSITIONAL',
+            ltf_regime VARCHAR(16) NOT NULL DEFAULT 'RANGING',
+            chop_score DECIMAL(5,4) NOT NULL DEFAULT 0.5000,
+            ema20_d1 DECIMAL(20,8) DEFAULT NULL,
+            atr14_h1 DECIMAL(20,8) DEFAULT NULL,
+            htf_bias_high DECIMAL(20,8) DEFAULT NULL,
+            htf_bias_low DECIMAL(20,8) DEFAULT NULL,
+            source VARCHAR(20) NOT NULL DEFAULT 'mt5',
+            calculated_at DATETIME NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY regime_lookup (user_id, symbol),
+            KEY user_updated (user_id, calculated_at)
+        ) $charset;";
+    }
+
+    private static function ensure_regime_snapshots_table() {
+        global $wpdb;
+
+        if (file_exists(ABSPATH . 'wp-admin/includes/upgrade.php')) {
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        }
+
+        if (!function_exists('dbDelta')) {
+            return false;
+        }
+
+        if (is_object($wpdb) && property_exists($wpdb, 'last_error')) {
+            $wpdb->last_error = '';
+        }
+
+        dbDelta(self::get_regime_snapshots_table_sql($wpdb->get_charset_collate()));
+
+        if (is_object($wpdb) && property_exists($wpdb, 'last_error') && $wpdb->last_error !== '') {
+            return false;
+        }
+
+        return true;
+    }
+
     private static function ensure_soak_tables() {
         global $wpdb;
 
@@ -667,21 +713,7 @@ final class SMC_SuperFib_Sniper_REST {
         ) $charset;";
 
         // Phase 5: MT5 regime snapshots
-        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_regime_snapshots (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            user_id BIGINT UNSIGNED NOT NULL,
-            symbol VARCHAR(24) NOT NULL,
-            htf_bias VARCHAR(16) NOT NULL DEFAULT 'TRANSITIONAL',
-            ltf_regime VARCHAR(16) NOT NULL DEFAULT 'RANGING',
-            chop_score DECIMAL(5,4) NOT NULL DEFAULT 0.5000,
-            ema20_d1 DECIMAL(20,8) DEFAULT NULL,
-            atr14_h1 DECIMAL(20,8) DEFAULT NULL,
-            source VARCHAR(20) NOT NULL DEFAULT 'mt5',
-            calculated_at DATETIME NOT NULL,
-            PRIMARY KEY  (id),
-            UNIQUE KEY regime_lookup (user_id, symbol),
-            KEY user_updated (user_id, calculated_at)
-        ) $charset;";
+        $tables[] = self::get_regime_snapshots_table_sql($charset);
 
         // Phase 5B: Economic fundamental events
         // UNIQUE KEY uses (currency, event_date, event_name(64)) — not event_type — so that
@@ -3360,13 +3392,26 @@ final class SMC_SuperFib_Sniper_REST {
 
     // POST /ea/regime-snapshot — ingest regime batch from MT5 EA.
     // Payload: { regimes: [ { user_id, symbol, htf_bias, ltf_regime,
-    //                         chop_score, ema20_d1, atr14_h1 }, ... ] }
+    //                         chop_score, ema20_d1, atr14_h1,
+    //                         htf_bias_high, htf_bias_low }, ... ] }
     public function post_ea_regime_snapshot(WP_REST_Request $request) {
         global $wpdb;
 
         $payload = $request->get_json_params();
         if (!is_array($payload) || !isset($payload['regimes']) || !is_array($payload['regimes'])) {
             return new WP_Error('invalid_payload', 'regimes array required', array('status' => 400));
+        }
+
+        if (!self::ensure_regime_snapshots_table()) {
+            $detail = $this->wpdb_last_error();
+            if ($detail === null) {
+                $detail = 'dbDelta unavailable';
+            }
+            error_log('SMC SuperFIB EA regime snapshot table init failed: ' . $detail);
+            return new WP_REST_Response(array(
+                'error' => 'table_init_failed',
+                'detail' => $detail,
+            ), 500);
         }
 
         $user_id       = get_current_user_id();
@@ -3389,6 +3434,8 @@ final class SMC_SuperFib_Sniper_REST {
             $chop_score = max(0.0, min(1.0, (float) ($entry['chop_score'] ?? 0.5)));
             $ema20_d1   = isset($entry['ema20_d1']) && is_numeric($entry['ema20_d1']) ? (float) $entry['ema20_d1'] : null;
             $atr14_h1   = isset($entry['atr14_h1']) && is_numeric($entry['atr14_h1']) ? (float) $entry['atr14_h1'] : null;
+            $htf_bias_high = isset($entry['htf_bias_high']) && is_numeric($entry['htf_bias_high']) ? (float) $entry['htf_bias_high'] : null;
+            $htf_bias_low  = isset($entry['htf_bias_low']) && is_numeric($entry['htf_bias_low']) ? (float) $entry['htf_bias_low'] : null;
 
             if ($symbol === '' || !in_array($htf_bias, $valid_bias, true) || !in_array($ltf_regime, $valid_regimes, true)) {
                 $failed++;
@@ -3405,10 +3452,12 @@ final class SMC_SuperFib_Sniper_REST {
                     'chop_score'    => $chop_score,
                     'ema20_d1'      => $ema20_d1,
                     'atr14_h1'      => $atr14_h1,
+                    'htf_bias_high' => $htf_bias_high,
+                    'htf_bias_low'  => $htf_bias_low,
                     'source'        => 'mt5',
                     'calculated_at' => $calculated_at,
                 ),
-                array('%d', '%s', '%s', '%s', '%f', $ema20_d1 !== null ? '%f' : 'NULL', $atr14_h1 !== null ? '%f' : 'NULL', '%s', '%s')
+                array('%d', '%s', '%s', '%s', '%f', $ema20_d1 !== null ? '%f' : 'NULL', $atr14_h1 !== null ? '%f' : 'NULL', $htf_bias_high !== null ? '%f' : 'NULL', $htf_bias_low !== null ? '%f' : 'NULL', '%s', '%s')
             );
 
             if ($result !== false) {
@@ -3448,7 +3497,7 @@ final class SMC_SuperFib_Sniper_REST {
             $values[] = $symbol;
         }
 
-        $sql  = $wpdb->prepare("SELECT symbol, htf_bias, ltf_regime, chop_score, ema20_d1, atr14_h1, calculated_at FROM {$table} {$where} ORDER BY symbol", ...$values);
+        $sql  = $wpdb->prepare("SELECT symbol, htf_bias, ltf_regime, chop_score, ema20_d1, atr14_h1, htf_bias_high, htf_bias_low, calculated_at FROM {$table} {$where} ORDER BY symbol", ...$values);
         $rows = $wpdb->get_results($sql, ARRAY_A);
 
         $regimes = array();
@@ -3460,6 +3509,8 @@ final class SMC_SuperFib_Sniper_REST {
                 'chopScore'     => (float) $row['chop_score'],
                 'ema20D1'       => $row['ema20_d1'] !== null ? (float) $row['ema20_d1'] : null,
                 'atr14H1'       => $row['atr14_h1'] !== null ? (float) $row['atr14_h1'] : null,
+                'htfBiasHigh'   => isset($row['htf_bias_high']) && $row['htf_bias_high'] !== null ? (float) $row['htf_bias_high'] : null,
+                'htfBiasLow'    => isset($row['htf_bias_low']) && $row['htf_bias_low'] !== null ? (float) $row['htf_bias_low'] : null,
                 'calculatedAt'  => $this->to_iso((string) $row['calculated_at']),
                 'source'        => 'mt5',
             );
@@ -5380,7 +5431,9 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function build_symbol_state($user_id, $symbol, $price) {
-        $candles = $this->fetch_candles($user_id, $symbol, '15min', 120);
+        $fib_candle_limit = max(120, $this->fib_history_window_size('15min'));
+        $fib_candles = $this->fetch_candles($user_id, $symbol, '15min', $fib_candle_limit);
+        $candles = count($fib_candles) > 120 ? array_slice($fib_candles, -120) : $fib_candles;
         $has_key = $this->get_twelve_key_status($user_id) === 'ok';
         $settings = $this->get_settings($user_id);
         $stale_threshold_sec = $settings['staleThresholdSec'];
@@ -5435,16 +5488,41 @@ final class SMC_SuperFib_Sniper_REST {
         $close = (float) $last['close'];
         $move = $close - (float) $first['close'];
         $position_ratio = (($high - $close) / $range) * 100;
-        $pd_state = $this->pd_state($position_ratio);
         $bias = $move > $range * 0.2 ? 'BULL' : ($move < -$range * 0.2 ? 'BEAR' : 'RANGING');
         $chop = round(max(0, min(1, 1 - (abs($move) / $range))), 2);
         $levels = $this->fib_levels($high, $low, 'LTF_SF');
+        $this->fib_context_symbol = $symbol;
+        $this->fib_context_timeframe = '15min';
+        $this->fib_context_tf_seconds = max(60, (int) $this->timeframe_seconds('15min'));
+        $authority_levels = $this->fib_levels_from_candles($fib_candles);
+        $authority_high = null;
+        $authority_low = null;
+        foreach ($authority_levels['HTF_AF'] as $level) {
+            if ((float) $level['ratio'] === 0.0) {
+                $authority_high = (float) $level['price'];
+            } elseif ((float) $level['ratio'] === 100.0) {
+                $authority_low = (float) $level['price'];
+            }
+        }
+        $authority_range_valid = $authority_high !== null && $authority_low !== null && $authority_high > $authority_low;
+        if ($authority_range_valid) {
+            $authority_range = $authority_high - $authority_low;
+            $authority_mid = $authority_low + ($authority_range * 0.5);
+            $authority_eq_buffer = $authority_range * 0.03;
+            $pd_state = $close > ($authority_mid + $authority_eq_buffer)
+                ? 'PREMIUM'
+                : ($close < ($authority_mid - $authority_eq_buffer) ? 'DISCOUNT' : 'EQUILIBRIUM');
+        } else {
+            $pd_state = $this->pd_state($position_ratio);
+        }
         $nearest = $this->nearest_level($levels, $close);
         $sequence = $this->sequence_state($candles);
         $direction = $position_ratio >= 62.5 ? 'LONG' : ($position_ratio <= 25 ? 'SHORT' : ($bias === 'BEAR' ? 'SHORT' : 'LONG'));
         $f3_chop = ($position_ratio >= 37.5 && $position_ratio <= 62.5) || $chop >= 0.7 ? 'caution' : 'clear';
         $hta_override = $position_ratio < 0 || $position_ratio > 100;
         $status = 'WATCH';
+
+        $aov_equilibrium_blocked = $authority_range_valid && $pd_state === 'EQUILIBRIUM';
 
         if (!$sequence[$direction]['sweep']) {
             $status = 'WATCH';
@@ -5453,6 +5531,11 @@ final class SMC_SuperFib_Sniper_REST {
         } elseif ($chop >= 0.7) {
             // CRITICAL: Block READY status when chop >= 0.7 (F3 caution zone).
             // SMC methodology requires no entries in high-chop equilibrium.
+            $status = 'ARMED';
+        } elseif ($aov_equilibrium_blocked) {
+            // CRITICAL: HTF authority equilibrium is a hard AOV block, not merely
+            // a gate decoration. Keep structurally complete setups unconfirmed so
+            // they cannot be persisted/executed as backend-confirmed READY signals.
             $status = 'ARMED';
         } else {
             $status = 'READY';
@@ -5483,7 +5566,14 @@ final class SMC_SuperFib_Sniper_REST {
         // CRITICAL HARDENING: Block gate when chop >= 0.7 (F3 caution zone).
         // SMC methodology requires no entries in high-chop equilibrium; this was
         // missing from the live backend while the mock data showed BLOCKED correctly.
-        if ($chop >= 0.7) {
+        if ($aov_equilibrium_blocked) {
+            $gate = array(
+                'symbol' => $symbol,
+                'allow'  => 'BLOCKED',
+                'reason' => 'AOV_EQUILIBRIUM_ZONE',
+                'state'  => $symbol_state,
+            );
+        } elseif ($chop >= 0.7) {
             $gate = array(
                 'symbol' => $symbol,
                 'allow'  => 'BLOCKED',
@@ -5515,7 +5605,8 @@ final class SMC_SuperFib_Sniper_REST {
 
         // Anchor the signal identity to the latest analysed candle so the same setup stays stable
         // within one 15m bar, while later intraday setups get a distinct execution queue identity.
-        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol, $chop);
+        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol, $chop, $aov_equilibrium_blocked);
+        $backend_confirmed = $status === 'READY' && $data_live && $engine_blocker === 'OK';
 
         $signal_anchor = $last_candle && !empty($last_candle['time']) ? $last_candle['time'] : gmdate('c');
         $signal_id = 'sig-' . substr(md5($user_id . '|' . $symbol . '|' . $direction . '|' . $signal_anchor), 0, 16);
@@ -5528,9 +5619,10 @@ final class SMC_SuperFib_Sniper_REST {
             'verdict' => $this->verdict($status, $confluence, $chop),
             'computedBy' => 'backend',
             // CRITICAL HARDENING: Never backend-confirm a signal unless status is READY
-            // (which already incorporates chop gate blocking). Without this guard, 
-            // post_execute_signals() would still accept and queue non-READY signals.
-            'backendConfirmed' => $status === 'READY' && $data_live,
+            // and every hard backend gate is OK. Without this guard,
+            // post_execute_signals() would still accept and queue non-READY or
+            // gate-blocked signals.
+            'backendConfirmed' => $backend_confirmed,
             'engineBlocker' => $engine_blocker,
             'createdAt' => $signal_anchor,
             'engine' => array(
@@ -5563,7 +5655,7 @@ final class SMC_SuperFib_Sniper_REST {
             'regime' => $regime,
             'gate' => $gate,
             'signal' => $signal,
-            'plan' => $this->build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles),
+            'plan' => $backend_confirmed ? $this->build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles) : null,
             'diagnostic' => $diagnostic,
         );
     }
@@ -7598,7 +7690,7 @@ final class SMC_SuperFib_Sniper_REST {
     // Returns a single string reason explaining why a READY signal cannot be
     // backend-confirmed, or 'OK' when everything is healthy.
 
-    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol = null, $chop = null) {
+    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol = null, $chop = null, $aov_equilibrium_blocked = false) {
         $is_mt5_authority = false;
         if ($symbol !== null) {
             $is_mt5_authority = $this->is_mt5_authoritative($user_id, $symbol);
@@ -7650,6 +7742,11 @@ final class SMC_SuperFib_Sniper_REST {
         // can still queue a READY+confirmed signal even though the gate is BLOCKED,
         // breaking the chop-gate contract introduced by the gate patch.
         if ($chop !== null && (float) $chop >= 0.7) return 'CHOP_GATE_BLOCKED';
+
+        // CRITICAL HARDENING: HTF authority equilibrium is also a hard AOV block.
+        // It must suppress backend confirmation and plan generation, not just decorate
+        // the gate response as BLOCKED.
+        if ($aov_equilibrium_blocked) return 'AOV_EQUILIBRIUM_ZONE';
 
         return 'OK';
     }
