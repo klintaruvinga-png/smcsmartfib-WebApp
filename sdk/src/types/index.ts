@@ -21,6 +21,7 @@ export type EngineBlocker =
   | "INSUFFICIENT_CANDLE_HISTORY"
   | "READY_NOT_CONFIRMED_STALE_DATA"
   | "CHOP_GATE_BLOCKED"
+  | "AOV_EQUILIBRIUM_ZONE"
   | "OK";
 
 export type PriceSource = "mt5" | "twelve-data" | "unknown" | "mock";
