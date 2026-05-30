@@ -162,6 +162,12 @@ function normalizeLiveSignalsResponse(
   throw new Error("/live-signals: backend response missing signals array");
 }
 
+function requireLaddersResponse(raw: unknown): TradePlan[] {
+  if (Array.isArray(raw)) return raw as TradePlan[];
+
+  throw new Error("/ladders: backend response missing ladder array");
+}
+
 function requireWatchlistResponse(path: string, watchlist: Symbol[] | undefined): Symbol[] {
   if (!Array.isArray(watchlist)) {
     const message = `${path}: backend response missing watchlist array`;
@@ -469,7 +475,8 @@ export const apiClient = {
   },
   async getLadders(symbol?: Symbol, mock = MOCK_MODE): Promise<TradePlan[]> {
     if (mock) return [mockPlan];
-    return call<TradePlan[]>(`/ladders${symbol ? `?symbol=${symbol}` : ""}`);
+    const raw = await call<unknown>(`/ladders${symbol ? `?symbol=${symbol}` : ""}`);
+    return requireLaddersResponse(raw);
   },
   async getSession(mock = MOCK_MODE) {
     if (mock)

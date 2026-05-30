@@ -547,4 +547,18 @@ describe("PlanPage ranking and execution guards", () => {
     expect(renderedSymbols[1]).toContain("AUDUSD");
     expect(screen.queryByText("USDJPY")).toBeNull();
   });
+
+  it("diagnoses ladder ID mismatches when ladders exist but no watchlist candidate has a matching plan", () => {
+    renderPlanPage({
+      signals: [buildSignal({ id: "sig-001", symbol: "GBPUSD", verdict: "A+" })],
+      ladders: [buildPlan({ signalId: "sig-other", symbol: "GBPUSD" })],
+      watchlist: ["GBPUSD"],
+    });
+
+    expect(getRenderedCards()).toHaveLength(0);
+    expect(screen.getByText("No matching blueprint for current watchlist candidates.")).toBeTruthy();
+    expect(screen.getByText("Found 1 total blueprints")).toBeTruthy();
+    expect(screen.getByText("No ladder signal IDs match current watchlist candidates")).toBeTruthy();
+    expect(screen.getByText("Ladder IDs available: sig-other")).toBeTruthy();
+  });
 });

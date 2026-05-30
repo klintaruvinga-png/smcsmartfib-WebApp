@@ -301,3 +301,31 @@ describe("Phase 2 telemetry client reads", () => {
     );
   });
 });
+
+describe("ladders client contract", () => {
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("rejects malformed /ladders payloads instead of returning a non-array plan set", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ plans: [] }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+      ),
+    );
+
+    await expect(apiClient.getLadders(undefined, false)).rejects.toThrow(
+      "/ladders: backend response missing ladder array",
+    );
+  });
+});

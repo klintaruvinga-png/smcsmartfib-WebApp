@@ -1,48 +1,46 @@
-# Codex Implementation Summary
+# Issue summary
 
-## Issue summary
+Plan cards were not rendering because the plan page only renders `PlanCandidateCard` entries when current watchlist signals have matching backend ladder plans by `signal.id` to `TradePlan.signalId`. When `/ladders` was empty or returned non-matching IDs, the UI fell into plain diagnostic text without clearly separating an empty ladder response from a signal-ID contract mismatch.
 
-`/live-signals` returned signal objects that could stay structurally identical across repeated poll cycles when backend signal identity remained candle-anchored and unchanged. That blocked downstream frontend updates even though the route was being polled successfully.
+# Root cause implemented
 
-## Root cause implemented
+The implementation preserves backend ladder authority and hardens the frontend contract around it:
 
-Added a response-only `polledAt` timestamp inside `get_live_signals()` so each returned signal changes per poll response without altering stable backend signal identity, `createdAt`, engine computation, persistence, cache keys, or execution deduplication semantics.
+- `src/routes/-plan.page.tsx` now exposes mismatch diagnostics when ladders exist but none match the current watchlist candidate signal IDs.
+- `src/lib/api/sniperClient.ts` now rejects malformed live `/ladders` payloads that are not arrays instead of returning an unusable non-array value.
+- `src/hooks/useSniperData.ts` now applies the existing dev-only polling re-enable diagnostic to the ladders query, matching the live polling pattern.
 
-## Exact files changed
+# Exact files changed
 
-- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
-- `wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
-- `src/types/sniper.ts`
-- `sdk/src/types/index.ts`
+- `src/routes/-plan.page.tsx`: added watchlist candidate ID diagnostics, matched ladder count, and the explicit `No ladder signal IDs match current watchlist candidates` warning.
+- `src/routes/-plan.test.tsx`: added regression coverage for ladders that exist but do not match the current watchlist candidate IDs.
+- `src/lib/api/sniperClient.ts`: added `/ladders` array response validation.
+- `src/lib/api/sniperClient.test.ts`: added malformed `/ladders` response contract coverage.
+- `src/hooks/useSniperData.ts`: added `LADDERS_POLL` dev diagnostic through the existing polling diagnostic helper.
+- `reports/codex-implementation.md`: implementation handoff artifact.
+- `reports/codex-implementation.meta.json`: implementation metadata artifact.
 
-## Tests run
+# Tests run
 
-- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
-  - Expected failing TDD run completed before the route fix.
-- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
-  - PASS
-- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
-  - PASS
-- `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx src/routes/-signals.page.test.tsx src/routes/-plan.test.tsx`
-  - PASS
-- `npx tsc --noEmit`
-  - FAIL: existing unrelated `vite.config.ts` type mismatch (`test` is not a known property of `LovableViteTanstackOptions`)
-- `npm run validate:impl`
-  - PASS
+- `npx vitest run src/routes/-plan.test.tsx`
+  - Result: passed, 21 tests.
+- `npx vitest run src/lib/api/sniperClient.test.ts`
+  - Result: passed, 8 tests.
+- `npm run build`
+  - Result: passed.
+  - Note: Vite reported the existing chunk-size warning for large bundles.
 
-## Reports generated
+# Reports generated
 
 - `reports/codex-implementation.md`
 - `reports/codex-implementation.meta.json`
-- `reports/implementation-verification.md`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-30_live-signals-polled-at-contract.md`
-- `.github/migration/audits/phase-2-dashboard-live-signals-polled-at-parity-2026-05-30.md`
 
-## Remaining risks
+# Remaining risks
 
-- Manual authenticated verification against a live dashboard session is still required to confirm repeated `/live-signals` polls now trigger the expected frontend updates without any consumer path depending on object identity beyond the transport contract.
-- Repository-wide TypeScript validation remains blocked by the unrelated `vite.config.ts` config typing error.
+- Live backend verification was not executed in this local run. The required operational check remains comparing authenticated `/wp-json/sniper/v1/live-signals` signal IDs against `/wp-json/sniper/v1/ladders` `signalId` values for at least one active watchlist symbol.
+- The patch does not create frontend fallback plans. If the backend produces no ladders, the page correctly remains diagnostic-only.
 
-## Any contract ambiguities resolved during implementation
+# Any contract ambiguities resolved during implementation
 
-- The local PHP test harness previously treated `rest_ensure_response()` as a raw pass-through for arrays. Wrapping every array globally would have widened scope and broken unrelated contract tests, so the harness now uses an opt-in response wrapper only for the new `/live-signals` header regression.
+- A valid `/ladders` live response is an array of backend `TradePlan` objects. Non-array responses are contract failures and now throw `/ladders: backend response missing ladder array`.
+- Plan cards remain gated by exact `SignalCandidate.id` to `TradePlan.signalId` matching. Symbol-only matching is intentionally not used because it could render a stale or unrelated backend plan.
