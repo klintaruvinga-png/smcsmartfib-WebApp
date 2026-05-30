@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { useAccountTelemetry } from "@/hooks/useSniperData";
-import { fmtUSC } from "@/lib/format";
+import { fmtCurrency } from "@/lib/format";
 import { FreshnessBadge } from "./FreshnessBadge";
 
 export function WalletOverview() {
@@ -40,6 +40,7 @@ export function WalletOverview() {
     );
   }
 
+  const cur = account.currency;
   const floating = account.floatingPl;
   const onePctBalance = account.balance * 0.01;
   const onePctEquity = account.equity * 0.01;
@@ -62,21 +63,21 @@ export function WalletOverview() {
         <div className="grid grid-cols-2 lg:grid-cols-4 divide-bd divide-y lg:divide-y-0 lg:divide-x [&>*]:border-bd">
           <Cell
             label="EQUITY"
-            value={fmtUSC(account.equity)}
+            value={fmtCurrency(account.equity, cur)}
             valueClass="text-buy"
-            sub={<span className="text-mute">1% = {onePctEquity.toFixed(2)} USC</span>}
+            sub={<span className="text-mute">1% = {onePctEquity.toFixed(2)} {cur}</span>}
           />
           <Cell
             label="BALANCE"
-            value={fmtUSC(account.balance)}
+            value={fmtCurrency(account.balance, cur)}
             valueClass="text-info"
-            sub={<span className="text-mute">1% = {onePctBalance.toFixed(2)} USC</span>}
+            sub={<span className="text-mute">1% = {onePctBalance.toFixed(2)} {cur}</span>}
           />
           <Cell
             label="FLOATING P/L"
             value={`${floating >= 0 ? "+" : ""}${floating.toFixed(2)}`}
             valueClass={floating >= 0 ? "text-buy" : "text-sell"}
-            sub={<span className="text-mute">USC open exposure</span>}
+            sub={<span className="text-mute">{cur} open exposure</span>}
           />
           <Cell
             label="MARGIN LEVEL"

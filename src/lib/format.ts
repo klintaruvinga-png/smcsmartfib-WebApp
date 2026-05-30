@@ -18,9 +18,43 @@ export function fmtPct(value: number, signed = true): string {
   return `${s}%`;
 }
 
-export function fmtUSC(value: number, signed = false): string {
+/**
+ * Format a monetary value with the correct symbol/prefix for the given
+ * account currency string (as streamed by the EA via AccountTelemetry).
+ *
+ * Supported:
+ *   "USD" | "USC" → $ prefix  (USC is the micro-account internal label)
+ *   "EUR"         → € prefix
+ *   "GBP"         → £ prefix
+ *   "JPY"         → ¥ prefix, no decimal places
+ *   anything else → currency code prefix (e.g. "CHF 1.23")
+ *
+ * Falls back to "$" when currency is absent / empty.
+ */
+export function fmtCurrency(value: number, currency?: string | null, signed = false): string {
   const sign = signed && value > 0 ? "+" : "";
-  return `${sign}$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const cur = (currency ?? "").toUpperCase();
+
+  if (!cur || cur === "USD" || cur === "USC") {
+    return `${sign}$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  if (cur === "EUR") {
+    return `${sign}€${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  if (cur === "GBP") {
+    return `${sign}£${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  if (cur === "JPY") {
+    return `${sign}¥${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  }
+  // Generic: prefix with ISO code
+  return `${sign}${cur} ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** Thin backward-compat wrapper — callers that already know the account
+ *  currency is USC/USD can continue using fmtUSC without change. */
+export function fmtUSC(value: number, signed = false): string {
+  return fmtCurrency(value, "USD", signed);
 }
 
 export function fmtZAR(value: number): string {

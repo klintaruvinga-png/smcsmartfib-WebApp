@@ -514,7 +514,7 @@ export const apiClient = {
           mockAccount.equityUSC - (mockAccount.marginUsedPct / 100) * mockAccount.equityUSC,
         marginLevel: mockAccount.marginUsedPct > 0 ? (100 / mockAccount.marginUsedPct) * 100 : 0,
         floatingPl: mockAccount.equityUSC - mockAccount.balanceUSC,
-        currency: "USC",
+        currency: "USD",
         leverage: 0,
         eaVersion: "mock",
         lastSeenAt: new Date().toISOString(),

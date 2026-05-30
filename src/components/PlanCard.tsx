@@ -2,9 +2,10 @@ import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { VerdictBadge } from "@/components/sniper/VerdictBadge";
 import { DivergenceBanner, WarningLine } from "@/components/sniper/Warnings";
-import { fmtPct, fmtPrice, fmtUSC, fmtZAR, relTime } from "@/lib/format";
+import { fmtPct, fmtPrice, fmtCurrency, fmtZAR, relTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api/sniperClient";
+import { useAccountTelemetry } from "@/hooks/useSniperData";
 import { toast } from "sonner";
 import { ArrowDownRight, ArrowUpRight, Send } from "lucide-react";
 import { tickMotionHoldMs, tickMotionStyle, type TickMotionOptions } from "@/lib/tickMotion";
@@ -41,6 +42,7 @@ export function PlanCandidateCard({
     priceFlashHoldMs,
     signal.symbol,
   );
+  const { data: accountTelemetry } = useAccountTelemetry();
   const priceStyle = tickMotionStyle(`${signal.symbol}:plan-mid`, PLAN_CARD_TICK_MOTION, {
     motionKey,
     motionImpulse,
@@ -219,7 +221,7 @@ export function PlanCandidateCard({
           <PlanSection title="Stop & Risk" tone="sell">
             <div className="space-y-2">
               <StatRow label="SL" value={fmtPrice(plan.sl, signal.symbol)} valueClass="text-sell" />
-              <StatRow label="Risk" value={fmtUSC(plan.riskUSC)} sub={fmtZAR(plan.riskZAR)} />
+              <StatRow label="Risk" value={fmtCurrency(plan.riskUSC, accountTelemetry?.currency)} sub={fmtZAR(plan.riskZAR)} />
               <StatRow
                 label="DD impact"
                 value={fmtPct(plan.drawdownImpactPct)}

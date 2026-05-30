@@ -8,7 +8,7 @@ import {
 import { mockEquityCurve } from "@/mocks/sniperData";
 import { MOCK_MODE } from "@/lib/api/sniperClient";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
-import { fmtPct, fmtUSC } from "@/lib/format";
+import { fmtPct, fmtCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { AreaChart, Area, ResponsiveContainer, YAxis, Tooltip } from "recharts";
 
@@ -64,7 +64,7 @@ export function AnalyticsPage() {
                 Equity (30d)
               </div>
               <div className="font-mono text-2xl font-semibold mt-1">
-                {telemetryUnavailable ? "Unavailable" : fmtUSC(equityValue)}
+                {telemetryUnavailable ? "Unavailable" : fmtCurrency(equityValue, accountTelemetry?.currency)}
               </div>
             </div>
             <FreshnessBadge state={accountFreshness} />
@@ -120,14 +120,14 @@ export function AnalyticsPage() {
 
         <Stat
           label="Today P/L"
-          value={fmtUSC(account?.todayPnlUSC ?? 0, true)}
+          value={fmtCurrency(account?.todayPnlUSC ?? 0, accountTelemetry?.currency, true)}
           sub={fmtPct(account?.todayPnlPct ?? 0)}
           tone={(account?.todayPnlUSC ?? 0) >= 0 ? "buy" : "sell"}
           state={account?.state ?? "unavailable"}
         />
         <Stat
           label="Floating P/L"
-          value={telemetryUnavailable ? "Unavailable" : fmtUSC(floatingPnl, true)}
+          value={telemetryUnavailable ? "Unavailable" : fmtCurrency(floatingPnl, accountTelemetry?.currency, true)}
           sub={
             telemetryUnavailable
               ? "Waiting for backend trade telemetry"
@@ -149,7 +149,7 @@ export function AnalyticsPage() {
           sub={
             telemetryUnavailable
               ? "Waiting for backend account telemetry"
-              : `${fmtUSC(balanceValue)} bal`
+              : `${fmtCurrency(balanceValue, accountTelemetry?.currency)} bal`
           }
           tone="info"
           state={accountFreshness}

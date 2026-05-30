@@ -91,6 +91,7 @@ export { SOAK_TEMPLATES } from "./types/index.js";
 export {
   fmtPrice,
   fmtPct,
+  fmtCurrency,
   fmtUSC,
   fmtZAR,
   relTime,

@@ -1,6 +1,6 @@
-import { useUserAccount, useUserProgress, useUserRiskProfile } from "@/hooks/useSniperData";
+import { useUserAccount, useUserProgress, useUserRiskProfile, useAccountTelemetry } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
-import { fmtUSC, fmtPct } from "@/lib/format";
+import { fmtCurrency, fmtPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Flame } from "lucide-react";
 
@@ -33,6 +33,7 @@ function ProgressLoadingBlock() {
 
 export function ProgressPage() {
   const { data: account } = useUserAccount();
+  const { data: accountTelemetry } = useAccountTelemetry();
   const { data: risk } = useUserRiskProfile();
   const {
     data: progressData,
@@ -55,14 +56,14 @@ export function ProgressPage() {
             <div className="text-[11px] font-mono uppercase tracking-wider text-mute">Equity</div>
             <FreshnessBadge state={account.state} />
           </div>
-          <div className="font-mono text-2xl font-semibold mt-2">{fmtUSC(account.equityUSC)}</div>
+          <div className="font-mono text-2xl font-semibold mt-2">{fmtCurrency(account.equityUSC, accountTelemetry?.currency)}</div>
           <div
             className={cn(
               "text-xs font-mono mt-0.5",
               account.todayPnlUSC >= 0 ? "text-buy" : "text-sell",
             )}
           >
-            {fmtUSC(account.todayPnlUSC, true)} today
+            {fmtCurrency(account.todayPnlUSC, accountTelemetry?.currency, true)} today
           </div>
         </div>
         <div className="rounded-lg border border-bd bg-bg1/60 p-4">

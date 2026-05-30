@@ -1,8 +1,8 @@
-import { useStableUserTrades, useSnapshot, usePollingUiState } from "@/hooks/useSniperData";
+import { useStableUserTrades, useSnapshot, usePollingUiState, useAccountTelemetry } from "@/hooks/useSniperData";
 import { SettingsQueryErrorState } from "@/components/sniper/SettingsQueryErrorState";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { WarningLine } from "@/components/sniper/Warnings";
-import { fmtPrice, fmtPct, fmtUSC, relTime } from "@/lib/format";
+import { fmtPrice, fmtPct, fmtCurrency, relTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Position } from "@/types/sniper";
 
@@ -16,6 +16,7 @@ export function BookPage() {
     settingsLoadError,
     retrySettingsLoad,
   } = usePollingUiState();
+  const { data: accountTelemetry } = useAccountTelemetry();
   const positions = trades?.positions ?? [];
 
   if (pendingSettingsLoad) {
@@ -66,7 +67,7 @@ export function BookPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Active Book</h1>
           <p className="text-xs text-mute mt-0.5">
-            {positions.length} open - {fmtUSC(totalPnl, true)}
+            {positions.length} open - {fmtCurrency(totalPnl, accountTelemetry?.currency, true)}
           </p>
         </div>
       </div>
@@ -105,7 +106,7 @@ export function BookPage() {
                   <span
                     className={cn("font-mono text-sm", groupPnl >= 0 ? "text-buy" : "text-sell")}
                   >
-                    {fmtUSC(groupPnl, true)}
+                    {fmtCurrency(groupPnl, accountTelemetry?.currency, true)}
                   </span>
                   <FreshnessBadge state={groupState} />
                 </div>
@@ -147,7 +148,7 @@ export function BookPage() {
                     </div>
                     <div className="col-span-2 sm:col-span-3 text-right font-mono">
                       <div className={cn(p.pnlUSC >= 0 ? "text-buy" : "text-sell")}>
-                        {fmtUSC(p.pnlUSC, true)}
+                        {fmtCurrency(p.pnlUSC, accountTelemetry?.currency, true)}
                       </div>
                       <div
                         className={cn(
