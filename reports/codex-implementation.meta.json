@@ -1,5 +1,5 @@
 {
-  "issue": "Signal ID is anchored to candle time, not clock time, preventing frontend re-renders when signal ID remains unchanged across poll cycles.",
-  "plan_hash": "532ee2cc382c55ae39b0ff8931886935949a27632dd73b3288dbb43402f06079",
-  "written_at": "2026-05-30T04:22:30.1285159Z"
+  "issue": "After recent commits, plan cards are not rendering and instead the frontend UI is showing plain text",
+  "plan_hash": "e159462d0042eb73f623898a665127c6f3fa8a8b5e641d7196ac84a678910b90",
+  "written_at": "2026-05-30T13:49:11.0655961+02:00"
 }

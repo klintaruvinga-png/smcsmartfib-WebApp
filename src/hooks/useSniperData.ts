@@ -501,8 +501,9 @@ export function useUserRiskProfile() {
 }
 
 export function useLadders() {
-  const { backendReady, pollMs } = usePollingQueryState();
+  const { backendReady, pendingSettingsLoad, pollMs } = usePollingQueryState();
   const enabled = backendReady && pollMs !== null;
+  useLivePollingDiagnostics("LADDERS_POLL", backendReady, pendingSettingsLoad, pollMs);
   return useQuery<TradePlan[]>({
     queryKey: ["ladders"],
     queryFn: () => apiClient.getLadders(),

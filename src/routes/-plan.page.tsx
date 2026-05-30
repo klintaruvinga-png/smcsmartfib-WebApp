@@ -119,6 +119,11 @@ export function PlanPage() {
   }
 
   if (topCandidates.length === 0) {
+    const watchlistCandidateIds = watchlistCandidates.map(({ signal }) => signal.id);
+    const blueprintIds = ladders?.map((ladder) => ladder.signalId) ?? [];
+    const matchedWatchlistBlueprintCount = watchlistCandidateIds.filter((signalId) =>
+      laddersBySignalId.has(signalId),
+    ).length;
     const diagnostics = {
       signalCount: uniqueSignals.length,
       watchlistCount: watchlist.length,
@@ -126,7 +131,9 @@ export function PlanPage() {
       topSignal: firstWatchlistCandidate?.signal.id,
       topSymbol: firstWatchlistCandidate?.signal.symbol,
       blueprintCount: ladders?.length ?? 0,
-      blueprintIds: ladders?.map((ladder) => ladder.signalId) ?? [],
+      blueprintIds,
+      watchlistCandidateIds,
+      matchedWatchlistBlueprintCount,
     };
 
     return (
@@ -159,8 +166,21 @@ export function PlanPage() {
                 Ladders endpoint returned no data - check backend connectivity
               </div>
             )}
+            {diagnostics.blueprintCount > 0 &&
+              diagnostics.watchlistCandidateCount > 0 &&
+              diagnostics.matchedWatchlistBlueprintCount === 0 && (
+                <div className="flex items-center gap-1.5 text-warn">
+                  <Search className="h-3.5 w-3.5 shrink-0" />
+                  No ladder signal IDs match current watchlist candidates
+                </div>
+              )}
             {diagnostics.blueprintCount > 0 && (
               <div>Ladder IDs available: {diagnostics.blueprintIds.join(", ") || "none"}</div>
+            )}
+            {diagnostics.watchlistCandidateIds.length > 0 && (
+              <div>
+                Watchlist candidate IDs: {diagnostics.watchlistCandidateIds.join(", ") || "none"}
+              </div>
             )}
           </div>
         </div>
