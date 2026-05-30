@@ -6,12 +6,13 @@ export function SyncChip({ state, label = "BACKEND" }: { state: FreshnessState; 
     live: { dot: "pulse-dot", text: "text-buy", word: "LIVE" },
     "pending-sync": { dot: "pulse-dot warn", text: "text-info", word: "SYNC" },
     stale: { dot: "pulse-dot warn", text: "text-warn", word: "STALE" },
+    closed_session: { dot: "pulse-dot warn", text: "text-info", word: "CLOSED" },
     mock: { dot: "pulse-dot warn", text: "text-violet", word: "MOCK" },
     blocked: { dot: "pulse-dot sell", text: "text-sell", word: "BLOCK" },
     offline: { dot: "pulse-dot sell", text: "text-sell", word: "OFFLINE" },
     unavailable: { dot: "pulse-dot sell", text: "text-mute", word: "N/A" },
   };
-  const s = map[state];
+  const s = map[state] ?? map.stale;
   return (
     <div className="inline-flex items-center gap-2 rounded-md border border-bd bg-bg2/60 px-2.5 py-1.5">
       <span className={s.dot} />
