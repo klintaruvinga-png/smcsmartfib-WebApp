@@ -13,6 +13,10 @@ describe("MT5 signal dispatch parity guard", () => {
 
     expect(marketDataEngine).toContain("fibEngine.BuildSignalFibLevels(symbols[i], fibLevels)");
     expect(marketDataEngine).toContain("regimeEngine.ComputeRegimeState(symbols[i], regimeState)");
+    expect(marketDataEngine).toContain("if (!IsLive(symbols[i]))");
+    expect(marketDataEngine.indexOf("if (!IsLive(symbols[i]))")).toBeLessThan(
+      marketDataEngine.indexOf("fibEngine.BuildSignalFibLevels(symbols[i], fibLevels)")
+    );
     expect(marketDataEngine).not.toContain('string htfBias    = "TRANSITIONAL";');
     expect(marketDataEngine).not.toContain('string ltfRegime  = "RANGING";');
     expect(marketDataEngine).not.toContain("int fibCount = 0;");
