@@ -133,11 +133,7 @@ export function PlanPage() {
       signalCount: uniqueSignals.length,
       watchlistCount: watchlist.length,
       watchlistCandidateCount: watchlistCandidates.length,
-      topSignal: firstWatchlistCandidate?.signal.id,
-      topSymbol: firstWatchlistCandidate?.signal.symbol,
       blueprintCount: ladders?.length ?? 0,
-      blueprintIds,
-      watchlistCandidateIds,
       matchedWatchlistBlueprintCount,
     };
 
@@ -168,13 +164,6 @@ export function PlanPage() {
             <div>Signals loaded: {diagnostics.signalCount}</div>
             <div>Watchlist symbols: {diagnostics.watchlistCount}</div>
             <div>Watchlist candidates: {diagnostics.watchlistCandidateCount}</div>
-            {firstWatchlistCandidate && (
-              <div>
-                Top watchlist candidate:{" "}
-                <span className="text-info font-mono">{diagnostics.topSignal}</span> (
-                {diagnostics.topSymbol} {firstWatchlistCandidate.signal.direction})
-              </div>
-            )}
             <div>Found {diagnostics.blueprintCount} total blueprints</div>
             {diagnostics.blueprintCount === 0 && (
               <div className="flex items-center gap-1.5 text-warn">
@@ -190,15 +179,60 @@ export function PlanPage() {
                   No ladder signal IDs match current watchlist candidates
                 </div>
               )}
-            {diagnostics.blueprintCount > 0 && (
-              <div>Ladder IDs available: {diagnostics.blueprintIds.join(", ") || "none"}</div>
-            )}
-            {diagnostics.watchlistCandidateIds.length > 0 && (
-              <div>
-                Watchlist candidate IDs: {diagnostics.watchlistCandidateIds.join(", ") || "none"}
-              </div>
-            )}
           </div>
+          {watchlistCandidates.length > 0 && (
+            <div className="space-y-1.5 max-w-xl">
+              <div className="text-xs font-medium text-mute uppercase tracking-wide">
+                Candidate gate status
+              </div>
+              {watchlistCandidates.map(({ signal }) => {
+                const blocker = signal.engineBlocker ?? "UNKNOWN";
+                const isReady = signal.status === "READY";
+                const isBlocked = !isReady || blocker !== "OK";
+                return (
+                  <div
+                    key={signal.id}
+                    className="text-xs bg-bg1/40 rounded px-3 py-2 flex items-start gap-2"
+                  >
+                    <AlertTriangle
+                      className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${isBlocked ? "text-warn" : "text-ok"}`}
+                    />
+                    <div className="space-y-0.5 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-info">{signal.symbol}</span>
+                        <span className="text-mute">{signal.direction}</span>
+                        <span
+                          className={`font-mono font-semibold ${isReady ? "text-ok" : "text-warn"}`}
+                        >
+                          {signal.status}
+                        </span>
+                        {signal.backendConfirmed && (
+                          <span className="text-ok">backend-confirmed</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap text-dim">
+                        <span>blocker:</span>
+                        <span
+                          className={`font-mono ${blocker === "OK" ? "text-ok" : "text-warn"}`}
+                        >
+                          {blocker}
+                        </span>
+                        <span className="text-dim/50">·</span>
+                        <span className="font-mono truncate max-w-[18ch]">{signal.id}</span>
+                      </div>
+                      {signal.engine && (
+                        <div className="text-dim flex gap-2 flex-wrap">
+                          <span>htf: {signal.engine.htfBias}</span>
+                          <span>·</span>
+                          <span>pd: {signal.engine.pdState}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     );
