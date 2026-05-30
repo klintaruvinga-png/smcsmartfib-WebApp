@@ -84,8 +84,16 @@ if (!class_exists('TestWpdb')) {
     class TestWpdb {
         public $prefix = 'wp_';
         public $tables = array();
+        public $schemas = array();
+        public $last_error = '';
 
         public function replace($table, $data, $formats = array()) {
+            $unknown_columns = $this->find_unknown_columns($table, $data);
+            if (!empty($unknown_columns)) {
+                $this->last_error = 'Unknown column ' . $unknown_columns[0];
+                return false;
+            }
+            $this->last_error = '';
             if (!isset($this->tables[$table])) {
                 $this->tables[$table] = array();
             }
@@ -121,6 +129,29 @@ if (!class_exists('TestWpdb')) {
 
         public function get_charset_collate() {
             return '';
+        }
+
+        public function apply_dbdelta($sql) {
+            if (!preg_match('/CREATE TABLE\s+([^\s(]+)\s*\((.*)\)\s*;?\s*$/is', trim($sql), $matches)) {
+                return true;
+            }
+
+            $table = $matches[1];
+            if (!isset($this->schemas[$table])) {
+                $this->schemas[$table] = array();
+            }
+
+            foreach (preg_split('/\n/', $matches[2]) as $line) {
+                $line = trim($line, " \t\r\n,");
+                if ($line === '' || preg_match('/^(PRIMARY|UNIQUE|KEY)\b/i', $line)) {
+                    continue;
+                }
+                if (preg_match('/^`?([A-Za-z0-9_]+)`?\s+/', $line, $column_match)) {
+                    $this->schemas[$table][$column_match[1]] = true;
+                }
+            }
+            $this->last_error = '';
+            return true;
         }
 
         public function prepare($query, ...$args) {
@@ -396,6 +427,20 @@ if (!class_exists('TestWpdb')) {
             return array();
         }
 
+        private function find_unknown_columns($table, $data) {
+            if (empty($this->schemas[$table])) {
+                return array();
+            }
+
+            $unknown = array();
+            foreach (array_keys($data) as $column) {
+                if (!isset($this->schemas[$table][$column])) {
+                    $unknown[] = $column;
+                }
+            }
+            return $unknown;
+        }
+
         private function row_key($table, $data) {
             if (substr($table, -9) === 'snapshots') {
                 return $data['user_id'] . '|' . $data['symbol'];
@@ -449,6 +494,10 @@ if (!function_exists('register_rest_route')) {
 }
 if (!function_exists('dbDelta')) {
     function dbDelta(...$args) {
+        global $wpdb;
+        if (is_object($wpdb) && method_exists($wpdb, 'apply_dbdelta')) {
+            return $wpdb->apply_dbdelta($args[0] ?? '');
+        }
         return true;
     }
 }
@@ -1207,6 +1256,20 @@ assert_same('BLOCKED', $htfEquilibriumState['gate']['allow'] ?? null, 'build_sym
 assert_same('AOV_EQUILIBRIUM_ZONE', $htfEquilibriumState['gate']['reason'] ?? null, 'build_symbol_state must report the AOV equilibrium-zone block reason');
 assert_same('EQUILIBRIUM', $htfEquilibriumState['signal']['engine']['pdState'] ?? null, 'build_symbol_state must derive pdState from HTF authority range, not the local M15 range');
 
+$regimeTable = $wpdb->prefix . 'smc_sf_regime_snapshots';
+$wpdb->schemas[$regimeTable] = array_fill_keys(array(
+    'id',
+    'user_id',
+    'symbol',
+    'htf_bias',
+    'ltf_regime',
+    'chop_score',
+    'ema20_d1',
+    'atr14_h1',
+    'source',
+    'calculated_at',
+), true);
+
 $regimeResponse = $instance->post_ea_regime_snapshot(new WP_REST_Request(array(
     'regimes' => array(
         array(
@@ -1222,7 +1285,8 @@ $regimeResponse = $instance->post_ea_regime_snapshot(new WP_REST_Request(array(
     ),
 )));
 assert_true(is_array($regimeResponse) && !empty($regimeResponse['ok']), 'EA regime snapshot ingest should accept HTF bias range fields');
-$regimeTable = $wpdb->prefix . 'smc_sf_regime_snapshots';
+assert_true(!empty($wpdb->schemas[$regimeTable]['htf_bias_high']), 'EA regime snapshot ingest must migrate old regime table before writing htf_bias_high');
+assert_true(!empty($wpdb->schemas[$regimeTable]['htf_bias_low']), 'EA regime snapshot ingest must migrate old regime table before writing htf_bias_low');
 $regimeRow = $wpdb->tables[$regimeTable]['7|EURUSD'] ?? null;
 assert_true(is_array($regimeRow), 'EA regime snapshot row was not stored');
 assert_true(abs((float) ($regimeRow['htf_bias_high'] ?? 0) - 1.1500) < 0.0000001, 'EA regime snapshot must persist htf_bias_high');

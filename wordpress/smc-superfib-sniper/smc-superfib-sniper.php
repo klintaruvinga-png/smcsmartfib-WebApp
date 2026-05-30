@@ -610,6 +610,52 @@ final class SMC_SuperFib_Sniper_REST {
         return true;
     }
 
+    private static function get_regime_snapshots_table_sql(string $charset): string {
+        global $wpdb;
+
+        return "CREATE TABLE {$wpdb->prefix}smc_sf_regime_snapshots (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT UNSIGNED NOT NULL,
+            symbol VARCHAR(24) NOT NULL,
+            htf_bias VARCHAR(16) NOT NULL DEFAULT 'TRANSITIONAL',
+            ltf_regime VARCHAR(16) NOT NULL DEFAULT 'RANGING',
+            chop_score DECIMAL(5,4) NOT NULL DEFAULT 0.5000,
+            ema20_d1 DECIMAL(20,8) DEFAULT NULL,
+            atr14_h1 DECIMAL(20,8) DEFAULT NULL,
+            htf_bias_high DECIMAL(20,8) DEFAULT NULL,
+            htf_bias_low DECIMAL(20,8) DEFAULT NULL,
+            source VARCHAR(20) NOT NULL DEFAULT 'mt5',
+            calculated_at DATETIME NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY regime_lookup (user_id, symbol),
+            KEY user_updated (user_id, calculated_at)
+        ) $charset;";
+    }
+
+    private static function ensure_regime_snapshots_table() {
+        global $wpdb;
+
+        if (file_exists(ABSPATH . 'wp-admin/includes/upgrade.php')) {
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        }
+
+        if (!function_exists('dbDelta')) {
+            return false;
+        }
+
+        if (is_object($wpdb) && property_exists($wpdb, 'last_error')) {
+            $wpdb->last_error = '';
+        }
+
+        dbDelta(self::get_regime_snapshots_table_sql($wpdb->get_charset_collate()));
+
+        if (is_object($wpdb) && property_exists($wpdb, 'last_error') && $wpdb->last_error !== '') {
+            return false;
+        }
+
+        return true;
+    }
+
     private static function ensure_soak_tables() {
         global $wpdb;
 
@@ -667,23 +713,7 @@ final class SMC_SuperFib_Sniper_REST {
         ) $charset;";
 
         // Phase 5: MT5 regime snapshots
-        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_regime_snapshots (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            user_id BIGINT UNSIGNED NOT NULL,
-            symbol VARCHAR(24) NOT NULL,
-            htf_bias VARCHAR(16) NOT NULL DEFAULT 'TRANSITIONAL',
-            ltf_regime VARCHAR(16) NOT NULL DEFAULT 'RANGING',
-            chop_score DECIMAL(5,4) NOT NULL DEFAULT 0.5000,
-            ema20_d1 DECIMAL(20,8) DEFAULT NULL,
-            atr14_h1 DECIMAL(20,8) DEFAULT NULL,
-            htf_bias_high DECIMAL(20,8) DEFAULT NULL,
-            htf_bias_low DECIMAL(20,8) DEFAULT NULL,
-            source VARCHAR(20) NOT NULL DEFAULT 'mt5',
-            calculated_at DATETIME NOT NULL,
-            PRIMARY KEY  (id),
-            UNIQUE KEY regime_lookup (user_id, symbol),
-            KEY user_updated (user_id, calculated_at)
-        ) $charset;";
+        $tables[] = self::get_regime_snapshots_table_sql($charset);
 
         // Phase 5B: Economic fundamental events
         // UNIQUE KEY uses (currency, event_date, event_name(64)) — not event_type — so that
@@ -3370,6 +3400,18 @@ final class SMC_SuperFib_Sniper_REST {
         $payload = $request->get_json_params();
         if (!is_array($payload) || !isset($payload['regimes']) || !is_array($payload['regimes'])) {
             return new WP_Error('invalid_payload', 'regimes array required', array('status' => 400));
+        }
+
+        if (!self::ensure_regime_snapshots_table()) {
+            $detail = $this->wpdb_last_error();
+            if ($detail === null) {
+                $detail = 'dbDelta unavailable';
+            }
+            error_log('SMC SuperFIB EA regime snapshot table init failed: ' . $detail);
+            return new WP_REST_Response(array(
+                'error' => 'table_init_failed',
+                'detail' => $detail,
+            ), 500);
         }
 
         $user_id       = get_current_user_id();
