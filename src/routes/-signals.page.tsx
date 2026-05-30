@@ -27,6 +27,7 @@ function blockerLabel(b: EngineBlocker | undefined): string {
   if (!b || b === "OK") return "";
   const map: Partial<Record<EngineBlocker, string>> = {
     AOV_EQUILIBRIUM_ZONE: "AOV equilibrium zone",
+    ANCHOR_CHOP_BLOCKED: "SF+AF dual equilibrium — anchor chop zone",
   };
   return map[b] ?? b.replace(/_/g, " ").toLowerCase();
 }

@@ -1325,6 +1325,30 @@ assert_same(false, $htfEquilibriumState['signal']['backendConfirmed'] ?? null, '
 assert_same('AOV_EQUILIBRIUM_ZONE', $htfEquilibriumState['signal']['engineBlocker'] ?? null, 'AOV equilibrium must surface as the signal engine blocker');
 assert_same(null, $htfEquilibriumState['plan'] ?? null, 'AOV equilibrium-blocked signals must not generate executable trade plans');
 
+$regimeResponse = $instance->post_ea_regime_snapshot(new WP_REST_Request(array(
+    'regimes' => array(
+        array(
+            'symbol' => $htfEquilibriumSymbol,
+            'htf_bias' => 'BULL',
+            'ltf_regime' => 'RANGING',
+            'chop_score' => 0.25,
+            'ema20_d1' => 1.1000,
+            'atr14_h1' => 0.0025,
+            'htf_bias_high' => 1.1500,
+            'htf_bias_low' => 1.0500,
+        ),
+    ),
+)));
+assert_true(is_array($regimeResponse) && !empty($regimeResponse['ok']), 'EA regime snapshot ingest should accept low-chop regime data for equilibrium blockers');
+$lowChopEquilibriumState = $buildSymbolState->invoke($instance, 7, $htfEquilibriumSymbol, array(
+    'symbol' => $htfEquilibriumSymbol,
+    'mid' => 1.1020,
+    'updatedAt' => gmdate('c', time() - 5),
+    'state' => 'live',
+));
+assert_same('AOV_EQUILIBRIUM_ZONE', $lowChopEquilibriumState['signal']['engineBlocker'] ?? null, 'AOV equilibrium must still surface as the engine blocker at low chop');
+assert_true(($lowChopEquilibriumState['signal']['status'] ?? null) !== 'ARMED', 'AOV equilibrium at low chop must not be forced to ARMED');
+
 $regimeTable = $wpdb->prefix . 'smc_sf_regime_snapshots';
 $wpdb->schemas[$regimeTable] = array_fill_keys(array(
     'id',

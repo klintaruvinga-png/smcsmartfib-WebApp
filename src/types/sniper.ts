@@ -20,8 +20,7 @@ export type EngineBlocker =
   | "CANDLES_STALE"
   | "INSUFFICIENT_CANDLE_HISTORY"
   | "READY_NOT_CONFIRMED_STALE_DATA"
-  | "CHOP_GATE_BLOCKED"
-  | "AOV_EQUILIBRIUM_ZONE"
+  | "ANCHOR_CHOP_BLOCKED"
   | "OK";
 export type PriceSource = "mt5" | "twelve-data" | "unknown" | "mock";
 
@@ -138,7 +137,10 @@ export interface ChartSnapshot {
 export interface RegimeState {
   symbol: Symbol;
   bias: "BULL" | "BEAR" | "RANGING";
-  chop: number; // 0..1
+  chop: number; // 0..1 — candle-derived, kept as diagnostic only
+  anchorChop: "SF+AF" | "SF" | "AF" | "none" | null;
+  sfPosition: number | null; // 0–100%, where close sits in LTF SF anchor
+  afPosition: number | null; // 0–100%, where close sits in HTF AF anchor
   nearestFib: number | null;
   updatedAt: string;
   state: FreshnessState;
@@ -174,6 +176,10 @@ export interface SignalCandidate {
     displacement: DisplacementQuality;
     htaOverride: boolean;
     f3Chop: "clear" | "caution";
+    anchorChopSource: "SF+AF" | "SF" | "AF" | "none" | null;
+    sfPosition: number | null;
+    afPosition: number | null;
+    candleChop: number | null; // diagnostic only
     ltfLevel: FibLevel | null;
     firstReactionFamily: FibFamily | null;
     chartState: string;

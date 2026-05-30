@@ -9,7 +9,7 @@ import {
 import { useStreamingTicks } from "@/hooks/useStreamingTicks";
 import { useTickFlash } from "@/hooks/useTickFlash";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
-import { BiasBadge, ChopMeter, GateBadge } from "@/components/sniper/Indicators";
+import { BiasBadge, GateBadge, AnchorChopBadge, AnchorPositionMeter } from "@/components/sniper/Indicators";
 import { SettingsQueryErrorState } from "@/components/sniper/SettingsQueryErrorState";
 import { WarningLine } from "@/components/sniper/Warnings";
 import { fmtPrice, fmtPct, relTime } from "@/lib/format";
@@ -42,7 +42,7 @@ function blockerWarning(blocker: EngineBlocker | undefined): string | null {
     CANDLES_STALE: "Candles stale (>2 h old)",
     INSUFFICIENT_CANDLE_HISTORY: "Insufficient candle history (<30 bars)",
     READY_NOT_CONFIRMED_STALE_DATA: "READY but stale data - confirmation blocked",
-    CHOP_GATE_BLOCKED: "Gate blocked - chop > 0.7 (F3 caution zone)",
+    ANCHOR_CHOP_BLOCKED: "Gate blocked - SF+AF dual equilibrium zone",
     AOV_EQUILIBRIUM_ZONE: "Gate blocked - HTF authority equilibrium",
   };
   return map[blocker] ?? blocker.replace(/_/g, " ").toLowerCase();
@@ -90,7 +90,7 @@ export function LivePage() {
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Live Radar</h1>
-          <p className="text-xs text-mute mt-0.5">Prices / Regime / Gate / Chop</p>
+          <p className="text-xs text-mute mt-0.5">Prices / Regime / Gate / Anchor</p>
         </div>
         <button
           onClick={() => runBatch(undefined)}
@@ -343,7 +343,13 @@ function PriceCard({
         {regime && (
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-mute">Chop</span>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-mute">Anchor</span>
+              <AnchorChopBadge source={regime.anchorChop ?? "none"} />
+            </div>
+            <AnchorPositionMeter label="SF" pct={regime.sfPosition ?? null} />
+            <AnchorPositionMeter label="AF" pct={regime.afPosition ?? null} />
+            <div className="flex items-center justify-between pt-0.5">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-mute">Nearest Fib</span>
               <span
                 style={chopTickStyle}
                 className={cn(
@@ -352,10 +358,9 @@ function PriceCard({
                   chopFlash === "down" && "tick-flash-down",
                 )}
               >
-                Fib {regime.nearestFib ? fmtPrice(regime.nearestFib, price.symbol) : "--"}
+                {regime.nearestFib ? fmtPrice(regime.nearestFib, price.symbol) : "--"}
               </span>
             </div>
-            <ChopMeter value={regime.chop} />
           </div>
         )}
       </div>

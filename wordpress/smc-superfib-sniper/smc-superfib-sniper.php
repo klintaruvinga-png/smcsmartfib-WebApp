@@ -5547,7 +5547,44 @@ final class SMC_SuperFib_Sniper_REST {
         $nearest = $this->nearest_level($levels, $close);
         $sequence = $this->sequence_state($candles);
         $direction = $position_ratio >= 62.5 ? 'LONG' : ($position_ratio <= 25 ? 'SHORT' : ($bias === 'BEAR' ? 'SHORT' : 'LONG'));
-        $f3_chop = ($position_ratio >= 37.5 && $position_ratio <= 62.5) || $chop >= 0.7 ? 'caution' : 'clear';
+
+        // ── Anchor-based chop (ICT-aligned) ─────────────────────────────────
+        // Replaces candle-momentum chop (1 - abs(move)/range).
+        // ICT chop = price inside the 37.5–62.5% equilibrium of a structured
+        // anchor range, not how directional the last N candles were.
+        //
+        // SF  = LTF SuperFib composite anchor  (local session)
+        // AF  = HTF Authority Fib anchor        (higher-timeframe)
+        //
+        // Both anchors in equilibrium → HARD BLOCK (dual-anchor chop zone).
+        // One anchor in equilibrium   → CAUTION (score penalty only, not block).
+        // Neither anchor              → CLEAR.
+
+        $sf_anchor_bounds  = $authority_levels['sf_anchor'] ?? null;
+        $af_anchor_bounds  = $authority_levels['af_anchor'] ?? null;
+        $sf_position_pct   = null;
+        $af_position_pct   = null;
+
+        if ($sf_anchor_bounds && ($sf_anchor_bounds['high'] - $sf_anchor_bounds['low']) > 0) {
+            $sf_position_pct = (($sf_anchor_bounds['high'] - $close) /
+                                ($sf_anchor_bounds['high'] - $sf_anchor_bounds['low'])) * 100;
+        }
+        if ($af_anchor_bounds && ($af_anchor_bounds['high'] - $af_anchor_bounds['low']) > 0) {
+            $af_position_pct = (($af_anchor_bounds['high'] - $close) /
+                                ($af_anchor_bounds['high'] - $af_anchor_bounds['low'])) * 100;
+        }
+
+        $sf_in_eq = $sf_position_pct !== null && $sf_position_pct >= 37.5 && $sf_position_pct <= 62.5;
+        $af_in_eq = $af_position_pct !== null && $af_position_pct >= 37.5 && $af_position_pct <= 62.5;
+
+        // Dual-anchor equilibrium = structural chop, hard block.
+        $anchor_chop_blocked = $sf_in_eq && $af_in_eq;
+        // Single-anchor equilibrium = caution, soft penalty.
+        $anchor_chop_caution = $sf_in_eq || $af_in_eq;
+        $anchor_chop_source  = ($sf_in_eq && $af_in_eq) ? 'SF+AF' : ($sf_in_eq ? 'SF' : ($af_in_eq ? 'AF' : 'none'));
+
+        // f3_chop now reflects anchor position, not candle momentum.
+        $f3_chop = $anchor_chop_caution ? 'caution' : 'clear';
         $hta_override = $position_ratio < 0 || $position_ratio > 100;
         $fundamental_bias = $this->get_symbol_fundamental_bias($symbol);
         $fundamental_htf_bias = null;
@@ -5572,14 +5609,15 @@ final class SMC_SuperFib_Sniper_REST {
             $status = 'WATCH';
         } elseif (!$sequence[$direction]['mss']) {
             $status = 'ARMED';
-        } elseif ($chop >= 0.7) {
-            // CRITICAL: Block READY status when chop >= 0.7 (F3 caution zone).
-            // SMC methodology requires no entries in high-chop equilibrium.
+        } elseif ($anchor_chop_blocked) {
+            // CRITICAL: Both SF and AF anchors place price in equilibrium (37.5–62.5%).
+            // Dual-anchor chop is a hard structural block — no directional basis exists.
             $status = 'ARMED';
-        } elseif ($aov_equilibrium_blocked) {
-            // CRITICAL: HTF authority equilibrium is a hard AOV block, not merely
-            // a gate decoration. Keep structurally complete setups unconfirmed so
-            // they cannot be persisted/executed as backend-confirmed READY signals.
+        } elseif ($aov_equilibrium_blocked && $chop !== null && $chop >= 0.55) {
+            // CRITICAL: HTF authority equilibrium is an aggressive gate only when
+            // the market is sufficiently choppy. In low-chop equilibrium, allow
+            // the signal to remain in the normal WATCH/READY path instead of
+            // forcing ARMED.
             $status = 'ARMED';
         } elseif ($sequence[$direction]['displacement'] === 'weak') {
             $status = 'ARMED';
@@ -5667,11 +5705,11 @@ final class SMC_SuperFib_Sniper_REST {
                 'reason' => 'AOV_EQUILIBRIUM_ZONE',
                 'state'  => $symbol_state,
             );
-        } elseif ($chop >= 0.7) {
+        } elseif ($anchor_chop_blocked) {
             $gate = array(
                 'symbol' => $symbol,
                 'allow'  => 'BLOCKED',
-                'reason' => 'chop > 0.7 — F3 caution zone',
+                'reason' => 'SF+AF dual equilibrium — anchor chop zone',
                 'state'  => $symbol_state,
             );
         } else {
@@ -5683,12 +5721,15 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         $regime = array(
-            'symbol' => $symbol,
-            'bias' => $bias,
-            'chop' => $chop,
-            'nearestFib' => $nearest ? $nearest['price'] : null,
-            'updatedAt' => gmdate('c'),
-            'state' => $symbol_state,
+            'symbol'          => $symbol,
+            'bias'            => $bias,
+            'chop'            => $chop,           // kept as diagnostic (candle-derived)
+            'anchorChop'      => $anchor_chop_source,
+            'sfPosition'      => $sf_position_pct !== null ? round($sf_position_pct, 1) : null,
+            'afPosition'      => $af_position_pct !== null ? round($af_position_pct, 1) : null,
+            'nearestFib'      => $nearest ? $nearest['price'] : null,
+            'updatedAt'       => gmdate('c'),
+            'state'           => $symbol_state,
         );
 
         $ltf_level = $this->execution_level($levels, $direction);
@@ -5699,7 +5740,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         // Anchor the signal identity to the latest analysed candle so the same setup stays stable
         // within one 15m bar, while later intraday setups get a distinct execution queue identity.
-        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol, $chop, $aov_equilibrium_blocked, $is_equity_off_session);
+        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol, $anchor_chop_blocked, $aov_equilibrium_blocked, $is_equity_off_session);
         $backend_confirmed = $status === 'READY' && $data_live && $engine_blocker === 'OK';
 
         $signal_anchor = $last_candle && !empty($last_candle['time']) ? $last_candle['time'] : gmdate('c');
@@ -5710,7 +5751,7 @@ final class SMC_SuperFib_Sniper_REST {
             'direction' => $direction,
             'status' => $status,
             'confluence' => $confluence,
-            'verdict' => $this->verdict($status, $confluence, $chop),
+            'verdict' => $this->verdict($status, $confluence, $anchor_chop_caution),
             'computedBy' => 'backend',
             // CRITICAL HARDENING: Never backend-confirm a signal unless status is READY
             // and every hard backend gate is OK. Without this guard,
@@ -5729,6 +5770,10 @@ final class SMC_SuperFib_Sniper_REST {
                 'displacement' => $sequence[$direction]['displacement'],
                 'htaOverride' => $hta_override,
                 'f3Chop' => $f3_chop,
+                'anchorChopSource' => $anchor_chop_source,
+                'sfPosition' => $sf_position_pct !== null ? round($sf_position_pct, 1) : null,
+                'afPosition' => $af_position_pct !== null ? round($af_position_pct, 1) : null,
+                'candleChop' => $chop,   // diagnostic only — not used for gating
                 'ltfLevel' => $ltf_level,
                 'firstReactionFamily' => $hta_override ? 'HTA_SF' : 'LTF_SF',
                 'chartState' => 'chart-derived',
@@ -7655,9 +7700,20 @@ final class SMC_SuperFib_Sniper_REST {
         );
         error_log('[INFO] SMC SuperFIB fib calc ' . (function_exists('wp_json_encode') ? wp_json_encode($log_payload) : json_encode($log_payload)));
 
+        $sf_anchor = $composite['valid'] ? array(
+            'high' => $composite['high'], 
+            'low'  => $composite['low'],
+        ) : null;
+        $af_anchor = !empty($htf_anchor['valid']) ? array(
+            'high' => $htf_anchor['high'],
+            'low'  => $htf_anchor['low'],
+        ) : null;
+
         return array(
             'LTF_SF' => $ltf_levels,
             'HTF_AF' => $htf_levels,
+            'sf_anchor' => $sf_anchor,
+            'af_anchor' => $af_anchor,
         );
     }
 
@@ -7830,9 +7886,11 @@ final class SMC_SuperFib_Sniper_REST {
         return 'DISCOUNT';
     }
 
-    private function verdict($status, $confluence, $chop) {
+    private function verdict($status, $confluence, $anchor_chop_caution) {
         $structural = array_values(array_diff($confluence, array('HTA_SF', 'LTF_SF')));
-        $score = count($structural) - ($chop > 0.7 ? 2 : 0);
+        // -1 soft penalty for single-anchor caution (was -2 hard for candle chop > 0.7).
+        // Dual-anchor HARD BLOCK never reaches verdict() — status is forced ARMED before this.
+        $score = count($structural) - ($anchor_chop_caution ? 1 : 0);
         if ($status === 'READY' && $score >= 3) {
             return 'A+';
         }
@@ -7846,7 +7904,7 @@ final class SMC_SuperFib_Sniper_REST {
     // Returns a single string reason explaining why a READY signal cannot be
     // backend-confirmed, or 'OK' when everything is healthy.
 
-    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol = null, $chop = null, $aov_equilibrium_blocked = false, $is_equity_off_session = null) {
+    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol = null, $anchor_chop_blocked = false, $aov_equilibrium_blocked = false, $is_equity_off_session = null) {
         $is_mt5_authority = false;
         if ($symbol !== null) {
             $is_mt5_authority = $this->is_mt5_authoritative($user_id, $symbol);
@@ -7898,11 +7956,10 @@ final class SMC_SuperFib_Sniper_REST {
 
         if ($status === 'READY' && !$data_live) return 'READY_NOT_CONFIRMED_STALE_DATA';
 
-        // CRITICAL HARDENING: Gate is BLOCKED when chop >= 0.7; signal must never be
-        // backend-confirmed in this state. Without this check, post_execute_signals()
-        // can still queue a READY+confirmed signal even though the gate is BLOCKED,
-        // breaking the chop-gate contract introduced by the gate patch.
-        if ($chop !== null && (float) $chop >= 0.7) return 'CHOP_GATE_BLOCKED';
+        // CRITICAL HARDENING: Gate is BLOCKED when both SF and AF anchors place price
+        // in equilibrium (37.5–62.5%). This is the ICT-aligned dual-anchor chop block.
+        // Single-anchor caution does NOT block — it only applies a score penalty in verdict().
+        if ($anchor_chop_blocked) return 'ANCHOR_CHOP_BLOCKED';
 
         // CRITICAL HARDENING: HTF authority equilibrium is also a hard AOV block.
         // It must suppress backend confirmation and plan generation, not just decorate

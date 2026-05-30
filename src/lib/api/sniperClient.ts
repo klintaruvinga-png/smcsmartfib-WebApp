@@ -401,6 +401,15 @@ function normalizeSnapshot(snapshot: {
     regimes: (snapshot.regimes ?? []).map((regime) => ({
       ...regime,
       chop: toFiniteNumber(regime.chop),
+      anchorChop: regime.anchorChop ?? null,
+      sfPosition:
+        regime.sfPosition === null || regime.sfPosition === undefined
+          ? null
+          : toFiniteNumber(regime.sfPosition, Number(regime.sfPosition)),
+      afPosition:
+        regime.afPosition === null || regime.afPosition === undefined
+          ? null
+          : toFiniteNumber(regime.afPosition, Number(regime.afPosition)),
       nearestFib:
         regime.nearestFib === null || regime.nearestFib === undefined
           ? null
