@@ -1155,6 +1155,79 @@ assert_same('QUOTE_UNAVAILABLE', $missingQuoteState['diagnostic']['engineBlocker
 assert_true(array_key_exists('lastPriceAt', $missingQuoteState['diagnostic']), 'build_symbol_state diagnostics must retain the lastPriceAt field when quotes are missing');
 assert_same(null, $missingQuoteState['diagnostic']['lastPriceAt'], 'build_symbol_state must not fabricate lastPriceAt when no authoritative quote exists');
 
+$htfEquilibriumSymbol = 'AOVTEST';
+$wpdb->replace($snapshotTable, array(
+    'user_id' => 7,
+    'symbol' => $htfEquilibriumSymbol,
+    'bid' => 1.1018,
+    'ask' => 1.1022,
+    'mid' => 1.1020,
+    'spread' => 2,
+    'change_pct_1d' => 0,
+    'source' => 'mt5',
+    'state' => 'live',
+    'updated_at' => gmdate('Y-m-d H:i:s', time() - 5),
+));
+
+$currentWeekStart = strtotime('monday this week 12:00 UTC');
+$candleIndex = 0;
+for ($weekOffset = 5; $weekOffset >= 0; $weekOffset--) {
+    for ($dayOffset = 0; $dayOffset < 5; $dayOffset++) {
+        $timestamp = $currentWeekStart - ($weekOffset * 7 * 86400) + ($dayOffset * 86400);
+        if ($timestamp > time() - 900) {
+            $timestamp = time() - 900;
+        }
+        $isAuthorityWeek = $weekOffset === 3;
+        $open = $candleIndex === 0 ? 1.0000 : 1.0900 + ($candleIndex * 0.0002);
+        $close = ($weekOffset === 0 && $dayOffset === 4) ? 1.1020 : $open + 0.0001;
+        $wpdb->replace($candleTable, array(
+            'user_id' => 7,
+            'symbol' => $htfEquilibriumSymbol,
+            'timeframe' => '15min',
+            'candle_time' => gmdate('Y-m-d H:i:s', $timestamp),
+            'open' => $open,
+            'high' => $isAuthorityWeek ? 1.2000 : max($open, $close) + 0.0010,
+            'low' => $isAuthorityWeek ? 1.0000 : min($open, $close) - 0.0010,
+            'close' => $close,
+            'volume' => '10',
+            'source' => 'mt5',
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ));
+        $candleIndex++;
+    }
+}
+
+$htfEquilibriumState = $buildSymbolState->invoke($instance, 7, $htfEquilibriumSymbol, array(
+    'symbol' => $htfEquilibriumSymbol,
+    'mid' => 1.1020,
+    'updatedAt' => gmdate('c', time() - 5),
+    'state' => 'live',
+));
+assert_same('BLOCKED', $htfEquilibriumState['gate']['allow'] ?? null, 'build_symbol_state must block entries inside the HTF authority equilibrium buffer');
+assert_same('AOV_EQUILIBRIUM_ZONE', $htfEquilibriumState['gate']['reason'] ?? null, 'build_symbol_state must report the AOV equilibrium-zone block reason');
+assert_same('EQUILIBRIUM', $htfEquilibriumState['signal']['engine']['pdState'] ?? null, 'build_symbol_state must derive pdState from HTF authority range, not the local M15 range');
+
+$regimeResponse = $instance->post_ea_regime_snapshot(new WP_REST_Request(array(
+    'regimes' => array(
+        array(
+            'symbol' => 'EURUSD',
+            'htf_bias' => 'BULL',
+            'ltf_regime' => 'TRENDING',
+            'chop_score' => 0.25,
+            'ema20_d1' => 1.1000,
+            'atr14_h1' => 0.0025,
+            'htf_bias_high' => 1.1500,
+            'htf_bias_low' => 1.0500,
+        ),
+    ),
+)));
+assert_true(is_array($regimeResponse) && !empty($regimeResponse['ok']), 'EA regime snapshot ingest should accept HTF bias range fields');
+$regimeTable = $wpdb->prefix . 'smc_sf_regime_snapshots';
+$regimeRow = $wpdb->tables[$regimeTable]['7|EURUSD'] ?? null;
+assert_true(is_array($regimeRow), 'EA regime snapshot row was not stored');
+assert_true(abs((float) ($regimeRow['htf_bias_high'] ?? 0) - 1.1500) < 0.0000001, 'EA regime snapshot must persist htf_bias_high');
+assert_true(abs((float) ($regimeRow['htf_bias_low'] ?? 0) - 1.0500) < 0.0000001, 'EA regime snapshot must persist htf_bias_low');
+
 $normalizeTs = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'normalize_market_timestamp');
 $normalizeTs->setAccessible(true);
 

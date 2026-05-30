@@ -8,6 +8,8 @@ struct RegimeSnapshotOut
     double chopScore;
     double ema20D1;
     double atr14H1;
+    double htfBiasHigh;
+    double htfBiasLow;
 };
 
 //+------------------------------------------------------------------+
@@ -89,6 +91,24 @@ public:
         else
             htfBias = "TRANSITIONAL";
 
+        double htfBiasHigh = 0.0;
+        double htfBiasLow  = 0.0;
+        int matrixLb = EMA_PERIOD * 2;
+        double d1Highs[];
+        double d1Lows[];
+        int d1HBars = CopyHigh(symbol, PERIOD_D1, 1, matrixLb, d1Highs);
+        int d1LBars = CopyLow(symbol, PERIOD_D1, 1, matrixLb, d1Lows);
+        if (d1HBars >= matrixLb && d1LBars >= matrixLb)
+        {
+            int highIdx = ArrayMaximum(d1Highs, 0, d1HBars);
+            int lowIdx  = ArrayMinimum(d1Lows, 0, d1LBars);
+            if (highIdx >= 0 && lowIdx >= 0)
+            {
+                htfBiasHigh = d1Highs[highIdx];
+                htfBiasLow  = d1Lows[lowIdx];
+            }
+        }
+
         // --- 2. H1 ATR-14 for volatility gating ---
         MqlRates h1Rates[];
         int h1Bars = CopyRates(symbol, PERIOD_H1, 0, ATR_PERIOD + 5, h1Rates);
@@ -127,6 +147,8 @@ public:
         out.chopScore = chopScore;
         out.ema20D1 = ema20;
         out.atr14H1 = atr14;
+        out.htfBiasHigh = htfBiasHigh;
+        out.htfBiasLow = htfBiasLow;
 
         return true;
     }
@@ -145,7 +167,9 @@ public:
         json += "\"ltf_regime\":\""  + state.ltfRegime                    + "\",";
         json += "\"chop_score\":"    + DoubleToString(state.chopScore, 4) + ",";
         json += "\"ema20_d1\":"      + DoubleToString(state.ema20D1, 8)   + ",";
-        json += "\"atr14_h1\":"      + DoubleToString(state.atr14H1, 8);
+        json += "\"atr14_h1\":"      + DoubleToString(state.atr14H1, 8)   + ",";
+        json += "\"htf_bias_high\":" + DoubleToString(state.htfBiasHigh, 8) + ",";
+        json += "\"htf_bias_low\":"  + DoubleToString(state.htfBiasLow, 8);
         json += "}";
 
         return json;

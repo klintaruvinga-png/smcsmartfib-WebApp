@@ -676,6 +676,8 @@ final class SMC_SuperFib_Sniper_REST {
             chop_score DECIMAL(5,4) NOT NULL DEFAULT 0.5000,
             ema20_d1 DECIMAL(20,8) DEFAULT NULL,
             atr14_h1 DECIMAL(20,8) DEFAULT NULL,
+            htf_bias_high DECIMAL(20,8) DEFAULT NULL,
+            htf_bias_low DECIMAL(20,8) DEFAULT NULL,
             source VARCHAR(20) NOT NULL DEFAULT 'mt5',
             calculated_at DATETIME NOT NULL,
             PRIMARY KEY  (id),
@@ -3360,7 +3362,8 @@ final class SMC_SuperFib_Sniper_REST {
 
     // POST /ea/regime-snapshot — ingest regime batch from MT5 EA.
     // Payload: { regimes: [ { user_id, symbol, htf_bias, ltf_regime,
-    //                         chop_score, ema20_d1, atr14_h1 }, ... ] }
+    //                         chop_score, ema20_d1, atr14_h1,
+    //                         htf_bias_high, htf_bias_low }, ... ] }
     public function post_ea_regime_snapshot(WP_REST_Request $request) {
         global $wpdb;
 
@@ -3389,6 +3392,8 @@ final class SMC_SuperFib_Sniper_REST {
             $chop_score = max(0.0, min(1.0, (float) ($entry['chop_score'] ?? 0.5)));
             $ema20_d1   = isset($entry['ema20_d1']) && is_numeric($entry['ema20_d1']) ? (float) $entry['ema20_d1'] : null;
             $atr14_h1   = isset($entry['atr14_h1']) && is_numeric($entry['atr14_h1']) ? (float) $entry['atr14_h1'] : null;
+            $htf_bias_high = isset($entry['htf_bias_high']) && is_numeric($entry['htf_bias_high']) ? (float) $entry['htf_bias_high'] : null;
+            $htf_bias_low  = isset($entry['htf_bias_low']) && is_numeric($entry['htf_bias_low']) ? (float) $entry['htf_bias_low'] : null;
 
             if ($symbol === '' || !in_array($htf_bias, $valid_bias, true) || !in_array($ltf_regime, $valid_regimes, true)) {
                 $failed++;
@@ -3405,10 +3410,12 @@ final class SMC_SuperFib_Sniper_REST {
                     'chop_score'    => $chop_score,
                     'ema20_d1'      => $ema20_d1,
                     'atr14_h1'      => $atr14_h1,
+                    'htf_bias_high' => $htf_bias_high,
+                    'htf_bias_low'  => $htf_bias_low,
                     'source'        => 'mt5',
                     'calculated_at' => $calculated_at,
                 ),
-                array('%d', '%s', '%s', '%s', '%f', $ema20_d1 !== null ? '%f' : 'NULL', $atr14_h1 !== null ? '%f' : 'NULL', '%s', '%s')
+                array('%d', '%s', '%s', '%s', '%f', $ema20_d1 !== null ? '%f' : 'NULL', $atr14_h1 !== null ? '%f' : 'NULL', $htf_bias_high !== null ? '%f' : 'NULL', $htf_bias_low !== null ? '%f' : 'NULL', '%s', '%s')
             );
 
             if ($result !== false) {
@@ -3448,7 +3455,7 @@ final class SMC_SuperFib_Sniper_REST {
             $values[] = $symbol;
         }
 
-        $sql  = $wpdb->prepare("SELECT symbol, htf_bias, ltf_regime, chop_score, ema20_d1, atr14_h1, calculated_at FROM {$table} {$where} ORDER BY symbol", ...$values);
+        $sql  = $wpdb->prepare("SELECT symbol, htf_bias, ltf_regime, chop_score, ema20_d1, atr14_h1, htf_bias_high, htf_bias_low, calculated_at FROM {$table} {$where} ORDER BY symbol", ...$values);
         $rows = $wpdb->get_results($sql, ARRAY_A);
 
         $regimes = array();
@@ -3460,6 +3467,8 @@ final class SMC_SuperFib_Sniper_REST {
                 'chopScore'     => (float) $row['chop_score'],
                 'ema20D1'       => $row['ema20_d1'] !== null ? (float) $row['ema20_d1'] : null,
                 'atr14H1'       => $row['atr14_h1'] !== null ? (float) $row['atr14_h1'] : null,
+                'htfBiasHigh'   => isset($row['htf_bias_high']) && $row['htf_bias_high'] !== null ? (float) $row['htf_bias_high'] : null,
+                'htfBiasLow'    => isset($row['htf_bias_low']) && $row['htf_bias_low'] !== null ? (float) $row['htf_bias_low'] : null,
                 'calculatedAt'  => $this->to_iso((string) $row['calculated_at']),
                 'source'        => 'mt5',
             );
@@ -5380,7 +5389,9 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function build_symbol_state($user_id, $symbol, $price) {
-        $candles = $this->fetch_candles($user_id, $symbol, '15min', 120);
+        $fib_candle_limit = max(120, $this->fib_history_window_size('15min'));
+        $fib_candles = $this->fetch_candles($user_id, $symbol, '15min', $fib_candle_limit);
+        $candles = count($fib_candles) > 120 ? array_slice($fib_candles, -120) : $fib_candles;
         $has_key = $this->get_twelve_key_status($user_id) === 'ok';
         $settings = $this->get_settings($user_id);
         $stale_threshold_sec = $settings['staleThresholdSec'];
@@ -5435,10 +5446,33 @@ final class SMC_SuperFib_Sniper_REST {
         $close = (float) $last['close'];
         $move = $close - (float) $first['close'];
         $position_ratio = (($high - $close) / $range) * 100;
-        $pd_state = $this->pd_state($position_ratio);
         $bias = $move > $range * 0.2 ? 'BULL' : ($move < -$range * 0.2 ? 'BEAR' : 'RANGING');
         $chop = round(max(0, min(1, 1 - (abs($move) / $range))), 2);
         $levels = $this->fib_levels($high, $low, 'LTF_SF');
+        $this->fib_context_symbol = $symbol;
+        $this->fib_context_timeframe = '15min';
+        $this->fib_context_tf_seconds = max(60, (int) $this->timeframe_seconds('15min'));
+        $authority_levels = $this->fib_levels_from_candles($fib_candles);
+        $authority_high = null;
+        $authority_low = null;
+        foreach ($authority_levels['HTF_AF'] as $level) {
+            if ((float) $level['ratio'] === 0.0) {
+                $authority_high = (float) $level['price'];
+            } elseif ((float) $level['ratio'] === 100.0) {
+                $authority_low = (float) $level['price'];
+            }
+        }
+        $authority_range_valid = $authority_high !== null && $authority_low !== null && $authority_high > $authority_low;
+        if ($authority_range_valid) {
+            $authority_range = $authority_high - $authority_low;
+            $authority_mid = $authority_low + ($authority_range * 0.5);
+            $authority_eq_buffer = $authority_range * 0.03;
+            $pd_state = $close > ($authority_mid + $authority_eq_buffer)
+                ? 'PREMIUM'
+                : ($close < ($authority_mid - $authority_eq_buffer) ? 'DISCOUNT' : 'EQUILIBRIUM');
+        } else {
+            $pd_state = $this->pd_state($position_ratio);
+        }
         $nearest = $this->nearest_level($levels, $close);
         $sequence = $this->sequence_state($candles);
         $direction = $position_ratio >= 62.5 ? 'LONG' : ($position_ratio <= 25 ? 'SHORT' : ($bias === 'BEAR' ? 'SHORT' : 'LONG'));
@@ -5483,7 +5517,14 @@ final class SMC_SuperFib_Sniper_REST {
         // CRITICAL HARDENING: Block gate when chop >= 0.7 (F3 caution zone).
         // SMC methodology requires no entries in high-chop equilibrium; this was
         // missing from the live backend while the mock data showed BLOCKED correctly.
-        if ($chop >= 0.7) {
+        if ($authority_range_valid && $pd_state === 'EQUILIBRIUM') {
+            $gate = array(
+                'symbol' => $symbol,
+                'allow'  => 'BLOCKED',
+                'reason' => 'AOV_EQUILIBRIUM_ZONE',
+                'state'  => $symbol_state,
+            );
+        } elseif ($chop >= 0.7) {
             $gate = array(
                 'symbol' => $symbol,
                 'allow'  => 'BLOCKED',

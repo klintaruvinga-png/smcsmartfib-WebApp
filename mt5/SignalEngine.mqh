@@ -111,7 +111,7 @@ public:
         double displBand = DISPLACEMENT_PIPS * pipSize;
 
         // --- Gate: skip CHOP regimes — signals require directional structure.
-        if (ltfRegime == "CHOP" && chopScore > 0.72)
+        if (ltfRegime == "CHOP" && chopScore >= 0.70)
             return false;
 
         // --- Find the nearest fib level to current price ---
@@ -144,7 +144,7 @@ public:
         string zoneLabel = ValueZoneStateToString(zoneState);
 
         // --- Direction from HTF bias and price relative to fib ---
-        string direction = DetermineDirection(htfBias, mid, trig.price);
+        string direction = DetermineDirection(htfBias, mid, trig.price, trig.ratio);
 
         if (zoneState == VALUE_ZONE_EQUILIBRIUM)
         {
@@ -155,6 +155,12 @@ public:
         if (IsRatioMatch(trig.ratio, 50.0))
         {
             LogCandidateDecision(normalizedSymbol, trig, zoneLabel, 0.0, "AOV_EQUILIBRIUM_LEVEL");
+            return false;
+        }
+
+        if (!LevelRoleMatchesDirection(htfBias, trig.ratio, direction))
+        {
+            LogCandidateDecision(normalizedSymbol, trig, zoneLabel, 0.0, "AOV_LEVEL_POLARITY_MISMATCH");
             return false;
         }
 
@@ -329,8 +335,12 @@ private:
         return foundHigh && foundLow && outHigh > outLow;
     }
 
-    string DetermineDirection(string htfBias, double mid, double fibPrice)
+    string DetermineDirection(string htfBias, double mid, double fibPrice, double ratio)
     {
+        if (htfBias == "BEAR" && LevelIsHistoricalSupport(ratio))
+            return "SHORT";
+        if (htfBias == "BULL" && LevelIsHistoricalResistance(ratio))
+            return "LONG";
         if (htfBias == "BULL")
             return (mid < fibPrice) ? "LONG" : "SHORT";
         if (htfBias == "BEAR")
@@ -338,6 +348,30 @@ private:
 
         // TRANSITIONAL: direction from price side relative to the trigger level.
         return (mid < fibPrice) ? "LONG" : "SHORT";
+    }
+
+    bool LevelIsHistoricalSupport(double ratio)
+    {
+        return IsRatioMatch(ratio, 62.5) ||
+               IsRatioMatch(ratio, 75.0) ||
+               IsRatioMatch(ratio, 100.0);
+    }
+
+    bool LevelIsHistoricalResistance(double ratio)
+    {
+        return IsRatioMatch(ratio, 0.0) ||
+               IsRatioMatch(ratio, 25.0);
+    }
+
+    bool LevelRoleMatchesDirection(string htfBias, double ratio, string direction)
+    {
+        if (IsRatioMatch(ratio, 50.0))
+            return false;
+        if (htfBias == "BULL")
+            return direction == "LONG";
+        if (htfBias == "BEAR")
+            return direction == "SHORT";
+        return true;
     }
 
     int ResolveValueZoneState(double price, double high, double low)

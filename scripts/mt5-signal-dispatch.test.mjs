@@ -28,7 +28,17 @@ describe("MT5 signal dispatch parity guard", () => {
     expect(fibEngine).toContain('int chartTfSeconds[3] = {900, 3600, 14400};');
     expect(fibEngine).toContain('string tfNames[3] = {"M15", "H1", "H4"};');
     expect(regimeEngine).toContain("bool ComputeRegimeState(string symbol, RegimeSnapshotOut& out)");
+    expect(regimeEngine).toContain("double htfBiasHigh;");
+    expect(regimeEngine).toContain("double htfBiasLow;");
+    expect(regimeEngine).toContain('\\"htf_bias_high\\"');
+    expect(regimeEngine).toContain('\\"htf_bias_low\\"');
+    expect(regimeEngine).toContain("CopyHigh(symbol, PERIOD_D1, 1,");
+    expect(regimeEngine).toContain("CopyLow(symbol, PERIOD_D1, 1,");
     expect(signalEngine).toContain("TryGetAuthorityRange(fibLevels, fibCount, trig.timeframe,");
+    expect(signalEngine).toContain('if (ltfRegime == "CHOP" && chopScore >= 0.70)');
+    expect(signalEngine).toContain("DetermineDirection(htfBias, mid, trig.price, trig.ratio)");
+    expect(signalEngine).toContain("LevelRoleMatchesDirection(htfBias, trig.ratio, direction)");
+    expect(signalEngine).toContain("AOV_LEVEL_POLARITY_MISMATCH");
     expect(signalEngine).toContain("ComputeFibTP(fibLevels, fibCount, trig, direction, pipSize)");
     expect(signalEngine).toContain("fibLevels[i].timeframe != trigger.timeframe");
     expect(signalEngine).toContain("fibLevels[i].family != trigger.family");
