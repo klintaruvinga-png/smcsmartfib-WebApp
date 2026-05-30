@@ -26,6 +26,7 @@ import type {
   Position,
   RegimeState,
   RiskProfile,
+  LiveSignalsResponse,
   SignalCandidate,
   Symbol,
   SymbolDiagnostic,
@@ -151,6 +152,15 @@ type RawUserProgressResponse = {
   };
   generated_at?: string;
 };
+
+function normalizeLiveSignalsResponse(
+  raw: LiveSignalsResponse | SignalCandidate[],
+): SignalCandidate[] {
+  if (Array.isArray(raw)) return raw;
+  if (raw && Array.isArray(raw.signals)) return raw.signals;
+
+  throw new Error("/live-signals: backend response missing signals array");
+}
 
 function requireWatchlistResponse(path: string, watchlist: Symbol[] | undefined): Symbol[] {
   if (!Array.isArray(watchlist)) {
@@ -452,7 +462,10 @@ export const apiClient = {
       const wl = new Set(mockSettings.watchlist);
       return mockSignals.filter((s) => wl.has(s.symbol));
     }
-    return call<SignalCandidate[]>("/live-signals", { cacheBust: true });
+    const raw = await call<LiveSignalsResponse | SignalCandidate[]>("/live-signals", {
+      cacheBust: true,
+    });
+    return normalizeLiveSignalsResponse(raw);
   },
   async getLadders(symbol?: Symbol, mock = MOCK_MODE): Promise<TradePlan[]> {
     if (mock) return [mockPlan];

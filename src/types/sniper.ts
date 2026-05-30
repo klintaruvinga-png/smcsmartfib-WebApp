@@ -162,7 +162,6 @@ export interface SignalCandidate {
   backendConfirmed: boolean;
   engineBlocker?: EngineBlocker;
   createdAt: string;
-  polledAt?: string;
   engine?: {
     htfBias: "BULL" | "BEAR" | "TRANSITIONAL";
     pdState: PdState;
@@ -177,6 +176,11 @@ export interface SignalCandidate {
     chartState: string;
     panelState: string | null;
   };
+}
+
+export interface LiveSignalsResponse {
+  signals: SignalCandidate[];
+  polledAt: string;
 }
 
 export interface TradePlan {

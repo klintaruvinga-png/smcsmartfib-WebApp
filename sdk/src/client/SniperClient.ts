@@ -15,6 +15,7 @@ import type {
   RiskProfile,
   SessionInfo,
   SignalCandidate,
+  LiveSignalsResponse,
   SoakCheckpointRow,
   SoakEvidencePayload,
   SoakEvidenceRow,
@@ -153,6 +154,15 @@ function normalizeOrder(r: RawOrder): PendingOrder {
     placedAt: r.placed_at ?? new Date(0).toISOString(),
     state: r.freshness ?? "unavailable",
   };
+}
+
+function normalizeLiveSignalsResponse(
+  raw: LiveSignalsResponse | SignalCandidate[],
+): SignalCandidate[] {
+  if (Array.isArray(raw)) return raw;
+  if (raw && Array.isArray(raw.signals)) return raw.signals;
+
+  throw new ApiError("/live-signals", 200, "backend response missing signals array");
 }
 
 function normalizeSnapshot(raw: {
@@ -302,7 +312,8 @@ export class SniperClient {
   }
 
   async getLiveSignals(): Promise<SignalCandidate[]> {
-    return this.request("/live-signals");
+    const raw = await this.request<LiveSignalsResponse | SignalCandidate[]>("/live-signals");
+    return normalizeLiveSignalsResponse(raw);
   }
 
   async getLadders(symbol?: Symbol): Promise<TradePlan[]> {

@@ -206,6 +206,7 @@ describe("useLiveSignals", () => {
       queryKey: ["live-signals"],
       enabled: true,
       staleTime: 0,
+      structuralSharing: false,
       refetchInterval: 5_000,
     });
   });

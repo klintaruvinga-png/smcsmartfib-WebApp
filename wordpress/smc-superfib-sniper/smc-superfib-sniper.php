@@ -4992,16 +4992,10 @@ final class SMC_SuperFib_Sniper_REST {
     public function get_live_signals() {
         $user_id = get_current_user_id();
         $snapshot = $this->ensure_engine_snapshot($user_id);
-        $polled_at = gmdate('c');
-        $signals = array_map(function ($signal) use ($polled_at) {
-            if (!is_array($signal)) {
-                return $signal;
-            }
-
-            $signal['polledAt'] = $polled_at;
-            return $signal;
-        }, is_array($snapshot['signals'] ?? null) ? $snapshot['signals'] : array());
-        $response = rest_ensure_response($signals);
+        $response = rest_ensure_response(array(
+            'signals' => is_array($snapshot['signals'] ?? null) ? $snapshot['signals'] : array(),
+            'polledAt' => gmdate('c'),
+        ));
         $response->header('Cache-Control', 'no-store, no-cache, must-revalidate');
         $response->header('Pragma', 'no-cache');
         return $response;
