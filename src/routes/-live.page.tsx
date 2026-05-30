@@ -25,6 +25,7 @@ import type {
   RegimeState,
   GateState,
   SymbolDiagnostic,
+  FreshnessState,
 } from "@/types/sniper";
 
 function blockerWarning(blocker: EngineBlocker | undefined): string | null {
@@ -36,6 +37,7 @@ function blockerWarning(blocker: EngineBlocker | undefined): string | null {
     QUOTE_UNAVAILABLE: "Price unavailable",
     PRICE_STALE: "Price data stale",
     PRICE_NOT_MT5_FRESH: "No fresh MT5 price",
+    CLOSED_SESSION: "Equity index regular session closed",
     CANDLES_MISSING: "No candle history",
     CANDLES_STALE: "Candles stale (>2 h old)",
     INSUFFICIENT_CANDLE_HISTORY: "Insufficient candle history (<30 bars)",
@@ -230,9 +232,16 @@ function PriceCard({
   );
 
   // Preserve backend freshness authority. Do not reclassify cards from browser-clock math.
-  const stale = price.state === "stale" || regime?.state === "stale";
+  const displayState: FreshnessState =
+    diagnostic?.priceState === "closed_session" ||
+    regime?.state === "closed_session" ||
+    gate?.state === "closed_session"
+      ? "closed_session"
+      : price.state;
+  const stale = displayState === "stale" || regime?.state === "stale";
+  const closedSession = displayState === "closed_session";
   const priceUnavailable =
-    price.mid === 0 && (price.state === "unavailable" || gate?.allow === "BLOCKED");
+    price.mid === 0 && (displayState === "unavailable" || gate?.allow === "BLOCKED");
   const diagWarning = blockerWarning(diagnostic?.engineBlocker);
   const diagLevel =
     diagnostic?.engineBlocker === "KEY_MISSING" ||
@@ -242,8 +251,9 @@ function PriceCard({
       : "warn";
   const staleTimestamp = diagnostic?.lastPriceAt ?? price.updatedAt;
   const restTickDir = heldMidDir;
+  const canAnimateTicks = displayState === "live" || displayState === "mock";
   const canHoldTheme =
-    !priceUnavailable && !stale && price.state !== "unavailable" && gate?.allow !== "BLOCKED";
+    canAnimateTicks && !priceUnavailable && !stale && !closedSession && gate?.allow !== "BLOCKED";
 
   useEffect(() => {
     if (diagnostic?.engineBlocker === "RATE_LIMITED") {
@@ -260,18 +270,20 @@ function PriceCard({
     <div
       className={cn(
         "rounded-lg border bg-bg1/60 p-3.5 space-y-3 transition-colors",
-        price.state === "unavailable" || gate?.allow === "BLOCKED"
+        displayState === "unavailable" || gate?.allow === "BLOCKED"
           ? "border-sell/30"
-          : stale
-            ? "border-warn/30"
-            : "border-bd",
+          : closedSession
+            ? "border-info/30"
+            : stale
+              ? "border-warn/30"
+              : "border-bd",
         canHoldTheme && restTickDir === "up" && "tick-surface-hold-up",
         canHoldTheme && restTickDir === "down" && "tick-surface-hold-down",
       )}
     >
       <div className="flex items-center justify-between">
         <div className="font-mono text-base font-semibold">{price.symbol}</div>
-        <FreshnessBadge state={price.state} />
+        <FreshnessBadge state={displayState} />
       </div>
 
       <div className="flex items-baseline justify-between">
@@ -279,10 +291,10 @@ function PriceCard({
           style={midTickStyle}
           className={cn(
             "font-mono text-2xl font-semibold tabular-nums rounded px-1 -mx-1 price-smooth",
-            heldMidDir === "up" && "tick-hold-up",
-            heldMidDir === "down" && "tick-hold-down",
-            midDir === "up" && "tick-flash-up",
-            midDir === "down" && "tick-flash-down",
+            canAnimateTicks && heldMidDir === "up" && "tick-hold-up",
+            canAnimateTicks && heldMidDir === "down" && "tick-hold-down",
+            canAnimateTicks && midDir === "up" && "tick-flash-up",
+            canAnimateTicks && midDir === "down" && "tick-flash-down",
           )}
         >
           {priceUnavailable ? "--" : fmtPrice(animatedMid ?? price.mid, price.symbol)}
@@ -297,10 +309,10 @@ function PriceCard({
           style={bidTickStyle}
           className={cn(
             "font-mono tabular-nums rounded px-1 -mx-1 price-smooth",
-            heldBidDir === "up" && "tick-hold-up",
-            heldBidDir === "down" && "tick-hold-down",
-            bidDir === "up" && "tick-flash-up-fast",
-            bidDir === "down" && "tick-flash-down-fast",
+            canAnimateTicks && heldBidDir === "up" && "tick-hold-up",
+            canAnimateTicks && heldBidDir === "down" && "tick-hold-down",
+            canAnimateTicks && bidDir === "up" && "tick-flash-up-fast",
+            canAnimateTicks && bidDir === "down" && "tick-flash-down-fast",
           )}
         >
           BID {priceUnavailable ? "--" : fmtPrice(animatedBid ?? price.bid, price.symbol)}
@@ -309,10 +321,10 @@ function PriceCard({
           style={askTickStyle}
           className={cn(
             "font-mono tabular-nums rounded px-1 -mx-1 price-smooth",
-            heldAskDir === "up" && "tick-hold-up",
-            heldAskDir === "down" && "tick-hold-down",
-            askDir === "up" && "tick-flash-up-fast",
-            askDir === "down" && "tick-flash-down-fast",
+            canAnimateTicks && heldAskDir === "up" && "tick-hold-up",
+            canAnimateTicks && heldAskDir === "down" && "tick-hold-down",
+            canAnimateTicks && askDir === "up" && "tick-flash-up-fast",
+            canAnimateTicks && askDir === "down" && "tick-flash-down-fast",
           )}
         >
           ASK {priceUnavailable ? "--" : fmtPrice(animatedAsk ?? price.ask, price.symbol)}

@@ -8,6 +8,7 @@ const STYLES: Record<FreshnessState, { label: string; cls: string }> = {
   blocked: { label: "BLOCKED", cls: "bg-sell/15 text-sell border-sell/40" },
   offline: { label: "OFFLINE", cls: "bg-sell/15 text-sell border-sell/40" },
   "pending-sync": { label: "SYNCING", cls: "bg-info/15 text-info border-info/40" },
+  closed_session: { label: "CLOSED", cls: "bg-info/15 text-info border-info/40" },
   mock: { label: "MOCK", cls: "bg-violet/15 text-violet border-violet/40" },
 };
 

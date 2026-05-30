@@ -219,6 +219,12 @@ public:
         else
             status = "READY";
 
+        // HARDENING: HTF-opposed setups must not reach READY even if the other
+        // gates close. Keep them capped at ARMED.
+        if (htfOpposed && status == "READY") {
+            status = "ARMED";
+        }
+
         // --- Confidence score ---
         double confidence = (double) gates / 4.0;
         if (htfAligned)

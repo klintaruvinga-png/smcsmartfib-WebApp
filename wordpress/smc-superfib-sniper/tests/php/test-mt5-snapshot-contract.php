@@ -247,6 +247,39 @@ if (!class_exists('TestWpdb')) {
         }
 
         public function get_row($query, $output = ARRAY_A) {
+            if (preg_match("/SELECT \\* FROM ([^\\s]+)\\s+WHERE user_id = (\\d+) AND symbol = '([^']+)' AND fib_family = '([^']*)' AND fib_ratio = ([0-9.]+)\\s+AND fib_level IS NOT NULL AND fib_level BETWEEN ([0-9.\\-]+) AND ([0-9.\\-]+) AND direction = '([^']+)'\\s+ORDER BY created_at DESC LIMIT 1/s", $query, $m)) {
+                $table = $m[1];
+                $user_id = (int) $m[2];
+                $symbol = $m[3];
+                $fib_family = $m[4];
+                $fib_ratio = (float) $m[5];
+                $min_fib_level = (float) $m[6];
+                $max_fib_level = (float) $m[7];
+                $direction = $m[8];
+                $latest = null;
+                foreach ($this->tables[$table] ?? array() as $row) {
+                    if ((int) ($row['user_id'] ?? 0) !== $user_id) {
+                        continue;
+                    }
+                    if (($row['symbol'] ?? '') !== $symbol || ($row['direction'] ?? '') !== $direction || ($row['fib_family'] ?? '') !== $fib_family) {
+                        continue;
+                    }
+                    if (abs((float) ($row['fib_ratio'] ?? 0) - $fib_ratio) > 0.0000001) {
+                        continue;
+                    }
+                    if (!isset($row['fib_level']) || !is_numeric($row['fib_level'])) {
+                        continue;
+                    }
+                    $row_fib_level = (float) $row['fib_level'];
+                    if ($row_fib_level < $min_fib_level || $row_fib_level > $max_fib_level) {
+                        continue;
+                    }
+                    if ($latest === null || strcmp((string) ($row['created_at'] ?? ''), (string) ($latest['created_at'] ?? '')) > 0) {
+                        $latest = $row;
+                    }
+                }
+                return $latest;
+            }
             if (preg_match("/SELECT \\* FROM ([^\\s]+)\\s+WHERE user_id = (\\d+) AND symbol = '([^']+)' AND direction = '([^']+)' AND fib_family = '([^']*)' AND fib_ratio = ([0-9.]+)\\s+AND fib_level IS NOT NULL AND fib_level BETWEEN ([0-9.\\-]+) AND ([0-9.\\-]+)\\s+ORDER BY created_at DESC LIMIT 1/s", $query, $m)) {
                 $table = $m[1];
                 $user_id = (int) $m[2];
@@ -1148,6 +1181,38 @@ $determineBlocker->setAccessible(true);
 $staleBlocker = $determineBlocker->invoke($instance, 7, $staleQuote, $staleCandles, false, 'WATCH', 'EURUSD');
 assert_same('PRICE_STALE', $staleBlocker, 'EA-authoritative stale symbols must not surface RATE_LIMITED from stale Twelve Data cooldown state');
 
+
+$closedSessionFreshCandles = array();
+for ($i = 29; $i >= 0; $i--) {
+    $closedSessionFreshCandles[] = array(
+        'time' => gmdate('c', time() - ($i * 60)),
+        'open' => 18450.0,
+        'high' => 18460.0,
+        'low' => 18440.0,
+        'close' => 18455.0,
+    );
+}
+$closedSessionQuote = array(
+    'symbol' => 'NAS100',
+    'bid' => 18455.0,
+    'ask' => 18456.0,
+    'mid' => 18455.5,
+    'source' => 'mt5',
+    'state' => 'live',
+    'updatedAt' => gmdate('c'),
+);
+$closedSessionBlocker = $determineBlocker->invoke($instance, 7, $closedSessionQuote, $closedSessionFreshCandles, true, 'READY', 'NAS100', null, false, true);
+assert_same('CLOSED_SESSION', $closedSessionBlocker, 'Fresh NAS100 snapshots during the closed regular session must not be backend-confirmable as live data');
+
+$applyClosedSessionPriceStates = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'apply_closed_session_price_states');
+$applyClosedSessionPriceStates->setAccessible(true);
+$closedSessionPrices = $applyClosedSessionPriceStates->invoke($instance, array($closedSessionQuote), array(array(
+    'symbol' => 'NAS100',
+    'priceState' => 'closed_session',
+    'engineBlocker' => 'CLOSED_SESSION',
+)));
+assert_same('closed_session', $closedSessionPrices[0]['state'] ?? null, 'Closed-session diagnostics must propagate to the rendered price snapshot state');
+
 $wpdb->replace($snapshotTable, array(
     'user_id' => 7,
     'symbol' => 'XAUUSD',
@@ -1506,6 +1571,67 @@ assert_true(is_array($preEntrySecondResponse) && !empty($preEntrySecondResponse[
 assert_true(isset($wpdb->tables[$candidateTable]['mt5-gbpusd-pre-1']), 'Pre-entry baseline candidate row should remain stored');
 assert_true(!isset($wpdb->tables[$candidateTable]['mt5-gbpusd-pre-2']), 'Pre-entry duplicate MT5 candidate must be suppressed while the prior signal remains valid');
 assert_same($preEntryCountBefore + 1, count($wpdb->tables[$candidateTable] ?? array()), 'Pre-entry suppression must keep one stored candidate for the same live range');
+
+
+$wpdb->replace($snapshotTable, array(
+    'user_id' => 7,
+    'symbol' => 'USDCHF',
+    'bid' => 0.9200,
+    'ask' => 0.9202,
+    'mid' => 0.9201,
+    'change_pct_1d' => 0.1,
+    'source' => 'mt5',
+    'updated_at' => $tradeTelemetrySeenAt,
+    'state' => 'live',
+));
+$directionFlipCountBefore = count($wpdb->tables[$candidateTable] ?? array());
+$directionFlipShortResponse = $instance->post_ea_signal_candidates(new WP_REST_Request(array(
+    'candidates' => array(
+        array(
+            'id' => 'mt5-usdchf-flip-short',
+            'symbol' => 'USDCHF',
+            'direction' => 'SHORT',
+            'status' => 'READY',
+            'verdict' => 'A',
+            'entry_price' => 0.9195,
+            'sl_price' => 0.9220,
+            'tp_price' => 0.9145,
+            'fib_level' => 0.9200,
+            'fib_ratio' => 61.8,
+            'fib_family' => 'LTF_SF',
+            'htf_bias' => 'BEAR',
+            'ltf_regime' => 'TRENDING',
+            'confidence' => 0.8,
+            'created_at' => gmdate('Y-m-d H:i:s', time() - 120),
+        ),
+    ),
+)));
+assert_true(is_array($directionFlipShortResponse) && !empty($directionFlipShortResponse['ok']), 'Direction-flip baseline MT5 candidate ingest should accept the first candidate');
+$directionFlipLongResponse = $instance->post_ea_signal_candidates(new WP_REST_Request(array(
+    'candidates' => array(
+        array(
+            'id' => 'mt5-usdchf-flip-long',
+            'symbol' => 'USDCHF',
+            'direction' => 'LONG',
+            'status' => 'READY',
+            'verdict' => 'A',
+            'entry_price' => 0.9210,
+            'sl_price' => 0.9185,
+            'tp_price' => 0.9260,
+            'fib_level' => 0.92005,
+            'fib_ratio' => 61.8,
+            'fib_family' => 'LTF_SF',
+            'htf_bias' => 'BULL',
+            'ltf_regime' => 'TRENDING',
+            'confidence' => 0.82,
+            'created_at' => gmdate('Y-m-d H:i:s', time() - 60),
+        ),
+    ),
+)));
+assert_true(is_array($directionFlipLongResponse) && !empty($directionFlipLongResponse['ok']), 'Opposite-direction MT5 candidate should return a successful response');
+assert_true(isset($wpdb->tables[$candidateTable]['mt5-usdchf-flip-short']), 'Direction-flip baseline candidate row should remain stored');
+assert_true(isset($wpdb->tables[$candidateTable]['mt5-usdchf-flip-long']), 'Opposite-direction READY candidate at the same fib range must be accepted');
+assert_same($directionFlipCountBefore + 2, count($wpdb->tables[$candidateTable] ?? array()), 'MT5 lifecycle duplicate lookup must be scoped to the incoming direction');
 
 $wpdb->replace($snapshotTable, array(
     'user_id' => 7,
