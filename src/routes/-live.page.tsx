@@ -36,6 +36,7 @@ function blockerWarning(blocker: EngineBlocker | undefined): string | null {
     QUOTE_UNAVAILABLE: "Price unavailable",
     PRICE_STALE: "Price data stale",
     PRICE_NOT_MT5_FRESH: "No fresh MT5 price",
+    CLOSED_SESSION: "Equity index regular session closed",
     CANDLES_MISSING: "No candle history",
     CANDLES_STALE: "Candles stale (>2 h old)",
     INSUFFICIENT_CANDLE_HISTORY: "Insufficient candle history (<30 bars)",

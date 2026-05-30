@@ -5,6 +5,7 @@ export type FreshnessState =
   | "blocked"
   | "offline"
   | "pending-sync"
+  | "closed_session"
   | "mock";
 
 export type EngineBlocker =
@@ -14,6 +15,7 @@ export type EngineBlocker =
   | "QUOTE_UNAVAILABLE"
   | "PRICE_STALE"
   | "PRICE_NOT_MT5_FRESH"
+  | "CLOSED_SESSION"
   | "CANDLES_MISSING"
   | "CANDLES_STALE"
   | "INSUFFICIENT_CANDLE_HISTORY"
@@ -26,7 +28,7 @@ export type PriceSource = "mt5" | "twelve-data" | "unknown" | "mock";
 export interface SymbolDiagnostic {
   symbol: Symbol;
   priceState: FreshnessState;
-  candleState: "live" | "stale" | "missing" | "not_checked";
+  candleState: "live" | "stale" | "missing" | "closed_session" | "not_checked";
   lastPriceAt: string | null;
   lastCandleAt: string | null;
   candleCount: number;

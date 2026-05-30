@@ -3843,7 +3843,7 @@ final class SMC_SuperFib_Sniper_REST {
             $prior_candidate = $this->find_latest_mt5_candidate_for_range(
                 $user_id,
                 $symbol,
-                null,
+                $direction,
                 $fib_family,
                 $fib_ratio,
                 $fib_level
@@ -5606,7 +5606,7 @@ final class SMC_SuperFib_Sniper_REST {
         $prior_candidate = $this->find_latest_mt5_candidate_for_range(
             $user_id,
             $symbol,
-            null,
+            $direction,
             'LTF_SF',
             isset($nearest['ratio']) ? (float) $nearest['ratio'] : null,
             isset($nearest['price']) ? (float) $nearest['price'] : null
@@ -5652,10 +5652,10 @@ final class SMC_SuperFib_Sniper_REST {
         $price_is_live  = isset($price['state']) && $price['state'] === 'live';
         $candle_age_sec = $last_candle ? (time() - strtotime($last_candle['time'])) : PHP_INT_MAX;
         $candles_fresh  = $last_candle && $candle_age_sec <= 7200;
-        $data_live      = $price_is_live && $candles_fresh;
         $is_equity_off_session = $this->is_equity_index_off_session($symbol);
-        $symbol_state   = $data_live ? 'live' : ($is_equity_off_session ? 'closed_session' : 'stale');
-        $candle_state   = empty($candles) ? 'missing' : ($candles_fresh ? 'live' : ($is_equity_off_session ? 'closed_session' : 'stale'));
+        $data_live      = !$is_equity_off_session && $price_is_live && $candles_fresh;
+        $symbol_state   = $is_equity_off_session ? 'closed_session' : ($data_live ? 'live' : 'stale');
+        $candle_state   = empty($candles) ? 'missing' : ($is_equity_off_session ? 'closed_session' : ($candles_fresh ? 'live' : 'stale'));
 
         // CRITICAL HARDENING: Block gate when chop >= 0.7 (F3 caution zone).
         // SMC methodology requires no entries in high-chop equilibrium; this was
@@ -5699,7 +5699,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         // Anchor the signal identity to the latest analysed candle so the same setup stays stable
         // within one 15m bar, while later intraday setups get a distinct execution queue identity.
-        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol, $chop, $aov_equilibrium_blocked);
+        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol, $chop, $aov_equilibrium_blocked, $is_equity_off_session);
         $backend_confirmed = $status === 'READY' && $data_live && $engine_blocker === 'OK';
 
         $signal_anchor = $last_candle && !empty($last_candle['time']) ? $last_candle['time'] : gmdate('c');
@@ -5738,7 +5738,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         $diagnostic = array(
             'symbol' => $symbol,
-            'priceState' => $price['state'] ?? $symbol_state,
+            'priceState' => $symbol_state,
             'candleState' => $candle_state,
             'lastPriceAt' => $price['updatedAt'] ?? null,
             'lastCandleAt' => $last_candle ? $last_candle['time'] : null,
@@ -7815,7 +7815,7 @@ final class SMC_SuperFib_Sniper_REST {
     // Returns a single string reason explaining why a READY signal cannot be
     // backend-confirmed, or 'OK' when everything is healthy.
 
-    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol = null, $chop = null, $aov_equilibrium_blocked = false) {
+    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol = null, $chop = null, $aov_equilibrium_blocked = false, $is_equity_off_session = null) {
         $is_mt5_authority = false;
         if ($symbol !== null) {
             $is_mt5_authority = $this->is_mt5_authoritative($user_id, $symbol);
@@ -7856,6 +7856,11 @@ final class SMC_SuperFib_Sniper_REST {
 
         $last_candle = end($candles);
         $candle_age_sec = $last_candle ? (time() - strtotime($last_candle['time'])) : PHP_INT_MAX;
+
+        if ($is_equity_off_session === null && $symbol !== null) {
+            $is_equity_off_session = $this->is_equity_index_off_session($symbol);
+        }
+        if ($is_equity_off_session) return 'CLOSED_SESSION';
 
         if ($price_state === 'stale') return 'PRICE_STALE';
         if ($candle_age_sec > 7200) return 'CANDLES_STALE';
