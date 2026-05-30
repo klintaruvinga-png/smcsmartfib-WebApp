@@ -312,6 +312,14 @@ public:
         {
             string norm = symbolNormalizer.NormalizeSymbol(symbols[i]);
 
+            if (!IsLive(symbols[i]))
+            {
+                Print("[SignalEngine] Symbol not LIVE symbol=", symbols[i],
+                      " freshness=", FreshnessStateName(GetFreshnessState(symbols[i])),
+                      " — skipping candidate evaluation.");
+                continue;
+            }
+
             // Fetch fib levels for this symbol across the signal-selection set.
             // BuildSignalFibLevels() now aggregates M15, H1, and H4 levels.
             FibLevelOut fibLevels[];
