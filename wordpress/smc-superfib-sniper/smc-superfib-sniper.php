@@ -3843,7 +3843,7 @@ final class SMC_SuperFib_Sniper_REST {
             $prior_candidate = $this->find_latest_mt5_candidate_for_range(
                 $user_id,
                 $symbol,
-                $direction,
+                null,
                 $fib_family,
                 $fib_ratio,
                 $fib_level
@@ -3869,6 +3869,21 @@ final class SMC_SuperFib_Sniper_REST {
                     $this->audit($user_id, 'ea.signal_candidate_suppressed', $diagnostic);
                     error_log(sprintf(
                         '[SMC_SF] ea/signal-candidates suppressed prior=%s incoming=%s symbol=%s direction=%s basis=%s reason=%s',
+                        $diagnostic['prior_candidate_id'],
+                        $stored_id,
+                        $symbol,
+                        $direction,
+                        $lifecycle_state,
+                        $lifecycle_reason
+                    ));
+                    $suppressed++;
+                    continue;
+                }
+
+                if ($lifecycle_state === 'INACTIVE_DIRECTION_FLIP_UNCONFIRMED') {
+                    $this->audit($user_id, 'ea.signal_candidate_suppressed', $diagnostic);
+                    error_log(sprintf(
+                        '[SMC_SF] ea/signal-candidates direction-flip suppressed prior=%s incoming=%s symbol=%s direction=%s basis=%s reason=%s',
                         $diagnostic['prior_candidate_id'],
                         $stored_id,
                         $symbol,
@@ -3945,7 +3960,7 @@ final class SMC_SuperFib_Sniper_REST {
         ));
     }
 
-    private function find_latest_mt5_candidate_for_range(int $user_id, string $symbol, string $direction, string $fib_family, ?float $fib_ratio, ?float $fib_level) {
+    private function find_latest_mt5_candidate_for_range(int $user_id, string $symbol, ?string $direction, string $fib_family, ?float $fib_ratio, ?float $fib_level) {
         global $wpdb;
 
         if ($fib_family === '' || $fib_ratio === null || $fib_level === null) {
@@ -3956,19 +3971,26 @@ final class SMC_SuperFib_Sniper_REST {
         $min_fib_level = $fib_level - $price_tolerance;
         $max_fib_level = $fib_level + $price_tolerance;
 
-        $row = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM {$this->table('mt5_signal_candidates')}
-             WHERE user_id = %d AND symbol = %s AND direction = %s AND fib_family = %s AND fib_ratio = %f
-               AND fib_level IS NOT NULL AND fib_level BETWEEN %f AND %f
-             ORDER BY created_at DESC LIMIT 1",
+        $query = "SELECT * FROM {$this->table('mt5_signal_candidates')}
+             WHERE user_id = %d AND symbol = %s AND fib_family = %s AND fib_ratio = %f
+               AND fib_level IS NOT NULL AND fib_level BETWEEN %f AND %f";
+        $params = array(
             $user_id,
             $symbol,
-            $direction,
             $fib_family,
             $fib_ratio,
             $min_fib_level,
             $max_fib_level
-        ), ARRAY_A);
+        );
+
+        if ($direction !== null) {
+            $query .= " AND direction = %s";
+            $params[] = $direction;
+        }
+
+        $query .= "
+             ORDER BY created_at DESC LIMIT 1";
+        $row = $wpdb->get_row($wpdb->prepare($query, ...$params), ARRAY_A);
 
         return is_array($row) ? $row : null;
     }
@@ -4051,6 +4073,13 @@ final class SMC_SuperFib_Sniper_REST {
             return array(
                 'state' => 'INACTIVE_STOPPED_OUT',
                 'reason' => 'stop_loss_crossed',
+            );
+        }
+
+        if (strtoupper((string) ($prior_candidate['direction'] ?? '')) !== $direction) {
+            return array(
+                'state' => 'INACTIVE_DIRECTION_FLIP_UNCONFIRMED',
+                'reason' => 'opposite_direction_same_fib_unconfirmed',
             );
         }
 

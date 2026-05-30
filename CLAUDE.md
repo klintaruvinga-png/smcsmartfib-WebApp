@@ -13,6 +13,15 @@ be asked.
 - Always create a normal open PR. The PR-created Codex review stage depends
   on an active PR, not a draft PR.
 
+## SMC Superpowers Guidance
+
+- Follow root `AGENTS.md` and local skills in `skills/` before implementation.
+- Only open a PR after the final diff has been reviewed and approved.
+- Target the repository's active development branch rather than `main`, unless
+  the user explicitly directs otherwise.
+- Document agent assistance in the PR body if the change was generated or
+  guided by an AI workflow.
+
 ## PR Review Fix Stage (Local Claude Code)
 
 After Codex opens a PR, the review-fix stage runs locally — not via GitHub Actions.
