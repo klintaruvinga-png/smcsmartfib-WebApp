@@ -118,6 +118,7 @@ export function useLiveSignals() {
     queryFn: () => apiClient.getLiveSignals(),
     enabled,
     staleTime: 0,
+    structuralSharing: false,
     refetchOnWindowFocus: false,
     refetchInterval: enabled ? pollMs : false,
   });
