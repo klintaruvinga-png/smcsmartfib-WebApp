@@ -1223,7 +1223,7 @@ $candleIndex = 0;
 for ($weekOffset = 5; $weekOffset >= 0; $weekOffset--) {
     for ($dayOffset = 0; $dayOffset < 5; $dayOffset++) {
         $timestamp = $currentWeekStart - ($weekOffset * 7 * 86400) + ($dayOffset * 86400);
-        if ($timestamp > time() - 900) {
+        if ($timestamp > time() - 900 || ($weekOffset === 0 && $dayOffset === 4)) {
             $timestamp = time() - 900;
         }
         $isAuthorityWeek = $weekOffset === 3;
@@ -1255,6 +1255,10 @@ $htfEquilibriumState = $buildSymbolState->invoke($instance, 7, $htfEquilibriumSy
 assert_same('BLOCKED', $htfEquilibriumState['gate']['allow'] ?? null, 'build_symbol_state must block entries inside the HTF authority equilibrium buffer');
 assert_same('AOV_EQUILIBRIUM_ZONE', $htfEquilibriumState['gate']['reason'] ?? null, 'build_symbol_state must report the AOV equilibrium-zone block reason');
 assert_same('EQUILIBRIUM', $htfEquilibriumState['signal']['engine']['pdState'] ?? null, 'build_symbol_state must derive pdState from HTF authority range, not the local M15 range');
+assert_true(($htfEquilibriumState['signal']['status'] ?? null) !== 'READY', 'AOV equilibrium-blocked signals must not remain READY');
+assert_same(false, $htfEquilibriumState['signal']['backendConfirmed'] ?? null, 'AOV equilibrium-blocked signals must not be backend-confirmed');
+assert_same('AOV_EQUILIBRIUM_ZONE', $htfEquilibriumState['signal']['engineBlocker'] ?? null, 'AOV equilibrium must surface as the signal engine blocker');
+assert_same(null, $htfEquilibriumState['plan'] ?? null, 'AOV equilibrium-blocked signals must not generate executable trade plans');
 
 $regimeTable = $wpdb->prefix . 'smc_sf_regime_snapshots';
 $wpdb->schemas[$regimeTable] = array_fill_keys(array(

@@ -5522,6 +5522,8 @@ final class SMC_SuperFib_Sniper_REST {
         $hta_override = $position_ratio < 0 || $position_ratio > 100;
         $status = 'WATCH';
 
+        $aov_equilibrium_blocked = $authority_range_valid && $pd_state === 'EQUILIBRIUM';
+
         if (!$sequence[$direction]['sweep']) {
             $status = 'WATCH';
         } elseif (!$sequence[$direction]['mss']) {
@@ -5529,6 +5531,11 @@ final class SMC_SuperFib_Sniper_REST {
         } elseif ($chop >= 0.7) {
             // CRITICAL: Block READY status when chop >= 0.7 (F3 caution zone).
             // SMC methodology requires no entries in high-chop equilibrium.
+            $status = 'ARMED';
+        } elseif ($aov_equilibrium_blocked) {
+            // CRITICAL: HTF authority equilibrium is a hard AOV block, not merely
+            // a gate decoration. Keep structurally complete setups unconfirmed so
+            // they cannot be persisted/executed as backend-confirmed READY signals.
             $status = 'ARMED';
         } else {
             $status = 'READY';
@@ -5559,7 +5566,7 @@ final class SMC_SuperFib_Sniper_REST {
         // CRITICAL HARDENING: Block gate when chop >= 0.7 (F3 caution zone).
         // SMC methodology requires no entries in high-chop equilibrium; this was
         // missing from the live backend while the mock data showed BLOCKED correctly.
-        if ($authority_range_valid && $pd_state === 'EQUILIBRIUM') {
+        if ($aov_equilibrium_blocked) {
             $gate = array(
                 'symbol' => $symbol,
                 'allow'  => 'BLOCKED',
@@ -5598,7 +5605,8 @@ final class SMC_SuperFib_Sniper_REST {
 
         // Anchor the signal identity to the latest analysed candle so the same setup stays stable
         // within one 15m bar, while later intraday setups get a distinct execution queue identity.
-        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol, $chop);
+        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol, $chop, $aov_equilibrium_blocked);
+        $backend_confirmed = $status === 'READY' && $data_live && $engine_blocker === 'OK';
 
         $signal_anchor = $last_candle && !empty($last_candle['time']) ? $last_candle['time'] : gmdate('c');
         $signal_id = 'sig-' . substr(md5($user_id . '|' . $symbol . '|' . $direction . '|' . $signal_anchor), 0, 16);
@@ -5611,9 +5619,10 @@ final class SMC_SuperFib_Sniper_REST {
             'verdict' => $this->verdict($status, $confluence, $chop),
             'computedBy' => 'backend',
             // CRITICAL HARDENING: Never backend-confirm a signal unless status is READY
-            // (which already incorporates chop gate blocking). Without this guard, 
-            // post_execute_signals() would still accept and queue non-READY signals.
-            'backendConfirmed' => $status === 'READY' && $data_live,
+            // and every hard backend gate is OK. Without this guard,
+            // post_execute_signals() would still accept and queue non-READY or
+            // gate-blocked signals.
+            'backendConfirmed' => $backend_confirmed,
             'engineBlocker' => $engine_blocker,
             'createdAt' => $signal_anchor,
             'engine' => array(
@@ -5646,7 +5655,7 @@ final class SMC_SuperFib_Sniper_REST {
             'regime' => $regime,
             'gate' => $gate,
             'signal' => $signal,
-            'plan' => $this->build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles),
+            'plan' => $backend_confirmed ? $this->build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles) : null,
             'diagnostic' => $diagnostic,
         );
     }
@@ -7681,7 +7690,7 @@ final class SMC_SuperFib_Sniper_REST {
     // Returns a single string reason explaining why a READY signal cannot be
     // backend-confirmed, or 'OK' when everything is healthy.
 
-    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol = null, $chop = null) {
+    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol = null, $chop = null, $aov_equilibrium_blocked = false) {
         $is_mt5_authority = false;
         if ($symbol !== null) {
             $is_mt5_authority = $this->is_mt5_authoritative($user_id, $symbol);
@@ -7733,6 +7742,11 @@ final class SMC_SuperFib_Sniper_REST {
         // can still queue a READY+confirmed signal even though the gate is BLOCKED,
         // breaking the chop-gate contract introduced by the gate patch.
         if ($chop !== null && (float) $chop >= 0.7) return 'CHOP_GATE_BLOCKED';
+
+        // CRITICAL HARDENING: HTF authority equilibrium is also a hard AOV block.
+        // It must suppress backend confirmation and plan generation, not just decorate
+        // the gate response as BLOCKED.
+        if ($aov_equilibrium_blocked) return 'AOV_EQUILIBRIUM_ZONE';
 
         return 'OK';
     }
