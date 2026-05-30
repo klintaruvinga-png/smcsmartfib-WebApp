@@ -7407,6 +7407,36 @@ final class SMC_SuperFib_Sniper_REST {
         return is_array($snapshot) ? $snapshot : null;
     }
 
+    private function apply_closed_session_price_states(array $prices, array $diagnostics): array {
+        $closed_symbols = array();
+        foreach ($diagnostics as $diagnostic) {
+            if (!is_array($diagnostic)) {
+                continue;
+            }
+            $symbol = strtoupper((string) ($diagnostic['symbol'] ?? ''));
+            if ($symbol !== '' && ($diagnostic['priceState'] ?? '') === 'closed_session') {
+                $closed_symbols[$symbol] = true;
+            }
+        }
+
+        if (empty($closed_symbols)) {
+            return $prices;
+        }
+
+        foreach ($prices as &$price) {
+            if (!is_array($price)) {
+                continue;
+            }
+            $symbol = strtoupper((string) ($price['symbol'] ?? ''));
+            if (isset($closed_symbols[$symbol])) {
+                $price['state'] = 'closed_session';
+            }
+        }
+        unset($price);
+
+        return $prices;
+    }
+
     private function ensure_engine_snapshot($user_id, $force = false) {
         $settings = $this->get_settings($user_id);
         $symbols = $settings['watchlist'];
@@ -7426,6 +7456,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         $prices = $this->refresh_prices($user_id, $symbols);
         $engine = $this->run_engine_for_symbols($user_id, $symbols, $prices, $force);
+        $prices = $this->apply_closed_session_price_states($prices, $engine['diagnostics'] ?? array());
         $snapshot = array(
             'prices' => $prices,
             'regimes' => $engine['regimes'],

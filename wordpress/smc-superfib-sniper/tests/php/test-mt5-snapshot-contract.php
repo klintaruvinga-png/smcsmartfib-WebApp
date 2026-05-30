@@ -1204,6 +1204,15 @@ $closedSessionQuote = array(
 $closedSessionBlocker = $determineBlocker->invoke($instance, 7, $closedSessionQuote, $closedSessionFreshCandles, true, 'READY', 'NAS100', null, false, true);
 assert_same('CLOSED_SESSION', $closedSessionBlocker, 'Fresh NAS100 snapshots during the closed regular session must not be backend-confirmable as live data');
 
+$applyClosedSessionPriceStates = new ReflectionMethod(SMC_SuperFib_Sniper_REST::class, 'apply_closed_session_price_states');
+$applyClosedSessionPriceStates->setAccessible(true);
+$closedSessionPrices = $applyClosedSessionPriceStates->invoke($instance, array($closedSessionQuote), array(array(
+    'symbol' => 'NAS100',
+    'priceState' => 'closed_session',
+    'engineBlocker' => 'CLOSED_SESSION',
+)));
+assert_same('closed_session', $closedSessionPrices[0]['state'] ?? null, 'Closed-session diagnostics must propagate to the rendered price snapshot state');
+
 $wpdb->replace($snapshotTable, array(
     'user_id' => 7,
     'symbol' => 'XAUUSD',
