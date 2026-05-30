@@ -178,6 +178,11 @@ export interface SignalCandidate {
   };
 }
 
+export interface LiveSignalsResponse {
+  signals: SignalCandidate[];
+  polledAt: string;
+}
+
 export interface TradePlan {
   signalId: string;
   symbol?: Symbol;

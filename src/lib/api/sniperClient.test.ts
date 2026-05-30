@@ -279,13 +279,18 @@ describe("Phase 2 telemetry client reads", () => {
   });
 
   it("requests live signals with a cache-bust token and no-store fetch cache", async () => {
+    const signals = [{ id: "EURUSD-LONG" }];
     const fetchMock = vi.fn(
-      async () => new Response(JSON.stringify([]), { status: 200, headers: { "Content-Type": "application/json" } }),
+      async () =>
+        new Response(JSON.stringify({ signals, polledAt: "2026-05-30T00:00:00+00:00" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
     );
 
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(apiClient.getLiveSignals(false)).resolves.toEqual([]);
+    await expect(apiClient.getLiveSignals(false)).resolves.toEqual(signals);
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringMatching(/\/sniper\/v1\/live-signals\?_=\d+$/),

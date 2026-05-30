@@ -195,6 +195,11 @@ export interface SignalCandidate {
   };
 }
 
+export interface LiveSignalsResponse {
+  signals: SignalCandidate[];
+  polledAt: string;
+}
+
 // ─── Trade plans ─────────────────────────────────────────────────────────────
 
 export interface TradePlan {

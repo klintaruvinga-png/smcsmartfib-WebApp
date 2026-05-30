@@ -2,39 +2,47 @@
 
 ## Issue summary
 
-Updated the Phase 4 migration governance docs so they accurately show the current blocker: corrected H4 runtime and a synthetic parity-validator PASS exist, but final live Phase 4 closeout is still blocked on paired MT5/Pine exports and manual scenario evidence.
+`/live-signals` returned signal objects that could stay structurally identical across repeated poll cycles when backend signal identity remained candle-anchored and unchanged. That blocked downstream frontend updates even though the route was being polled successfully.
 
 ## Root cause implemented
 
-Implemented a documentation hardening patch that separates repository-level synthetic validator evidence from final live paired-export gate evidence. This removes the ambiguity that could otherwise cause reviewers to think either that no parity artifact exists or that Phase 4 is already closed.
+Added a response-only `polledAt` timestamp inside `get_live_signals()` so each returned signal changes per poll response without altering stable backend signal identity, `createdAt`, engine computation, persistence, cache keys, or execution deduplication semantics.
 
 ## Exact files changed
 
-- `.github/migration/phase-updates/phase4-next-actions-checklist-2026-05-27.md`
-- `.github/migration-status.md`
-- `.github/migration/RISK_REGISTER.md`
-- `reports/codex-implementation.md`
+- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+- `wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
+- `src/types/sniper.ts`
+- `sdk/src/types/index.ts`
 
 ## Tests run
 
-- `rg -n "synthetic|paired|final gate|paired-export|self-test" .github/migration/phase-updates/phase4-next-actions-checklist-2026-05-27.md .github/migration-status.md .github/migration/RISK_REGISTER.md`
-- `rg -n '"gate": "PASS"|"overall_parity_pct": 100|"critical_mismatches_count": 0' reports/phase4-gate.json`
-- `rg -n "When --mt5-file and --pine-file are both absent|No input files provided - running synthetic self-test|both --mt5-file and --pine-file must be provided together" scripts/parity-validator.php`
-- `rg -n "mt5-levels\\.json|pine-levels\\.json|384 rows across \`24\`|Weekend gap and sparse-data|30-day" PHASE4_TESTING_GUIDE.md`
-- `git diff --stat -- .github/migration/phase-updates/phase4-next-actions-checklist-2026-05-27.md .github/migration-status.md .github/migration/RISK_REGISTER.md reports/codex-implementation.md`
-- `node scripts/validate-implementation.mjs`
+- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
+  - Expected failing TDD run completed before the route fix.
+- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+  - PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
+  - PASS
+- `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx src/routes/-signals.page.test.tsx src/routes/-plan.test.tsx`
+  - PASS
+- `npx tsc --noEmit`
+  - FAIL: existing unrelated `vite.config.ts` type mismatch (`test` is not a known property of `LovableViteTanstackOptions`)
+- `npm run validate:impl`
+  - PASS
 
 ## Reports generated
 
 - `reports/codex-implementation.md`
 - `reports/codex-implementation.meta.json`
+- `reports/implementation-verification.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-30_live-signals-polled-at-contract.md`
+- `.github/migration/audits/phase-2-dashboard-live-signals-polled-at-parity-2026-05-30.md`
 
 ## Remaining risks
 
-Final Phase 4 closure still depends on authenticated paired `mt5-levels.json` / `pine-levels.json` exports, a paired-input validator run that replaces the synthetic PASS artifact, and manual weekend-gap plus sparse-data validation evidence.
+- Manual authenticated verification against a live dashboard session is still required to confirm repeated `/live-signals` polls now trigger the expected frontend updates without any consumer path depending on object identity beyond the transport contract.
+- Repository-wide TypeScript validation remains blocked by the unrelated `vite.config.ts` config typing error.
 
 ## Any contract ambiguities resolved during implementation
 
-The contract required a workflow-state transition via command/script, but the repo CLI only exposes `research-start`, `planning-start`, and `print`. The current workflow state was already `READY_FOR_IMPLEMENTATION` with `editing_locked=false`, so no direct state mutation was needed and no manual JSON edit was made.
-
-The worktree already contained unrelated changes in `reports/` before implementation. For the contract's diff-scope validation, the smallest safe interpretation was to check `git diff --stat` against the intended Phase 4 documentation files and implementation artifacts only, rather than the full dirty worktree.
+- The local PHP test harness previously treated `rest_ensure_response()` as a raw pass-through for arrays. Wrapping every array globally would have widened scope and broken unrelated contract tests, so the harness now uses an opt-in response wrapper only for the new `/live-signals` header regression.
