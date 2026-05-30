@@ -5549,6 +5549,21 @@ final class SMC_SuperFib_Sniper_REST {
         $direction = $position_ratio >= 62.5 ? 'LONG' : ($position_ratio <= 25 ? 'SHORT' : ($bias === 'BEAR' ? 'SHORT' : 'LONG'));
         $f3_chop = ($position_ratio >= 37.5 && $position_ratio <= 62.5) || $chop >= 0.7 ? 'caution' : 'clear';
         $hta_override = $position_ratio < 0 || $position_ratio > 100;
+        $fundamental_bias = $this->get_symbol_fundamental_bias($symbol);
+        $fundamental_htf_bias = null;
+        $fundamental_htf_category = null;
+        $fundamental_htf_opposed = false;
+        if (is_array($fundamental_bias)) {
+            $fundamental_htf_category = $fundamental_bias['category'] ?? null;
+            if ($fundamental_htf_category === 'BULLISH') {
+                $fundamental_htf_bias = 'BULL';
+            } elseif ($fundamental_htf_category === 'BEARISH') {
+                $fundamental_htf_bias = 'BEAR';
+            }
+            $fundamental_htf_opposed = $fundamental_htf_bias !== null
+                && (($fundamental_htf_bias === 'BULL' && $direction === 'SHORT')
+                    || ($fundamental_htf_bias === 'BEAR' && $direction === 'LONG'));
+        }
         $status = 'WATCH';
 
         $aov_equilibrium_blocked = $authority_range_valid && $pd_state === 'EQUILIBRIUM';
@@ -5566,8 +5581,57 @@ final class SMC_SuperFib_Sniper_REST {
             // a gate decoration. Keep structurally complete setups unconfirmed so
             // they cannot be persisted/executed as backend-confirmed READY signals.
             $status = 'ARMED';
+        } elseif ($sequence[$direction]['displacement'] === 'weak') {
+            $status = 'ARMED';
+        } elseif ($fundamental_htf_opposed) {
+            // CRITICAL: Fundamental HTF bias opposes the signal direction.
+            // Do not allow a counter-bias setup to reach READY.
+            $status = 'ARMED';
         } else {
             $status = 'READY';
+        }
+
+        $entry_ratio = $direction === 'LONG' ? 62.5 : 25;
+        $stop_ratio = $direction === 'LONG' ? 75 : 0;
+        $entry_price = $this->price_for_ratio($high, $low, $entry_ratio);
+        $stop_price = $this->price_for_ratio($high, $low, $stop_ratio);
+        $tp1_price = $this->price_for_ratio($high, $low, 50);
+        $risk_unit = max(abs($entry_price - $stop_price), 0.00000001);
+        $tp1_rr = round(abs($tp1_price - $entry_price) / $risk_unit, 2);
+        if ($status === 'READY' && $tp1_rr < 1.0) {
+            $status = 'ARMED';
+        }
+
+        $lifecycle_diagnostic = null;
+        $prior_candidate = $this->find_latest_mt5_candidate_for_range(
+            $user_id,
+            $symbol,
+            null,
+            'LTF_SF',
+            isset($nearest['ratio']) ? (float) $nearest['ratio'] : null,
+            isset($nearest['price']) ? (float) $nearest['price'] : null
+        );
+
+        if (is_array($prior_candidate)) {
+            $lifecycle = $this->get_mt5_candidate_lifecycle_state($user_id, $symbol, $direction, $prior_candidate);
+            $lifecycle_state = (string) ($lifecycle['state'] ?? 'LIFECYCLE_UNRESOLVED');
+            $lifecycle_reason = (string) ($lifecycle['reason'] ?? '');
+            $prior_candidate_status = strtoupper((string) ($prior_candidate['status'] ?? ''));
+            $prior_candidate_is_ready = $prior_candidate_status === 'READY';
+            $lifecycle_diagnostic = array(
+                'state' => $lifecycle_state,
+                'reason' => $lifecycle_reason,
+                'candidateId' => (string) ($prior_candidate['id'] ?? ''),
+                'candidateDirection' => strtoupper((string) ($prior_candidate['direction'] ?? '')),
+                'priorCandidateStatus' => $prior_candidate_status,
+            );
+
+            if (in_array($lifecycle_state, array('ACTIVE_OPEN_POSITION', 'ACTIVE_PENDING_ORDER', 'ACTIVE_PRE_ENTRY'), true)) {
+                $status = 'WATCH';
+            } elseif ($status === 'READY' && $prior_candidate_is_ready) {
+                // Suppress repeated READY signals for the same MT5 candidate range.
+                $status = 'ARMED';
+            }
         }
 
         $confluence = array('HTA_SF', 'LTF_SF');
@@ -5589,8 +5653,9 @@ final class SMC_SuperFib_Sniper_REST {
         $candle_age_sec = $last_candle ? (time() - strtotime($last_candle['time'])) : PHP_INT_MAX;
         $candles_fresh  = $last_candle && $candle_age_sec <= 7200;
         $data_live      = $price_is_live && $candles_fresh;
-        $symbol_state   = $data_live ? 'live' : 'stale';
-        $candle_state   = empty($candles) ? 'missing' : ($candles_fresh ? 'live' : 'stale');
+        $is_equity_off_session = $this->is_equity_index_off_session($symbol);
+        $symbol_state   = $data_live ? 'live' : ($is_equity_off_session ? 'closed_session' : 'stale');
+        $candle_state   = empty($candles) ? 'missing' : ($candles_fresh ? 'live' : ($is_equity_off_session ? 'closed_session' : 'stale'));
 
         // CRITICAL HARDENING: Block gate when chop >= 0.7 (F3 caution zone).
         // SMC methodology requires no entries in high-chop equilibrium; this was
@@ -5656,6 +5721,7 @@ final class SMC_SuperFib_Sniper_REST {
             'createdAt' => $signal_anchor,
             'engine' => array(
                 'htfBias' => $bias === 'RANGING' ? 'TRANSITIONAL' : $bias,
+                'fundamentalBias' => $fundamental_htf_category ?? 'NEUTRAL',
                 'pdState' => $pd_state,
                 'drawOnLiquidity' => $direction === 'LONG' ? 'opposing buy-side liquidity' : 'opposing sell-side liquidity',
                 'sweep' => $sequence[$direction]['sweep'] ? 'present' : 'absent',
@@ -5678,6 +5744,8 @@ final class SMC_SuperFib_Sniper_REST {
             'lastCandleAt' => $last_candle ? $last_candle['time'] : null,
             'candleCount' => count($candles),
             'engineBlocker' => $engine_blocker,
+            'fundamentalBias' => $fundamental_htf_category ?? 'NEUTRAL',
+            'lifecycle' => $lifecycle_diagnostic,
         );
 
         return array(
@@ -6003,6 +6071,34 @@ final class SMC_SuperFib_Sniper_REST {
                 'mss' => $close < $internal_low && $displacement !== 'none',
                 'displacement' => $displacement,
             ),
+        );
+    }
+
+    private function get_symbol_fundamental_bias(string $symbol): ?array {
+        $pair = $this->split_symbol_pair($symbol);
+        if (!$pair) {
+            return null;
+        }
+
+        $currency = $pair[0];
+        if ($currency === '') {
+            return null;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'smc_sf_fundamental_bias';
+        $row = $wpdb->get_row($wpdb->prepare(
+            "SELECT composite_score, category FROM {$table} WHERE currency = %s LIMIT 1",
+            $currency
+        ), ARRAY_A);
+
+        if (!$row) {
+            return null;
+        }
+
+        return array(
+            'compositeScore' => isset($row['composite_score']) ? (float) $row['composite_score'] : 0.0,
+            'category' => isset($row['category']) ? (string) $row['category'] : 'NEUTRAL',
         );
     }
 
