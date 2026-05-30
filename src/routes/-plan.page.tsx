@@ -90,7 +90,8 @@ export function PlanPage() {
 
   const watchlistCandidates = candidatePool.filter(({ signal }) => watchlistSet.has(signal.symbol));
   const rankedWatchlistCandidates = [...watchlistCandidates].sort(compareRankedCandidates);
-  const topCandidates = rankedWatchlistCandidates.filter(hasRenderablePlan).slice(0, 3);
+  // Show all ranked candidates — cards render in "awaiting blueprint" state when no plan exists
+  const topCandidates = rankedWatchlistCandidates.slice(0, 3);
   const divergentCount = topCandidates.filter(
     ({ signal }) => signal.computedBy === "frontend" && !signal.backendConfirmed,
   ).length;

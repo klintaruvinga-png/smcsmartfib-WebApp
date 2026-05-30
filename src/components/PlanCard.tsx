@@ -30,7 +30,7 @@ export function PlanCandidateCard({
   planComplete,
 }: {
   signal: SignalCandidate;
-  plan: TradePlan;
+  plan: TradePlan | null;
   price?: PairPrice;
   planComplete: boolean;
 }) {
@@ -49,50 +49,54 @@ export function PlanCandidateCard({
     price && price.mid > 0 && (price.state === "live" || price.state === "mock"),
   );
   const divergence = signal.computedBy === "frontend" && !signal.backendConfirmed;
-  const executableStageLots = hasExecutableStageLots(plan);
-  const skippedStageLots = hasSkippedStageLots(plan);
-  const familyPill = plan.executionSource ?? plan.ladder?.e1.family;
-  const entryRows = [
-    {
-      stage: "E1",
-      entry: fmtPrice(plan.entries.e1, signal.symbol),
-      lot: formatLotSize(plan.lotSize.e1),
-      stop: fmtPrice(plan.stops?.e1 ?? plan.sl, signal.symbol),
-      target: formatOptionalPrice(plan.tps?.tp1, signal.symbol),
-    },
-    {
-      stage: "E2",
-      entry: fmtPrice(plan.entries.e2, signal.symbol),
-      lot: formatLotSize(plan.lotSize.e2),
-      stop: fmtPrice(plan.stops?.e2 ?? plan.sl, signal.symbol),
-      target: formatOptionalPrice(plan.tps?.tp2, signal.symbol),
-    },
-    {
-      stage: "E3",
-      entry: fmtPrice(plan.entries.e3, signal.symbol),
-      lot: formatLotSize(plan.lotSize.e3),
-      stop: fmtPrice(plan.stops?.e3 ?? plan.sl, signal.symbol),
-      target: formatOptionalPrice(plan.tps?.tp3, signal.symbol),
-    },
-  ];
-  const targetRows = [
-    {
-      label: "TP1",
-      price: formatOptionalPrice(plan.tps?.tp1, signal.symbol),
-      ratio: formatOptionalRatio(plan.rr?.tp1),
-    },
-    {
-      label: "TP2",
-      price: formatOptionalPrice(plan.tps?.tp2, signal.symbol),
-      ratio: formatOptionalRatio(plan.rr?.tp2),
-    },
-    {
-      label: "TP3",
-      price: formatOptionalPrice(plan.tps?.tp3, signal.symbol),
-      ratio: formatOptionalRatio(plan.rr?.tp3),
-    },
-  ];
-  const showLadderStatus = Boolean(plan.state || plan.stageFills);
+  const executableStageLots = plan ? hasExecutableStageLots(plan) : true;
+  const skippedStageLots = plan ? hasSkippedStageLots(plan) : false;
+  const familyPill = plan?.executionSource ?? plan?.ladder?.e1.family;
+  const entryRows = plan
+    ? [
+        {
+          stage: "E1",
+          entry: fmtPrice(plan.entries.e1, signal.symbol),
+          lot: formatLotSize(plan.lotSize.e1),
+          stop: fmtPrice(plan.stops?.e1 ?? plan.sl, signal.symbol),
+          target: formatOptionalPrice(plan.tps?.tp1, signal.symbol),
+        },
+        {
+          stage: "E2",
+          entry: fmtPrice(plan.entries.e2, signal.symbol),
+          lot: formatLotSize(plan.lotSize.e2),
+          stop: fmtPrice(plan.stops?.e2 ?? plan.sl, signal.symbol),
+          target: formatOptionalPrice(plan.tps?.tp2, signal.symbol),
+        },
+        {
+          stage: "E3",
+          entry: fmtPrice(plan.entries.e3, signal.symbol),
+          lot: formatLotSize(plan.lotSize.e3),
+          stop: fmtPrice(plan.stops?.e3 ?? plan.sl, signal.symbol),
+          target: formatOptionalPrice(plan.tps?.tp3, signal.symbol),
+        },
+      ]
+    : null;
+  const targetRows = plan
+    ? [
+        {
+          label: "TP1",
+          price: formatOptionalPrice(plan.tps?.tp1, signal.symbol),
+          ratio: formatOptionalRatio(plan.rr?.tp1),
+        },
+        {
+          label: "TP2",
+          price: formatOptionalPrice(plan.tps?.tp2, signal.symbol),
+          ratio: formatOptionalRatio(plan.rr?.tp2),
+        },
+        {
+          label: "TP3",
+          price: formatOptionalPrice(plan.tps?.tp3, signal.symbol),
+          ratio: formatOptionalRatio(plan.rr?.tp3),
+        },
+      ]
+    : null;
+  const showLadderStatus = Boolean(plan?.state || plan?.stageFills);
 
   return (
     <section
@@ -142,9 +146,13 @@ export function PlanCandidateCard({
           >
             {price ? fmtPrice(value ?? price.mid, signal.symbol) : "--"}
           </span>
-          <MetaChip tone={plan.source === "backend-blueprint" ? "buy" : "violet"}>
-            {plan.source}
-          </MetaChip>
+          {plan ? (
+            <MetaChip tone={plan.source === "backend-blueprint" ? "buy" : "violet"}>
+              {plan.source}
+            </MetaChip>
+          ) : (
+            <MetaChip tone="neutral">NO BLUEPRINT</MetaChip>
+          )}
           <MetaChip tone={signal.backendConfirmed ? "buy" : "warn"}>
             {signal.backendConfirmed ? "BACKEND OK" : "UNCONFIRMED"}
           </MetaChip>
@@ -158,86 +166,114 @@ export function PlanCandidateCard({
         </DivergenceBanner>
       )}
 
-      {!planComplete && (
+      {!planComplete && plan && (
         <WarningLine level="warn">
           Backend plan is missing TP2/TP3 or R:R values. Full 3-stage ladder is not confirmed.
           Execution blocked until the backend publishes a complete plan.
         </WarningLine>
       )}
 
-      {skippedStageLots && (
+      {skippedStageLots && plan && (
         <WarningLine level="warn">
           Backend plan contains stage lots below {MIN_EXECUTABLE_STAGE_LOT.toFixed(2)}. The backend
           will skip those stages and queue any remaining executable legs.
         </WarningLine>
       )}
 
-      {!executableStageLots && (
+      {!executableStageLots && plan && (
         <WarningLine level="warn">
           No backend stage lots meet the {MIN_EXECUTABLE_STAGE_LOT.toFixed(2)} execution minimum.
           Execution blocked until the backend publishes executable sizing.
         </WarningLine>
       )}
 
-      <div className="grid gap-3 xl:grid-cols-[1.8fr_1fr_1fr_1fr]">
-        <PlanSection title="Entries" tone="info">
-          <div className="grid grid-cols-[auto_repeat(4,minmax(0,1fr))] gap-x-2 gap-y-2 text-[10px] font-mono">
-            <SectionHeaderCell />
-            <SectionHeaderCell>Entry</SectionHeaderCell>
-            <SectionHeaderCell>Lot sizing</SectionHeaderCell>
-            <SectionHeaderCell>SL</SectionHeaderCell>
-            <SectionHeaderCell>TP</SectionHeaderCell>
-            {entryRows.map((row) => (
-              <EntryRow key={row.stage} {...row} />
-            ))}
-          </div>
-        </PlanSection>
-
-        <PlanSection title="Targets" tone="buy">
-          <div className="space-y-2">
-            {targetRows.map((target) => (
-              <StatRow
-                key={target.label}
-                label={target.label}
-                value={target.price}
-                sub={target.ratio}
-                valueClass="text-buy"
-              />
-            ))}
-          </div>
-        </PlanSection>
-
-        <PlanSection title="Stop & Risk" tone="sell">
-          <div className="space-y-2">
-            <StatRow label="SL" value={fmtPrice(plan.sl, signal.symbol)} valueClass="text-sell" />
-            <StatRow label="Risk" value={fmtUSC(plan.riskUSC)} sub={fmtZAR(plan.riskZAR)} />
-            <StatRow
-              label="DD impact"
-              value={fmtPct(plan.drawdownImpactPct)}
-              sub="of equity"
-              valueClass="text-warn"
-            />
-          </div>
-        </PlanSection>
-
-        {showLadderStatus && (
-          <PlanSection title="Ladder Status" tone="neutral">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-2 text-xs">
-                <span className="font-mono uppercase tracking-wider text-mute">State</span>
-                <span className="font-mono text-sm font-semibold">{plan.state ?? "--"}</span>
-              </div>
-              {plan.stageFills && (
-                <div className="grid grid-cols-3 gap-2">
-                  <StageStatusChip label="E1" filled={plan.stageFills.e1} />
-                  <StageStatusChip label="E2" filled={plan.stageFills.e2} />
-                  <StageStatusChip label="E3" filled={plan.stageFills.e3} />
-                </div>
-              )}
+      {plan ? (
+        <div className="grid gap-3 xl:grid-cols-[1.8fr_1fr_1fr_1fr]">
+          <PlanSection title="Entries" tone="info">
+            <div className="grid grid-cols-[auto_repeat(4,minmax(0,1fr))] gap-x-2 gap-y-2 text-[10px] font-mono">
+              <SectionHeaderCell />
+              <SectionHeaderCell>Entry</SectionHeaderCell>
+              <SectionHeaderCell>Lot sizing</SectionHeaderCell>
+              <SectionHeaderCell>SL</SectionHeaderCell>
+              <SectionHeaderCell>TP</SectionHeaderCell>
+              {entryRows!.map((row) => (
+                <EntryRow key={row.stage} {...row} />
+              ))}
             </div>
           </PlanSection>
-        )}
-      </div>
+
+          <PlanSection title="Targets" tone="buy">
+            <div className="space-y-2">
+              {targetRows!.map((target) => (
+                <StatRow
+                  key={target.label}
+                  label={target.label}
+                  value={target.price}
+                  sub={target.ratio}
+                  valueClass="text-buy"
+                />
+              ))}
+            </div>
+          </PlanSection>
+
+          <PlanSection title="Stop & Risk" tone="sell">
+            <div className="space-y-2">
+              <StatRow label="SL" value={fmtPrice(plan.sl, signal.symbol)} valueClass="text-sell" />
+              <StatRow label="Risk" value={fmtUSC(plan.riskUSC)} sub={fmtZAR(plan.riskZAR)} />
+              <StatRow
+                label="DD impact"
+                value={fmtPct(plan.drawdownImpactPct)}
+                sub="of equity"
+                valueClass="text-warn"
+              />
+            </div>
+          </PlanSection>
+
+          {showLadderStatus && (
+            <PlanSection title="Ladder Status" tone="neutral">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="font-mono uppercase tracking-wider text-mute">State</span>
+                  <span className="font-mono text-sm font-semibold">{plan.state ?? "--"}</span>
+                </div>
+                {plan.stageFills && (
+                  <div className="grid grid-cols-3 gap-2">
+                    <StageStatusChip label="E1" filled={plan.stageFills.e1} />
+                    <StageStatusChip label="E2" filled={plan.stageFills.e2} />
+                    <StageStatusChip label="E3" filled={plan.stageFills.e3} />
+                  </div>
+                )}
+              </div>
+            </PlanSection>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-bd bg-bg1/40 px-4 py-5 space-y-2">
+          <div className="text-xs font-mono uppercase tracking-wider text-mute">
+            Awaiting blueprint
+          </div>
+          <div className="text-sm text-dim">
+            {signal.engineBlocker
+              ? signal.engineBlocker
+              : signal.status === "ARMED"
+                ? "Signal is ARMED — blueprint generated when READY conditions are met"
+                : "Signal is being monitored — no entry conditions met yet"}
+          </div>
+          {signal.engine && (
+            <div className="flex gap-3 flex-wrap text-[11px] font-mono text-dim pt-1">
+              <span>HTF: {signal.engine.htfBias}</span>
+              <span>·</span>
+              <span>PD: {signal.engine.pdState}</span>
+              {signal.engineBlocker && signal.engineBlocker !== "OK" && (
+                <>
+                  <span>·</span>
+                  <span className="text-warn">{signal.engineBlocker}</span>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-bd bg-bg1/40 px-3 py-3">
         <div className="text-[11px] text-mute">
