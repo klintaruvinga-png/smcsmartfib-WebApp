@@ -54,7 +54,12 @@ function hasRenderablePlan(candidate: RankedCandidate): candidate is RenderableC
 
 export function PlanPage() {
   const { data: signals, isLoading: signalsLoading } = useLiveSignals();
-  const { data: ladders, isLoading: laddersLoading } = useLadders();
+  const {
+    data: ladders,
+    isLoading: laddersLoading,
+    isError: laddersIsError,
+    error: laddersError,
+  } = useLadders();
   const { data: snapshot } = useSnapshot();
   const {
     pendingSettingsLoad,
@@ -138,8 +143,19 @@ export function PlanPage() {
 
     return (
       <div className="space-y-5">
-        <WalletOverview />
-        <div className="space-y-3 text-sm">
+          <WalletOverview />
+          {laddersIsError && (
+            <div className="rounded-lg border border-warn/30 bg-warn/5 p-3 text-sm">
+              <div className="flex items-center gap-2 text-warn">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>/ladders: backend response missing ladder array</div>
+              </div>
+              {laddersError instanceof Error && (
+                <div className="text-xs text-mute mt-2">{laddersError.message}</div>
+              )}
+            </div>
+          )}
+          <div className="space-y-3 text-sm">
           <div className="flex items-center gap-2 text-mute">
             <AlertTriangle className="h-4 w-4 text-warn shrink-0" />
             {watchlist.length === 0
