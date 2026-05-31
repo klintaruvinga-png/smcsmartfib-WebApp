@@ -1,5 +1,5 @@
 {
-  "issue": "SMC Intake - Remove PR 301's over-strict gate",
-  "plan_hash": "2303e87bb043140cbb5f22537e4d927ff71912ddfe6df66a382ec1d4f4b9357c",
-  "written_at": "2026-05-31T09:13:42.340Z"
+  "issue": "SMC Intake - Fix flicker and pending persistence \u00b7 PATCH",
+  "plan_hash": "f64245c30733d23dfdd9678bcd31e84e8d797e60185c12d9e803255189724da5",
+  "written_at": "2026-05-31T10:18:25.0163705Z"
 }

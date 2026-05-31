@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 import { apiClient, normalizeBackendUrl, setBackendUrl } from "@/lib/api/sniperClient";
 import { reconcileUserTrades, type TradeContinuityState } from "@/lib/tradeContinuity";
@@ -119,6 +119,7 @@ export function useLiveSignals() {
     enabled,
     staleTime: 0,
     structuralSharing: false,
+    placeholderData: keepPreviousData,
     refetchOnWindowFocus: false,
     refetchInterval: enabled ? pollMs : false,
   });
@@ -508,6 +509,7 @@ export function useLadders() {
     queryKey: ["ladders"],
     queryFn: () => apiClient.getLadders(),
     enabled,
+    placeholderData: keepPreviousData,
     refetchInterval: enabled ? pollMs : false,
   });
 }
