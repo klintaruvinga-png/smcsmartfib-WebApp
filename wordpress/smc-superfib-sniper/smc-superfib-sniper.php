@@ -5426,16 +5426,21 @@ final class SMC_SuperFib_Sniper_REST {
 
             if ($state['plan']) {
                 $plans[] = $state['plan'];
-                $wpdb->replace(
-                    $this->table('trade_plans'),
-                    array(
-                        'signal_id' => $state['plan']['signalId'],
-                        'user_id' => $user_id,
-                        'plan' => wp_json_encode($state['plan']),
-                        'updated_at' => $this->now_mysql(),
-                    ),
-                    array('%s', '%d', '%s', '%s')
-                );
+                if (
+                    ($state['plan']['source'] ?? null) === 'backend-blueprint'
+                    && ($state['signal']['backendConfirmed'] ?? false) === true
+                ) {
+                    $wpdb->replace(
+                        $this->table('trade_plans'),
+                        array(
+                            'signal_id' => $state['plan']['signalId'],
+                            'user_id' => $user_id,
+                            'plan' => wp_json_encode($state['plan']),
+                            'updated_at' => $this->now_mysql(),
+                        ),
+                        array('%s', '%d', '%s', '%s')
+                    );
+                }
             }
         }
 
@@ -5796,9 +5801,50 @@ final class SMC_SuperFib_Sniper_REST {
             'regime' => $regime,
             'gate' => $gate,
             'signal' => $signal,
-            'plan' => $backend_confirmed ? $this->build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles) : null,
+            'plan' => $this->build_pending_or_confirmed_plan(
+                $user_id,
+                $signal,
+                $high,
+                $low,
+                $sequence,
+                $candles,
+                $backend_confirmed,
+                $data_live,
+                $engine_blocker,
+                $lifecycle_diagnostic
+            ),
             'diagnostic' => $diagnostic,
         );
+    }
+
+    private function build_pending_or_confirmed_plan($user_id, $signal, $high, $low, $sequence, $candles, $backend_confirmed, $data_live, $engine_blocker, $lifecycle_diagnostic) {
+        if ($backend_confirmed === true) {
+            return $this->build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles);
+        }
+
+        if (
+            $backend_confirmed !== false
+            || $data_live !== true
+            || $engine_blocker !== 'OK'
+            || !is_array($lifecycle_diagnostic)
+            || ($signal['status'] ?? null) !== 'ARMED'
+        ) {
+            return null;
+        }
+
+        $lifecycle_state = strtoupper((string) ($lifecycle_diagnostic['state'] ?? ''));
+        $prior_candidate_status = strtoupper((string) ($lifecycle_diagnostic['priorCandidateStatus'] ?? ''));
+        $active_pre_entry = $lifecycle_state === 'ACTIVE_PRE_ENTRY';
+        $repeated_ready_candidate = in_array($lifecycle_state, array('', 'OK', 'LIFECYCLE_UNRESOLVED'), true)
+            && $prior_candidate_status === 'READY';
+
+        if (!$active_pre_entry && !$repeated_ready_candidate) {
+            return null;
+        }
+
+        $plan = $this->build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles);
+        $plan['source'] = 'pending-blueprint';
+        return $plan;
     }
 
     private function build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles) {

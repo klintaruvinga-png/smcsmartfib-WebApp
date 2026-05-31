@@ -1432,9 +1432,34 @@ $preEntryState = $buildSymbolState->invoke($instance, 7, 'CHFJPY', array(
 ));
 assert_same('ARMED', $preEntryState['signal']['status'] ?? null, 'ACTIVE_PRE_ENTRY must cap a structurally READY build_symbol_state signal at ARMED, not WATCH');
 assert_same(false, $preEntryState['signal']['backendConfirmed'] ?? null, 'ACTIVE_PRE_ENTRY capped signals must not be backend-confirmed');
-assert_same(null, $preEntryState['plan'] ?? null, 'ACTIVE_PRE_ENTRY capped signals must not generate executable trade plans');
+assert_true(is_array($preEntryState['plan'] ?? null), 'ACTIVE_PRE_ENTRY capped signals must expose a non-executable pending blueprint');
+assert_same('pending-blueprint', $preEntryState['plan']['source'] ?? null, 'ACTIVE_PRE_ENTRY capped signals must tag the plan as pending-blueprint');
 assert_same('ACTIVE_PRE_ENTRY', $preEntryState['diagnostic']['lifecycle']['state'] ?? null, 'ACTIVE_PRE_ENTRY lifecycle diagnostics must remain visible');
 assert_same('entry_not_crossed', $preEntryState['diagnostic']['lifecycle']['reason'] ?? null, 'ACTIVE_PRE_ENTRY lifecycle reason must remain entry_not_crossed');
+
+$pendingTradePlanRows = array_filter($wpdb->tables[$wpdb->prefix . 'smc_sf_trade_plans'] ?? array(), function ($row) use ($preEntryState) {
+    return ($row['signal_id'] ?? null) === ($preEntryState['signal']['id'] ?? null);
+});
+assert_same(0, count($pendingTradePlanRows), 'ACTIVE_PRE_ENTRY pending blueprints must not be persisted as executable trade plan rows during build_symbol_state');
+
+$wpdb->replace($wpdb->prefix . 'smc_sf_user_settings', array(
+    'user_id' => 7,
+    'settings' => json_encode(array(
+        'backendUrl' => 'https://example.com/wp-json',
+        'refreshIntervalSec' => 30,
+        'staleThresholdSec' => 10,
+        'watchlist' => array('CHFJPY'),
+        'riskAllocation' => array('perTradePct' => 0.5, 'dailyMaxPct' => 2.0, 'ddCapPct' => 6.0),
+    )),
+    'updated_at' => gmdate('Y-m-d H:i:s'),
+));
+unset($GLOBALS['test_user_meta'][7]['smc_sf_engine_snapshot']);
+$preEntrySnapshot = $ensureEngineSnapshot->invoke($instance, 7, true);
+assert_same('pending-blueprint', $preEntrySnapshot['plans'][0]['source'] ?? null, 'ensure_engine_snapshot must expose ACTIVE_PRE_ENTRY pending blueprints in the plans payload');
+$persistedPendingRows = array_filter($wpdb->tables[$wpdb->prefix . 'smc_sf_trade_plans'] ?? array(), function ($row) use ($preEntrySnapshot) {
+    return ($row['signal_id'] ?? null) === ($preEntrySnapshot['plans'][0]['signalId'] ?? null);
+});
+assert_same(0, count($persistedPendingRows), 'ensure_engine_snapshot must not persist pending-blueprint plans as executable trade plan rows');
 
 $openPositionFixture = seed_ready_build_symbol_state_fixture($wpdb, 7, 'EURCHF', 1.1141, 1.1143);
 $wpdb->replace($buildLifecycleCandidateTable, array(
