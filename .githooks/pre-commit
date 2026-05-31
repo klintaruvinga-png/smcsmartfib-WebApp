@@ -5,6 +5,21 @@
 # The watcher's validateImplementationRun() performs the same checks at pipeline level;
 # this hook catches the problem at commit time so Codex cannot "finish" without the report.
 #
+# MANUAL SESSION BYPASS
+# When you commit on a codex/* branch outside the automation pipeline (manual edits,
+# hotfixes, tooling updates) use ONE of these two methods to bypass the guard:
+#
+#   Method A - environment variable (single commit):
+#     SMC_MANUAL_SESSION=1 git commit -m "your message"
+#
+#   Method B - sentinel file (multiple commits in a session):
+#     touch reports/.manual-session
+#     git commit ...   # repeat as needed
+#     rm reports/.manual-session
+#
+# The sentinel file is git-ignored and never committed.
+# Both methods log the bypass to stderr so the decision is auditable.
+#
 # To install: git config core.hooksPath .githooks
 # (run once, or add to package.json prepare script)
 
@@ -18,6 +33,23 @@ case "$branch" in
     exit 0
     ;;
 esac
+
+# -- Manual session bypass -----------------------------------------------------
+# Honour an explicit manual-session signal before enforcing the report check.
+# This allows direct edits on codex/* branches that are not driven by the pipeline.
+
+if [ "${SMC_MANUAL_SESSION:-}" = "1" ]; then
+  echo "  [codex pre-commit guard] Manual session (env). Skipping report check." >&2
+  exit 0
+fi
+
+MANUAL_SENTINEL="reports/.manual-session"
+if [ -f "$MANUAL_SENTINEL" ]; then
+  echo "  [codex pre-commit guard] Manual session (sentinel file). Skipping report check." >&2
+  exit 0
+fi
+
+# -- Pipeline-driven enforcement ----------------------------------------------
 
 IMPL_FILE="reports/codex-implementation.md"
 
@@ -33,6 +65,10 @@ if [ ! -f "$IMPL_FILE" ]; then
   echo "      - Reports generated"
   echo "      - Remaining risks"
   echo "      - Any contract ambiguities resolved during implementation"
+  echo ""
+  echo "    Committing manually (not via the pipeline)? Use one of:"
+  echo "      SMC_MANUAL_SESSION=1 git commit -m \"...\""
+  echo "      touch reports/.manual-session   # then commit freely; rm when done"
   echo ""
   exit 1
 fi

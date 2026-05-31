@@ -300,6 +300,41 @@ describe("Phase 2 telemetry client reads", () => {
       }),
     );
   });
+
+  it("requests chart snapshots with a cache-bust token and no-store fetch cache", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            symbol: "EURUSD",
+            timeframe: "15min",
+            candles: [],
+            fibLevels: [],
+            updatedAt: null,
+            state: "stale",
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiClient.getChartSnapshot("EURUSD", "15min", false)).resolves.toMatchObject({
+      symbol: "EURUSD",
+      state: "stale",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/sniper\/v1\/charts\?symbol=EURUSD&timeframe=15min&_=\d+$/),
+      expect.objectContaining({
+        method: "GET",
+        cache: "no-store",
+      }),
+    );
+  });
 });
 
 describe("ladders client contract", () => {

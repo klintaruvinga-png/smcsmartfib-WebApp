@@ -53,3 +53,4 @@ reports/codex-last-message.txt
 reports/review-event.json
 reports/codex-review.json
 reports/.claude-hardening-blocked.json
+reports/.manual-session
