@@ -7,7 +7,7 @@ import type { SignalCandidate, Symbol, TradePlan } from "@/types/sniper";
 import { mockPlan } from "@/mocks/sniperData";
 
 const hookMocks = vi.hoisted(() => ({
-  useLiveSignals: vi.fn(),
+  useDisplaySignals: vi.fn(),
   useLadders: vi.fn(),
   useSnapshot: vi.fn(),
   useCanonicalWatchlist: vi.fn(),
@@ -24,7 +24,7 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
 });
 
 vi.mock("@/hooks/useSniperData", () => ({
-  useLiveSignals: hookMocks.useLiveSignals,
+  useDisplaySignals: hookMocks.useDisplaySignals,
   useLadders: hookMocks.useLadders,
   useSnapshot: hookMocks.useSnapshot,
   useCanonicalWatchlist: hookMocks.useCanonicalWatchlist,
@@ -125,8 +125,12 @@ function renderPlanPage({
   ladders: TradePlan[];
   watchlist?: Symbol[];
 }) {
-  hookMocks.useLiveSignals.mockReturnValue({
-    data: signals,
+  hookMocks.useDisplaySignals.mockReturnValue({
+    data: {
+      signals,
+      polledAt: "2026-05-14T08:00:00.000Z",
+      meta: { boardSize: 3, totalActive: signals.length },
+    },
     isLoading: false,
   });
   hookMocks.useLadders.mockReturnValue({
@@ -444,7 +448,7 @@ describe("PlanPage ranking and execution guards", () => {
     ).toBeNull();
   });
 
-  it("scopes rendered cards to the canonical watchlist", () => {
+  it("prefers canonical watchlist candidates when any are active", () => {
     renderPlanPage({
       signals: [
         buildSignal({ id: "sig-001", symbol: "GBPUSD", verdict: "A+" }),
@@ -466,6 +470,89 @@ describe("PlanPage ranking and execution guards", () => {
     expect(cards).toHaveLength(1);
     expect(cards[0]?.textContent).toContain("GBPUSD");
     expect(screen.queryByText("NZDUSD")).toBeNull();
+  });
+
+  it("falls back to the ranked global candidate pool when no watchlist candidates are active", () => {
+    renderPlanPage({
+      signals: [
+        buildSignal({
+          id: "sig-001",
+          symbol: "NZDUSD",
+          status: "WATCH",
+          verdict: "A",
+          backendConfirmed: false,
+          createdAt: "2026-05-14T08:00:00.000Z",
+        }),
+        buildSignal({
+          id: "sig-002",
+          symbol: "CADJPY",
+          status: "READY",
+          verdict: "A",
+          backendConfirmed: true,
+          createdAt: "2026-05-14T08:01:00.000Z",
+        }),
+        buildSignal({
+          id: "sig-003",
+          symbol: "EURJPY",
+          status: "ARMED",
+          verdict: "B",
+          backendConfirmed: false,
+          createdAt: "2026-05-14T08:02:00.000Z",
+        }),
+      ],
+      ladders: [
+        buildPlan({ signalId: "sig-001", symbol: "NZDUSD", source: "pending-blueprint" }),
+        buildPlan({ signalId: "sig-002", symbol: "CADJPY", source: "backend-blueprint" }),
+      ],
+      watchlist: ["GBPUSD"],
+    });
+
+    expect(screen.queryByText("No active watchlist candidates found.")).toBeNull();
+    expect(screen.getByText("Fallback top list")).toBeTruthy();
+
+    const renderedSymbols = getRenderedSymbols();
+    expect(getRenderedCards()).toHaveLength(3);
+    expect(renderedSymbols[0]).toContain("CADJPY");
+    expect(renderedSymbols[1]).toContain("NZDUSD");
+    expect(renderedSymbols[2]).toContain("EURJPY");
+    expect(renderedSymbols[2]).toContain("NO BLUEPRINT");
+
+    const executionButtons = screen.getAllByRole("button", { name: "Send to execution" });
+    expect((executionButtons[1] as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("keeps the empty diagnostics when no global candidates exist", () => {
+    renderPlanPage({
+      signals: [],
+      ladders: [],
+      watchlist: ["GBPUSD"],
+    });
+
+    expect(getRenderedCards()).toHaveLength(0);
+    expect(screen.getByText("No active watchlist candidates found.")).toBeTruthy();
+  });
+
+  it("limits fallback rendering to the selected board size", () => {
+    renderPlanPage({
+      signals: [
+        buildSignal({ id: "sig-001", symbol: "NZDUSD", verdict: "A+" }),
+        buildSignal({ id: "sig-002", symbol: "CADJPY", verdict: "A" }),
+        buildSignal({ id: "sig-003", symbol: "EURJPY", verdict: "B" }),
+        buildSignal({ id: "sig-004", symbol: "CHFJPY", verdict: "C" }),
+        buildSignal({ id: "sig-005", symbol: "USDCAD", verdict: "B" }),
+      ],
+      ladders: [
+        buildPlan({ signalId: "sig-001", symbol: "NZDUSD" }),
+        buildPlan({ signalId: "sig-002", symbol: "CADJPY" }),
+        buildPlan({ signalId: "sig-003", symbol: "EURJPY" }),
+        buildPlan({ signalId: "sig-004", symbol: "CHFJPY" }),
+        buildPlan({ signalId: "sig-005", symbol: "USDCAD" }),
+      ],
+      watchlist: ["GBPUSD"],
+    });
+
+    expect(getRenderedCards()).toHaveLength(3);
+    expect(screen.getByText("Fallback top list")).toBeTruthy();
   });
 
   it("limits rendering to the top 3 eligible watchlist candidates", () => {

@@ -1,5 +1,5 @@
 {
-  "issue": "SMC Intake - Backend/UI Major Update - Signal Persistence Arbiter",
-  "plan_hash": "bdf8c2436808b2feb6bbde3f15a4d65298f23333d46c222751ec2dd6cecbd90a",
-  "written_at": "2026-05-31T14:32:25.367Z"
+  "issue": "Pending Blueprints on Plan Page — always show a top list of next-best blueprints on front end regardless of grade/status/quality; replaced only by Arbiter when better/newer valid blueprints are available.",
+  "plan_hash": "eefd44c10ccfc8c275143be4d2d044de81aa3b2cd8bb970c34bc526d1dc50197",
+  "written_at": "2026-05-31T22:58:00.000Z"
 }

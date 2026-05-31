@@ -29,6 +29,64 @@ type RenderableCandidate = RankedCandidate & {
   hasPlan: true;
 };
 
+function verdictRank(verdict: SignalCandidate["verdict"]): number {
+  if (verdict === "A+") return 0;
+  if (verdict === "A") return 1;
+  if (verdict === "B") return 2;
+  if (verdict === "C") return 3;
+  return 99;
+}
+
+function planSourceRank(plan: TradePlan | null): number {
+  if (!plan) return 4;
+  if (plan.source === "backend-blueprint") return 0;
+  if (plan.source === "pending-blueprint") return 1;
+  if (plan.source === "watch-blueprint") return 2;
+  if (plan.source === "frontend-preview") return 3;
+  return 4;
+}
+
+function statusRank(status: SignalCandidate["status"]): number {
+  if (status === "READY") return 0;
+  if (status === "ARMED") return 1;
+  if (status === "WATCH") return 2;
+  return 99;
+}
+
+function parseTimestamp(value: string | undefined): number | null {
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function rankCandidates(candidates: RankedCandidate[]): RankedCandidate[] {
+  return [...candidates].sort((left, right) => {
+    const verdictDelta = verdictRank(left.signal.verdict) - verdictRank(right.signal.verdict);
+    if (verdictDelta !== 0) return verdictDelta;
+
+    const backendDelta = Number(right.signal.backendConfirmed) - Number(left.signal.backendConfirmed);
+    if (backendDelta !== 0) return backendDelta;
+
+    const sourceDelta = planSourceRank(left.plan) - planSourceRank(right.plan);
+    if (sourceDelta !== 0) return sourceDelta;
+
+    const statusDelta = statusRank(left.signal.status) - statusRank(right.signal.status);
+    if (statusDelta !== 0) return statusDelta;
+
+    const completeDelta = Number(right.planComplete) - Number(left.planComplete);
+    if (completeDelta !== 0) return completeDelta;
+
+    const leftCreatedAt = parseTimestamp(left.signal.createdAt);
+    const rightCreatedAt = parseTimestamp(right.signal.createdAt);
+    if (leftCreatedAt !== null && rightCreatedAt !== null) {
+      const createdAtDelta = rightCreatedAt - leftCreatedAt;
+      if (createdAtDelta !== 0) return createdAtDelta;
+    }
+
+    return left.originalIndex - right.originalIndex;
+  });
+}
+
 export function PlanPage() {
   const [boardSize, setBoardSize] = useState<3 | 5 | 10>(3);
   const { data: liveSignals, isLoading: signalsLoading } = useDisplaySignals(boardSize);
@@ -64,9 +122,13 @@ export function PlanPage() {
     };
   });
 
+  const rankedCandidatePool = rankCandidates(candidatePool);
   const watchlistCandidates = candidatePool.filter(({ signal }) => watchlistSet.has(signal.symbol));
-  const topCandidates = watchlistCandidates;
-  const rankedWatchlistCandidates = watchlistCandidates;
+  const rankedWatchlistCandidates = rankCandidates(watchlistCandidates);
+  const candidateSource = rankedWatchlistCandidates.length > 0 ? "watchlist" : "fallback";
+  const topCandidates = (
+    candidateSource === "watchlist" ? rankedWatchlistCandidates : rankedCandidatePool
+  ).slice(0, boardSize);
   const divergentCount = topCandidates.filter(
     ({ signal }) => signal.computedBy === "frontend" && !signal.backendConfirmed,
   ).length;
@@ -221,6 +283,11 @@ export function PlanPage() {
           <h1 className="text-xl font-semibold tracking-tight">Signal Plans</h1>
           <p className="text-xs text-mute mt-0.5">
             Showing {topCandidates.length} of {totalActiveSignals} backend-arbited active signal{totalActiveSignals === 1 ? "" : "s"}
+            {candidateSource === "fallback" && (
+              <span className="ml-2 rounded border border-warn/30 bg-warn/5 px-1.5 py-0.5 text-warn">
+                Fallback top list
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">

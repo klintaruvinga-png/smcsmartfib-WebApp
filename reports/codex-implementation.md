@@ -1,42 +1,36 @@
-## Issue summary
+# Issue summary
 
-`/live-signals` exposed raw engine snapshot signals, allowing transient `WATCH` output and stale/blocker noise to appear as display cards instead of reading a backend-owned durable display board.
+Plan page candidate rendering was gated to canonical watchlist matches only. When active display signals existed outside the watchlist, the page rendered the empty watchlist diagnostics instead of the required next-best blueprint list.
 
-## Root cause implemented
+# Root cause implemented
 
-Implemented a backend live signal board arbiter backed by `smc_sf_signals`. Engine runs and live-signal polls now reconcile only eligible backend `ARMED`/`READY` signals with `engineBlocker=OK`, hide current stale/blocker symbols, and read `/live-signals` from durable rows instead of raw snapshot signals.
+Implemented a frontend-only watchlist-preferred/global-fallback selection path in `src/routes/-plan.page.tsx`. Candidates are ranked from the already-loaded display signal pool, watchlist candidates remain preferred when present, and the ranked global pool is used only when no watchlist candidates are active.
 
-## Exact files changed
+# Exact files changed
 
-- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` — replaced raw snapshot reads in `get_live_signals()`, added display-board reconciliation/reader helpers, and moved signal persistence behind eligibility checks.
-- `wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` — updated live-signal contract coverage to seed durable `smc_sf_signals` rows, reject raw `WATCH` snapshot output, preserve stable envelope fields, and reject persisted rows with current blocker diagnostics.
-- `reports/codex-implementation.md` — recorded implementation details and verification results.
-- `reports/codex-implementation.meta.json` — recorded the implementation metadata and current plan hash required by the pipeline validator.
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-31_signal-persistence-arbiter.md` — documented runtime integrity findings and regression coverage.
-- `.github/migration/audits/phase-5-backend-live-signal-board-parity-2026-05-31.md` — documented backend/dashboard parity re-validation.
+- `src/routes/-plan.page.tsx` — added local candidate ranking helpers, replaced `topCandidates = watchlistCandidates` with watchlist-first/global-fallback selection sliced to `boardSize`, and added a compact `Fallback top list` label for fallback rendering.
+- `src/routes/-plan.test.tsx` — updated mocks from `useLiveSignals` to `useDisplaySignals`, preserved watchlist preference coverage, and added fallback, true-empty, and board-size regression tests.
+- `reports/codex-implementation.md` — added this implementation summary required by the contract.
+- `reports/codex-implementation.meta.json` — restored required pipeline metadata with the current plan hash.
 
-## Tests run
+# Tests run
 
-- Red check: `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` failed before production code changes because raw snapshot `WATCH` output was returned.
-- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` — passed.
-- `npm test -- --run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx src/routes/-signals.page.test.tsx src/routes/-plan.test.tsx` — failed because the root package has no `test` script.
-- `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx src/routes/-signals.page.test.tsx src/routes/-plan.test.tsx` — passed, 4 files / 44 tests.
-- `npm run typecheck` — failed because the root package has no `typecheck` script.
-- `npx tsc --noEmit` — failed on existing `vite.config.ts` typing: `test` is not accepted by `LovableViteTanstackOptions`.
-- `npm run build` — passed.
+- `npm test -- src/routes/-plan.test.tsx` — failed because `package.json` has no `test` script.
+- `npx vitest run src/routes/-plan.test.tsx` — passed, 1 test file and 27 tests.
+- `npm run build` — passed for client and SSR builds; Vite reported existing large chunk warnings.
 - `npm run validate:impl` — passed.
 
-## Reports generated
+# Reports generated
 
+- `.github/docs/BUG_SWEEP_REPORT_2026-06-01_pending-blueprints-plan-fallback.md`
+- `.github/migration/audits/phase-0-dashboard-parity-2026-06-01.md`
 - `reports/codex-implementation.md`
 - `reports/codex-implementation.meta.json`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-31_signal-persistence-arbiter.md`
-- `.github/migration/audits/phase-5-backend-live-signal-board-parity-2026-05-31.md`
 
-## Remaining risks
+# Remaining risks
 
-Manual live API polling and MT5 candidate replay are still pending. Direct TypeScript verification remains blocked by the existing `vite.config.ts` type mismatch, although the production Vite build passed. The patch intentionally does not add a new display-signals table or backend top-N cap.
+Manual live verification still needs a backend snapshot where canonical watchlist symbols have no active candidates while `/live-signals` returns active display signals. Arbiter replacement remains dependent on the existing polling/refetch path; no backend or API contract was changed.
 
-## Any contract ambiguities resolved during implementation
+# Any contract ambiguities resolved during implementation
 
-The contract required stale/blocker diagnostics to remove persisted board rows even when `get_live_signals()` serves a cached snapshot. I used the smallest safe interpretation: `get_live_signals()` still calls `ensure_engine_snapshot()` first, then reconciles only the current snapshot diagnostics into the durable board before reading it. Eligible signal upserts remain engine-run owned, and raw snapshot signals are never returned as a fallback.
+The contract asked to run a failing test before implementation, but the critical execution order also required writing this summary immediately after code changes and before validation. I followed the critical order and deferred all validation until after this file was written.
