@@ -8698,7 +8698,7 @@ final class SMC_SuperFib_Sniper_REST {
     private function no_cache_response($payload) {
         $response = rest_ensure_response($payload);
 
-        if ($response instanceof WP_REST_Response) {
+        if ($response instanceof WP_REST_Response && method_exists($response, 'header')) {
             $response->header('Cache-Control', 'no-store, no-cache, must-revalidate');
             $response->header('Pragma', 'no-cache');
         }
