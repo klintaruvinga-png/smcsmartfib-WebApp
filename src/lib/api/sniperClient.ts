@@ -156,8 +156,16 @@ type RawUserProgressResponse = {
 function normalizeLiveSignalsResponse(
   raw: LiveSignalsResponse | SignalCandidate[],
 ): SignalCandidate[] {
-  if (Array.isArray(raw)) return raw;
-  if (raw && Array.isArray(raw.signals)) return raw.signals;
+  return normalizeLiveSignalsEnvelope(raw).signals;
+}
+
+function normalizeLiveSignalsEnvelope(
+  raw: LiveSignalsResponse | SignalCandidate[],
+): LiveSignalsResponse {
+  if (Array.isArray(raw)) {
+    return { signals: raw, polledAt: new Date().toISOString() };
+  }
+  if (raw && Array.isArray(raw.signals)) return raw;
 
   throw new Error("/live-signals: backend response missing signals array");
 }
@@ -473,15 +481,21 @@ export const apiClient = {
       { cacheBust: true },
     );
   },
-  async getLiveSignals(mock = MOCK_MODE): Promise<SignalCandidate[]> {
+  async getLiveSignals(mock = MOCK_MODE, boardSize?: 3 | 5 | 10): Promise<SignalCandidate[]> {
+    const response = await this.getDisplaySignals(mock, boardSize);
+    return response.signals;
+  },
+  async getDisplaySignals(mock = MOCK_MODE, boardSize?: 3 | 5 | 10): Promise<LiveSignalsResponse> {
     if (mock) {
       const wl = new Set(mockSettings.watchlist);
-      return mockSignals.filter((s) => wl.has(s.symbol));
+      const signals = mockSignals.filter((s) => wl.has(s.symbol)).slice(0, boardSize ?? 3);
+      return { signals, polledAt: new Date().toISOString(), meta: { boardSize: boardSize ?? 3, totalActive: signals.length } };
     }
-    const raw = await call<LiveSignalsResponse | SignalCandidate[]>("/live-signals", {
+    const path = boardSize ? `/live-signals?board_size=${boardSize}` : "/live-signals";
+    const raw = await call<LiveSignalsResponse | SignalCandidate[]>(path, {
       cacheBust: true,
     });
-    return normalizeLiveSignalsResponse(raw);
+    return normalizeLiveSignalsEnvelope(raw);
   },
   async getLadders(symbol?: Symbol, mock = MOCK_MODE): Promise<TradePlan[]> {
     if (mock) return [mockPlan];

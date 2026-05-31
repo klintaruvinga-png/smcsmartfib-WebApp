@@ -23,6 +23,8 @@ final class SMC_SuperFib_Sniper_REST {
     // Backfill: all historical engine_runs records are included in streak computation.
     const ACTIVE_DAY_DEFINITION = 'CALENDAR_DAY_WITH_ANY_COMPLETED_ENGINE_RUN';
 
+    private static $display_signals_table_ready = false;
+
     private $ratios = array(-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300);
     private $fib_context_symbol = '';
     private $fib_context_timeframe = '';
@@ -31,6 +33,7 @@ final class SMC_SuperFib_Sniper_REST {
     public static function boot() {
         $instance = new self();
         add_action('rest_api_init', array($instance, 'register_routes'));
+        add_action('init', array(__CLASS__, 'ensure_display_signals_table'), 1);
         
         // Send CORS headers on all REST responses (success, error, auth failure, etc)
         add_filter('rest_post_dispatch', function($response, $server, $request) {
@@ -268,6 +271,8 @@ final class SMC_SuperFib_Sniper_REST {
             KEY user_status (user_id, status)
         ) $charset;";
 
+        $tables[] = self::get_display_signals_table_sql($charset);
+
         $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_trade_plans (
             signal_id VARCHAR(64) NOT NULL,
             user_id BIGINT UNSIGNED NOT NULL,
@@ -435,8 +440,74 @@ final class SMC_SuperFib_Sniper_REST {
             dbDelta($sql);
         }
 
+        self::ensure_display_signals_table();
         self::ensure_trade_telemetry_tables();
         self::ensure_soak_tables();
+    }
+
+    private static function get_display_signals_table_sql(string $charset): string {
+        global $wpdb;
+
+        return "CREATE TABLE {$wpdb->prefix}smc_sf_display_signals (
+            id VARCHAR(64) NOT NULL,
+            user_id BIGINT UNSIGNED NOT NULL,
+            symbol VARCHAR(24) NOT NULL,
+            direction VARCHAR(8) NOT NULL,
+            lifecycle_state VARCHAR(32) NOT NULL DEFAULT 'DISPLAY_ACTIVE',
+            status VARCHAR(16) NOT NULL,
+            verdict VARCHAR(4) NOT NULL,
+            quality_score DECIMAL(10,4) NOT NULL DEFAULT 0,
+            signal_family_key VARCHAR(128) NOT NULL,
+            entry_price DECIMAL(20,8) NOT NULL,
+            sl_price DECIMAL(20,8) DEFAULT NULL,
+            tp_price DECIMAL(20,8) DEFAULT NULL,
+            source_candidate_id VARCHAR(64) DEFAULT NULL,
+            source VARCHAR(16) NOT NULL DEFAULT 'backend',
+            entry_hit_at DATETIME DEFAULT NULL,
+            stop_hit_at DATETIME DEFAULT NULL,
+            replaced_by VARCHAR(64) DEFAULT NULL,
+            invalidated_at DATETIME DEFAULT NULL,
+            invalidation_reason VARCHAR(64) DEFAULT NULL,
+            first_seen_at DATETIME NOT NULL,
+            last_confirmed_at DATETIME NOT NULL,
+            last_evaluated_at DATETIME NOT NULL,
+            expires_at DATETIME DEFAULT NULL,
+            confluence LONGTEXT NOT NULL,
+            engine LONGTEXT NOT NULL,
+            PRIMARY KEY  (id),
+            KEY user_active (user_id, lifecycle_state, quality_score),
+            KEY user_symbol (user_id, symbol, lifecycle_state),
+            KEY user_family (user_id, signal_family_key(64))
+        ) $charset;";
+    }
+
+    public static function ensure_display_signals_table() {
+        global $wpdb;
+
+        if (self::$display_signals_table_ready) {
+            return true;
+        }
+
+        if (file_exists(ABSPATH . 'wp-admin/includes/upgrade.php')) {
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        }
+
+        if (!function_exists('dbDelta')) {
+            return false;
+        }
+
+        if (is_object($wpdb) && property_exists($wpdb, 'last_error')) {
+            $wpdb->last_error = '';
+        }
+
+        dbDelta(self::get_display_signals_table_sql($wpdb->get_charset_collate()));
+
+        if (is_object($wpdb) && property_exists($wpdb, 'last_error') && $wpdb->last_error !== '') {
+            return false;
+        }
+
+        self::$display_signals_table_ready = true;
+        return true;
     }
 
     private static function ensure_bridge_tables() {
@@ -1986,6 +2057,7 @@ final class SMC_SuperFib_Sniper_REST {
             'staleThresholdSec' => $this->int_between($payload, 'staleThresholdSec', 10, 120, $current['staleThresholdSec']),
             'watchlist' => $this->validate_watchlist_symbols(isset($payload['watchlist']) ? $payload['watchlist'] : $current['watchlist']),
             'riskAllocation' => $this->sanitize_risk_allocation(isset($payload['riskAllocation']) ? $payload['riskAllocation'] : $current['riskAllocation'], $current['riskAllocation']),
+            'signalBoardSize' => $this->sanitize_signal_board_size($payload['signalBoardSize'] ?? ($payload['boardSize'] ?? $current['signalBoardSize'])),
         ));
         $this->replace_json('user_settings', array(
             'user_id' => $user_id,
@@ -5082,9 +5154,14 @@ final class SMC_SuperFib_Sniper_REST {
             array(),
             is_array($snapshot['diagnostics'] ?? null) ? $snapshot['diagnostics'] : array()
         );
+        $board_size = $this->resolve_signal_board_size($user_id);
         return $this->no_cache_response(array(
-            'signals' => $this->read_live_signal_board((int) $user_id, $symbols),
+            'signals' => $this->read_live_signal_board((int) $user_id, $symbols, $board_size),
             'polledAt' => gmdate('c'),
+            'meta' => array(
+                'boardSize' => $board_size,
+                'totalActive' => $this->count_live_signal_board((int) $user_id, $symbols),
+            ),
         ));
     }
 
@@ -5450,8 +5527,9 @@ final class SMC_SuperFib_Sniper_REST {
         );
 
         $this->reconcile_live_signal_board((int) $user_id, $symbols, $signals, $diagnostics);
+        $display_signals = $this->read_live_signal_board((int) $user_id, $symbols, $this->resolve_signal_board_size((int) $user_id));
 
-        $result = array('regimes' => $regimes, 'gates' => $gates, 'signals' => $signals, 'plans' => $plans, 'diagnostics' => $diagnostics);
+        $result = array('regimes' => $regimes, 'gates' => $gates, 'signals' => $display_signals, 'plans' => $plans, 'diagnostics' => $diagnostics);
         set_transient($transient_key, $result, 5);
 
         return $result;
@@ -5460,15 +5538,122 @@ final class SMC_SuperFib_Sniper_REST {
     private function reconcile_live_signal_board(int $user_id, array $symbols, array $signals, array $diagnostics): void {
         global $wpdb;
 
-        $watchlist_lookup = array();
-        foreach ($symbols as $symbol) {
-            $normalized = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $symbol));
-            if ($normalized !== '') {
-                $watchlist_lookup[$normalized] = true;
+        $watchlist_lookup = $this->normalize_symbol_lookup($symbols);
+        $now = $this->now_mysql();
+        $blocked_symbols = $this->extract_blocked_symbols($diagnostics, $watchlist_lookup);
+
+        $active_rows = $this->read_display_signal_rows($user_id, array_keys($watchlist_lookup), true);
+        foreach ($active_rows as $row) {
+            $row_symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($row['symbol'] ?? '')));
+            if ($row_symbol === '' || !isset($watchlist_lookup[$row_symbol])) {
+                $this->transition_display_signal($user_id, $row, 'INVALIDATED', 'watchlist_removed', null, $now);
+                continue;
+            }
+
+            $candidate = $this->display_row_to_lifecycle_candidate($row);
+            $lifecycle = $this->get_mt5_candidate_lifecycle_state(
+                $user_id,
+                $row_symbol,
+                strtoupper((string) ($row['direction'] ?? 'LONG')),
+                $candidate
+            );
+            $state = (string) ($lifecycle['state'] ?? 'LIFECYCLE_UNRESOLVED');
+            if ($state === 'INACTIVE_STOPPED_OUT') {
+                $this->transition_display_signal($user_id, $row, 'STOP_HIT', (string) ($lifecycle['reason'] ?? 'stop_loss_crossed'), null, $now);
+                continue;
+            }
+            if (in_array($state, array('ACTIVE_OPEN_POSITION', 'ACTIVE_PENDING_ORDER'), true)) {
+                $this->transition_display_signal($user_id, $row, 'FILLED_CONFIRMED', (string) ($lifecycle['reason'] ?? 'matching_trade'), null, $now);
+                continue;
+            }
+            if ($state === 'INACTIVE_ENTRY_PASSED') {
+                $this->transition_display_signal($user_id, $row, 'ENTRY_HIT', (string) ($lifecycle['reason'] ?? 'entry_crossed_without_matching_trade'), null, $now);
+                continue;
+            }
+            if (isset($blocked_symbols[$row_symbol])) {
+                $this->transition_display_signal($user_id, $row, 'STALE_HELD', (string) ($blocked_symbols[$row_symbol]['engineBlocker'] ?? 'stale_data'), null, $now);
+                continue;
+            }
+            if (strtoupper((string) ($row['lifecycle_state'] ?? '')) === 'STALE_HELD') {
+                $this->transition_display_signal($user_id, $row, 'DISPLAY_ACTIVE', 'fresh_data_restored', null, $now);
+                continue;
+            }
+            if (!empty($row['expires_at']) && strcmp((string) $row['expires_at'], $now) < 0) {
+                $this->transition_display_signal($user_id, $row, 'EXPIRED', 'ttl_exceeded', null, $now);
             }
         }
 
-        $blocked_symbols = array();
+        $active_rows = $this->read_display_signal_rows($user_id, array_keys($watchlist_lookup), true);
+        foreach ($signals as $signal) {
+            if (!is_array($signal) || !$this->is_display_signal_eligible($signal, $watchlist_lookup)) {
+                continue;
+            }
+            $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($signal['symbol'] ?? '')));
+            if ($symbol === '' || isset($blocked_symbols[$symbol])) {
+                continue;
+            }
+
+            $candidate = $this->hydrate_display_signal_candidate($user_id, $signal);
+            if ($candidate === null) {
+                continue;
+            }
+
+            $status = strtoupper((string) ($candidate['status'] ?? ''));
+            $quality_score = $this->compute_display_signal_quality_score($candidate, $signal);
+            if ($status === 'READY' && $quality_score < 300) {
+                continue;
+            }
+            if ($status === 'ARMED' && !$this->armed_signal_confirmed($user_id, $candidate, $now)) {
+                continue;
+            }
+
+            $family_key = $this->compute_signal_family_key($user_id, $candidate, $signal);
+            $existing_same_family = $this->find_display_row_by_family($active_rows, $family_key);
+            if ($existing_same_family !== null) {
+                $existing_score = (float) ($existing_same_family['quality_score'] ?? 0);
+                if ($quality_score >= $existing_score || ($quality_score - $existing_score) >= 50) {
+                    $this->upsert_display_signal_row($user_id, $signal, $candidate, $family_key, $quality_score, $existing_same_family, $now);
+                    $active_rows = $this->read_display_signal_rows($user_id, array_keys($watchlist_lookup), true);
+                }
+                continue;
+            }
+
+            $same_direction_row = $this->find_display_row_by_symbol_direction($active_rows, $symbol, strtoupper((string) ($candidate['direction'] ?? '')), true);
+            if ($same_direction_row !== null && $quality_score < ((float) ($same_direction_row['quality_score'] ?? 0) + 50)) {
+                continue;
+            }
+
+            $opposite_row = $this->find_display_row_by_symbol_direction($active_rows, $symbol, strtoupper((string) ($candidate['direction'] ?? '')), false);
+            if ($opposite_row !== null) {
+                if ($status !== 'READY' || $quality_score < ((float) ($opposite_row['quality_score'] ?? 0) + 150)) {
+                    continue;
+                }
+            }
+
+            $inserted_id = $this->upsert_display_signal_row($user_id, $signal, $candidate, $family_key, $quality_score, null, $now);
+            if ($same_direction_row !== null) {
+                $this->transition_display_signal($user_id, $same_direction_row, 'REPLACED', 'better_same_direction_signal', $inserted_id, $now);
+            }
+            if ($opposite_row !== null) {
+                $this->transition_display_signal($user_id, $opposite_row, 'REPLACED', 'stronger_opposing_signal', $inserted_id, $now);
+            }
+            $active_rows = $this->read_display_signal_rows($user_id, array_keys($watchlist_lookup), true);
+        }
+    }
+
+    private function normalize_symbol_lookup(array $symbols): array {
+        $lookup = array();
+        foreach ($symbols as $symbol) {
+            $normalized = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $symbol));
+            if ($normalized !== '') {
+                $lookup[$normalized] = true;
+            }
+        }
+        return $lookup;
+    }
+
+    private function extract_blocked_symbols(array $diagnostics, array $watchlist_lookup): array {
+        $blocked = array();
         foreach ($diagnostics as $diagnostic) {
             if (!is_array($diagnostic) || empty($diagnostic['symbol'])) {
                 continue;
@@ -5480,73 +5665,264 @@ final class SMC_SuperFib_Sniper_REST {
             $engine_blocker = strtoupper((string) ($diagnostic['engineBlocker'] ?? 'OK'));
             $price_state = strtolower((string) ($diagnostic['priceState'] ?? 'live'));
             $candle_state = strtolower((string) ($diagnostic['candleState'] ?? 'live'));
-            if (
-                $engine_blocker !== 'OK'
-                || $price_state !== 'live'
-                || in_array($candle_state, array('stale', 'offline', 'missing', 'closed_session'), true)
-            ) {
-                $blocked_symbols[$symbol] = array(
+            if ($engine_blocker !== 'OK' || $price_state !== 'live' || in_array($candle_state, array('stale', 'offline', 'missing', 'closed_session'), true)) {
+                $blocked[$symbol] = array(
                     'engineBlocker' => $engine_blocker !== '' ? $engine_blocker : 'UNKNOWN',
                     'priceState' => $price_state !== '' ? $price_state : 'unknown',
                     'candleState' => $candle_state !== '' ? $candle_state : 'unknown',
                 );
             }
         }
+        return $blocked;
+    }
 
-        foreach ($blocked_symbols as $symbol => $blocker) {
-            $wpdb->update(
-                $this->table('signals'),
-                array(
-                    'status' => 'WATCH',
-                    'backend_confirmed' => 0,
-                    'engine' => wp_json_encode(array('engineBlocker' => $blocker['engineBlocker'])),
-                    'updated_at' => $this->now_mysql(),
-                ),
-                array(
-                    'user_id' => $user_id,
-                    'symbol' => $symbol,
-                ),
-                array('%s', '%d', '%s', '%s'),
-                array('%d', '%s')
+    private function hydrate_display_signal_candidate(int $user_id, array $signal): ?array {
+        global $wpdb;
+        $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($signal['symbol'] ?? '')));
+        $direction = strtoupper((string) ($signal['direction'] ?? ''));
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table('mt5_signal_candidates')} WHERE user_id = %d",
+            $user_id
+        ), ARRAY_A);
+        $latest = null;
+        foreach ((array) $rows as $row) {
+            if (($row['symbol'] ?? '') !== $symbol || strtoupper((string) ($row['direction'] ?? '')) !== $direction) {
+                continue;
+            }
+            if ($latest === null || strcmp((string) ($row['created_at'] ?? ''), (string) ($latest['created_at'] ?? '')) > 0) {
+                $latest = $row;
+            }
+        }
+        if (!is_array($latest)) {
+            $entry = isset($signal['entryPrice']) && is_numeric($signal['entryPrice']) ? (float) $signal['entryPrice'] : 0.0;
+            if ($entry <= 0) {
+                return null;
+            }
+            return array(
+                'id' => (string) ($signal['id'] ?? ''),
+                'symbol' => $symbol,
+                'direction' => $direction,
+                'status' => strtoupper((string) ($signal['status'] ?? '')),
+                'verdict' => strtoupper((string) ($signal['verdict'] ?? 'C')),
+                'entry_price' => $entry,
+                'sl_price' => isset($signal['slPrice']) && is_numeric($signal['slPrice']) ? (float) $signal['slPrice'] : null,
+                'tp_price' => isset($signal['tpPrice']) && is_numeric($signal['tpPrice']) ? (float) $signal['tpPrice'] : null,
+                'fib_family' => (string) (($signal['engine']['firstReactionFamily'] ?? null) ?: 'backend'),
+                'fib_ratio' => null,
+                'confidence' => 0.0,
+                'pine_match' => null,
+                'created_at' => $this->normalize_market_timestamp($signal['createdAt'] ?? null, $this->now_mysql()),
             );
-            error_log(sprintf(
-                '[SMC_SF] live signal board hid symbol=%s user_id=%d blocker=%s priceState=%s candleState=%s',
-                $symbol,
-                $user_id,
-                $blocker['engineBlocker'],
-                $blocker['priceState'],
-                $blocker['candleState']
-            ));
         }
+        $latest['status'] = strtoupper((string) ($signal['status'] ?? ($latest['status'] ?? '')));
+        $latest['verdict'] = strtoupper((string) ($signal['verdict'] ?? ($latest['verdict'] ?? 'C')));
+        return $latest;
+    }
 
-        foreach ($signals as $signal) {
-            if (!is_array($signal) || !$this->is_display_signal_eligible($signal, $watchlist_lookup)) {
-                continue;
+    private function armed_signal_confirmed(int $user_id, array $candidate, string $now): bool {
+        $key = 'smc_sf_armed_confirm_' . $user_id . '_' . md5($this->compute_signal_family_key($user_id, $candidate, array()));
+        $state = get_transient($key);
+        $count = is_array($state) ? (int) ($state['count'] ?? 0) : 0;
+        $count++;
+        set_transient($key, array('count' => $count, 'lastSeenAt' => $now), 300);
+        return $count >= 2;
+    }
+
+    private function compute_signal_family_key(int $user_id, array $candidate, array $signal): string {
+        $engine = is_array($signal['engine'] ?? null) ? $signal['engine'] : array();
+        $anchor = (string) ($engine['anchorSessionId'] ?? ($engine['anchorSession'] ?? date('Ymd', strtotime((string) ($candidate['created_at'] ?? $this->now_mysql())))));
+        $parts = array(
+            $user_id,
+            preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($candidate['symbol'] ?? ''))),
+            strtoupper((string) ($candidate['direction'] ?? '')),
+            (string) (($candidate['fib_family'] ?? '') ?: ($engine['firstReactionFamily'] ?? 'backend')),
+            is_numeric($candidate['fib_ratio'] ?? null) ? number_format((float) $candidate['fib_ratio'], 4, '.', '') : 'na',
+            $anchor,
+        );
+        return substr(hash('sha256', implode('|', $parts)), 0, 64);
+    }
+
+    private function compute_display_signal_quality_score(array $candidate, array $signal): float {
+        $verdict_scores = array('A+' => 400, 'A' => 300, 'B' => 200, 'C' => 100);
+        $status_scores = array('READY' => 120, 'ARMED' => 70, 'WATCH' => 20);
+        $engine = is_array($signal['engine'] ?? null) ? $signal['engine'] : array();
+        $score = (float) ($verdict_scores[strtoupper((string) ($candidate['verdict'] ?? 'C'))] ?? 100);
+        $score += (float) ($status_scores[strtoupper((string) ($candidate['status'] ?? 'WATCH'))] ?? 0);
+        $score += max(0.0, min(1.0, (float) ($candidate['confidence'] ?? 0.0))) * 100.0;
+        foreach (array('sweep', 'mss') as $key) {
+            if (strtoupper((string) ($engine[$key] ?? '')) === 'PRESENT') {
+                $score += 25.0;
             }
-            $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($signal['symbol'] ?? '')));
-            if (isset($blocked_symbols[$symbol])) {
-                continue;
-            }
-            $signal_engine = is_array($signal['engine'] ?? null) ? $signal['engine'] : array();
-            if (!isset($signal_engine['engineBlocker'])) {
-                $signal_engine['engineBlocker'] = 'OK';
-            }
-            $created_at = $this->normalize_market_timestamp($signal['createdAt'] ?? null, $this->now_mysql());
-            $wpdb->query($wpdb->prepare(
-                "INSERT INTO `{$this->table('signals')}` (id, user_id, symbol, direction, status, verdict, confluence, engine, backend_confirmed, created_at, updated_at) VALUES (%s, %d, %s, %s, %s, %s, %s, %s, %d, %s, %s) ON DUPLICATE KEY UPDATE symbol=VALUES(symbol), direction=VALUES(direction), status=VALUES(status), verdict=VALUES(verdict), confluence=VALUES(confluence), engine=VALUES(engine), backend_confirmed=VALUES(backend_confirmed), updated_at=VALUES(updated_at)",
-                (string) $signal['id'],
-                $user_id,
-                $symbol,
-                strtoupper((string) ($signal['direction'] ?? '')),
-                strtoupper((string) ($signal['status'] ?? '')),
-                strtoupper((string) ($signal['verdict'] ?? 'C')),
-                wp_json_encode(is_array($signal['confluence'] ?? null) ? $signal['confluence'] : array()),
-                wp_json_encode($signal_engine),
-                !empty($signal['backendConfirmed']) ? 1 : 0,
-                $created_at,
-                $this->now_mysql()
-            ));
         }
+        if (in_array(strtoupper((string) ($engine['displacement'] ?? '')), array('CLEAN', 'STRONG'), true)) {
+            $score += 25.0;
+        }
+        $direction = strtoupper((string) ($candidate['direction'] ?? ''));
+        $htf_bias = strtoupper((string) ($engine['htfBias'] ?? ($candidate['htf_bias'] ?? '')));
+        if (($direction === 'LONG' && $htf_bias === 'BULL') || ($direction === 'SHORT' && $htf_bias === 'BEAR')) {
+            $score += 80.0;
+        }
+        $pd_state = strtoupper((string) ($engine['pdState'] ?? ''));
+        if (($direction === 'LONG' && $pd_state === 'DISCOUNT') || ($direction === 'SHORT' && $pd_state === 'PREMIUM')) {
+            $score += 60.0;
+        }
+        switch (strtoupper((string) ($candidate['pine_match'] ?? ''))) {
+            case 'EXACT': $score += 100.0; break;
+            case 'DRIFT': $score += 30.0; break;
+            case 'MISMATCH': $score -= 150.0; break;
+        }
+        if (strtoupper((string) ($signal['engineBlocker'] ?? ($engine['engineBlocker'] ?? 'OK'))) !== 'OK') {
+            $score -= 300.0;
+        }
+        $chop = isset($engine['candleChop']) && is_numeric($engine['candleChop']) ? (float) $engine['candleChop'] : null;
+        if ($chop !== null && $chop >= 0.7) {
+            $score -= 150.0;
+        } elseif ($chop !== null && $chop >= 0.55) {
+            $score -= 50.0;
+        }
+        return round($score, 4);
+    }
+
+    private function read_display_signal_rows(int $user_id, array $symbols, bool $include_terminal = false): array {
+        global $wpdb;
+        self::ensure_display_signals_table();
+        $lookup = $this->normalize_symbol_lookup($symbols);
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table('display_signals')} WHERE user_id = %d",
+            $user_id
+        ), ARRAY_A);
+        $allowed_states = $include_terminal
+            ? array('DISPLAY_ACTIVE', 'STALE_HELD', 'ENTRY_HIT')
+            : array('DISPLAY_ACTIVE', 'STALE_HELD', 'ENTRY_HIT', 'FILLED_CONFIRMED');
+        $out = array();
+        foreach ((array) $rows as $row) {
+            $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($row['symbol'] ?? '')));
+            if (!empty($lookup) && !isset($lookup[$symbol])) {
+                continue;
+            }
+            if (!in_array(strtoupper((string) ($row['lifecycle_state'] ?? '')), $allowed_states, true)) {
+                continue;
+            }
+            $out[] = $row;
+        }
+        return $out;
+    }
+
+    private function find_display_row_by_family(array $rows, string $family_key): ?array {
+        foreach ($rows as $row) {
+            if ((string) ($row['signal_family_key'] ?? '') === $family_key) {
+                return $row;
+            }
+        }
+        return null;
+    }
+
+    private function find_display_row_by_symbol_direction(array $rows, string $symbol, string $direction, bool $same): ?array {
+        foreach ($rows as $row) {
+            if (strtoupper((string) ($row['symbol'] ?? '')) !== $symbol) {
+                continue;
+            }
+            $row_direction = strtoupper((string) ($row['direction'] ?? ''));
+            if (($same && $row_direction === $direction) || (!$same && $row_direction !== $direction)) {
+                return $row;
+            }
+        }
+        return null;
+    }
+
+    private function upsert_display_signal_row(int $user_id, array $signal, array $candidate, string $family_key, float $quality_score, ?array $existing, string $now): string {
+        global $wpdb;
+        self::ensure_display_signals_table();
+        $source_signal_id = trim((string) ($signal['id'] ?? ''));
+        $source_candidate_id = trim((string) ($candidate['id'] ?? ''));
+        if ($source_signal_id === '') {
+            $source_signal_id = $source_candidate_id;
+        }
+        $id = $existing !== null ? (string) $existing['id'] : $source_signal_id;
+        if ($id === '') {
+            $id = 'disp-' . substr(hash('sha256', $family_key), 0, 18);
+        }
+        $engine = is_array($signal['engine'] ?? null) ? $signal['engine'] : array();
+        if (!isset($engine['engineBlocker'])) {
+            $engine['engineBlocker'] = (string) ($signal['engineBlocker'] ?? 'OK');
+        }
+        $row = array(
+            'id' => $id,
+            'user_id' => $user_id,
+            'symbol' => preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($candidate['symbol'] ?? ''))),
+            'direction' => strtoupper((string) ($candidate['direction'] ?? '')),
+            'lifecycle_state' => 'DISPLAY_ACTIVE',
+            'status' => strtoupper((string) ($candidate['status'] ?? '')),
+            'verdict' => strtoupper((string) ($candidate['verdict'] ?? 'C')),
+            'quality_score' => $quality_score,
+            'signal_family_key' => $family_key,
+            'entry_price' => (float) ($candidate['entry_price'] ?? 0),
+            'sl_price' => isset($candidate['sl_price']) && is_numeric($candidate['sl_price']) ? (float) $candidate['sl_price'] : null,
+            'tp_price' => isset($candidate['tp_price']) && is_numeric($candidate['tp_price']) ? (float) $candidate['tp_price'] : null,
+            'source_candidate_id' => (string) ($candidate['id'] ?? ($signal['id'] ?? '')),
+            'source' => 'backend',
+            'entry_hit_at' => $existing['entry_hit_at'] ?? null,
+            'stop_hit_at' => $existing['stop_hit_at'] ?? null,
+            'replaced_by' => null,
+            'invalidated_at' => null,
+            'invalidation_reason' => null,
+            'first_seen_at' => $existing['first_seen_at'] ?? $now,
+            'last_confirmed_at' => $now,
+            'last_evaluated_at' => $now,
+            'expires_at' => gmdate('Y-m-d H:i:s', strtotime($now . ' +4 hours')),
+            'confluence' => wp_json_encode(is_array($signal['confluence'] ?? null) ? $signal['confluence'] : array()),
+            'engine' => wp_json_encode($engine),
+        );
+        $wpdb->replace($this->table('display_signals'), $row);
+        $this->audit($user_id, $existing === null ? 'display_signal.promoted' : 'display_signal.upgraded', array(
+            'id' => $id,
+            'symbol' => $row['symbol'],
+            'direction' => $row['direction'],
+            'quality_score' => $quality_score,
+            'signal_family_key' => $family_key,
+        ));
+        return $id;
+    }
+
+    private function transition_display_signal(int $user_id, array $row, string $state, string $reason, ?string $replaced_by, string $now): void {
+        global $wpdb;
+        self::ensure_display_signals_table();
+        $data = array(
+            'lifecycle_state' => $state,
+            'last_evaluated_at' => $now,
+        );
+        if ($state === 'ENTRY_HIT' && empty($row['entry_hit_at'])) {
+            $data['entry_hit_at'] = $now;
+        }
+        if ($state === 'STOP_HIT') {
+            $data['stop_hit_at'] = $now;
+        }
+        if (in_array($state, array('STOP_HIT', 'REPLACED', 'EXPIRED', 'INVALIDATED'), true)) {
+            $data['invalidated_at'] = $now;
+            $data['invalidation_reason'] = $reason;
+        }
+        if ($replaced_by !== null) {
+            $data['replaced_by'] = $replaced_by;
+        }
+        $wpdb->update($this->table('display_signals'), $data, array('id' => (string) ($row['id'] ?? ''), 'user_id' => $user_id));
+        $this->audit($user_id, 'display_signal.lifecycle_transition', array(
+            'id' => (string) ($row['id'] ?? ''),
+            'symbol' => (string) ($row['symbol'] ?? ''),
+            'state' => $state,
+            'reason' => $reason,
+            'replaced_by' => $replaced_by,
+        ));
+    }
+
+    private function display_row_to_lifecycle_candidate(array $row): array {
+        return array(
+            'id' => (string) ($row['source_candidate_id'] ?? $row['id'] ?? ''),
+            'symbol' => (string) ($row['symbol'] ?? ''),
+            'direction' => strtoupper((string) ($row['direction'] ?? '')),
+            'entry_price' => (float) ($row['entry_price'] ?? 0),
+            'sl_price' => isset($row['sl_price']) && is_numeric($row['sl_price']) ? (float) $row['sl_price'] : null,
+            'tp_price' => isset($row['tp_price']) && is_numeric($row['tp_price']) ? (float) $row['tp_price'] : null,
+        );
     }
 
     private function is_display_signal_eligible(array $signal, array $watchlist_lookup): bool {
@@ -5569,68 +5945,29 @@ final class SMC_SuperFib_Sniper_REST {
         return $engine_blocker === 'OK';
     }
 
-    private function read_live_signal_board(int $user_id, array $symbols): array {
-        global $wpdb;
-
-        $watchlist_lookup = array();
-        foreach ($symbols as $symbol) {
-            $normalized = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $symbol));
-            if ($normalized !== '') {
-                $watchlist_lookup[$normalized] = true;
+    private function read_live_signal_board(int $user_id, array $symbols, ?int $board_size = null): array {
+        $rows = $this->read_display_signal_rows($user_id, $symbols, false);
+        usort($rows, function ($a, $b) {
+            $score_cmp = ((float) ($b['quality_score'] ?? 0)) <=> ((float) ($a['quality_score'] ?? 0));
+            if ($score_cmp !== 0) {
+                return $score_cmp;
             }
-        }
-        if (empty($watchlist_lookup)) {
-            return array();
-        }
-
-        $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$this->table('signals')} WHERE user_id = %d",
-            $user_id
-        ), ARRAY_A);
-        $eligible = array();
-        foreach ((array) $rows as $row) {
-            $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($row['symbol'] ?? '')));
-            if ($symbol === '' || !isset($watchlist_lookup[$symbol])) {
-                continue;
-            }
-            $status = strtoupper((string) ($row['status'] ?? ''));
-            if (!in_array($status, array('ARMED', 'READY'), true)) {
-                continue;
-            }
-            $engine = json_decode((string) ($row['engine'] ?? ''), true);
-            if (!is_array($engine)) {
-                $engine = array();
-            }
-            $engine_blocker = strtoupper((string) ($engine['engineBlocker'] ?? 'OK'));
-            if ($engine_blocker !== 'OK') {
-                continue;
-            }
-            $row['_decoded_engine'] = $engine;
-            $eligible[] = $row;
-        }
-
-        $verdict_rank = array('A+' => 4, 'A' => 3, 'B' => 2, 'C' => 1);
-        usort($eligible, function ($a, $b) use ($verdict_rank) {
-            $confirmed_cmp = ((int) ($b['backend_confirmed'] ?? 0)) <=> ((int) ($a['backend_confirmed'] ?? 0));
-            if ($confirmed_cmp !== 0) {
-                return $confirmed_cmp;
-            }
-            $a_verdict = strtoupper((string) ($a['verdict'] ?? 'C'));
-            $b_verdict = strtoupper((string) ($b['verdict'] ?? 'C'));
-            $verdict_cmp = ($verdict_rank[$b_verdict] ?? 0) <=> ($verdict_rank[$a_verdict] ?? 0);
-            if ($verdict_cmp !== 0) {
-                return $verdict_cmp;
-            }
-            $updated_cmp = strcmp((string) ($b['updated_at'] ?? ''), (string) ($a['updated_at'] ?? ''));
+            $updated_cmp = strcmp((string) ($b['last_confirmed_at'] ?? ''), (string) ($a['last_confirmed_at'] ?? ''));
             if ($updated_cmp !== 0) {
                 return $updated_cmp;
             }
             return strcmp((string) ($a['id'] ?? ''), (string) ($b['id'] ?? ''));
         });
-
+        if ($board_size !== null) {
+            $rows = array_slice($rows, 0, max(1, min(10, $board_size)));
+        }
         return array_values(array_map(function ($row) {
             return $this->signal_row_to_candidate($row);
-        }, $eligible));
+        }, $rows));
+    }
+
+    private function count_live_signal_board(int $user_id, array $symbols): int {
+        return count($this->read_display_signal_rows($user_id, $symbols, false));
     }
 
     private function signal_row_to_candidate(array $row): array {
@@ -5638,13 +5975,12 @@ final class SMC_SuperFib_Sniper_REST {
         if (!is_array($confluence)) {
             $confluence = array();
         }
-        $engine = isset($row['_decoded_engine']) && is_array($row['_decoded_engine'])
-            ? $row['_decoded_engine']
-            : json_decode((string) ($row['engine'] ?? ''), true);
+        $engine = json_decode((string) ($row['engine'] ?? ''), true);
         if (!is_array($engine)) {
             $engine = array();
         }
         $engine_blocker = strtoupper((string) ($engine['engineBlocker'] ?? 'OK'));
+        $lifecycle_state = strtoupper((string) ($row['lifecycle_state'] ?? 'DISPLAY_ACTIVE'));
 
         return array(
             'id' => (string) ($row['id'] ?? ''),
@@ -5654,9 +5990,28 @@ final class SMC_SuperFib_Sniper_REST {
             'confluence' => array_values($confluence),
             'verdict' => strtoupper((string) ($row['verdict'] ?? 'C')),
             'computedBy' => 'backend',
-            'backendConfirmed' => (int) ($row['backend_confirmed'] ?? 0) === 1,
+            'backendConfirmed' => true,
             'engineBlocker' => $engine_blocker,
-            'createdAt' => $this->to_iso((string) ($row['created_at'] ?? '')),
+            'createdAt' => $this->to_iso((string) ($row['first_seen_at'] ?? '')),
+            'qualityScore' => (float) ($row['quality_score'] ?? 0),
+            'lifecycleState' => $lifecycle_state,
+            'signalFamilyKey' => (string) ($row['signal_family_key'] ?? ''),
+            'entryPrice' => (float) ($row['entry_price'] ?? 0),
+            'slPrice' => isset($row['sl_price']) && is_numeric($row['sl_price']) ? (float) $row['sl_price'] : null,
+            'tpPrice' => isset($row['tp_price']) && is_numeric($row['tp_price']) ? (float) $row['tp_price'] : null,
+            'validity' => array(
+                'state' => $lifecycle_state,
+                'entryHitAt' => !empty($row['entry_hit_at']) ? $this->to_iso((string) $row['entry_hit_at']) : null,
+                'stopHitAt' => !empty($row['stop_hit_at']) ? $this->to_iso((string) $row['stop_hit_at']) : null,
+                'invalidationReason' => (string) ($row['invalidation_reason'] ?? ''),
+            ),
+            'persistence' => array(
+                'firstSeenAt' => $this->to_iso((string) ($row['first_seen_at'] ?? '')),
+                'lastConfirmedAt' => $this->to_iso((string) ($row['last_confirmed_at'] ?? '')),
+                'lastEvaluatedAt' => $this->to_iso((string) ($row['last_evaluated_at'] ?? '')),
+                'expiresAt' => !empty($row['expires_at']) ? $this->to_iso((string) $row['expires_at']) : null,
+                'replacedBy' => (string) ($row['replaced_by'] ?? ''),
+            ),
             'engine' => $engine,
         );
     }
@@ -6796,6 +7151,7 @@ final class SMC_SuperFib_Sniper_REST {
             'staleThresholdSec' => 60,
             'watchlist' => array('GBPUSD', 'AUDUSD', 'EURUSD', 'NZDUSD', 'USDJPY', 'AUDJPY', 'EURJPY', 'XAUUSD'),
             'riskAllocation' => array('perTradePct' => 0.5, 'dailyMaxPct' => 2.0, 'ddCapPct' => 6.0),
+            'signalBoardSize' => 3,
         );
 
         $row = $wpdb->get_var($wpdb->prepare(
@@ -8545,6 +8901,26 @@ final class SMC_SuperFib_Sniper_REST {
             'dailyMaxPct' => $this->float_between($payload, 'dailyMaxPct', 0.1, 20.0, $fallback['dailyMaxPct']),
             'ddCapPct' => $this->float_between($payload, 'ddCapPct', 0.1, 50.0, $fallback['ddCapPct']),
         );
+    }
+
+    private function sanitize_signal_board_size($value): int {
+        $size = (int) $value;
+        if ($size <= 3) {
+            return 3;
+        }
+        if ($size <= 5) {
+            return 5;
+        }
+        return 10;
+    }
+
+    private function resolve_signal_board_size(int $user_id): int {
+        $request_value = isset($_GET['board_size']) ? $_GET['board_size'] : (isset($_GET['boardSize']) ? $_GET['boardSize'] : null);
+        if ($request_value !== null) {
+            return $this->sanitize_signal_board_size($request_value);
+        }
+        $settings = $this->get_settings($user_id);
+        return $this->sanitize_signal_board_size($settings['signalBoardSize'] ?? 3);
     }
 
     private function int_between($payload, $key, $min, $max, $fallback) {
