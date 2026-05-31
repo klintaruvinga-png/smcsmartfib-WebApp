@@ -6,6 +6,13 @@ and the permanent guard installed to prevent recurrence. New entries are prepend
 
 ---
 
+## [2026-05-30] Phase 4 live soak status confirmed; next manual gate action identified
+
+- **Update:** Phase 4 Fib Engine Migration is actively soaking on live MT5, with `Phase-4-Implementation` deployed and the 30-day corpus accumulation window open. T0 admin baseline capture is complete, and corrected H4 runtime ingest verification is confirmed.
+- **Next manual action:** Confirm the authenticated export path for `/wp-json/sniper/v1/market-data/fib-levels`, then capture the first paired `mt5-levels.json` / `pine-levels.json` export snapshot for the live parity validator. This is the earliest required operator step before the weekly soak checkpoints and final 30-day gate.
+- **Gate note:** Current `reports/phase4-gate.json` is a synthetic validator self-test and does not yet represent the final MT5-vs-Pine paired gate closure.
+- **Target cadence:** Weekly soak checkpoints are due 2026-06-03, 2026-06-10, and 2026-06-17, with the final 30-day checkpoint due 2026-06-26.
+
 ## [2026-05-26] Stale pipeline artifacts block new research cycles
 
 - **Failure:** Prior-cycle `reports/codex-plan.md` (issue: crypto weekend session classification, PR #228) remained in the working directory when the "Fix EA compile errors" task was queued. Codex read the stale contract and halted with a conflict error.

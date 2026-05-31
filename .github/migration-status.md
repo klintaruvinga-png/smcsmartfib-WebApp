@@ -286,7 +286,7 @@ MT5 Live vs Pine Live:     PENDING (requires paired `mt5-levels.json` / `pine-le
 - ~~Live EA/plugin build verification pending~~ — **CLEARED 2026-05-27**
 - ~~**[OPERATOR]** Corrected H4 MT5 build not yet redeployed~~ — **CLEARED 2026-05-28**: corrected EA deployed; backend ingest confirmed `levels_written=128` for `XAUUSD` at `15:14:35 UTC`
 - **[GOVERNANCE]** Synthetic PASS artifact is not the final gate — `reports/phase4-gate.json` currently proves validator tooling only because `scripts/parity-validator.php` was run without paired `--mt5-file` and `--pine-file` inputs
-- **[OPERATOR]** Authenticated MT5 fib export path not yet confirmed — direct anonymous/userless GET to `/market-data/fib-levels` returns `smc_sf_auth_required` (401) by design
+- **[OPERATOR]** Authenticated MT5 fib export path confirmed — operator capture succeeded for `EURUSD`, `USDJPY`, `XAUUSD` and snapshots were saved to `./snapshots/20260531_041253/`
 - **[OPERATOR]** Live parity corpus not yet complete — no committed paired `mt5-levels.json` or `pine-levels.json` artifacts exist yet, and MT5 must continue running against real market data until the 30-day capture window and manual scenario checks are complete before the gate can be validated
 
 ---

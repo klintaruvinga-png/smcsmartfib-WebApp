@@ -507,17 +507,37 @@ public:
 
     // ---- Compression threshold ----
     // Matches PHP fib_compression_threshold(): pip_size * min_pips
+    //
+    // REGRESSION FIX: pip_size is now looked up from a hardcoded table that
+    // mirrors PHP's instrument spec exactly. The previous implementation
+    // derived pip_size from SYMBOL_POINT at runtime; brokers that report
+    // SYMBOL_POINT=0.001 for JPY pairs produced a threshold 10× larger than
+    // PHP's, causing valid LTF_SF sessions to be silently rejected as compressed
+    // (e.g. USDJPY H1/M15 LTF_SF always returned empty).
     double CompressionThreshold(string symbol)
     {
+        double pip_size = PipSizeForSymbol(symbol);
         bool isJPY = (StringLen(symbol) >= 6 &&
                       StringSubstr(symbol, 3, 3) == "JPY");
-        double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
-        if (point <= 0.0) point = 0.00001;
-
-        // Derive pip size: JPY pairs use 2dp so pip = 100*point; others 5dp so pip = 10*point
-        double pip_size = isJPY ? (point * 100.0) : (point * 10.0);
         double min_pips = isJPY ? 40.0 : 20.0;
         return min_pips * pip_size;
+    }
+
+    // Return the canonical pip size for a symbol, matching PHP instrument spec.
+    // Fallback: 0.0001 (standard 5dp forex).
+    double PipSizeForSymbol(string symbol)
+    {
+        // JPY pairs — 0.01
+        if (symbol == "USDJPY" || symbol == "AUDJPY" || symbol == "EURJPY" ||
+            symbol == "GBPJPY" || symbol == "NZDJPY" || symbol == "CADJPY")
+            return 0.01;
+
+        // Metals — 0.01
+        if (symbol == "XAUUSD" || symbol == "XAGUSD")
+            return 0.01;
+
+        // Standard 5dp forex — 0.0001
+        return 0.0001;
     }
 
     // ---- Lookback window ----

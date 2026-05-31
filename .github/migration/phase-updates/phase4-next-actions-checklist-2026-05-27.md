@@ -48,7 +48,7 @@
 
 | Status | Task | Owner | Target | Evidence to capture | Notes |
 |--------|------|-------|--------|---------------------|-------|
-| [ ] | Confirm authenticated export path for `/market-data/fib-levels` | Operator | Next session | Successful authenticated response for `EURUSD` | Direct unauthenticated GET returns `401 smc_sf_auth_required` by design |
+| [x] | Confirm authenticated export path for `/market-data/fib-levels` | Operator | Next session | Successful authenticated response for `EURUSD`, `USDJPY`, `XAUUSD`; snapshots saved to `./snapshots/20260531_041253/` | Direct unauthenticated GET returns `401 smc_sf_auth_required` by design |
 | [ ] | Export `mt5-levels.json` in flat validator format for `EURUSD`, `USDJPY`, `XAUUSD` | Operator | After auth path confirmed | Saved `mt5-levels.json` with `384` rows | Must include M15/H1/H4/D1 and both families |
 | [ ] | Capture `pine-levels.json` at the same UTC snapshot as MT5 export | Operator | Same session as MT5 export | Saved `pine-levels.json` with `384` rows | Use closed candles only |
 | [ ] | Run parity validator dry run on first matched snapshot set | Operator | After first paired export | `reports/phase4-gate.json` | Must use paired `--mt5-file` and `--pine-file` inputs; existing repo PASS artifact is synthetic self-test evidence only |
