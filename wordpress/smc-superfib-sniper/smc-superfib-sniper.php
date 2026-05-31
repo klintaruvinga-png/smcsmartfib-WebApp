@@ -3379,11 +3379,14 @@ final class SMC_SuperFib_Sniper_REST {
             );
         }
 
-        return rest_ensure_response(array(
+        $response = rest_ensure_response(array(
             'ok'     => true,
             'symbol' => $symbol,
             'fibs'   => $result,
         ));
+        $response->header('Cache-Control', 'no-store, no-cache, must-revalidate');
+        $response->header('Pragma', 'no-cache');
+        return $response;
     }
 
     // =========================================================================
