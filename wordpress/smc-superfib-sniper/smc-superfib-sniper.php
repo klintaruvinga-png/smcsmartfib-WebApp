@@ -5751,7 +5751,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         // Anchor the signal identity to the latest analysed candle so the same setup stays stable
         // within one 15m bar, while later intraday setups get a distinct execution queue identity.
-        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol, $anchor_chop_blocked, $aov_equilibrium_blocked, $is_equity_off_session);
+        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol, $anchor_chop_blocked, $aov_equilibrium_blocked, $is_equity_off_session, $fundamental_htf_opposed);
         $backend_confirmed = $status === 'READY' && $data_live && $engine_blocker === 'OK';
 
         $signal_anchor = $last_candle && !empty($last_candle['time']) ? $last_candle['time'] : gmdate('c');
@@ -7961,7 +7961,7 @@ final class SMC_SuperFib_Sniper_REST {
     // Returns a single string reason explaining why a READY signal cannot be
     // backend-confirmed, or 'OK' when everything is healthy.
 
-    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol = null, $anchor_chop_blocked = false, $aov_equilibrium_blocked = false, $is_equity_off_session = null) {
+    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol = null, $anchor_chop_blocked = false, $aov_equilibrium_blocked = false, $is_equity_off_session = null, $fundamental_htf_opposed = false) {
         $is_mt5_authority = false;
         if ($symbol !== null) {
             $is_mt5_authority = $this->is_mt5_authoritative($user_id, $symbol);
@@ -8022,6 +8022,11 @@ final class SMC_SuperFib_Sniper_REST {
         // It must suppress backend confirmation and plan generation, not just decorate
         // the gate response as BLOCKED.
         if ($aov_equilibrium_blocked) return 'AOV_EQUILIBRIUM_ZONE';
+
+        // CRITICAL HARDENING: HTF fundamental counter-bias is a hard readiness veto.
+        // Keep these ARMED setups planless by surfacing the same blocker that
+        // prevented READY instead of allowing the pending-blueprint path via OK.
+        if ($fundamental_htf_opposed) return 'FUNDAMENTAL_HTF_OPPOSED';
 
         return 'OK';
     }

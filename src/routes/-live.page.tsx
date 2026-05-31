@@ -44,6 +44,7 @@ function blockerWarning(blocker: EngineBlocker | undefined): string | null {
     READY_NOT_CONFIRMED_STALE_DATA: "READY but stale data - confirmation blocked",
     ANCHOR_CHOP_BLOCKED: "Gate blocked - SF+AF dual equilibrium zone",
     AOV_EQUILIBRIUM_ZONE: "Gate blocked - HTF authority equilibrium",
+    FUNDAMENTAL_HTF_OPPOSED: "Gate blocked - HTF fundamentals oppose signal bias",
   };
   return map[blocker] ?? blocker.replace(/_/g, " ").toLowerCase();
 }
