@@ -5838,15 +5838,30 @@ final class SMC_SuperFib_Sniper_REST {
         $has_sweep = !in_array($sweep_value, $negative_structural_values, true);
         $has_mss = !in_array($mss_value, $negative_structural_values, true);
         $has_displacement = in_array($displacement_value, array('clean', 'strong'), true);
+        $signal_status = $signal['status'] ?? null;
+        $lifecycle_state = is_array($lifecycle_diagnostic) ? ($lifecycle_diagnostic['state'] ?? null) : null;
+        $lifecycle_hard_suppressed = in_array($lifecycle_state, array('ACTIVE_OPEN_POSITION', 'ACTIVE_PENDING_ORDER'), true);
 
         if (
             $backend_confirmed !== false
             || $data_live !== true
             || $engine_blocker !== 'OK'
-            || ($signal['status'] ?? null) === 'WATCH'
-            || !$has_sweep
-            || (!$has_mss && !$has_displacement)
+            || $lifecycle_hard_suppressed
         ) {
+            return null;
+        }
+
+        if ($signal_status === 'WATCH') {
+            $plan = $this->build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles);
+            if (!is_array($plan)) {
+                return null;
+            }
+
+            $plan['source'] = 'watch-blueprint';
+            return $plan;
+        }
+
+        if (!$has_sweep || (!$has_mss && !$has_displacement)) {
             return null;
         }
 

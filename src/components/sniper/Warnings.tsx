@@ -1,25 +1,34 @@
 import { cn } from "@/lib/utils";
+import { Info } from "lucide-react";
 
 export function WarningLine({
   level = "warn",
   children,
   className,
 }: {
-  level?: "warn" | "block";
+  level?: "warn" | "block" | "watch";
   children: React.ReactNode;
   className?: string;
 }) {
+  const isWatch = level === "watch";
+
   return (
     <div
       className={cn(
         "flex items-start gap-2 rounded border px-2.5 py-1.5 text-xs",
         level === "warn"
           ? "border-warn/40 bg-warn/10 text-warn"
-          : "border-sell/50 bg-sell/10 text-sell",
+          : isWatch
+            ? "border-info/40 bg-info/10 text-info"
+            : "border-sell/50 bg-sell/10 text-sell",
         className,
       )}
     >
-      <span aria-hidden>⚠️</span>
+      {isWatch ? (
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+      ) : (
+        <span aria-hidden>⚠️</span>
+      )}
       <span className="leading-tight">{children}</span>
     </div>
   );

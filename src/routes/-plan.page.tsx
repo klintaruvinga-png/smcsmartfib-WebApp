@@ -30,6 +30,22 @@ type RenderableCandidate = RankedCandidate & {
   hasPlan: true;
 };
 
+function planQualityRank(candidate: RankedCandidate) {
+  if (candidate.signal.backendConfirmed && candidate.plan?.source === "backend-blueprint") {
+    return 4;
+  }
+  if (candidate.plan?.source === "backend-blueprint") {
+    return 3;
+  }
+  if (candidate.plan?.source === "pending-blueprint") {
+    return 2;
+  }
+  if (candidate.plan?.source === "watch-blueprint") {
+    return 1;
+  }
+  return 0;
+}
+
 function compareRankedCandidates(a: RankedCandidate, b: RankedCandidate) {
   const verdictDelta =
     (VERDICT_RANK[b.signal.verdict] ?? 0) - (VERDICT_RANK[a.signal.verdict] ?? 0);
@@ -42,6 +58,9 @@ function compareRankedCandidates(a: RankedCandidate, b: RankedCandidate) {
   const aReady = a.signal.status === "READY";
   const bReady = b.signal.status === "READY";
   if (aReady !== bReady) return aReady ? -1 : 1;
+
+  const planQualityDelta = planQualityRank(b) - planQualityRank(a);
+  if (planQualityDelta !== 0) return planQualityDelta;
 
   if (a.hasPlan !== b.hasPlan) return a.hasPlan ? -1 : 1;
 
@@ -140,19 +159,19 @@ export function PlanPage() {
 
     return (
       <div className="space-y-5">
-          <WalletOverview />
-          {laddersIsError && (
-            <div className="rounded-lg border border-warn/30 bg-warn/5 p-3 text-sm">
-              <div className="flex items-center gap-2 text-warn">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <div>/ladders: backend response missing ladder array</div>
-              </div>
-              {laddersError instanceof Error && (
-                <div className="text-xs text-mute mt-2">{laddersError.message}</div>
-              )}
+        <WalletOverview />
+        {laddersIsError && (
+          <div className="rounded-lg border border-warn/30 bg-warn/5 p-3 text-sm">
+            <div className="flex items-center gap-2 text-warn">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>/ladders: backend response missing ladder array</div>
             </div>
-          )}
-          <div className="space-y-3 text-sm">
+            {laddersError instanceof Error && (
+              <div className="text-xs text-mute mt-2">{laddersError.message}</div>
+            )}
+          </div>
+        )}
+        <div className="space-y-3 text-sm">
           <div className="flex items-center gap-2 text-mute">
             <AlertTriangle className="h-4 w-4 text-warn shrink-0" />
             {watchlist.length === 0
@@ -213,9 +232,7 @@ export function PlanPage() {
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap text-dim">
                         <span>blocker:</span>
-                        <span
-                          className={`font-mono ${blocker === "OK" ? "text-ok" : "text-warn"}`}
-                        >
+                        <span className={`font-mono ${blocker === "OK" ? "text-ok" : "text-warn"}`}>
                           {blocker}
                         </span>
                         <span className="text-dim/50">·</span>

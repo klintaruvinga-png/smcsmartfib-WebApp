@@ -55,6 +55,7 @@ export function PlanCandidateCard({
   const skippedStageLots = plan ? hasSkippedStageLots(plan) : false;
   const familyPill = plan?.executionSource ?? plan?.ladder?.e1.family;
   const pendingBlueprint = plan?.source === "pending-blueprint";
+  const watchBlueprint = plan?.source === "watch-blueprint";
   const entryRows = plan
     ? [
         {
@@ -156,11 +157,17 @@ export function PlanCandidateCard({
                   ? "buy"
                   : pendingBlueprint
                     ? "pending"
-                    : "violet"
+                    : watchBlueprint
+                      ? "info"
+                      : "violet"
               }
             >
               {pendingBlueprint && <Lock className="h-3 w-3" />}
-              {pendingBlueprint ? "PENDING BLUEPRINT" : plan.source}
+              {pendingBlueprint
+                ? "PENDING BLUEPRINT"
+                : watchBlueprint
+                  ? "WATCH BLUEPRINT"
+                  : plan.source}
             </MetaChip>
           ) : (
             <MetaChip tone="neutral">NO BLUEPRINT</MetaChip>
@@ -182,6 +189,13 @@ export function PlanCandidateCard({
         <WarningLine level="warn">
           Pending blueprint is visible for planning only. Execution remains disabled until backend
           confirmation.
+        </WarningLine>
+      )}
+
+      {watchBlueprint && (
+        <WarningLine level="watch">
+          Watch blueprint is indicative and read-only. It will be replaced when a higher-quality
+          ARMED/READY or backend-confirmed blueprint is available.
         </WarningLine>
       )}
 
@@ -413,7 +427,7 @@ function MetaChip({
   tone,
   children,
 }: {
-  tone: "buy" | "violet" | "warn" | "neutral" | "pending";
+  tone: "buy" | "violet" | "warn" | "neutral" | "pending" | "info";
   children: ReactNode;
 }) {
   return (
@@ -425,6 +439,7 @@ function MetaChip({
         tone === "warn" && "border-warn/40 text-warn bg-warn/10",
         tone === "neutral" && "border-bd text-mute bg-bg2",
         tone === "pending" && "border-warn/40 text-warn bg-warn/10",
+        tone === "info" && "border-info/40 text-info bg-info/10",
       )}
     >
       {children}
