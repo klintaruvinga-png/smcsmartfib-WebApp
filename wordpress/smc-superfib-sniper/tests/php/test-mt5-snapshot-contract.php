@@ -1203,25 +1203,57 @@ $stableLiveSignalsSnapshot = array(
     'gates' => array(),
     'signals' => array(
         array(
-            'id' => 'sig-eurusd-long-stable',
+            'id' => 'sig-eurusd-watch-raw',
             'symbol' => 'EURUSD',
             'direction' => 'LONG',
-            'status' => 'READY',
-            'confluence' => array('OB', 'FVG'),
-            'verdict' => 'A',
+            'status' => 'WATCH',
+            'confluence' => array('HTA_SF'),
+            'verdict' => 'C',
             'computedBy' => 'backend',
-            'backendConfirmed' => true,
+            'backendConfirmed' => false,
+            'engineBlocker' => 'OK',
             'createdAt' => '2026-05-03T08:15:00+00:00',
         ),
     ),
     'plans' => array(),
-    'diagnostics' => array(),
+    'diagnostics' => array(
+        array(
+            'symbol' => 'EURUSD',
+            'priceState' => 'live',
+            'candleState' => 'live',
+            'engineBlocker' => 'OK',
+        ),
+    ),
     'meta' => array(
         'computedAt' => gmdate('c'),
         'watchlist' => array('EURUSD'),
     ),
 );
 update_user_meta(7, 'smc_sf_engine_snapshot', $stableLiveSignalsSnapshot);
+$signalsTable = $wpdb->prefix . 'smc_sf_signals';
+$wpdb->replace($signalsTable, array(
+    'id' => 'sig-eurusd-long-stable',
+    'user_id' => 7,
+    'symbol' => 'EURUSD',
+    'direction' => 'LONG',
+    'status' => 'READY',
+    'verdict' => 'A',
+    'confluence' => json_encode(array('OB', 'FVG')),
+    'engine' => json_encode(array(
+        'engineBlocker' => 'OK',
+        'htfBias' => 'BULL',
+        'pdState' => 'DISCOUNT',
+        'drawOnLiquidity' => 'opposing buy-side liquidity',
+        'sweep' => 'present',
+        'mss' => 'present',
+        'displacement' => 'clean',
+        'htaOverride' => false,
+        'f3Chop' => 'clear',
+    )),
+    'backend_confirmed' => 1,
+    'created_at' => '2026-05-03 08:15:00',
+    'updated_at' => '2026-05-03 08:16:00',
+));
 $GLOBALS['test_rest_force_response'] = true;
 $firstLiveSignalsResponse = $instance->get_live_signals();
 assert_true($firstLiveSignalsResponse instanceof WP_REST_Response, 'get_live_signals must return a REST response when header assertions are enabled');
@@ -1241,6 +1273,7 @@ assert_true(!empty($firstLiveSignalsPayload['polledAt']), 'get_live_signals must
 assert_true(!empty($secondLiveSignalsPayload['polledAt']), 'get_live_signals must stamp polledAt on the response envelope');
 assert_same(1, count($firstLiveSignals), 'get_live_signals must preserve the stable signal count across repeated polls');
 assert_same(1, count($secondLiveSignals), 'get_live_signals must preserve the stable signal count across repeated polls');
+assert_same('sig-eurusd-long-stable', $firstLiveSignals[0]['id'] ?? null, 'get_live_signals must read the durable board row instead of raw snapshot WATCH output');
 assert_same($firstLiveSignals[0]['id'] ?? null, $secondLiveSignals[0]['id'] ?? null, 'get_live_signals must keep signal identity stable across repeated polls');
 assert_same($firstLiveSignals[0]['createdAt'] ?? null, $secondLiveSignals[0]['createdAt'] ?? null, 'get_live_signals must keep createdAt stable across repeated polls');
 assert_same($firstLiveSignals[0]['backendConfirmed'] ?? null, $secondLiveSignals[0]['backendConfirmed'] ?? null, 'get_live_signals must keep backendConfirmed stable across repeated polls');
@@ -1250,6 +1283,23 @@ assert_same('no-store, no-cache, must-revalidate', $firstLiveSignalsHeaders['Cac
 assert_same('no-cache', $firstLiveSignalsHeaders['Pragma'] ?? null, 'get_live_signals must preserve Pragma anti-cache headers');
 assert_same('no-store, no-cache, must-revalidate', $secondLiveSignalsHeaders['Cache-Control'] ?? null, 'get_live_signals must preserve Cache-Control anti-cache headers');
 assert_same('no-cache', $secondLiveSignalsHeaders['Pragma'] ?? null, 'get_live_signals must preserve Pragma anti-cache headers');
+
+$blockedLiveSignalsSnapshot = $stableLiveSignalsSnapshot;
+$blockedLiveSignalsSnapshot['signals'] = array();
+$blockedLiveSignalsSnapshot['diagnostics'] = array(
+    array(
+        'symbol' => 'EURUSD',
+        'priceState' => 'stale',
+        'candleState' => 'live',
+        'engineBlocker' => 'PRICE_NOT_MT5_FRESH',
+    ),
+);
+update_user_meta(7, 'smc_sf_engine_snapshot', $blockedLiveSignalsSnapshot);
+$GLOBALS['test_rest_force_response'] = true;
+$blockedLiveSignalsResponse = $instance->get_live_signals();
+$blockedLiveSignalsPayload = $blockedLiveSignalsResponse->get_data();
+unset($GLOBALS['test_rest_force_response']);
+assert_same(0, count($blockedLiveSignalsPayload['signals'] ?? array()), 'get_live_signals must reject persisted board rows for symbols with current blocker diagnostics');
 
 $GLOBALS['test_rest_force_response'] = true;
 $volatileResponseChecks = array(

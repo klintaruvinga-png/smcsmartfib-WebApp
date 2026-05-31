@@ -5072,8 +5072,18 @@ final class SMC_SuperFib_Sniper_REST {
     public function get_live_signals() {
         $user_id = get_current_user_id();
         $snapshot = $this->ensure_engine_snapshot($user_id);
+        $settings = $this->get_settings($user_id);
+        $symbols = is_array($snapshot['meta']['watchlist'] ?? null)
+            ? $snapshot['meta']['watchlist']
+            : ($settings['watchlist'] ?? array());
+        $this->reconcile_live_signal_board(
+            (int) $user_id,
+            $symbols,
+            array(),
+            is_array($snapshot['diagnostics'] ?? null) ? $snapshot['diagnostics'] : array()
+        );
         return $this->no_cache_response(array(
-            'signals' => is_array($snapshot['signals'] ?? null) ? $snapshot['signals'] : array(),
+            'signals' => $this->read_live_signal_board((int) $user_id, $symbols),
             'polledAt' => gmdate('c'),
         ));
     }
@@ -5406,22 +5416,6 @@ final class SMC_SuperFib_Sniper_REST {
 
             if ($state['signal']) {
                 $signals[] = $state['signal'];
-                $sig = $state['signal'];
-                $sig_created = gmdate('Y-m-d H:i:s', strtotime($sig['createdAt']));
-                $wpdb->query($wpdb->prepare(
-                    "INSERT INTO `{$this->table('signals')}` (id, user_id, symbol, direction, status, verdict, confluence, engine, backend_confirmed, created_at, updated_at) VALUES (%s, %d, %s, %s, %s, %s, %s, %s, %d, %s, %s) ON DUPLICATE KEY UPDATE symbol=VALUES(symbol), direction=VALUES(direction), status=VALUES(status), verdict=VALUES(verdict), confluence=VALUES(confluence), engine=VALUES(engine), backend_confirmed=VALUES(backend_confirmed), updated_at=VALUES(updated_at)",
-                    $sig['id'],
-                    $user_id,
-                    $symbol,
-                    $sig['direction'],
-                    $sig['status'],
-                    $sig['verdict'],
-                    wp_json_encode($sig['confluence']),
-                    wp_json_encode($sig['engine']),
-                    $sig['backendConfirmed'] ? 1 : 0,
-                    $sig_created,
-                    $this->now_mysql()
-                ));
             }
 
             if ($state['plan']) {
@@ -5455,10 +5449,216 @@ final class SMC_SuperFib_Sniper_REST {
             array('%d', '%s', '%s', '%s')
         );
 
+        $this->reconcile_live_signal_board((int) $user_id, $symbols, $signals, $diagnostics);
+
         $result = array('regimes' => $regimes, 'gates' => $gates, 'signals' => $signals, 'plans' => $plans, 'diagnostics' => $diagnostics);
         set_transient($transient_key, $result, 5);
 
         return $result;
+    }
+
+    private function reconcile_live_signal_board(int $user_id, array $symbols, array $signals, array $diagnostics): void {
+        global $wpdb;
+
+        $watchlist_lookup = array();
+        foreach ($symbols as $symbol) {
+            $normalized = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $symbol));
+            if ($normalized !== '') {
+                $watchlist_lookup[$normalized] = true;
+            }
+        }
+
+        $blocked_symbols = array();
+        foreach ($diagnostics as $diagnostic) {
+            if (!is_array($diagnostic) || empty($diagnostic['symbol'])) {
+                continue;
+            }
+            $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $diagnostic['symbol']));
+            if ($symbol === '' || !isset($watchlist_lookup[$symbol])) {
+                continue;
+            }
+            $engine_blocker = strtoupper((string) ($diagnostic['engineBlocker'] ?? 'OK'));
+            $price_state = strtolower((string) ($diagnostic['priceState'] ?? 'live'));
+            $candle_state = strtolower((string) ($diagnostic['candleState'] ?? 'live'));
+            if (
+                $engine_blocker !== 'OK'
+                || $price_state !== 'live'
+                || in_array($candle_state, array('stale', 'offline', 'missing', 'closed_session'), true)
+            ) {
+                $blocked_symbols[$symbol] = array(
+                    'engineBlocker' => $engine_blocker !== '' ? $engine_blocker : 'UNKNOWN',
+                    'priceState' => $price_state !== '' ? $price_state : 'unknown',
+                    'candleState' => $candle_state !== '' ? $candle_state : 'unknown',
+                );
+            }
+        }
+
+        foreach ($blocked_symbols as $symbol => $blocker) {
+            $wpdb->update(
+                $this->table('signals'),
+                array(
+                    'status' => 'WATCH',
+                    'backend_confirmed' => 0,
+                    'engine' => wp_json_encode(array('engineBlocker' => $blocker['engineBlocker'])),
+                    'updated_at' => $this->now_mysql(),
+                ),
+                array(
+                    'user_id' => $user_id,
+                    'symbol' => $symbol,
+                ),
+                array('%s', '%d', '%s', '%s'),
+                array('%d', '%s')
+            );
+            error_log(sprintf(
+                '[SMC_SF] live signal board hid symbol=%s user_id=%d blocker=%s priceState=%s candleState=%s',
+                $symbol,
+                $user_id,
+                $blocker['engineBlocker'],
+                $blocker['priceState'],
+                $blocker['candleState']
+            ));
+        }
+
+        foreach ($signals as $signal) {
+            if (!is_array($signal) || !$this->is_display_signal_eligible($signal, $watchlist_lookup)) {
+                continue;
+            }
+            $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($signal['symbol'] ?? '')));
+            if (isset($blocked_symbols[$symbol])) {
+                continue;
+            }
+            $signal_engine = is_array($signal['engine'] ?? null) ? $signal['engine'] : array();
+            if (!isset($signal_engine['engineBlocker'])) {
+                $signal_engine['engineBlocker'] = 'OK';
+            }
+            $created_at = $this->normalize_market_timestamp($signal['createdAt'] ?? null, $this->now_mysql());
+            $wpdb->query($wpdb->prepare(
+                "INSERT INTO `{$this->table('signals')}` (id, user_id, symbol, direction, status, verdict, confluence, engine, backend_confirmed, created_at, updated_at) VALUES (%s, %d, %s, %s, %s, %s, %s, %s, %d, %s, %s) ON DUPLICATE KEY UPDATE symbol=VALUES(symbol), direction=VALUES(direction), status=VALUES(status), verdict=VALUES(verdict), confluence=VALUES(confluence), engine=VALUES(engine), backend_confirmed=VALUES(backend_confirmed), updated_at=VALUES(updated_at)",
+                (string) $signal['id'],
+                $user_id,
+                $symbol,
+                strtoupper((string) ($signal['direction'] ?? '')),
+                strtoupper((string) ($signal['status'] ?? '')),
+                strtoupper((string) ($signal['verdict'] ?? 'C')),
+                wp_json_encode(is_array($signal['confluence'] ?? null) ? $signal['confluence'] : array()),
+                wp_json_encode($signal_engine),
+                !empty($signal['backendConfirmed']) ? 1 : 0,
+                $created_at,
+                $this->now_mysql()
+            ));
+        }
+    }
+
+    private function is_display_signal_eligible(array $signal, array $watchlist_lookup): bool {
+        $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($signal['symbol'] ?? '')));
+        if ($symbol === '' || !isset($watchlist_lookup[$symbol])) {
+            return false;
+        }
+
+        $status = strtoupper((string) ($signal['status'] ?? ''));
+        if (!in_array($status, array('ARMED', 'READY'), true)) {
+            return false;
+        }
+
+        if (($signal['computedBy'] ?? null) !== 'backend') {
+            return false;
+        }
+
+        $engine = is_array($signal['engine'] ?? null) ? $signal['engine'] : array();
+        $engine_blocker = strtoupper((string) ($signal['engineBlocker'] ?? ($engine['engineBlocker'] ?? '')));
+        return $engine_blocker === 'OK';
+    }
+
+    private function read_live_signal_board(int $user_id, array $symbols): array {
+        global $wpdb;
+
+        $watchlist_lookup = array();
+        foreach ($symbols as $symbol) {
+            $normalized = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $symbol));
+            if ($normalized !== '') {
+                $watchlist_lookup[$normalized] = true;
+            }
+        }
+        if (empty($watchlist_lookup)) {
+            return array();
+        }
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table('signals')} WHERE user_id = %d",
+            $user_id
+        ), ARRAY_A);
+        $eligible = array();
+        foreach ((array) $rows as $row) {
+            $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($row['symbol'] ?? '')));
+            if ($symbol === '' || !isset($watchlist_lookup[$symbol])) {
+                continue;
+            }
+            $status = strtoupper((string) ($row['status'] ?? ''));
+            if (!in_array($status, array('ARMED', 'READY'), true)) {
+                continue;
+            }
+            $engine = json_decode((string) ($row['engine'] ?? ''), true);
+            if (!is_array($engine)) {
+                $engine = array();
+            }
+            $engine_blocker = strtoupper((string) ($engine['engineBlocker'] ?? 'OK'));
+            if ($engine_blocker !== 'OK') {
+                continue;
+            }
+            $row['_decoded_engine'] = $engine;
+            $eligible[] = $row;
+        }
+
+        $verdict_rank = array('A+' => 4, 'A' => 3, 'B' => 2, 'C' => 1);
+        usort($eligible, function ($a, $b) use ($verdict_rank) {
+            $confirmed_cmp = ((int) ($b['backend_confirmed'] ?? 0)) <=> ((int) ($a['backend_confirmed'] ?? 0));
+            if ($confirmed_cmp !== 0) {
+                return $confirmed_cmp;
+            }
+            $a_verdict = strtoupper((string) ($a['verdict'] ?? 'C'));
+            $b_verdict = strtoupper((string) ($b['verdict'] ?? 'C'));
+            $verdict_cmp = ($verdict_rank[$b_verdict] ?? 0) <=> ($verdict_rank[$a_verdict] ?? 0);
+            if ($verdict_cmp !== 0) {
+                return $verdict_cmp;
+            }
+            $updated_cmp = strcmp((string) ($b['updated_at'] ?? ''), (string) ($a['updated_at'] ?? ''));
+            if ($updated_cmp !== 0) {
+                return $updated_cmp;
+            }
+            return strcmp((string) ($a['id'] ?? ''), (string) ($b['id'] ?? ''));
+        });
+
+        return array_values(array_map(function ($row) {
+            return $this->signal_row_to_candidate($row);
+        }, $eligible));
+    }
+
+    private function signal_row_to_candidate(array $row): array {
+        $confluence = json_decode((string) ($row['confluence'] ?? ''), true);
+        if (!is_array($confluence)) {
+            $confluence = array();
+        }
+        $engine = isset($row['_decoded_engine']) && is_array($row['_decoded_engine'])
+            ? $row['_decoded_engine']
+            : json_decode((string) ($row['engine'] ?? ''), true);
+        if (!is_array($engine)) {
+            $engine = array();
+        }
+        $engine_blocker = strtoupper((string) ($engine['engineBlocker'] ?? 'OK'));
+
+        return array(
+            'id' => (string) ($row['id'] ?? ''),
+            'symbol' => (string) ($row['symbol'] ?? ''),
+            'direction' => strtoupper((string) ($row['direction'] ?? 'LONG')),
+            'status' => strtoupper((string) ($row['status'] ?? 'ARMED')),
+            'confluence' => array_values($confluence),
+            'verdict' => strtoupper((string) ($row['verdict'] ?? 'C')),
+            'computedBy' => 'backend',
+            'backendConfirmed' => (int) ($row['backend_confirmed'] ?? 0) === 1,
+            'engineBlocker' => $engine_blocker,
+            'createdAt' => $this->to_iso((string) ($row['created_at'] ?? '')),
+            'engine' => $engine,
+        );
     }
 
     private function build_symbol_state($user_id, $symbol, $price) {
