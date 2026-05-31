@@ -1,5 +1,5 @@
 {
-  "issue": "SMC Intake - Blueprint Gating Throttling Adjustment",
-  "plan_hash": "08e285025b7b0029536a8f71218ea4482e61ba2b2a4f4f6d0efbcb27ff288301",
-  "written_at": "2026-05-31T07:43:10.0164633Z"
+  "issue": "SMC Intake - Remove PR 301's over-strict gate",
+  "plan_hash": "2303e87bb043140cbb5f22537e4d927ff71912ddfe6df66a382ec1d4f4b9357c",
+  "written_at": "2026-05-31T09:13:42.340Z"
 }

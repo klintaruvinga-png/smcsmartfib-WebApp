@@ -5751,7 +5751,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         // Anchor the signal identity to the latest analysed candle so the same setup stays stable
         // within one 15m bar, while later intraday setups get a distinct execution queue identity.
-        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol, $anchor_chop_blocked, $aov_equilibrium_blocked, $is_equity_off_session);
+        $engine_blocker = $this->determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol, $anchor_chop_blocked, $aov_equilibrium_blocked, $is_equity_off_session, $fundamental_htf_opposed);
         $backend_confirmed = $status === 'READY' && $data_live && $engine_blocker === 'OK';
 
         $signal_anchor = $last_candle && !empty($last_candle['time']) ? $last_candle['time'] : gmdate('c');
@@ -5830,28 +5830,31 @@ final class SMC_SuperFib_Sniper_REST {
             return $this->build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles);
         }
 
+        $engine = is_array($signal['engine'] ?? null) ? $signal['engine'] : array();
+        $negative_structural_values = array('', '0', 'FALSE', 'NO', 'NONE', 'ABSENT', 'MISSING', 'NULL');
+        $sweep_value = strtoupper(trim((string) ($engine['sweep'] ?? '')));
+        $mss_value = strtoupper(trim((string) ($engine['mss'] ?? '')));
+        $displacement_value = strtolower(trim((string) ($engine['displacement'] ?? '')));
+        $has_sweep = !in_array($sweep_value, $negative_structural_values, true);
+        $has_mss = !in_array($mss_value, $negative_structural_values, true);
+        $has_displacement = in_array($displacement_value, array('clean', 'strong'), true);
+
         if (
             $backend_confirmed !== false
             || $data_live !== true
             || $engine_blocker !== 'OK'
-            || !is_array($lifecycle_diagnostic)
-            || ($signal['status'] ?? null) !== 'ARMED'
-            || strtoupper((string) $pre_lifecycle_status) !== 'READY'
+            || ($signal['status'] ?? null) === 'WATCH'
+            || !$has_sweep
+            || (!$has_mss && !$has_displacement)
         ) {
             return null;
         }
 
-        $lifecycle_state = strtoupper((string) ($lifecycle_diagnostic['state'] ?? ''));
-        $prior_candidate_status = strtoupper((string) ($lifecycle_diagnostic['priorCandidateStatus'] ?? ''));
-        $active_pre_entry = $lifecycle_state === 'ACTIVE_PRE_ENTRY';
-        $repeated_ready_candidate = in_array($lifecycle_state, array('', 'OK', 'LIFECYCLE_UNRESOLVED'), true)
-            && $prior_candidate_status === 'READY';
-
-        if (!$active_pre_entry && !$repeated_ready_candidate) {
+        $plan = $this->build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles);
+        if (!is_array($plan)) {
             return null;
         }
 
-        $plan = $this->build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles);
         $plan['source'] = 'pending-blueprint';
         return $plan;
     }
@@ -7958,7 +7961,7 @@ final class SMC_SuperFib_Sniper_REST {
     // Returns a single string reason explaining why a READY signal cannot be
     // backend-confirmed, or 'OK' when everything is healthy.
 
-    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol = null, $anchor_chop_blocked = false, $aov_equilibrium_blocked = false, $is_equity_off_session = null) {
+    private function determine_engine_blocker($user_id, $price, $candles, $data_live, $status, $symbol = null, $anchor_chop_blocked = false, $aov_equilibrium_blocked = false, $is_equity_off_session = null, $fundamental_htf_opposed = false) {
         $is_mt5_authority = false;
         if ($symbol !== null) {
             $is_mt5_authority = $this->is_mt5_authoritative($user_id, $symbol);
@@ -8019,6 +8022,11 @@ final class SMC_SuperFib_Sniper_REST {
         // It must suppress backend confirmation and plan generation, not just decorate
         // the gate response as BLOCKED.
         if ($aov_equilibrium_blocked) return 'AOV_EQUILIBRIUM_ZONE';
+
+        // CRITICAL HARDENING: HTF fundamental counter-bias is a hard readiness veto.
+        // Keep these ARMED setups planless by surfacing the same blocker that
+        // prevented READY instead of allowing the pending-blueprint path via OK.
+        if ($fundamental_htf_opposed) return 'FUNDAMENTAL_HTF_OPPOSED';
 
         return 'OK';
     }

@@ -247,6 +247,16 @@ if (!class_exists('TestWpdb')) {
         }
 
         public function get_row($query, $output = ARRAY_A) {
+            if (preg_match("/SELECT composite_score, category FROM ([^ ]+) WHERE currency = '([^']+)' LIMIT 1/", $query, $m)) {
+                $table = $m[1];
+                $currency = $m[2];
+                foreach ($this->tables[$table] ?? array() as $row) {
+                    if (($row['currency'] ?? '') === $currency) {
+                        return $row;
+                    }
+                }
+                return null;
+            }
             if (preg_match("/SELECT \\* FROM ([^\\s]+)\\s+WHERE user_id = (\\d+) AND symbol = '([^']+)' AND fib_family = '([^']*)' AND fib_ratio = ([0-9.]+)\\s+AND fib_level IS NOT NULL AND fib_level BETWEEN ([0-9.\\-]+) AND ([0-9.\\-]+) AND direction = '([^']+)'\\s+ORDER BY created_at DESC LIMIT 1/s", $query, $m)) {
                 $table = $m[1];
                 $user_id = (int) $m[2];
@@ -684,7 +694,7 @@ function assert_same($expected, $actual, $message) {
     }
 }
 
-function seed_ready_build_symbol_state_fixture($wpdb, $user_id, $symbol, $bid, $ask, $last_open = 1.1020) {
+function seed_ready_build_symbol_state_fixture($wpdb, $user_id, $symbol, $bid, $ask, $last_open = 1.1020, $last_close = 1.1142) {
     $snapshotTable = $wpdb->prefix . 'smc_sf_snapshots';
     $candleTable = $wpdb->prefix . 'smc_sf_candles';
     $now = time();
@@ -724,7 +734,7 @@ function seed_ready_build_symbol_state_fixture($wpdb, $user_id, $symbol, $bid, $
             $open = $last_open;
             $high = 1.1150;
             $low = 1.1010;
-            $close = 1.1142;
+            $close = $last_close;
         }
 
         $wpdb->replace($candleTable, array(
@@ -1401,6 +1411,48 @@ assert_same('READY', $noPriorState['signal']['status'] ?? null, 'build_symbol_st
 assert_same(true, $noPriorState['signal']['backendConfirmed'] ?? null, 'build_symbol_state must backend-confirm a live READY setup with no lifecycle blocker');
 assert_true(is_array($noPriorState['plan'] ?? null), 'build_symbol_state must generate a plan for the unblocked READY control setup');
 
+seed_ready_build_symbol_state_fixture($wpdb, 7, 'AUDCHF', 1.1134, 1.1136, 1.1020, 1.1135);
+$structuralNoLifecycleState = $buildSymbolState->invoke($instance, 7, 'AUDCHF', array(
+    'symbol' => 'AUDCHF',
+    'bid' => 1.1134,
+    'ask' => 1.1136,
+    'mid' => 1.1135,
+    'updatedAt' => gmdate('c', time() - 5),
+    'state' => 'live',
+    'source' => 'mt5',
+));
+assert_same('ARMED', $structuralNoLifecycleState['signal']['status'] ?? null, 'Structurally valid no-lifecycle setup must remain ARMED when structural confirmation is present but MSS has not crossed');
+assert_same(false, $structuralNoLifecycleState['signal']['backendConfirmed'] ?? null, 'Structurally valid no-lifecycle pending blueprint must not be backend-confirmed');
+assert_same('OK', $structuralNoLifecycleState['signal']['engineBlocker'] ?? null, 'Structurally valid no-lifecycle pending blueprint must keep engineBlocker OK');
+assert_same('present', $structuralNoLifecycleState['signal']['engine']['sweep'] ?? null, 'Structurally valid no-lifecycle pending blueprint must require sweep confirmation');
+assert_same('absent', $structuralNoLifecycleState['signal']['engine']['mss'] ?? null, 'Structurally valid no-lifecycle pending blueprint may use clean or strong displacement when MSS has not crossed');
+assert_true(in_array($structuralNoLifecycleState['signal']['engine']['displacement'] ?? null, array('clean', 'strong'), true), 'Structurally valid no-lifecycle pending blueprint must retain clean or strong displacement');
+assert_same(null, $structuralNoLifecycleState['diagnostic']['lifecycle'] ?? null, 'Structurally valid no-lifecycle pending blueprint must not require lifecycle diagnostics');
+assert_true(is_array($structuralNoLifecycleState['plan'] ?? null), 'Structurally valid no-lifecycle ARMED setup must expose a non-executable pending blueprint');
+assert_same('pending-blueprint', $structuralNoLifecycleState['plan']['source'] ?? null, 'Structurally valid no-lifecycle ARMED setup must tag the plan as pending-blueprint');
+
+seed_ready_build_symbol_state_fixture($wpdb, 7, 'USDCHF', 1.1141, 1.1143);
+$wpdb->replace($wpdb->prefix . 'smc_sf_fundamental_bias', array(
+    'currency' => 'USD',
+    'composite_score' => -1.5,
+    'category' => 'BEARISH',
+    'updated_at' => gmdate('Y-m-d H:i:s'),
+));
+$fundamentalOpposedState = $buildSymbolState->invoke($instance, 7, 'USDCHF', array(
+    'symbol' => 'USDCHF',
+    'bid' => 1.1141,
+    'ask' => 1.1143,
+    'mid' => 1.1142,
+    'updatedAt' => gmdate('c', time() - 5),
+    'state' => 'live',
+    'source' => 'mt5',
+));
+assert_same('ARMED', $fundamentalOpposedState['signal']['status'] ?? null, 'Opposing HTF fundamentals must cap an otherwise READY setup at ARMED');
+assert_same(false, $fundamentalOpposedState['signal']['backendConfirmed'] ?? null, 'Opposing HTF fundamentals must prevent backend confirmation');
+assert_same('FUNDAMENTAL_HTF_OPPOSED', $fundamentalOpposedState['signal']['engineBlocker'] ?? null, 'Opposing HTF fundamentals must surface a hard engine blocker instead of OK');
+assert_same('BEARISH', $fundamentalOpposedState['signal']['engine']['fundamentalBias'] ?? null, 'Opposing HTF fundamental bias must remain visible in signal diagnostics');
+assert_same(null, $fundamentalOpposedState['plan'] ?? null, 'Counter-bias ARMED setups must remain planless instead of emitting pending blueprints');
+
 $preEntryFixture = seed_ready_build_symbol_state_fixture($wpdb, 7, 'CHFJPY', 1.1141, 1.1143);
 $wpdb->replace($buildLifecycleCandidateTable, array(
     'id' => 'mt5-chfjpy-build-pre-entry',
@@ -1461,7 +1513,7 @@ $persistedPendingRows = array_filter($wpdb->tables[$wpdb->prefix . 'smc_sf_trade
 });
 assert_same(0, count($persistedPendingRows), 'ensure_engine_snapshot must not persist pending-blueprint plans as executable trade plan rows');
 
-$weakDisplacementFixture = seed_ready_build_symbol_state_fixture($wpdb, 7, 'NZDCHF', 1.1141, 1.1143, 1.1093);
+$weakDisplacementFixture = seed_ready_build_symbol_state_fixture($wpdb, 7, 'NZDCHF', 1.1134, 1.1136, 1.1093, 1.1135);
 $wpdb->replace($buildLifecycleCandidateTable, array(
     'id' => 'mt5-nzdchf-build-weak-pre-entry',
     'user_id' => 7,
@@ -1483,18 +1535,19 @@ $wpdb->replace($buildLifecycleCandidateTable, array(
 ));
 $weakDisplacementState = $buildSymbolState->invoke($instance, 7, 'NZDCHF', array(
     'symbol' => 'NZDCHF',
-    'bid' => 1.1141,
-    'ask' => 1.1143,
-    'mid' => 1.1142,
+    'bid' => 1.1134,
+    'ask' => 1.1136,
+    'mid' => 1.1135,
     'updatedAt' => gmdate('c', time() - 5),
     'state' => 'live',
     'source' => 'mt5',
 ));
 assert_same('ARMED', $weakDisplacementState['signal']['status'] ?? null, 'Weak-displacement ACTIVE_PRE_ENTRY setup must remain ARMED');
 assert_same('weak', $weakDisplacementState['signal']['engine']['displacement'] ?? null, 'Weak-displacement fixture must exercise a structural ARMED reason before lifecycle throttling');
+assert_same('absent', $weakDisplacementState['signal']['engine']['mss'] ?? null, 'Weak-displacement fixture must not pass via MSS structural confirmation');
 assert_same('OK', $weakDisplacementState['signal']['engineBlocker'] ?? null, 'Weak-displacement ARMED setups can still have no engine blocker');
 assert_same('ACTIVE_PRE_ENTRY', $weakDisplacementState['diagnostic']['lifecycle']['state'] ?? null, 'Weak-displacement setup must still report the ACTIVE_PRE_ENTRY lifecycle');
-assert_same(null, $weakDisplacementState['plan'] ?? null, 'Pending blueprints must require a pre-lifecycle READY status, not merely final ARMED plus ACTIVE_PRE_ENTRY');
+assert_same(null, $weakDisplacementState['plan'] ?? null, 'Pending blueprints must require MSS or clean/strong displacement, not merely final ARMED plus ACTIVE_PRE_ENTRY');
 
 $openPositionFixture = seed_ready_build_symbol_state_fixture($wpdb, 7, 'EURCHF', 1.1141, 1.1143);
 $wpdb->replace($buildLifecycleCandidateTable, array(

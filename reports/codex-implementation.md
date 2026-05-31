@@ -1,40 +1,39 @@
 # Issue summary
 
-SMC intake blueprint gating exposed no plan for lifecycle-throttled `ACTIVE_PRE_ENTRY` signals because `build_symbol_state()` returned `plan: null` whenever `backendConfirmed` was false, even when live data and deterministic candle structure were available.
+SMC Intake pending blueprints were still blocked by PR 301's over-strict lifecycle gate. Live, engine-unblocked, structurally valid ARMED setups could return `plan: null` when lifecycle diagnostics were missing or not READY.
 
 # Root cause implemented
 
-Implemented a backend-only pending blueprint path for live, unblocked, ARMED lifecycle-throttled setups. Confirmed READY signals still return unchanged `backend-blueprint` plans, pending plans differ only by `source: pending-blueprint`, and execution authority remains tied to `backendConfirmed`.
+Updated `SMC_SuperFib_Sniper_REST::build_pending_or_confirmed_plan()` so pending blueprint visibility no longer depends on `lifecycle_diagnostic` array membership or `pre_lifecycle_status === 'READY'`. The pending path now requires backend non-confirmation, live data, `engineBlocker === 'OK'`, non-WATCH status, sweep confirmation, and either MSS confirmation or clean/strong displacement.
 
 # Exact files changed
 
-- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` — added `build_pending_or_confirmed_plan()` and guarded `trade_plans` persistence to confirmed backend blueprints only.
-- `wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` — updated `ACTIVE_PRE_ENTRY` assertions for pending blueprint visibility and no pending-plan persistence, while preserving hard-blocked null-plan checks.
-- `src/types/sniper.ts` — extended `TradePlan.source` with `pending-blueprint`.
-- `src/components/PlanCard.tsx` — added pending blueprint label, lock icon, warning, and non-executable chip styling while preserving backend-confirmed execution disabling.
-- `src/routes/-plan.test.tsx` — added pending blueprint rendering/disabled-execution coverage and aligned the local hook mock/current awaiting-blueprint expectations.
+- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` - replaced the lifecycle-dependent pending gate with structural engine checks and guarded pending plan tagging to arrays only.
+- `wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` - added a build_symbol_state regression for a live ARMED structural setup with no lifecycle diagnostic and adjusted the fixture helper to support the needed final candle close.
+- `reports/codex-implementation.md` - implementation summary required by the contract.
+- `reports/codex-implementation.meta.json` - implementation metadata required by `npm run validate:impl`.
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-31_remove-pr-301-over-strict-gate.md` - runtime integrity bug sweep.
+- `.github/migration/audits/phase-0-signalengine-freshnessengine-parity-2026-05-31.md` - parity re-validation audit.
 
 # Tests run
 
-- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` — passed.
-- `php wordpress/smc-superfib-sniper/tests/php/test-execute-signals-stage-lots.php` — passed.
-- `npx vitest run src/routes/-plan.test.tsx` — passed.
-- `npm run build` — passed.
-- `npm run validate:impl` — passed.
-- `npm run lint` — failed on unrelated pre-existing Prettier errors outside the changed files.
+- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` - RED before implementation; failed at the new no-lifecycle pending blueprint assertion as expected.
+- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` - passed after implementation.
+- `php wordpress/smc-superfib-sniper/tests/php/test-fib-parity.php` - passed.
+- `php scripts/parity-validator.php` - passed; synthetic self-test reported 100% parity, 384/384 exact matches, 0 critical mismatches.
+- `npm run build` - passed.
+- `npm run validate:impl` - initially failed because `reports/codex-implementation.meta.json` was missing from the starting worktree; passed after recreating metadata with the current plan hash.
+- `npm run lint` - failed on unrelated existing Prettier/style errors outside the files changed for this patch.
 
 # Reports generated
 
-- `reports/codex-implementation.md`
-- `reports/codex-implementation.meta.json`
-- `reports/implementation-verification.md`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-31_blueprint-gating-throttle.md`
-- `.github/migration/audits/phase-0-sniper-parity-2026-05-31.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-31_remove-pr-301-over-strict-gate.md`
+- `.github/migration/audits/phase-0-signalengine-freshnessengine-parity-2026-05-31.md`
 
 # Remaining risks
 
-Manual replay against a live `ACTIVE_PRE_ENTRY` setup is still required to confirm the operator-facing snapshot payload and `/user/execute-signals` rejection path in an integrated environment. Repo-wide lint remains blocked by unrelated existing Prettier issues in files outside this patch scope.
+Engine structural value semantics are interpreted conservatively from current payload values: `present` passes for sweep/MSS, negative/empty values do not, and displacement only passes for `clean` or `strong`. Existing snapshot caches may still contain old `plan: null` payloads until recomputed. Repo-wide lint remains blocked by unrelated pre-existing Prettier/style errors outside this patch scope.
 
 # Any contract ambiguities resolved during implementation
 
-For repeated prior MT5 candidate throttling, pending blueprint eligibility was interpreted narrowly as lifecycle state `OK`, `LIFECYCLE_UNRESOLVED`, or empty with `priorCandidateStatus === READY`, plus live data, `engineBlocker === OK`, and final signal status `ARMED`.
+The contract allowed missing or unresolved lifecycle diagnostics; the regression uses the smallest safe missing-lifecycle case through `build_symbol_state()` rather than bypassing the real runtime path or changing private APIs. The existing weak-displacement fixture also had MSS present, which would satisfy the new `MSS or clean/strong displacement` structural rule; it was narrowed to weak displacement without MSS so the existing no-plan protection still tests a structurally invalid pending blueprint.
