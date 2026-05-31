@@ -762,6 +762,65 @@ function seed_ready_build_symbol_state_fixture($wpdb, $user_id, $symbol, $bid, $
     );
 }
 
+function seed_watch_build_symbol_state_fixture($wpdb, $user_id, $symbol, $bid, $ask) {
+    $snapshotTable = $wpdb->prefix . 'smc_sf_snapshots';
+    $candleTable = $wpdb->prefix . 'smc_sf_candles';
+    $now = time();
+    $bucket = (int) (floor($now / 900) * 900);
+    $start = $bucket - (119 * 900);
+
+    $wpdb->replace($snapshotTable, array(
+        'user_id' => $user_id,
+        'symbol' => $symbol,
+        'bid' => $bid,
+        'ask' => $ask,
+        'mid' => ($bid + $ask) / 2,
+        'spread' => 2,
+        'change_pct_1d' => 0,
+        'source' => 'mt5',
+        'state' => 'live',
+        'updated_at' => gmdate('Y-m-d H:i:s', $now - 5),
+    ));
+
+    for ($i = 0; $i < 120; $i++) {
+        $open = 1.1300;
+        $high = 1.1400;
+        $low = 1.1210;
+        $close = 1.1290;
+
+        if ($i >= 85 && $i <= 109) {
+            $open = 1.1180;
+            $high = 1.1200;
+            $low = 1.1100;
+            $close = 1.1160;
+        } elseif ($i >= 110 && $i <= 118) {
+            $open = 1.1160;
+            $high = 1.1180;
+            $low = 1.1110;
+            $close = 1.1150;
+        } elseif ($i === 119) {
+            $open = 1.1140;
+            $high = 1.1180;
+            $low = 1.1110;
+            $close = 1.1142;
+        }
+
+        $wpdb->replace($candleTable, array(
+            'user_id' => $user_id,
+            'symbol' => $symbol,
+            'timeframe' => '15min',
+            'candle_time' => gmdate('Y-m-d H:i:s', $start + ($i * 900)),
+            'open' => $open,
+            'high' => $high,
+            'low' => $low,
+            'close' => $close,
+            'volume' => '10',
+            'source' => 'mt5',
+            'created_at' => gmdate('Y-m-d H:i:s', $now),
+        ));
+    }
+}
+
 $instance = new SMC_SuperFib_Sniper_REST();
 $instance->register_routes();
 
@@ -1431,6 +1490,22 @@ assert_same(null, $structuralNoLifecycleState['diagnostic']['lifecycle'] ?? null
 assert_true(is_array($structuralNoLifecycleState['plan'] ?? null), 'Structurally valid no-lifecycle ARMED setup must expose a non-executable pending blueprint');
 assert_same('pending-blueprint', $structuralNoLifecycleState['plan']['source'] ?? null, 'Structurally valid no-lifecycle ARMED setup must tag the plan as pending-blueprint');
 
+seed_watch_build_symbol_state_fixture($wpdb, 7, 'NZDCAD', 1.1141, 1.1143);
+$watchBlueprintState = $buildSymbolState->invoke($instance, 7, 'NZDCAD', array(
+    'symbol' => 'NZDCAD',
+    'bid' => 1.1141,
+    'ask' => 1.1143,
+    'mid' => 1.1142,
+    'updatedAt' => gmdate('c', time() - 5),
+    'state' => 'live',
+    'source' => 'mt5',
+));
+assert_same('WATCH', $watchBlueprintState['signal']['status'] ?? null, 'Natural live no-sweep setup must remain WATCH');
+assert_same(false, $watchBlueprintState['signal']['backendConfirmed'] ?? null, 'Natural WATCH blueprints must not be backend-confirmed');
+assert_same('OK', $watchBlueprintState['signal']['engineBlocker'] ?? null, 'Natural WATCH blueprint fixture must stay unblocked');
+assert_true(is_array($watchBlueprintState['plan'] ?? null), 'Natural live WATCH setup must expose a read-only watch blueprint');
+assert_same('watch-blueprint', $watchBlueprintState['plan']['source'] ?? null, 'Natural live WATCH setup must tag the plan as watch-blueprint');
+
 seed_ready_build_symbol_state_fixture($wpdb, 7, 'USDCHF', 1.1141, 1.1143);
 $wpdb->replace($wpdb->prefix . 'smc_sf_fundamental_bias', array(
     'currency' => 'USD',
@@ -1512,6 +1587,25 @@ $persistedPendingRows = array_filter($wpdb->tables[$wpdb->prefix . 'smc_sf_trade
     return ($row['signal_id'] ?? null) === ($preEntrySnapshot['plans'][0]['signalId'] ?? null);
 });
 assert_same(0, count($persistedPendingRows), 'ensure_engine_snapshot must not persist pending-blueprint plans as executable trade plan rows');
+
+$wpdb->replace($wpdb->prefix . 'smc_sf_user_settings', array(
+    'user_id' => 7,
+    'settings' => json_encode(array(
+        'backendUrl' => 'https://example.com/wp-json',
+        'refreshIntervalSec' => 30,
+        'staleThresholdSec' => 10,
+        'watchlist' => array('NZDCAD'),
+        'riskAllocation' => array('perTradePct' => 0.5, 'dailyMaxPct' => 2.0, 'ddCapPct' => 6.0),
+    )),
+    'updated_at' => gmdate('Y-m-d H:i:s'),
+));
+unset($GLOBALS['test_user_meta'][7]['smc_sf_engine_snapshot']);
+$watchBlueprintSnapshot = $ensureEngineSnapshot->invoke($instance, 7, true);
+assert_same('watch-blueprint', $watchBlueprintSnapshot['plans'][0]['source'] ?? null, 'ensure_engine_snapshot must expose natural WATCH blueprints in the plans payload');
+$persistedWatchRows = array_filter($wpdb->tables[$wpdb->prefix . 'smc_sf_trade_plans'] ?? array(), function ($row) use ($watchBlueprintSnapshot) {
+    return ($row['signal_id'] ?? null) === ($watchBlueprintSnapshot['plans'][0]['signalId'] ?? null);
+});
+assert_same(0, count($persistedWatchRows), 'ensure_engine_snapshot must not persist watch-blueprint plans as executable trade plan rows');
 
 $weakDisplacementFixture = seed_ready_build_symbol_state_fixture($wpdb, 7, 'NZDCHF', 1.1134, 1.1136, 1.1093, 1.1135);
 $wpdb->replace($buildLifecycleCandidateTable, array(

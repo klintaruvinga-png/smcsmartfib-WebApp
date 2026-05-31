@@ -1,40 +1,30 @@
-# Phase 0 Sniper Parity Audit - Pending Blueprint Visibility
+# Phase 0 Sniper Parity Audit: Watch Blueprint
 
 Date: 2026-05-31
-Issue: SMC Intake - Blueprint Gating Throttling Adjustment
+Issue: SMC Intake - Watch blueprint PATCH
 
 ## Scope
 
-Re-validated backend/dashboard plan semantics for lifecycle-throttled blueprint visibility. Pine formulas, Fibonacci ratios, stop logic, target logic, lot sizing, stage progression, and execution queue logic were intentionally untouched.
+- Backend `TradePlan.source` emission.
+- Frontend and SDK `TradePlan.source` type contracts.
+- Dashboard ranking and rendering for backend-authored ladder plans.
 
-## Backend Parity
+## Formula Parity
 
-- Confirmed backend plans still use the unchanged `build_trade_plan()` output and retain `source: backend-blueprint`.
-- Pending blueprints call the same `build_trade_plan()` path once and change only `source` to `pending-blueprint`.
-- `backendConfirmed`, `status`, `engineBlocker`, stale-data gates, lifecycle diagnostics, and signal ID anchoring remain unchanged.
-- Pending blueprint eligibility is limited to live data, `engineBlocker === OK`, final `status === ARMED`, and approved lifecycle throttle diagnostics.
+Diff inspection confirms no Pine formulas, MT5 formulas, entry ratios, stop ratios, target ratios, lot sizing math, risk conversion, or `build_trade_plan()` calculations were changed.
 
-## Dashboard Parity
+## Source Literal Parity
 
-- `TradePlan.source` now accepts `pending-blueprint` without weakening other `TradePlan` fields.
-- Pending blueprints render the same entry, stop, target, risk, lot, and ladder fields as backend plans.
-- Dashboard execution remains disabled through the existing `!signal.backendConfirmed` guard.
-- The UI labels pending plans as `PENDING BLUEPRINT` and warns that execution remains disabled until backend confirmation.
+- Backend may now emit `watch-blueprint` only for live, unblocked, non-lifecycle-suppressed WATCH signals.
+- App `TradePlan.source` accepts `frontend-preview`, `backend-blueprint`, `pending-blueprint`, and `watch-blueprint`.
+- SDK `TradePlan.source` accepts `frontend-preview`, `backend-blueprint`, `pending-blueprint`, and `watch-blueprint`.
+- Plan card rendering recognizes `pending-blueprint` and `watch-blueprint` as distinct non-executable blueprint states.
+- Plan ranking orders same-verdict candidates by confirmed backend plan quality, backend blueprint, pending blueprint, watch blueprint, then no plan.
 
-## Persistence Parity
+## Backend Authority
 
-- Snapshot `plans` includes pending blueprints for dashboard visibility.
-- `smc_sf_trade_plans` persistence is restricted to confirmed backend blueprints only.
-- Pending blueprints do not become durable executable plan rows.
+No frontend-only plan synthesis was added. Watch blueprints are backend-authored response payloads only. Execution remains gated by `backendConfirmed`, plan completeness, and executable stage lots.
 
-## Validation Evidence
+## Result
 
-- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` passed.
-- `php wordpress/smc-superfib-sniper/tests/php/test-execute-signals-stage-lots.php` passed.
-- `npx vitest run src/routes/-plan.test.tsx` passed.
-- `npm run build` passed.
-- `npm run validate:impl` passed.
-
-## Parity Impact
-
-No Pine or calculation formula parity changes were made. The API contract addition is limited to a new non-executable plan `source` value for approved pending blueprint visibility.
+Parity re-validation passed for the source-literal contract and confirmed that calculation formulas were untouched.

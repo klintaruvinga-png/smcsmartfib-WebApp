@@ -328,6 +328,35 @@ describe("PlanPage ranking and execution guards", () => {
     ).toBe(true);
   });
 
+  it("renders watch blueprints as read-only and keeps execution disabled", () => {
+    renderPlanPage({
+      signals: [
+        buildSignal({
+          status: "WATCH",
+          backendConfirmed: false,
+        }),
+      ],
+      ladders: [
+        buildPlan({
+          source: "watch-blueprint",
+        }),
+      ],
+    });
+
+    const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
+    expect(screen.getByText("WATCH BLUEPRINT")).toBeTruthy();
+    expect(cardText).toContain("1.26750");
+    expect(
+      screen.getByText(
+        /Watch blueprint is indicative and read-only\. It will be replaced when a higher-quality ARMED\/READY or backend-confirmed blueprint is available\./,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText("UNCONFIRMED")).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
   it("mirrors backend-authored stage lot sizes without recomputing or flattening them", () => {
     renderPlanPage({
       signals: [buildSignal()],
@@ -548,6 +577,58 @@ describe("PlanPage ranking and execution guards", () => {
         /Backend plan is missing TP2\/TP3 or R:R values\. Full 3-stage ladder is not confirmed\./,
       ),
     ).toBeTruthy();
+  });
+
+  it("orders same-verdict candidates by backend, pending, watch, then no-plan quality", () => {
+    renderPlanPage({
+      signals: [
+        buildSignal({
+          id: "sig-001",
+          symbol: "GBPUSD",
+          status: "WATCH",
+          verdict: "A",
+          backendConfirmed: false,
+          createdAt: "2026-05-14T08:00:00.000Z",
+        }),
+        buildSignal({
+          id: "sig-002",
+          symbol: "USDJPY",
+          status: "WATCH",
+          verdict: "A",
+          backendConfirmed: false,
+          createdAt: "2026-05-14T08:01:00.000Z",
+        }),
+        buildSignal({
+          id: "sig-003",
+          symbol: "AUDUSD",
+          status: "WATCH",
+          verdict: "A",
+          backendConfirmed: false,
+          createdAt: "2026-05-14T08:02:00.000Z",
+        }),
+        buildSignal({
+          id: "sig-004",
+          symbol: "EURUSD",
+          status: "WATCH",
+          verdict: "A",
+          backendConfirmed: false,
+          createdAt: "2026-05-14T08:03:00.000Z",
+        }),
+      ],
+      ladders: [
+        buildPlan({ signalId: "sig-003", symbol: "AUDUSD", source: "watch-blueprint" }),
+        buildPlan({ signalId: "sig-001", symbol: "GBPUSD", source: "backend-blueprint" }),
+        buildPlan({ signalId: "sig-002", symbol: "USDJPY", source: "pending-blueprint" }),
+      ],
+      watchlist: ["GBPUSD", "USDJPY", "AUDUSD", "EURUSD"],
+    });
+
+    const renderedSymbols = getRenderedSymbols();
+    expect(getRenderedCards()).toHaveLength(3);
+    expect(renderedSymbols[0]).toContain("GBPUSD");
+    expect(renderedSymbols[1]).toContain("USDJPY");
+    expect(renderedSymbols[2]).toContain("AUDUSD");
+    expect(screen.queryByText("EURUSD")).toBeNull();
   });
 
   it("renders watchlist candidates without plan objects in awaiting-blueprint state", () => {
