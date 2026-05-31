@@ -5830,28 +5830,31 @@ final class SMC_SuperFib_Sniper_REST {
             return $this->build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles);
         }
 
+        $engine = is_array($signal['engine'] ?? null) ? $signal['engine'] : array();
+        $negative_structural_values = array('', '0', 'FALSE', 'NO', 'NONE', 'ABSENT', 'MISSING', 'NULL');
+        $sweep_value = strtoupper(trim((string) ($engine['sweep'] ?? '')));
+        $mss_value = strtoupper(trim((string) ($engine['mss'] ?? '')));
+        $displacement_value = strtolower(trim((string) ($engine['displacement'] ?? '')));
+        $has_sweep = !in_array($sweep_value, $negative_structural_values, true);
+        $has_mss = !in_array($mss_value, $negative_structural_values, true);
+        $has_displacement = in_array($displacement_value, array('clean', 'strong'), true);
+
         if (
             $backend_confirmed !== false
             || $data_live !== true
             || $engine_blocker !== 'OK'
-            || !is_array($lifecycle_diagnostic)
-            || ($signal['status'] ?? null) !== 'ARMED'
-            || strtoupper((string) $pre_lifecycle_status) !== 'READY'
+            || ($signal['status'] ?? null) === 'WATCH'
+            || !$has_sweep
+            || (!$has_mss && !$has_displacement)
         ) {
             return null;
         }
 
-        $lifecycle_state = strtoupper((string) ($lifecycle_diagnostic['state'] ?? ''));
-        $prior_candidate_status = strtoupper((string) ($lifecycle_diagnostic['priorCandidateStatus'] ?? ''));
-        $active_pre_entry = $lifecycle_state === 'ACTIVE_PRE_ENTRY';
-        $repeated_ready_candidate = in_array($lifecycle_state, array('', 'OK', 'LIFECYCLE_UNRESOLVED'), true)
-            && $prior_candidate_status === 'READY';
-
-        if (!$active_pre_entry && !$repeated_ready_candidate) {
+        $plan = $this->build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles);
+        if (!is_array($plan)) {
             return null;
         }
 
-        $plan = $this->build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles);
         $plan['source'] = 'pending-blueprint';
         return $plan;
     }
