@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api/sniperClient";
 import { useAccountTelemetry } from "@/hooks/useSniperData";
 import { toast } from "sonner";
-import { ArrowDownRight, ArrowUpRight, Send } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Lock, Send } from "lucide-react";
 import { tickMotionHoldMs, tickMotionStyle, type TickMotionOptions } from "@/lib/tickMotion";
 import type { PairPrice, SignalCandidate, TradePlan } from "@/types/sniper";
 import type { ReactNode } from "react";
@@ -54,6 +54,7 @@ export function PlanCandidateCard({
   const executableStageLots = plan ? hasExecutableStageLots(plan) : true;
   const skippedStageLots = plan ? hasSkippedStageLots(plan) : false;
   const familyPill = plan?.executionSource ?? plan?.ladder?.e1.family;
+  const pendingBlueprint = plan?.source === "pending-blueprint";
   const entryRows = plan
     ? [
         {
@@ -149,8 +150,17 @@ export function PlanCandidateCard({
             {price ? fmtPrice(value ?? price.mid, signal.symbol) : "--"}
           </span>
           {plan ? (
-            <MetaChip tone={plan.source === "backend-blueprint" ? "buy" : "violet"}>
-              {plan.source}
+            <MetaChip
+              tone={
+                plan.source === "backend-blueprint"
+                  ? "buy"
+                  : pendingBlueprint
+                    ? "pending"
+                    : "violet"
+              }
+            >
+              {pendingBlueprint && <Lock className="h-3 w-3" />}
+              {pendingBlueprint ? "PENDING BLUEPRINT" : plan.source}
             </MetaChip>
           ) : (
             <MetaChip tone="neutral">NO BLUEPRINT</MetaChip>
@@ -166,6 +176,13 @@ export function PlanCandidateCard({
           Frontend computed this signal but the backend has not confirmed it. Do not execute until
           backend confirmation.
         </DivergenceBanner>
+      )}
+
+      {pendingBlueprint && (
+        <WarningLine level="warn">
+          Pending blueprint is visible for planning only. Execution remains disabled until backend
+          confirmation.
+        </WarningLine>
       )}
 
       {!planComplete && plan && (
@@ -221,7 +238,11 @@ export function PlanCandidateCard({
           <PlanSection title="Stop & Risk" tone="sell">
             <div className="space-y-2">
               <StatRow label="SL" value={fmtPrice(plan.sl, signal.symbol)} valueClass="text-sell" />
-              <StatRow label="Risk" value={fmtCurrency(plan.riskUSC, accountTelemetry?.currency)} sub={fmtZAR(plan.riskZAR)} />
+              <StatRow
+                label="Risk"
+                value={fmtCurrency(plan.riskUSC, accountTelemetry?.currency)}
+                sub={fmtZAR(plan.riskZAR)}
+              />
               <StatRow
                 label="DD impact"
                 value={fmtPct(plan.drawdownImpactPct)}
@@ -388,14 +409,22 @@ function MetaPill({ children }: { children: ReactNode }) {
   );
 }
 
-function MetaChip({ tone, children }: { tone: "buy" | "violet" | "warn"; children: ReactNode }) {
+function MetaChip({
+  tone,
+  children,
+}: {
+  tone: "buy" | "violet" | "warn" | "neutral" | "pending";
+  children: ReactNode;
+}) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider font-mono",
+        "inline-flex items-center gap-1 rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider font-mono",
         tone === "buy" && "border-buy/40 text-buy bg-buy/10",
         tone === "violet" && "border-violet/40 text-violet bg-violet/10",
         tone === "warn" && "border-warn/40 text-warn bg-warn/10",
+        tone === "neutral" && "border-bd text-mute bg-bg2",
+        tone === "pending" && "border-warn/40 text-warn bg-warn/10",
       )}
     >
       {children}

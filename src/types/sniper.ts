@@ -209,7 +209,7 @@ export interface TradePlan {
   riskUSC: number;
   riskZAR: number;
   drawdownImpactPct: number;
-  source: "frontend-preview" | "backend-blueprint";
+  source: "frontend-preview" | "backend-blueprint" | "pending-blueprint";
   executionSource?: "LTF_SF";
   ladderId?: string;
   direction?: "LONG" | "SHORT";

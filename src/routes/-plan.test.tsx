@@ -12,6 +12,7 @@ const hookMocks = vi.hoisted(() => ({
   useSnapshot: vi.fn(),
   useCanonicalWatchlist: vi.fn(),
   usePollingUiState: vi.fn(),
+  useAccountTelemetry: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-router", async (importOriginal) => {
@@ -28,6 +29,7 @@ vi.mock("@/hooks/useSniperData", () => ({
   useSnapshot: hookMocks.useSnapshot,
   useCanonicalWatchlist: hookMocks.useCanonicalWatchlist,
   usePollingUiState: hookMocks.usePollingUiState,
+  useAccountTelemetry: hookMocks.useAccountTelemetry,
 }));
 
 vi.mock("@/hooks/useAnimatedNumber", () => ({
@@ -231,6 +233,9 @@ describe("PlanPage ranking and execution guards", () => {
       pollMs: 5_000,
       retrySettingsLoad: vi.fn(),
     });
+    hookMocks.useAccountTelemetry.mockReturnValue({
+      data: { currency: "USD" },
+    });
     mockWatchlist(["GBPUSD", "USDJPY", "AUDUSD", "EURUSD", "XAUUSD"]);
   });
 
@@ -293,6 +298,34 @@ describe("PlanPage ranking and execution guards", () => {
     expect(
       (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
     ).toBe(false);
+  });
+
+  it("renders pending blueprints without enabling execution", () => {
+    renderPlanPage({
+      signals: [
+        buildSignal({
+          status: "ARMED",
+          backendConfirmed: false,
+        }),
+      ],
+      ladders: [
+        buildPlan({
+          source: "pending-blueprint",
+        }),
+      ],
+    });
+
+    const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
+    expect(screen.getByText("PENDING BLUEPRINT")).toBeTruthy();
+    expect(cardText).toContain("1.26750");
+    expect(cardText).toContain("1.27050");
+    expect(cardText).toContain("$124.00");
+    expect(
+      screen.getByText(/Execution remains disabled until backend confirmation\./),
+    ).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
   });
 
   it("mirrors backend-authored stage lot sizes without recomputing or flattening them", () => {
@@ -517,7 +550,7 @@ describe("PlanPage ranking and execution guards", () => {
     ).toBeTruthy();
   });
 
-  it("excludes watchlist candidates that do not have plan objects", () => {
+  it("renders watchlist candidates without plan objects in awaiting-blueprint state", () => {
     renderPlanPage({
       signals: [
         buildSignal({ id: "sig-001", symbol: "GBPUSD", verdict: "A+" }),
@@ -542,23 +575,26 @@ describe("PlanPage ranking and execution guards", () => {
     });
 
     const renderedSymbols = getRenderedSymbols();
-    expect(getRenderedCards()).toHaveLength(2);
+    expect(getRenderedCards()).toHaveLength(3);
     expect(renderedSymbols[0]).toContain("GBPUSD");
-    expect(renderedSymbols[1]).toContain("AUDUSD");
-    expect(screen.queryByText("USDJPY")).toBeNull();
+    expect(renderedSymbols[1]).toContain("USDJPY");
+    expect(renderedSymbols[1]).toContain("NO BLUEPRINT");
+    expect(renderedSymbols[2]).toContain("AUDUSD");
   });
 
-  it("diagnoses ladder ID mismatches when ladders exist but no watchlist candidate has a matching plan", () => {
+  it("renders awaiting-blueprint cards when ladders exist but no watchlist candidate has a matching plan", () => {
     renderPlanPage({
       signals: [buildSignal({ id: "sig-001", symbol: "GBPUSD", verdict: "A+" })],
       ladders: [buildPlan({ signalId: "sig-other", symbol: "GBPUSD" })],
       watchlist: ["GBPUSD"],
     });
 
-    expect(getRenderedCards()).toHaveLength(0);
-    expect(screen.getByText("No matching blueprint for current watchlist candidates.")).toBeTruthy();
-    expect(screen.getByText("Found 1 total blueprints")).toBeTruthy();
-    expect(screen.getByText("No ladder signal IDs match current watchlist candidates")).toBeTruthy();
-    expect(screen.getByText("Ladder IDs available: sig-other")).toBeTruthy();
+    expect(getRenderedCards()).toHaveLength(1);
+    const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
+    expect(cardText).toContain("GBPUSD");
+    expect(cardText).toContain("NO BLUEPRINT");
+    expect(
+      screen.queryByText("No matching blueprint for current watchlist candidates."),
+    ).toBeNull();
   });
 });

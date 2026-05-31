@@ -54,3 +54,23 @@ Required manual checks:
 
 - No authenticated browser network capture was available in this workspace.
 - The TypeScript baseline error in `vite.config.ts` prevented a clean repo-wide `tsc --noEmit` pass unrelated to this patch.
+
+---
+
+# Blueprint Gating Throttle Verification
+
+Issue: SMC Intake - Blueprint Gating Throttling Adjustment
+Date: 2026-05-31
+
+## Commands
+
+- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` — passed.
+- `php wordpress/smc-superfib-sniper/tests/php/test-execute-signals-stage-lots.php` — passed.
+- `npx vitest run src/routes/-plan.test.tsx` — passed.
+- `npm run build` — passed.
+- `npm run validate:impl` — passed.
+- `npm run lint` — failed on unrelated repo-wide Prettier errors in existing files outside this patch scope.
+
+## Notes
+
+Touched frontend files were formatted with `npx prettier --write src/components/PlanCard.tsx src/routes/-plan.test.tsx src/types/sniper.ts`. Remaining lint failures are outside the changed files.
