@@ -23,6 +23,8 @@ final class SMC_SuperFib_Sniper_REST {
     // Backfill: all historical engine_runs records are included in streak computation.
     const ACTIVE_DAY_DEFINITION = 'CALENDAR_DAY_WITH_ANY_COMPLETED_ENGINE_RUN';
 
+    private static $display_signals_table_ready = false;
+
     private $ratios = array(-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300);
     private $fib_context_symbol = '';
     private $fib_context_timeframe = '';
@@ -31,6 +33,7 @@ final class SMC_SuperFib_Sniper_REST {
     public static function boot() {
         $instance = new self();
         add_action('rest_api_init', array($instance, 'register_routes'));
+        add_action('init', array(__CLASS__, 'ensure_display_signals_table'), 1);
         
         // Send CORS headers on all REST responses (success, error, auth failure, etc)
         add_filter('rest_post_dispatch', function($response, $server, $request) {
@@ -268,37 +271,7 @@ final class SMC_SuperFib_Sniper_REST {
             KEY user_status (user_id, status)
         ) $charset;";
 
-        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_display_signals (
-            id VARCHAR(64) NOT NULL,
-            user_id BIGINT UNSIGNED NOT NULL,
-            symbol VARCHAR(24) NOT NULL,
-            direction VARCHAR(8) NOT NULL,
-            lifecycle_state VARCHAR(32) NOT NULL DEFAULT 'DISPLAY_ACTIVE',
-            status VARCHAR(16) NOT NULL,
-            verdict VARCHAR(4) NOT NULL,
-            quality_score DECIMAL(10,4) NOT NULL DEFAULT 0,
-            signal_family_key VARCHAR(128) NOT NULL,
-            entry_price DECIMAL(20,8) NOT NULL,
-            sl_price DECIMAL(20,8) DEFAULT NULL,
-            tp_price DECIMAL(20,8) DEFAULT NULL,
-            source_candidate_id VARCHAR(64) DEFAULT NULL,
-            source VARCHAR(16) NOT NULL DEFAULT 'backend',
-            entry_hit_at DATETIME DEFAULT NULL,
-            stop_hit_at DATETIME DEFAULT NULL,
-            replaced_by VARCHAR(64) DEFAULT NULL,
-            invalidated_at DATETIME DEFAULT NULL,
-            invalidation_reason VARCHAR(64) DEFAULT NULL,
-            first_seen_at DATETIME NOT NULL,
-            last_confirmed_at DATETIME NOT NULL,
-            last_evaluated_at DATETIME NOT NULL,
-            expires_at DATETIME DEFAULT NULL,
-            confluence LONGTEXT NOT NULL,
-            engine LONGTEXT NOT NULL,
-            PRIMARY KEY  (id),
-            KEY user_active (user_id, lifecycle_state, quality_score),
-            KEY user_symbol (user_id, symbol, lifecycle_state),
-            KEY user_family (user_id, signal_family_key(64))
-        ) $charset;";
+        $tables[] = self::get_display_signals_table_sql($charset);
 
         $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_trade_plans (
             signal_id VARCHAR(64) NOT NULL,
@@ -467,8 +440,74 @@ final class SMC_SuperFib_Sniper_REST {
             dbDelta($sql);
         }
 
+        self::ensure_display_signals_table();
         self::ensure_trade_telemetry_tables();
         self::ensure_soak_tables();
+    }
+
+    private static function get_display_signals_table_sql(string $charset): string {
+        global $wpdb;
+
+        return "CREATE TABLE {$wpdb->prefix}smc_sf_display_signals (
+            id VARCHAR(64) NOT NULL,
+            user_id BIGINT UNSIGNED NOT NULL,
+            symbol VARCHAR(24) NOT NULL,
+            direction VARCHAR(8) NOT NULL,
+            lifecycle_state VARCHAR(32) NOT NULL DEFAULT 'DISPLAY_ACTIVE',
+            status VARCHAR(16) NOT NULL,
+            verdict VARCHAR(4) NOT NULL,
+            quality_score DECIMAL(10,4) NOT NULL DEFAULT 0,
+            signal_family_key VARCHAR(128) NOT NULL,
+            entry_price DECIMAL(20,8) NOT NULL,
+            sl_price DECIMAL(20,8) DEFAULT NULL,
+            tp_price DECIMAL(20,8) DEFAULT NULL,
+            source_candidate_id VARCHAR(64) DEFAULT NULL,
+            source VARCHAR(16) NOT NULL DEFAULT 'backend',
+            entry_hit_at DATETIME DEFAULT NULL,
+            stop_hit_at DATETIME DEFAULT NULL,
+            replaced_by VARCHAR(64) DEFAULT NULL,
+            invalidated_at DATETIME DEFAULT NULL,
+            invalidation_reason VARCHAR(64) DEFAULT NULL,
+            first_seen_at DATETIME NOT NULL,
+            last_confirmed_at DATETIME NOT NULL,
+            last_evaluated_at DATETIME NOT NULL,
+            expires_at DATETIME DEFAULT NULL,
+            confluence LONGTEXT NOT NULL,
+            engine LONGTEXT NOT NULL,
+            PRIMARY KEY  (id),
+            KEY user_active (user_id, lifecycle_state, quality_score),
+            KEY user_symbol (user_id, symbol, lifecycle_state),
+            KEY user_family (user_id, signal_family_key(64))
+        ) $charset;";
+    }
+
+    public static function ensure_display_signals_table() {
+        global $wpdb;
+
+        if (self::$display_signals_table_ready) {
+            return true;
+        }
+
+        if (file_exists(ABSPATH . 'wp-admin/includes/upgrade.php')) {
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        }
+
+        if (!function_exists('dbDelta')) {
+            return false;
+        }
+
+        if (is_object($wpdb) && property_exists($wpdb, 'last_error')) {
+            $wpdb->last_error = '';
+        }
+
+        dbDelta(self::get_display_signals_table_sql($wpdb->get_charset_collate()));
+
+        if (is_object($wpdb) && property_exists($wpdb, 'last_error') && $wpdb->last_error !== '') {
+            return false;
+        }
+
+        self::$display_signals_table_ready = true;
+        return true;
     }
 
     private static function ensure_bridge_tables() {
@@ -5746,6 +5785,7 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function read_display_signal_rows(int $user_id, array $symbols, bool $include_terminal = false): array {
         global $wpdb;
+        self::ensure_display_signals_table();
         $lookup = $this->normalize_symbol_lookup($symbols);
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM {$this->table('display_signals')} WHERE user_id = %d",
@@ -5792,7 +5832,16 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function upsert_display_signal_row(int $user_id, array $signal, array $candidate, string $family_key, float $quality_score, ?array $existing, string $now): string {
         global $wpdb;
-        $id = $existing !== null ? (string) $existing['id'] : 'disp-' . substr(hash('sha256', $family_key . '|' . (string) ($signal['id'] ?? '')), 0, 18);
+        self::ensure_display_signals_table();
+        $source_signal_id = trim((string) ($signal['id'] ?? ''));
+        $source_candidate_id = trim((string) ($candidate['id'] ?? ''));
+        if ($source_signal_id === '') {
+            $source_signal_id = $source_candidate_id;
+        }
+        $id = $existing !== null ? (string) $existing['id'] : $source_signal_id;
+        if ($id === '') {
+            $id = 'disp-' . substr(hash('sha256', $family_key), 0, 18);
+        }
         $engine = is_array($signal['engine'] ?? null) ? $signal['engine'] : array();
         if (!isset($engine['engineBlocker'])) {
             $engine['engineBlocker'] = (string) ($signal['engineBlocker'] ?? 'OK');
@@ -5810,7 +5859,7 @@ final class SMC_SuperFib_Sniper_REST {
             'entry_price' => (float) ($candidate['entry_price'] ?? 0),
             'sl_price' => isset($candidate['sl_price']) && is_numeric($candidate['sl_price']) ? (float) $candidate['sl_price'] : null,
             'tp_price' => isset($candidate['tp_price']) && is_numeric($candidate['tp_price']) ? (float) $candidate['tp_price'] : null,
-            'source_candidate_id' => (string) ($candidate['id'] ?? ''),
+            'source_candidate_id' => (string) ($candidate['id'] ?? ($signal['id'] ?? '')),
             'source' => 'backend',
             'entry_hit_at' => $existing['entry_hit_at'] ?? null,
             'stop_hit_at' => $existing['stop_hit_at'] ?? null,
@@ -5837,6 +5886,7 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function transition_display_signal(int $user_id, array $row, string $state, string $reason, ?string $replaced_by, string $now): void {
         global $wpdb;
+        self::ensure_display_signals_table();
         $data = array(
             'lifecycle_state' => $state,
             'last_evaluated_at' => $now,

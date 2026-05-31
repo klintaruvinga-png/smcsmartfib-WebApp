@@ -821,6 +821,14 @@ function seed_watch_build_symbol_state_fixture($wpdb, $user_id, $symbol, $bid, $
     }
 }
 
+$displaySignalsRuntimeTable = $wpdb->prefix . 'smc_sf_display_signals';
+$displaySignalsReadyProperty = new ReflectionProperty('SMC_SuperFib_Sniper_REST', 'display_signals_table_ready');
+$displaySignalsReadyProperty->setAccessible(true);
+$displaySignalsReadyProperty->setValue(null, false);
+unset($wpdb->schemas[$displaySignalsRuntimeTable], $wpdb->tables[$displaySignalsRuntimeTable]);
+assert_true(SMC_SuperFib_Sniper_REST::ensure_display_signals_table(), 'Runtime display_signals migration should succeed outside activation');
+assert_true(isset($wpdb->schemas[$displaySignalsRuntimeTable]['source_candidate_id']), 'Runtime display_signals migration must create the display board schema');
+
 $instance = new SMC_SuperFib_Sniper_REST();
 $instance->register_routes();
 
@@ -1318,6 +1326,39 @@ $blockedLiveSignalsPayload = $blockedLiveSignalsResponse->get_data();
 unset($GLOBALS['test_rest_force_response']);
 assert_same(1, count($blockedLiveSignalsPayload['signals'] ?? array()), 'get_live_signals must hold persisted board rows through current blocker diagnostics');
 assert_same('STALE_HELD', $blockedLiveSignalsPayload['signals'][0]['lifecycleState'] ?? null, 'get_live_signals must mark held rows as STALE_HELD instead of hiding them');
+
+$upsertDisplaySignalMethod = new ReflectionMethod('SMC_SuperFib_Sniper_REST', 'upsert_display_signal_row');
+$upsertDisplaySignalMethod->setAccessible(true);
+$promotedDisplayId = $upsertDisplaySignalMethod->invoke(
+    $instance,
+    7,
+    array(
+        'id' => 'sig-eurusd-ready-source',
+        'symbol' => 'EURUSD',
+        'direction' => 'LONG',
+        'status' => 'READY',
+        'verdict' => 'A',
+        'confluence' => array('OB', 'FVG'),
+        'engine' => array('engineBlocker' => 'OK'),
+    ),
+    array(
+        'id' => 'mt5-candidate-eurusd-ready',
+        'symbol' => 'EURUSD',
+        'direction' => 'LONG',
+        'status' => 'READY',
+        'verdict' => 'A',
+        'entry_price' => 1.09125,
+        'sl_price' => 1.08000,
+        'tp_price' => 1.10500,
+    ),
+    'family-eurusd-ready-source',
+    850.0,
+    null,
+    '2026-05-03 08:17:00'
+);
+assert_same('sig-eurusd-ready-source', $promotedDisplayId, 'New display promotions must preserve the backend source signal id');
+assert_true(isset($wpdb->tables[$displaySignalsTable]['sig-eurusd-ready-source']), 'Display board row must be keyed by the backend source signal id for ladder and execution matching');
+assert_same('mt5-candidate-eurusd-ready', $wpdb->tables[$displaySignalsTable]['sig-eurusd-ready-source']['source_candidate_id'] ?? null, 'Display board rows should still retain the originating MT5 candidate id separately');
 
 $GLOBALS['test_rest_force_response'] = true;
 $volatileResponseChecks = array(
