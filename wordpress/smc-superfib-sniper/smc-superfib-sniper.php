@@ -5661,8 +5661,10 @@ final class SMC_SuperFib_Sniper_REST {
                 'priorCandidateStatus' => $prior_candidate_status,
             );
 
-            if (in_array($lifecycle_state, array('ACTIVE_OPEN_POSITION', 'ACTIVE_PENDING_ORDER', 'ACTIVE_PRE_ENTRY'), true)) {
+            if (in_array($lifecycle_state, array('ACTIVE_OPEN_POSITION', 'ACTIVE_PENDING_ORDER'), true)) {
                 $status = 'WATCH';
+            } elseif ($lifecycle_state === 'ACTIVE_PRE_ENTRY' && $status === 'READY') {
+                $status = 'ARMED';
             } elseif ($status === 'READY' && $prior_candidate_is_ready) {
                 // Suppress repeated READY signals for the same MT5 candidate range.
                 $status = 'ARMED';

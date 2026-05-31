@@ -684,6 +684,74 @@ function assert_same($expected, $actual, $message) {
     }
 }
 
+function seed_ready_build_symbol_state_fixture($wpdb, $user_id, $symbol, $bid, $ask) {
+    $snapshotTable = $wpdb->prefix . 'smc_sf_snapshots';
+    $candleTable = $wpdb->prefix . 'smc_sf_candles';
+    $now = time();
+    $bucket = (int) (floor($now / 900) * 900);
+    $start = $bucket - (119 * 900);
+
+    $wpdb->replace($snapshotTable, array(
+        'user_id' => $user_id,
+        'symbol' => $symbol,
+        'bid' => $bid,
+        'ask' => $ask,
+        'mid' => ($bid + $ask) / 2,
+        'spread' => 2,
+        'change_pct_1d' => 0,
+        'source' => 'mt5',
+        'state' => 'live',
+        'updated_at' => gmdate('Y-m-d H:i:s', $now - 5),
+    ));
+
+    for ($i = 0; $i < 120; $i++) {
+        $open = 1.1300;
+        $high = 1.1400;
+        $low = 1.1210;
+        $close = 1.1290;
+
+        if ($i >= 85 && $i <= 109) {
+            $open = 1.1180;
+            $high = 1.1200;
+            $low = 1.1100;
+            $close = 1.1160;
+        } elseif ($i >= 110 && $i <= 118) {
+            $open = 1.1090;
+            $high = 1.1140;
+            $low = $i === 110 ? 1.0990 : 1.1060;
+            $close = 1.1120;
+        } elseif ($i === 119) {
+            $open = 1.1020;
+            $high = 1.1150;
+            $low = 1.1010;
+            $close = 1.1142;
+        }
+
+        $wpdb->replace($candleTable, array(
+            'user_id' => $user_id,
+            'symbol' => $symbol,
+            'timeframe' => '15min',
+            'candle_time' => gmdate('Y-m-d H:i:s', $start + ($i * 900)),
+            'open' => $open,
+            'high' => $high,
+            'low' => $low,
+            'close' => $close,
+            'volume' => '10',
+            'source' => 'mt5',
+            'created_at' => gmdate('Y-m-d H:i:s', $now),
+        ));
+    }
+
+    return array(
+        'direction' => 'LONG',
+        'fibRatio' => 62.5,
+        'fibLevel' => 1.114375,
+        'entryPrice' => 1.1160,
+        'slPrice' => 1.10925,
+        'tpPrice' => 1.1195,
+    );
+}
+
 $instance = new SMC_SuperFib_Sniper_REST();
 $instance->register_routes();
 
@@ -1294,6 +1362,196 @@ $missingQuoteState = $buildSymbolState->invoke($instance, 7, 'GBPUSD', null);
 assert_same('QUOTE_UNAVAILABLE', $missingQuoteState['diagnostic']['engineBlocker'] ?? null, 'build_symbol_state must keep quote-unavailable diagnostics when candles exist without a quote');
 assert_true(array_key_exists('lastPriceAt', $missingQuoteState['diagnostic']), 'build_symbol_state diagnostics must retain the lastPriceAt field when quotes are missing');
 assert_same(null, $missingQuoteState['diagnostic']['lastPriceAt'], 'build_symbol_state must not fabricate lastPriceAt when no authoritative quote exists');
+
+$buildLifecycleCandidateTable = $wpdb->prefix . 'smc_sf_mt5_signal_candidates';
+$buildLifecycleAccountTelemetryTable = $wpdb->prefix . 'smc_sf_account_telemetry';
+$buildLifecycleTradePositionsTable = $wpdb->prefix . 'smc_sf_trade_positions';
+$buildLifecycleTradeOrdersTable = $wpdb->prefix . 'smc_sf_trade_orders';
+$buildLifecycleSeenAt = gmdate('Y-m-d H:i:s');
+$wpdb->replace($buildLifecycleAccountTelemetryTable, array(
+    'id' => 'acct-telemetry-build-symbol-lifecycle',
+    'user_id' => 7,
+    'account_id' => 'acct-1',
+    'terminal_id' => 'term-1',
+    'balance' => 10000,
+    'equity' => 10000,
+    'margin' => 0,
+    'free_margin' => 10000,
+    'margin_level' => 0,
+    'floating_pl' => 0,
+    'currency' => 'USD',
+    'leverage' => 100,
+    'ea_version' => 'test',
+    'last_seen_at' => $buildLifecycleSeenAt,
+    'updated_at' => $buildLifecycleSeenAt,
+    'raw_json' => '{}',
+));
+
+$noPriorFixture = seed_ready_build_symbol_state_fixture($wpdb, 7, 'CADCHF', 1.1141, 1.1143);
+$noPriorState = $buildSymbolState->invoke($instance, 7, 'CADCHF', array(
+    'symbol' => 'CADCHF',
+    'bid' => 1.1141,
+    'ask' => 1.1143,
+    'mid' => 1.1142,
+    'updatedAt' => gmdate('c', time() - 5),
+    'state' => 'live',
+    'source' => 'mt5',
+));
+assert_same('READY', $noPriorState['signal']['status'] ?? null, 'build_symbol_state must keep a structurally valid setup READY when there is no prior MT5 candidate');
+assert_same(true, $noPriorState['signal']['backendConfirmed'] ?? null, 'build_symbol_state must backend-confirm a live READY setup with no lifecycle blocker');
+assert_true(is_array($noPriorState['plan'] ?? null), 'build_symbol_state must generate a plan for the unblocked READY control setup');
+
+$preEntryFixture = seed_ready_build_symbol_state_fixture($wpdb, 7, 'CHFJPY', 1.1141, 1.1143);
+$wpdb->replace($buildLifecycleCandidateTable, array(
+    'id' => 'mt5-chfjpy-build-pre-entry',
+    'user_id' => 7,
+    'symbol' => 'CHFJPY',
+    'direction' => $preEntryFixture['direction'],
+    'status' => 'READY',
+    'verdict' => 'A',
+    'entry_price' => $preEntryFixture['entryPrice'],
+    'sl_price' => $preEntryFixture['slPrice'],
+    'tp_price' => $preEntryFixture['tpPrice'],
+    'fib_level' => $preEntryFixture['fibLevel'],
+    'fib_ratio' => $preEntryFixture['fibRatio'],
+    'fib_family' => 'LTF_SF',
+    'htf_bias' => 'BULL',
+    'ltf_regime' => 'TRENDING',
+    'confidence' => 0.85,
+    'created_at' => gmdate('Y-m-d H:i:s', time() - 120),
+    'updated_at' => gmdate('Y-m-d H:i:s', time() - 120),
+));
+$preEntryState = $buildSymbolState->invoke($instance, 7, 'CHFJPY', array(
+    'symbol' => 'CHFJPY',
+    'bid' => 1.1141,
+    'ask' => 1.1143,
+    'mid' => 1.1142,
+    'updatedAt' => gmdate('c', time() - 5),
+    'state' => 'live',
+    'source' => 'mt5',
+));
+assert_same('ARMED', $preEntryState['signal']['status'] ?? null, 'ACTIVE_PRE_ENTRY must cap a structurally READY build_symbol_state signal at ARMED, not WATCH');
+assert_same(false, $preEntryState['signal']['backendConfirmed'] ?? null, 'ACTIVE_PRE_ENTRY capped signals must not be backend-confirmed');
+assert_same(null, $preEntryState['plan'] ?? null, 'ACTIVE_PRE_ENTRY capped signals must not generate executable trade plans');
+assert_same('ACTIVE_PRE_ENTRY', $preEntryState['diagnostic']['lifecycle']['state'] ?? null, 'ACTIVE_PRE_ENTRY lifecycle diagnostics must remain visible');
+assert_same('entry_not_crossed', $preEntryState['diagnostic']['lifecycle']['reason'] ?? null, 'ACTIVE_PRE_ENTRY lifecycle reason must remain entry_not_crossed');
+
+$openPositionFixture = seed_ready_build_symbol_state_fixture($wpdb, 7, 'EURCHF', 1.1141, 1.1143);
+$wpdb->replace($buildLifecycleCandidateTable, array(
+    'id' => 'mt5-eurchf-build-open-position',
+    'user_id' => 7,
+    'symbol' => 'EURCHF',
+    'direction' => $openPositionFixture['direction'],
+    'status' => 'READY',
+    'verdict' => 'A',
+    'entry_price' => $openPositionFixture['entryPrice'],
+    'sl_price' => $openPositionFixture['slPrice'],
+    'tp_price' => $openPositionFixture['tpPrice'],
+    'fib_level' => $openPositionFixture['fibLevel'],
+    'fib_ratio' => $openPositionFixture['fibRatio'],
+    'fib_family' => 'LTF_SF',
+    'htf_bias' => 'BULL',
+    'ltf_regime' => 'TRENDING',
+    'confidence' => 0.85,
+    'created_at' => gmdate('Y-m-d H:i:s', time() - 120),
+    'updated_at' => gmdate('Y-m-d H:i:s', time() - 120),
+));
+$wpdb->replace($buildLifecycleTradePositionsTable, array(
+    'deterministic_key' => 'position:7:acct-1:term-1:build-eurchf',
+    'user_id' => 7,
+    'account_id' => 'acct-1',
+    'terminal_id' => 'term-1',
+    'position_id' => 'build-pos-eurchf',
+    'symbol' => 'EURCHF',
+    'normalized_symbol' => 'EURCHF',
+    'direction' => 'BUY',
+    'entry_price' => $openPositionFixture['entryPrice'],
+    'current_price' => 1.1162,
+    'sl' => $openPositionFixture['slPrice'],
+    'tp' => $openPositionFixture['tpPrice'],
+    'volume' => 0.1,
+    'profit' => 0,
+    'swap' => 0,
+    'commission' => 0,
+    'magic' => 123,
+    'comment' => 'test',
+    'opened_at' => $buildLifecycleSeenAt,
+    'state' => 'open',
+    'ea_version' => 'test',
+    'last_seen_at' => $buildLifecycleSeenAt,
+    'updated_at' => $buildLifecycleSeenAt,
+    'raw_json' => '{}',
+));
+$openPositionState = $buildSymbolState->invoke($instance, 7, 'EURCHF', array(
+    'symbol' => 'EURCHF',
+    'bid' => 1.1141,
+    'ask' => 1.1143,
+    'mid' => 1.1142,
+    'updatedAt' => gmdate('c', time() - 5),
+    'state' => 'live',
+    'source' => 'mt5',
+));
+assert_same('WATCH', $openPositionState['signal']['status'] ?? null, 'ACTIVE_OPEN_POSITION must still hard-suppress build_symbol_state to WATCH');
+assert_same(false, $openPositionState['signal']['backendConfirmed'] ?? null, 'ACTIVE_OPEN_POSITION signals must not be backend-confirmed');
+assert_same(null, $openPositionState['plan'] ?? null, 'ACTIVE_OPEN_POSITION signals must not generate executable trade plans');
+assert_same('ACTIVE_OPEN_POSITION', $openPositionState['diagnostic']['lifecycle']['state'] ?? null, 'ACTIVE_OPEN_POSITION lifecycle diagnostics must remain visible');
+
+$pendingOrderFixture = seed_ready_build_symbol_state_fixture($wpdb, 7, 'GBPCHF', 1.1141, 1.1143);
+$wpdb->replace($buildLifecycleCandidateTable, array(
+    'id' => 'mt5-gbpchf-build-pending-order',
+    'user_id' => 7,
+    'symbol' => 'GBPCHF',
+    'direction' => $pendingOrderFixture['direction'],
+    'status' => 'READY',
+    'verdict' => 'A',
+    'entry_price' => $pendingOrderFixture['entryPrice'],
+    'sl_price' => $pendingOrderFixture['slPrice'],
+    'tp_price' => $pendingOrderFixture['tpPrice'],
+    'fib_level' => $pendingOrderFixture['fibLevel'],
+    'fib_ratio' => $pendingOrderFixture['fibRatio'],
+    'fib_family' => 'LTF_SF',
+    'htf_bias' => 'BULL',
+    'ltf_regime' => 'TRENDING',
+    'confidence' => 0.85,
+    'created_at' => gmdate('Y-m-d H:i:s', time() - 120),
+    'updated_at' => gmdate('Y-m-d H:i:s', time() - 120),
+));
+$wpdb->replace($buildLifecycleTradeOrdersTable, array(
+    'deterministic_key' => 'order:7:acct-1:term-1:build-gbpchf',
+    'user_id' => 7,
+    'account_id' => 'acct-1',
+    'terminal_id' => 'term-1',
+    'order_id' => 'build-ord-gbpchf',
+    'symbol' => 'GBPCHF',
+    'normalized_symbol' => 'GBPCHF',
+    'order_type' => 'BUY_LIMIT',
+    'direction' => 'BUY',
+    'entry_price' => $pendingOrderFixture['entryPrice'],
+    'sl' => $pendingOrderFixture['slPrice'],
+    'tp' => $pendingOrderFixture['tpPrice'],
+    'volume' => 0.1,
+    'magic' => 123,
+    'comment' => 'test',
+    'placed_at' => $buildLifecycleSeenAt,
+    'state' => 'active',
+    'ea_version' => 'test',
+    'last_seen_at' => $buildLifecycleSeenAt,
+    'updated_at' => $buildLifecycleSeenAt,
+    'raw_json' => '{}',
+));
+$pendingOrderState = $buildSymbolState->invoke($instance, 7, 'GBPCHF', array(
+    'symbol' => 'GBPCHF',
+    'bid' => 1.1141,
+    'ask' => 1.1143,
+    'mid' => 1.1142,
+    'updatedAt' => gmdate('c', time() - 5),
+    'state' => 'live',
+    'source' => 'mt5',
+));
+assert_same('WATCH', $pendingOrderState['signal']['status'] ?? null, 'ACTIVE_PENDING_ORDER must still hard-suppress build_symbol_state to WATCH');
+assert_same(false, $pendingOrderState['signal']['backendConfirmed'] ?? null, 'ACTIVE_PENDING_ORDER signals must not be backend-confirmed');
+assert_same(null, $pendingOrderState['plan'] ?? null, 'ACTIVE_PENDING_ORDER signals must not generate executable trade plans');
+assert_same('ACTIVE_PENDING_ORDER', $pendingOrderState['diagnostic']['lifecycle']['state'] ?? null, 'ACTIVE_PENDING_ORDER lifecycle diagnostics must remain visible');
 
 $htfEquilibriumSymbol = 'AOVTEST';
 $wpdb->replace($snapshotTable, array(
