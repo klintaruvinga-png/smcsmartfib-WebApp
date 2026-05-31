@@ -118,6 +118,12 @@ export function PlanCandidateCard({
             <span className="font-mono text-lg font-semibold">{signal.symbol}</span>
             <DirectionBadge direction={signal.direction} />
             <StatusBadge status={signal.status} />
+            {signal.lifecycleState && signal.lifecycleState !== "DISPLAY_ACTIVE" && (
+              <MetaPill>{signal.lifecycleState}</MetaPill>
+            )}
+            {typeof signal.qualityScore === "number" && (
+              <MetaPill>QS {Math.round(signal.qualityScore)}</MetaPill>
+            )}
             <FreshnessBadge state={price?.state ?? "pending-sync"} />
             <MetaPill>{signal.id}</MetaPill>
             <MetaPill>{relTime(signal.createdAt)}</MetaPill>

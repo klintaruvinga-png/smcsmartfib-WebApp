@@ -1230,12 +1230,13 @@ $stableLiveSignalsSnapshot = array(
     ),
 );
 update_user_meta(7, 'smc_sf_engine_snapshot', $stableLiveSignalsSnapshot);
-$signalsTable = $wpdb->prefix . 'smc_sf_signals';
-$wpdb->replace($signalsTable, array(
-    'id' => 'sig-eurusd-long-stable',
+$displaySignalsTable = $wpdb->prefix . 'smc_sf_display_signals';
+$wpdb->replace($displaySignalsTable, array(
+    'id' => 'disp-eurusd-long-stable',
     'user_id' => 7,
     'symbol' => 'EURUSD',
     'direction' => 'LONG',
+    'lifecycle_state' => 'DISPLAY_ACTIVE',
     'status' => 'READY',
     'verdict' => 'A',
     'confluence' => json_encode(array('OB', 'FVG')),
@@ -1250,9 +1251,22 @@ $wpdb->replace($signalsTable, array(
         'htaOverride' => false,
         'f3Chop' => 'clear',
     )),
-    'backend_confirmed' => 1,
-    'created_at' => '2026-05-03 08:15:00',
-    'updated_at' => '2026-05-03 08:16:00',
+    'quality_score' => 735.0,
+    'signal_family_key' => 'family-eurusd-long',
+    'entry_price' => 9.99000000,
+    'sl_price' => 1.08000000,
+    'tp_price' => 1.09500000,
+    'source_candidate_id' => 'sig-eurusd-long-stable',
+    'source' => 'backend',
+    'entry_hit_at' => null,
+    'stop_hit_at' => null,
+    'replaced_by' => null,
+    'invalidated_at' => null,
+    'invalidation_reason' => null,
+    'first_seen_at' => '2026-05-03 08:15:00',
+    'last_confirmed_at' => '2026-05-03 08:16:00',
+    'last_evaluated_at' => '2026-05-03 08:16:00',
+    'expires_at' => '2026-12-31 12:16:00',
 ));
 $GLOBALS['test_rest_force_response'] = true;
 $firstLiveSignalsResponse = $instance->get_live_signals();
@@ -1273,10 +1287,13 @@ assert_true(!empty($firstLiveSignalsPayload['polledAt']), 'get_live_signals must
 assert_true(!empty($secondLiveSignalsPayload['polledAt']), 'get_live_signals must stamp polledAt on the response envelope');
 assert_same(1, count($firstLiveSignals), 'get_live_signals must preserve the stable signal count across repeated polls');
 assert_same(1, count($secondLiveSignals), 'get_live_signals must preserve the stable signal count across repeated polls');
-assert_same('sig-eurusd-long-stable', $firstLiveSignals[0]['id'] ?? null, 'get_live_signals must read the durable board row instead of raw snapshot WATCH output');
+assert_same('disp-eurusd-long-stable', $firstLiveSignals[0]['id'] ?? null, 'get_live_signals must read the durable display board row instead of raw snapshot WATCH output');
 assert_same($firstLiveSignals[0]['id'] ?? null, $secondLiveSignals[0]['id'] ?? null, 'get_live_signals must keep signal identity stable across repeated polls');
 assert_same($firstLiveSignals[0]['createdAt'] ?? null, $secondLiveSignals[0]['createdAt'] ?? null, 'get_live_signals must keep createdAt stable across repeated polls');
 assert_same($firstLiveSignals[0]['backendConfirmed'] ?? null, $secondLiveSignals[0]['backendConfirmed'] ?? null, 'get_live_signals must keep backendConfirmed stable across repeated polls');
+assert_same('DISPLAY_ACTIVE', $firstLiveSignals[0]['lifecycleState'] ?? null, 'get_live_signals must expose display lifecycle state');
+assert_same(735.0, $firstLiveSignals[0]['qualityScore'] ?? null, 'get_live_signals must expose deterministic display quality score');
+assert_same(1, $firstLiveSignalsPayload['meta']['totalActive'] ?? null, 'get_live_signals must expose total active board signals');
 assert_true(!array_key_exists('polledAt', $firstLiveSignals[0] ?? array()), 'get_live_signals must not stamp polledAt on individual signals');
 assert_true(!array_key_exists('polledAt', $secondLiveSignals[0] ?? array()), 'get_live_signals must not stamp polledAt on individual signals');
 assert_same('no-store, no-cache, must-revalidate', $firstLiveSignalsHeaders['Cache-Control'] ?? null, 'get_live_signals must preserve Cache-Control anti-cache headers');
@@ -1299,7 +1316,8 @@ $GLOBALS['test_rest_force_response'] = true;
 $blockedLiveSignalsResponse = $instance->get_live_signals();
 $blockedLiveSignalsPayload = $blockedLiveSignalsResponse->get_data();
 unset($GLOBALS['test_rest_force_response']);
-assert_same(0, count($blockedLiveSignalsPayload['signals'] ?? array()), 'get_live_signals must reject persisted board rows for symbols with current blocker diagnostics');
+assert_same(1, count($blockedLiveSignalsPayload['signals'] ?? array()), 'get_live_signals must hold persisted board rows through current blocker diagnostics');
+assert_same('STALE_HELD', $blockedLiveSignalsPayload['signals'][0]['lifecycleState'] ?? null, 'get_live_signals must mark held rows as STALE_HELD instead of hiding them');
 
 $GLOBALS['test_rest_force_response'] = true;
 $volatileResponseChecks = array(
