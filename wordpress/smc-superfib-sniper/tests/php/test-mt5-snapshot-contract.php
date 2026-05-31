@@ -1327,6 +1327,112 @@ unset($GLOBALS['test_rest_force_response']);
 assert_same(1, count($blockedLiveSignalsPayload['signals'] ?? array()), 'get_live_signals must hold persisted board rows through current blocker diagnostics');
 assert_same('STALE_HELD', $blockedLiveSignalsPayload['signals'][0]['lifecycleState'] ?? null, 'get_live_signals must mark held rows as STALE_HELD instead of hiding them');
 
+$computeSignalFamilyKeyMethod = new ReflectionMethod('SMC_SuperFib_Sniper_REST', 'compute_signal_family_key');
+$computeSignalFamilyKeyMethod->setAccessible(true);
+$terminalCandidate = array(
+    'id' => 'sig-gbpusd-entry-source',
+    'symbol' => 'GBPUSD',
+    'direction' => 'LONG',
+    'status' => 'READY',
+    'verdict' => 'A',
+    'entry_price' => 1.09125,
+    'sl_price' => 1.08000,
+    'tp_price' => 1.10500,
+    'fib_family' => 'backend',
+    'fib_ratio' => null,
+    'confidence' => 0.8,
+    'pine_match' => 'EXACT',
+    'created_at' => '2026-05-03 08:17:00',
+);
+$terminalSignal = array(
+    'id' => 'sig-gbpusd-entry-source',
+    'symbol' => 'GBPUSD',
+    'direction' => 'LONG',
+    'status' => 'READY',
+    'verdict' => 'A',
+    'computedBy' => 'backend',
+    'backendConfirmed' => true,
+    'engineBlocker' => 'OK',
+    'entryPrice' => 1.09125,
+    'slPrice' => 1.08000,
+    'tpPrice' => 1.10500,
+    'createdAt' => '2026-05-03T08:17:00+00:00',
+    'confluence' => array('OB', 'FVG'),
+    'engine' => array(
+        'engineBlocker' => 'OK',
+        'anchorSessionId' => '20260503',
+        'firstReactionFamily' => 'backend',
+        'htfBias' => 'BULL',
+        'pdState' => 'DISCOUNT',
+        'sweep' => 'present',
+        'mss' => 'present',
+        'displacement' => 'clean',
+    ),
+);
+$terminalFamilyKey = $computeSignalFamilyKeyMethod->invoke($instance, 7, $terminalCandidate, $terminalSignal);
+$wpdb->replace($snapshotTable, array(
+    'user_id' => 7,
+    'symbol' => 'GBPUSD',
+    'bid' => 1.1010,
+    'ask' => 1.1012,
+    'mid' => 1.1011,
+    'spread' => 2,
+    'change_pct_1d' => 0,
+    'source' => 'mt5',
+    'state' => 'live',
+    'updated_at' => gmdate('Y-m-d H:i:s'),
+));
+$wpdb->replace($displaySignalsTable, array(
+    'id' => 'disp-gbpusd-entry-terminal',
+    'user_id' => 7,
+    'symbol' => 'GBPUSD',
+    'direction' => 'LONG',
+    'lifecycle_state' => 'DISPLAY_ACTIVE',
+    'status' => 'READY',
+    'verdict' => 'A',
+    'confluence' => json_encode(array('OB', 'FVG')),
+    'engine' => json_encode($terminalSignal['engine']),
+    'quality_score' => 500.0,
+    'signal_family_key' => $terminalFamilyKey,
+    'entry_price' => 1.09125,
+    'sl_price' => 1.08000,
+    'tp_price' => 1.10500,
+    'source_candidate_id' => 'sig-gbpusd-entry-source',
+    'source' => 'backend',
+    'entry_hit_at' => null,
+    'stop_hit_at' => null,
+    'replaced_by' => null,
+    'invalidated_at' => null,
+    'invalidation_reason' => null,
+    'first_seen_at' => '2026-05-03 08:16:00',
+    'last_confirmed_at' => '2026-05-03 08:16:00',
+    'last_evaluated_at' => '2026-05-03 08:16:00',
+    'expires_at' => '2026-12-31 12:16:00',
+));
+$reconcileLiveSignalBoardMethod = new ReflectionMethod('SMC_SuperFib_Sniper_REST', 'reconcile_live_signal_board');
+$reconcileLiveSignalBoardMethod->setAccessible(true);
+$reconcileLiveSignalBoardMethod->invoke($instance, 7, array('GBPUSD'), array($terminalSignal), array(array(
+    'symbol' => 'GBPUSD',
+    'priceState' => 'live',
+    'candleState' => 'live',
+    'engineBlocker' => 'OK',
+)));
+$terminalDisplayRow = $wpdb->tables[$displaySignalsTable]['disp-gbpusd-entry-terminal'] ?? array();
+assert_same('ENTRY_HIT', $terminalDisplayRow['lifecycle_state'] ?? null, 'Live board reconciliation must not resurrect entry-hit rows to DISPLAY_ACTIVE during same-family upserts');
+assert_true(!empty($terminalDisplayRow['entry_hit_at'] ?? null), 'Entry-hit rows must preserve the first terminal entry timestamp after reconciliation');
+$wpdb->replace($snapshotTable, array(
+    'user_id' => 7,
+    'symbol' => 'GBPUSD',
+    'bid' => 1.1010,
+    'ask' => 1.1012,
+    'mid' => 1.1011,
+    'spread' => 2,
+    'change_pct_1d' => 0,
+    'source' => 'test-archived',
+    'state' => 'stale',
+    'updated_at' => '2026-05-03 08:17:00',
+));
+
 $upsertDisplaySignalMethod = new ReflectionMethod('SMC_SuperFib_Sniper_REST', 'upsert_display_signal_row');
 $upsertDisplaySignalMethod->setAccessible(true);
 $promotedDisplayId = $upsertDisplaySignalMethod->invoke(

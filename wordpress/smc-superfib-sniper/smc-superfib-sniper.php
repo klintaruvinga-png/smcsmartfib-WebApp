@@ -5830,9 +5830,16 @@ final class SMC_SuperFib_Sniper_REST {
         return null;
     }
 
+    private function is_terminal_display_lifecycle_state(string $state): bool {
+        return in_array(strtoupper($state), array('ENTRY_HIT', 'FILLED_CONFIRMED', 'STOP_HIT', 'REPLACED', 'EXPIRED', 'INVALIDATED'), true);
+    }
+
     private function upsert_display_signal_row(int $user_id, array $signal, array $candidate, string $family_key, float $quality_score, ?array $existing, string $now): string {
         global $wpdb;
         self::ensure_display_signals_table();
+        if ($existing !== null && $this->is_terminal_display_lifecycle_state((string) ($existing['lifecycle_state'] ?? ''))) {
+            return (string) ($existing['id'] ?? '');
+        }
         $source_signal_id = trim((string) ($signal['id'] ?? ''));
         $source_candidate_id = trim((string) ($candidate['id'] ?? ''));
         if ($source_signal_id === '') {
