@@ -4,6 +4,7 @@ import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const reactQueryMocks = vi.hoisted(() => ({
+  keepPreviousData: vi.fn(),
   useMutation: vi.fn(),
   useQuery: vi.fn(),
   useQueryClient: vi.fn(),
@@ -12,6 +13,7 @@ const reactQueryMocks = vi.hoisted(() => ({
 const apiMocks = vi.hoisted(() => ({
   getAccountTelemetry: vi.fn(),
   getEngineHealth: vi.fn(),
+  getLadders: vi.fn(),
   getLiveSignals: vi.fn(),
   getUserProgress: vi.fn(),
   getUserSettings: vi.fn(),
@@ -22,6 +24,7 @@ const apiMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@tanstack/react-query", () => ({
+  keepPreviousData: reactQueryMocks.keepPreviousData,
   useMutation: reactQueryMocks.useMutation,
   useQuery: reactQueryMocks.useQuery,
   useQueryClient: reactQueryMocks.useQueryClient,
@@ -31,6 +34,7 @@ vi.mock("@/lib/api/sniperClient", () => ({
   apiClient: {
     getAccountTelemetry: apiMocks.getAccountTelemetry,
     getEngineHealth: apiMocks.getEngineHealth,
+    getLadders: apiMocks.getLadders,
     getLiveSignals: apiMocks.getLiveSignals,
     getUserProgress: apiMocks.getUserProgress,
     getUserSettings: apiMocks.getUserSettings,
@@ -41,7 +45,10 @@ vi.mock("@/lib/api/sniperClient", () => ({
   setBackendUrl: apiMocks.setBackendUrl,
 }));
 
+import { keepPreviousData } from "@tanstack/react-query";
+
 import {
+  createLaddersQueryOptions,
   useAccountTelemetry,
   useEngineHealth,
   useLiveSignals,
@@ -56,6 +63,7 @@ describe("useEngineHealth", () => {
     reactQueryMocks.useQuery.mockReset();
     apiMocks.getAccountTelemetry.mockReset();
     apiMocks.getEngineHealth.mockReset();
+    apiMocks.getLadders.mockReset();
     apiMocks.getLiveSignals.mockReset();
     apiMocks.getUserProgress.mockReset();
     apiMocks.getUserSettings.mockReset();
@@ -207,6 +215,18 @@ describe("useLiveSignals", () => {
       enabled: true,
       staleTime: 0,
       structuralSharing: false,
+      placeholderData: keepPreviousData,
+      refetchInterval: 5_000,
+    });
+  });
+});
+
+describe("useLadders", () => {
+  it("retains previous ladder data while preserving the polling cadence", () => {
+    expect(createLaddersQueryOptions(true, 5_000)).toMatchObject({
+      queryKey: ["ladders"],
+      enabled: true,
+      placeholderData: keepPreviousData,
       refetchInterval: 5_000,
     });
   });

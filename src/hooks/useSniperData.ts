@@ -1,4 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { UseQueryOptions } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 import { apiClient, normalizeBackendUrl, setBackendUrl } from "@/lib/api/sniperClient";
 import { reconcileUserTrades, type TradeContinuityState } from "@/lib/tradeContinuity";
@@ -105,7 +106,7 @@ export function useSnapshot() {
     queryFn: () => apiClient.getSnapshot(),
     enabled,
     refetchOnWindowFocus: false,
-    refetchInterval: enabled ? pollMs : false,
+    refetchInterval: enabled && pollMs !== null ? pollMs : false,
   });
 }
 
@@ -119,8 +120,9 @@ export function useLiveSignals() {
     enabled,
     staleTime: 0,
     structuralSharing: false,
+    placeholderData: keepPreviousData,
     refetchOnWindowFocus: false,
-    refetchInterval: enabled ? pollMs : false,
+    refetchInterval: enabled && pollMs !== null ? pollMs : false,
   });
 }
 
@@ -132,7 +134,7 @@ export function useUserTrades() {
     queryKey: ["user-trades"],
     queryFn: () => apiClient.getUserTrades(),
     enabled,
-    refetchInterval: enabled ? pollMs : false,
+    refetchInterval: enabled && pollMs !== null ? pollMs : false,
   });
 }
 
@@ -196,7 +198,7 @@ export function useUserAccount() {
     queryKey: ["user-account"],
     queryFn: () => apiClient.getUserAccount(),
     enabled,
-    refetchInterval: enabled ? pollMs : false,
+    refetchInterval: enabled && pollMs !== null ? pollMs : false,
   });
 }
 
@@ -208,7 +210,7 @@ export function useUserProgress() {
     queryFn: () => apiClient.getUserProgress(),
     enabled,
     staleTime: 0,
-    refetchInterval: enabled ? pollMs : false,
+    refetchInterval: enabled && pollMs !== null ? pollMs : false,
   });
 }
 
@@ -219,7 +221,7 @@ export function useAccountTelemetry() {
     queryKey: ["account-telemetry"],
     queryFn: () => apiClient.getAccountTelemetry(),
     enabled,
-    refetchInterval: enabled ? pollMs : false,
+    refetchInterval: enabled && pollMs !== null ? pollMs : false,
   });
 }
 
@@ -487,7 +489,7 @@ export function useEngineHealth() {
     enabled,
     // Phase 0: health query must reflect backend state within one poll cycle; disable caching.
     staleTime: 0,
-    refetchInterval: enabled ? pollMs : false,
+    refetchInterval: enabled && pollMs !== null ? pollMs : false,
   });
 }
 
@@ -500,16 +502,26 @@ export function useUserRiskProfile() {
   });
 }
 
+export function createLaddersQueryOptions(
+  enabled: boolean,
+  pollMs: number | null,
+): UseQueryOptions<TradePlan[], Error, TradePlan[], readonly ["ladders"]> {
+  return {
+    queryKey: ["ladders"] as const,
+    queryFn: () => apiClient.getLadders(),
+    enabled,
+    placeholderData: keepPreviousData,
+    refetchInterval: enabled && pollMs !== null ? pollMs : false,
+  };
+}
+
 export function useLadders() {
   const { backendReady, pendingSettingsLoad, pollMs } = usePollingQueryState();
   const enabled = backendReady && pollMs !== null;
   useLivePollingDiagnostics("LADDERS_POLL", backendReady, pendingSettingsLoad, pollMs);
-  return useQuery<TradePlan[]>({
-    queryKey: ["ladders"],
-    queryFn: () => apiClient.getLadders(),
-    enabled,
-    refetchInterval: enabled ? pollMs : false,
-  });
+  return useQuery<TradePlan[], Error, TradePlan[], readonly ["ladders"]>(
+    createLaddersQueryOptions(enabled, pollMs),
+  );
 }
 
 /** Trigger a forced backend market-data refresh + engine run, then invalidate all dependent queries. */
