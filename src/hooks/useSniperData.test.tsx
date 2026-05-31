@@ -48,9 +48,9 @@ vi.mock("@/lib/api/sniperClient", () => ({
 import { keepPreviousData } from "@tanstack/react-query";
 
 import {
+  createLaddersQueryOptions,
   useAccountTelemetry,
   useEngineHealth,
-  useLadders,
   useLiveSignals,
   usePollingUiState,
   useUserProgress,
@@ -222,35 +222,8 @@ describe("useLiveSignals", () => {
 });
 
 describe("useLadders", () => {
-  beforeEach(() => {
-    reactQueryMocks.useQuery.mockReset();
-  });
-
   it("retains previous ladder data while preserving the polling cadence", () => {
-    let laddersOptions: Record<string, unknown> | undefined;
-
-    reactQueryMocks.useQuery.mockImplementation((options: { queryKey: string[] }) => {
-      if (options.queryKey[0] === "user-settings") {
-        return {
-          data: {
-            backendUrl: "https://backend.example/wp-json",
-            refreshIntervalSec: 5,
-            watchlist: [],
-          },
-        };
-      }
-
-      if (options.queryKey[0] === "ladders") {
-        laddersOptions = options;
-        return { data: undefined };
-      }
-
-      return { data: undefined };
-    });
-
-    renderHook(() => useLadders());
-
-    expect(laddersOptions).toMatchObject({
+    expect(createLaddersQueryOptions(true, 5_000)).toMatchObject({
       queryKey: ["ladders"],
       enabled: true,
       placeholderData: keepPreviousData,
