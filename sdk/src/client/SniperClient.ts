@@ -159,8 +159,16 @@ function normalizeOrder(r: RawOrder): PendingOrder {
 function normalizeLiveSignalsResponse(
   raw: LiveSignalsResponse | SignalCandidate[],
 ): SignalCandidate[] {
-  if (Array.isArray(raw)) return raw;
-  if (raw && Array.isArray(raw.signals)) return raw.signals;
+  return normalizeLiveSignalsEnvelope(raw).signals;
+}
+
+function normalizeLiveSignalsEnvelope(
+  raw: LiveSignalsResponse | SignalCandidate[],
+): LiveSignalsResponse {
+  if (Array.isArray(raw)) {
+    return { signals: raw, polledAt: new Date().toISOString() };
+  }
+  if (raw && Array.isArray(raw.signals)) return raw;
 
   throw new ApiError("/live-signals", 200, "backend response missing signals array");
 }
@@ -311,9 +319,15 @@ export class SniperClient {
     );
   }
 
-  async getLiveSignals(): Promise<SignalCandidate[]> {
-    const raw = await this.request<LiveSignalsResponse | SignalCandidate[]>("/live-signals");
-    return normalizeLiveSignalsResponse(raw);
+  async getLiveSignals(boardSize?: 3 | 5 | 10): Promise<SignalCandidate[]> {
+    const response = await this.getDisplaySignals(boardSize);
+    return response.signals;
+  }
+
+  async getDisplaySignals(boardSize?: 3 | 5 | 10): Promise<LiveSignalsResponse> {
+    const path = boardSize ? `/live-signals?board_size=${boardSize}` : "/live-signals";
+    const raw = await this.request<LiveSignalsResponse | SignalCandidate[]>(path);
+    return normalizeLiveSignalsEnvelope(raw);
   }
 
   async getLadders(symbol?: Symbol): Promise<TradePlan[]> {

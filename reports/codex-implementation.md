@@ -1,38 +1,42 @@
-# Issue summary
+## Issue summary
 
-Sweep-present unconfirmed ARMED/READY signals were blocked from producing pending blueprints when MSS was absent and displacement was weak or absent.
+`/live-signals` exposed raw engine snapshot signals, allowing transient `WATCH` output and stale/blocker noise to appear as display cards instead of reading a backend-owned durable display board.
 
-# Root cause implemented
+## Root cause implemented
 
-Updated the ARMED/READY pending-blueprint gate in `SMC_SuperFIB_Sniper::build_pending_or_confirmed_plan()` so sweep remains the only structural prerequisite after the existing live data, OK engine blocker, and hard lifecycle suppression checks.
+Implemented a backend live signal board arbiter backed by `smc_sf_signals`. Engine runs and live-signal polls now reconcile only eligible backend `ARMED`/`READY` signals with `engineBlocker=OK`, hide current stale/blocker symbols, and read `/live-signals` from durable rows instead of raw snapshot signals.
 
-# Exact files changed
+## Exact files changed
 
-- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` — relaxed the pending-blueprint guard from sweep plus MSS/clean displacement to sweep-only.
-- `wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` — updated the weak-displacement ACTIVE_PRE_ENTRY contract case to expect a non-executable `pending-blueprint` and assert it is not persisted to `smc_sf_trade_plans`.
-- `reports/codex-implementation.md` — recorded the implementation summary and verification results.
-- `reports/codex-implementation.meta.json` — restored the required implementation metadata with the current plan hash for repository validation.
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-31_watch-blueprint-v2-patch.md` — documented runtime integrity findings and regression coverage.
-- `.github/migration/audits/phase-0-backend-dashboard-watch-blueprint-v2-parity-2026-05-31.md` — documented scoped backend/dashboard source parity.
+- `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` — replaced raw snapshot reads in `get_live_signals()`, added display-board reconciliation/reader helpers, and moved signal persistence behind eligibility checks.
+- `wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` — updated live-signal contract coverage to seed durable `smc_sf_signals` rows, reject raw `WATCH` snapshot output, preserve stable envelope fields, and reject persisted rows with current blocker diagnostics.
+- `reports/codex-implementation.md` — recorded implementation details and verification results.
+- `reports/codex-implementation.meta.json` — recorded the implementation metadata and current plan hash required by the pipeline validator.
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-31_signal-persistence-arbiter.md` — documented runtime integrity findings and regression coverage.
+- `.github/migration/audits/phase-5-backend-live-signal-board-parity-2026-05-31.md` — documented backend/dashboard parity re-validation.
 
-# Tests run
+## Tests run
 
-- Pre-patch RED check: `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` failed on the new weak-displacement pending-blueprint expectation, as expected.
+- Red check: `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` failed before production code changes because raw snapshot `WATCH` output was returned.
 - `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` — passed.
-- `npx vitest run src/routes/-plan.test.tsx` — passed, 24 tests.
+- `npm test -- --run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx src/routes/-signals.page.test.tsx src/routes/-plan.test.tsx` — failed because the root package has no `test` script.
+- `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx src/routes/-signals.page.test.tsx src/routes/-plan.test.tsx` — passed, 4 files / 44 tests.
+- `npm run typecheck` — failed because the root package has no `typecheck` script.
+- `npx tsc --noEmit` — failed on existing `vite.config.ts` typing: `test` is not accepted by `LovableViteTanstackOptions`.
+- `npm run build` — passed.
 - `npm run validate:impl` — passed.
 
-# Reports generated
+## Reports generated
 
 - `reports/codex-implementation.md`
 - `reports/codex-implementation.meta.json`
-- `.github/docs/BUG_SWEEP_REPORT_2026-05-31_watch-blueprint-v2-patch.md`
-- `.github/migration/audits/phase-0-backend-dashboard-watch-blueprint-v2-parity-2026-05-31.md`
+- `.github/docs/BUG_SWEEP_REPORT_2026-05-31_signal-persistence-arbiter.md`
+- `.github/migration/audits/phase-5-backend-live-signal-board-parity-2026-05-31.md`
 
-# Remaining risks
+## Remaining risks
 
-Snapshot replay with representative WATCH, ARMED sweep-only, READY confirmed, and blocked fixtures remains the contract's live-like manual verification item before merge. No Pine formulas, MT5 ingestion, stale thresholds, persistence contracts, or frontend source-of-truth behavior were intentionally changed.
+Manual live API polling and MT5 candidate replay are still pending. Direct TypeScript verification remains blocked by the existing `vite.config.ts` type mismatch, although the production Vite build passed. The patch intentionally does not add a new display-signals table or backend top-N cap.
 
-# Any contract ambiguities resolved during implementation
+## Any contract ambiguities resolved during implementation
 
-The contract mentioned current frontend support as already present while listing frontend files in the research context. I treated frontend changes as out of scope because the implementation contract named only the PHP backend guard and PHP contract test for modification.
+The contract required stale/blocker diagnostics to remove persisted board rows even when `get_live_signals()` serves a cached snapshot. I used the smallest safe interpretation: `get_live_signals()` still calls `ensure_engine_snapshot()` first, then reconciles only the current snapshot diagnostics into the durable board before reading it. Eligible signal upserts remain engine-run owned, and raw snapshot signals are never returned as a fallback.

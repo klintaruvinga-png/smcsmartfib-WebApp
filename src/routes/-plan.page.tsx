@@ -1,6 +1,6 @@
 import {
   useCanonicalWatchlist,
-  useLiveSignals,
+  useDisplaySignals,
   useLadders,
   useSnapshot,
   usePollingUiState,
@@ -9,13 +9,12 @@ import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { SettingsQueryErrorState } from "@/components/sniper/SettingsQueryErrorState";
 import { DivergenceBanner } from "@/components/sniper/Warnings";
 import { AlertTriangle, Loader2, Search } from "lucide-react";
+import { useState } from "react";
 import { deduplicateById } from "@/lib/utils";
 import { WalletOverview } from "@/components/sniper/WalletOverview";
 import { isTradePlanComplete } from "./-plan.utils";
 import type { SignalCandidate, TradePlan } from "@/types/sniper";
 import { PlanCandidateCard } from "@/components/PlanCard";
-
-const VERDICT_RANK: Record<string, number> = { "A+": 4, A: 3, B: 2, C: 1 };
 
 type RankedCandidate = {
   signal: SignalCandidate;
@@ -30,49 +29,11 @@ type RenderableCandidate = RankedCandidate & {
   hasPlan: true;
 };
 
-function planQualityRank(candidate: RankedCandidate) {
-  if (candidate.signal.backendConfirmed && candidate.plan?.source === "backend-blueprint") {
-    return 4;
-  }
-  if (candidate.plan?.source === "backend-blueprint") {
-    return 3;
-  }
-  if (candidate.plan?.source === "pending-blueprint") {
-    return 2;
-  }
-  if (candidate.plan?.source === "watch-blueprint") {
-    return 1;
-  }
-  return 0;
-}
-
-function compareRankedCandidates(a: RankedCandidate, b: RankedCandidate) {
-  const verdictDelta =
-    (VERDICT_RANK[b.signal.verdict] ?? 0) - (VERDICT_RANK[a.signal.verdict] ?? 0);
-  if (verdictDelta !== 0) return verdictDelta;
-
-  if (a.signal.backendConfirmed !== b.signal.backendConfirmed) {
-    return a.signal.backendConfirmed ? -1 : 1;
-  }
-
-  const aReady = a.signal.status === "READY";
-  const bReady = b.signal.status === "READY";
-  if (aReady !== bReady) return aReady ? -1 : 1;
-
-  const planQualityDelta = planQualityRank(b) - planQualityRank(a);
-  if (planQualityDelta !== 0) return planQualityDelta;
-
-  if (a.hasPlan !== b.hasPlan) return a.hasPlan ? -1 : 1;
-
-  return a.originalIndex - b.originalIndex;
-}
-
-function hasRenderablePlan(candidate: RankedCandidate): candidate is RenderableCandidate {
-  return candidate.hasPlan && candidate.plan !== null;
-}
-
 export function PlanPage() {
-  const { data: signals, isLoading: signalsLoading } = useLiveSignals();
+  const [boardSize, setBoardSize] = useState<3 | 5 | 10>(3);
+  const { data: liveSignals, isLoading: signalsLoading } = useDisplaySignals(boardSize);
+  const signals = liveSignals?.signals;
+  const totalActiveSignals = liveSignals?.meta?.totalActive ?? signals?.length ?? 0;
   const {
     data: ladders,
     isLoading: laddersLoading,
@@ -89,11 +50,7 @@ export function PlanPage() {
   } = usePollingUiState();
   const { watchlist, watchlistSet } = useCanonicalWatchlist();
 
-  const uniqueSignals = signals
-    ? deduplicateById(signals).sort(
-        (a, b) => (VERDICT_RANK[b.verdict] ?? 0) - (VERDICT_RANK[a.verdict] ?? 0),
-      )
-    : [];
+  const uniqueSignals = signals ? deduplicateById(signals) : [];
 
   const laddersBySignalId = new Map((ladders ?? []).map((ladder) => [ladder.signalId, ladder]));
   const candidatePool: RankedCandidate[] = uniqueSignals.map((signal, originalIndex) => {
@@ -108,9 +65,8 @@ export function PlanPage() {
   });
 
   const watchlistCandidates = candidatePool.filter(({ signal }) => watchlistSet.has(signal.symbol));
-  const rankedWatchlistCandidates = [...watchlistCandidates].sort(compareRankedCandidates);
-  // Show all ranked candidates — cards render in "awaiting blueprint" state when no plan exists
-  const topCandidates = rankedWatchlistCandidates.slice(0, 3);
+  const topCandidates = watchlistCandidates;
+  const rankedWatchlistCandidates = watchlistCandidates;
   const divergentCount = topCandidates.filter(
     ({ signal }) => signal.computedBy === "frontend" && !signal.backendConfirmed,
   ).length;
@@ -264,11 +220,27 @@ export function PlanPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Signal Plans</h1>
           <p className="text-xs text-mute mt-0.5">
-            Top {topCandidates.length} watchlist candidate{topCandidates.length > 1 ? "s" : ""} by
-            verdict
+            Showing {topCandidates.length} of {totalActiveSignals} backend-arbited active signal{totalActiveSignals === 1 ? "" : "s"}
           </p>
         </div>
-        <FreshnessBadge state={divergentCount > 0 ? "pending-sync" : "live"} />
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {totalActiveSignals > boardSize && (
+            <span className="text-xs text-mute">Showing {boardSize} of {totalActiveSignals}</span>
+          )}
+          {[3, 5, 10].map((size) => (
+            <button
+              key={size}
+              type="button"
+              onClick={() => setBoardSize(size as 3 | 5 | 10)}
+              className={`rounded border px-2 py-1 text-xs font-mono ${
+                boardSize === size ? "border-info text-info bg-info/10" : "border-bd text-mute"
+              }`}
+            >
+              {size === 10 ? "all" : size}
+            </button>
+          ))}
+          <FreshnessBadge state={divergentCount > 0 ? "pending-sync" : "live"} />
+        </div>
       </div>
 
       {divergentCount > 0 && (

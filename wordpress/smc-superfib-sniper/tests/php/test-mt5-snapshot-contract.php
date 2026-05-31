@@ -821,6 +821,14 @@ function seed_watch_build_symbol_state_fixture($wpdb, $user_id, $symbol, $bid, $
     }
 }
 
+$displaySignalsRuntimeTable = $wpdb->prefix . 'smc_sf_display_signals';
+$displaySignalsReadyProperty = new ReflectionProperty('SMC_SuperFib_Sniper_REST', 'display_signals_table_ready');
+$displaySignalsReadyProperty->setAccessible(true);
+$displaySignalsReadyProperty->setValue(null, false);
+unset($wpdb->schemas[$displaySignalsRuntimeTable], $wpdb->tables[$displaySignalsRuntimeTable]);
+assert_true(SMC_SuperFib_Sniper_REST::ensure_display_signals_table(), 'Runtime display_signals migration should succeed outside activation');
+assert_true(isset($wpdb->schemas[$displaySignalsRuntimeTable]['source_candidate_id']), 'Runtime display_signals migration must create the display board schema');
+
 $instance = new SMC_SuperFib_Sniper_REST();
 $instance->register_routes();
 
@@ -1203,25 +1211,71 @@ $stableLiveSignalsSnapshot = array(
     'gates' => array(),
     'signals' => array(
         array(
-            'id' => 'sig-eurusd-long-stable',
+            'id' => 'sig-eurusd-watch-raw',
             'symbol' => 'EURUSD',
             'direction' => 'LONG',
-            'status' => 'READY',
-            'confluence' => array('OB', 'FVG'),
-            'verdict' => 'A',
+            'status' => 'WATCH',
+            'confluence' => array('HTA_SF'),
+            'verdict' => 'C',
             'computedBy' => 'backend',
-            'backendConfirmed' => true,
+            'backendConfirmed' => false,
+            'engineBlocker' => 'OK',
             'createdAt' => '2026-05-03T08:15:00+00:00',
         ),
     ),
     'plans' => array(),
-    'diagnostics' => array(),
+    'diagnostics' => array(
+        array(
+            'symbol' => 'EURUSD',
+            'priceState' => 'live',
+            'candleState' => 'live',
+            'engineBlocker' => 'OK',
+        ),
+    ),
     'meta' => array(
         'computedAt' => gmdate('c'),
         'watchlist' => array('EURUSD'),
     ),
 );
 update_user_meta(7, 'smc_sf_engine_snapshot', $stableLiveSignalsSnapshot);
+$displaySignalsTable = $wpdb->prefix . 'smc_sf_display_signals';
+$wpdb->replace($displaySignalsTable, array(
+    'id' => 'disp-eurusd-long-stable',
+    'user_id' => 7,
+    'symbol' => 'EURUSD',
+    'direction' => 'LONG',
+    'lifecycle_state' => 'DISPLAY_ACTIVE',
+    'status' => 'READY',
+    'verdict' => 'A',
+    'confluence' => json_encode(array('OB', 'FVG')),
+    'engine' => json_encode(array(
+        'engineBlocker' => 'OK',
+        'htfBias' => 'BULL',
+        'pdState' => 'DISCOUNT',
+        'drawOnLiquidity' => 'opposing buy-side liquidity',
+        'sweep' => 'present',
+        'mss' => 'present',
+        'displacement' => 'clean',
+        'htaOverride' => false,
+        'f3Chop' => 'clear',
+    )),
+    'quality_score' => 735.0,
+    'signal_family_key' => 'family-eurusd-long',
+    'entry_price' => 9.99000000,
+    'sl_price' => 1.08000000,
+    'tp_price' => 1.09500000,
+    'source_candidate_id' => 'sig-eurusd-long-stable',
+    'source' => 'backend',
+    'entry_hit_at' => null,
+    'stop_hit_at' => null,
+    'replaced_by' => null,
+    'invalidated_at' => null,
+    'invalidation_reason' => null,
+    'first_seen_at' => '2026-05-03 08:15:00',
+    'last_confirmed_at' => '2026-05-03 08:16:00',
+    'last_evaluated_at' => '2026-05-03 08:16:00',
+    'expires_at' => '2026-12-31 12:16:00',
+));
 $GLOBALS['test_rest_force_response'] = true;
 $firstLiveSignalsResponse = $instance->get_live_signals();
 assert_true($firstLiveSignalsResponse instanceof WP_REST_Response, 'get_live_signals must return a REST response when header assertions are enabled');
@@ -1241,15 +1295,176 @@ assert_true(!empty($firstLiveSignalsPayload['polledAt']), 'get_live_signals must
 assert_true(!empty($secondLiveSignalsPayload['polledAt']), 'get_live_signals must stamp polledAt on the response envelope');
 assert_same(1, count($firstLiveSignals), 'get_live_signals must preserve the stable signal count across repeated polls');
 assert_same(1, count($secondLiveSignals), 'get_live_signals must preserve the stable signal count across repeated polls');
+assert_same('disp-eurusd-long-stable', $firstLiveSignals[0]['id'] ?? null, 'get_live_signals must read the durable display board row instead of raw snapshot WATCH output');
 assert_same($firstLiveSignals[0]['id'] ?? null, $secondLiveSignals[0]['id'] ?? null, 'get_live_signals must keep signal identity stable across repeated polls');
 assert_same($firstLiveSignals[0]['createdAt'] ?? null, $secondLiveSignals[0]['createdAt'] ?? null, 'get_live_signals must keep createdAt stable across repeated polls');
 assert_same($firstLiveSignals[0]['backendConfirmed'] ?? null, $secondLiveSignals[0]['backendConfirmed'] ?? null, 'get_live_signals must keep backendConfirmed stable across repeated polls');
+assert_same('DISPLAY_ACTIVE', $firstLiveSignals[0]['lifecycleState'] ?? null, 'get_live_signals must expose display lifecycle state');
+assert_same(735.0, $firstLiveSignals[0]['qualityScore'] ?? null, 'get_live_signals must expose deterministic display quality score');
+assert_same(1, $firstLiveSignalsPayload['meta']['totalActive'] ?? null, 'get_live_signals must expose total active board signals');
 assert_true(!array_key_exists('polledAt', $firstLiveSignals[0] ?? array()), 'get_live_signals must not stamp polledAt on individual signals');
 assert_true(!array_key_exists('polledAt', $secondLiveSignals[0] ?? array()), 'get_live_signals must not stamp polledAt on individual signals');
 assert_same('no-store, no-cache, must-revalidate', $firstLiveSignalsHeaders['Cache-Control'] ?? null, 'get_live_signals must preserve Cache-Control anti-cache headers');
 assert_same('no-cache', $firstLiveSignalsHeaders['Pragma'] ?? null, 'get_live_signals must preserve Pragma anti-cache headers');
 assert_same('no-store, no-cache, must-revalidate', $secondLiveSignalsHeaders['Cache-Control'] ?? null, 'get_live_signals must preserve Cache-Control anti-cache headers');
 assert_same('no-cache', $secondLiveSignalsHeaders['Pragma'] ?? null, 'get_live_signals must preserve Pragma anti-cache headers');
+
+$blockedLiveSignalsSnapshot = $stableLiveSignalsSnapshot;
+$blockedLiveSignalsSnapshot['signals'] = array();
+$blockedLiveSignalsSnapshot['diagnostics'] = array(
+    array(
+        'symbol' => 'EURUSD',
+        'priceState' => 'stale',
+        'candleState' => 'live',
+        'engineBlocker' => 'PRICE_NOT_MT5_FRESH',
+    ),
+);
+update_user_meta(7, 'smc_sf_engine_snapshot', $blockedLiveSignalsSnapshot);
+$GLOBALS['test_rest_force_response'] = true;
+$blockedLiveSignalsResponse = $instance->get_live_signals();
+$blockedLiveSignalsPayload = $blockedLiveSignalsResponse->get_data();
+unset($GLOBALS['test_rest_force_response']);
+assert_same(1, count($blockedLiveSignalsPayload['signals'] ?? array()), 'get_live_signals must hold persisted board rows through current blocker diagnostics');
+assert_same('STALE_HELD', $blockedLiveSignalsPayload['signals'][0]['lifecycleState'] ?? null, 'get_live_signals must mark held rows as STALE_HELD instead of hiding them');
+
+$computeSignalFamilyKeyMethod = new ReflectionMethod('SMC_SuperFib_Sniper_REST', 'compute_signal_family_key');
+$computeSignalFamilyKeyMethod->setAccessible(true);
+$terminalCandidate = array(
+    'id' => 'sig-gbpusd-entry-source',
+    'symbol' => 'GBPUSD',
+    'direction' => 'LONG',
+    'status' => 'READY',
+    'verdict' => 'A',
+    'entry_price' => 1.09125,
+    'sl_price' => 1.08000,
+    'tp_price' => 1.10500,
+    'fib_family' => 'backend',
+    'fib_ratio' => null,
+    'confidence' => 0.8,
+    'pine_match' => 'EXACT',
+    'created_at' => '2026-05-03 08:17:00',
+);
+$terminalSignal = array(
+    'id' => 'sig-gbpusd-entry-source',
+    'symbol' => 'GBPUSD',
+    'direction' => 'LONG',
+    'status' => 'READY',
+    'verdict' => 'A',
+    'computedBy' => 'backend',
+    'backendConfirmed' => true,
+    'engineBlocker' => 'OK',
+    'entryPrice' => 1.09125,
+    'slPrice' => 1.08000,
+    'tpPrice' => 1.10500,
+    'createdAt' => '2026-05-03T08:17:00+00:00',
+    'confluence' => array('OB', 'FVG'),
+    'engine' => array(
+        'engineBlocker' => 'OK',
+        'anchorSessionId' => '20260503',
+        'firstReactionFamily' => 'backend',
+        'htfBias' => 'BULL',
+        'pdState' => 'DISCOUNT',
+        'sweep' => 'present',
+        'mss' => 'present',
+        'displacement' => 'clean',
+    ),
+);
+$terminalFamilyKey = $computeSignalFamilyKeyMethod->invoke($instance, 7, $terminalCandidate, $terminalSignal);
+$wpdb->replace($snapshotTable, array(
+    'user_id' => 7,
+    'symbol' => 'GBPUSD',
+    'bid' => 1.1010,
+    'ask' => 1.1012,
+    'mid' => 1.1011,
+    'spread' => 2,
+    'change_pct_1d' => 0,
+    'source' => 'mt5',
+    'state' => 'live',
+    'updated_at' => gmdate('Y-m-d H:i:s'),
+));
+$wpdb->replace($displaySignalsTable, array(
+    'id' => 'disp-gbpusd-entry-terminal',
+    'user_id' => 7,
+    'symbol' => 'GBPUSD',
+    'direction' => 'LONG',
+    'lifecycle_state' => 'DISPLAY_ACTIVE',
+    'status' => 'READY',
+    'verdict' => 'A',
+    'confluence' => json_encode(array('OB', 'FVG')),
+    'engine' => json_encode($terminalSignal['engine']),
+    'quality_score' => 500.0,
+    'signal_family_key' => $terminalFamilyKey,
+    'entry_price' => 1.09125,
+    'sl_price' => 1.08000,
+    'tp_price' => 1.10500,
+    'source_candidate_id' => 'sig-gbpusd-entry-source',
+    'source' => 'backend',
+    'entry_hit_at' => null,
+    'stop_hit_at' => null,
+    'replaced_by' => null,
+    'invalidated_at' => null,
+    'invalidation_reason' => null,
+    'first_seen_at' => '2026-05-03 08:16:00',
+    'last_confirmed_at' => '2026-05-03 08:16:00',
+    'last_evaluated_at' => '2026-05-03 08:16:00',
+    'expires_at' => '2026-12-31 12:16:00',
+));
+$reconcileLiveSignalBoardMethod = new ReflectionMethod('SMC_SuperFib_Sniper_REST', 'reconcile_live_signal_board');
+$reconcileLiveSignalBoardMethod->setAccessible(true);
+$reconcileLiveSignalBoardMethod->invoke($instance, 7, array('GBPUSD'), array($terminalSignal), array(array(
+    'symbol' => 'GBPUSD',
+    'priceState' => 'live',
+    'candleState' => 'live',
+    'engineBlocker' => 'OK',
+)));
+$terminalDisplayRow = $wpdb->tables[$displaySignalsTable]['disp-gbpusd-entry-terminal'] ?? array();
+assert_same('ENTRY_HIT', $terminalDisplayRow['lifecycle_state'] ?? null, 'Live board reconciliation must not resurrect entry-hit rows to DISPLAY_ACTIVE during same-family upserts');
+assert_true(!empty($terminalDisplayRow['entry_hit_at'] ?? null), 'Entry-hit rows must preserve the first terminal entry timestamp after reconciliation');
+$wpdb->replace($snapshotTable, array(
+    'user_id' => 7,
+    'symbol' => 'GBPUSD',
+    'bid' => 1.1010,
+    'ask' => 1.1012,
+    'mid' => 1.1011,
+    'spread' => 2,
+    'change_pct_1d' => 0,
+    'source' => 'test-archived',
+    'state' => 'stale',
+    'updated_at' => '2026-05-03 08:17:00',
+));
+
+$upsertDisplaySignalMethod = new ReflectionMethod('SMC_SuperFib_Sniper_REST', 'upsert_display_signal_row');
+$upsertDisplaySignalMethod->setAccessible(true);
+$promotedDisplayId = $upsertDisplaySignalMethod->invoke(
+    $instance,
+    7,
+    array(
+        'id' => 'sig-eurusd-ready-source',
+        'symbol' => 'EURUSD',
+        'direction' => 'LONG',
+        'status' => 'READY',
+        'verdict' => 'A',
+        'confluence' => array('OB', 'FVG'),
+        'engine' => array('engineBlocker' => 'OK'),
+    ),
+    array(
+        'id' => 'mt5-candidate-eurusd-ready',
+        'symbol' => 'EURUSD',
+        'direction' => 'LONG',
+        'status' => 'READY',
+        'verdict' => 'A',
+        'entry_price' => 1.09125,
+        'sl_price' => 1.08000,
+        'tp_price' => 1.10500,
+    ),
+    'family-eurusd-ready-source',
+    850.0,
+    null,
+    '2026-05-03 08:17:00'
+);
+assert_same('sig-eurusd-ready-source', $promotedDisplayId, 'New display promotions must preserve the backend source signal id');
+assert_true(isset($wpdb->tables[$displaySignalsTable]['sig-eurusd-ready-source']), 'Display board row must be keyed by the backend source signal id for ladder and execution matching');
+assert_same('mt5-candidate-eurusd-ready', $wpdb->tables[$displaySignalsTable]['sig-eurusd-ready-source']['source_candidate_id'] ?? null, 'Display board rows should still retain the originating MT5 candidate id separately');
 
 $GLOBALS['test_rest_force_response'] = true;
 $volatileResponseChecks = array(

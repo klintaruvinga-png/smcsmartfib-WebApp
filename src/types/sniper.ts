@@ -99,6 +99,36 @@ export type PdState =
   | "EXTENDED_PREMIUM"
   | "EXTENDED_DISCOUNT";
 
+export type SignalLifecycleState =
+  | "DISPLAY_ACTIVE"
+  | "STALE_HELD"
+  | "ENTRY_HIT"
+  | "FILLED_CONFIRMED"
+  | "STOP_HIT"
+  | "REPLACED"
+  | "EXPIRED"
+  | "INVALIDATED";
+
+export interface SignalValidity {
+  state: SignalLifecycleState;
+  entryHitAt: string | null;
+  stopHitAt: string | null;
+  invalidationReason: string | null;
+}
+
+export interface SignalPersistence {
+  firstSeenAt: string;
+  lastConfirmedAt: string;
+  lastEvaluatedAt: string;
+  expiresAt: string | null;
+  replacedBy: string | null;
+}
+
+export interface LiveSignalsMeta {
+  boardSize: 3 | 5 | 10;
+  totalActive: number;
+}
+
 export interface FibLevel {
   family: FibFamily;
   ratio: number;
@@ -169,6 +199,14 @@ export interface SignalCandidate {
   backendConfirmed: boolean;
   engineBlocker?: EngineBlocker;
   createdAt: string;
+  qualityScore?: number;
+  lifecycleState?: SignalLifecycleState;
+  signalFamilyKey?: string;
+  entryPrice?: number;
+  slPrice?: number | null;
+  tpPrice?: number | null;
+  validity?: SignalValidity;
+  persistence?: SignalPersistence;
   engine?: {
     htfBias: "BULL" | "BEAR" | "TRANSITIONAL";
     pdState: PdState;
@@ -192,6 +230,7 @@ export interface SignalCandidate {
 export interface LiveSignalsResponse {
   signals: SignalCandidate[];
   polledAt: string;
+  meta?: LiveSignalsMeta;
 }
 
 export interface TradePlan {
@@ -265,6 +304,7 @@ export interface DashboardSettings {
   staleThresholdSec: number;
   watchlist: Symbol[];
   riskAllocation: { perTradePct: number; dailyMaxPct: number; ddCapPct: number };
+  signalBoardSize?: 3 | 5 | 10;
 }
 
 export interface RiskProfile {
