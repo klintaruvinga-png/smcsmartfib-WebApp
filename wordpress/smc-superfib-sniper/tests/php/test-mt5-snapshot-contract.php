@@ -684,7 +684,7 @@ function assert_same($expected, $actual, $message) {
     }
 }
 
-function seed_ready_build_symbol_state_fixture($wpdb, $user_id, $symbol, $bid, $ask) {
+function seed_ready_build_symbol_state_fixture($wpdb, $user_id, $symbol, $bid, $ask, $last_open = 1.1020) {
     $snapshotTable = $wpdb->prefix . 'smc_sf_snapshots';
     $candleTable = $wpdb->prefix . 'smc_sf_candles';
     $now = time();
@@ -721,7 +721,7 @@ function seed_ready_build_symbol_state_fixture($wpdb, $user_id, $symbol, $bid, $
             $low = $i === 110 ? 1.0990 : 1.1060;
             $close = 1.1120;
         } elseif ($i === 119) {
-            $open = 1.1020;
+            $open = $last_open;
             $high = 1.1150;
             $low = 1.1010;
             $close = 1.1142;
@@ -1460,6 +1460,41 @@ $persistedPendingRows = array_filter($wpdb->tables[$wpdb->prefix . 'smc_sf_trade
     return ($row['signal_id'] ?? null) === ($preEntrySnapshot['plans'][0]['signalId'] ?? null);
 });
 assert_same(0, count($persistedPendingRows), 'ensure_engine_snapshot must not persist pending-blueprint plans as executable trade plan rows');
+
+$weakDisplacementFixture = seed_ready_build_symbol_state_fixture($wpdb, 7, 'NZDCHF', 1.1141, 1.1143, 1.1093);
+$wpdb->replace($buildLifecycleCandidateTable, array(
+    'id' => 'mt5-nzdchf-build-weak-pre-entry',
+    'user_id' => 7,
+    'symbol' => 'NZDCHF',
+    'direction' => $weakDisplacementFixture['direction'],
+    'status' => 'READY',
+    'verdict' => 'A',
+    'entry_price' => $weakDisplacementFixture['entryPrice'],
+    'sl_price' => $weakDisplacementFixture['slPrice'],
+    'tp_price' => $weakDisplacementFixture['tpPrice'],
+    'fib_level' => $weakDisplacementFixture['fibLevel'],
+    'fib_ratio' => $weakDisplacementFixture['fibRatio'],
+    'fib_family' => 'LTF_SF',
+    'htf_bias' => 'BULL',
+    'ltf_regime' => 'TRENDING',
+    'confidence' => 0.85,
+    'created_at' => gmdate('Y-m-d H:i:s', time() - 120),
+    'updated_at' => gmdate('Y-m-d H:i:s', time() - 120),
+));
+$weakDisplacementState = $buildSymbolState->invoke($instance, 7, 'NZDCHF', array(
+    'symbol' => 'NZDCHF',
+    'bid' => 1.1141,
+    'ask' => 1.1143,
+    'mid' => 1.1142,
+    'updatedAt' => gmdate('c', time() - 5),
+    'state' => 'live',
+    'source' => 'mt5',
+));
+assert_same('ARMED', $weakDisplacementState['signal']['status'] ?? null, 'Weak-displacement ACTIVE_PRE_ENTRY setup must remain ARMED');
+assert_same('weak', $weakDisplacementState['signal']['engine']['displacement'] ?? null, 'Weak-displacement fixture must exercise a structural ARMED reason before lifecycle throttling');
+assert_same('OK', $weakDisplacementState['signal']['engineBlocker'] ?? null, 'Weak-displacement ARMED setups can still have no engine blocker');
+assert_same('ACTIVE_PRE_ENTRY', $weakDisplacementState['diagnostic']['lifecycle']['state'] ?? null, 'Weak-displacement setup must still report the ACTIVE_PRE_ENTRY lifecycle');
+assert_same(null, $weakDisplacementState['plan'] ?? null, 'Pending blueprints must require a pre-lifecycle READY status, not merely final ARMED plus ACTIVE_PRE_ENTRY');
 
 $openPositionFixture = seed_ready_build_symbol_state_fixture($wpdb, 7, 'EURCHF', 1.1141, 1.1143);
 $wpdb->replace($buildLifecycleCandidateTable, array(

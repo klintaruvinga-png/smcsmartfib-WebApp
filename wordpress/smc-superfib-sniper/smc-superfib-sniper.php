@@ -5642,6 +5642,13 @@ final class SMC_SuperFib_Sniper_REST {
             $status = 'ARMED';
         }
 
+        // Preserve the structural engine status before MT5 lifecycle throttling.
+        // Pending blueprints are only safe when lifecycle handling is the reason
+        // a READY setup was downgraded; structurally ARMED setups must remain
+        // planless even if the lifecycle lookup reports an ACTIVE_PRE_ENTRY or
+        // repeated READY candidate.
+        $pre_lifecycle_status = $status;
+
         $lifecycle_diagnostic = null;
         $prior_candidate = $this->find_latest_mt5_candidate_for_range(
             $user_id,
@@ -5811,13 +5818,14 @@ final class SMC_SuperFib_Sniper_REST {
                 $backend_confirmed,
                 $data_live,
                 $engine_blocker,
-                $lifecycle_diagnostic
+                $lifecycle_diagnostic,
+                $pre_lifecycle_status
             ),
             'diagnostic' => $diagnostic,
         );
     }
 
-    private function build_pending_or_confirmed_plan($user_id, $signal, $high, $low, $sequence, $candles, $backend_confirmed, $data_live, $engine_blocker, $lifecycle_diagnostic) {
+    private function build_pending_or_confirmed_plan($user_id, $signal, $high, $low, $sequence, $candles, $backend_confirmed, $data_live, $engine_blocker, $lifecycle_diagnostic, $pre_lifecycle_status = null) {
         if ($backend_confirmed === true) {
             return $this->build_trade_plan($user_id, $signal, $high, $low, $sequence, $candles);
         }
@@ -5828,6 +5836,7 @@ final class SMC_SuperFib_Sniper_REST {
             || $engine_blocker !== 'OK'
             || !is_array($lifecycle_diagnostic)
             || ($signal['status'] ?? null) !== 'ARMED'
+            || strtoupper((string) $pre_lifecycle_status) !== 'READY'
         ) {
             return null;
         }
