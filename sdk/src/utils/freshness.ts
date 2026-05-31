@@ -89,6 +89,7 @@ export function blockerLabel(blocker: EngineBlocker): string {
     READY_NOT_CONFIRMED_STALE_DATA: "Ready signal on stale data",
     ANCHOR_CHOP_BLOCKED: "Anchor chop blocked",
     AOV_EQUILIBRIUM_ZONE: "AOV equilibrium zone",
+    FUNDAMENTAL_HTF_OPPOSED: "HTF fundamentals oppose signal bias",
     OK: "OK",
   };
   return labels[blocker] ?? blocker;
