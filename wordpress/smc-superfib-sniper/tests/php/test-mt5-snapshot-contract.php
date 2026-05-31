@@ -1114,6 +1114,32 @@ assert_same('no-cache', $firstLiveSignalsHeaders['Pragma'] ?? null, 'get_live_si
 assert_same('no-store, no-cache, must-revalidate', $secondLiveSignalsHeaders['Cache-Control'] ?? null, 'get_live_signals must preserve Cache-Control anti-cache headers');
 assert_same('no-cache', $secondLiveSignalsHeaders['Pragma'] ?? null, 'get_live_signals must preserve Pragma anti-cache headers');
 
+$GLOBALS['test_rest_force_response'] = true;
+$volatileResponseChecks = array(
+    'get_snapshot' => $instance->get_snapshot(),
+    'get_chart_snapshot' => $instance->get_chart_snapshot(new WP_REST_Request(array(
+        'symbol' => 'EURUSD',
+        'timeframe' => '15min',
+    ))),
+    'get_market_data_regime' => $instance->get_market_data_regime(new WP_REST_Request(array(
+        'symbol' => 'EURUSD',
+    ))),
+    'get_market_data_signal_drift' => $instance->get_market_data_signal_drift(new WP_REST_Request()),
+    'get_account_telemetry' => $instance->get_account_telemetry(),
+    'get_positions' => $instance->get_positions(),
+    'get_orders' => $instance->get_orders(),
+    'get_user_progress' => $instance->get_user_progress(),
+);
+
+foreach ($volatileResponseChecks as $endpointName => $endpointResponse) {
+    assert_true($endpointResponse instanceof WP_REST_Response, $endpointName . ' must return a REST response when header assertions are enabled');
+    $endpointHeaders = $endpointResponse->get_headers();
+    assert_same('no-store, no-cache, must-revalidate', $endpointHeaders['Cache-Control'] ?? null, $endpointName . ' must preserve Cache-Control anti-cache headers');
+    assert_same('no-cache', $endpointHeaders['Pragma'] ?? null, $endpointName . ' must preserve Pragma anti-cache headers');
+}
+
+unset($GLOBALS['test_rest_force_response']);
+
 $wpdb->replace($wpdb->prefix . 'smc_sf_user_settings', array(
     'user_id' => 7,
     'settings' => json_encode(array(

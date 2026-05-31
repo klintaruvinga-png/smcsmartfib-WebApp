@@ -470,6 +470,7 @@ export const apiClient = {
     }
     return call<ChartSnapshot>(
       `/charts?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`,
+      { cacheBust: true },
     );
   },
   async getLiveSignals(mock = MOCK_MODE): Promise<SignalCandidate[]> {
@@ -484,7 +485,9 @@ export const apiClient = {
   },
   async getLadders(symbol?: Symbol, mock = MOCK_MODE): Promise<TradePlan[]> {
     if (mock) return [mockPlan];
-    const raw = await call<unknown>(`/ladders${symbol ? `?symbol=${symbol}` : ""}`);
+    const raw = await call<unknown>(`/ladders${symbol ? `?symbol=${symbol}` : ""}`, {
+      cacheBust: true,
+    });
     return requireLaddersResponse(raw);
   },
   async getSession(mock = MOCK_MODE) {
@@ -497,7 +500,7 @@ export const apiClient = {
   },
   async getEngineHealth(mock = MOCK_MODE): Promise<EngineHealth> {
     if (mock) return mockEngineHealth;
-    return call<EngineHealth>("/health");
+    return call<EngineHealth>("/health", { cacheBust: true });
   },
   async getAdminHealth(): Promise<AdminHealthResponse> {
     return fetchAdminHealth();
@@ -543,7 +546,7 @@ export const apiClient = {
   },
   async getUserAccount(mock = MOCK_MODE): Promise<AccountState> {
     if (mock) return mockAccount;
-    return call("/user/account");
+    return call("/user/account", { cacheBust: true });
   },
   async postUserAccount(payload: Partial<AccountState>, mock = MOCK_MODE): Promise<{ ok: true }> {
     if (mock) return { ok: true };
@@ -551,7 +554,7 @@ export const apiClient = {
   },
   async getUserSettings(mock = MOCK_MODE): Promise<DashboardSettings> {
     if (mock) return mockSettings;
-    return call("/user/settings");
+    return call("/user/settings", { cacheBust: true });
   },
   async postUserSettings(
     payload: Partial<DashboardSettings>,
@@ -573,7 +576,7 @@ export const apiClient = {
   },
   async getUserRiskProfile(mock = MOCK_MODE): Promise<RiskProfile> {
     if (mock) return mockRiskProfile;
-    return call("/user/risk-profile");
+    return call("/user/risk-profile", { cacheBust: true });
   },
   async getUserProgress(mock = MOCK_MODE): Promise<UserProgress> {
     if (mock) return mockUserProgress;

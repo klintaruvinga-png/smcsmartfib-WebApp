@@ -1,0 +1,150 @@
+{
+    "run_date": "2026-05-31",
+    "overall_parity_pct": 100,
+    "gate": "PASS",
+    "total_tuples": 384,
+    "exact_matches": 384,
+    "acceptable_drift": 0,
+    "critical_mismatches_count": 0,
+    "by_symbol": {
+        "EURUSD": {
+            "M15": {
+                "total": 32,
+                "exact": 32,
+                "acceptable": 0,
+                "critical": 0,
+                "parity_pct": 100,
+                "mismatches": []
+            },
+            "H1": {
+                "total": 32,
+                "exact": 32,
+                "acceptable": 0,
+                "critical": 0,
+                "parity_pct": 100,
+                "mismatches": []
+            },
+            "H4": {
+                "total": 32,
+                "exact": 32,
+                "acceptable": 0,
+                "critical": 0,
+                "parity_pct": 100,
+                "mismatches": []
+            },
+            "D1": {
+                "total": 32,
+                "exact": 32,
+                "acceptable": 0,
+                "critical": 0,
+                "parity_pct": 100,
+                "mismatches": []
+            }
+        },
+        "USDJPY": {
+            "M15": {
+                "total": 32,
+                "exact": 32,
+                "acceptable": 0,
+                "critical": 0,
+                "parity_pct": 100,
+                "mismatches": []
+            },
+            "H1": {
+                "total": 32,
+                "exact": 32,
+                "acceptable": 0,
+                "critical": 0,
+                "parity_pct": 100,
+                "mismatches": []
+            },
+            "H4": {
+                "total": 32,
+                "exact": 32,
+                "acceptable": 0,
+                "critical": 0,
+                "parity_pct": 100,
+                "mismatches": []
+            },
+            "D1": {
+                "total": 32,
+                "exact": 32,
+                "acceptable": 0,
+                "critical": 0,
+                "parity_pct": 100,
+                "mismatches": []
+            }
+        },
+        "XAUUSD": {
+            "M15": {
+                "total": 32,
+                "exact": 32,
+                "acceptable": 0,
+                "critical": 0,
+                "parity_pct": 100,
+                "mismatches": []
+            },
+            "H1": {
+                "total": 32,
+                "exact": 32,
+                "acceptable": 0,
+                "critical": 0,
+                "parity_pct": 100,
+                "mismatches": []
+            },
+            "H4": {
+                "total": 32,
+                "exact": 32,
+                "acceptable": 0,
+                "critical": 0,
+                "parity_pct": 100,
+                "mismatches": []
+            },
+            "D1": {
+                "total": 32,
+                "exact": 32,
+                "acceptable": 0,
+                "critical": 0,
+                "parity_pct": 100,
+                "mismatches": []
+            }
+        }
+    },
+    "critical_mismatches": [],
+    "acceptable_drift_detail": [],
+    "required_coverage": {
+        "symbols": [
+            "EURUSD",
+            "USDJPY",
+            "XAUUSD"
+        ],
+        "timeframes": [
+            "M15",
+            "H1",
+            "H4",
+            "D1"
+        ],
+        "families": [
+            "LTF_SF",
+            "HTF_AF"
+        ],
+        "ratios_per_group": 16,
+        "expected_tuple_count": 384,
+        "expected_group_count": 24,
+        "mt5_present_tuple_count": 384,
+        "pine_present_tuple_count": 384,
+        "mt5_present_group_count": 24,
+        "pine_present_group_count": 24,
+        "mt5_missing_tuple_count": 0,
+        "pine_missing_tuple_count": 0
+    },
+    "ignored_non_phase4_tuples": {
+        "mt5_count": 0,
+        "pine_count": 0
+    },
+    "thresholds": {
+        "exact_match": 1.0e-5,
+        "acceptable": 0.001,
+        "gate_pct": 99
+    }
+}

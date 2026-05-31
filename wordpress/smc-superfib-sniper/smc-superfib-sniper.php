@@ -1396,11 +1396,11 @@ final class SMC_SuperFib_Sniper_REST {
             ));
         }
 
-        return rest_ensure_response($this->build_health_payload($user_id));
+        return $this->no_cache_response($this->build_health_payload($user_id));
     }
 
     public function get_admin_health() {
-        return rest_ensure_response($this->build_health_payload(get_current_user_id()));
+        return $this->no_cache_response($this->build_health_payload(get_current_user_id()));
     }
 
     public function get_soak_report() {
@@ -2213,7 +2213,7 @@ final class SMC_SuperFib_Sniper_REST {
     public function get_snapshot() {
         $user_id = get_current_user_id();
         $snapshot = $this->ensure_engine_snapshot($user_id);
-        return rest_ensure_response($snapshot);
+        return $this->no_cache_response($snapshot);
     }
 
     // MT5 webhook — process and store market data from MT5 EA
@@ -3379,14 +3379,11 @@ final class SMC_SuperFib_Sniper_REST {
             );
         }
 
-        $response = rest_ensure_response(array(
+        return $this->no_cache_response(array(
             'ok'     => true,
             'symbol' => $symbol,
             'fibs'   => $result,
         ));
-        $response->header('Cache-Control', 'no-store, no-cache, must-revalidate');
-        $response->header('Pragma', 'no-cache');
-        return $response;
     }
 
     // =========================================================================
@@ -3519,7 +3516,7 @@ final class SMC_SuperFib_Sniper_REST {
             );
         }
 
-        return rest_ensure_response(array(
+        return $this->no_cache_response(array(
             'ok'      => true,
             'regimes' => $regimes,
         ));
@@ -4249,7 +4246,7 @@ final class SMC_SuperFib_Sniper_REST {
             );
         }
 
-        return rest_ensure_response(array(
+        return $this->no_cache_response(array(
             'ok'          => true,
             'parity' => array(
                 'total'      => $total,
@@ -5075,13 +5072,10 @@ final class SMC_SuperFib_Sniper_REST {
     public function get_live_signals() {
         $user_id = get_current_user_id();
         $snapshot = $this->ensure_engine_snapshot($user_id);
-        $response = rest_ensure_response(array(
+        return $this->no_cache_response(array(
             'signals' => is_array($snapshot['signals'] ?? null) ? $snapshot['signals'] : array(),
             'polledAt' => gmdate('c'),
         ));
-        $response->header('Cache-Control', 'no-store, no-cache, must-revalidate');
-        $response->header('Pragma', 'no-cache');
-        return $response;
     }
 
     // Pine webhook stub — intentionally audit-only until Pine alert integration is implemented.
@@ -5100,7 +5094,7 @@ final class SMC_SuperFib_Sniper_REST {
                 return isset($plan['symbol']) && $plan['symbol'] === $symbol;
             }));
         }
-        return rest_ensure_response($plans);
+        return $this->no_cache_response($plans);
     }
 
     public function get_chart_snapshot(WP_REST_Request $request) {
@@ -5127,7 +5121,7 @@ final class SMC_SuperFib_Sniper_REST {
         $this->fib_context_tf_seconds = max(60, (int) $this->timeframe_seconds($timeframe));
         $levels = $this->fib_levels_from_candles($candles);
 
-        return rest_ensure_response(array(
+        return $this->no_cache_response(array(
             'symbol' => $symbol,
             'timeframe' => $timeframe,
             'candles' => $chart_candles,
@@ -5148,22 +5142,22 @@ final class SMC_SuperFib_Sniper_REST {
 
     public function get_user_trades() {
         $user_id = get_current_user_id();
-        return rest_ensure_response(array(
+        return $this->no_cache_response(array(
             'positions' => $this->read_trade_payloads($user_id, 'position'),
             'orders' => $this->read_pending_orders($user_id),
         ));
     }
 
     public function get_account_telemetry() {
-        return rest_ensure_response($this->read_account_telemetry(get_current_user_id()));
+        return $this->no_cache_response($this->read_account_telemetry(get_current_user_id()));
     }
 
     public function get_positions() {
-        return rest_ensure_response($this->read_trade_positions(get_current_user_id()));
+        return $this->no_cache_response($this->read_trade_positions(get_current_user_id()));
     }
 
     public function get_orders() {
-        return rest_ensure_response($this->read_trade_orders(get_current_user_id()));
+        return $this->no_cache_response($this->read_trade_orders(get_current_user_id()));
     }
 
     // Audit-only stub — does not process payload; trade state is sourced from MT4/MT5 bridge.
@@ -5173,11 +5167,11 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     public function get_user_account() {
-        return rest_ensure_response($this->get_account_state(get_current_user_id()));
+        return $this->no_cache_response($this->get_account_state(get_current_user_id()));
     }
 
     public function get_user_progress() {
-        return rest_ensure_response($this->read_user_progress(get_current_user_id()));
+        return $this->no_cache_response($this->read_user_progress(get_current_user_id()));
     }
 
     public function post_user_account(WP_REST_Request $request) {
@@ -8699,6 +8693,17 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         return 200;
+    }
+
+    private function no_cache_response($payload) {
+        $response = rest_ensure_response($payload);
+
+        if ($response instanceof WP_REST_Response && method_exists($response, 'header')) {
+            $response->header('Cache-Control', 'no-store, no-cache, must-revalidate');
+            $response->header('Pragma', 'no-cache');
+        }
+
+        return $response;
     }
 
     private function to_iso($mysql_time) {
