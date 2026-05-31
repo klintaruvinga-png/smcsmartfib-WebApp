@@ -247,6 +247,16 @@ if (!class_exists('TestWpdb')) {
         }
 
         public function get_row($query, $output = ARRAY_A) {
+            if (preg_match("/SELECT composite_score, category FROM ([^ ]+) WHERE currency = '([^']+)' LIMIT 1/", $query, $m)) {
+                $table = $m[1];
+                $currency = $m[2];
+                foreach ($this->tables[$table] ?? array() as $row) {
+                    if (($row['currency'] ?? '') === $currency) {
+                        return $row;
+                    }
+                }
+                return null;
+            }
             if (preg_match("/SELECT \\* FROM ([^\\s]+)\\s+WHERE user_id = (\\d+) AND symbol = '([^']+)' AND fib_family = '([^']*)' AND fib_ratio = ([0-9.]+)\\s+AND fib_level IS NOT NULL AND fib_level BETWEEN ([0-9.\\-]+) AND ([0-9.\\-]+) AND direction = '([^']+)'\\s+ORDER BY created_at DESC LIMIT 1/s", $query, $m)) {
                 $table = $m[1];
                 $user_id = (int) $m[2];
@@ -1420,6 +1430,28 @@ assert_true(in_array($structuralNoLifecycleState['signal']['engine']['displaceme
 assert_same(null, $structuralNoLifecycleState['diagnostic']['lifecycle'] ?? null, 'Structurally valid no-lifecycle pending blueprint must not require lifecycle diagnostics');
 assert_true(is_array($structuralNoLifecycleState['plan'] ?? null), 'Structurally valid no-lifecycle ARMED setup must expose a non-executable pending blueprint');
 assert_same('pending-blueprint', $structuralNoLifecycleState['plan']['source'] ?? null, 'Structurally valid no-lifecycle ARMED setup must tag the plan as pending-blueprint');
+
+seed_ready_build_symbol_state_fixture($wpdb, 7, 'USDCHF', 1.1141, 1.1143);
+$wpdb->replace($wpdb->prefix . 'smc_sf_fundamental_bias', array(
+    'currency' => 'USD',
+    'composite_score' => -1.5,
+    'category' => 'BEARISH',
+    'updated_at' => gmdate('Y-m-d H:i:s'),
+));
+$fundamentalOpposedState = $buildSymbolState->invoke($instance, 7, 'USDCHF', array(
+    'symbol' => 'USDCHF',
+    'bid' => 1.1141,
+    'ask' => 1.1143,
+    'mid' => 1.1142,
+    'updatedAt' => gmdate('c', time() - 5),
+    'state' => 'live',
+    'source' => 'mt5',
+));
+assert_same('ARMED', $fundamentalOpposedState['signal']['status'] ?? null, 'Opposing HTF fundamentals must cap an otherwise READY setup at ARMED');
+assert_same(false, $fundamentalOpposedState['signal']['backendConfirmed'] ?? null, 'Opposing HTF fundamentals must prevent backend confirmation');
+assert_same('FUNDAMENTAL_HTF_OPPOSED', $fundamentalOpposedState['signal']['engineBlocker'] ?? null, 'Opposing HTF fundamentals must surface a hard engine blocker instead of OK');
+assert_same('BEARISH', $fundamentalOpposedState['signal']['engine']['fundamentalBias'] ?? null, 'Opposing HTF fundamental bias must remain visible in signal diagnostics');
+assert_same(null, $fundamentalOpposedState['plan'] ?? null, 'Counter-bias ARMED setups must remain planless instead of emitting pending blueprints');
 
 $preEntryFixture = seed_ready_build_symbol_state_fixture($wpdb, 7, 'CHFJPY', 1.1141, 1.1143);
 $wpdb->replace($buildLifecycleCandidateTable, array(
