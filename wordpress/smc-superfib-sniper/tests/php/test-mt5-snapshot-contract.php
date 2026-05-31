@@ -1641,7 +1641,12 @@ assert_same('weak', $weakDisplacementState['signal']['engine']['displacement'] ?
 assert_same('absent', $weakDisplacementState['signal']['engine']['mss'] ?? null, 'Weak-displacement fixture must not pass via MSS structural confirmation');
 assert_same('OK', $weakDisplacementState['signal']['engineBlocker'] ?? null, 'Weak-displacement ARMED setups can still have no engine blocker');
 assert_same('ACTIVE_PRE_ENTRY', $weakDisplacementState['diagnostic']['lifecycle']['state'] ?? null, 'Weak-displacement setup must still report the ACTIVE_PRE_ENTRY lifecycle');
-assert_same(null, $weakDisplacementState['plan'] ?? null, 'Pending blueprints must require MSS or clean/strong displacement, not merely final ARMED plus ACTIVE_PRE_ENTRY');
+assert_true(is_array($weakDisplacementState['plan'] ?? null), 'Sweep-present weak-displacement ARMED setups must expose a non-executable pending blueprint');
+assert_same('pending-blueprint', $weakDisplacementState['plan']['source'] ?? null, 'Sweep-present weak-displacement ARMED setups must tag the plan as pending-blueprint');
+$weakDisplacementTradePlanRows = array_filter($wpdb->tables[$wpdb->prefix . 'smc_sf_trade_plans'] ?? array(), function ($row) use ($weakDisplacementState) {
+    return ($row['signal_id'] ?? null) === ($weakDisplacementState['signal']['id'] ?? null);
+});
+assert_same(0, count($weakDisplacementTradePlanRows), 'Weak-displacement pending blueprints must not be persisted as executable trade plan rows during build_symbol_state');
 
 $openPositionFixture = seed_ready_build_symbol_state_fixture($wpdb, 7, 'EURCHF', 1.1141, 1.1143);
 $wpdb->replace($buildLifecycleCandidateTable, array(

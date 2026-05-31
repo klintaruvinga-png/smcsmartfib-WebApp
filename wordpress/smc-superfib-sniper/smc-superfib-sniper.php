@@ -5861,7 +5861,7 @@ final class SMC_SuperFib_Sniper_REST {
             return $plan;
         }
 
-        if (!$has_sweep || (!$has_mss && !$has_displacement)) {
+        if (!$has_sweep) {
             return null;
         }
 
