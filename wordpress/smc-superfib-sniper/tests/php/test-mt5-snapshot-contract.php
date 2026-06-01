@@ -1271,6 +1271,53 @@ assert_true($cachedReplayedRow === null, 'Cached display-board snapshot rows mus
 assert_same(0, count($cachedReplaySecondSignals), 'Repeated get_live_signals polling must continue to ignore cached display-board rows');
 assert_same(0, $cachedReplaySecondPayload['meta']['totalActive'] ?? null, 'Repeated get_live_signals polling must not accumulate cached display-board rows');
 
+$cachedCandidateSnapshot = $cachedBoardReplaySnapshot;
+$cachedCandidateSnapshot['signals'] = array();
+$cachedCandidateSnapshot['candidateSignals'] = array(
+    array(
+        'id' => 'sig-eurusd-cached-raw-candidate',
+        'symbol' => 'EURUSD',
+        'direction' => 'LONG',
+        'status' => 'READY',
+        'confluence' => array('OB', 'FVG'),
+        'verdict' => 'A',
+        'computedBy' => 'backend',
+        'backendConfirmed' => true,
+        'engineBlocker' => 'OK',
+        'entryPrice' => 1.1011,
+        'slPrice' => 1.0960,
+        'tpPrice' => 1.1120,
+        'createdAt' => '2026-05-03T08:15:00+00:00',
+        'engine' => array(
+            'engineBlocker' => 'OK',
+            'htfBias' => 'BULL',
+            'pdState' => 'DISCOUNT',
+            'sweep' => 'present',
+            'mss' => 'present',
+            'displacement' => 'clean',
+            'anchorSessionId' => 'cached-raw-candidate-session',
+            'firstReactionFamily' => 'backend',
+        ),
+    ),
+);
+$cachedCandidateSnapshot['plans'] = array(
+    array(
+        'signalId' => 'sig-eurusd-cached-raw-candidate',
+        'symbol' => 'EURUSD',
+        'direction' => 'LONG',
+    ),
+);
+update_user_meta(7, 'smc_sf_engine_snapshot', $cachedCandidateSnapshot);
+unset($wpdb->tables[$displaySignalsTable]);
+$GLOBALS['test_rest_force_response'] = true;
+$cachedCandidateResponse = $instance->get_live_signals();
+$cachedCandidatePayload = $cachedCandidateResponse->get_data();
+unset($GLOBALS['test_rest_force_response']);
+$cachedCandidateSignals = $cachedCandidatePayload['signals'] ?? array();
+assert_same(1, count($cachedCandidateSignals), 'get_live_signals must promote cached raw candidateSignals when /ladders computed the snapshot first');
+assert_same('sig-eurusd-cached-raw-candidate', $cachedCandidateSignals[0]['id'] ?? null, 'Promoted cached raw candidates must preserve source signal id for ladder matching');
+assert_same(1, $cachedCandidatePayload['meta']['totalActive'] ?? null, 'Cached raw candidate promotion must update total active board signals');
+
 $stableLiveSignalsSnapshot = array(
     'prices' => array(
         array(

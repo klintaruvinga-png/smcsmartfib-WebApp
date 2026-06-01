@@ -5149,13 +5149,24 @@ final class SMC_SuperFib_Sniper_REST {
         $symbols = is_array($snapshot['meta']['watchlist'] ?? null)
             ? $snapshot['meta']['watchlist']
             : ($settings['watchlist'] ?? array());
-        // Only freshly computed raw candidates may enter the promotion loop. Cached
-        // snapshots expose `signals` as the durable display-board projection, and
-        // replaying those rows can resurrect terminal signals during normal polling.
+        // Promote raw candidates even when another endpoint (for example
+        // /ladders) computed and cached the snapshot first. Cached `signals` are
+        // the durable display-board projection and must not be replayed as fresh
+        // promotion input, but `candidateSignals` is explicitly the raw engine
+        // candidate stream that feeds the board.
+        $promotion_candidates = array();
+        if (is_array($snapshot['candidateSignals'] ?? null)) {
+            $promotion_candidates = $snapshot['candidateSignals'];
+        } elseif ($snapshot_was_computed && is_array($snapshot['signals'] ?? null)) {
+            // Backward-compatible fallback for freshly computed legacy snapshots
+            // that predate the candidateSignals/display-board split.
+            $promotion_candidates = $snapshot['signals'];
+        }
+
         $this->reconcile_live_signal_board(
             (int) $user_id,
             $symbols,
-            $snapshot_was_computed && is_array($snapshot['candidateSignals'] ?? null) ? $snapshot['candidateSignals'] : array(),
+            $promotion_candidates,
             is_array($snapshot['diagnostics'] ?? null) ? $snapshot['diagnostics'] : array()
         );
         $board_size = $this->resolve_signal_board_size($user_id);
