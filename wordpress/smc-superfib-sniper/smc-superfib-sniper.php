@@ -456,6 +456,7 @@ final class SMC_SuperFib_Sniper_REST {
             lifecycle_state VARCHAR(32) NOT NULL DEFAULT 'DISPLAY_ACTIVE',
             status VARCHAR(16) NOT NULL,
             verdict VARCHAR(4) NOT NULL,
+            backend_confirmed TINYINT(1) NOT NULL DEFAULT 0,
             quality_score DECIMAL(10,4) NOT NULL DEFAULT 0,
             signal_family_key VARCHAR(128) NOT NULL,
             entry_price DECIMAL(20,8) NOT NULL,
