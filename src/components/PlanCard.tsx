@@ -56,6 +56,12 @@ export function PlanCandidateCard({
   const familyPill = plan?.executionSource ?? plan?.ladder?.e1.family;
   const pendingBlueprint = plan?.source === "pending-blueprint";
   const watchBlueprint = plan?.source === "watch-blueprint";
+  const canExecuteSignal =
+    signal.backendConfirmed &&
+    !pendingBlueprint &&
+    !watchBlueprint &&
+    planComplete &&
+    executableStageLots;
   const entryRows = plan
     ? [
         {
@@ -118,7 +124,9 @@ export function PlanCandidateCard({
             <VerdictBadge verdict={signal.verdict} />
             <span className="font-mono text-lg font-semibold">{signal.symbol}</span>
             <DirectionBadge direction={signal.direction} />
-            <StatusBadge status={pendingBlueprint && signal.status === "READY" ? "ARMED" : signal.status} />
+            <StatusBadge
+              status={pendingBlueprint && signal.status === "READY" ? "ARMED" : signal.status}
+            />
             {signal.lifecycleState && signal.lifecycleState !== "DISPLAY_ACTIVE" && (
               <MetaPill>{signal.lifecycleState}</MetaPill>
             )}
@@ -184,8 +192,8 @@ export function PlanCandidateCard({
 
       {pendingBlueprint && (
         <WarningLine level="warn">
-          Blueprint is unconfirmed. Visible for planning only — execution remains disabled until
-          the backend confirms this signal.
+          Blueprint is unconfirmed. Visible for planning only — execution remains disabled until the
+          backend confirms this signal.
         </WarningLine>
       )}
 
@@ -249,7 +257,11 @@ export function PlanCandidateCard({
 
             <PlanPanel title="Stop & Risk" tone="sell">
               <div className="space-y-2">
-                <StatRow label="SL" value={fmtPrice(plan.sl, signal.symbol)} valueClass="text-sell" />
+                <StatRow
+                  label="SL"
+                  value={fmtPrice(plan.sl, signal.symbol)}
+                  valueClass="text-sell"
+                />
                 <StatRow
                   label="Risk"
                   value={fmtCurrency(plan.riskUSC, accountTelemetry?.currency)}
@@ -285,7 +297,8 @@ export function PlanCandidateCard({
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-bd bg-bg1/40 px-3 py-3">
             <div className="text-[11px] text-mute">
-              Queues this ladder to <span className="font-mono text-dim">/user/execute-signals</span>.
+              Queues this ladder to{" "}
+              <span className="font-mono text-dim">/user/execute-signals</span>.
             </div>
             <button
               onClick={async () => {
@@ -298,10 +311,10 @@ export function PlanCandidateCard({
                   toast.error(err instanceof Error ? err.message : "Execution failed");
                 }
               }}
-              disabled={!signal.backendConfirmed || !planComplete || !executableStageLots}
+              disabled={!canExecuteSignal}
               className={cn(
                 "inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors w-full sm:w-auto",
-                signal.backendConfirmed && planComplete && executableStageLots
+                canExecuteSignal
                   ? "bg-buy/15 border border-buy/50 text-buy hover:bg-buy/25"
                   : "bg-bg2 border border-bd text-mute cursor-not-allowed",
               )}
@@ -338,34 +351,6 @@ export function PlanCandidateCard({
           )}
         </div>
       )}
-
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-bd bg-bg1/40 px-3 py-3">
-        <div className="text-[11px] text-mute">
-          Queues this ladder to <span className="font-mono text-dim">/user/execute-signals</span>.
-        </div>
-        <button
-          onClick={async () => {
-            try {
-              const response = await apiClient.postExecuteSignals({ signalIds: [signal.id] });
-              toast.success(
-                `Queued ${response.queued} order${response.queued > 1 ? "s" : ""} for execution`,
-              );
-            } catch (err) {
-              toast.error(err instanceof Error ? err.message : "Execution failed");
-            }
-          }}
-          disabled={!signal.backendConfirmed || pendingBlueprint || watchBlueprint || !planComplete || !executableStageLots}
-          className={cn(
-            "inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors",
-            signal.backendConfirmed && !pendingBlueprint && !watchBlueprint && planComplete && executableStageLots
-              ? "bg-buy/15 border border-buy/50 text-buy hover:bg-buy/25"
-              : "bg-bg2 border border-bd text-mute cursor-not-allowed",
-          )}
-        >
-          <Send className="h-4 w-4" />
-          Send to execution
-        </button>
-      </div>
 
       {!signal.backendConfirmed && (
         <WarningLine level="warn">
