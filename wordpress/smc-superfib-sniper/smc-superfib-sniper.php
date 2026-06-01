@@ -5143,15 +5143,19 @@ final class SMC_SuperFib_Sniper_REST {
 
     public function get_live_signals() {
         $user_id = get_current_user_id();
-        $snapshot = $this->ensure_engine_snapshot($user_id);
+        $snapshot_was_computed = false;
+        $snapshot = $this->ensure_engine_snapshot($user_id, false, $snapshot_was_computed);
         $settings = $this->get_settings($user_id);
         $symbols = is_array($snapshot['meta']['watchlist'] ?? null)
             ? $snapshot['meta']['watchlist']
             : ($settings['watchlist'] ?? array());
+        // Only freshly computed raw candidates may enter the promotion loop. Cached
+        // snapshots expose `signals` as the durable display-board projection, and
+        // replaying those rows can resurrect terminal signals during normal polling.
         $this->reconcile_live_signal_board(
             (int) $user_id,
             $symbols,
-            array(),
+            $snapshot_was_computed && is_array($snapshot['candidateSignals'] ?? null) ? $snapshot['candidateSignals'] : array(),
             is_array($snapshot['diagnostics'] ?? null) ? $snapshot['diagnostics'] : array()
         );
         $board_size = $this->resolve_signal_board_size($user_id);
@@ -5529,7 +5533,16 @@ final class SMC_SuperFib_Sniper_REST {
         $this->reconcile_live_signal_board((int) $user_id, $symbols, $signals, $diagnostics);
         $display_signals = $this->read_live_signal_board((int) $user_id, $symbols, $this->resolve_signal_board_size((int) $user_id));
 
-        $result = array('regimes' => $regimes, 'gates' => $gates, 'signals' => $display_signals, 'plans' => $plans, 'diagnostics' => $diagnostics);
+        $result = array(
+            'regimes' => $regimes,
+            'gates' => $gates,
+            'signals' => $display_signals,
+            // Keep raw engine candidates separate from the display-board projection
+            // so cached snapshots cannot be mistaken for fresh promotion input.
+            'candidateSignals' => $signals,
+            'plans' => $plans,
+            'diagnostics' => $diagnostics,
+        );
         set_transient($transient_key, $result, 5);
 
         return $result;
@@ -8117,7 +8130,8 @@ final class SMC_SuperFib_Sniper_REST {
         return $prices;
     }
 
-    private function ensure_engine_snapshot($user_id, $force = false) {
+    private function ensure_engine_snapshot($user_id, $force = false, &$was_computed = null) {
+        $was_computed = false;
         $settings = $this->get_settings($user_id);
         $symbols = $settings['watchlist'];
         $snapshot = $this->get_engine_snapshot($user_id);
@@ -8142,6 +8156,7 @@ final class SMC_SuperFib_Sniper_REST {
             'regimes' => $engine['regimes'],
             'gates' => $engine['gates'],
             'signals' => $engine['signals'],
+            'candidateSignals' => is_array($engine['candidateSignals'] ?? null) ? $engine['candidateSignals'] : array(),
             'plans' => $engine['plans'],
             'diagnostics' => $engine['diagnostics'] ?? array(),
             'meta' => array(
@@ -8150,6 +8165,7 @@ final class SMC_SuperFib_Sniper_REST {
             ),
         );
         $this->save_engine_snapshot($user_id, $snapshot);
+        $was_computed = true;
 
         return $snapshot;
     }
