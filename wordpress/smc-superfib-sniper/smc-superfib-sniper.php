@@ -5616,7 +5616,7 @@ final class SMC_SuperFib_Sniper_REST {
             if ($status === 'READY' && $quality_score < 300) {
                 continue;
             }
-            if ($status === 'ARMED' && !$this->armed_signal_confirmed($user_id, $candidate, $now)) {
+            if ($status === 'ARMED' && !$this->armed_signal_confirmed($user_id, $candidate, $signal, $now)) {
                 continue;
             }
 
@@ -5732,8 +5732,22 @@ final class SMC_SuperFib_Sniper_REST {
         return $latest;
     }
 
-    private function armed_signal_confirmed(int $user_id, array $candidate, string $now): bool {
-        $key = 'smc_sf_armed_confirm_' . $user_id . '_' . md5($this->compute_signal_family_key($user_id, $candidate, array()));
+    private function armed_signal_confirmed(int $user_id, array $candidate, array $signal, string $now): bool {
+        // Match the anchor used by compute_signal_family_key() so each display
+        // family, including same-day engine anchorSessionId variants, gets an
+        // independent confirmation counter before the family key is computed.
+        $engine = is_array($signal['engine'] ?? null) ? $signal['engine'] : array();
+        $fallback_anchor = date('Ymd', strtotime((string) ($candidate['created_at'] ?? $now)));
+        $anchor = (string) ($engine['anchorSessionId'] ?? ($engine['anchorSession'] ?? $fallback_anchor));
+        $family_parts = array(
+            $user_id,
+            preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($candidate['symbol'] ?? ''))),
+            strtoupper((string) ($candidate['direction'] ?? '')),
+            (string) ($candidate['fib_family'] ?? 'backend'),
+            is_numeric($candidate['fib_ratio'] ?? null) ? number_format((float) $candidate['fib_ratio'], 4, '.', '') : 'na',
+            $anchor,
+        );
+        $key = 'smc_sf_armed_confirm_' . $user_id . '_' . md5(implode('|', $family_parts));
         $state = get_transient($key);
         $count = is_array($state) ? (int) ($state['count'] ?? 0) : 0;
         $count++;
@@ -5805,8 +5819,8 @@ final class SMC_SuperFib_Sniper_REST {
             $user_id
         ), ARRAY_A);
         $allowed_states = $include_terminal
-            ? array('DISPLAY_ACTIVE', 'STALE_HELD', 'ENTRY_HIT')
-            : array('DISPLAY_ACTIVE', 'STALE_HELD', 'ENTRY_HIT', 'FILLED_CONFIRMED');
+            ? array('DISPLAY_ACTIVE', 'STALE_HELD', 'ENTRY_HIT', 'FILLED_CONFIRMED')
+            : array('DISPLAY_ACTIVE', 'STALE_HELD');
         $out = array();
         foreach ((array) $rows as $row) {
             $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($row['symbol'] ?? '')));
