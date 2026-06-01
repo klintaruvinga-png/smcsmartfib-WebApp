@@ -419,6 +419,7 @@ function MetaPill({ children, title }: { children: ReactNode; title?: string }) 
   );
 }
 
+function shortSignalId(id: string): string {
   // Strip "sig-" prefix and use last 4 chars uppercased for a memorable short ID
   const stripped = id.replace(/^sig-/i, "");
   return stripped.slice(-4).toUpperCase();
