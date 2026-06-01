@@ -357,7 +357,7 @@ export function PlanCandidateCard({
   );
 }
 
-function PlanSection({
+function PlanPanel({
   title,
   tone,
   children,
@@ -368,16 +368,18 @@ function PlanSection({
 }) {
   const accent =
     tone === "buy"
-      ? "border-buy/30"
+      ? "text-buy/80"
       : tone === "sell"
-        ? "border-sell/30"
+        ? "text-sell/80"
         : tone === "info"
-          ? "border-info/30"
-          : "border-bd";
+          ? "text-info/80"
+          : "text-mute";
 
   return (
-    <div className={cn("rounded-lg border bg-bg1/50 p-3", accent)}>
-      <div className="mb-3 text-[11px] font-mono uppercase tracking-wider text-mute">{title}</div>
+    <div className="bg-bg1/50 p-3">
+      <div className={cn("mb-3 text-[11px] font-mono uppercase tracking-wider", accent)}>
+        {title}
+      </div>
       {children}
     </div>
   );
