@@ -429,12 +429,34 @@ function StatusBadge({ status }: { status: SignalCandidate["status"] }) {
   );
 }
 
-function MetaPill({ children }: { children: ReactNode }) {
+function MetaPill({ children, title }: { children: ReactNode; title?: string }) {
   return (
-    <span className="rounded border border-bd bg-bg2 px-2 py-0.5 text-[10px] font-mono text-dim">
+    <span
+      title={title}
+      className="rounded border border-bd bg-bg2 px-2 py-0.5 text-[10px] font-mono text-dim"
+    >
       {children}
     </span>
   );
+}
+
+function MetaTag({ children, mono = false }: { children: ReactNode; mono?: boolean }) {
+  return (
+    <span
+      className={cn(
+        "rounded border border-bd/50 bg-bg2/40 px-1.5 py-0.5 text-[10px] text-dim/80",
+        mono && "font-mono",
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+function shortSignalId(id: string): string {
+  // Strip "sig-" prefix and use last 4 chars uppercased for a memorable short ID
+  const stripped = id.replace(/^sig-/i, "");
+  return stripped.slice(-4).toUpperCase();
 }
 
 function MetaChip({
