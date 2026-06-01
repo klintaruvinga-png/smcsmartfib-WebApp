@@ -5163,6 +5163,16 @@ final class SMC_SuperFib_Sniper_REST {
             $promotion_candidates = $snapshot['signals'];
         }
 
+        if (empty($promotion_candidates)) {
+            error_log(sprintf(
+                '[SMC_SF_SIGNAL_BOARD] empty_candidate_signals user_id=%d snapshotComputed=%s watchlistCount=%d diagnosticsCount=%d',
+                (int) $user_id,
+                $snapshot_was_computed ? 'true' : 'false',
+                is_array($symbols) ? count($symbols) : 0,
+                is_array($snapshot['diagnostics'] ?? null) ? count($snapshot['diagnostics']) : 0
+            ));
+        }
+
         $this->reconcile_live_signal_board(
             (int) $user_id,
             $symbols,
@@ -5620,6 +5630,15 @@ final class SMC_SuperFib_Sniper_REST {
 
             $candidate = $this->hydrate_display_signal_candidate($user_id, $signal);
             if ($candidate === null) {
+                error_log(sprintf(
+                    '[SMC_SF_SIGNAL_BOARD] hydrate_drop user_id=%d symbol=%s direction=%s status=%s entryPrice=%s engineBlocker=%s',
+                    (int) $user_id,
+                    (string) ($signal['symbol'] ?? ''),
+                    (string) ($signal['direction'] ?? ''),
+                    (string) ($signal['status'] ?? ''),
+                    isset($signal['entryPrice']) ? (string) $signal['entryPrice'] : 'missing',
+                    (string) ($signal['engineBlocker'] ?? '')
+                ));
                 continue;
             }
 
@@ -5741,6 +5760,7 @@ final class SMC_SuperFib_Sniper_REST {
                 'fib_ratio' => null,
                 'confidence' => 0.0,
                 'pine_match' => null,
+                'htf_bias' => (string) ($signal['engine']['htfBias'] ?? ''),
                 'created_at' => $this->normalize_market_timestamp($signal['createdAt'] ?? null, $this->now_mysql()),
             );
         }
@@ -6380,6 +6400,9 @@ final class SMC_SuperFib_Sniper_REST {
             'backendConfirmed' => $backend_confirmed,
             'engineBlocker' => $engine_blocker,
             'createdAt' => $signal_anchor,
+            'entryPrice' => $entry_price,
+            'slPrice' => $stop_price,
+            'tpPrice' => $tp1_price,
             'engine' => array(
                 'htfBias' => $bias === 'RANGING' ? 'TRANSITIONAL' : $bias,
                 'fundamentalBias' => $fundamental_htf_category ?? 'NEUTRAL',
