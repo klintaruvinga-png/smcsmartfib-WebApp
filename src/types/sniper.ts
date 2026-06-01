@@ -120,8 +120,10 @@ export interface SignalPersistence {
   firstSeenAt: string;
   lastConfirmedAt: string;
   lastEvaluatedAt: string;
+  lastBlueprintAt: string | null;
   expiresAt: string | null;
   replacedBy: string | null;
+  staleHeld: boolean;
 }
 
 export interface LiveSignalsMeta {
@@ -224,6 +226,8 @@ export interface SignalCandidate {
     firstReactionFamily: FibFamily | null;
     chartState: string;
     panelState: string | null;
+    graceHold?: boolean;
+    graceHoldReason?: string;
   };
 }
 

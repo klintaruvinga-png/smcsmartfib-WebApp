@@ -5698,10 +5698,54 @@ final class SMC_SuperFib_Sniper_REST {
                 continue;
             }
             if (isset($blocked_symbols[$row_symbol])) {
+                // Blueprint grace window: hold the signal as STALE_HELD with execution disabled
+                // for up to 300 s after the last confirmed blueprint, absorbing brief feed gaps.
+                $blueprint_grace_sec = 300; // 5 minutes
+                $last_blueprint_at   = $row['last_blueprint_at'] ?? null;
+                $within_grace        = !empty($last_blueprint_at)
+                    && (strtotime($now) - strtotime((string) $last_blueprint_at)) <= $blueprint_grace_sec;
+
+                if ($within_grace && strtoupper((string) ($row['lifecycle_state'] ?? '')) !== 'STALE_HELD') {
+                    $held_engine = json_decode((string) ($row['engine'] ?? '{}'), true);
+                    if (!is_array($held_engine)) {
+                        $held_engine = array();
+                    }
+                    $held_engine['graceHold']       = true;
+                    $held_engine['graceHoldReason'] = (string) ($blocked_symbols[$row_symbol]['engineBlocker'] ?? 'stale_data');
+                    $wpdb->update(
+                        $this->table('display_signals'),
+                        array(
+                            'lifecycle_state'  => 'STALE_HELD',
+                            'last_evaluated_at' => $now,
+                            'engine'           => wp_json_encode($held_engine),
+                        ),
+                        array('id' => (string) ($row['id'] ?? ''), 'user_id' => $user_id)
+                    );
+                    $this->audit($user_id, 'display_signal.grace_hold_entered', array(
+                        'id'               => (string) ($row['id'] ?? ''),
+                        'symbol'           => $row_symbol,
+                        'reason'           => $held_engine['graceHoldReason'],
+                        'last_blueprint_at' => $last_blueprint_at,
+                        'grace_window_sec' => $blueprint_grace_sec,
+                    ));
+                    continue;
+                }
+
+                // No confirmed blueprint within grace window — standard STALE_HELD transition.
                 $this->transition_display_signal($user_id, $row, 'STALE_HELD', (string) ($blocked_symbols[$row_symbol]['engineBlocker'] ?? 'stale_data'), null, $now);
                 continue;
             }
             if (strtoupper((string) ($row['lifecycle_state'] ?? '')) === 'STALE_HELD') {
+                // On recovery: strip graceHold flag from engine JSON before re-activating.
+                $restored_engine = json_decode((string) ($row['engine'] ?? '{}'), true);
+                if (is_array($restored_engine) && !empty($restored_engine['graceHold'])) {
+                    unset($restored_engine['graceHold'], $restored_engine['graceHoldReason']);
+                    $wpdb->update(
+                        $this->table('display_signals'),
+                        array('engine' => wp_json_encode($restored_engine)),
+                        array('id' => (string) ($row['id'] ?? ''), 'user_id' => $user_id)
+                    );
+                }
                 $this->transition_display_signal($user_id, $row, 'DISPLAY_ACTIVE', 'fresh_data_restored', null, $now);
                 continue;
             }
@@ -6043,6 +6087,9 @@ final class SMC_SuperFib_Sniper_REST {
             'invalidation_reason' => null,
             'first_seen_at' => $existing['first_seen_at'] ?? $now,
             'last_confirmed_at' => $now,
+            'last_blueprint_at' => (bool) ($signal['backendConfirmed'] ?? false)
+                ? $now
+                : ($existing['last_blueprint_at'] ?? null),
             'last_evaluated_at' => $now,
             'expires_at' => gmdate('Y-m-d H:i:s', strtotime($now . ' +4 hours')),
             'confluence' => wp_json_encode(is_array($signal['confluence'] ?? null) ? $signal['confluence'] : array()),
@@ -6184,8 +6231,10 @@ final class SMC_SuperFib_Sniper_REST {
                 'firstSeenAt' => $this->to_iso((string) ($row['first_seen_at'] ?? '')),
                 'lastConfirmedAt' => $this->to_iso((string) ($row['last_confirmed_at'] ?? '')),
                 'lastEvaluatedAt' => $this->to_iso((string) ($row['last_evaluated_at'] ?? '')),
+                'lastBlueprintAt' => !empty($row['last_blueprint_at']) ? $this->to_iso((string) $row['last_blueprint_at']) : null,
                 'expiresAt' => !empty($row['expires_at']) ? $this->to_iso((string) $row['expires_at']) : null,
                 'replacedBy' => (string) ($row['replaced_by'] ?? ''),
+                'staleHeld' => $lifecycle_state === 'STALE_HELD' && !empty($engine['graceHold']),
             ),
             'engine' => $engine,
         );

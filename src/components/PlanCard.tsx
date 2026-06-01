@@ -60,6 +60,7 @@ export function PlanCandidateCard({
     signal.backendConfirmed &&
     !pendingBlueprint &&
     !watchBlueprint &&
+    !signal.engine?.graceHold &&
     planComplete &&
     executableStageLots;
   const entryRows = plan
@@ -201,6 +202,13 @@ export function PlanCandidateCard({
         <WarningLine level="watch">
           Watch blueprint is indicative and read-only. It will be replaced when a higher-quality
           ARMED/READY or backend-confirmed blueprint is available.
+        </WarningLine>
+      )}
+
+      {signal.engine?.graceHold && (
+        <WarningLine level="warn">
+          Price feed interrupted ({signal.engine.graceHoldReason ?? "stale_data"}). Signal held
+          within grace window — execution disabled until feed recovers.
         </WarningLine>
       )}
 
