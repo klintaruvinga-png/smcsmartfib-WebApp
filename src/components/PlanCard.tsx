@@ -56,6 +56,12 @@ export function PlanCandidateCard({
   const familyPill = plan?.executionSource ?? plan?.ladder?.e1.family;
   const pendingBlueprint = plan?.source === "pending-blueprint";
   const watchBlueprint = plan?.source === "watch-blueprint";
+  const canExecuteSignal =
+    signal.backendConfirmed &&
+    !pendingBlueprint &&
+    !watchBlueprint &&
+    planComplete &&
+    executableStageLots;
   const entryRows = plan
     ? [
         {
@@ -118,7 +124,15 @@ export function PlanCandidateCard({
             <VerdictBadge verdict={signal.verdict} />
             <span className="font-mono text-lg font-semibold">{signal.symbol}</span>
             <DirectionBadge direction={signal.direction} />
-            <StatusBadge status={signal.status} />
+            <StatusBadge
+              status={pendingBlueprint && signal.status === "READY" ? "ARMED" : signal.status}
+            />
+            {signal.lifecycleState && signal.lifecycleState !== "DISPLAY_ACTIVE" && (
+              <MetaPill>{signal.lifecycleState}</MetaPill>
+            )}
+            {typeof signal.qualityScore === "number" && (
+              <MetaPill>QS {Math.round(signal.qualityScore)}</MetaPill>
+            )}
             <FreshnessBadge state={price?.state ?? "pending-sync"} />
             <MetaPill title={signal.id}>#{shortSignalId(signal.id)}</MetaPill>
             <span className="text-xs text-mute font-mono">{relTime(signal.createdAt)}</span>
@@ -153,10 +167,12 @@ export function PlanCandidateCard({
             >
               {pendingBlueprint && <Lock className="h-3 w-3" />}
               {pendingBlueprint
-                ? "PENDING BLUEPRINT"
+                ? "UNCONFIRMED"
                 : watchBlueprint
                   ? "WATCH BLUEPRINT"
-                  : plan.source}
+                  : plan.source === "backend-blueprint"
+                    ? "CONFIRMED"
+                    : plan.source}
             </MetaChip>
           ) : (
             <MetaChip tone="neutral">NO BLUEPRINT</MetaChip>
@@ -176,8 +192,8 @@ export function PlanCandidateCard({
 
       {pendingBlueprint && (
         <WarningLine level="warn">
-          Pending blueprint is visible for planning only. Execution remains disabled until backend
-          confirmation.
+          Blueprint is unconfirmed. Visible for planning only — execution remains disabled until the
+          backend confirms this signal.
         </WarningLine>
       )}
 
@@ -241,7 +257,11 @@ export function PlanCandidateCard({
 
             <PlanPanel title="Stop & Risk" tone="sell">
               <div className="space-y-2">
-                <StatRow label="SL" value={fmtPrice(plan.sl, signal.symbol)} valueClass="text-sell" />
+                <StatRow
+                  label="SL"
+                  value={fmtPrice(plan.sl, signal.symbol)}
+                  valueClass="text-sell"
+                />
                 <StatRow
                   label="Risk"
                   value={fmtCurrency(plan.riskUSC, accountTelemetry?.currency)}
@@ -277,7 +297,8 @@ export function PlanCandidateCard({
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-bd bg-bg1/40 px-3 py-3">
             <div className="text-[11px] text-mute">
-              Queues this ladder to <span className="font-mono text-dim">/user/execute-signals</span>.
+              Queues this ladder to{" "}
+              <span className="font-mono text-dim">/user/execute-signals</span>.
             </div>
             <button
               onClick={async () => {
@@ -290,10 +311,10 @@ export function PlanCandidateCard({
                   toast.error(err instanceof Error ? err.message : "Execution failed");
                 }
               }}
-              disabled={!signal.backendConfirmed || !planComplete || !executableStageLots}
+              disabled={!canExecuteSignal}
               className={cn(
                 "inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors w-full sm:w-auto",
-                signal.backendConfirmed && planComplete && executableStageLots
+                canExecuteSignal
                   ? "bg-buy/15 border border-buy/50 text-buy hover:bg-buy/25"
                   : "bg-bg2 border border-bd text-mute cursor-not-allowed",
               )}
