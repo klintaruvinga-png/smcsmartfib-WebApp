@@ -112,34 +112,38 @@ export function PlanCandidateCard({
       )}
     >
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-0">
+          {/* Primary UI tags — what the user reads at a glance */}
           <div className="flex items-center gap-2 flex-wrap">
             <VerdictBadge verdict={signal.verdict} />
             <span className="font-mono text-lg font-semibold">{signal.symbol}</span>
             <DirectionBadge direction={signal.direction} />
             <StatusBadge status={signal.status} />
-            {signal.lifecycleState && signal.lifecycleState !== "DISPLAY_ACTIVE" && (
-              <MetaPill>{signal.lifecycleState}</MetaPill>
-            )}
-            {typeof signal.qualityScore === "number" && (
-              <MetaPill>QS {Math.round(signal.qualityScore)}</MetaPill>
-            )}
             <FreshnessBadge state={price?.state ?? "pending-sync"} />
-            <MetaPill>{signal.id}</MetaPill>
-            <MetaPill>{relTime(signal.createdAt)}</MetaPill>
-            <MetaPill>{signal.computedBy}</MetaPill>
-            {familyPill && <MetaPill>{familyPill}</MetaPill>}
+            <MetaPill title={signal.id}>#{shortSignalId(signal.id)}</MetaPill>
+            <span className="text-xs text-mute font-mono">{relTime(signal.createdAt)}</span>
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {signal.confluence.slice(0, 4).map((item) => (
-              <span
-                key={item}
-                className="rounded border border-bd bg-bg2 px-2 py-0.5 text-[10px] font-mono text-dim"
-              >
-                {item}
-              </span>
-            ))}
-          </div>
+          {/* Meta / backend tags — collapsible, dimmer */}
+          <details className="group">
+            <summary className="cursor-pointer text-[10px] uppercase tracking-wide text-dim hover:text-mute select-none list-none flex items-center gap-1">
+              <span className="inline-block transition-transform group-open:rotate-90">›</span>
+              meta
+            </summary>
+            <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+              {typeof signal.qualityScore === "number" && (
+                <MetaTag>QS {Math.round(signal.qualityScore)}</MetaTag>
+              )}
+              {signal.lifecycleState && signal.lifecycleState !== "DISPLAY_ACTIVE" && (
+                <MetaTag>{signal.lifecycleState}</MetaTag>
+              )}
+              <MetaTag>{signal.computedBy}</MetaTag>
+              {familyPill && <MetaTag>{familyPill}</MetaTag>}
+              {signal.confluence.slice(0, 4).map((item) => (
+                <MetaTag key={item}>{item}</MetaTag>
+              ))}
+              <MetaTag mono>{signal.id}</MetaTag>
+            </div>
+          </details>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -425,12 +429,34 @@ function StatusBadge({ status }: { status: SignalCandidate["status"] }) {
   );
 }
 
-function MetaPill({ children }: { children: ReactNode }) {
+function MetaPill({ children, title }: { children: ReactNode; title?: string }) {
   return (
-    <span className="rounded border border-bd bg-bg2 px-2 py-0.5 text-[10px] font-mono text-dim">
+    <span
+      title={title}
+      className="rounded border border-bd bg-bg2 px-2 py-0.5 text-[10px] font-mono text-dim"
+    >
       {children}
     </span>
   );
+}
+
+function MetaTag({ children, mono = false }: { children: ReactNode; mono?: boolean }) {
+  return (
+    <span
+      className={cn(
+        "rounded border border-bd/50 bg-bg2/40 px-1.5 py-0.5 text-[10px] text-dim/80",
+        mono && "font-mono",
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+function shortSignalId(id: string): string {
+  // Strip "sig-" prefix and use last 4 chars uppercased for a memorable short ID
+  const stripped = id.replace(/^sig-/i, "");
+  return stripped.slice(-4).toUpperCase();
 }
 
 function MetaChip({
