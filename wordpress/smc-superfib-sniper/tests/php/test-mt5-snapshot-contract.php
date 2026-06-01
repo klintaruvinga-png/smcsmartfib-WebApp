@@ -1317,6 +1317,20 @@ $cachedCandidateSignals = $cachedCandidatePayload['signals'] ?? array();
 assert_same(1, count($cachedCandidateSignals), 'get_live_signals must promote cached raw candidateSignals when /ladders computed the snapshot first');
 assert_same('sig-eurusd-cached-raw-candidate', $cachedCandidateSignals[0]['id'] ?? null, 'Promoted cached raw candidates must preserve source signal id for ladder matching');
 assert_same(1, $cachedCandidatePayload['meta']['totalActive'] ?? null, 'Cached raw candidate promotion must update total active board signals');
+$wpdb->update($displaySignalsTable, array(
+    'expires_at' => '2000-01-01 00:00:00',
+), array(
+    'id' => 'sig-eurusd-cached-raw-candidate',
+    'user_id' => 7,
+));
+$GLOBALS['test_rest_force_response'] = true;
+$cachedCandidateExpiredResponse = $instance->get_live_signals();
+$cachedCandidateExpiredPayload = $cachedCandidateExpiredResponse->get_data();
+unset($GLOBALS['test_rest_force_response']);
+$cachedCandidateExpiredRow = $wpdb->tables[$displaySignalsTable]['sig-eurusd-cached-raw-candidate'] ?? array();
+assert_same('EXPIRED', $cachedCandidateExpiredRow['lifecycle_state'] ?? null, 'Cached raw candidate replay must not resurrect an expired display row back to active');
+assert_same(0, count($cachedCandidateExpiredPayload['signals'] ?? array()), 'Expired cached raw candidates must stay hidden from the active live board');
+assert_same(0, $cachedCandidateExpiredPayload['meta']['totalActive'] ?? null, 'Expired cached raw candidates must not be counted as active after cached replay');
 
 $stableLiveSignalsSnapshot = array(
     'prices' => array(
