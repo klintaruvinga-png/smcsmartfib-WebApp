@@ -5164,13 +5164,40 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         if (empty($promotion_candidates)) {
-            error_log(sprintf(
-                '[SMC_SF_SIGNAL_BOARD] empty_candidate_signals user_id=%d snapshotComputed=%s watchlistCount=%d diagnosticsCount=%d',
-                (int) $user_id,
-                $snapshot_was_computed ? 'true' : 'false',
-                is_array($symbols) ? count($symbols) : 0,
-                is_array($snapshot['diagnostics'] ?? null) ? count($snapshot['diagnostics']) : 0
-            ));
+            $diagnostics = is_array($snapshot['diagnostics'] ?? null) ? $snapshot['diagnostics'] : array();
+
+            $has_blocked_symbols = false;
+            foreach ($diagnostics as $diagnostic) {
+                if (!is_array($diagnostic)) {
+                    continue;
+                }
+                $engine_blocker = strtoupper((string) ($diagnostic['engineBlocker'] ?? 'OK'));
+                $price_state    = strtolower((string) ($diagnostic['priceState'] ?? 'live'));
+                $candle_state   = strtolower((string) ($diagnostic['candleState'] ?? 'live'));
+                if (
+                    $engine_blocker !== 'OK'
+                    || $price_state !== 'live'
+                    || in_array($candle_state, array('stale', 'offline', 'missing', 'closed_session'), true)
+                ) {
+                    $has_blocked_symbols = true;
+                    break;
+                }
+            }
+
+            if ($snapshot_was_computed || $has_blocked_symbols) {
+                $log_key = 'smc_sf_empty_candidates_log_' . (int) $user_id;
+                if (!get_transient($log_key)) {
+                    error_log(sprintf(
+                        '[SMC_SF_SIGNAL_BOARD] empty_candidate_signals user_id=%d snapshotComputed=%s watchlistCount=%d diagnosticsCount=%d hasBlockedSymbols=%s',
+                        (int) $user_id,
+                        $snapshot_was_computed ? 'true' : 'false',
+                        is_array($symbols) ? count($symbols) : 0,
+                        count($diagnostics),
+                        $has_blocked_symbols ? 'true' : 'false'
+                    ));
+                    set_transient($log_key, 1, 300);
+                }
+            }
         }
 
         $this->reconcile_live_signal_board(
