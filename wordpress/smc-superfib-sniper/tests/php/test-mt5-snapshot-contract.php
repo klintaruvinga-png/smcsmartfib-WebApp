@@ -1405,6 +1405,20 @@ assert_same('STALE_HELD', $blockedLiveSignalsPayload['signals'][0]['lifecycleSta
 
 $armedSignalConfirmedMethod = new ReflectionMethod('SMC_SuperFib_Sniper_REST', 'armed_signal_confirmed');
 $armedSignalConfirmedMethod->setAccessible(true);
+$armedConfirmationSignal = array(
+    'id' => 'sig-gbpusd-armed-confirm-anchor',
+    'symbol' => 'GBPUSD',
+    'direction' => 'LONG',
+    'status' => 'ARMED',
+    'verdict' => 'A',
+    'entryPrice' => 1.09125,
+    'slPrice' => 1.08000,
+    'tpPrice' => 1.10500,
+    'engine' => array(
+        'anchorSessionId' => 'london-20260503-a',
+        'firstReactionFamily' => 'backend',
+    ),
+);
 $armedConfirmationCandidate = array(
     'id' => 'sig-gbpusd-armed-confirm-anchor',
     'symbol' => 'GBPUSD',
@@ -1427,11 +1441,15 @@ $GLOBALS['test_transients'] = array_filter(
     },
     ARRAY_FILTER_USE_KEY
 );
-assert_true(!$armedSignalConfirmedMethod->invoke($instance, 7, $armedConfirmationCandidate, '2026-05-03 08:15:05'), 'First same-day ARMED sighting must remain unconfirmed');
+assert_true(!$armedSignalConfirmedMethod->invoke($instance, 7, $armedConfirmationCandidate, $armedConfirmationSignal, '2026-05-03 08:15:05'), 'First same-day ARMED sighting must remain unconfirmed');
 $armedConfirmationCandidate['created_at'] = '2026-05-03 08:30:00';
-assert_true($armedSignalConfirmedMethod->invoke($instance, 7, $armedConfirmationCandidate, '2026-05-03 08:30:05'), 'Second same-day ARMED sighting must confirm with the display-family date anchor');
+assert_true($armedSignalConfirmedMethod->invoke($instance, 7, $armedConfirmationCandidate, $armedConfirmationSignal, '2026-05-03 08:30:05'), 'Second same-anchor ARMED sighting must confirm with the engine display-family anchor');
+$armedConfirmationSignal['engine']['anchorSessionId'] = 'new-york-20260503-b';
+$armedConfirmationCandidate['created_at'] = '2026-05-03 15:01:00';
+assert_true(!$armedSignalConfirmedMethod->invoke($instance, 7, $armedConfirmationCandidate, $armedConfirmationSignal, '2026-05-03 15:01:05'), 'First same-day ARMED sighting on a new anchorSessionId must not inherit the prior anchor counter');
+$armedConfirmationSignal['engine'] = array('firstReactionFamily' => 'backend');
 $armedConfirmationCandidate['created_at'] = '2026-05-04 00:01:00';
-assert_true(!$armedSignalConfirmedMethod->invoke($instance, 7, $armedConfirmationCandidate, '2026-05-04 00:01:05'), 'First ARMED sighting on a new display-family date must not inherit the prior date counter');
+assert_true(!$armedSignalConfirmedMethod->invoke($instance, 7, $armedConfirmationCandidate, $armedConfirmationSignal, '2026-05-04 00:01:05'), 'First ARMED sighting on a new fallback display-family date must not inherit the prior anchor counter');
 
 $computeSignalFamilyKeyMethod = new ReflectionMethod('SMC_SuperFib_Sniper_REST', 'compute_signal_family_key');
 $computeSignalFamilyKeyMethod->setAccessible(true);

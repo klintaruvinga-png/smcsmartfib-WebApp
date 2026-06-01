@@ -5616,7 +5616,7 @@ final class SMC_SuperFib_Sniper_REST {
             if ($status === 'READY' && $quality_score < 300) {
                 continue;
             }
-            if ($status === 'ARMED' && !$this->armed_signal_confirmed($user_id, $candidate, $now)) {
+            if ($status === 'ARMED' && !$this->armed_signal_confirmed($user_id, $candidate, $signal, $now)) {
                 continue;
             }
 
@@ -5732,10 +5732,13 @@ final class SMC_SuperFib_Sniper_REST {
         return $latest;
     }
 
-    private function armed_signal_confirmed(int $user_id, array $candidate, string $now): bool {
-        // Match the fallback anchor used by compute_signal_family_key() so each
-        // calendar-day display family gets an independent confirmation counter.
-        $anchor = date('Ymd', strtotime((string) ($candidate['created_at'] ?? $now)));
+    private function armed_signal_confirmed(int $user_id, array $candidate, array $signal, string $now): bool {
+        // Match the anchor used by compute_signal_family_key() so each display
+        // family, including same-day engine anchorSessionId variants, gets an
+        // independent confirmation counter before the family key is computed.
+        $engine = is_array($signal['engine'] ?? null) ? $signal['engine'] : array();
+        $fallback_anchor = date('Ymd', strtotime((string) ($candidate['created_at'] ?? $now)));
+        $anchor = (string) ($engine['anchorSessionId'] ?? ($engine['anchorSession'] ?? $fallback_anchor));
         $family_parts = array(
             $user_id,
             preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($candidate['symbol'] ?? ''))),
