@@ -117,7 +117,7 @@ export function PlanCandidateCard({
             <VerdictBadge verdict={signal.verdict} />
             <span className="font-mono text-lg font-semibold">{signal.symbol}</span>
             <DirectionBadge direction={signal.direction} />
-            <StatusBadge status={signal.status} />
+            <StatusBadge status={pendingBlueprint && signal.status === "READY" ? "ARMED" : signal.status} />
             {signal.lifecycleState && signal.lifecycleState !== "DISPLAY_ACTIVE" && (
               <MetaPill>{signal.lifecycleState}</MetaPill>
             )}
@@ -170,10 +170,12 @@ export function PlanCandidateCard({
             >
               {pendingBlueprint && <Lock className="h-3 w-3" />}
               {pendingBlueprint
-                ? "PENDING BLUEPRINT"
+                ? "UNCONFIRMED"
                 : watchBlueprint
                   ? "WATCH BLUEPRINT"
-                  : plan.source}
+                  : plan.source === "backend-blueprint"
+                    ? "CONFIRMED"
+                    : plan.source}
             </MetaChip>
           ) : (
             <MetaChip tone="neutral">NO BLUEPRINT</MetaChip>
@@ -193,8 +195,8 @@ export function PlanCandidateCard({
 
       {pendingBlueprint && (
         <WarningLine level="warn">
-          Pending blueprint is visible for planning only. Execution remains disabled until backend
-          confirmation.
+          Blueprint is unconfirmed. Visible for planning only — execution remains disabled until
+          the backend confirms this signal.
         </WarningLine>
       )}
 
@@ -333,10 +335,10 @@ export function PlanCandidateCard({
               toast.error(err instanceof Error ? err.message : "Execution failed");
             }
           }}
-          disabled={!signal.backendConfirmed || !planComplete || !executableStageLots}
+          disabled={!signal.backendConfirmed || pendingBlueprint || watchBlueprint || !planComplete || !executableStageLots}
           className={cn(
             "inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors",
-            signal.backendConfirmed && planComplete && executableStageLots
+            signal.backendConfirmed && !pendingBlueprint && !watchBlueprint && planComplete && executableStageLots
               ? "bg-buy/15 border border-buy/50 text-buy hover:bg-buy/25"
               : "bg-bg2 border border-bd text-mute cursor-not-allowed",
           )}

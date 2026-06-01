@@ -105,6 +105,7 @@ export function useSnapshot() {
     queryKey: ["snapshot"],
     queryFn: () => apiClient.getSnapshot(),
     enabled,
+    placeholderData: keepPreviousData,
     refetchOnWindowFocus: false,
     refetchInterval: enabled && pollMs !== null ? pollMs : false,
   });

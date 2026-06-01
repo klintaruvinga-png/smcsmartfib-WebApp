@@ -5736,6 +5736,14 @@ final class SMC_SuperFib_Sniper_REST {
             }
 
             $status = strtoupper((string) ($candidate['status'] ?? ''));
+            // INVARIANT: READY on the display board means backend-confirmed and executable.
+            // If the engine computed READY but backendConfirmed=false (e.g. brief PRICE_STALE
+            // or stale candles at snapshot time), demote to ARMED for board storage so the
+            // frontend never sees READY + unconfirmed blueprint.
+            if ($status === 'READY' && !(bool) ($signal['backendConfirmed'] ?? false)) {
+                $status = 'ARMED';
+                $candidate['status'] = 'ARMED';
+            }
             $quality_score = $this->compute_display_signal_quality_score($candidate, $signal);
             if ($status === 'READY' && $quality_score < 300) {
                 continue;
@@ -6099,7 +6107,7 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         $status = strtoupper((string) ($signal['status'] ?? ''));
-        if (!in_array($status, array('ARMED', 'READY'), true)) {
+        if (!in_array($status, array('ARMED', 'READY', 'WATCH'), true)) {
             return false;
         }
 
@@ -6157,7 +6165,7 @@ final class SMC_SuperFib_Sniper_REST {
             'confluence' => array_values($confluence),
             'verdict' => strtoupper((string) ($row['verdict'] ?? 'C')),
             'computedBy' => 'backend',
-            'backendConfirmed' => true,
+            'backendConfirmed' => strtoupper((string) ($row['status'] ?? '')) === 'READY',
             'engineBlocker' => $engine_blocker,
             'createdAt' => $this->to_iso((string) ($row['first_seen_at'] ?? '')),
             'qualityScore' => (float) ($row['quality_score'] ?? 0),
