@@ -5151,7 +5151,7 @@ final class SMC_SuperFib_Sniper_REST {
         $this->reconcile_live_signal_board(
             (int) $user_id,
             $symbols,
-            array(),
+            is_array($snapshot['signals'] ?? null) ? $snapshot['signals'] : array(),
             is_array($snapshot['diagnostics'] ?? null) ? $snapshot['diagnostics'] : array()
         );
         $board_size = $this->resolve_signal_board_size($user_id);
