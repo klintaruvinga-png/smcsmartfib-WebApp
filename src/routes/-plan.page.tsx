@@ -4,6 +4,7 @@ import {
   useLadders,
   useSnapshot,
   usePollingUiState,
+  normalizeSymbolForWatchlistComparison,
 } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { SettingsQueryErrorState } from "@/components/sniper/SettingsQueryErrorState";
@@ -64,7 +65,9 @@ export function PlanPage() {
     };
   });
 
-  const watchlistCandidates = candidatePool.filter(({ signal }) => watchlistSet.has(signal.symbol));
+  const watchlistCandidates = candidatePool.filter(({ signal }) =>
+    watchlistSet.has(normalizeSymbolForWatchlistComparison(signal.symbol)),
+  );
   const topCandidates = watchlistCandidates;
   const rankedWatchlistCandidates = watchlistCandidates;
   const divergentCount = topCandidates.filter(
@@ -220,12 +223,15 @@ export function PlanPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Signal Plans</h1>
           <p className="text-xs text-mute mt-0.5">
-            Showing {topCandidates.length} of {totalActiveSignals} backend-arbited active signal{totalActiveSignals === 1 ? "" : "s"}
+            Showing {topCandidates.length} of {totalActiveSignals} backend-arbited active signal
+            {totalActiveSignals === 1 ? "" : "s"}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           {totalActiveSignals > boardSize && (
-            <span className="text-xs text-mute">Showing {boardSize} of {totalActiveSignals}</span>
+            <span className="text-xs text-mute">
+              Showing {boardSize} of {totalActiveSignals}
+            </span>
           )}
           {[3, 5, 10].map((size) => (
             <button

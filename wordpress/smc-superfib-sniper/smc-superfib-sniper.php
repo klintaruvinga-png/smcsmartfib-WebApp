@@ -5149,13 +5149,24 @@ final class SMC_SuperFib_Sniper_REST {
         $symbols = is_array($snapshot['meta']['watchlist'] ?? null)
             ? $snapshot['meta']['watchlist']
             : ($settings['watchlist'] ?? array());
-        // Only freshly computed raw candidates may enter the promotion loop. Cached
-        // snapshots expose `signals` as the durable display-board projection, and
-        // replaying those rows can resurrect terminal signals during normal polling.
+        // Promote raw candidates even when another endpoint (for example
+        // /ladders) computed and cached the snapshot first. Cached `signals` are
+        // the durable display-board projection and must not be replayed as fresh
+        // promotion input, but `candidateSignals` is explicitly the raw engine
+        // candidate stream that feeds the board.
+        $promotion_candidates = array();
+        if (is_array($snapshot['candidateSignals'] ?? null)) {
+            $promotion_candidates = $snapshot['candidateSignals'];
+        } elseif ($snapshot_was_computed && is_array($snapshot['signals'] ?? null)) {
+            // Backward-compatible fallback for freshly computed legacy snapshots
+            // that predate the candidateSignals/display-board split.
+            $promotion_candidates = $snapshot['signals'];
+        }
+
         $this->reconcile_live_signal_board(
             (int) $user_id,
             $symbols,
-            $snapshot_was_computed && is_array($snapshot['candidateSignals'] ?? null) ? $snapshot['candidateSignals'] : array(),
+            $promotion_candidates,
             is_array($snapshot['diagnostics'] ?? null) ? $snapshot['diagnostics'] : array()
         );
         $board_size = $this->resolve_signal_board_size($user_id);
@@ -5597,6 +5608,7 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         $active_rows = $this->read_display_signal_rows($user_id, array_keys($watchlist_lookup), true);
+        $promotion_family_rows = $this->read_display_signal_rows($user_id, array_keys($watchlist_lookup), true, true);
         foreach ($signals as $signal) {
             if (!is_array($signal) || !$this->is_display_signal_eligible($signal, $watchlist_lookup)) {
                 continue;
@@ -5621,12 +5633,16 @@ final class SMC_SuperFib_Sniper_REST {
             }
 
             $family_key = $this->compute_signal_family_key($user_id, $candidate, $signal);
-            $existing_same_family = $this->find_display_row_by_family($active_rows, $family_key);
+            $existing_same_family = $this->find_display_row_by_family($promotion_family_rows, $family_key);
             if ($existing_same_family !== null) {
+                if ($this->is_terminal_display_lifecycle_state((string) ($existing_same_family['lifecycle_state'] ?? ''))) {
+                    continue;
+                }
                 $existing_score = (float) ($existing_same_family['quality_score'] ?? 0);
                 if ($quality_score >= $existing_score || ($quality_score - $existing_score) >= 50) {
                     $this->upsert_display_signal_row($user_id, $signal, $candidate, $family_key, $quality_score, $existing_same_family, $now);
                     $active_rows = $this->read_display_signal_rows($user_id, array_keys($watchlist_lookup), true);
+                    $promotion_family_rows = $this->read_display_signal_rows($user_id, array_keys($watchlist_lookup), true, true);
                 }
                 continue;
             }
@@ -5651,6 +5667,7 @@ final class SMC_SuperFib_Sniper_REST {
                 $this->transition_display_signal($user_id, $opposite_row, 'REPLACED', 'stronger_opposing_signal', $inserted_id, $now);
             }
             $active_rows = $this->read_display_signal_rows($user_id, array_keys($watchlist_lookup), true);
+            $promotion_family_rows = $this->read_display_signal_rows($user_id, array_keys($watchlist_lookup), true, true);
         }
     }
 
@@ -5810,7 +5827,7 @@ final class SMC_SuperFib_Sniper_REST {
         return round($score, 4);
     }
 
-    private function read_display_signal_rows(int $user_id, array $symbols, bool $include_terminal = false): array {
+    private function read_display_signal_rows(int $user_id, array $symbols, bool $include_terminal = false, bool $include_closed_terminal = false): array {
         global $wpdb;
         self::ensure_display_signals_table();
         $lookup = $this->normalize_symbol_lookup($symbols);
@@ -5821,6 +5838,9 @@ final class SMC_SuperFib_Sniper_REST {
         $allowed_states = $include_terminal
             ? array('DISPLAY_ACTIVE', 'STALE_HELD', 'ENTRY_HIT', 'FILLED_CONFIRMED')
             : array('DISPLAY_ACTIVE', 'STALE_HELD');
+        if ($include_closed_terminal) {
+            $allowed_states = array_merge($allowed_states, array('STOP_HIT', 'REPLACED', 'EXPIRED', 'INVALIDATED'));
+        }
         $out = array();
         foreach ((array) $rows as $row) {
             $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($row['symbol'] ?? '')));

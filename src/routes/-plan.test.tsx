@@ -8,6 +8,7 @@ import { mockPlan } from "@/mocks/sniperData";
 
 const hookMocks = vi.hoisted(() => ({
   useLiveSignals: vi.fn(),
+  useDisplaySignals: vi.fn(),
   useLadders: vi.fn(),
   useSnapshot: vi.fn(),
   useCanonicalWatchlist: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
 
 vi.mock("@/hooks/useSniperData", () => ({
   useLiveSignals: hookMocks.useLiveSignals,
+  useDisplaySignals: hookMocks.useDisplaySignals,
   useLadders: hookMocks.useLadders,
   useSnapshot: hookMocks.useSnapshot,
   useCanonicalWatchlist: hookMocks.useCanonicalWatchlist,
@@ -127,6 +129,14 @@ function renderPlanPage({
 }) {
   hookMocks.useLiveSignals.mockReturnValue({
     data: signals,
+    isLoading: false,
+  });
+  hookMocks.useDisplaySignals.mockReturnValue({
+    data: {
+      signals,
+      polledAt: "2026-05-14T08:00:00.000Z",
+      meta: { boardSize: 3, totalActive: signals.length },
+    },
     isLoading: false,
   });
   hookMocks.useLadders.mockReturnValue({
@@ -442,6 +452,19 @@ describe("PlanPage ranking and execution guards", () => {
     expect(
       screen.queryByText("Configure a backend URL in Account before loading signal plans."),
     ).toBeNull();
+  });
+
+  it("matches broker-suffixed signal symbols against the canonical watchlist", () => {
+    renderPlanPage({
+      signals: [buildSignal({ id: "sig-001", symbol: "GBPUSD.pro" as Symbol, verdict: "A+" })],
+      ladders: [buildPlan({ signalId: "sig-001", symbol: "GBPUSD" })],
+      watchlist: ["GBPUSD"],
+    });
+
+    const cards = getRenderedCards();
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.textContent).toContain("GBPUSD.pro");
+    expect(screen.queryByText("No active watchlist candidates found.")).toBeNull();
   });
 
   it("scopes rendered cards to the canonical watchlist", () => {
