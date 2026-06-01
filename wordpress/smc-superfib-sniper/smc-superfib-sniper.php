@@ -6675,6 +6675,7 @@ final class SMC_SuperFib_Sniper_REST {
         $spec = $this->get_instrument_spec($sym);
         $pip = $spec ? (float) $spec['pip_size'] : 0.0001;
         $pip_val = $spec ? $this->pip_value_per_standard_lot($user_id, $sym, $spec) : 10.0;
+        $is_reference_instrument = is_array($spec) && (($spec['type'] ?? '') === 'reference');
 
         // Compute swings for SL using the candles already fetched by build_symbol_state().
         if (count($candles) >= 35) {
@@ -6720,7 +6721,9 @@ final class SMC_SuperFib_Sniper_REST {
         // using the proven 20/30/50 family split without exceeding the family risk budget.
         $risk_alloc = array('e1' => 0.20, 'e2' => 0.30, 'e3' => 0.50);
         foreach (array('e1', 'e2', 'e3') as $stage) {
-            if (!$has_live_sizing_equity) {
+            if (!$has_live_sizing_equity || $is_reference_instrument) {
+                // Reference instruments (for example DXYUSD) may be watched for context,
+                // but they do not have executable lot sizing.
                 $lots[$stage] = 0.0;
                 continue;
             }
