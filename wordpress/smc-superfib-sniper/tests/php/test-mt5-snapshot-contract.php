@@ -1197,7 +1197,7 @@ assert_same($reducedWatchlistSnapshot, $cachedReplay, 'Unchanged watchlists must
 
 $displaySignalsTable = $wpdb->prefix . 'smc_sf_display_signals';
 unset($wpdb->tables[$displaySignalsTable]);
-$pollPromotionSnapshot = array(
+$cachedBoardReplaySnapshot = array(
     'prices' => array(
         array(
             'symbol' => 'EURUSD',
@@ -1213,7 +1213,7 @@ $pollPromotionSnapshot = array(
     'gates' => array(),
     'signals' => array(
         array(
-            'id' => 'sig-eurusd-poll-promote',
+            'id' => 'disp-eurusd-cached-board-row',
             'symbol' => 'EURUSD',
             'direction' => 'LONG',
             'status' => 'READY',
@@ -1233,7 +1233,7 @@ $pollPromotionSnapshot = array(
                 'sweep' => 'present',
                 'mss' => 'present',
                 'displacement' => 'clean',
-                'anchorSessionId' => 'poll-promotion-session',
+                'anchorSessionId' => 'cached-board-replay-session',
             ),
         ),
     ),
@@ -1251,23 +1251,21 @@ $pollPromotionSnapshot = array(
         'watchlist' => array('EURUSD'),
     ),
 );
-update_user_meta(7, 'smc_sf_engine_snapshot', $pollPromotionSnapshot);
+update_user_meta(7, 'smc_sf_engine_snapshot', $cachedBoardReplaySnapshot);
 $GLOBALS['test_rest_force_response'] = true;
-$pollPromotionFirstResponse = $instance->get_live_signals();
-$pollPromotionFirstPayload = $pollPromotionFirstResponse->get_data();
-$pollPromotionSecondResponse = $instance->get_live_signals();
-$pollPromotionSecondPayload = $pollPromotionSecondResponse->get_data();
+$cachedReplayFirstResponse = $instance->get_live_signals();
+$cachedReplayFirstPayload = $cachedReplayFirstResponse->get_data();
+$cachedReplaySecondResponse = $instance->get_live_signals();
+$cachedReplaySecondPayload = $cachedReplaySecondResponse->get_data();
 unset($GLOBALS['test_rest_force_response']);
-$pollPromotionFirstSignals = $pollPromotionFirstPayload['signals'] ?? array();
-$pollPromotionSecondSignals = $pollPromotionSecondPayload['signals'] ?? array();
-$pollPromotedRow = $wpdb->tables[$displaySignalsTable]['sig-eurusd-poll-promote'] ?? null;
-assert_same(1, count($pollPromotionFirstSignals), 'get_live_signals must promote eligible snapshot signals during normal polling when the display board is empty');
-assert_same(1, $pollPromotionFirstPayload['meta']['totalActive'] ?? null, 'get_live_signals must count poll-promoted display board rows');
-assert_true(is_array($pollPromotedRow), 'get_live_signals poll promotion must persist a display board row');
-assert_same('DISPLAY_ACTIVE', $pollPromotedRow['lifecycle_state'] ?? null, 'Poll-promoted display board rows must be active');
-assert_same('sig-eurusd-poll-promote', $pollPromotionFirstSignals[0]['id'] ?? null, 'Poll-promoted live signals must preserve the source signal id');
-assert_same(1, count($pollPromotionSecondSignals), 'Repeated get_live_signals polling must not duplicate poll-promoted board rows');
-assert_same($pollPromotionFirstSignals[0]['id'] ?? null, $pollPromotionSecondSignals[0]['id'] ?? null, 'Repeated get_live_signals polling must keep poll-promoted signal identity stable');
+$cachedReplayFirstSignals = $cachedReplayFirstPayload['signals'] ?? array();
+$cachedReplaySecondSignals = $cachedReplaySecondPayload['signals'] ?? array();
+$cachedReplayedRow = $wpdb->tables[$displaySignalsTable]['disp-eurusd-cached-board-row'] ?? null;
+assert_same(0, count($cachedReplayFirstSignals), 'get_live_signals must not replay cached display-board snapshot rows as fresh promotion candidates');
+assert_same(0, $cachedReplayFirstPayload['meta']['totalActive'] ?? null, 'get_live_signals must keep the live board empty when only cached display-board rows are available');
+assert_true($cachedReplayedRow === null, 'Cached display-board snapshot rows must not be persisted again as active rows');
+assert_same(0, count($cachedReplaySecondSignals), 'Repeated get_live_signals polling must continue to ignore cached display-board rows');
+assert_same(0, $cachedReplaySecondPayload['meta']['totalActive'] ?? null, 'Repeated get_live_signals polling must not accumulate cached display-board rows');
 
 $stableLiveSignalsSnapshot = array(
     'prices' => array(
