@@ -12,6 +12,7 @@ const reactQueryMocks = vi.hoisted(() => ({
 
 const apiMocks = vi.hoisted(() => ({
   getAccountTelemetry: vi.fn(),
+  getDisplaySignals: vi.fn(),
   getEngineHealth: vi.fn(),
   getLadders: vi.fn(),
   getLiveSignals: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("@/lib/api/sniperClient", () => ({
   apiClient: {
     getAccountTelemetry: apiMocks.getAccountTelemetry,
+    getDisplaySignals: apiMocks.getDisplaySignals,
     getEngineHealth: apiMocks.getEngineHealth,
     getLadders: apiMocks.getLadders,
     getLiveSignals: apiMocks.getLiveSignals,
@@ -62,6 +64,7 @@ describe("useEngineHealth", () => {
   beforeEach(() => {
     reactQueryMocks.useQuery.mockReset();
     apiMocks.getAccountTelemetry.mockReset();
+    apiMocks.getDisplaySignals.mockReset();
     apiMocks.getEngineHealth.mockReset();
     apiMocks.getLadders.mockReset();
     apiMocks.getLiveSignals.mockReset();
@@ -211,13 +214,14 @@ describe("useLiveSignals", () => {
     renderHook(() => useLiveSignals());
 
     expect(liveSignalsOptions).toMatchObject({
-      queryKey: ["live-signals"],
+      queryKey: ["live-signals", 3],
       enabled: true,
       staleTime: 0,
       structuralSharing: false,
       placeholderData: keepPreviousData,
       refetchInterval: 5_000,
     });
+    expect(liveSignalsOptions?.queryFn).toEqual(expect.any(Function));
   });
 });
 
