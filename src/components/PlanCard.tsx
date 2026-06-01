@@ -419,20 +419,6 @@ function MetaPill({ children, title }: { children: ReactNode; title?: string }) 
   );
 }
 
-function MetaTag({ children, mono = false }: { children: ReactNode; mono?: boolean }) {
-  return (
-    <span
-      className={cn(
-        "rounded border border-bd/50 bg-bg2/40 px-1.5 py-0.5 text-[10px] text-dim/80",
-        mono && "font-mono",
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
-function shortSignalId(id: string): string {
   // Strip "sig-" prefix and use last 4 chars uppercased for a memorable short ID
   const stripped = id.replace(/^sig-/i, "");
   return stripped.slice(-4).toUpperCase();
