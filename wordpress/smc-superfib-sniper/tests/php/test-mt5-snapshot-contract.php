@@ -832,6 +832,7 @@ $displaySignalsReadyProperty->setValue(null, false);
 unset($wpdb->schemas[$displaySignalsRuntimeTable], $wpdb->tables[$displaySignalsRuntimeTable]);
 assert_true(SMC_SuperFib_Sniper_REST::ensure_display_signals_table(), 'Runtime display_signals migration should succeed outside activation');
 assert_true(isset($wpdb->schemas[$displaySignalsRuntimeTable]['source_candidate_id']), 'Runtime display_signals migration must create the display board schema');
+assert_true(isset($wpdb->schemas[$displaySignalsRuntimeTable]['backend_confirmed']), 'Runtime display_signals migration must include backend_confirmed for display board upserts');
 
 $instance = new SMC_SuperFib_Sniper_REST();
 $instance->register_routes();
