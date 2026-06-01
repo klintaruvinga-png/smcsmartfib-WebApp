@@ -6662,6 +6662,11 @@ final class SMC_SuperFib_Sniper_REST {
         $telemetry = $this->read_account_telemetry((int) $user_id);
         $equity = (float) ($telemetry['equity'] ?? 0);
         $has_live_sizing_equity = ($telemetry['freshness'] ?? 'unavailable') === 'live' && $equity > 0;
+        // USC (micro-cent) accounts report equity 100× smaller than USD.
+        // Detect from telemetry currency and apply the inverse multiplier so pip_val
+        // (always expressed in USD) stays comparable to stage_risk.
+        $account_currency = strtoupper((string) ($telemetry['currency'] ?? ''));
+        $usc_to_usd_scale = ($account_currency === 'USC') ? 100.0 : 1.0;
         $risk_usc = $has_live_sizing_equity
             ? round($equity * ((float) $risk['perTradePct'] / 100), 2)
             : 0.0;
@@ -6722,7 +6727,10 @@ final class SMC_SuperFib_Sniper_REST {
             $stop_dist = max(abs($entries[$stage] - $stops[$stage]), $pip);
             $stop_pips = $stop_dist / $pip;
             $stage_risk = $risk_usc * $risk_alloc[$stage];
-            $raw_lots = $stage_risk / max($stop_pips * $pip_val, 0.01);
+            // Scale pip_val by usc_to_usd_scale so USC equity is comparable
+            // to a USD-denominated pip_val (metals, indices, crypto).
+            $pip_val_scaled = $pip_val * $usc_to_usd_scale;
+            $raw_lots = $stage_risk / max($stop_pips * $pip_val_scaled, 0.01);
             $stage_lot = floor($raw_lots * 100) / 100;
             $lots[$stage] = $stage_lot >= 0.01 ? round($stage_lot, 2) : 0.0;
         }
@@ -6922,6 +6930,12 @@ final class SMC_SuperFib_Sniper_REST {
             'WALLSTREET30'=> 'US30',    // "Wall Street 30" full stripped
             'DOW30'       => 'US30',
             'DJ30'        => 'US30',
+            // SPX500 / S&P 500 broker aliases
+            'USSP500'     => 'SPX500',  // "US SP 500" after space-strip
+            'USSP'        => 'SPX500',
+            'SPX500'      => 'SPX500',
+            'US500'       => 'SPX500',
+            'SP500'       => 'SPX500',
             // Metals
             'GOLD'        => 'XAUUSD',
             'SILVER'      => 'XAGUSD',
@@ -9063,6 +9077,11 @@ final class SMC_SuperFib_Sniper_REST {
             // INDICES — contract sizes vary by broker; defaults use $1/point/lot
             'US30'   => array('type' => 'index',  'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
             'NAS100' => array('type' => 'index',  'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
+            'SPX500' => array('type' => 'index',  'pip_size' => 0.1,    'contract_size' => 1, 'pip_val' => 0.1),
+            // MACRO / REFERENCE — no lot sizing; informational only
+            'DXYUSD' => array('type' => 'reference', 'pip_size' => 0.001, 'contract_size' => 0, 'pip_val' => 0.0),
+            // EXOTIC FOREX
+            'USDZAR' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
             // CRYPTO — contract sizes vary by broker; defaults use $1/point/lot
             'BTCUSD' => array('type' => 'crypto', 'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
             'ETHUSD' => array('type' => 'crypto', 'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),

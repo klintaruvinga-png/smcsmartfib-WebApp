@@ -113,6 +113,8 @@ public:
         AddKnownSymbol("UKOIL");
         // Macro / reference
         AddKnownSymbol("DXYUSD");   // US Dollar Index — present in EA Symbols (Deriv)
+        AddKnownSymbol("USDZAR");   // Exotic forex — present in EA shipped list
+        AddKnownSymbol("SPX500");   // S&P 500 — canonical alias for US SP 500
     }
 
     ~SymbolNormalizer() {}
