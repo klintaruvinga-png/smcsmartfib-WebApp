@@ -5581,6 +5581,60 @@ final class SMC_SuperFib_Sniper_REST {
         $this->reconcile_live_signal_board((int) $user_id, $symbols, $signals, $diagnostics);
         $display_signals = $this->read_live_signal_board((int) $user_id, $symbols, $this->resolve_signal_board_size((int) $user_id));
 
+        // CRITICAL: Rekey plan signalIds to match the display-board signal ids.
+        // build_trade_plan() sets signalId = raw engine signal['id'] (sig-HASH).
+        // When a signal is an UPDATE of an existing display_signals row, the display
+        // board returns the ORIGINAL sig-HASH (set at first insert), not the freshly
+        // computed one from the current engine run.
+        // The frontend matches: laddersBySignalId.get(signal.id) where signal.id is
+        // the display-board id. If the display row was promoted in a prior cycle its
+        // id is sig-OLD while the new plan has signalId = sig-NEW => no match => NO BLUEPRINT.
+        // Fix: after reconciliation, rekey each plan's signalId to the display-board
+        // signal id for the same symbol+direction so the frontend join always resolves.
+        $display_id_by_symbol_dir = array();
+        foreach ($display_signals as $ds) {
+            $ds_key = strtoupper((string) ($ds['symbol'] ?? '')) . '|' . strtoupper((string) ($ds['direction'] ?? ''));
+            if ($ds_key !== '|' && !empty($ds['id'])) {
+                $display_id_by_symbol_dir[$ds_key] = (string) $ds['id'];
+            }
+        }
+        $rekeyed_plan_ids = array();
+        foreach ($plans as &$plan) {
+            $plan_key = strtoupper((string) ($plan['symbol'] ?? '')) . '|' . strtoupper((string) ($plan['direction'] ?? ''));
+            if (isset($display_id_by_symbol_dir[$plan_key]) && $display_id_by_symbol_dir[$plan_key] !== '') {
+                $plan['signalId'] = $display_id_by_symbol_dir[$plan_key];
+                $rekeyed_plan_ids[$display_id_by_symbol_dir[$plan_key]] = true;
+            }
+        }
+        unset($plan);
+
+        // Diagnostic: READY + backendConfirmed must always have a blueprint after rekey.
+        // If the rekey still left a READY confirmed signal without a plan it means
+        // build_pending_or_confirmed_plan() returned null for a signal that should have
+        // produced a backend-blueprint. Log once per signal (throttled) — do not mask
+        // NO BLUEPRINT in the frontend.
+        foreach ($display_signals as $ds) {
+            $ds_status    = strtoupper((string) ($ds['status'] ?? ''));
+            $ds_confirmed = (bool) ($ds['backendConfirmed'] ?? false);
+            $ds_id        = (string) ($ds['id'] ?? '');
+
+            if ($ds_status === 'READY' && $ds_confirmed && $ds_id !== '' && !isset($rekeyed_plan_ids[$ds_id])) {
+                $log_key = 'smc_sf_ready_missing_blueprint_' . (int) $user_id . '_' . md5($ds_id);
+                if (!get_transient($log_key)) {
+                    error_log(sprintf(
+                        '[SMC_SF_SIGNAL_BOARD] ready_missing_blueprint user_id=%d symbol=%s direction=%s signalId=%s engineBlocker=%s entryPrice=%s',
+                        (int) $user_id,
+                        (string) ($ds['symbol'] ?? ''),
+                        (string) ($ds['direction'] ?? ''),
+                        $ds_id,
+                        (string) ($ds['engineBlocker'] ?? ''),
+                        isset($ds['entryPrice']) && is_numeric($ds['entryPrice']) ? (string) ($ds['entryPrice']) : 'missing'
+                    ));
+                    set_transient($log_key, 1, 300);
+                }
+            }
+        }
+
         $result = array(
             'regimes' => $regimes,
             'gates' => $gates,
