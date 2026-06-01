@@ -5733,7 +5733,18 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function armed_signal_confirmed(int $user_id, array $candidate, string $now): bool {
-        $key = 'smc_sf_armed_confirm_' . $user_id . '_' . md5($this->compute_signal_family_key($user_id, $candidate, array()));
+        // Use symbol+direction+fib_ratio+fib_family as the stable per-family key.
+        // Passing an empty signal array loses the anchorSessionId, collapsing all same-day
+        // ARMED signals for a symbol into a shared counter. Use a direct hash of the
+        // stable candidate fields instead.
+        $family_parts = array(
+            $user_id,
+            preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($candidate['symbol'] ?? ''))),
+            strtoupper((string) ($candidate['direction'] ?? '')),
+            (string) ($candidate['fib_family'] ?? 'backend'),
+            is_numeric($candidate['fib_ratio'] ?? null) ? number_format((float) $candidate['fib_ratio'], 4, '.', '') : 'na',
+        );
+        $key = 'smc_sf_armed_confirm_' . $user_id . '_' . md5(implode('|', $family_parts));
         $state = get_transient($key);
         $count = is_array($state) ? (int) ($state['count'] ?? 0) : 0;
         $count++;
@@ -5805,8 +5816,8 @@ final class SMC_SuperFib_Sniper_REST {
             $user_id
         ), ARRAY_A);
         $allowed_states = $include_terminal
-            ? array('DISPLAY_ACTIVE', 'STALE_HELD', 'ENTRY_HIT')
-            : array('DISPLAY_ACTIVE', 'STALE_HELD', 'ENTRY_HIT', 'FILLED_CONFIRMED');
+            ? array('DISPLAY_ACTIVE', 'STALE_HELD', 'ENTRY_HIT', 'FILLED_CONFIRMED')
+            : array('DISPLAY_ACTIVE', 'STALE_HELD');
         $out = array();
         foreach ((array) $rows as $row) {
             $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($row['symbol'] ?? '')));
