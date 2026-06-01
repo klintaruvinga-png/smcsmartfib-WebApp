@@ -471,6 +471,7 @@ final class SMC_SuperFib_Sniper_REST {
             first_seen_at DATETIME NOT NULL,
             last_confirmed_at DATETIME NOT NULL,
             last_evaluated_at DATETIME NOT NULL,
+            last_blueprint_at DATETIME DEFAULT NULL,
             expires_at DATETIME DEFAULT NULL,
             confluence LONGTEXT NOT NULL,
             engine LONGTEXT NOT NULL,
