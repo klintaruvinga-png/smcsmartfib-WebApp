@@ -112,7 +112,8 @@ export function PlanCandidateCard({
       )}
     >
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-0">
+          {/* Primary UI tags — what the user reads at a glance */}
           <div className="flex items-center gap-2 flex-wrap">
             <VerdictBadge verdict={signal.verdict} />
             <span className="font-mono text-lg font-semibold">{signal.symbol}</span>
@@ -125,20 +126,8 @@ export function PlanCandidateCard({
               <MetaPill>QS {Math.round(signal.qualityScore)}</MetaPill>
             )}
             <FreshnessBadge state={price?.state ?? "pending-sync"} />
-            <MetaPill>{signal.id}</MetaPill>
-            <MetaPill>{relTime(signal.createdAt)}</MetaPill>
-            <MetaPill>{signal.computedBy}</MetaPill>
-            {familyPill && <MetaPill>{familyPill}</MetaPill>}
-          </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {signal.confluence.slice(0, 4).map((item) => (
-              <span
-                key={item}
-                className="rounded border border-bd bg-bg2 px-2 py-0.5 text-[10px] font-mono text-dim"
-              >
-                {item}
-              </span>
-            ))}
+            <MetaPill title={signal.id}>#{shortSignalId(signal.id)}</MetaPill>
+            <span className="text-xs text-mute font-mono">{relTime(signal.createdAt)}</span>
           </div>
         </div>
 
@@ -229,68 +218,98 @@ export function PlanCandidateCard({
       )}
 
       {plan ? (
-        <div className="grid gap-3 xl:grid-cols-[1.8fr_1fr_1fr_1fr]">
-          <PlanSection title="Entries" tone="info">
-            <div className="grid grid-cols-[auto_repeat(4,minmax(0,1fr))] gap-x-2 gap-y-2 text-[10px] font-mono">
-              <SectionHeaderCell />
-              <SectionHeaderCell>Entry</SectionHeaderCell>
-              <SectionHeaderCell>Lot sizing</SectionHeaderCell>
-              <SectionHeaderCell>SL</SectionHeaderCell>
-              <SectionHeaderCell>TP</SectionHeaderCell>
-              {entryRows!.map((row) => (
-                <EntryRow key={row.stage} {...row} />
-              ))}
-            </div>
-          </PlanSection>
-
-          <PlanSection title="Targets" tone="buy">
-            <div className="space-y-2">
-              {targetRows!.map((target) => (
-                <StatRow
-                  key={target.label}
-                  label={target.label}
-                  value={target.price}
-                  sub={target.ratio}
-                  valueClass="text-buy"
-                />
-              ))}
-            </div>
-          </PlanSection>
-
-          <PlanSection title="Stop & Risk" tone="sell">
-            <div className="space-y-2">
-              <StatRow label="SL" value={fmtPrice(plan.sl, signal.symbol)} valueClass="text-sell" />
-              <StatRow
-                label="Risk"
-                value={fmtCurrency(plan.riskUSC, accountTelemetry?.currency)}
-                sub={fmtZAR(plan.riskZAR)}
-              />
-              <StatRow
-                label="DD impact"
-                value={fmtPct(plan.drawdownImpactPct)}
-                sub="of equity"
-                valueClass="text-warn"
-              />
-            </div>
-          </PlanSection>
-
-          {showLadderStatus && (
-            <PlanSection title="Ladder Status" tone="neutral">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-2 text-xs">
-                  <span className="font-mono uppercase tracking-wider text-mute">State</span>
-                  <span className="font-mono text-sm font-semibold">{plan.state ?? "--"}</span>
-                </div>
-                {plan.stageFills && (
-                  <div className="grid grid-cols-3 gap-2">
-                    <StageStatusChip label="E1" filled={plan.stageFills.e1} />
-                    <StageStatusChip label="E2" filled={plan.stageFills.e2} />
-                    <StageStatusChip label="E3" filled={plan.stageFills.e3} />
-                  </div>
-                )}
+        <div className="rounded-lg border border-bd bg-bg1/50 overflow-hidden">
+          <div className="grid gap-px bg-bd/60 xl:grid-cols-[1.8fr_1fr_1fr_1fr]">
+            <PlanPanel title="Entries" tone="info">
+              <div className="grid grid-cols-[auto_repeat(4,minmax(0,1fr))] gap-x-2 gap-y-2 text-[10px] font-mono">
+                <SectionHeaderCell />
+                <SectionHeaderCell>Entry</SectionHeaderCell>
+                <SectionHeaderCell>Lot sizing</SectionHeaderCell>
+                <SectionHeaderCell>SL</SectionHeaderCell>
+                <SectionHeaderCell>TP</SectionHeaderCell>
+                {entryRows!.map((row) => (
+                  <EntryRow key={row.stage} {...row} />
+                ))}
               </div>
-            </PlanSection>
-          )}
+            </PlanPanel>
+
+            <PlanPanel title="Targets" tone="buy">
+              <div className="space-y-2">
+                {targetRows!.map((target) => (
+                  <StatRow
+                    key={target.label}
+                    label={target.label}
+                    value={target.price}
+                    sub={target.ratio}
+                    valueClass="text-buy"
+                  />
+                ))}
+              </div>
+            </PlanPanel>
+
+            <PlanPanel title="Stop & Risk" tone="sell">
+              <div className="space-y-2">
+                <StatRow label="SL" value={fmtPrice(plan.sl, signal.symbol)} valueClass="text-sell" />
+                <StatRow
+                  label="Risk"
+                  value={fmtCurrency(plan.riskUSC, accountTelemetry?.currency)}
+                  sub={fmtZAR(plan.riskZAR)}
+                />
+                <StatRow
+                  label="DD impact"
+                  value={fmtPct(plan.drawdownImpactPct)}
+                  sub="of equity"
+                  valueClass="text-warn"
+                />
+              </div>
+            </PlanPanel>
+
+            {showLadderStatus && (
+              <PlanPanel title="Ladder Status" tone="neutral">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="font-mono uppercase tracking-wider text-mute">State</span>
+                    <span className="font-mono text-sm font-semibold">{plan.state ?? "--"}</span>
+                  </div>
+                  {plan.stageFills && (
+                    <div className="grid grid-cols-3 gap-2">
+                      <StageStatusChip label="E1" filled={plan.stageFills.e1} />
+                      <StageStatusChip label="E2" filled={plan.stageFills.e2} />
+                      <StageStatusChip label="E3" filled={plan.stageFills.e3} />
+                    </div>
+                  )}
+                </div>
+              </PlanPanel>
+            )}
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-bd bg-bg1/40 px-3 py-3">
+            <div className="text-[11px] text-mute">
+              Queues this ladder to <span className="font-mono text-dim">/user/execute-signals</span>.
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  const response = await apiClient.postExecuteSignals({ signalIds: [signal.id] });
+                  toast.success(
+                    `Queued ${response.queued} order${response.queued > 1 ? "s" : ""} for execution`,
+                  );
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Execution failed");
+                }
+              }}
+              disabled={!signal.backendConfirmed || !planComplete || !executableStageLots}
+              className={cn(
+                "inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors w-full sm:w-auto",
+                signal.backendConfirmed && planComplete && executableStageLots
+                  ? "bg-buy/15 border border-buy/50 text-buy hover:bg-buy/25"
+                  : "bg-bg2 border border-bd text-mute cursor-not-allowed",
+              )}
+            >
+              <Send className="h-4 w-4" />
+              Send to execution
+            </button>
+          </div>
         </div>
       ) : (
         <div className="rounded-lg border border-bd bg-bg1/40 px-4 py-5 space-y-2">
@@ -357,7 +376,7 @@ export function PlanCandidateCard({
   );
 }
 
-function PlanSection({
+function PlanPanel({
   title,
   tone,
   children,
@@ -368,16 +387,18 @@ function PlanSection({
 }) {
   const accent =
     tone === "buy"
-      ? "border-buy/30"
+      ? "text-buy/80"
       : tone === "sell"
-        ? "border-sell/30"
+        ? "text-sell/80"
         : tone === "info"
-          ? "border-info/30"
-          : "border-bd";
+          ? "text-info/80"
+          : "text-mute";
 
   return (
-    <div className={cn("rounded-lg border bg-bg1/50 p-3", accent)}>
-      <div className="mb-3 text-[11px] font-mono uppercase tracking-wider text-mute">{title}</div>
+    <div className="bg-bg1/50 p-3">
+      <div className={cn("mb-3 text-[11px] font-mono uppercase tracking-wider", accent)}>
+        {title}
+      </div>
       {children}
     </div>
   );
@@ -423,12 +444,21 @@ function StatusBadge({ status }: { status: SignalCandidate["status"] }) {
   );
 }
 
-function MetaPill({ children }: { children: ReactNode }) {
+function MetaPill({ children, title }: { children: ReactNode; title?: string }) {
   return (
-    <span className="rounded border border-bd bg-bg2 px-2 py-0.5 text-[10px] font-mono text-dim">
+    <span
+      title={title}
+      className="rounded border border-bd bg-bg2 px-2 py-0.5 text-[10px] font-mono text-dim"
+    >
       {children}
     </span>
   );
+}
+
+function shortSignalId(id: string): string {
+  // Strip "sig-" prefix and use last 4 chars uppercased for a memorable short ID
+  const stripped = id.replace(/^sig-/i, "");
+  return stripped.slice(-4).toUpperCase();
 }
 
 function MetaChip({
