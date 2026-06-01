@@ -412,13 +412,14 @@ if (!class_exists('TestWpdb')) {
         }
 
         public function get_results($query, $output = ARRAY_A) {
-            if (preg_match("/SELECT candle_time, open, high, low, close(?:, volume)?(?:, source)? FROM ([^ ]+) WHERE user_id = (\\d+) AND symbol = '([^']+)' AND timeframe = '([^']+)'(?: AND source = '([^']+)')? ORDER BY candle_time (ASC|DESC)/", $query, $m)) {
+            if (preg_match("/SELECT candle_time, open, high, low, close(?:, volume)?(?:, source)? FROM ([^ ]+) WHERE user_id = (\\d+) AND symbol = '([^']+)' AND timeframe = '([^']+)'(?: AND source = '([^']+)')? ORDER BY candle_time (ASC|DESC)(?: LIMIT (\\d+))?$/", $query, $m)) {
                 $table = $m[1];
                 $user_id = (int) $m[2];
                 $symbol = $m[3];
                 $timeframe = $m[4];
                 $source = isset($m[5]) && $m[5] !== '' ? $m[5] : null;
                 $direction = isset($m[6]) ? $m[6] : 'ASC';
+                $limit = isset($m[7]) && $m[7] !== '' ? (int) $m[7] : null;
                 $rows = array();
                 foreach ($this->tables[$table] ?? array() as $row) {
                     if ((int) $row['user_id'] !== $user_id || $row['symbol'] !== $symbol || $row['timeframe'] !== $timeframe) {
@@ -433,6 +434,9 @@ if (!class_exists('TestWpdb')) {
                     $cmp = strcmp($a['candle_time'], $b['candle_time']);
                     return $direction === 'DESC' ? -1 * $cmp : $cmp;
                 });
+                if ($limit !== null) {
+                    $rows = array_slice($rows, 0, $limit);
+                }
                 return $rows;
             }
             if (preg_match("/SELECT \\* FROM ([^ ]+) WHERE user_id = (\\d+)$/", $query, $m)) {
@@ -2067,16 +2071,26 @@ $wpdb->replace($snapshotTable, array(
 ));
 
 $currentWeekStart = strtotime('monday this week 12:00 UTC');
+$latestCompletedCandle = (int) (floor((time() - 900) / 900) * 900);
+$todayMidnight = (int) strtotime('today 00:00 UTC');
+$clampBeforeToday = $latestCompletedCandle >= $currentWeekStart;
+$clampedCurrentWeekCandles = 0;
+$isFirstClamped = false;
 $candleIndex = 0;
 for ($weekOffset = 5; $weekOffset >= 0; $weekOffset--) {
     for ($dayOffset = 0; $dayOffset < 5; $dayOffset++) {
         $timestamp = $currentWeekStart - ($weekOffset * 7 * 86400) + ($dayOffset * 86400);
-        if ($timestamp > time() - 900 || ($weekOffset === 0 && $dayOffset === 4)) {
-            $timestamp = time() - 900;
+        $isFirstClamped = false;
+        if ($timestamp > $latestCompletedCandle || ($weekOffset === 0 && $dayOffset === 4)) {
+            $timestamp = $clampBeforeToday
+                ? $todayMidnight - (($clampedCurrentWeekCandles + 1) * 900)
+                : $latestCompletedCandle - ($clampedCurrentWeekCandles * 900);
+            $isFirstClamped = ($clampedCurrentWeekCandles === 0);
+            $clampedCurrentWeekCandles++;
         }
         $isAuthorityWeek = $weekOffset === 3;
         $open = $candleIndex === 0 ? 1.0000 : 1.0900 + ($candleIndex * 0.0002);
-        $close = ($weekOffset === 0 && $dayOffset === 4) ? 1.1020 : $open + 0.0001;
+        $close = $isFirstClamped ? 1.1020 : $open + 0.0001;
         $wpdb->replace($candleTable, array(
             'user_id' => 7,
             'symbol' => $htfEquilibriumSymbol,
@@ -2093,6 +2107,13 @@ for ($weekOffset = 5; $weekOffset >= 0; $weekOffset--) {
         $candleIndex++;
     }
 }
+$aovCandleCount = 0;
+foreach ($wpdb->tables[$candleTable] ?? array() as $row) {
+    if (($row['symbol'] ?? null) === $htfEquilibriumSymbol && ($row['timeframe'] ?? null) === '15min') {
+        $aovCandleCount++;
+    }
+}
+assert_same(30, $aovCandleCount, 'AOV fixture must keep 30 unique candles after clamping future rows');
 
 $htfEquilibriumState = $buildSymbolState->invoke($instance, 7, $htfEquilibriumSymbol, array(
     'symbol' => $htfEquilibriumSymbol,
