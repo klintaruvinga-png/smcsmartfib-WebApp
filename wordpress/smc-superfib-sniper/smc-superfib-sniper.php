@@ -5163,6 +5163,17 @@ final class SMC_SuperFib_Sniper_REST {
             $promotion_candidates = $snapshot['signals'];
         }
 
+        if (empty($promotion_candidates)) {
+            error_log('[SMC_SF_SIGNAL_BOARD] promotion_empty ' . wp_json_encode(array(
+                'userId' => (int) $user_id,
+                'snapshotSource' => $snapshot_was_computed ? 'fresh' : 'cached',
+                'symbolCount' => count($symbols),
+                'diagnosticCount' => is_array($snapshot['diagnostics'] ?? null) ? count($snapshot['diagnostics']) : 0,
+                'hasCandidateSignals' => array_key_exists('candidateSignals', $snapshot),
+                'hasSignals' => array_key_exists('signals', $snapshot),
+            )));
+        }
+
         $this->reconcile_live_signal_board(
             (int) $user_id,
             $symbols,
@@ -5620,6 +5631,14 @@ final class SMC_SuperFib_Sniper_REST {
 
             $candidate = $this->hydrate_display_signal_candidate($user_id, $signal);
             if ($candidate === null) {
+                error_log('[SMC_SF_SIGNAL_BOARD] hydrate_drop ' . wp_json_encode(array(
+                    'userId' => (int) $user_id,
+                    'symbol' => $symbol,
+                    'direction' => strtoupper((string) ($signal['direction'] ?? '')),
+                    'status' => strtoupper((string) ($signal['status'] ?? '')),
+                    'entryPrice' => $signal['entryPrice'] ?? null,
+                    'engineBlocker' => strtoupper((string) ($signal['engineBlocker'] ?? 'UNKNOWN')),
+                )));
                 continue;
             }
 
@@ -5737,6 +5756,7 @@ final class SMC_SuperFib_Sniper_REST {
                 'entry_price' => $entry,
                 'sl_price' => isset($signal['slPrice']) && is_numeric($signal['slPrice']) ? (float) $signal['slPrice'] : null,
                 'tp_price' => isset($signal['tpPrice']) && is_numeric($signal['tpPrice']) ? (float) $signal['tpPrice'] : null,
+                'htf_bias' => (string) ($signal['engine']['htfBias'] ?? 'TRANSITIONAL'),
                 'fib_family' => (string) (($signal['engine']['firstReactionFamily'] ?? null) ?: 'backend'),
                 'fib_ratio' => null,
                 'confidence' => 0.0,
@@ -6370,6 +6390,9 @@ final class SMC_SuperFib_Sniper_REST {
             'symbol' => $symbol,
             'direction' => $direction,
             'status' => $status,
+            'entryPrice' => $entry_price,
+            'slPrice' => $stop_price,
+            'tpPrice' => $tp1_price,
             'confluence' => $confluence,
             'verdict' => $this->verdict($status, $confluence, $anchor_chop_caution),
             'computedBy' => 'backend',
