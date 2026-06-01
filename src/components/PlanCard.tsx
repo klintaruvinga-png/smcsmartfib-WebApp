@@ -123,27 +123,6 @@ export function PlanCandidateCard({
             <MetaPill title={signal.id}>#{shortSignalId(signal.id)}</MetaPill>
             <span className="text-xs text-mute font-mono">{relTime(signal.createdAt)}</span>
           </div>
-          {/* Meta / backend tags — collapsible, dimmer */}
-          <details className="group">
-            <summary className="cursor-pointer text-[10px] uppercase tracking-wide text-dim hover:text-mute select-none list-none flex items-center gap-1">
-              <span className="inline-block transition-transform group-open:rotate-90">›</span>
-              meta
-            </summary>
-            <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-              {typeof signal.qualityScore === "number" && (
-                <MetaTag>QS {Math.round(signal.qualityScore)}</MetaTag>
-              )}
-              {signal.lifecycleState && signal.lifecycleState !== "DISPLAY_ACTIVE" && (
-                <MetaTag>{signal.lifecycleState}</MetaTag>
-              )}
-              <MetaTag>{signal.computedBy}</MetaTag>
-              {familyPill && <MetaTag>{familyPill}</MetaTag>}
-              {signal.confluence.slice(0, 4).map((item) => (
-                <MetaTag key={item}>{item}</MetaTag>
-              ))}
-              <MetaTag mono>{signal.id}</MetaTag>
-            </div>
-          </details>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
