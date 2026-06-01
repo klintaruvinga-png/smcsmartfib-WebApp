@@ -5549,21 +5549,6 @@ final class SMC_SuperFib_Sniper_REST {
 
             if ($state['plan']) {
                 $plans[] = $state['plan'];
-                if (
-                    ($state['plan']['source'] ?? null) === 'backend-blueprint'
-                    && ($state['signal']['backendConfirmed'] ?? false) === true
-                ) {
-                    $wpdb->replace(
-                        $this->table('trade_plans'),
-                        array(
-                            'signal_id' => $state['plan']['signalId'],
-                            'user_id' => $user_id,
-                            'plan' => wp_json_encode($state['plan']),
-                            'updated_at' => $this->now_mysql(),
-                        ),
-                        array('%s', '%d', '%s', '%s')
-                    );
-                }
             }
         }
 
@@ -5607,6 +5592,33 @@ final class SMC_SuperFib_Sniper_REST {
             }
         }
         unset($plan);
+
+        // Persist only after display-board reconciliation so the database row uses the
+        // same signal id that the UI submits to post_execute_signals(). If an updated
+        // display-board row kept sig-OLD while the current engine signal is sig-NEW,
+        // this replace refreshes the executable plan under sig-OLD instead of leaving
+        // execution to miss the row or consume a stale sig-OLD blueprint.
+        foreach ($plans as $plan) {
+            if (($plan['source'] ?? null) !== 'backend-blueprint') {
+                continue;
+            }
+
+            $plan_signal_id = (string) ($plan['signalId'] ?? '');
+            if ($plan_signal_id === '') {
+                continue;
+            }
+
+            $wpdb->replace(
+                $this->table('trade_plans'),
+                array(
+                    'signal_id' => $plan_signal_id,
+                    'user_id' => $user_id,
+                    'plan' => wp_json_encode($plan),
+                    'updated_at' => $this->now_mysql(),
+                ),
+                array('%s', '%d', '%s', '%s')
+            );
+        }
 
         // Diagnostic: READY + backendConfirmed must always have a blueprint after rekey.
         // If the rekey still left a READY confirmed signal without a plan it means
