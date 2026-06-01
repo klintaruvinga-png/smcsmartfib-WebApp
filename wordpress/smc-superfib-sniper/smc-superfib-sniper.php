@@ -5733,16 +5733,16 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function armed_signal_confirmed(int $user_id, array $candidate, string $now): bool {
-        // Use symbol+direction+fib_ratio+fib_family as the stable per-family key.
-        // Passing an empty signal array loses the anchorSessionId, collapsing all same-day
-        // ARMED signals for a symbol into a shared counter. Use a direct hash of the
-        // stable candidate fields instead.
+        // Match the fallback anchor used by compute_signal_family_key() so each
+        // calendar-day display family gets an independent confirmation counter.
+        $anchor = date('Ymd', strtotime((string) ($candidate['created_at'] ?? $now)));
         $family_parts = array(
             $user_id,
             preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($candidate['symbol'] ?? ''))),
             strtoupper((string) ($candidate['direction'] ?? '')),
             (string) ($candidate['fib_family'] ?? 'backend'),
             is_numeric($candidate['fib_ratio'] ?? null) ? number_format((float) $candidate['fib_ratio'], 4, '.', '') : 'na',
+            $anchor,
         );
         $key = 'smc_sf_armed_confirm_' . $user_id . '_' . md5(implode('|', $family_parts));
         $state = get_transient($key);
