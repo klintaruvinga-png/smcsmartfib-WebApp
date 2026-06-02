@@ -4,7 +4,7 @@ SMC SuperFIB is a trading dashboard stack for SuperFIB signal review, backend-co
 
 ## Version tracks
 
-- Stack version: `v13.0.2`
+- Stack version: `v13.1.0`
 - Pine indicator version: `v13.1.3`
 
 The dashboard stack and the TradingView Pine indicator ship on separate version tracks. Pine is intentionally ahead and is not changed by this repository patch.

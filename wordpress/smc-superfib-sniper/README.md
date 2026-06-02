@@ -4,13 +4,13 @@ Install `smc-superfib-sniper.php` as a WordPress plugin on `trader.stokvelsociet
 
 ## Runtime contract
 
-- Plugin version: `13.0.2`
+- Plugin version: `13.1.0`
 - REST namespace: `/wp-json/sniper/v1`
 - Auth: logged-in WordPress user + `X-WP-Nonce`
 - Twelve Data key: submitted from the frontend, encrypted in WordPress, never returned by REST
 - Execution: queues backend-confirmed LTF SF ladder orders only; no broker placement in v1
 
-## v13.0.2 MT5 authority notes
+## v13.1.0 MT5 authority notes
 
 - MT5-live symbols are authoritative for price refresh and direct quote lookups; stale or non-MT5 prices are blocked instead of falling back to Twelve Data quotes.
 - Successful EA market-stream snapshot writes clear same-symbol TD quote-TTL and rate-limit transients, then write a lightweight `engine_runs` heartbeat so `/health` `backendSync` reflects live EA activity.

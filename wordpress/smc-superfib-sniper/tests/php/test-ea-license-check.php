@@ -43,7 +43,7 @@ $allowed = dispatch_ea_request($plugin, 'permission_ea_bridge', 'get_ea_license_
     'user_id' => 7,
     'account_id' => '12345678',
     'terminal_id' => 'MT5-DESKTOP-ABC',
-    'ea_version' => '13.0.3',
+    'ea_version' => '13.1.0',
 ), ea_bridge_headers());
 assert_true($allowed instanceof WP_REST_Response, 'License-check should return a REST response for valid requests.');
 assert_same(true, $allowed->data['ok'], 'License-check response must set ok=true.');
@@ -61,7 +61,7 @@ $query_request = new QueryParamOnlyWP_REST_Request(array(
     'user_id' => 7,
     'account_id' => '12345678',
     'terminal_id' => 'MT5-DESKTOP-ABC',
-    'ea_version' => '13.0.3',
+    'ea_version' => '13.1.0',
 ), ea_bridge_headers());
 $query_permission = $plugin->permission_ea_bridge($query_request);
 assert_same(true, $query_permission, 'License-check query-param user_id must pass auth without a JSON body.');
