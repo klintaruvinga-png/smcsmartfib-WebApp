@@ -251,7 +251,7 @@ Market-Stream Auth:
 - [x] **[MANUAL]** Historical runtime verification captured *(2026-05-27 — pre-correction evidence only; backend ingest confirmed `levels_written=96` before H4 was added)*
 - [x] **[MANUAL]** Redeploy the corrected H4 build and confirm backend ingest `levels_written=128` *(confirmed 2026-05-28; `XAUUSD` ingest logged at `15:14:35 UTC`)*
 - [ ] **[MANUAL]** Historical replay corpus (EURUSD + USDJPY + XAUUSD, 30-day, M15/H1/H4/D1)
-- [ ] **[MANUAL]** Live parity validator run — MT5 output vs. Pine reference snapshots
+- [x] **[MANUAL]** Live parity validator run — MT5 output vs. Pine reference snapshots (first paired-export run executed 2026-06-02; gate FAIL 40.89%; final gate remains open)
 - [ ] **[MANUAL]** Weekend gap + sparse data scenario validation
 
 ### Success Criteria
@@ -276,7 +276,7 @@ Market-Stream Auth:
 PHP Fixture Parity:        PASS (100%, 0.00000 delta max all 12 fixtures)
 Ingestion Contract Tests:  PASS (7/7; 128-row H4 contract enforced)
 Parity Validator Self-Test: PASS (synthetic no-input mode, 100%, 384/384 tuples)
-MT5 Live vs Pine Live:     PENDING (requires paired `mt5-levels.json` / `pine-levels.json` exports plus weekend-gap and sparse-data evidence)
+MT5 Live vs Pine Live:     PENDING (first paired-export run executed 2026-06-02; gate FAIL 40.89%; final gate remains open; weekend-gap and sparse-data evidence still required)
 ```
 
 ### Blockers
