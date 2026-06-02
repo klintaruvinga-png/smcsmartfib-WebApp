@@ -39,6 +39,23 @@ Verification results for Phase 2:
 - `php wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php`: PASS.
 - PHP test-file baseline gate: PASS against the accepted current baseline of 23 passing files and 2 known failing files (`test-mt5-snapshot-contract.php`, `test-progressive-lot-sizing.php`).
 
-## Phase 3–7
+## Phase 3 — CORS service extraction
 
-Not started in this patch. The next behavior-preserving extraction should target another low-reflection, self-contained service area and keep the same baseline gate expectation unless the two known failures are resolved separately.
+| file | change |
+|---|---|
+| `wordpress/smc-superfib-sniper/class-cors-service.php` | Added `SMC_SuperFib_Cors_Service` to own allowed-origin lookup, origin matching, allowed-header strings, CORS header emission, preflight handling, and origin consistency validation. |
+| `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | Requires the CORS service and keeps the original private static CORS helper methods as compatibility delegates for boot-time hooks and reflection-based regression tests. |
+| `reports/plugin-refactor-phase-summaries.md` | Recorded Phase 3 scope and verification status. |
+
+Verification results for Phase 3:
+
+- `php -l wordpress/smc-superfib-sniper/class-cors-service.php`: PASS.
+- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`: PASS.
+- `php wordpress/smc-superfib-sniper/tests/php/test-cors-regression.php`: PASS.
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-bridge-bootstrap.php`: PASS.
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php`: PASS.
+- PHP test-file baseline gate: PASS against the accepted current baseline of 23 passing files and 2 known failing files (`test-mt5-snapshot-contract.php`, `test-progressive-lot-sizing.php`).
+
+## Phase 4–7
+
+Not started in this patch. The next behavior-preserving extraction should target another self-contained service area and keep the same baseline gate expectation unless the two known failures are resolved separately.
