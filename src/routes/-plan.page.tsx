@@ -30,6 +30,15 @@ type RenderableCandidate = RankedCandidate & {
   hasPlan: true;
 };
 
+// Rank candidates: planComplete > hasPlan > no-plan; ties broken by original board position.
+function rankCandidates(candidates: RankedCandidate[]): RankedCandidate[] {
+  return [...candidates].sort((a, b) => {
+    if (a.planComplete !== b.planComplete) return a.planComplete ? -1 : 1;
+    if (a.hasPlan !== b.hasPlan) return a.hasPlan ? -1 : 1;
+    return a.originalIndex - b.originalIndex;
+  });
+}
+
 export function PlanPage() {
   const [boardSize, setBoardSize] = useState<3 | 5 | 10>(3);
   const { data: liveSignals, isLoading: signalsLoading } = useDisplaySignals(boardSize);
@@ -68,14 +77,37 @@ export function PlanPage() {
   const watchlistCandidates = candidatePool.filter(({ signal }) =>
     watchlistSet.has(normalizeSymbolForWatchlistComparison(signal.symbol)),
   );
-  const topCandidates = watchlistCandidates;
-  const rankedWatchlistCandidates = watchlistCandidates;
+  const rankedWatchlistCandidates = rankCandidates(watchlistCandidates);
+
+  // Global fallback: only act on the second call when the watchlist-scoped board is empty.
+  const needsGlobalFallback = rankedWatchlistCandidates.length === 0;
+  const { data: globalSignalsData, isLoading: globalSignalsLoading } = useDisplaySignals(
+    boardSize,
+    needsGlobalFallback ? 'global' : undefined,
+  );
+  const globalSignals = needsGlobalFallback ? (globalSignalsData?.signals ?? []) : [];
+  const uniqueGlobalSignals = deduplicateById(globalSignals);
+  const globalCandidatePool: RankedCandidate[] = uniqueGlobalSignals.map((signal, originalIndex) => {
+    const candidatePlan = laddersBySignalId.get(signal.id) ?? null;
+    return {
+      signal: { ...signal, backendConfirmed: false },
+      plan: candidatePlan,
+      hasPlan: candidatePlan !== null,
+      planComplete: false,
+      originalIndex,
+    };
+  });
+  const rankedGlobalCandidates = rankCandidates(globalCandidatePool);
+
+  const topCandidates =
+    rankedWatchlistCandidates.length > 0 ? rankedWatchlistCandidates.slice(0, boardSize) : [];
+  const isUsingGlobalFallback = rankedWatchlistCandidates.length === 0 && rankedGlobalCandidates.length > 0;
   const divergentCount = topCandidates.filter(
     ({ signal }) => signal.computedBy === "frontend" && !signal.backendConfirmed,
   ).length;
   const firstWatchlistCandidate = rankedWatchlistCandidates[0];
 
-  if (pendingSettingsLoad || signalsLoading || laddersLoading) {
+  if (pendingSettingsLoad || signalsLoading || laddersLoading || (needsGlobalFallback && globalSignalsLoading)) {
     return (
       <div className="flex items-center gap-2 text-mute text-sm">
         <Loader2 className="h-4 w-4 animate-spin" />
@@ -102,7 +134,7 @@ export function PlanPage() {
     );
   }
 
-  if (topCandidates.length === 0) {
+  if (topCandidates.length === 0 && !isUsingGlobalFallback) {
     const watchlistCandidateIds = watchlistCandidates.map(({ signal }) => signal.id);
     const blueprintIds = ladders?.map((ladder) => ladder.signalId) ?? [];
     const matchedWatchlistBlueprintCount = watchlistCandidateIds.filter((signalId) =>
@@ -222,10 +254,16 @@ export function PlanPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Signal Plans</h1>
-          <p className="text-xs text-mute mt-0.5">
-            Showing {topCandidates.length} of {totalActiveSignals} backend-arbited active signal
-            {totalActiveSignals === 1 ? "" : "s"}
-          </p>
+          {isUsingGlobalFallback ? (
+            <p className="text-xs text-warn mt-0.5">
+              No watchlist candidates — showing global board fallback (display only, no execution)
+            </p>
+          ) : (
+            <p className="text-xs text-mute mt-0.5">
+              Showing {topCandidates.length} of {totalActiveSignals} backend-arbited active signal
+              {totalActiveSignals === 1 ? "" : "s"}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           {totalActiveSignals > boardSize && (
@@ -257,7 +295,7 @@ export function PlanPage() {
       )}
 
       <div className="space-y-4">
-        {topCandidates.map((candidate) => (
+        {(isUsingGlobalFallback ? rankedGlobalCandidates.slice(0, boardSize) : topCandidates).map((candidate) => (
           <PlanCandidateCard
             key={candidate.signal.id}
             signal={candidate.signal}

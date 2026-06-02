@@ -5143,14 +5143,16 @@ final class SMC_SuperFib_Sniper_REST {
         return rest_ensure_response(array('ok' => true));
     }
 
-    public function get_live_signals() {
+    public function get_live_signals(WP_REST_Request $request = null) {
         $user_id = get_current_user_id();
         $snapshot_was_computed = false;
         $snapshot = $this->ensure_engine_snapshot($user_id, false, $snapshot_was_computed);
         $settings = $this->get_settings($user_id);
-        $symbols = is_array($snapshot['meta']['watchlist'] ?? null)
+        $watchlist_symbols = is_array($snapshot['meta']['watchlist'] ?? null)
             ? $snapshot['meta']['watchlist']
             : ($settings['watchlist'] ?? array());
+        $scope = $request ? sanitize_text_field((string) ($request->get_param('scope') ?? 'watchlist')) : 'watchlist';
+        $symbols = ($scope === 'global') ? array() : $watchlist_symbols;
         // Promote raw candidates even when another endpoint (for example
         // /ladders) computed and cached the snapshot first. Cached `signals` are
         // the durable display-board projection and must not be replayed as fresh
@@ -5204,17 +5206,20 @@ final class SMC_SuperFib_Sniper_REST {
 
         $this->reconcile_live_signal_board(
             (int) $user_id,
-            $symbols,
+            $watchlist_symbols,
             $promotion_candidates,
             is_array($snapshot['diagnostics'] ?? null) ? $snapshot['diagnostics'] : array()
         );
         $board_size = $this->resolve_signal_board_size($user_id);
+        // Count scope: global requests report the full board; watchlist requests report only
+        // the watchlist-scoped count so totalActive stays consistent with the signals returned.
+        $count_symbols = ($scope === 'global') ? array() : $watchlist_symbols;
         return $this->no_cache_response(array(
             'signals' => $this->read_live_signal_board((int) $user_id, $symbols, $board_size),
             'polledAt' => gmdate('c'),
             'meta' => array(
                 'boardSize' => $board_size,
-                'totalActive' => $this->count_live_signal_board((int) $user_id, $symbols),
+                'totalActive' => $this->count_live_signal_board((int) $user_id, $count_symbols),
             ),
         ));
     }

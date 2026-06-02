@@ -111,13 +111,13 @@ export function useSnapshot() {
   });
 }
 
-export function useDisplaySignals(boardSize: 3 | 5 | 10 = 3) {
+export function useDisplaySignals(boardSize: 3 | 5 | 10 = 3, scope?: 'watchlist' | 'global') {
   const { backendReady, pollMs } = usePollingQueryState();
   // CRITICAL: Only enable query when backend is ready AND pollMs is valid (not null).
   const enabled = backendReady && pollMs !== null;
   return useQuery({
-    queryKey: ["live-signals", boardSize],
-    queryFn: () => apiClient.getDisplaySignals(false, boardSize),
+    queryKey: ["live-signals", boardSize, scope ?? 'watchlist'],
+    queryFn: () => apiClient.getDisplaySignals(false, boardSize, scope),
     enabled,
     staleTime: 0,
     structuralSharing: false,
