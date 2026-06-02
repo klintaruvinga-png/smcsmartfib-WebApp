@@ -4,12 +4,13 @@
  *
  * Tests:
  *   1. Signal validator accepts { "signals": [...] } keyed payload  → gate=FAIL (NO_PINE)
- *   2. Signal validator accepts bare array payload
- *   3. MT5-only (NO_PINE) signal causes gate=FAIL
- *   4. Pine-only (NO_MT5) signal causes gate=FAIL
- *   5. Regime validator accepts { "regimes": [...] } keyed payload  → gate=FAIL (MISSING_COUNTERPART)
- *   6. Missing regime counterpart causes gate=FAIL
- *   7. Display schema SQL includes backend_confirmed column
+ *   2. Signal validator accepts EA { "candidates": [...] } payload
+ *   3. Signal validator accepts bare array payload
+ *   4. MT5-only (NO_PINE) signal causes gate=FAIL
+ *   5. Pine-only (NO_MT5) signal causes gate=FAIL
+ *   6. Regime validator accepts { "regimes": [...] } keyed payload  → gate=FAIL (MISSING_COUNTERPART)
+ *   7. Missing regime counterpart causes gate=FAIL
+ *   8. Display schema SQL includes backend_confirmed column
  */
 
 $pass = 0;
@@ -80,13 +81,20 @@ assert_eq('Signal validator: keyed JSON wrapper accepted (gate=FAIL on NO_PINE)'
 assert_eq('Signal validator: no_pine_counterpart=1', 1, $r['no_pine_counterpart'] ?? null);
 
 // ---------------------------------------------------------------------------
-// TEST 2: Signal validator bare array still works (matched, gate=PASS)
+// TEST 2: Signal validator accepts EA { "candidates": [...] } payload (matched, gate=PASS)
+// ---------------------------------------------------------------------------
+$r = run_signal_validator(['candidates' => [$mt5Signal]], [$pineSignal]);
+assert_eq('Signal validator: candidates wrapper accepted (gate=PASS)', 'PASS', $r['gate'] ?? null);
+assert_eq('Signal validator: candidates wrapper increments total_signals', 1, $r['total_signals'] ?? null);
+
+// ---------------------------------------------------------------------------
+// TEST 3: Signal validator bare array still works (matched, gate=PASS)
 // ---------------------------------------------------------------------------
 $r = run_signal_validator([$mt5Signal], [$pineSignal]);
 assert_eq('Signal validator: bare array accepted (gate=PASS)', 'PASS', $r['gate'] ?? null);
 
 // ---------------------------------------------------------------------------
-// TEST 3: MT5-only NO_PINE increments totalSignals and causes gate=FAIL
+// TEST 4: MT5-only NO_PINE increments totalSignals and causes gate=FAIL
 // ---------------------------------------------------------------------------
 $r = run_signal_validator(['signals' => [$mt5Signal]], ['signals' => []]);
 assert_eq('NO_PINE causes gate=FAIL', 'FAIL', $r['gate'] ?? null);
@@ -94,7 +102,7 @@ assert_eq('NO_PINE increments total_signals', 1, $r['total_signals'] ?? null);
 assert_eq('NO_PINE increments mismatches', 1, $r['mismatches'] ?? null);
 
 // ---------------------------------------------------------------------------
-// TEST 4: Pine-only NO_MT5 increments mismatches and causes gate=FAIL
+// TEST 5: Pine-only NO_MT5 increments mismatches and causes gate=FAIL
 // ---------------------------------------------------------------------------
 $r = run_signal_validator(['signals' => []], ['signals' => [$pineSignal]]);
 assert_eq('NO_MT5 causes gate=FAIL', 'FAIL', $r['gate'] ?? null);
@@ -109,18 +117,18 @@ $pineRegime = ['symbol' => 'EURUSD', 'htf_bias' => 'BULLISH', 'ltf_regime' => 'T
 $extraMt5 = ['symbol' => 'GBPUSD', 'htf_bias' => 'BEARISH', 'ltf_regime' => 'TREND_DOWN', 'chop_score' => 25.0];
 
 // ---------------------------------------------------------------------------
-// TEST 5: Regime validator accepts keyed { "regimes": [...] } and detects MISSING → gate=FAIL
+// TEST 6: Regime validator accepts keyed { "regimes": [...] } and detects MISSING → gate=FAIL
 // ---------------------------------------------------------------------------
 $r = run_regime_validator(['regimes' => [$mt5Regime, $extraMt5]], ['regimes' => [$pineRegime]]);
 assert_eq('Regime validator: keyed JSON wrapper accepted (gate=FAIL on MISSING_COUNTERPART)', 'FAIL', $r['gate'] ?? null);
 
 // ---------------------------------------------------------------------------
-// TEST 6: Missing regime counterpart increments criticalMismatches → gate=FAIL
+// TEST 7: Missing regime counterpart increments criticalMismatches → gate=FAIL
 // ---------------------------------------------------------------------------
 assert_eq('MISSING_COUNTERPART increments critical_mismatches_count', 1, $r['critical_mismatches_count'] ?? null);
 
 // ---------------------------------------------------------------------------
-// TEST 7: Display schema SQL includes backend_confirmed column
+// TEST 8: Display schema SQL includes backend_confirmed column
 // ---------------------------------------------------------------------------
 $pluginFile = __DIR__ . '/../wordpress/smc-superfib-sniper/smc-superfib-sniper.php';
 if (file_exists($pluginFile)) {

@@ -64,8 +64,10 @@ function readJsonInput(string $file, string $label): array
 
 function extractSignalRecords(array $data): array
 {
-    if (isset($data['signals']) && is_array($data['signals'])) {
-        return $data['signals'];
+    foreach (['signals', 'candidates'] as $recordsKey) {
+        if (isset($data[$recordsKey]) && is_array($data[$recordsKey])) {
+            return $data[$recordsKey];
+        }
     }
 
     return array_values($data) === $data ? $data : [];
@@ -75,7 +77,7 @@ $mt5Data = readJsonInput($mt5File, 'mt5');
 $pineData = readJsonInput($pineFile, 'pine');
 
 // Extract signal records (expected format: array of { id, symbol, direction, entry_price, ... })
-// Handles both keyed { "signals": [...] } and bare array payloads.
+// Handles keyed { "signals": [...] }, EA { "candidates": [...] }, and bare array payloads.
 $mt5Signals = extractSignalRecords($mt5Data);
 $pineSignals = extractSignalRecords($pineData);
 
