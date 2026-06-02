@@ -49,7 +49,26 @@ index 0000000..a6d63a9
 +
 +- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`: PASS (no syntax errors).
 +- `php -l wordpress/smc-superfib-sniper/class-market-data-service.php`: PASS (no syntax errors).
-+- `php wordpress/smc-superfib-sniper/tests/php/*.php`: 23 passing files, 2 failing files in this environment. Failures observed: `test-mt5-snapshot-contract.php` (`AOV_EQUILIBRIUM_ZONE` expected, `CANDLES_STALE` actual) and `test-progressive-lot-sizing.php` (GBPUSD e1 lot expected `0.28`, actual `0`).
++- PHP test-file baseline gate (runs every expanded test file; do not use `php wordpress/smc-superfib-sniper/tests/php/*.php` because PHP treats paths after the first file as script arguments):
++
++  ```bash
++  passed=0; failed=0; failed_files=(); \
++  expected_failed='test-mt5-snapshot-contract.php test-progressive-lot-sizing.php'; \
++  for file in wordpress/smc-superfib-sniper/tests/php/*.php; do \
++    if php "$file"; then \
++      passed=$((passed + 1)); \
++    else \
++      failed=$((failed + 1)); \
++      failed_files+=("$(basename "$file")"); \
++    fi; \
++  done; \
++  actual_failed="${failed_files[*]}"; \
++  printf 'PHP test files: %d passed, %d failed\n' "$passed" "$failed"; \
++  printf 'Failed files: %s\n' "${actual_failed:-none}"; \
++  test "$passed" -eq 23 && test "$failed" -eq 2 && test "$actual_failed" = "$expected_failed"
++  ```
++
++  Baseline result: 23 passing files, 2 failing files in this environment. Failures observed: `test-mt5-snapshot-contract.php` (`AOV_EQUILIBRIUM_ZONE` expected, `CANDLES_STALE` actual) and `test-progressive-lot-sizing.php` (GBPUSD e1 lot expected `0.28`, actual `0`).
 +
 +## REST namespace
 +
