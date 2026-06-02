@@ -3,8 +3,8 @@
 **Created**: 2026-05-27  
 **Updated**: 2026-06-01  
 **Phase**: 4 - Fib Engine Migration  
-**Status**: Live soak active; H4 runtime verified; synthetic validator PASS recorded; final paired-export gate pending  
-**Primary tracker**: `.github/migration-status.md`  
+**Status**: Live soak active; H4 runtime verified; synthetic validator PASS recorded; first paired-export validator run executed 2026-06-02; gate FAIL 40.89%; final paired-export gate pending
+**Primary tracker**: `.github/migration-status.md`
 **Companion log**: `.github/migration/phase-updates/phase4-live-soak-started-2026-05-27.md`  
 **Contract correction addendum**: `.github/migration/phase-updates/phase4-timeframe-contract-correction-2026-05-28.md`  
 **Operational testing runbook**: `.github/migration/PHASE4_OPERATIONAL_TESTING_RUNBOOK.md` (NEW)
@@ -79,7 +79,7 @@ php scripts/signal-parity-validator.php --mt5-file mt5-signals.json --pine-file 
 |--------|------|-------|--------|---------------------|-------------|
 | [ ] | **Export `mt5-levels.json`** for EURUSD/USDJPY/XAUUSD with all M15/H1/H4/D1 timeframes | Operator | By 2026-06-05 | `mt5-levels.json` with 384 rows (24 groups) | Phase 5 gate |
 | [ ] | **Capture `pine-levels.json`** at same UTC snapshot as MT5 export | Operator | Same session as MT5 export | `pine-levels.json` with 384 rows | Phase 5 gate |
-| [ ] | Run parity validator dry run on first matched snapshot set | Operator | After first paired export | `reports/phase4-gate.json` (paired-export run, not synthetic) | Phase 5 gate |
+| [x] | Run parity validator dry run on first matched snapshot set | Operator | 2026-06-02 | `reports/phase4-gate.json` (first paired-export run; FAIL 40.89%) | Phase 5 gate |
 | [ ] | **Weekend gap scenario verification** (Test 1: Fri EOD → Mon US open) | Operator | 2026-06-01/06-03 (this weekend) | Snapshots + notes (see runbook for checklist) | Phase 4 gate closure |
 | [ ] | **Sparse-data scenario verification** (Test 2: illiquid session simulation) | Operator | During next illiquid session | Snapshots + backend logs (see runbook for checklist) | Phase 4 gate closure |
 | [ ] | Weekly soak checkpoint snapshot #1 | Operator | 2026-06-03 09:00:02 SAST | Admin export + notes | Monitoring |

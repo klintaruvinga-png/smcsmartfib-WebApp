@@ -6,6 +6,13 @@ and the permanent guard installed to prevent recurrence. New entries are prepend
 
 ---
 
+## [2026-06-02] Phase 4 live paired-export parity run completed; gate FAIL 40.89%
+
+- **Update:** Fresh `pine-levels.json` was copied into `reports/phase4-parity/pine-levels.json`; both `reports/phase4-parity/mt5-levels.json` and `reports/phase4-parity/pine-levels.json` contain 384 rows.
+- **Result:** The first paired MT5 vs Pine parity validator run produced `reports/phase4-gate.json` with `gate=FAIL`, `overall_parity_pct=40.89`, and `critical_mismatches_count=227`.
+- **Next action:** Investigate the MT5/Pine pricing drift in the live export set; preserve the failed gate artifact and continue capturing weekend-gap and sparse-data evidence before the final Phase 4 gate.
+- **Note:** This is the first live paired-export gate attempt, separate from the earlier synthetic validator self-test.
+
 ## [2026-05-30] Phase 4 live soak status confirmed; next manual gate action identified
 
 - **Update:** Phase 4 Fib Engine Migration is actively soaking on live MT5, with `Phase-4-Implementation` deployed and the 30-day corpus accumulation window open. T0 admin baseline capture is complete, and corrected H4 runtime ingest verification is confirmed.

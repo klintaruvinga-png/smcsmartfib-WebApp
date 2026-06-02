@@ -122,6 +122,7 @@ $directionMatches = 0;
 $exactEntries = 0;
 $driftEntries = 0;
 $mismatches = 0;
+$noMt5Counterpart = 0;
 $noPineCounterpart = 0;
 $noMt5Counterpart = 0;
 $totalSignals = 0;
@@ -133,8 +134,9 @@ foreach ($allKeys as $key) {
     $pineBatch = $pineIndex[$key] ?? [];
 
     if (empty($mt5Batch)) {
-        $noMt5Counterpart += count($pineBatch);
-        $mismatches += count($pineBatch);
+        $unmatchedCount = count($pineBatch);
+        $noMt5Counterpart += $unmatchedCount;
+        $mismatches += $unmatchedCount;
         foreach ($pineBatch as $signal) {
             $matches[] = [
                 'symbol' => $signal['symbol'],
@@ -147,9 +149,10 @@ foreach ($allKeys as $key) {
     }
 
     if (empty($pineBatch)) {
-        $noPineCounterpart += count($mt5Batch);
-        $mismatches += count($mt5Batch);
-        $totalSignals += count($mt5Batch);
+        $unmatchedCount = count($mt5Batch);
+        $noPineCounterpart += $unmatchedCount;
+        $mismatches += $unmatchedCount;
+        $totalSignals += $unmatchedCount;
         foreach ($mt5Batch as $signal) {
             $matches[] = [
                 'symbol' => $signal['symbol'],
@@ -254,6 +257,7 @@ $report = [
     'exact_entries' => $exactEntries,
     'drift_entries' => $driftEntries,
     'mismatches' => $mismatches,
+    'no_mt5_counterpart' => $noMt5Counterpart,
     'no_pine_counterpart' => $noPineCounterpart,
     'no_mt5_counterpart' => $noMt5Counterpart,
     'gate_criteria' => [
