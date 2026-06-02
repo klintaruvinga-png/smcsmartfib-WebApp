@@ -28,7 +28,7 @@ $payload = array(
     'leverage' => 500,
     'trade_allowed' => true,
     'connected' => true,
-    'ea_version' => '13.0.3',
+    'ea_version' => '13.1.0',
     'terminal_build' => '4150',
     'timestamp' => '2026-05-13T10:05:00Z',
 );
@@ -52,7 +52,7 @@ assert_same('USD', $record['currency'] ?? null, 'Account-sync must preserve curr
 assert_same(500, $record['leverage'] ?? null, 'Account-sync must preserve leverage.');
 assert_same(true, $record['trade_allowed'] ?? null, 'Account-sync must preserve trade_allowed.');
 assert_same(true, $record['connected'] ?? null, 'Account-sync must preserve connected.');
-assert_same('13.0.3', $record['ea_version'] ?? null, 'Account-sync must preserve ea_version.');
+assert_same('13.1.0', $record['ea_version'] ?? null, 'Account-sync must preserve ea_version.');
 assert_true(is_array($record['raw_json'] ?? null), 'Account-sync must preserve the raw payload inside raw_json.');
 
 $after_engine_runs = count($wpdb->tables['wp_smc_sf_engine_runs'] ?? array());
