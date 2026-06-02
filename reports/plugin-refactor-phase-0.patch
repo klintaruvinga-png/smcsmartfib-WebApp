@@ -1,0 +1,981 @@
+diff --git a/reports/plugin-refactor-blast-radius.md b/reports/plugin-refactor-blast-radius.md
+new file mode 100644
+index 0000000..895c2b3
+--- /dev/null
++++ b/reports/plugin-refactor-blast-radius.md
+@@ -0,0 +1,31 @@
++# SMC SuperFIB Plugin Refactor Blast Radius (Phase 0)
++
++Reflection-coupling inventory captured before PHP code movement. Levels are based on explicit Reflection API usage and number of reflected methods in each test file.
++
++| test file | coupling level | reflection API hits | reflected methods detected |
++|---|---|---:|---|
++| `fib-test-helpers.php` | **medium** | 4 | — |
++| `phase3_mt5_simulation_test.php` | **none** | 0 | — |
++| `test-cors-regression.php` | **high** | 9 | `get_allowed_origins`, `get_cors_allowed_headers`, `is_allowed_origin`, `validate_cors_origins_consistency` |
++| `test-dxy-reference-lot-sizing.php` | **none** | 0 | — |
++| `test-ea-account-sync.php` | **none** | 0 | — |
++| `test-ea-bridge-bootstrap.php` | **none** | 0 | — |
++| `test-ea-heartbeat.php` | **none** | 0 | — |
++| `test-ea-license-check.php` | **none** | 0 | — |
++| `test-ea-market-stream.php` | **none** | 0 | — |
++| `test-ea-symbol-sync.php` | **none** | 0 | — |
++| `test-execute-signals-stage-lots.php` | **none** | 0 | — |
++| `test-fib-ingestion.php` | **high** | 5 | `get_market_data_fib_levels`, `post_ea_fib_levels` |
++| `test-fib-parity.php` | **none** | 0 | — |
++| `test-get-soak-report.php` | **none** | 0 | — |
++| `test-htf-authority-anchor.php` | **none** | 0 | — |
++| `test-market-data-service-source-filter.php` | **none** | 0 | — |
++| `test-mt5-snapshot-contract.php` | **high** | 29 | `apply_closed_session_price_states`, `armed_signal_confirmed`, `build_symbol_state`, `compute_signal_family_key`, `determine_engine_blocker`, `ensure_engine_snapshot`, `fetch_candles`, `fetch_quote`, `get_cached_price`, `latest_timestamp`, `normalize_market_timestamp`, `reconcile_live_signal_board`, `run_engine_for_symbols`, `upsert_display_signal_row` |
++| `test-phase2-trade-telemetry.php` | **medium** | 2 | — |
++| `test-pip-value-parity.php` | **high** | 5 | `get_instrument_spec`, `pip_value_from_market` |
++| `test-progressive-lot-sizing.php` | **none** | 0 | — |
++| `test-rest-bootstrap-settings.php` | **none** | 0 | — |
++| `test-session-anchors.php` | **none** | 0 | — |
++| `test-settings-risk-fallbacks.php` | **high** | 7 | `float_between`, `int_between`, `sanitize_risk_allocation` |
++| `test-superfib-weighting.php` | **none** | 0 | — |
++| `test-watchlist-snapshot-regression.php` | **high** | 13 | `delete_engine_snapshot`, `get_settings`, `is_engine_snapshot_current`, `is_supported_symbol`, `sanitize_symbols`, `save_watchlist` |
+diff --git a/reports/plugin-refactor-inventory.md b/reports/plugin-refactor-inventory.md
+new file mode 100644
+index 0000000..a6d63a9
+--- /dev/null
++++ b/reports/plugin-refactor-inventory.md
+@@ -0,0 +1,920 @@
++# SMC SuperFIB Plugin Refactor Inventory (Phase 0)
++
++Generated before PHP code movement. Source files inspected: `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` and `class-market-data-service.php`.
++
++## Baseline syntax and test gate
++
++- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`: PASS (no syntax errors).
++- `php -l wordpress/smc-superfib-sniper/class-market-data-service.php`: PASS (no syntax errors).
++- `php wordpress/smc-superfib-sniper/tests/php/*.php`: 23 passing files, 2 failing files in this environment. Failures observed: `test-mt5-snapshot-contract.php` (`AOV_EQUILIBRIUM_ZONE` expected, `CANDLES_STALE` actual) and `test-progressive-lot-sizing.php` (GBPUSD e1 lot expected `0.28`, actual `0`).
++
++## REST namespace
++
++- `sniper/v1` (declared as `NAMESPACE`).
++
++## REST routes (62)
++
++| line | path | methods expression | callback | permission callback |
++|---:|---|---|---|---|
++| 972 | `/health` | `WP_REST_Server::READABLE` | `get_health` | `__return_true` |
++| 973 | `/admin/health` | `WP_REST_Server::READABLE` | `get_admin_health` | `permission_admin` |
++| 978 | `/admin/soak-report` | `WP_REST_Server::READABLE` | `get_soak_report` | `permission_admin` |
++| 983 | `/admin/soak-evidence` | `WP_REST_Server::CREATABLE` | `upsert_soak_evidence` | `permission_admin` |
++| 988 | `/admin/soak-checkpoint` | `WP_REST_Server::CREATABLE` | `create_soak_checkpoint` | `permission_admin` |
++| 993 | `/admin/soak-reset` | `WP_REST_Server::DELETABLE` | `reset_soak` | `permission_admin` |
++| 998 | `/session` | `WP_REST_Server::READABLE` | `get_session` | `__return_true` |
++| 999 | `/snapshot` | `WP_REST_Server::READABLE` | `get_snapshot` | `permission_user` |
++| 1000 | `/snapshot` | `WP_REST_Server::CREATABLE` | `post_snapshot` | `permission_user` |
++| 1001 | `/charts` | `WP_REST_Server::READABLE` | `get_chart_snapshot` | `permission_user` |
++| 1002 | `/regimes` | `WP_REST_Server::READABLE` | `get_regimes` | `permission_user` |
++| 1003 | `/regime` | `WP_REST_Server::CREATABLE` | `post_regime` | `permission_user` |
++| 1004 | `/live-signals` | `WP_REST_Server::READABLE` | `get_live_signals` | `permission_user` |
++| 1005 | `/signal` | `WP_REST_Server::CREATABLE` | `post_signal` | `permission_user` |
++| 1006 | `/ladders` | `WP_REST_Server::READABLE` | `get_ladders` | `permission_user` |
++| 1008 | `/user/engine-batch` | `WP_REST_Server::CREATABLE` | `post_engine_batch` | `permission_user` |
++| 1009 | `/user/market-data` | `WP_REST_Server::CREATABLE` | `post_user_market_data` | `permission_user` |
++| 1010 | `/user/trades` | `WP_REST_Server::READABLE` | `get_user_trades` | `permission_user` |
++| 1011 | `/user/trades` | `WP_REST_Server::CREATABLE` | `post_user_trades` | `permission_user` |
++| 1012 | `/user/account` | `WP_REST_Server::READABLE` | `get_user_account` | `permission_user` |
++| 1013 | `/user/account` | `WP_REST_Server::CREATABLE` | `post_user_account` | `permission_user` |
++| 1014 | `/user/progress` | `WP_REST_Server::READABLE` | `get_user_progress` | `permission_user` |
++| 1015 | `/user/settings` | `WP_REST_Server::READABLE` | `get_user_settings` | `permission_user` |
++| 1016 | `/user/settings` | `WP_REST_Server::CREATABLE` | `post_user_settings` | `permission_user` |
++| 1017 | `/user/risk-profile` | `WP_REST_Server::READABLE` | `get_user_risk_profile` | `permission_user` |
++| 1018 | `/user/risk-profile` | `WP_REST_Server::CREATABLE` | `post_user_risk_profile` | `permission_user` |
++| 1019 | `/user/trade-queue` | `WP_REST_Server::READABLE` | `get_user_trade_queue` | `permission_user` |
++| 1020 | `/user/trade-queue` | `WP_REST_Server::CREATABLE` | `post_user_trade_queue` | `permission_user` |
++| 1021 | `/user/execute-signals` | `WP_REST_Server::CREATABLE` | `post_execute_signals` | `permission_user` |
++| 1022 | `/user/twelve-data-key` | `WP_REST_Server::CREATABLE` | `post_twelve_data_key` | `permission_user` |
++| 1023 | `/user/twelve-data-key` | `WP_REST_Server::DELETABLE` | `delete_twelve_data_key` | `permission_user` |
++| 1024 | `/user/watchlist` | `WP_REST_Server::READABLE` | `get_user_watchlist` | `permission_user` |
++| 1025 | `/user/watchlist` | `WP_REST_Server::CREATABLE` | `post_user_watchlist` | `permission_user` |
++| 1026 | `/user/watchlist/add` | `WP_REST_Server::CREATABLE` | `post_watchlist_add` | `permission_user` |
++| 1027 | `/user/watchlist/remove` | `WP_REST_Server::CREATABLE` | `post_watchlist_remove` | `permission_user` |
++| 1028 | `/instruments` | `WP_REST_Server::READABLE` | `get_instruments` | `permission_user` |
++| 1029 | `/account-telemetry` | `WP_REST_Server::READABLE` | `get_account_telemetry` | `permission_user` |
++| 1030 | `/positions` | `WP_REST_Server::READABLE` | `get_positions` | `permission_user` |
++| 1031 | `/orders` | `WP_REST_Server::READABLE` | `get_orders` | `permission_user` |
++| 1032 | `/market-data-authority` | `WP_REST_Server::READABLE` | `get_market_data_authority` | `permission_user` |
++| 1033 | `/authority-diagnostics` | `WP_REST_Server::READABLE` | `get_authority_diagnostics` | `permission_user` |
++| 1036 | `/ea/market-stream` | `WP_REST_Server::CREATABLE` | `post_ea_market_stream` | `permission_ea_market_stream` |
++| 1041 | `/ea/heartbeat` | `WP_REST_Server::CREATABLE` | `post_ea_heartbeat` | `permission_ea_bridge` |
++| 1046 | `/ea/account-sync` | `WP_REST_Server::CREATABLE` | `post_ea_account_sync` | `permission_ea_bridge` |
++| 1051 | `/ea/symbol-sync` | `WP_REST_Server::CREATABLE` | `post_ea_symbol_sync` | `permission_ea_bridge` |
++| 1056 | `/ea/license-check` | `WP_REST_Server::READABLE` | `get_ea_license_check` | `permission_ea_bridge` |
++| 1063 | `/ea/fib-levels` | `WP_REST_Server::CREATABLE` | `post_ea_fib_levels` | `permission_ea_bridge` |
++| 1070 | `/market-data/fib-levels` | `WP_REST_Server::READABLE` | `get_market_data_fib_levels` | `permission_user` |
++| 1077 | `/ea/regime-snapshot` | `WP_REST_Server::CREATABLE` | `post_ea_regime_snapshot` | `permission_ea_bridge` |
++| 1084 | `/market-data/regime` | `WP_REST_Server::READABLE` | `get_market_data_regime` | `permission_user` |
++| 1091 | `/fundamentals/refresh` | `WP_REST_Server::CREATABLE` | `post_fundamentals_refresh` | `permission_user` |
++| 1098 | `/fundamentals/bias` | `WP_REST_Server::READABLE` | `get_fundamentals_bias` | `permission_user` |
++| 1105 | `/ea/signal-candidates` | `WP_REST_Server::CREATABLE` | `post_ea_signal_candidates` | `permission_ea_bridge` |
++| 1112 | `/market-data/signal-drift` | `WP_REST_Server::READABLE` | `get_market_data_signal_drift` | `permission_user` |
++| 1119 | `/ea/execution-queue` | `WP_REST_Server::READABLE` | `get_ea_execution_queue` | `permission_ea_bridge` |
++| 1126 | `/ea/execution-ack` | `WP_REST_Server::CREATABLE` | `post_ea_execution_ack` | `permission_ea_bridge` |
++| 1133 | `/user/execution-request` | `WP_REST_Server::CREATABLE` | `post_user_execution_request` | `permission_user` |
++| 1140 | `/user/execution-audit` | `WP_REST_Server::READABLE` | `get_user_execution_audit` | `permission_user` |
++| 1147 | `/user/approval-queue` | `WP_REST_Server::READABLE` | `get_user_approval_queue` | `permission_user` |
++| 1152 | `/user/approval-queue/review` | `WP_REST_Server::CREATABLE` | `post_approval_queue_review` | `permission_user` |
++| 1159 | `/user/license` | `WP_REST_Server::READABLE` | `get_user_license` | `permission_user` |
++| 1164 | `/admin/license/set-tier` | `WP_REST_Server::CREATABLE` | `post_admin_set_license_tier` | `permission_admin` |
++
++## Class methods in monolith
++
++| line | visibility | method |
++|---:|---|---|
++| 32 | `public` | `boot` |
++| 112 | `public` | `add_twicehourly_cron_schedule` |
++| 124 | `public` | `cron_refresh_fundamentals` |
++| 141 | `public` | `enqueue_rest_api_settings` |
++| 169 | `public` | `prune_old_table_rows` |
++| 184 | `public` | `deactivate` |
++| 190 | `public` | `activate` |
++| 447 | `private` | `get_display_signals_table_sql` |
++| 485 | `public` | `ensure_display_signals_table` |
++| 514 | `private` | `ensure_bridge_tables` |
++| 574 | `private` | `ensure_trade_telemetry_tables` |
++| 685 | `private` | `get_regime_snapshots_table_sql` |
++| 707 | `private` | `ensure_regime_snapshots_table` |
++| 731 | `private` | `ensure_soak_tables` |
++| 970 | `public` | `register_routes` |
++| 1170 | `private` | `route` |
++| 1178 | `public` | `permission_user` |
++| 1200 | `public` | `permission_admin` |
++| 1236 | `public` | `permission_ea_market_stream` |
++| 1240 | `public` | `permission_ea_bridge` |
++| 1291 | `private` | `get_ea_api_key` |
++| 1310 | `private` | `ea_request_value` |
++| 1319 | `private` | `resolve_ea_user_id` |
++| 1333 | `private` | `is_allowed_origin` |
++| 1355 | `private` | `get_allowed_origins` |
++| 1365 | `private` | `get_cors_allowed_headers` |
++| 1369 | `private` | `send_cors_headers_for_origin` |
++| 1378 | `private` | `handle_options_preflight_request` |
++| 1399 | `private` | `validate_cors_origins_consistency` |
++| 1417 | `public` | `get_session` |
++| 1451 | `public` | `get_health` |
++| 1474 | `public` | `get_admin_health` |
++| 1478 | `public` | `get_soak_report` |
++| 1673 | `public` | `upsert_soak_evidence` |
++| 1765 | `public` | `create_soak_checkpoint` |
++| 1865 | `public` | `reset_soak` |
++| 1892 | `private` | `build_health_payload` |
++| 2041 | `public` | `get_user_settings` |
++| 2047 | `public` | `post_user_settings` |
++| 2098 | `public` | `post_twelve_data_key` |
++| 2144 | `public` | `delete_twelve_data_key` |
++| 2152 | `public` | `get_instruments` |
++| 2156 | `public` | `get_user_watchlist` |
++| 2165 | `public` | `post_user_watchlist` |
++| 2178 | `public` | `post_watchlist_add` |
++| 2207 | `public` | `post_watchlist_remove` |
++| 2233 | `public` | `get_user_risk_profile` |
++| 2237 | `public` | `post_user_risk_profile` |
++| 2286 | `public` | `get_snapshot` |
++| 2294 | `public` | `post_snapshot` |
++| 2444 | `private` | `normalize_snapshot_payload_compat` |
++| 2484 | `private` | `normalize_phase3_market_stream_payload` |
++| 2529 | `private` | `has_any_phase3_candle_alias` |
++| 2540 | `private` | `is_phase3_market_stream_payload` |
++| 2551 | `private` | `normalize_mt5_freshness_value` |
++| 2558 | `private` | `normalize_mt5_session_value` |
++| 2581 | `private` | `validate_phase3_market_stream_payload` |
++| 2631 | `public` | `get_market_data_authority` |
++| 2654 | `public` | `get_authority_diagnostics` |
++| 2722 | `public` | `post_ea_market_stream` |
++| 3070 | `public` | `post_ea_heartbeat` |
++| 3114 | `public` | `post_ea_account_sync` |
++| 3179 | `public` | `post_ea_symbol_sync` |
++| 3243 | `public` | `get_ea_license_check` |
++| 3301 | `public` | `post_ea_fib_levels` |
++| 3406 | `public` | `get_market_data_fib_levels` |
++| 3471 | `public` | `post_ea_regime_snapshot` |
++| 3558 | `public` | `get_market_data_regime` |
++| 3605 | `public` | `post_fundamentals_refresh` |
++| 3628 | `public` | `get_fundamentals_bias` |
++| 3667 | `private` | `format_bias_row` |
++| 3681 | `private` | `ingest_economic_calendar` |
++| 3754 | `private` | `classify_event_type` |
++| 3769 | `private` | `score_fundamental_event` |
++| 3802 | `private` | `recompute_fundamental_bias` |
++| 3868 | `public` | `post_ea_signal_candidates` |
++| 4036 | `private` | `find_latest_mt5_candidate_for_range` |
++| 4071 | `private` | `get_mt5_candidate_lifecycle_state` |
++| 4165 | `private` | `candidate_matches_trade_record` |
++| 4204 | `private` | `has_directional_price_crossed` |
++| 4220 | `private` | `get_mt5_candidate_price_tolerance` |
++| 4233 | `private` | `classify_signal_drift` |
++| 4273 | `public` | `get_market_data_signal_drift` |
++| 4346 | `public` | `get_ea_execution_queue` |
++| 4392 | `public` | `post_ea_execution_ack` |
++| 4436 | `public` | `post_user_execution_request` |
++| 4513 | `public` | `get_user_execution_audit` |
++| 4556 | `private` | `is_phase6_gate_cleared` |
++| 4592 | `public` | `get_user_approval_queue` |
++| 4636 | `public` | `post_approval_queue_review` |
++| 4682 | `public` | `get_user_license` |
++| 4730 | `public` | `post_admin_set_license_tier` |
++| 4785 | `private` | `insert_engine_heartbeat` |
++| 4800 | `private` | `ea_identity_key` |
++| 4806 | `private` | `sanitize_ea_text` |
++| 4811 | `private` | `sanitize_ea_number` |
++| 4815 | `private` | `sanitize_ea_int` |
++| 4819 | `private` | `sanitize_ea_bool` |
++| 4831 | `private` | `normalize_symbol_sync_payload` |
++| 4863 | `private` | `build_symbol_sync_record` |
++| 4913 | `private` | `resolve_ea_license_status` |
++| 4967 | `private` | `upsert_mt5_snapshot` |
++| 5005 | `private` | `mt5_change_pct_1d` |
++| 5031 | `private` | `insert_mt5_candle` |
++| 5099 | `private` | `guard_tick_volume` |
++| 5126 | `private` | `validate_ohlc` |
++| 5133 | `public` | `get_regimes` |
++| 5141 | `public` | `post_regime` |
++| 5145 | `public` | `get_live_signals` |
++| 5228 | `public` | `post_signal` |
++| 5232 | `public` | `get_ladders` |
++| 5245 | `public` | `get_chart_snapshot` |
++| 5281 | `public` | `post_user_market_data` |
++| 5288 | `public` | `get_user_trades` |
++| 5296 | `public` | `get_account_telemetry` |
++| 5300 | `public` | `get_positions` |
++| 5304 | `public` | `get_orders` |
++| 5310 | `public` | `post_user_trades` |
++| 5314 | `public` | `get_user_account` |
++| 5318 | `public` | `get_user_progress` |
++| 5322 | `public` | `post_user_account` |
++| 5354 | `public` | `get_user_trade_queue` |
++| 5360 | `public` | `post_user_trade_queue` |
++| 5364 | `public` | `post_execute_signals` |
++| 5446 | `public` | `post_engine_batch` |
++| 5467 | `private` | `run_engine_for_symbols` |
++| 5671 | `private` | `reconcile_live_signal_board` |
++| 5853 | `private` | `normalize_symbol_lookup` |
++| 5864 | `private` | `extract_blocked_symbols` |
++| 5888 | `private` | `hydrate_display_signal_candidate` |
++| 5932 | `private` | `armed_signal_confirmed` |
++| 5955 | `private` | `compute_signal_family_key` |
++| 5969 | `private` | `compute_display_signal_quality_score` |
++| 6010 | `private` | `read_display_signal_rows` |
++| 6038 | `private` | `find_display_row_by_family` |
++| 6047 | `private` | `find_display_row_by_symbol_direction` |
++| 6060 | `private` | `is_terminal_display_lifecycle_state` |
++| 6064 | `private` | `upsert_display_signal_row` |
++| 6126 | `private` | `transition_display_signal` |
++| 6156 | `private` | `display_row_to_lifecycle_candidate` |
++| 6167 | `private` | `is_display_signal_eligible` |
++| 6190 | `private` | `read_live_signal_board` |
++| 6211 | `private` | `count_live_signal_board` |
++| 6215 | `private` | `signal_row_to_candidate` |
++| 6263 | `private` | `build_symbol_state` |
++| 6630 | `private` | `build_pending_or_confirmed_plan` |
++| 6679 | `private` | `build_trade_plan` |
++| 6790 | `private` | `get_sl_from_sweep` |
++| 6802 | `private` | `legacy_stage_entry_spread` |
++| 6810 | `private` | `legacy_stage_reentry_from_stop` |
++| 6821 | `private` | `enforce_progressive_stage_lots` |
++| 6842 | `private` | `pip_value_per_standard_lot` |
++| 6852 | `private` | `pip_value_from_market` |
++| 6874 | `private` | `market_mids_for_symbol` |
++| 6898 | `private` | `quote_to_usd_rate_from_market` |
++| 6921 | `private` | `reference_mid` |
++| 6939 | `private` | `normalize_symbol_token` |
++| 6943 | `private` | `map_symbol_aliases` |
++| 6969 | `private` | `reference_mid_from_market` |
++| 6974 | `private` | `split_symbol_pair` |
++| 6983 | `private` | `sequence_state` |
++| 7013 | `private` | `get_symbol_fundamental_bias` |
++| 7041 | `private` | `refresh_prices` |
++| 7075 | `private` | `fetch_quote` |
++| 7104 | `private` | `fetch_candles` |
++| 7322 | `private` | `fetch_aggregated_mt5_m1_candles` |
++| 7381 | `private` | `validate_twelve_key` |
++| 7408 | `private` | `get_settings` |
++| 7437 | `private` | `get_risk_profile` |
++| 7454 | `private` | `get_account_state` |
++| 7486 | `private` | `read_user_progress` |
++| 7495 | `private` | `get_account_blob` |
++| 7505 | `private` | `read_trade_payloads` |
++| 7518 | `private` | `read_pending_orders` |
++| 7530 | `private` | `has_phase2_trade_telemetry_payload` |
++| 7539 | `private` | `persist_phase2_trade_telemetry` |
++| 7741 | `private` | `build_account_telemetry_record` |
++| 7783 | `private` | `build_trade_position_record` |
++| 7839 | `private` | `build_trade_order_record` |
++| 7892 | `private` | `sweep_absent_trade_rows` |
++| 7951 | `private` | `read_account_telemetry` |
++| 8020 | `private` | `read_progress_equity_pulse` |
++| 8035 | `private` | `read_progress_streak` |
++| 8111 | `private` | `read_progress_milestones` |
++| 8135 | `private` | `resolve_active_trade_identity` |
++| 8153 | `private` | `read_trade_positions` |
++| 8197 | `private` | `read_trade_orders` |
++| 8238 | `private` | `normalize_trade_direction_for_read` |
++| 8249 | `private` | `telemetry_freshness_state` |
++| 8257 | `private` | `progress_state_from_freshness` |
++| 8267 | `private` | `has_engine_heartbeat_source` |
++| 8305 | `private` | `has_any_trade_telemetry` |
++| 8309 | `private` | `latest_trade_telemetry_seen_at` |
++| 8332 | `private` | `max_mysql_timestamp` |
++| 8342 | `private` | `get_engine_snapshot` |
++| 8347 | `private` | `apply_closed_session_price_states` |
++| 8377 | `private` | `ensure_engine_snapshot` |
++| 8417 | `private` | `save_engine_snapshot` |
++| 8425 | `private` | `delete_engine_snapshot` |
++| 8430 | `private` | `invalidate_watchlist_snapshot_if_changed` |
++| 8440 | `private` | `log_watchlist_snapshot_skip` |
++| 8448 | `private` | `is_engine_snapshot_current` |
++| 8494 | `private` | `get_snapshot_row` |
++| 8507 | `private` | `get_cached_price` |
++| 8537 | `private` | `find_price` |
++| 8546 | `private` | `fib_levels_from_candles` |
++| 8615 | `private` | `fib_history_window_size` |
++| 8628 | `private` | `fib_compression_threshold` |
++| 8637 | `private` | `filter_compressed_fib_anchor` |
++| 8658 | `private` | `superfib_composite_anchor` |
++| 8706 | `private` | `fib_levels` |
++| 8720 | `private` | `ratio_label` |
++| 8728 | `private` | `price_for_ratio` |
++| 8732 | `private` | `nearest_level` |
++| 8742 | `private` | `execution_level` |
++| 8752 | `private` | `fib_role` |
++| 8768 | `private` | `pd_state` |
++| 8784 | `private` | `verdict` |
++| 8802 | `private` | `determine_engine_blocker` |
++| 8872 | `private` | `is_mt5_authoritative` |
++| 8889 | `private` | `rl_transient_key` |
++| 8897 | `private` | `set_feed_rate_limited` |
++| 8905 | `private` | `is_feed_rate_limited` |
++| 8916 | `private` | `get_twelve_key_status` |
++| 8926 | `private` | `clear_feed_rate_limit_state` |
++| 8934 | `private` | `log_feed_debug` |
++| 8950 | `private` | `set_twelve_key_status` |
++| 8968 | `private` | `get_twelve_key` |
++| 8981 | `private` | `encrypt_secret` |
++| 9001 | `private` | `decrypt_secret` |
++| 9027 | `private` | `crypto_key` |
++| 9032 | `private` | `replace_json` |
++| 9042 | `private` | `audit` |
++| 9056 | `private` | `instrument_specs` |
++| 9117 | `private` | `get_instrument_spec` |
++| 9123 | `private` | `is_supported_symbol` |
++| 9129 | `private` | `validate_watchlist_symbols` |
++| 9139 | `private` | `save_watchlist` |
++| 9149 | `private` | `sanitize_symbols` |
++| 9167 | `private` | `sanitize_risk_allocation` |
++| 9178 | `private` | `sanitize_signal_board_size` |
++| 9189 | `private` | `resolve_signal_board_size` |
++| 9198 | `private` | `int_between` |
++| 9205 | `private` | `float_between` |
++| 9212 | `private` | `twelve_symbol` |
++| 9223 | `private` | `latest_timestamp` |
++| 9244 | `private` | `is_stale` |
++| 9257 | `private` | `iso_age_sec` |
++| 9289 | `private` | `parse_mt5_timestamp` |
++| 9301 | `private` | `timeframe_seconds` |
++| 9322 | `private` | `is_equity_index_off_session` |
++| 9346 | `private` | `is_us_dst_active` |
++| 9364 | `private` | `is_chart_candle_fresh` |
++| 9379 | `private` | `normalize_market_timestamp` |
++| 9420 | `private` | `normalize_mt5_timeframe` |
++| 9441 | `private` | `mt5_freshness_to_snapshot_state` |
++| 9456 | `private` | `table` |
++| 9461 | `private` | `now_mysql` |
++| 9465 | `private` | `soak_get_var` |
++| 9475 | `private` | `soak_get_row` |
++| 9485 | `private` | `soak_get_results` |
++| 9495 | `private` | `seed_baseline_checkpoint` |
++| 9546 | `private` | `infer_soak_type_from_evidence_rows` |
++| 9571 | `private` | `map_soak_evidence_row` |
++| 9583 | `private` | `map_soak_checkpoint_row` |
++| 9595 | `private` | `reset_wpdb_error` |
++| 9602 | `private` | `wpdb_last_error` |
++| 9610 | `private` | `rest_response_status_code` |
++| 9626 | `private` | `no_cache_response` |
++| 9637 | `private` | `to_iso` |
++
++## `$wpdb` usage sites (188)
++
++| line | statement excerpt |
++|---:|---|
++| 128 | `"SELECT DISTINCT user_id FROM {$wpdb->prefix}smc_sf_integrations WHERE provider = 'twelve_data' AND key_status = 'ok'"` |
++| 173 | `$wpdb->query($wpdb->prepare(` |
++| 174 | `"DELETE FROM \u0060{$wpdb->prefix}smc_sf_engine_runs\u0060 WHERE created_at < %s",` |
++| 178 | `$wpdb->query($wpdb->prepare(` |
++| 179 | `"DELETE FROM \u0060{$wpdb->prefix}smc_sf_audit_events\u0060 WHERE created_at < %s",` |
++| 199 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_user_settings (` |
++| 206 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_integrations (` |
++| 215 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_candles (` |
++| 233 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_snapshots (` |
++| 247 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_engine_runs (` |
++| 257 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_signals (` |
++| 276 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_trade_plans (` |
++| 285 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_trade_queue (` |
++| 296 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_account_snapshots (` |
++| 303 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_symbol_sync (` |
++| 335 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_trade_positions (` |
++| 367 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_trade_orders (` |
++| 396 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_account_telemetry (` |
++| 418 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_trades (` |
++| 429 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_audit_events (` |
++| 440 | `dbDelta($sql);` |
++| 451 | `return "CREATE TABLE {$wpdb->prefix}smc_sf_display_signals (` |
++| 497 | `if (!function_exists('dbDelta')) {` |
++| 505 | `dbDelta(self::get_display_signals_table_sql($wpdb->get_charset_collate()));` |
++| 522 | `if (!function_exists('dbDelta')) {` |
++| 533 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_symbol_sync (` |
++| 566 | `dbDelta($sql);` |
++| 582 | `if (!function_exists('dbDelta')) {` |
++| 593 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_trade_positions (` |
++| 625 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_trade_orders (` |
++| 654 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_account_telemetry (` |
++| 677 | `dbDelta($sql);` |
++| 689 | `return "CREATE TABLE {$wpdb->prefix}smc_sf_regime_snapshots (` |
++| 715 | `if (!function_exists('dbDelta')) {` |
++| 723 | `dbDelta(self::get_regime_snapshots_table_sql($wpdb->get_charset_collate()));` |
++| 739 | `if (!function_exists('dbDelta')) {` |
++| 750 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_soak_evidence (` |
++| 762 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_soak_checkpoints (` |
++| 773 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_fib_levels (` |
++| 797 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_fundamental_events (` |
++| 815 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_fundamental_bias (` |
++| 829 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_mt5_signal_candidates (` |
++| 855 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_execution_audit (` |
++| 880 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_approval_queue (` |
++| 899 | `$tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_license_tiers (` |
++| 914 | `$fundamentals_table = $wpdb->prefix . 'smc_sf_fundamental_events';` |
++| 915 | `$event_lookup_index = $wpdb->get_results("SHOW INDEX FROM {$fundamentals_table} WHERE Key_name = 'event_lookup'");` |
++| 927 | `$wpdb->query("ALTER TABLE {$fundamentals_table} DROP KEY event_lookup");` |
++| 928 | `$wpdb->query("ALTER TABLE {$fundamentals_table} ADD UNIQUE KEY event_lookup (currency, event_date, event_name(64))");` |
++| 937 | `dbDelta($sql);` |
++| 944 | `// dbDelta cannot drop or rename existing UNIQUE keys, so we handle it explicitly.` |
++| 951 | `$events_table = $wpdb->prefix . 'smc_sf_fundamental_events';` |
++| 952 | `$old_key_exists = $wpdb->get_var($wpdb->prepare(` |
++| 962 | `$wpdb->query("ALTER TABLE \u0060{$events_table}\u0060` |
++| 1485 | `$detail = 'dbDelta unavailable';` |
++| 1522 | `$snapshots_count = $this->soak_get_var($wpdb->prepare(` |
++| 1534 | `$candles_count = $this->soak_get_var($wpdb->prepare(` |
++| 1546 | `$engine_runs_summary = $this->soak_get_row($wpdb->prepare(` |
++| 1567 | `$audit_events_summary = $this->soak_get_row($wpdb->prepare(` |
++| 1647 | `$checkpoints_rows = $this->soak_get_results($wpdb->prepare(` |
++| 1711 | `$existing = $this->soak_get_row($wpdb->prepare(` |
++| 1722 | `$saved = $wpdb->update(` |
++| 1735 | `$saved = $wpdb->insert(` |
++| 1754 | `$stored = $this->soak_get_row($wpdb->prepare(` |
++| 1827 | `$wpdb->query('START TRANSACTION');` |
++| 1828 | `$inserted = $wpdb->insert(` |
++| 1839 | `$wpdb->query('ROLLBACK');` |
++| 1845 | `$pruned = $wpdb->query($wpdb->prepare(` |
++| 1850 | `$wpdb->query('ROLLBACK');` |
++| 1855 | `$wpdb->query('COMMIT');` |
++| 1858 | `'id' => isset($wpdb->insert_id) ? (int) $wpdb->insert_id : 0,` |
++| 1870 | `$wpdb->query('START TRANSACTION');` |
++| 1872 | `$deleted_checkpoints = $wpdb->query("DELETE FROM {$this->table('soak_checkpoints')}");` |
++| 1874 | `$wpdb->query('ROLLBACK');` |
++| 1878 | `$deleted_evidence = $wpdb->query("DELETE FROM {$this->table('soak_evidence')}");` |
++| 1880 | `$wpdb->query('ROLLBACK');` |
++| 1884 | `$wpdb->query('COMMIT');` |
++| 2127 | `$wpdb->replace(` |
++| 2148 | `$wpdb->delete($this->table('integrations'), array('user_id' => $user_id, 'provider' => self::TWELVE_PROVIDER), array('%d', '%s'));` |
++| 2229 | `$wpdb->delete($this->table('snapshots'), array('user_id' => $user_id, 'symbol' => $symbol), array('%d', '%s'));` |
++| 2347 | `$snapshot_write_applied = $wpdb->replace(` |
++| 2367 | `$snapshot_write_applied = $wpdb->update(` |
++| 2400 | `$wpdb->replace(` |
++| 2664 | `$row = $wpdb->get_row($wpdb->prepare(` |
++| 3185 | `error_log('SMC SuperFIB EA symbol sync failed: symbol_sync table init error ' . ($detail !== null ? $detail : 'dbDelta unavailable'));` |
++| 3209 | `$saved = $wpdb->replace(` |
++| 3331 | `$table           = $wpdb->prefix . 'smc_sf_fib_levels';` |
++| 3365 | `$result = $wpdb->replace(` |
++| 3418 | `$table     = $wpdb->prefix . 'smc_sf_fib_levels';` |
++| 3433 | `$sql  = $wpdb->prepare("SELECT timeframe, family, ratio, price, calculated_at FROM {$table} {$where} ORDER BY timeframe, family, ratio", ...$values);` |
++| 3434 | `$rows = $wpdb->get_results($sql, ARRAY_A);` |
++| 3482 | `$detail = 'dbDelta unavailable';` |
++| 3492 | `$table         = $wpdb->prefix . 'smc_sf_regime_snapshots';` |
++| 3519 | `$result = $wpdb->replace(` |
++| 3565 | `$table  = $wpdb->prefix . 'smc_sf_regime_snapshots';` |
++| 3574 | `$sql  = $wpdb->prepare("SELECT symbol, htf_bias, ltf_regime, chop_score, ema20_d1, atr14_h1, htf_bias_high, htf_bias_low, calculated_at FROM {$table} {$where} ORDER BY symbol", ...$values);` |
++| 3575 | `$rows = $wpdb->get_results($sql, ARRAY_A);` |
++| 3633 | `$table    = $wpdb->prefix . 'smc_sf_fundamental_bias';` |
++| 3636 | `$row = $wpdb->get_row($wpdb->prepare(` |
++| 3656 | `$rows  = $wpdb->get_results("SELECT currency, composite_score, category, event_count, computed_at, expires_at FROM {$table} ORDER BY currency", ARRAY_A);` |
++| 3703 | `$table   = $wpdb->prefix . 'smc_sf_fundamental_events';` |
++| 3724 | `$result = $wpdb->replace(` |
++| 3805 | `$events_table = $wpdb->prefix . 'smc_sf_fundamental_events';` |
++| 3806 | `$bias_table   = $wpdb->prefix . 'smc_sf_fundamental_bias';` |
++| 3810 | `$rows = $wpdb->get_results($wpdb->prepare(` |
++| 3842 | `$wpdb->replace(` |
++| 3877 | `$table           = $wpdb->prefix . 'smc_sf_mt5_signal_candidates';` |
++| 3988 | `$result = $wpdb->replace(` |
++| 4067 | `$row = $wpdb->get_row($wpdb->prepare($query, ...$params), ARRAY_A);` |
++| 4237 | `$pine_signal = $wpdb->get_row($wpdb->prepare(` |
++| 4277 | `$table   = $wpdb->prefix . 'smc_sf_mt5_signal_candidates';` |
++| 4280 | `$rows = $wpdb->get_results($wpdb->prepare(` |
++| 4361 | `$table = $wpdb->prefix . 'smc_sf_execution_audit';` |
++| 4362 | `$rows  = $wpdb->get_results($wpdb->prepare(` |
++| 4409 | `$table = $wpdb->prefix . 'smc_sf_execution_audit';` |
++| 4411 | `$updated = $wpdb->update(` |
++| 4475 | `$table = $wpdb->prefix . 'smc_sf_execution_audit';` |
++| 4478 | `$result = $wpdb->insert(` |
++| 4508 | `'request_id' => $wpdb->insert_id,` |
++| 4518 | `$table   = $wpdb->prefix . 'smc_sf_execution_audit';` |
++| 4520 | `$rows = $wpdb->get_results($wpdb->prepare(` |
++| 4559 | `$table = $wpdb->prefix . 'smc_sf_mt5_signal_candidates';` |
++| 4568 | `$comparable = (int) $wpdb->get_var($wpdb->prepare(` |
++| 4578 | `$exact = (int) $wpdb->get_var($wpdb->prepare(` |
++| 4597 | `$table   = $wpdb->prefix . 'smc_sf_approval_queue';` |
++| 4600 | `$wpdb->query($wpdb->prepare(` |
++| 4605 | `$rows = $wpdb->get_results($wpdb->prepare(` |
++| 4653 | `$table = $wpdb->prefix . 'smc_sf_approval_queue';` |
++| 4655 | `$updated = $wpdb->update(` |
++| 4686 | `$table   = $wpdb->prefix . 'smc_sf_license_tiers';` |
++| 4688 | `$row = $wpdb->get_row($wpdb->prepare(` |
++| 4756 | `$table   = $wpdb->prefix . 'smc_sf_license_tiers';` |
++| 4758 | `$wpdb->replace(` |
++| 4789 | `$wpdb->insert(` |
++| 4986 | `$result = $wpdb->replace(` |
++| 5009 | `$day_open = $wpdb->get_var($wpdb->prepare(` |
++| 5071 | `$result = $wpdb->replace(` |
++| 5375 | `$signal = $wpdb->get_row($wpdb->prepare(` |
++| 5392 | `$plan_row = $wpdb->get_row($wpdb->prepare(` |
++| 5427 | `$wpdb->replace(` |
++| 5562 | `$wpdb->insert(` |
++| 5618 | `$wpdb->replace(` |
++| 5722 | `$wpdb->update(` |
++| 5750 | `$wpdb->update(` |
++| 5893 | `$rows = $wpdb->get_results($wpdb->prepare(` |
++| 6015 | `$rows = $wpdb->get_results($wpdb->prepare(` |
++| 6116 | `$wpdb->replace($this->table('display_signals'), $row);` |
++| 6147 | `$wpdb->update($this->table('display_signals'), $data, array('id' => (string) ($row['id'] ?? ''), 'user_id' => $user_id));` |
++| 7026 | `$table = $wpdb->prefix . 'smc_sf_fundamental_bias';` |
++| 7027 | `$row = $wpdb->get_row($wpdb->prepare(` |
++| 7169 | `$wpdb->query($wpdb->prepare(` |
++| 7211 | `$all_candles = $wpdb->get_results($wpdb->prepare(` |
++| 7331 | `$m1_rows = $wpdb->get_results($wpdb->prepare(` |
++| 7422 | `$row = $wpdb->get_var($wpdb->prepare(` |
++| 7498 | `$row = $wpdb->get_var($wpdb->prepare(` |
++| 7508 | `$rows = $wpdb->get_results($wpdb->prepare(` |
++| 7521 | `$rows = $wpdb->get_results($wpdb->prepare(` |
++| 7547 | `'detail' => $detail !== null ? $detail : 'dbDelta unavailable',` |
++| 7662 | `$account_saved = $wpdb->replace(` |
++| 7673 | `$saved = $wpdb->replace(` |
++| 7686 | `$saved = $wpdb->replace(` |
++| 7906 | `$existing_rows = $wpdb->get_results($wpdb->prepare(` |
++| 7925 | `$updated = $wpdb->update(` |
++| 7974 | `$rows = $wpdb->get_results($wpdb->prepare(` |
++| 8042 | `$rows = $wpdb->get_results(` |
++| 8043 | `$wpdb->prepare(` |
++| 8139 | `$row = $wpdb->get_row($wpdb->prepare(` |
++| 8162 | `$rows = $wpdb->get_results($wpdb->prepare(` |
++| 8206 | `$rows = $wpdb->get_results($wpdb->prepare(` |
++| 8275 | `$match = $wpdb->get_var($wpdb->prepare(` |
++| 8290 | `$rows = $wpdb->get_results($wpdb->prepare(` |
++| 8317 | `$rows = $wpdb->get_results($wpdb->prepare(` |
++| 8505 | `return $wpdb->get_row($wpdb->prepare($query, $params), ARRAY_A);` |
++| 8919 | `$status = $wpdb->get_var($wpdb->prepare(` |
++| 8953 | `$row = $wpdb->get_row($wpdb->prepare(` |
++| 8959 | `$wpdb->update(` |
++| 8971 | `$encrypted = $wpdb->get_var($wpdb->prepare(` |
++| 9040 | `$wpdb->replace($this->table($table), $data);` |
++| 9045 | `$wpdb->insert(` |
++| 9233 | `return $wpdb->get_var($wpdb->prepare(` |
++| 9239 | `return $wpdb->get_var($wpdb->prepare(` |
++| 9459 | `return $wpdb->prefix . 'smc_sf_' . $name;` |
++| 9469 | `$value = $wpdb->get_var($query);` |
++| 9479 | `$value = $wpdb->get_row($query, ARRAY_A);` |
++| 9489 | `$value = $wpdb->get_results($query, ARRAY_A);` |
++| 9505 | `$lock_acquired = $wpdb->get_var("SELECT GET_LOCK('smc_sf_baseline_seed', 10)");` |
++| 9517 | `$inserted = $wpdb->query($wpdb->prepare(` |
++| 9543 | `$wpdb->query("SELECT RELEASE_LOCK('smc_sf_baseline_seed')");` |
++
++## Table names / table-like identifiers
++
++- `smc_sf_account_snapshots`
++- `smc_sf_account_telemetry`
++- `smc_sf_admin_required`
++- `smc_sf_allowed_origins`
++- `smc_sf_api_key_invalid`
++- `smc_sf_api_key_missing`
++- `smc_sf_api_key_unconfigured`
++- `smc_sf_approval_queue`
++- `smc_sf_armed_confirm_`
++- `smc_sf_audit_events`
++- `smc_sf_auth_required`
++- `smc_sf_baseline_seed`
++- `smc_sf_candles`
++- `smc_sf_crypto_decrypt_failed`
++- `smc_sf_crypto_failed`
++- `smc_sf_crypto_missing`
++- `smc_sf_crypto_payload`
++- `smc_sf_ct_`
++- `smc_sf_display_signals`
++- `smc_sf_empty_candidates_log_`
++- `smc_sf_engine_runs`
++- `smc_sf_engine_snapshot`
++- `smc_sf_execution_audit`
++- `smc_sf_fib_levels`
++- `smc_sf_freshness_`
++- `smc_sf_fundamental_bias`
++- `smc_sf_fundamental_events`
++- `smc_sf_integrations`
++- `smc_sf_license_tiers`
++- `smc_sf_mt5_signal_candidates`
++- `smc_sf_prune_tables`
++- `smc_sf_qt_`
++- `smc_sf_ready_missing_blueprint_`
++- `smc_sf_refresh_fundamentals`
++- `smc_sf_regime_snapshots`
++- `smc_sf_rl_`
++- `smc_sf_session_`
++- `smc_sf_signals`
++- `smc_sf_snapshots`
++- `smc_sf_soak_baseline_exists`
++- `smc_sf_soak_checkpoint_insert_failed`
++- `smc_sf_soak_checkpoint_lookup_failed`
++- `smc_sf_soak_checkpoint_prune_failed`
++- `smc_sf_soak_checkpoint_report_failed`
++- `smc_sf_soak_checkpoint_type_invalid`
++- `smc_sf_soak_checkpoints`
++- `smc_sf_soak_evidence`
++- `smc_sf_soak_evidence_key_required`
++- `smc_sf_soak_evidence_lookup_failed`
++- `smc_sf_soak_evidence_reload_failed`
++- `smc_sf_soak_evidence_type_invalid`
++- `smc_sf_soak_evidence_value_required`
++- `smc_sf_soak_evidence_write_failed`
++- `smc_sf_soak_operator_required`
++- `smc_sf_soak_reset_checkpoints_failed`
++- `smc_sf_soak_reset_evidence_failed`
++- `smc_sf_symbol_sync`
++- `smc_sf_symbol_sync_symbol_invalid`
++- `smc_sf_symbol_sync_symbols_required`
++- `smc_sf_symbol_sync_table_init_failed`
++- `smc_sf_symbol_sync_write_failed`
++- `smc_sf_trade_orders`
++- `smc_sf_trade_plans`
++- `smc_sf_trade_positions`
++- `smc_sf_trade_queue`
++- `smc_sf_trade_telemetry_account_invalid`
++- `smc_sf_trade_telemetry_account_required`
++- `smc_sf_trade_telemetry_account_write_failed`
++- `smc_sf_trade_telemetry_identity_required`
++- `smc_sf_trade_telemetry_order_invalid`
++- `smc_sf_trade_telemetry_order_write_failed`
++- `smc_sf_trade_telemetry_orders_required`
++- `smc_sf_trade_telemetry_position_invalid`
++- `smc_sf_trade_telemetry_position_write_failed`
++- `smc_sf_trade_telemetry_positions_required`
++- `smc_sf_trade_telemetry_schema_required`
++- `smc_sf_trade_telemetry_table_init_failed`
++- `smc_sf_trades`
++- `smc_sf_user_invalid`
++- `smc_sf_user_required`
++- `smc_sf_user_settings`
++- `smc_sf_watchlist_symbol_missing`
++- `smc_sf_watchlist_unsupported`
++
++## Constants
++
++| line | declaration |
++|---:|---|
++| 17 | `const NAMESPACE = 'sniper/v1';` |
++
++## Globals
++
++| line | declaration |
++|---:|---|
++| 125 | `global $wpdb;` |
++| 171 | `global $wpdb;` |
++| 192 | `global $wpdb;` |
++| 449 | `global $wpdb;` |
++| 487 | `global $wpdb;` |
++| 516 | `global $wpdb;` |
++| 576 | `global $wpdb;` |
++| 687 | `global $wpdb;` |
++| 709 | `global $wpdb;` |
++| 733 | `global $wpdb;` |
++| 1480 | `global $wpdb;` |
++| 1676 | `global $wpdb;` |
++| 1768 | `global $wpdb;` |
++| 1868 | `global $wpdb;` |
++| 2100 | `global $wpdb;` |
++| 2146 | `global $wpdb;` |
++| 2209 | `global $wpdb;` |
++| 2295 | `global $wpdb;` |
++| 2663 | `global $wpdb;` |
++| 2723 | `global $wpdb;` |
++| 3181 | `global $wpdb;` |
++| 3302 | `global $wpdb;` |
++| 3407 | `global $wpdb;` |
++| 3472 | `global $wpdb;` |
++| 3559 | `global $wpdb;` |
++| 3629 | `global $wpdb;` |
++| 3682 | `global $wpdb;` |
++| 3803 | `global $wpdb;` |
++| 3869 | `global $wpdb;` |
++| 4038 | `global $wpdb;` |
++| 4234 | `global $wpdb;` |
++| 4274 | `global $wpdb;` |
++| 4347 | `global $wpdb;` |
++| 4393 | `global $wpdb;` |
++| 4437 | `global $wpdb;` |
++| 4514 | `global $wpdb;` |
++| 4557 | `global $wpdb;` |
++| 4593 | `global $wpdb;` |
++| 4637 | `global $wpdb;` |
++| 4683 | `global $wpdb;` |
++| 4731 | `global $wpdb;` |
++| 4787 | `global $wpdb;` |
++| 4968 | `global $wpdb;` |
++| 5007 | `global $wpdb;` |
++| 5032 | `global $wpdb;` |
++| 5366 | `global $wpdb;` |
++| 5469 | `global $wpdb;` |
++| 5673 | `global $wpdb;` |
++| 5890 | `global $wpdb;` |
++| 6012 | `global $wpdb;` |
++| 6066 | `global $wpdb;` |
++| 6128 | `global $wpdb;` |
++| 7025 | `global $wpdb;` |
++| 7106 | `global $wpdb;` |
++| 7324 | `global $wpdb;` |
++| 7410 | `global $wpdb;` |
++| 7497 | `global $wpdb;` |
++| 7507 | `global $wpdb;` |
++| 7520 | `global $wpdb;` |
++| 7541 | `global $wpdb;` |
++| 7904 | `global $wpdb;` |
++| 7953 | `global $wpdb;` |
++| 8037 | `global $wpdb;` |
++| 8137 | `global $wpdb;` |
++| 8155 | `global $wpdb;` |
++| 8199 | `global $wpdb;` |
++| 8269 | `global $wpdb;` |
++| 8311 | `global $wpdb;` |
++| 8496 | `global $wpdb;` |
++| 8918 | `global $wpdb;` |
++| 8952 | `global $wpdb;` |
++| 8970 | `global $wpdb;` |
++| 9034 | `global $wpdb;` |
++| 9044 | `global $wpdb;` |
++| 9225 | `global $wpdb;` |
++| 9458 | `global $wpdb;` |
++| 9467 | `global $wpdb;` |
++| 9477 | `global $wpdb;` |
++| 9487 | `global $wpdb;` |
++| 9497 | `global $wpdb;` |
++| 9597 | `global $wpdb;` |
++| 9604 | `global $wpdb;` |
++
++## Hooks and scheduling calls
++
++| line | call |
++|---:|---|
++| 35 | `add_action('rest_api_init', array($instance, 'register_routes'));` |
++| 36 | `add_action('init', array(__CLASS__, 'ensure_display_signals_table'), 1);` |
++| 39 | `add_filter('rest_post_dispatch', function($response, $server, $request) {` |
++| 48 | `add_filter('rest_pre_serve_request', function($value) {` |
++| 58 | `add_action('init', function() {` |
++| 70 | `add_action('wp_loaded', function() {` |
++| 91 | `add_action('wp_enqueue_scripts', array(__CLASS__, 'enqueue_rest_api_settings'));` |
++| 92 | `add_action('admin_enqueue_scripts', array(__CLASS__, 'enqueue_rest_api_settings'));` |
++| 96 | `add_action('smc_sf_prune_tables', array(__CLASS__, 'prune_old_table_rows'));` |
++| 98 | `wp_schedule_event(time(), 'daily', 'smc_sf_prune_tables');` |
++| 106 | `add_filter('cron_schedules', array(__CLASS__, 'add_twicehourly_cron_schedule'));` |
++| 107 | `add_action('smc_sf_refresh_fundamentals', array($instance, 'cron_refresh_fundamentals'));` |
++| 109 | `wp_schedule_event(time(), 'twicehourly', 'smc_sf_refresh_fundamentals');` |
++| 187 | `wp_clear_scheduled_hook('smc_sf_prune_tables');` |
++| 9646 | `register_activation_hook(__FILE__, array('SMC_SuperFib_Sniper_REST', 'activate'));` |
++| 9647 | `register_deactivation_hook(__FILE__, array('SMC_SuperFib_Sniper_REST', 'deactivate'));` |
++| 9649 | `add_action('plugins_loaded', array('SMC_SuperFib_Sniper_REST', 'boot'));` |
++
++## Response shape / response construction sites (166)
++
++| line | statement excerpt |
++|---:|---|
++| 45 | `return $response;` |
++| 1195 | `return new WP_Error('smc_sf_auth_required', 'Authentication required.', array('status' => 401));` |
++| 1217 | `return new WP_Error('smc_sf_auth_required', 'Authentication required.', array('status' => 401));` |
++| 1231 | `return new WP_Error('smc_sf_admin_required', 'Administrator access required.', array('status' => 403));` |
++| 1245 | `return new WP_Error('smc_sf_api_key_missing', 'X-EA-API-Key or X-API-KEY header required.', array('status' => 401));` |
++| 1251 | `return new WP_Error('smc_sf_api_key_unconfigured', 'EA ingest key not configured.', array('status' => 503));` |
++| 1256 | `return new WP_Error('smc_sf_api_key_invalid', 'Invalid API key.', array('status' => 403));` |
++| 1267 | `return new WP_Error('smc_sf_user_required', 'user_id is required for EA ingest.', array('status' => 400));` |
++| 1273 | `return new WP_Error('smc_sf_user_invalid', 'user_id must reference a valid readable user.', array('status' => 403));` |
++| 1444 | `return rest_ensure_response(array(` |
++| 1465 | `return rest_ensure_response(array(` |
++| 1472 | `return $this->no_cache_response($this->build_health_payload($user_id));` |
++| 1476 | `return $this->no_cache_response($this->build_health_payload(get_current_user_id()));` |
++| 1488 | `return new WP_REST_Response(array(` |
++| 1607 | `return new WP_REST_Response(array(` |
++| 1616 | `return new WP_REST_Response(array(` |
++| 1625 | `return new WP_REST_Response(array(` |
++| 1633 | `return new WP_REST_Response(array(` |
++| 1664 | `return new WP_REST_Response($report, 200);` |
++| 1667 | `return new WP_REST_Response(array(` |
++| 1699 | `return new WP_Error('smc_sf_soak_evidence_key_required', 'evidence_key is required.', array('status' => 400));` |
++| 1702 | `return new WP_Error('smc_sf_soak_evidence_type_invalid', 'evidence_type is invalid.', array('status' => 400));` |
++| 1705 | `return new WP_Error('smc_sf_soak_evidence_value_required', 'evidence_value is required.', array('status' => 400));` |
++| 1708 | `return new WP_Error('smc_sf_soak_operator_required', 'operator is required.', array('status' => 400));` |
++| 1717 | `return new WP_Error('smc_sf_soak_evidence_lookup_failed', 'Could not read soak evidence.', array('status' => 500));` |
++| 1751 | `return new WP_Error('smc_sf_soak_evidence_write_failed', 'Could not save soak evidence.', array('status' => 500));` |
++| 1760 | `return new WP_Error('smc_sf_soak_evidence_reload_failed', 'Soak evidence saved but could not be reloaded.', array('status' => 500));` |
++| 1763 | `return rest_ensure_response($this->map_soak_evidence_row($stored['value']));` |
++| 1780 | `return new WP_Error('smc_sf_soak_checkpoint_type_invalid', 'checkpoint_type is invalid.', array('status' => 400));` |
++| 1787 | `return new WP_Error('smc_sf_soak_checkpoint_lookup_failed', 'Could not inspect baseline checkpoint state.', array('status' => 500));` |
++| 1791 | `return new WP_Error('smc_sf_soak_baseline_exists', 'Baseline snapshot already exists for this soak.', array('status' => 409));` |
++| 1802 | `return new WP_Error(` |
++| 1840 | `return new WP_Error('smc_sf_soak_checkpoint_insert_failed', 'Could not create soak checkpoint.', array('status' => 500));` |
++| 1851 | `return new WP_Error('smc_sf_soak_checkpoint_prune_failed', 'Could not prune old soak checkpoints.', array('status' => 500));` |
++| 1857 | `return rest_ensure_response(array(` |
++| 1875 | `return new WP_Error('smc_sf_soak_reset_checkpoints_failed', 'Could not clear soak checkpoints.', array('status' => 500));` |
++| 1881 | `return new WP_Error('smc_sf_soak_reset_evidence_failed', 'Could not clear soak evidence.', array('status' => 500));` |
++| 1886 | `return rest_ensure_response(array(` |
++| 2045 | `return rest_ensure_response($settings);` |
++| 2096 | `return rest_ensure_response(array('ok' => true, 'watchlist' => $persisted_settings['watchlist']));` |
++| 2108 | `return rest_ensure_response(array('ok' => false, 'status' => 'missing', 'message' => 'Twelve Data API key is required.'));` |
++| 2113 | `return rest_ensure_response(array('ok' => false, 'status' => 'invalid', 'message' => 'Invalid API key format.'));` |
++| 2118 | `return rest_ensure_response($validation);` |
++| 2142 | `return rest_ensure_response(array('ok' => true, 'status' => 'ok'));` |
++| 2150 | `return rest_ensure_response(array('ok' => true, 'status' => 'missing'));` |
++| 2154 | `return rest_ensure_response($this->instrument_specs());` |
++| 2160 | `return rest_ensure_response(array(` |
++| 2176 | `return rest_ensure_response(array('ok' => true, 'watchlist' => $persisted_settings['watchlist']));` |
++| 2185 | `return new WP_Error('smc_sf_watchlist_symbol_missing', 'Symbol is required.', array('status' => 400));` |
++| 2188 | `return new WP_Error('smc_sf_watchlist_unsupported', 'Symbol not supported: ' . $symbol, array('status' => 400));` |
++| 2205 | `return rest_ensure_response(array('ok' => true, 'watchlist' => $watchlist));` |
++| 2215 | `return new WP_Error('smc_sf_watchlist_symbol_missing', 'Symbol is required.', array('status' => 400));` |
++| 2231 | `return rest_ensure_response(array('ok' => true, 'watchlist' => $watchlist));` |
++| 2235 | `return rest_ensure_response($this->get_risk_profile(get_current_user_id()));` |
++| 2284 | `return rest_ensure_response(array('ok' => true));` |
++| 2290 | `return $this->no_cache_response($snapshot);` |
++| 2306 | `return new WP_REST_Response(array('error' => 'Invalid payload'), 400);` |
++| 2324 | `return rest_ensure_response(array('ok' => true));` |
++| 2442 | `return rest_ensure_response(array('ok' => true));` |
++| 2639 | `return rest_ensure_response($svc->get_authority_state($user_id, $symbol));` |
++| 2652 | `return rest_ensure_response($result);` |
++| 2660 | `return new WP_REST_Response(array('error' => 'symbol required'), 400);` |
++| 2671 | `return rest_ensure_response(array(` |
++| 2683 | `return rest_ensure_response(array(` |
++| 2736 | `return new WP_Error('smc_sf_user_invalid', 'user_id must reference a valid readable user.', array('status' => 403));` |
++| 2750 | `return new WP_Error(` |
++| 2760 | `return new WP_Error('invalid_payload', 'Missing required symbol field', array('status' => 400));` |
++| 2830 | `return new WP_Error('invalid_phase3_payload', $phase3_validation_error['message'], array('status' => 400));` |
++| 2853 | `return new WP_Error('stale_data', 'Rejected market data with unparseable timestamp', array('status' => 422));` |
++| 2867 | `return new WP_Error('stale_data', 'Rejected market data older than 300 seconds', array('status' => 422));` |
++| 2880 | `return new WP_Error('missing_prices', 'bid and ask are required.', array('status' => 400));` |
++| 2896 | `return new WP_Error('invalid_prices', 'bid and ask must be finite positive numbers with bid <= ask.', array('status' => 422));` |
++| 3057 | `return rest_ensure_response(array(` |
++| 3107 | `return rest_ensure_response(array(` |
++| 3171 | `return rest_ensure_response(array(` |
++| 3186 | `return new WP_Error('smc_sf_symbol_sync_table_init_failed', 'Could not initialize symbol sync storage.', array('status' => 500));` |
++| 3199 | `return new WP_Error('smc_sf_symbol_sync_symbols_required', 'symbols payload is required.', array('status' => 400));` |
++| 3222 | `return new WP_Error('smc_sf_symbol_sync_write_failed', 'Could not persist symbol sync payload.', array('status' => 500));` |
++| 3235 | `return rest_ensure_response(array(` |
++| 3267 | `return rest_ensure_response(array(` |
++| 3284 | `return rest_ensure_response(array(` |
++| 3306 | `return new WP_Error('invalid_payload', 'JSON body required', array('status' => 400));` |
++| 3312 | `return new WP_Error('missing_fields', 'symbol and levels are required', array('status' => 400));` |
++| 3317 | `return new WP_Error('invalid_symbol', 'symbol must be a non-empty alphanumeric string', array('status' => 400));` |
++| 3322 | `return new WP_Error('invalid_levels', 'levels must be an array', array('status' => 400));` |
++| 3395 | `return rest_ensure_response(array(` |
++| 3413 | `return new WP_Error('missing_symbol', 'symbol query parameter is required', array('status' => 400));` |
++| 3456 | `return $this->no_cache_response(array(` |
++| 3476 | `return new WP_Error('invalid_payload', 'regimes array required', array('status' => 400));` |
++| 3485 | `return new WP_REST_Response(array(` |
++| 3549 | `return rest_ensure_response(array(` |
++| 3593 | `return $this->no_cache_response(array(` |
++| 3610 | `return new WP_Error('no_td_key', 'Twelve Data API key required for fundamentals refresh', array('status' => 422));` |
++| 3619 | `return rest_ensure_response(array(` |
++| 3642 | `return rest_ensure_response(array(` |
++| 3650 | `return rest_ensure_response(array(` |
++| 3662 | `return rest_ensure_response(array(` |
++| 3689 | `$response = wp_remote_get($url, array('timeout' => 15));` |
++| 3873 | `return new WP_Error('invalid_payload', 'candidates array required', array('status' => 400));` |
++| 4030 | `return rest_ensure_response(array(` |
++| 4323 | `return $this->no_cache_response(array(` |
++| 4353 | `return rest_ensure_response(array(` |
++| 4384 | `return rest_ensure_response(array(` |
++| 4397 | `return new WP_Error('invalid_payload', 'request_id required', array('status' => 400));` |
++| 4428 | `return rest_ensure_response(array(` |
++| 4441 | `return new WP_Error('invalid_payload', 'JSON body required', array('status' => 400));` |
++| 4448 | `return new WP_Error('phase6_gate', 'Execution is gated behind Phase 6 parity ≥ 95%', array('status' => 403));` |
++| 4462 | `return new WP_Error('sl_required', 'sl_price is required for all execution requests', array('status' => 422));` |
++| 4467 | `return new WP_Error('invalid_direction', 'direction must be LONG or SHORT', array('status' => 422));` |
++| 4472 | `return new WP_Error('invalid_lots', 'lots must be between 0.01 and 10.0', array('status' => 422));` |
++| 4506 | `return rest_ensure_response(array(` |
++| 4549 | `return rest_ensure_response(array(` |
++| 4629 | `return rest_ensure_response(array(` |
++| 4641 | `return new WP_Error('invalid_payload', 'id required', array('status' => 400));` |
++| 4650 | `return new WP_Error('invalid_decision', 'decision must be APPROVED or REJECTED', array('status' => 422));` |
++| 4671 | `return rest_ensure_response(array(` |
++| 4696 | `return rest_ensure_response(array(` |
++| 4713 | `return rest_ensure_response(array(` |
++| 4735 | `return new WP_Error('invalid_payload', 'user_id and tier required', array('status' => 400));` |
++| 4743 | `return new WP_Error('invalid_tier', 'tier must be one of: ' . implode(', ', $valid_tiers), array('status' => 422));` |
++| 4778 | `return rest_ensure_response(array(` |
++| 4877 | `return new WP_Error('smc_sf_symbol_sync_symbol_invalid', 'broker_symbol and normalized_symbol are required for symbol sync.', array('status' => 400));` |
++| 5137 | `return rest_ensure_response($snapshot['regimes'] ?? array());` |
++| 5143 | `return rest_ensure_response(array('ok' => true));` |
++| 5217 | `return $this->no_cache_response(array(` |
++| 5230 | `return rest_ensure_response(array('ok' => true));` |
++| 5243 | `return $this->no_cache_response($plans);` |
++| 5270 | `return $this->no_cache_response(array(` |
++| 5286 | `return rest_ensure_response($this->refresh_prices($user_id, $symbols));` |
++| 5291 | `return $this->no_cache_response(array(` |
++| 5298 | `return $this->no_cache_response($this->read_account_telemetry(get_current_user_id()));` |
++| 5302 | `return $this->no_cache_response($this->read_trade_positions(get_current_user_id()));` |
++| 5306 | `return $this->no_cache_response($this->read_trade_orders(get_current_user_id()));` |
++| 5312 | `return rest_ensure_response(array('ok' => true));` |
++| 5316 | `return $this->no_cache_response($this->get_account_state(get_current_user_id()));` |
++| 5320 | `return $this->no_cache_response($this->read_user_progress(get_current_user_id()));` |
++| 5352 | `return rest_ensure_response(array('ok' => true));` |
++| 5356 | `return rest_ensure_response($this->read_pending_orders(get_current_user_id()));` |
++| 5362 | `return rest_ensure_response(array('ok' => true));` |
++| 5444 | `return rest_ensure_response(array('ok' => true, 'queued' => $queued));` |
++| 5462 | `return rest_ensure_response(array(` |
++| 7139 | `$response = wp_remote_get($url, array('timeout' => 15));` |
++| 7387 | `$response = wp_remote_get($url, array('timeout' => 12));` |
++| 7390 | `return array('ok' => false, 'status' => 'blocked', 'message' => $response->get_error_message());` |
++| 7549 | `return new WP_Error(` |
++| 7559 | `return new WP_Error(` |
++| 7568 | `return new WP_Error('smc_sf_trade_telemetry_positions_required', 'positions[] is required.', array('status' => 400));` |
++| 7572 | `return new WP_Error('smc_sf_trade_telemetry_orders_required', 'pending_orders[] is required.', array('status' => 400));` |
++| 7576 | `return new WP_Error('smc_sf_trade_telemetry_account_required', 'account_metrics is required.', array('status' => 400));` |
++| 7587 | `return new WP_Error(` |
++| 7621 | `return new WP_Error('smc_sf_trade_telemetry_position_invalid', 'Each positions[] entry must be an object.', array('status' => 400));` |
++| 7645 | `return new WP_Error('smc_sf_trade_telemetry_order_invalid', 'Each pending_orders[] entry must be an object.', array('status' => 400));` |
++| 7668 | `return new WP_Error('smc_sf_trade_telemetry_account_write_failed', 'Could not persist account telemetry.', array('status' => 500));` |
++| 7679 | `return new WP_Error('smc_sf_trade_telemetry_position_write_failed', 'Could not persist trade positions.', array('status' => 500));` |
++| 7692 | `return new WP_Error('smc_sf_trade_telemetry_order_write_failed', 'Could not persist trade orders.', array('status' => 500));` |
++| 7757 | `return new WP_Error(` |
++| 7800 | `return new WP_Error(` |
++| 7856 | `return new WP_Error(` |
++| 8984 | `return new WP_Error('smc_sf_crypto_missing', 'OpenSSL encryption is required.', array('status' => 500));` |
++| 8991 | `return new WP_Error('smc_sf_crypto_failed', 'Could not encrypt API key.', array('status' => 500));` |
++| 9004 | `return new WP_Error('smc_sf_crypto_missing', 'OpenSSL decryption is required.', array('status' => 500));` |
++| 9009 | `return new WP_Error('smc_sf_crypto_payload', 'Stored API key payload is invalid.', array('status' => 500));` |
++| 9022 | `return new WP_Error('smc_sf_crypto_decrypt_failed', 'Could not decrypt API key.', array('status' => 500));` |
++| 9617 | `return (int) $response->get_status();` |
++| 9621 | `return (int) $response->status;` |
++| 9635 | `return $response;` |
+diff --git a/reports/plugin-refactor-phase-summaries.md b/reports/plugin-refactor-phase-summaries.md
+new file mode 100644
+index 0000000..837b337
+--- /dev/null
++++ b/reports/plugin-refactor-phase-summaries.md
+@@ -0,0 +1,12 @@
++# SMC SuperFIB Plugin Refactor Phase Summaries
++
++## Phase 0 — Inventory
++
++| file | change |
++|---|---|
++| `reports/plugin-refactor-inventory.md` | Added pre-movement inventory of REST namespace/routes, monolith methods, `$wpdb` usage sites, table-like identifiers, constants, globals, hooks, response construction sites, and baseline verification results. |
++| `reports/plugin-refactor-blast-radius.md` | Added test-level reflection blast-radius classification for all 25 PHP test files. |
++
++## Phase 1–7
++
++Not started in this patch because Phase 0 baseline PHP tests are not fully green in the current environment; behavior-preserving extraction is gated until the baseline failures are resolved or accepted as known failures.
