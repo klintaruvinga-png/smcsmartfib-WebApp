@@ -494,12 +494,14 @@ function EntryRow({
   lot,
   stop,
   target,
+  rr,
 }: {
   stage: string;
   entry: string;
   lot: string;
   stop: string;
   target: string;
+  rr: string;
 }) {
   return (
     <>
@@ -508,6 +510,7 @@ function EntryRow({
       <div className="text-tx">{lot}</div>
       <div className="text-tx">{stop}</div>
       <div className="text-buy">{target}</div>
+      <div className="text-info">{rr}</div>
     </>
   );
 }
