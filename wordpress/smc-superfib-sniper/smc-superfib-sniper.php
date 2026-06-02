@@ -6145,6 +6145,9 @@ final class SMC_SuperFib_Sniper_REST {
         if ($sequence[$direction ?: 'LONG']['mss']) {
             $confluence[] = 'MSS';
         }
+        if (in_array($sequence[$direction ?: 'LONG']['displacement'], array('clean', 'strong'), true)) {
+            $confluence[] = 'displacement';
+        }
         if ($f3_chop === 'clear') {
             $confluence[] = 'F3-clear';
         }
