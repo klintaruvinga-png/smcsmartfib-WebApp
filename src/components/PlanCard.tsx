@@ -240,15 +240,18 @@ export function PlanCandidateCard({
         <div className="rounded-lg border border-bd bg-bg1/50 overflow-hidden">
           <div className="grid gap-px bg-bd/60 xl:grid-cols-[1.8fr_1fr_1fr_1fr]">
             <PlanPanel title="Entries" tone="info">
-              <div className="grid grid-cols-[auto_repeat(4,minmax(0,1fr))] gap-x-2 gap-y-2 text-[10px] font-mono">
-                <SectionHeaderCell />
-                <SectionHeaderCell>Entry</SectionHeaderCell>
-                <SectionHeaderCell>Lot sizing</SectionHeaderCell>
-                <SectionHeaderCell>SL</SectionHeaderCell>
-                <SectionHeaderCell>TP</SectionHeaderCell>
-                {entryRows!.map((row) => (
-                  <EntryRow key={row.stage} {...row} />
-                ))}
+              <div className="overflow-x-auto -mx-3 px-3">
+                <div className="grid grid-cols-[auto_repeat(5,minmax(0,1fr))] gap-x-2 gap-y-2 text-[10px] font-mono min-w-[360px]">
+                  <SectionHeaderCell />
+                  <SectionHeaderCell>Entry</SectionHeaderCell>
+                  <SectionHeaderCell>Lot</SectionHeaderCell>
+                  <SectionHeaderCell>SL</SectionHeaderCell>
+                  <SectionHeaderCell>TP</SectionHeaderCell>
+                  <SectionHeaderCell>RR</SectionHeaderCell>
+                  {entryRows!.map((row) => (
+                    <EntryRow key={row.stage} {...row} />
+                  ))}
+                </div>
               </div>
             </PlanPanel>
 
