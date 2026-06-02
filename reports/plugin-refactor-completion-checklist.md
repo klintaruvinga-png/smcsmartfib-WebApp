@@ -39,9 +39,16 @@
 | `php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php` | PASS |
 | `php wordpress/smc-superfib-sniper/tests/php/test-progressive-lot-sizing.php` | PASS |
 | `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` | PASS |
-| Full PHP test-file gate over `wordpress/smc-superfib-sniper/tests/php/*.php` | PASS: 25 passed, 0 failed; failed files: none |
+| Full PHP test-file gate using `passed=0; failed=0; failed_files=(); for f in wordpress/smc-superfib-sniper/tests/php/*.php; do echo "== $f =="; if php "$f"; then passed=$((passed+1)); else failed=$((failed+1)); failed_files+=("$f"); fi; done; printf 'PHP test files: %d passed, %d failed\n' "$passed" "$failed"; if [ "$failed" -gt 0 ]; then printf 'Failed files: %s\n' "${failed_files[*]}"; exit 1; else printf 'Failed files: none\n'; fi` | PASS: 25 passed, 0 failed; failed files: none |
 | `npm run build` | PASS |
 | `npm run test:focused` | WARNING: fails in the repo test environment with React dispatcher-null `Invalid hook call` errors; a temporary minimal `renderHook` smoke test reproduced the same environment failure. |
+
+## PR #332 Phase 1+ audit closeout
+
+- Re-audited runtime PHP changes from `fde38da` through `b916526`, excluding the already-accepted USC cent-account fix at `30ba3ed`.
+- Closed the P1 review gap for PR #332 Phase 1+ runtime PHP changes: no new defects found after route-registration, auth, CORS, settings/risk, watchlist, EA request, and shared utility extraction review.
+- Closed the P2 test-command concern: the verified 25/0 result uses the full `for f in wordpress/smc-superfib-sniper/tests/php/*.php; do ... php "$f" ... done` loop form restored in `7804886`, not a single `php tests/*.php` invocation.
+- Current verification output explicitly ended with `PHP test files: 25 passed, 0 failed` and `Failed files: none`.
 
 ## Closeout notes
 
