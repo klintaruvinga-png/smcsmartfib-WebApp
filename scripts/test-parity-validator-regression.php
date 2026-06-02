@@ -66,6 +66,21 @@ function run_regime_validator(array $mt5Payload, array $pinePayload): array {
     return run_validator('regime-parity-validator.php', $mt5Payload, $pinePayload, 'reg');
 }
 
+function resolve_plugin_file(): ?string {
+    $candidates = array(
+        __DIR__ . '/../wordpress/smc-superfib-sniper/smc-superfib-sniper.php',
+        __DIR__ . '/../wordpress/smc-superfib-sniper v13.1.0/smc-superfib-sniper.php',
+    );
+
+    foreach ($candidates as $candidate) {
+        if (file_exists($candidate)) {
+            return $candidate;
+        }
+    }
+
+    return null;
+}
+
 // ---------------------------------------------------------------------------
 // Signal fixtures
 // ---------------------------------------------------------------------------
@@ -130,8 +145,9 @@ assert_eq('MISSING_COUNTERPART increments critical_mismatches_count', 1, $r['cri
 // ---------------------------------------------------------------------------
 // TEST 8: Display schema SQL includes backend_confirmed column
 // ---------------------------------------------------------------------------
-$pluginFile = __DIR__ . '/../wordpress/smc-superfib-sniper/smc-superfib-sniper.php';
-if (file_exists($pluginFile)) {
+$pluginFile = resolve_plugin_file();
+assert_eq('Display schema plugin file is available', true, $pluginFile !== null);
+if ($pluginFile !== null) {
     $src = file_get_contents($pluginFile);
     $inSql = false;
     $found = false;
@@ -148,8 +164,6 @@ if (file_exists($pluginFile)) {
         }
     }
     assert_eq('Display schema SQL contains backend_confirmed column', true, $found);
-} else {
-    echo "[SKIP] Plugin file not found at expected path\n";
 }
 
 // ---------------------------------------------------------------------------
