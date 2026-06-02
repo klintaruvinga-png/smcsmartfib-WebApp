@@ -189,7 +189,7 @@ final class SMC_SuperFib_Sniper_REST {
         return \SMC\SuperFib\Database\Schema::get_display_signals_table_sql($charset);
     }
 
-    private static function ensure_bridge_tables() {
+    public static function ensure_bridge_tables() {
         return \SMC\SuperFib\Database\Schema::ensure_bridge_tables();
     }
 
@@ -242,11 +242,11 @@ final class SMC_SuperFib_Sniper_REST {
         return \SMC\SuperFib\Rest\Permissions::get_ea_api_key($request);
     }
 
-    private function ea_request_value(WP_REST_Request $request, array $payload, $key, $default = null) {
+    public function ea_request_value(WP_REST_Request $request, array $payload, $key, $default = null) {
         return \SMC\SuperFib\Rest\Permissions::ea_request_value($request, $payload, $key, $default);
     }
 
-    private function resolve_ea_user_id(): int
+    public function resolve_ea_user_id(): int
     {
         return \SMC\SuperFib\Rest\Permissions::resolve_ea_user_id();
     }
@@ -431,7 +431,7 @@ final class SMC_SuperFib_Sniper_REST {
         return new \SMC\SuperFib\Service\FundamentalsService($this);
     }
 
-    private function normalize_phase3_market_stream_payload(array $payload): array
+    public function normalize_phase3_market_stream_payload(array $payload): array
     {
         if (!isset($payload['candle']) && $this->has_any_phase3_candle_alias($payload, 'candle_')) {
             $payload['candle'] = array(
@@ -487,7 +487,7 @@ final class SMC_SuperFib_Sniper_REST {
         return false;
     }
 
-    private function is_phase3_market_stream_payload(array $payload): bool
+    public function is_phase3_market_stream_payload(array $payload): bool
     {
         foreach (array('candle_m15', 'candle_m15_open', 'candle_m15_time') as $key) {
             if (array_key_exists($key, $payload)) {
@@ -498,14 +498,14 @@ final class SMC_SuperFib_Sniper_REST {
         return false;
     }
 
-    private function normalize_mt5_freshness_value($freshness): string
+    public function normalize_mt5_freshness_value($freshness): string
     {
         $value = strtoupper(trim((string) $freshness));
         $allowed = array('LIVE', 'DELAYED', 'STALE', 'CLOSED', 'DISCONNECTED');
         return in_array($value, $allowed, true) ? $value : '';
     }
 
-    private function normalize_mt5_session_value($session): string
+    public function normalize_mt5_session_value($session): string
     {
         $value = trim((string) $session);
         if ($value === '') {
@@ -528,7 +528,7 @@ final class SMC_SuperFib_Sniper_REST {
         return $map[$upper] ?? '';
     }
 
-    private function validate_phase3_market_stream_payload(array $payload): array
+    public function validate_phase3_market_stream_payload(array $payload): array
     {
         $timestamp_raw = !empty($payload['quote_time'])
             ? $payload['quote_time']
@@ -1085,7 +1085,7 @@ final class SMC_SuperFib_Sniper_REST {
     // Determine pine_match classification by comparing MT5 candidate against
     // existing Pine-sourced signals in smc_sf_signals.
     // Returns: EXACT / DRIFT / MISMATCH / NO_PINE
-    private function classify_signal_drift($user_id, $symbol, $direction, $mt5_entry, &$drift_pips = null) {
+    public function classify_signal_drift($user_id, $symbol, $direction, $mt5_entry, &$drift_pips = null) {
         global $wpdb;
         $drift_pips = null;
 
@@ -1542,7 +1542,7 @@ final class SMC_SuperFib_Sniper_REST {
         ));
     }
 
-    private function insert_engine_heartbeat($user_id, array $summary) {
+    public function insert_engine_heartbeat($user_id, array $summary) {
         global $wpdb;
 
         $wpdb->insert(
@@ -1557,26 +1557,26 @@ final class SMC_SuperFib_Sniper_REST {
         );
     }
 
-    private function ea_identity_key($account_id, $terminal_id) {
+    public function ea_identity_key($account_id, $terminal_id) {
         $account_fragment = $account_id !== '' ? $account_id : 'unknown-account';
         $terminal_fragment = $terminal_id !== '' ? $terminal_id : 'unknown-terminal';
         return $account_fragment . '|' . $terminal_fragment;
     }
 
-    private function sanitize_ea_text($value, $max_length = 128) {
+    public function sanitize_ea_text($value, $max_length = 128) {
         $clean = sanitize_text_field((string) $value);
         return substr($clean, 0, $max_length);
     }
 
-    private function sanitize_ea_number($value, $fallback = 0.0) {
+    public function sanitize_ea_number($value, $fallback = 0.0) {
         return is_numeric($value) ? (float) $value : (float) $fallback;
     }
 
-    private function sanitize_ea_int($value, $fallback = 0) {
+    public function sanitize_ea_int($value, $fallback = 0) {
         return is_numeric($value) ? (int) $value : (int) $fallback;
     }
 
-    private function sanitize_ea_bool($value) {
+    public function sanitize_ea_bool($value) {
         if (is_bool($value)) {
             return $value;
         }
@@ -1588,7 +1588,7 @@ final class SMC_SuperFib_Sniper_REST {
         return in_array($normalized, array('1', 'true', 'yes', 'on', 'connected', 'live'), true);
     }
 
-    private function normalize_symbol_sync_payload(WP_REST_Request $request, array $payload) {
+    public function normalize_symbol_sync_payload(WP_REST_Request $request, array $payload) {
         $symbols = $this->ea_request_value($request, $payload, 'symbols', array());
         if (is_array($symbols) && isset($symbols['broker_symbol'])) {
             return array($symbols);
@@ -1620,7 +1620,7 @@ final class SMC_SuperFib_Sniper_REST {
         return array();
     }
 
-    private function build_symbol_sync_record(WP_REST_Request $request, array $payload, array $symbol_payload, $user_id, $seen_at) {
+    public function build_symbol_sync_record(WP_REST_Request $request, array $payload, array $symbol_payload, $user_id, $seen_at) {
         $account_id = $this->sanitize_ea_text(
             array_key_exists('account_id', $symbol_payload) ? $symbol_payload['account_id'] : $this->ea_request_value($request, $payload, 'account_id', ''),
             64
@@ -1670,7 +1670,7 @@ final class SMC_SuperFib_Sniper_REST {
         );
     }
 
-    private function resolve_ea_license_status(array $blob, $account_id, $terminal_id) {
+    public function resolve_ea_license_status(array $blob, $account_id, $terminal_id) {
         $allowed = true;
         $status = 'active';
         $reason = null;
@@ -1723,7 +1723,7 @@ final class SMC_SuperFib_Sniper_REST {
      * Insert or update MT5 price snapshot
      * Regression guard: Atomic operation with proper source tagging
      */
-    private function upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $updated_at = null, $freshness = '') {
+    public function upsert_mt5_snapshot($user_id, $symbol, $bid, $ask, $updated_at = null, $freshness = '') {
         global $wpdb;
 
         $mid = ($bid + $ask) / 2;
@@ -1787,7 +1787,7 @@ final class SMC_SuperFib_Sniper_REST {
      * Insert MT5 candle data
      * Regression guard: Atomic operation with proper source tagging
      */
-    private function insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $stream_timestamp = null, $max_age_sec = 180) {
+    public function insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $stream_timestamp = null, $max_age_sec = 180) {
         global $wpdb;
 
         // Parse timestamp to MySQL format
@@ -1882,7 +1882,7 @@ final class SMC_SuperFib_Sniper_REST {
      * Validate OHLC ordering: high >= max(open,close), low <= min(open,close).
      * Returns false if the candle is logically inconsistent and should be rejected.
      */
-    private function validate_ohlc(array $candle): bool {
+    public function validate_ohlc(array $candle): bool {
         $open  = (float) $candle['open'];
         $high  = (float) $candle['high'];
         $low   = (float) $candle['low'];
@@ -2205,7 +2205,7 @@ final class SMC_SuperFib_Sniper_REST {
         return $result;
     }
 
-    private function reconcile_live_signal_board(int $user_id, array $symbols, array $signals, array $diagnostics): void {
+    public function reconcile_live_signal_board(int $user_id, array $symbols, array $signals, array $diagnostics): void {
         global $wpdb;
 
         $watchlist_lookup = $this->normalize_symbol_lookup($symbols);
@@ -2724,7 +2724,7 @@ final class SMC_SuperFib_Sniper_REST {
         return true;
     }
 
-    private function read_live_signal_board(int $user_id, array $symbols, ?int $board_size = null): array {
+    public function read_live_signal_board(int $user_id, array $symbols, ?int $board_size = null): array {
         $rows = $this->read_display_signal_rows($user_id, $symbols, false);
         usort($rows, function ($a, $b) {
             $score_cmp = ((float) ($b['quality_score'] ?? 0)) <=> ((float) ($a['quality_score'] ?? 0));
@@ -2745,7 +2745,7 @@ final class SMC_SuperFib_Sniper_REST {
         }, $rows));
     }
 
-    private function count_live_signal_board(int $user_id, array $symbols): int {
+    public function count_live_signal_board(int $user_id, array $symbols): int {
         return count($this->read_display_signal_rows($user_id, $symbols, false));
     }
 
@@ -3477,7 +3477,7 @@ final class SMC_SuperFib_Sniper_REST {
         return preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $symbol));
     }
 
-    private function map_symbol_aliases($symbol) {
+    public function map_symbol_aliases($symbol) {
         static $aliases = array(
             // NAS100 / NASDAQ broker aliases
             'NASDAQ'      => 'NAS100',
@@ -3575,7 +3575,7 @@ final class SMC_SuperFib_Sniper_REST {
         );
     }
 
-    private function refresh_prices($user_id, $symbols) {
+    public function refresh_prices($user_id, $symbols) {
         $prices = array();
         $stale_threshold_sec = $this->get_settings($user_id)['staleThresholdSec'];
         foreach ($symbols as $symbol) {
@@ -3638,7 +3638,7 @@ final class SMC_SuperFib_Sniper_REST {
         return null;
     }
 
-    private function fetch_candles($user_id, $symbol, $timeframe, $outputsize) {
+    public function fetch_candles($user_id, $symbol, $timeframe, $outputsize) {
         global $wpdb;
 
         // Candle TTL: skip upstream call when candles were fetched recently, when the symbol is
@@ -3915,7 +3915,7 @@ final class SMC_SuperFib_Sniper_REST {
         return array_slice(array_values($buckets), -1 * max(1, (int) $outputsize));
     }
 
-    private function validate_twelve_key($api_key) {
+    public function validate_twelve_key($api_key) {
         $url = add_query_arg(array(
             'symbol' => 'EUR/USD',
             'apikey' => $api_key,
@@ -3942,7 +3942,7 @@ final class SMC_SuperFib_Sniper_REST {
         return array('ok' => true, 'status' => 'ok');
     }
 
-    private function get_settings($user_id) {
+    public function get_settings($user_id) {
         global $wpdb;
 
         $default = array(
@@ -3971,7 +3971,7 @@ final class SMC_SuperFib_Sniper_REST {
         return $default;
     }
 
-    private function get_risk_profile($user_id) {
+    public function get_risk_profile($user_id) {
         $blob = $this->get_account_blob($user_id);
         if (!empty($blob['riskProfile'])) {
             return $blob['riskProfile'];
@@ -3988,7 +3988,7 @@ final class SMC_SuperFib_Sniper_REST {
         );
     }
 
-    private function get_account_state($user_id) {
+    public function get_account_state($user_id) {
         $blob = $this->get_account_blob($user_id);
         $positions = $this->read_trade_payloads($user_id, 'position');
         $orders = $this->read_pending_orders($user_id);
@@ -4020,7 +4020,7 @@ final class SMC_SuperFib_Sniper_REST {
         return $default;
     }
 
-    private function read_user_progress(int $user_id): array {
+    public function read_user_progress(int $user_id): array {
         return array(
             'equity_pulse' => $this->read_progress_equity_pulse($user_id),
             'streak' => $this->read_progress_streak($user_id),
@@ -4029,7 +4029,7 @@ final class SMC_SuperFib_Sniper_REST {
         );
     }
 
-    private function get_account_blob($user_id) {
+    public function get_account_blob($user_id) {
         global $wpdb;
         $row = $wpdb->get_var($wpdb->prepare(
             "SELECT data FROM {$this->table('account_snapshots')} WHERE user_id = %d",
@@ -4039,7 +4039,7 @@ final class SMC_SuperFib_Sniper_REST {
         return is_array($decoded) ? $decoded : array();
     }
 
-    private function read_trade_payloads($user_id, $kind) {
+    public function read_trade_payloads($user_id, $kind) {
         global $wpdb;
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT payload FROM {$this->table('trades')} WHERE user_id = %d AND kind = %s ORDER BY created_at DESC",
@@ -4052,7 +4052,7 @@ final class SMC_SuperFib_Sniper_REST {
         }, $rows)));
     }
 
-    private function read_pending_orders($user_id) {
+    public function read_pending_orders($user_id) {
         global $wpdb;
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT payload FROM {$this->table('trade_queue')} WHERE user_id = %d AND state = 'pending-sync' ORDER BY created_at DESC",
@@ -4064,7 +4064,7 @@ final class SMC_SuperFib_Sniper_REST {
         }, $rows)));
     }
 
-    private function has_phase2_trade_telemetry_payload(array $payload): bool {
+    public function has_phase2_trade_telemetry_payload(array $payload): bool {
         return array_key_exists('schema_version', $payload)
             || array_key_exists('positions', $payload)
             || array_key_exists('pending_orders', $payload)
@@ -4073,7 +4073,7 @@ final class SMC_SuperFib_Sniper_REST {
             || array_key_exists('terminal_id', $payload);
     }
 
-    private function persist_phase2_trade_telemetry(WP_REST_Request $request, array $payload, int $user_id) {
+    public function persist_phase2_trade_telemetry(WP_REST_Request $request, array $payload, int $user_id) {
         global $wpdb;
 
         if (!self::ensure_trade_telemetry_tables()) {
@@ -4485,7 +4485,7 @@ final class SMC_SuperFib_Sniper_REST {
         return $swept;
     }
 
-    private function read_account_telemetry(int $user_id): array {
+    public function read_account_telemetry(int $user_id): array {
         global $wpdb;
 
         if (!self::ensure_trade_telemetry_tables()) {
@@ -4687,7 +4687,7 @@ final class SMC_SuperFib_Sniper_REST {
         );
     }
 
-    private function read_trade_positions(int $user_id): array {
+    public function read_trade_positions(int $user_id): array {
         global $wpdb;
 
         if (!self::ensure_trade_telemetry_tables()) {
@@ -4731,7 +4731,7 @@ final class SMC_SuperFib_Sniper_REST {
         }, is_array($rows) ? $rows : array()));
     }
 
-    private function read_trade_orders(int $user_id): array {
+    public function read_trade_orders(int $user_id): array {
         global $wpdb;
 
         if (!self::ensure_trade_telemetry_tables()) {
@@ -4876,7 +4876,7 @@ final class SMC_SuperFib_Sniper_REST {
         return strcmp($left, $right) >= 0 ? $left : $right;
     }
 
-    private function get_engine_snapshot($user_id) {
+    public function get_engine_snapshot($user_id) {
         $snapshot = get_user_meta($user_id, 'smc_sf_engine_snapshot', true);
         return is_array($snapshot) ? $snapshot : null;
     }
@@ -4911,7 +4911,7 @@ final class SMC_SuperFib_Sniper_REST {
         return $prices;
     }
 
-    private function ensure_engine_snapshot($user_id, $force = false, &$was_computed = null) {
+    public function ensure_engine_snapshot($user_id, $force = false, &$was_computed = null) {
         $was_computed = false;
         $settings = $this->get_settings($user_id);
         $symbols = $settings['watchlist'];
@@ -4959,12 +4959,12 @@ final class SMC_SuperFib_Sniper_REST {
         return true;
     }
 
-    private function delete_engine_snapshot($user_id) {
+    public function delete_engine_snapshot($user_id) {
         delete_user_meta($user_id, 'smc_sf_engine_snapshot');
         error_log("SMC_SF: engine snapshot invalidated for user {$user_id}");
     }
 
-    private function invalidate_watchlist_snapshot_if_changed($user_id, $previous_watchlist, $next_watchlist, $context) {
+    public function invalidate_watchlist_snapshot_if_changed($user_id, $previous_watchlist, $next_watchlist, $context) {
         if ($previous_watchlist !== $next_watchlist) {
             $this->delete_engine_snapshot($user_id);
             return true;
@@ -4974,7 +4974,7 @@ final class SMC_SuperFib_Sniper_REST {
         return false;
     }
 
-    private function log_watchlist_snapshot_skip($user_id, $context) {
+    public function log_watchlist_snapshot_skip($user_id, $context) {
         error_log(sprintf(
             'SMC_SF WARNING: engine snapshot retained for user %d during %s because watchlist was unchanged',
             (int) $user_id,
@@ -5028,7 +5028,7 @@ final class SMC_SuperFib_Sniper_REST {
         return true;
     }
 
-    private function get_snapshot_row($user_id, $symbol, $source = 'mt5') {
+    public function get_snapshot_row($user_id, $symbol, $source = 'mt5') {
         global $wpdb;
 
         $query = "SELECT * FROM {$this->table('snapshots')} WHERE user_id = %d AND symbol = %s";
@@ -5041,7 +5041,7 @@ final class SMC_SuperFib_Sniper_REST {
         return $wpdb->get_row($wpdb->prepare($query, $params), ARRAY_A);
     }
 
-    private function get_cached_price($user_id, $symbol, $stale_threshold_sec = null) {
+    public function get_cached_price($user_id, $symbol, $stale_threshold_sec = null) {
         $row = $this->get_snapshot_row($user_id, $symbol, 'mt5');
         if (!$row) {
             return null;
@@ -5407,7 +5407,7 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
 
-    private function is_mt5_authoritative($user_id, $symbol) {
+    public function is_mt5_authoritative($user_id, $symbol) {
         if (!$symbol) return false;
         $cached_price = $this->get_cached_price($user_id, $symbol, PHP_INT_MAX);
         if ($cached_price && ($cached_price['source'] ?? '') === 'mt5') {
@@ -5423,7 +5423,7 @@ final class SMC_SuperFib_Sniper_REST {
     // short-lived WP transient so the stored key credential (key_status = 'ok')
     // is never corrupted.  After the TTL expires the feed recovers automatically.
 
-    private function rl_transient_key($user_id, $symbol = null) {
+    public function rl_transient_key($user_id, $symbol = null) {
         $key = 'smc_sf_rl_' . (int) $user_id;
         if ($symbol) {
             $key .= '_' . sanitize_key($symbol);
@@ -5439,7 +5439,7 @@ final class SMC_SuperFib_Sniper_REST {
         }
     }
 
-    private function is_feed_rate_limited($user_id, $symbol = null) {
+    public function is_feed_rate_limited($user_id, $symbol = null) {
         $key = $symbol !== null ? $this->rl_transient_key($user_id, $symbol) : $this->rl_transient_key($user_id);
         $state = get_transient($key) !== false;
 
@@ -5450,7 +5450,7 @@ final class SMC_SuperFib_Sniper_REST {
         return $state;
     }
 
-    private function get_twelve_key_status($user_id) {
+    public function get_twelve_key_status($user_id) {
         global $wpdb;
         $status = $wpdb->get_var($wpdb->prepare(
             "SELECT key_status FROM {$this->table('integrations')} WHERE user_id = %d AND provider = %s",
@@ -5460,7 +5460,7 @@ final class SMC_SuperFib_Sniper_REST {
         return $status ? $status : 'missing';
     }
 
-    private function clear_feed_rate_limit_state($user_id) {
+    public function clear_feed_rate_limit_state($user_id) {
         delete_transient($this->rl_transient_key($user_id));
         $settings = $this->get_settings($user_id);
         foreach ($settings['watchlist'] as $symbol) {
@@ -5468,7 +5468,7 @@ final class SMC_SuperFib_Sniper_REST {
         }
     }
 
-    private function log_feed_debug($event, $context = array()) {
+    public function log_feed_debug($event, $context = array()) {
         $parts = array();
         foreach ($context as $key => $value) {
             if (is_bool($value)) {
@@ -5515,7 +5515,7 @@ final class SMC_SuperFib_Sniper_REST {
         return $this->decrypt_secret($encrypted);
     }
 
-    private function encrypt_secret($secret) {
+    public function encrypt_secret($secret) {
         if (!function_exists('openssl_encrypt')) {
             return new WP_Error('smc_sf_crypto_missing', 'OpenSSL encryption is required.', array('status' => 500));
         }
@@ -5566,7 +5566,7 @@ final class SMC_SuperFib_Sniper_REST {
         return hash('sha256', $salt . '|smc-superfib-sniper|' . (defined('SECURE_AUTH_SALT') ? SECURE_AUTH_SALT : ''), true);
     }
 
-    private function replace_json($table, $data) {
+    public function replace_json($table, $data) {
         global $wpdb;
         foreach ($data as $field => $value) {
             if (is_array($value)) {
@@ -5576,7 +5576,7 @@ final class SMC_SuperFib_Sniper_REST {
         $wpdb->replace($this->table($table), $data);
     }
 
-    private function audit($user_id, $event_type, $payload) {
+    public function audit($user_id, $event_type, $payload) {
         global $wpdb;
         $wpdb->insert(
             $this->table('audit_events'),
@@ -5590,7 +5590,7 @@ final class SMC_SuperFib_Sniper_REST {
         );
     }
 
-    private function instrument_specs() {
+    public function instrument_specs() {
         static $specs = null;
         if ($specs !== null) {
             return $specs;
@@ -5657,13 +5657,13 @@ final class SMC_SuperFib_Sniper_REST {
         return isset($specs[$key]) ? $specs[$key] : null;
     }
 
-    private function is_supported_symbol($symbol) {
+    public function is_supported_symbol($symbol) {
         $key = $this->map_symbol_aliases($symbol);
         $specs = $this->instrument_specs();
         return isset($specs[$key]);
     }
 
-    private function validate_watchlist_symbols($symbols) {
+    public function validate_watchlist_symbols($symbols) {
         $out = array();
         foreach ($this->sanitize_symbols($symbols) as $sym) {
             if ($this->is_supported_symbol($sym)) {
@@ -5673,7 +5673,7 @@ final class SMC_SuperFib_Sniper_REST {
         return $out;
     }
 
-    private function save_watchlist($user_id, $watchlist) {
+    public function save_watchlist($user_id, $watchlist) {
         $current = $this->get_settings($user_id);
         $current['watchlist'] = $this->validate_watchlist_symbols($watchlist);
         $this->replace_json('user_settings', array(
@@ -5683,7 +5683,7 @@ final class SMC_SuperFib_Sniper_REST {
         ));
     }
 
-    private function sanitize_symbols($symbols) {
+    public function sanitize_symbols($symbols) {
         if (!is_array($symbols)) {
             return array();
         }
@@ -5701,7 +5701,7 @@ final class SMC_SuperFib_Sniper_REST {
         return array_slice($out, 0, 24);
     }
 
-    private function sanitize_risk_allocation($payload, $fallback) {
+    public function sanitize_risk_allocation($payload, $fallback) {
         if (!is_array($payload)) {
             return $fallback;
         }
@@ -5712,7 +5712,7 @@ final class SMC_SuperFib_Sniper_REST {
         );
     }
 
-    private function sanitize_signal_board_size($value): int {
+    public function sanitize_signal_board_size($value): int {
         $size = (int) $value;
         if ($size <= 3) {
             return 3;
@@ -5723,7 +5723,7 @@ final class SMC_SuperFib_Sniper_REST {
         return 10;
     }
 
-    private function resolve_signal_board_size(int $user_id): int {
+    public function resolve_signal_board_size(int $user_id): int {
         $request_value = isset($_GET['board_size']) ? $_GET['board_size'] : (isset($_GET['boardSize']) ? $_GET['boardSize'] : null);
         if ($request_value !== null) {
             return $this->sanitize_signal_board_size($request_value);
@@ -5732,14 +5732,14 @@ final class SMC_SuperFib_Sniper_REST {
         return $this->sanitize_signal_board_size($settings['signalBoardSize'] ?? 3);
     }
 
-    private function int_between($payload, $key, $min, $max, $fallback) {
+    public function int_between($payload, $key, $min, $max, $fallback) {
         if (!is_array($payload) || !isset($payload[$key])) {
             return $fallback;
         }
         return max($min, min($max, (int) $payload[$key]));
     }
 
-    private function float_between($payload, $key, $min, $max, $fallback) {
+    public function float_between($payload, $key, $min, $max, $fallback) {
         if (!is_array($payload) || !isset($payload[$key])) {
             return $fallback;
         }
@@ -5757,7 +5757,7 @@ final class SMC_SuperFib_Sniper_REST {
         return $key;
     }
 
-    private function latest_timestamp($table, $user_id, $column) {
+    public function latest_timestamp($table, $user_id, $column) {
         global $wpdb;
         $allowed_tables  = array('snapshots', 'engine_runs');
         $allowed_columns = array('updated_at', 'created_at');
@@ -5855,7 +5855,7 @@ final class SMC_SuperFib_Sniper_REST {
     // NYSE/NASDAQ regular session: 09:30-16:00 ET.
     //   EDT (UTC-4, 2nd Sun March → 1st Sun November): 13:30-20:00 UTC
     //   EST (UTC-5, otherwise):                         14:30-21:00 UTC
-    private function is_equity_index_off_session($symbol) {
+    public function is_equity_index_off_session($symbol) {
         static $equity_symbols = array('NAS100', 'US30');
         if (!in_array(strtoupper((string) $symbol), $equity_symbols, true)) {
             return false;
@@ -5898,7 +5898,7 @@ final class SMC_SuperFib_Sniper_REST {
         return $day < $first_sunday_day || ($day === $first_sunday_day && $hour < 6);
     }
 
-    private function is_chart_candle_fresh($candle_time, $timeframe) {
+    public function is_chart_candle_fresh($candle_time, $timeframe) {
         $candle_ts = $candle_time ? strtotime((string) $candle_time) : false;
         if (!$candle_ts) {
             return false;
@@ -5913,7 +5913,7 @@ final class SMC_SuperFib_Sniper_REST {
         return (time() - $candle_ts) <= $threshold_sec;
     }
 
-    private function normalize_market_timestamp($raw_time, $fallback = null) {
+    public function normalize_market_timestamp($raw_time, $fallback = null) {
         $fallback_value = (func_num_args() >= 2) ? $fallback : $this->now_mysql();
         if ($raw_time === null || $raw_time === '') {
             return $fallback_value;
@@ -5954,7 +5954,7 @@ final class SMC_SuperFib_Sniper_REST {
         return gmdate('Y-m-d H:i:s', $ts);
     }
 
-    private function normalize_mt5_timeframe($timeframe) {
+    public function normalize_mt5_timeframe($timeframe) {
         $value = strtoupper(trim((string) $timeframe));
         $mt5_map = array(
             'M1' => '1min',
@@ -5975,7 +5975,7 @@ final class SMC_SuperFib_Sniper_REST {
         return sanitize_text_field($timeframe ?: '15min');
     }
 
-    private function mt5_freshness_to_snapshot_state($freshness) {
+    public function mt5_freshness_to_snapshot_state($freshness) {
         switch (strtoupper(trim((string) $freshness))) {
             case 'LIVE':
                 return 'live';
@@ -5990,12 +5990,12 @@ final class SMC_SuperFib_Sniper_REST {
         }
     }
 
-    private function table($name) {
+    public function table($name) {
         global $wpdb;
         return $wpdb->prefix . 'smc_sf_' . $name;
     }
 
-    private function now_mysql() {
+    public function now_mysql() {
         return gmdate('Y-m-d H:i:s');
     }
 
@@ -6136,7 +6136,7 @@ final class SMC_SuperFib_Sniper_REST {
         }
     }
 
-    private function wpdb_last_error() {
+    public function wpdb_last_error() {
         global $wpdb;
         if (is_object($wpdb) && property_exists($wpdb, 'last_error') && $wpdb->last_error !== '') {
             return (string) $wpdb->last_error;
@@ -6160,7 +6160,7 @@ final class SMC_SuperFib_Sniper_REST {
         return 200;
     }
 
-    private function no_cache_response($payload) {
+    public function no_cache_response($payload) {
         $response = rest_ensure_response($payload);
 
         if ($response instanceof WP_REST_Response && method_exists($response, 'header')) {
@@ -6171,7 +6171,7 @@ final class SMC_SuperFib_Sniper_REST {
         return $response;
     }
 
-    private function to_iso($mysql_time) {
+    public function to_iso($mysql_time) {
         if (!$mysql_time) {
             return null;
         }
