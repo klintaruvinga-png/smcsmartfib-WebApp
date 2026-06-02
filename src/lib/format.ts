@@ -61,6 +61,22 @@ export function fmtZAR(value: number): string {
   return `R${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
+export function fmtLocalCurrency(
+  value: number | null | undefined,
+  currencyCode?: string | null,
+  locale?: string,
+): string {
+  if (value === undefined || value === null || !Number.isFinite(value)) return "--";
+  const resolvedLocale =
+    locale ?? (typeof navigator !== "undefined" ? navigator.language : "en-ZA");
+
+  return new Intl.NumberFormat(resolvedLocale, {
+    style: "currency",
+    currency: currencyCode || "ZAR",
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 export function relTime(iso: string | null | undefined): string {
   if (!iso) return "unknown";
   const timestamp = new Date(iso).getTime();
