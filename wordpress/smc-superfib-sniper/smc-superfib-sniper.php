@@ -11,6 +11,13 @@ if (!defined('ABSPATH')) {
 }
 
 require_once __DIR__ . '/class-market-data-service.php';
+require_once __DIR__ . '/class-auth-service.php';
+require_once __DIR__ . '/class-cors-service.php';
+require_once __DIR__ . '/class-ea-request-service.php';
+require_once __DIR__ . '/class-plugin-utils.php';
+require_once __DIR__ . '/class-settings-service.php';
+require_once __DIR__ . '/class-watchlist-service.php';
+require_once __DIR__ . '/class-route-registrar.php';
 
 final class SMC_SuperFib_Sniper_REST {
     const VERSION = '13.0.3';
@@ -969,427 +976,80 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     public function register_routes() {
-        $this->route('/health', WP_REST_Server::READABLE, 'get_health', false);
-        register_rest_route(self::NAMESPACE, '/admin/health', array(
-            'methods' => WP_REST_Server::READABLE,
-            'callback' => array($this, 'get_admin_health'),
-            'permission_callback' => array($this, 'permission_admin'),
-        ));
-        register_rest_route(self::NAMESPACE, '/admin/soak-report', array(
-            'methods' => WP_REST_Server::READABLE,
-            'callback' => array($this, 'get_soak_report'),
-            'permission_callback' => array($this, 'permission_admin'),
-        ));
-        register_rest_route(self::NAMESPACE, '/admin/soak-evidence', array(
-            'methods' => WP_REST_Server::CREATABLE,
-            'callback' => array($this, 'upsert_soak_evidence'),
-            'permission_callback' => array($this, 'permission_admin'),
-        ));
-        register_rest_route(self::NAMESPACE, '/admin/soak-checkpoint', array(
-            'methods' => WP_REST_Server::CREATABLE,
-            'callback' => array($this, 'create_soak_checkpoint'),
-            'permission_callback' => array($this, 'permission_admin'),
-        ));
-        register_rest_route(self::NAMESPACE, '/admin/soak-reset', array(
-            'methods' => WP_REST_Server::DELETABLE,
-            'callback' => array($this, 'reset_soak'),
-            'permission_callback' => array($this, 'permission_admin'),
-        ));
-        $this->route('/session', WP_REST_Server::READABLE, 'get_session', false);
-        $this->route('/snapshot', WP_REST_Server::READABLE, 'get_snapshot', true);
-        $this->route('/snapshot', WP_REST_Server::CREATABLE, 'post_snapshot', true);
-        $this->route('/charts', WP_REST_Server::READABLE, 'get_chart_snapshot', true);
-        $this->route('/regimes', WP_REST_Server::READABLE, 'get_regimes', true);
-        $this->route('/regime', WP_REST_Server::CREATABLE, 'post_regime', true);
-        $this->route('/live-signals', WP_REST_Server::READABLE, 'get_live_signals', true);
-        $this->route('/signal', WP_REST_Server::CREATABLE, 'post_signal', true);
-        $this->route('/ladders', WP_REST_Server::READABLE, 'get_ladders', true);
-
-        $this->route('/user/engine-batch', WP_REST_Server::CREATABLE, 'post_engine_batch', true);
-        $this->route('/user/market-data', WP_REST_Server::CREATABLE, 'post_user_market_data', true);
-        $this->route('/user/trades', WP_REST_Server::READABLE, 'get_user_trades', true);
-        $this->route('/user/trades', WP_REST_Server::CREATABLE, 'post_user_trades', true);
-        $this->route('/user/account', WP_REST_Server::READABLE, 'get_user_account', true);
-        $this->route('/user/account', WP_REST_Server::CREATABLE, 'post_user_account', true);
-        $this->route('/user/progress', WP_REST_Server::READABLE, 'get_user_progress', true);
-        $this->route('/user/settings', WP_REST_Server::READABLE, 'get_user_settings', true);
-        $this->route('/user/settings', WP_REST_Server::CREATABLE, 'post_user_settings', true);
-        $this->route('/user/risk-profile', WP_REST_Server::READABLE, 'get_user_risk_profile', true);
-        $this->route('/user/risk-profile', WP_REST_Server::CREATABLE, 'post_user_risk_profile', true);
-        $this->route('/user/trade-queue', WP_REST_Server::READABLE, 'get_user_trade_queue', true);
-        $this->route('/user/trade-queue', WP_REST_Server::CREATABLE, 'post_user_trade_queue', true);
-        $this->route('/user/execute-signals', WP_REST_Server::CREATABLE, 'post_execute_signals', true);
-        $this->route('/user/twelve-data-key', WP_REST_Server::CREATABLE, 'post_twelve_data_key', true);
-        $this->route('/user/twelve-data-key', WP_REST_Server::DELETABLE, 'delete_twelve_data_key', true);
-        $this->route('/user/watchlist', WP_REST_Server::READABLE, 'get_user_watchlist', true);
-        $this->route('/user/watchlist', WP_REST_Server::CREATABLE, 'post_user_watchlist', true);
-        $this->route('/user/watchlist/add', WP_REST_Server::CREATABLE, 'post_watchlist_add', true);
-        $this->route('/user/watchlist/remove', WP_REST_Server::CREATABLE, 'post_watchlist_remove', true);
-        $this->route('/instruments', WP_REST_Server::READABLE, 'get_instruments', true);
-        $this->route('/account-telemetry', WP_REST_Server::READABLE, 'get_account_telemetry', true);
-        $this->route('/positions', WP_REST_Server::READABLE, 'get_positions', true);
-        $this->route('/orders', WP_REST_Server::READABLE, 'get_orders', true);
-        $this->route('/market-data-authority', WP_REST_Server::READABLE, 'get_market_data_authority', true);
-        $this->route('/authority-diagnostics', WP_REST_Server::READABLE, 'get_authority_diagnostics', true);
-
-        // MT5 EA market data ingestion endpoint (API key auth, no session/cookies).
-        register_rest_route(self::NAMESPACE, '/ea/market-stream', array(
-            'methods' => WP_REST_Server::CREATABLE,
-            'callback' => array($this, 'post_ea_market_stream'),
-            'permission_callback' => array($this, 'permission_ea_market_stream'),
-        ));
-        register_rest_route(self::NAMESPACE, '/ea/heartbeat', array(
-            'methods' => WP_REST_Server::CREATABLE,
-            'callback' => array($this, 'post_ea_heartbeat'),
-            'permission_callback' => array($this, 'permission_ea_bridge'),
-        ));
-        register_rest_route(self::NAMESPACE, '/ea/account-sync', array(
-            'methods' => WP_REST_Server::CREATABLE,
-            'callback' => array($this, 'post_ea_account_sync'),
-            'permission_callback' => array($this, 'permission_ea_bridge'),
-        ));
-        register_rest_route(self::NAMESPACE, '/ea/symbol-sync', array(
-            'methods' => WP_REST_Server::CREATABLE,
-            'callback' => array($this, 'post_ea_symbol_sync'),
-            'permission_callback' => array($this, 'permission_ea_bridge'),
-        ));
-        register_rest_route(self::NAMESPACE, '/ea/license-check', array(
-            'methods' => WP_REST_Server::READABLE,
-            'callback' => array($this, 'get_ea_license_check'),
-            'permission_callback' => array($this, 'permission_ea_bridge'),
-        ));
-
-        // Phase 4: fib level ingestion from MT5 EA
-        register_rest_route(self::NAMESPACE, '/ea/fib-levels', array(
-            'methods' => WP_REST_Server::CREATABLE,
-            'callback' => array($this, 'post_ea_fib_levels'),
-            'permission_callback' => array($this, 'permission_ea_bridge'),
-        ));
-
-        // Phase 4: fib level retrieval for dashboard
-        register_rest_route(self::NAMESPACE, '/market-data/fib-levels', array(
-            'methods' => WP_REST_Server::READABLE,
-            'callback' => array($this, 'get_market_data_fib_levels'),
-            'permission_callback' => array($this, 'permission_user'),
-        ));
-
-        // Phase 5: regime snapshot ingestion from MT5 EA
-        register_rest_route(self::NAMESPACE, '/ea/regime-snapshot', array(
-            'methods' => WP_REST_Server::CREATABLE,
-            'callback' => array($this, 'post_ea_regime_snapshot'),
-            'permission_callback' => array($this, 'permission_ea_bridge'),
-        ));
-
-        // Phase 5: regime data retrieval for dashboard
-        register_rest_route(self::NAMESPACE, '/market-data/regime', array(
-            'methods' => WP_REST_Server::READABLE,
-            'callback' => array($this, 'get_market_data_regime'),
-            'permission_callback' => array($this, 'permission_user'),
-        ));
-
-        // Phase 5B: fundamentals bias refresh (admin or user-triggered)
-        register_rest_route(self::NAMESPACE, '/fundamentals/refresh', array(
-            'methods' => WP_REST_Server::CREATABLE,
-            'callback' => array($this, 'post_fundamentals_refresh'),
-            'permission_callback' => array($this, 'permission_user'),
-        ));
-
-        // Phase 5B: fundamentals bias retrieval for dashboard
-        register_rest_route(self::NAMESPACE, '/fundamentals/bias', array(
-            'methods' => WP_REST_Server::READABLE,
-            'callback' => array($this, 'get_fundamentals_bias'),
-            'permission_callback' => array($this, 'permission_user'),
-        ));
-
-        // Phase 6: MT5 signal candidates ingestion (dual-run)
-        register_rest_route(self::NAMESPACE, '/ea/signal-candidates', array(
-            'methods' => WP_REST_Server::CREATABLE,
-            'callback' => array($this, 'post_ea_signal_candidates'),
-            'permission_callback' => array($this, 'permission_ea_bridge'),
-        ));
-
-        // Phase 6: Signal drift report for dashboard
-        register_rest_route(self::NAMESPACE, '/market-data/signal-drift', array(
-            'methods' => WP_REST_Server::READABLE,
-            'callback' => array($this, 'get_market_data_signal_drift'),
-            'permission_callback' => array($this, 'permission_user'),
-        ));
-
-        // Phase 7: Execution queue polling by MT5 EA
-        register_rest_route(self::NAMESPACE, '/ea/execution-queue', array(
-            'methods' => WP_REST_Server::READABLE,
-            'callback' => array($this, 'get_ea_execution_queue'),
-            'permission_callback' => array($this, 'permission_ea_bridge'),
-        ));
-
-        // Phase 7: Execution acknowledgement from MT5 EA
-        register_rest_route(self::NAMESPACE, '/ea/execution-ack', array(
-            'methods' => WP_REST_Server::CREATABLE,
-            'callback' => array($this, 'post_ea_execution_ack'),
-            'permission_callback' => array($this, 'permission_ea_bridge'),
-        ));
-
-        // Phase 7: Operator execution request from dashboard
-        register_rest_route(self::NAMESPACE, '/user/execution-request', array(
-            'methods' => WP_REST_Server::CREATABLE,
-            'callback' => array($this, 'post_user_execution_request'),
-            'permission_callback' => array($this, 'permission_user'),
-        ));
-
-        // Phase 7: Execution audit trail for dashboard
-        register_rest_route(self::NAMESPACE, '/user/execution-audit', array(
-            'methods' => WP_REST_Server::READABLE,
-            'callback' => array($this, 'get_user_execution_audit'),
-            'permission_callback' => array($this, 'permission_user'),
-        ));
-
-        // Phase 8: Approval queue read/review
-        register_rest_route(self::NAMESPACE, '/user/approval-queue', array(
-            'methods' => WP_REST_Server::READABLE,
-            'callback' => array($this, 'get_user_approval_queue'),
-            'permission_callback' => array($this, 'permission_user'),
-        ));
-        register_rest_route(self::NAMESPACE, '/user/approval-queue/review', array(
-            'methods' => WP_REST_Server::CREATABLE,
-            'callback' => array($this, 'post_approval_queue_review'),
-            'permission_callback' => array($this, 'permission_user'),
-        ));
-
-        // Phase 9: License tier read (user) and management (admin)
-        register_rest_route(self::NAMESPACE, '/user/license', array(
-            'methods' => WP_REST_Server::READABLE,
-            'callback' => array($this, 'get_user_license'),
-            'permission_callback' => array($this, 'permission_user'),
-        ));
-        register_rest_route(self::NAMESPACE, '/admin/license/set-tier', array(
-            'methods' => WP_REST_Server::CREATABLE,
-            'callback' => array($this, 'post_admin_set_license_tier'),
-            'permission_callback' => array($this, 'permission_admin'),
-        ));
-    }
-
-    private function route($path, $methods, $callback, $auth_required) {
-        register_rest_route(self::NAMESPACE, $path, array(
-            'methods' => $methods,
-            'callback' => array($this, $callback),
-            'permission_callback' => $auth_required ? array($this, 'permission_user') : '__return_true',
-        ));
+        $registrar = new SMC_SuperFib_Route_Registrar();
+        $registrar->register($this);
     }
 
     public function permission_user() {
-        $logged_in = is_user_logged_in();
-        $can_read = current_user_can('read');
-        $user_id = get_current_user_id();
-
-        if (!$logged_in || !$can_read) {
-            error_log(sprintf(
-                'SMC SuperFIB auth failed: user_id=%s logged_in=%s can_read=%s request_uri=%s method=%s remote_addr=%s',
-                $user_id,
-                $logged_in ? 'true' : 'false',
-                $can_read ? 'true' : 'false',
-                isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : 'unknown',
-                isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'unknown',
-                isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'unknown'
-            ));
-
-            return new WP_Error('smc_sf_auth_required', 'Authentication required.', array('status' => 401));
-        }
-
-        return true;
+        return $this->auth_service()->permission_user();
     }
 
     public function permission_admin() {
-        $logged_in = is_user_logged_in();
-        $can_manage = current_user_can('manage_options');
-        $user_id = get_current_user_id();
-
-        if (!$logged_in) {
-            error_log(sprintf(
-                'SMC SuperFIB admin auth failed: user_id=%s logged_in=%s can_manage_options=%s request_uri=%s method=%s remote_addr=%s',
-                $user_id,
-                $logged_in ? 'true' : 'false',
-                $can_manage ? 'true' : 'false',
-                isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : 'unknown',
-                isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'unknown',
-                isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'unknown'
-            ));
-
-            return new WP_Error('smc_sf_auth_required', 'Authentication required.', array('status' => 401));
-        }
-
-        if (!$can_manage) {
-            error_log(sprintf(
-                'SMC SuperFIB admin auth failed: user_id=%s logged_in=%s can_manage_options=%s request_uri=%s method=%s remote_addr=%s',
-                $user_id,
-                $logged_in ? 'true' : 'false',
-                $can_manage ? 'true' : 'false',
-                isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : 'unknown',
-                isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'unknown',
-                isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'unknown'
-            ));
-
-            return new WP_Error('smc_sf_admin_required', 'Administrator access required.', array('status' => 403));
-        }
-
-        return true;
+        return $this->auth_service()->permission_admin();
     }
 
     public function permission_ea_market_stream(WP_REST_Request $request) {
-        return $this->permission_ea_bridge($request);
+        return $this->auth_service()->permission_ea_market_stream($request);
     }
 
     public function permission_ea_bridge(WP_REST_Request $request) {
-        $provided = trim((string) $this->get_ea_api_key($request));
-        if ($provided === '') {
-            error_log('SMC SuperFIB EA bridge auth failed: missing API key.');
-            return new WP_Error('smc_sf_api_key_missing', 'X-EA-API-Key or X-API-KEY header required.', array('status' => 401));
-        }
-
-        $configured = trim((string) (defined('SMC_SF_EA_API_KEY') ? SMC_SF_EA_API_KEY : getenv('SMC_SF_EA_API_KEY')));
-        if ($configured === '') {
-            error_log('SMC SuperFIB EA bridge auth failed: SMC_SF_EA_API_KEY is not configured.');
-            return new WP_Error('smc_sf_api_key_unconfigured', 'EA ingest key not configured.', array('status' => 503));
-        }
-
-        if (!hash_equals($configured, $provided)) {
-            error_log('SMC SuperFIB EA bridge auth failed: invalid API key.');
-            return new WP_Error('smc_sf_api_key_invalid', 'Invalid API key.', array('status' => 403));
-        }
-
-        $payload = $request->get_json_params();
-        if (!is_array($payload)) {
-            $payload = array();
-        }
-
-        $ea_user_id = (int) $this->ea_request_value($request, $payload, 'user_id', 0);
-        if ($ea_user_id <= 0) {
-            error_log('SMC SuperFIB EA bridge auth failed: missing user_id.');
-            return new WP_Error('smc_sf_user_required', 'user_id is required for EA ingest.', array('status' => 400));
-        }
-
-        $user = get_userdata($ea_user_id);
-        if (!$user || !user_can($user, 'read')) {
-            error_log('SMC SuperFIB EA bridge auth failed: invalid readable user_id=' . $ea_user_id);
-            return new WP_Error('smc_sf_user_invalid', 'user_id must reference a valid readable user.', array('status' => 403));
-        }
-
-        // Bind ingest writes to a concrete WordPress user context.
-        wp_set_current_user($ea_user_id);
-
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            $route = method_exists($request, 'get_route') ? (string) $request->get_route() : '';
-            $method = method_exists($request, 'get_method') ? (string) $request->get_method() : '';
-            error_log(
-                'SMC SuperFIB EA bridge auth success: user_id=' . $ea_user_id
-                . ($method !== '' ? ' method=' . $method : '')
-                . ($route !== '' ? ' route=' . $route : '')
-            );
-        }
-
-        return true;
+        return $this->auth_service()->permission_ea_bridge($request);
     }
 
-    private function get_ea_api_key(WP_REST_Request $request): string
-    {
-        $header_names = array(
-            'x-ea-api-key',
-            'x_ea_api_key',
-            'x-api-key',
-            'x_api_key',
-        );
-
-        foreach ($header_names as $name) {
-            $value = trim((string) $request->get_header($name));
-            if ($value !== '') {
-                return $value;
-            }
+    private function auth_service() {
+        static $service = null;
+        if ($service === null) {
+            $service = new SMC_SuperFib_Auth_Service();
         }
 
-        return '';
+        return $service;
+    }
+
+    private function ea_request_service() {
+        static $service = null;
+        if ($service === null) {
+            $service = new SMC_SuperFib_EA_Request_Service();
+        }
+
+        return $service;
     }
 
     private function ea_request_value(WP_REST_Request $request, array $payload, $key, $default = null) {
-        if (array_key_exists($key, $payload)) {
-            return $payload[$key];
-        }
-
-        $value = $request->get_param($key);
-        return $value !== null ? $value : $default;
+        return $this->ea_request_service()->request_value($request, $payload, $key, $default);
     }
 
     private function resolve_ea_user_id(): int
     {
-        // EA key is global — resolve to the admin user
-        // who owns the plugin installation
-        $admin = get_users(array(
-            'role'    => 'administrator',
-            'number'  => 1,
-            'orderby' => 'ID',
-            'order'   => 'ASC',
-            'fields'  => array('ID'),
-        ));
-        return !empty($admin) ? (int) $admin[0]->ID : 1;
+        return $this->ea_request_service()->resolve_ea_user_id();
+    }
+
+    private static function cors_service() {
+        static $service = null;
+        if ($service === null) {
+            $service = new SMC_SuperFib_Cors_Service();
+        }
+
+        return $service;
     }
 
     private static function is_allowed_origin($origin, $allowed) {
-        $normalized = untrailingslashit($origin);
-        $allowed_normalized = array_map('untrailingslashit', $allowed);
-
-        if (in_array($normalized, $allowed_normalized, true)) {
-            return true;
-        }
-
-        $host = wp_parse_url($origin, PHP_URL_HOST);
-        if (!$host) {
-            return false;
-        }
-
-        if (preg_match('/^(?:[0-9a-f\-]+\.lovableproject\.com|id-preview--[0-9a-z\-]+\.lovable\.app)$/', $host)) {
-            return true;
-        }
-
-        // Allow only explicitly trusted Worker hostnames listed in get_allowed_origins().
-        // Do not allow wildcard *.workers.dev because CORS credentials are enabled.
-        return false;
+        return self::cors_service()->is_allowed_origin($origin, $allowed);
     }
 
     private static function get_allowed_origins() {
-        return apply_filters('smc_sf_allowed_origins', array(
-            home_url(),
-            'https://trader.stokvelsociety.co.za',
-            'https://smcsuperfibwebapp.klintaruvinga.workers.dev',
-            'https://smcsmartfib.lovable.app',
-            'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
-        ));
+        return self::cors_service()->get_allowed_origins();
     }
 
     private static function get_cors_allowed_headers() {
-        return 'Authorization, Content-Type, X-WP-Nonce, X-Sniper-Secret, X-EA-API-Key, X-API-KEY';
+        return self::cors_service()->get_allowed_headers();
     }
 
     private static function send_cors_headers_for_origin($origin) {
-        header('Vary: Origin', false);
-        header('Access-Control-Allow-Origin: ' . $origin);
-        header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
-        header('Access-Control-Allow-Headers: ' . self::get_cors_allowed_headers());
-        header('Access-Control-Allow-Credentials: true');
-        header('Access-Control-Max-Age: 86400');
+        self::cors_service()->send_headers_for_origin($origin);
     }
 
     private static function handle_options_preflight_request() {
-        if (isset($_SERVER['REQUEST_METHOD']) && strtoupper($_SERVER['REQUEST_METHOD']) === 'OPTIONS') {
-            $request_uri = $_SERVER['REQUEST_URI'] ?? '';
-            if (strpos($request_uri, '/wp-json/sniper/v1/') !== false) {
-                $allowed = self::get_allowed_origins();
-                $origin  = isset($_SERVER['HTTP_ORIGIN']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
-                if ($origin && self::is_allowed_origin($origin, $allowed)) {
-                    self::send_cors_headers_for_origin($origin);
-                    header('Content-Length: 0');
-                    http_response_code(204);
-                    exit;
-                }
-            }
-        }
+        self::cors_service()->handle_options_preflight_request();
     }
 
     /**
@@ -1397,22 +1057,7 @@ final class SMC_SuperFib_Sniper_REST {
      * This prevents future CORS issues from protocol prefix mismatches.
      */
     private static function validate_cors_origins_consistency() {
-        $allowed_origins = self::get_allowed_origins();
-        $normalized_origins = array_map('untrailingslashit', $allowed_origins);
-
-        // Validate that all origins include protocol (no bare hostnames)
-        foreach ($allowed_origins as $origin) {
-            if (!wp_parse_url($origin, PHP_URL_SCHEME)) {
-                return false;
-            }
-        }
-
-        // Validate that there are no duplicate origins after normalization.
-        if (count($normalized_origins) !== count(array_unique($normalized_origins))) {
-            return false;
-        }
-
-        return true;
+        return self::cors_service()->validate_origins_consistency();
     }
 
     public function get_session() {
@@ -6682,11 +6327,6 @@ final class SMC_SuperFib_Sniper_REST {
         $telemetry = $this->read_account_telemetry((int) $user_id);
         $equity = (float) ($telemetry['equity'] ?? 0);
         $has_live_sizing_equity = ($telemetry['freshness'] ?? 'unavailable') === 'live' && $equity > 0;
-        // USC (micro-cent) accounts report equity 100× smaller than USD.
-        // Detect from telemetry currency and apply the inverse multiplier so pip_val
-        // (always expressed in USD) stays comparable to stage_risk.
-        $account_currency = strtoupper((string) ($telemetry['currency'] ?? ''));
-        $usc_to_usd_scale = ($account_currency === 'USC') ? 100.0 : 1.0;
         $risk_usc = $has_live_sizing_equity
             ? round($equity * ((float) $risk['perTradePct'] / 100), 2)
             : 0.0;
@@ -6750,10 +6390,7 @@ final class SMC_SuperFib_Sniper_REST {
             $stop_dist = max(abs($entries[$stage] - $stops[$stage]), $pip);
             $stop_pips = $stop_dist / $pip;
             $stage_risk = $risk_usc * $risk_alloc[$stage];
-            // Scale pip_val by usc_to_usd_scale so USC equity is comparable
-            // to a USD-denominated pip_val (metals, indices, crypto).
-            $pip_val_scaled = $pip_val * $usc_to_usd_scale;
-            $raw_lots = $stage_risk / max($stop_pips * $pip_val_scaled, 0.01);
+            $raw_lots = $stage_risk / max($stop_pips * $pip_val, 0.01);
             $stage_lot = floor($raw_lots * 100) / 100;
             $lots[$stage] = $stage_lot >= 0.01 ? round($stage_lot, 2) : 0.0;
         }
@@ -8848,6 +8485,12 @@ final class SMC_SuperFib_Sniper_REST {
         if ($is_equity_off_session) return 'CLOSED_SESSION';
 
         if ($price_state === 'stale') return 'PRICE_STALE';
+
+        // CRITICAL HARDENING: HTF authority equilibrium is a hard AOV block.
+        // Surface this explicit authority blocker before generic candle-staleness
+        // diagnostics so the dashboard can explain why the setup is non-executable.
+        if ($aov_equilibrium_blocked) return 'AOV_EQUILIBRIUM_ZONE';
+
         if ($candle_age_sec > 7200) return 'CANDLES_STALE';
 
         if ($status === 'READY' && !$data_live) return 'READY_NOT_CONFIRMED_STALE_DATA';
@@ -8856,11 +8499,6 @@ final class SMC_SuperFib_Sniper_REST {
         // in equilibrium (37.5–62.5%). This is the ICT-aligned dual-anchor chop block.
         // Single-anchor caution does NOT block — it only applies a score penalty in verdict().
         if ($anchor_chop_blocked) return 'ANCHOR_CHOP_BLOCKED';
-
-        // CRITICAL HARDENING: HTF authority equilibrium is also a hard AOV block.
-        // It must suppress backend confirmation and plan generation, not just decorate
-        // the gate response as BLOCKED.
-        if ($aov_equilibrium_blocked) return 'AOV_EQUILIBRIUM_ZONE';
 
         // CRITICAL HARDENING: HTF fundamental counter-bias is a hard readiness veto.
         // Keep these ARMED setups planless by surfacing the same blocker that
@@ -9121,20 +8759,30 @@ final class SMC_SuperFib_Sniper_REST {
         return isset($specs[$key]) ? $specs[$key] : null;
     }
 
+    private function watchlist_service() {
+        static $service = null;
+        if ($service === null) {
+            $service = new SMC_SuperFib_Watchlist_Service();
+        }
+
+        return $service;
+    }
+
     private function is_supported_symbol($symbol) {
         $key = $this->map_symbol_aliases($symbol);
-        $specs = $this->instrument_specs();
-        return isset($specs[$key]);
+        return $this->watchlist_service()->is_supported_symbol($key, $this->instrument_specs());
     }
 
     private function validate_watchlist_symbols($symbols) {
-        $out = array();
-        foreach ($this->sanitize_symbols($symbols) as $sym) {
-            if ($this->is_supported_symbol($sym)) {
-                $out[] = $sym;
+        return $this->watchlist_service()->validate_watchlist_symbols(
+            $symbols,
+            function ($items) {
+                return $this->sanitize_symbols($items);
+            },
+            function ($symbol) {
+                return $this->is_supported_symbol($symbol);
             }
-        }
-        return $out;
+        );
     }
 
     private function save_watchlist($user_id, $watchlist) {
@@ -9147,44 +8795,27 @@ final class SMC_SuperFib_Sniper_REST {
         ));
     }
 
+    private function settings_service() {
+        static $service = null;
+        if ($service === null) {
+            $service = new SMC_SuperFib_Settings_Service();
+        }
+
+        return $service;
+    }
+
     private function sanitize_symbols($symbols) {
-        if (!is_array($symbols)) {
-            return array();
-        }
-        $out = array();
-        foreach ($symbols as $symbol) {
-            $clean = $this->map_symbol_aliases($symbol);
-            // Reject empty strings and suspiciously long tokens (longest real symbol is ~10 chars).
-            if ($clean === '' || strlen($clean) > 12) {
-                continue;
-            }
-            if (!in_array($clean, $out, true)) {
-                $out[] = $clean;
-            }
-        }
-        return array_slice($out, 0, 24);
+        return $this->watchlist_service()->sanitize_symbols($symbols, function ($symbol) {
+            return $this->map_symbol_aliases($symbol);
+        });
     }
 
     private function sanitize_risk_allocation($payload, $fallback) {
-        if (!is_array($payload)) {
-            return $fallback;
-        }
-        return array(
-            'perTradePct' => $this->float_between($payload, 'perTradePct', 0.1, 5.0, $fallback['perTradePct']),
-            'dailyMaxPct' => $this->float_between($payload, 'dailyMaxPct', 0.1, 20.0, $fallback['dailyMaxPct']),
-            'ddCapPct' => $this->float_between($payload, 'ddCapPct', 0.1, 50.0, $fallback['ddCapPct']),
-        );
+        return $this->settings_service()->sanitize_risk_allocation($payload, $fallback);
     }
 
     private function sanitize_signal_board_size($value): int {
-        $size = (int) $value;
-        if ($size <= 3) {
-            return 3;
-        }
-        if ($size <= 5) {
-            return 5;
-        }
-        return 10;
+        return $this->settings_service()->sanitize_signal_board_size($value);
     }
 
     private function resolve_signal_board_size(int $user_id): int {
@@ -9197,17 +8828,11 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function int_between($payload, $key, $min, $max, $fallback) {
-        if (!is_array($payload) || !isset($payload[$key])) {
-            return $fallback;
-        }
-        return max($min, min($max, (int) $payload[$key]));
+        return $this->settings_service()->int_between($payload, $key, $min, $max, $fallback);
     }
 
     private function float_between($payload, $key, $min, $max, $fallback) {
-        if (!is_array($payload) || !isset($payload[$key])) {
-            return $fallback;
-        }
-        return max($min, min($max, (float) $payload[$key]));
+        return $this->settings_service()->float_between($payload, $key, $min, $max, $fallback);
     }
 
     private function twelve_symbol($symbol) {
@@ -9454,13 +9079,21 @@ final class SMC_SuperFib_Sniper_REST {
         }
     }
 
+    private function plugin_utils() {
+        static $utils = null;
+        if ($utils === null) {
+            $utils = new SMC_SuperFib_Plugin_Utils();
+        }
+
+        return $utils;
+    }
+
     private function table($name) {
-        global $wpdb;
-        return $wpdb->prefix . 'smc_sf_' . $name;
+        return $this->plugin_utils()->table($name);
     }
 
     private function now_mysql() {
-        return gmdate('Y-m-d H:i:s');
+        return $this->plugin_utils()->now_mysql();
     }
 
     private function soak_get_var($query) {
@@ -9601,27 +9234,11 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function wpdb_last_error() {
-        global $wpdb;
-        if (is_object($wpdb) && property_exists($wpdb, 'last_error') && $wpdb->last_error !== '') {
-            return (string) $wpdb->last_error;
-        }
-        return null;
+        return $this->plugin_utils()->wpdb_last_error();
     }
 
     private function rest_response_status_code($response) {
-        if (!($response instanceof WP_REST_Response)) {
-            return 200;
-        }
-
-        if (method_exists($response, 'get_status')) {
-            return (int) $response->get_status();
-        }
-
-        if (property_exists($response, 'status')) {
-            return (int) $response->status;
-        }
-
-        return 200;
+        return $this->plugin_utils()->rest_response_status_code($response);
     }
 
     private function no_cache_response($payload) {
@@ -9636,10 +9253,7 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function to_iso($mysql_time) {
-        if (!$mysql_time) {
-            return null;
-        }
-        return gmdate('c', strtotime($mysql_time . ' UTC'));
+        return $this->plugin_utils()->to_iso($mysql_time);
     }
 }
 
