@@ -485,13 +485,23 @@ export const apiClient = {
     const response = await this.getDisplaySignals(mock, boardSize);
     return response.signals;
   },
-  async getDisplaySignals(mock = MOCK_MODE, boardSize?: 3 | 5 | 10): Promise<LiveSignalsResponse> {
+  async getDisplaySignals(
+    mock = MOCK_MODE,
+    boardSize?: 3 | 5 | 10,
+    scope?: 'watchlist' | 'global',
+  ): Promise<LiveSignalsResponse> {
     if (mock) {
       const wl = new Set(mockSettings.watchlist);
-      const signals = mockSignals.filter((s) => wl.has(s.symbol)).slice(0, boardSize ?? 3);
+      const signals = scope === 'global'
+        ? mockSignals.slice(0, boardSize ?? 3)
+        : mockSignals.filter((s) => wl.has(s.symbol)).slice(0, boardSize ?? 3);
       return { signals, polledAt: new Date().toISOString(), meta: { boardSize: boardSize ?? 3, totalActive: signals.length } };
     }
-    const path = boardSize ? `/live-signals?board_size=${boardSize}` : "/live-signals";
+    const params = new URLSearchParams();
+    if (boardSize) params.set('board_size', String(boardSize));
+    if (scope === 'global') params.set('scope', 'global');
+    const qs = params.toString();
+    const path = qs ? `/live-signals?${qs}` : '/live-signals';
     const raw = await call<LiveSignalsResponse | SignalCandidate[]>(path, {
       cacheBust: true,
     });

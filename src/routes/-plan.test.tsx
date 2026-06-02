@@ -32,6 +32,7 @@ vi.mock("@/hooks/useSniperData", () => ({
   useCanonicalWatchlist: hookMocks.useCanonicalWatchlist,
   usePollingUiState: hookMocks.usePollingUiState,
   useAccountTelemetry: hookMocks.useAccountTelemetry,
+  normalizeSymbolForWatchlistComparison: (symbol: string) => symbol,
 }));
 
 vi.mock("@/hooks/useAnimatedNumber", () => ({
@@ -122,23 +123,34 @@ function renderPlanPage({
   signals,
   ladders,
   watchlist,
+  globalSignals,
 }: {
   signals: SignalCandidate[];
   ladders: TradePlan[];
   watchlist?: Symbol[];
+  globalSignals?: SignalCandidate[];
 }) {
   hookMocks.useLiveSignals.mockReturnValue({
     data: signals,
     isLoading: false,
   });
-  hookMocks.useDisplaySignals.mockReturnValue({
-    data: {
-      signals,
-      polledAt: "2026-05-14T08:00:00.000Z",
-      meta: { boardSize: 3, totalActive: signals.length },
-    },
-    isLoading: false,
-  });
+  hookMocks.useDisplaySignals
+    .mockReturnValueOnce({
+      data: {
+        signals,
+        polledAt: "2026-05-14T08:00:00.000Z",
+        meta: { boardSize: 3, totalActive: signals.length },
+      },
+      isLoading: false,
+    })
+    .mockReturnValue({
+      data: {
+        signals: globalSignals ?? signals,
+        polledAt: "2026-05-14T08:00:00.000Z",
+        meta: { boardSize: 3, totalActive: (globalSignals ?? signals).length },
+      },
+      isLoading: false,
+    });
   hookMocks.useLadders.mockReturnValue({
     data: ladders,
     isLoading: false,
@@ -700,5 +712,49 @@ describe("PlanPage ranking and execution guards", () => {
     expect(
       screen.queryByText("No matching blueprint for current watchlist candidates."),
     ).toBeNull();
+  });
+
+  it("falls back to global board when watchlist returns zero candidates", () => {
+    const globalSig = buildSignal({ id: "sig-global-001", symbol: "AUDJPY" as Symbol, backendConfirmed: true });
+    renderPlanPage({
+      signals: [],
+      ladders: [],
+      watchlist: ["GBPUSD"],
+      globalSignals: [globalSig],
+    });
+
+    expect(screen.getByText(/No watchlist candidates — showing global board fallback/)).toBeTruthy();
+    expect(getRenderedCards()).toHaveLength(1);
+    expect(getRenderedCards()[0]?.textContent).toContain("AUDJPY");
+    expect(screen.queryByText("No active watchlist candidates found.")).toBeNull();
+  });
+
+  it("never marks global fallback rows as backendConfirmed", () => {
+    const globalSig = buildSignal({ id: "sig-global-002", symbol: "AUDJPY" as Symbol, backendConfirmed: true });
+    renderPlanPage({
+      signals: [],
+      ladders: [],
+      watchlist: ["GBPUSD"],
+      globalSignals: [globalSig],
+    });
+
+    expect(screen.getByText(/No watchlist candidates — showing global board fallback/)).toBeTruthy();
+    const card = getRenderedCards()[0];
+    expect(card).toBeTruthy();
+    expect(card?.textContent).not.toContain("backend-confirmed");
+  });
+
+  it("shows the empty-state when both watchlist and global scopes return no candidates", () => {
+    renderPlanPage({
+      signals: [],
+      ladders: [],
+      watchlist: ["GBPUSD"],
+      globalSignals: [],
+    });
+
+    expect(
+      screen.getByText("No active watchlist candidates found."),
+    ).toBeTruthy();
+    expect(screen.queryByText(/No watchlist candidates — showing global board fallback/)).toBeNull();
   });
 });
