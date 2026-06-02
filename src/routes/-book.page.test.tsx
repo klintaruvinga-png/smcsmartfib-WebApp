@@ -7,6 +7,7 @@ const hookMocks = vi.hoisted(() => ({
   useStableUserTrades: vi.fn(),
   useSnapshot: vi.fn(),
   usePollingUiState: vi.fn(),
+  useAccountTelemetry: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-router", async (importOriginal) => {
@@ -21,6 +22,7 @@ vi.mock("@/hooks/useSniperData", () => ({
   useStableUserTrades: hookMocks.useStableUserTrades,
   useSnapshot: hookMocks.useSnapshot,
   usePollingUiState: hookMocks.usePollingUiState,
+  useAccountTelemetry: hookMocks.useAccountTelemetry,
 }));
 
 import { BookPage } from "./-book.page";
