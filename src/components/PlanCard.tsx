@@ -71,6 +71,7 @@ export function PlanCandidateCard({
           lot: formatLotSize(plan.lotSize.e1),
           stop: fmtPrice(plan.stops?.e1 ?? plan.sl, signal.symbol),
           target: formatOptionalPrice(plan.tps?.tp1, signal.symbol),
+          rr: formatOptionalRatio(plan.rr?.tp1),
         },
         {
           stage: "E2",
@@ -78,6 +79,7 @@ export function PlanCandidateCard({
           lot: formatLotSize(plan.lotSize.e2),
           stop: fmtPrice(plan.stops?.e2 ?? plan.sl, signal.symbol),
           target: formatOptionalPrice(plan.tps?.tp2, signal.symbol),
+          rr: formatOptionalRatio(plan.rr?.tp2),
         },
         {
           stage: "E3",
@@ -85,6 +87,7 @@ export function PlanCandidateCard({
           lot: formatLotSize(plan.lotSize.e3),
           stop: fmtPrice(plan.stops?.e3 ?? plan.sl, signal.symbol),
           target: formatOptionalPrice(plan.tps?.tp3, signal.symbol),
+          rr: formatOptionalRatio(plan.rr?.tp3),
         },
       ]
     : null;
@@ -237,15 +240,18 @@ export function PlanCandidateCard({
         <div className="rounded-lg border border-bd bg-bg1/50 overflow-hidden">
           <div className="grid gap-px bg-bd/60 xl:grid-cols-[1.8fr_1fr_1fr_1fr]">
             <PlanPanel title="Entries" tone="info">
-              <div className="grid grid-cols-[auto_repeat(4,minmax(0,1fr))] gap-x-2 gap-y-2 text-[10px] font-mono">
-                <SectionHeaderCell />
-                <SectionHeaderCell>Entry</SectionHeaderCell>
-                <SectionHeaderCell>Lot sizing</SectionHeaderCell>
-                <SectionHeaderCell>SL</SectionHeaderCell>
-                <SectionHeaderCell>TP</SectionHeaderCell>
-                {entryRows!.map((row) => (
-                  <EntryRow key={row.stage} {...row} />
-                ))}
+              <div className="overflow-x-auto -mx-3 px-3">
+                <div className="grid grid-cols-[auto_repeat(5,minmax(0,1fr))] gap-x-2 gap-y-2 text-[10px] font-mono min-w-[360px]">
+                  <SectionHeaderCell />
+                  <SectionHeaderCell>Entry</SectionHeaderCell>
+                  <SectionHeaderCell>Lot</SectionHeaderCell>
+                  <SectionHeaderCell>SL</SectionHeaderCell>
+                  <SectionHeaderCell>TP</SectionHeaderCell>
+                  <SectionHeaderCell>RR</SectionHeaderCell>
+                  {entryRows!.map((row) => (
+                    <EntryRow key={row.stage} {...row} />
+                  ))}
+                </div>
               </div>
             </PlanPanel>
 
@@ -488,12 +494,14 @@ function EntryRow({
   lot,
   stop,
   target,
+  rr,
 }: {
   stage: string;
   entry: string;
   lot: string;
   stop: string;
   target: string;
+  rr: string;
 }) {
   return (
     <>
@@ -502,6 +510,7 @@ function EntryRow({
       <div className="text-tx">{lot}</div>
       <div className="text-tx">{stop}</div>
       <div className="text-buy">{target}</div>
+      <div className="text-info">{rr}</div>
     </>
   );
 }

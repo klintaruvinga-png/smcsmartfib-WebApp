@@ -7,6 +7,7 @@ const hookMocks = vi.hoisted(() => ({
   useStableUserTrades: vi.fn(),
   useSnapshot: vi.fn(),
   usePollingUiState: vi.fn(),
+  useAccountTelemetry: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-router", async (importOriginal) => {
@@ -21,6 +22,7 @@ vi.mock("@/hooks/useSniperData", () => ({
   useStableUserTrades: hookMocks.useStableUserTrades,
   useSnapshot: hookMocks.useSnapshot,
   usePollingUiState: hookMocks.usePollingUiState,
+  useAccountTelemetry: hookMocks.useAccountTelemetry,
 }));
 
 import { BookPage } from "./-book.page";
@@ -35,6 +37,7 @@ describe("BookPage", () => {
       settingsLoadError: null,
       retrySettingsLoad: vi.fn(),
     });
+    hookMocks.useAccountTelemetry.mockReturnValue({ data: { currency: "USD" } });
   });
 
   it("shows a degraded state when backend trade telemetry is unreachable", () => {
@@ -51,7 +54,7 @@ describe("BookPage", () => {
     ).toBeTruthy();
   });
 
-  it("groups live positions by symbol and direction", () => {
+  it("groups live positions by symbol regardless of direction", () => {
     hookMocks.useStableUserTrades.mockReturnValue({
       data: {
         positions: [
@@ -88,7 +91,8 @@ describe("BookPage", () => {
 
     render(<BookPage />);
 
-    expect(screen.getAllByText("EURUSD")).toHaveLength(2);
+    // Symbol appears once as group header (no longer split by direction)
+    expect(screen.getAllByText("EURUSD")).toHaveLength(1);
     expect(screen.getAllByText("LONG").length).toBeGreaterThan(0);
     expect(screen.getAllByText("SHORT").length).toBeGreaterThan(0);
   });
