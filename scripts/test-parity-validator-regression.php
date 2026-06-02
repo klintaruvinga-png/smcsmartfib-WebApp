@@ -10,7 +10,8 @@
  *   5. Pine-only (NO_MT5) signal causes gate=FAIL
  *   6. Regime validator accepts { "regimes": [...] } keyed payload  → gate=FAIL (MISSING_COUNTERPART)
  *   7. Missing regime counterpart causes gate=FAIL
- *   8. Display schema SQL includes backend_confirmed column
+ *   8. Display schema plugin uses the stable smc-superfib-sniper slug
+ *   9. Display schema SQL includes backend_confirmed column
  */
 
 $pass = 0;
@@ -66,19 +67,8 @@ function run_regime_validator(array $mt5Payload, array $pinePayload): array {
     return run_validator('regime-parity-validator.php', $mt5Payload, $pinePayload, 'reg');
 }
 
-function resolve_plugin_file(): ?string {
-    $candidates = array(
-        __DIR__ . '/../wordpress/smc-superfib-sniper/smc-superfib-sniper.php',
-        __DIR__ . '/../wordpress/smc-superfib-sniper v13.1.0/smc-superfib-sniper.php',
-    );
-
-    foreach ($candidates as $candidate) {
-        if (file_exists($candidate)) {
-            return $candidate;
-        }
-    }
-
-    return null;
+function resolve_plugin_file(): string {
+    return __DIR__ . '/../wordpress/smc-superfib-sniper/smc-superfib-sniper.php';
 }
 
 // ---------------------------------------------------------------------------
@@ -143,11 +133,15 @@ assert_eq('Regime validator: keyed JSON wrapper accepted (gate=FAIL on MISSING_C
 assert_eq('MISSING_COUNTERPART increments critical_mismatches_count', 1, $r['critical_mismatches_count'] ?? null);
 
 // ---------------------------------------------------------------------------
-// TEST 8: Display schema SQL includes backend_confirmed column
+// TEST 8: Display schema plugin uses the stable smc-superfib-sniper slug
 // ---------------------------------------------------------------------------
 $pluginFile = resolve_plugin_file();
-assert_eq('Display schema plugin file is available', true, $pluginFile !== null);
-if ($pluginFile !== null) {
+assert_eq('Display schema plugin file uses stable plugin slug', true, file_exists($pluginFile));
+
+// ---------------------------------------------------------------------------
+// TEST 9: Display schema SQL includes backend_confirmed column
+// ---------------------------------------------------------------------------
+if (file_exists($pluginFile)) {
     $src = file_get_contents($pluginFile);
     $inSql = false;
     $found = false;
