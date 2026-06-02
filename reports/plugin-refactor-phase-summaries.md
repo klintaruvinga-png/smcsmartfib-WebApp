@@ -11,14 +11,15 @@
 
 | file | change |
 |---|---|
-| `wordpress/smc-superfib-sniper/class-route-registrar.php` | Added a dedicated `SMC_SuperFib_Route_Registrar` that owns REST route wiring for the plugin while preserving the same namespace, route paths, HTTP methods, callbacks, and permission callbacks. |
-| `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | Required the registrar and reduced `register_routes()` to delegation, removing the monolith-local route helper. |
+| `wordpress/smc-superfib-sniper/class-route-registrar.php` | Completed the route migration with declarative route definitions, a single registration loop, and centralized permission callback mapping while preserving the same namespace, route paths, HTTP methods, callbacks, and permission callbacks. |
+| `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | Requires the registrar and keeps `register_routes()` as delegation only, leaving route definitions and route helper logic outside the monolith. |
 | `reports/plugin-refactor-phase-summaries.md` | Recorded Phase 1 scope and verification status. |
 
 Verification results for Phase 1:
 
 - `php -l wordpress/smc-superfib-sniper/class-route-registrar.php`: PASS.
 - `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`: PASS.
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-bridge-bootstrap.php`: PASS.
 - `php wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php`: PASS.
 - PHP test-file baseline gate: PASS against the accepted current baseline of 23 passing files and 2 known failing files (`test-mt5-snapshot-contract.php`, `test-progressive-lot-sizing.php`).
 
