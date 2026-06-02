@@ -766,6 +766,71 @@ function seed_ready_build_symbol_state_fixture($wpdb, $user_id, $symbol, $bid, $
     );
 }
 
+function seed_dual_anchor_strong_confluence_fixture($wpdb, $user_id, $symbol) {
+    $snapshotTable = $wpdb->prefix . 'smc_sf_snapshots';
+    $candleTable = $wpdb->prefix . 'smc_sf_candles';
+    $now = time();
+    $latestDisplacementCandle = (int) (floor(($now - 900) / 900) * 900);
+    $intradayStart = $latestDisplacementCandle - (34 * 900);
+
+    $wpdb->replace($snapshotTable, array(
+        'user_id' => $user_id,
+        'symbol' => $symbol,
+        'bid' => 1.1078,
+        'ask' => 1.1082,
+        'mid' => 1.1080,
+        'spread' => 2,
+        'change_pct_1d' => 0,
+        'source' => 'mt5',
+        'state' => 'live',
+        'updated_at' => gmdate('Y-m-d H:i:s', $now - 5),
+    ));
+
+    $rows = array();
+    $push = function ($timestamp, $open, $high, $low, $close) use (&$rows) {
+        $rows[] = array($timestamp, $open, $high, $low, $close);
+    };
+
+    for ($weekOffset = 5; $weekOffset >= 1; $weekOffset--) {
+        $timestamp = strtotime('monday this week 12:00 UTC') - ($weekOffset * 7 * 86400);
+        $isAuthorityWeek = $weekOffset === 3;
+        $push($timestamp, 1.0900, $isAuthorityWeek ? 1.2000 : 1.1120, $isAuthorityWeek ? 1.0000 : 1.0850, 1.1000);
+    }
+
+    for ($dayOffset = 3; $dayOffset >= 1; $dayOffset--) {
+        $push(strtotime('today 12:00 UTC') - ($dayOffset * 86400), 1.1000, 1.2000, 1.0000, 1.1050);
+    }
+
+    for ($i = 0; $i < 25; $i++) {
+        $timestamp = $intradayStart + ($i * 900);
+        $push($timestamp, 1.1020, 1.1060, 1.0010, 1.1040);
+    }
+
+    for ($i = 0; $i < 9; $i++) {
+        $timestamp = $intradayStart + (($i + 25) * 900);
+        $low = $i === 0 ? 0.9900 : 1.1010;
+        $push($timestamp, 1.1020, 1.1060, $low, 1.1040);
+    }
+
+    $push($latestDisplacementCandle, 1.1000, 1.1100, 1.1000, 1.1080);
+
+    foreach ($rows as $row) {
+        $wpdb->replace($candleTable, array(
+            'user_id' => $user_id,
+            'symbol' => $symbol,
+            'timeframe' => '15min',
+            'candle_time' => gmdate('Y-m-d H:i:s', $row[0]),
+            'open' => $row[1],
+            'high' => $row[2],
+            'low' => $row[3],
+            'close' => $row[4],
+            'volume' => '10',
+            'source' => 'mt5',
+            'created_at' => gmdate('Y-m-d H:i:s', $now),
+        ));
+    }
+}
+
 function seed_watch_build_symbol_state_fixture($wpdb, $user_id, $symbol, $bid, $ask) {
     $snapshotTable = $wpdb->prefix . 'smc_sf_snapshots';
     $candleTable = $wpdb->prefix . 'smc_sf_candles';
@@ -2165,6 +2230,33 @@ assert_same('WATCH', $pendingOrderState['signal']['status'] ?? null, 'ACTIVE_PEN
 assert_same(false, $pendingOrderState['signal']['backendConfirmed'] ?? null, 'ACTIVE_PENDING_ORDER signals must not be backend-confirmed');
 assert_same(null, $pendingOrderState['plan'] ?? null, 'ACTIVE_PENDING_ORDER signals must not generate executable trade plans');
 assert_same('ACTIVE_PENDING_ORDER', $pendingOrderState['diagnostic']['lifecycle']['state'] ?? null, 'ACTIVE_PENDING_ORDER lifecycle diagnostics must remain visible');
+
+$dualAnchorSymbol = 'DUALOK';
+seed_dual_anchor_strong_confluence_fixture($wpdb, 7, $dualAnchorSymbol);
+$dualAnchorMaxCandleTime = 0;
+foreach ($wpdb->tables[$candleTable] ?? array() as $row) {
+    if (($row['symbol'] ?? null) === $dualAnchorSymbol && ($row['timeframe'] ?? null) === '15min') {
+        $dualAnchorMaxCandleTime = max($dualAnchorMaxCandleTime, strtotime((string) ($row['candle_time'] ?? '')));
+    }
+}
+assert_true($dualAnchorMaxCandleTime <= (int) (floor((time() - 900) / 900) * 900), 'Dual-anchor fixture must not seed future candles ahead of the final displacement bar');
+$dualAnchorState = $buildSymbolState->invoke($instance, 7, $dualAnchorSymbol, array(
+    'symbol' => $dualAnchorSymbol,
+    'bid' => 1.1078,
+    'ask' => 1.1082,
+    'mid' => 1.1080,
+    'updatedAt' => gmdate('c', time() - 5),
+    'state' => 'live',
+    'source' => 'mt5',
+));
+assert_same('BUY', $dualAnchorState['gate']['allow'] ?? null, 'Strong dual-anchor equilibrium setups must be allowed through the gate');
+assert_same('SF+AF dual equilibrium — strong confluence, A-cap applied', $dualAnchorState['gate']['reason'] ?? null, 'Strong dual-anchor equilibrium setups must use the A-cap gate reason');
+assert_same('SF+AF', $dualAnchorState['signal']['engine']['anchorChopSource'] ?? null, 'Strong dual-anchor fixture must exercise dual-anchor equilibrium');
+assert_same('caution', $dualAnchorState['signal']['engine']['f3Chop'] ?? null, 'Dual-anchor fixture must retain SF-driven F3 caution');
+assert_true(in_array('displacement', $dualAnchorState['signal']['confluence'] ?? array(), true), 'Clean/strong displacement must count as structural confluence');
+assert_true(in_array($dualAnchorState['signal']['engine']['displacement'] ?? null, array('clean', 'strong'), true), 'Strong dual-anchor fixture must have clean or strong displacement');
+assert_same('A', $dualAnchorState['signal']['verdict'] ?? null, 'Strong dual-anchor equilibrium setups must be capped at an A verdict');
+assert_same('OK', $dualAnchorState['signal']['engineBlocker'] ?? null, 'Strong dual-anchor equilibrium setups must not keep the anchor-chop blocker');
 
 $htfEquilibriumSymbol = 'AOVTEST';
 $wpdb->replace($snapshotTable, array(

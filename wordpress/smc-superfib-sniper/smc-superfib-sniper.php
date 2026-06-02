@@ -6003,9 +6003,13 @@ final class SMC_SuperFib_Sniper_REST {
         // SF  = LTF SuperFib composite anchor  (local session)
         // AF  = HTF Authority Fib anchor        (higher-timeframe)
         //
-        // Both anchors in equilibrium → HARD BLOCK (dual-anchor chop zone).
-        // One anchor in equilibrium   → CAUTION (score penalty only, not block).
-        // Neither anchor              → CLEAR.
+        // PATCH v1.1 — Asymmetric AF chop weighting:
+        // SF in eq only   → CAUTION: score -1 (execution context is indecisive).
+        // AF in eq only   → CONTEXT: no penalty (HTF range may be wide; LTF
+        //                   setup may still be clean inside that band).
+        // SF + AF in eq   → HARD BLOCK only when structural confluence < 3.
+        //                   Strong sweep/MSS/F3 evidence overrides to A-cap.
+        // Neither anchor  → CLEAR.
 
         $sf_anchor_bounds  = $authority_levels['sf_anchor'] ?? null;
         $af_anchor_bounds  = $authority_levels['af_anchor'] ?? null;
@@ -6024,14 +6028,19 @@ final class SMC_SuperFib_Sniper_REST {
         $sf_in_eq = $sf_position_pct !== null && $sf_position_pct >= 37.5 && $sf_position_pct <= 62.5;
         $af_in_eq = $af_position_pct !== null && $af_position_pct >= 37.5 && $af_position_pct <= 62.5;
 
-        // Dual-anchor equilibrium = structural chop, hard block.
-        $anchor_chop_blocked = $sf_in_eq && $af_in_eq;
-        // Single-anchor equilibrium = caution, soft penalty.
-        $anchor_chop_caution = $sf_in_eq || $af_in_eq;
-        $anchor_chop_source  = ($sf_in_eq && $af_in_eq) ? 'SF+AF' : ($sf_in_eq ? 'SF' : ($af_in_eq ? 'AF' : 'none'));
+        // PATCH v1.1: AF-only equilibrium is context only — no penalty, no block.
+        // SF equilibrium is execution chop and retains the caution/score penalty.
+        // Dual-anchor hard block is deferred: resolved after confluence count.
+        $dual_anchor_eq      = $sf_in_eq && $af_in_eq;  // candidate for hard block
+        $af_equilibrium_ctx  = $af_in_eq && !$sf_in_eq; // AF-only: context flag, no penalty
+        // anchor_chop_caution is now SF-driven only (not AF-only).
+        $anchor_chop_caution = $sf_in_eq;  // SF in eq → score -1 in verdict()
+        $anchor_chop_source  = $dual_anchor_eq ? 'SF+AF' : ($sf_in_eq ? 'SF' : ($af_equilibrium_ctx ? 'AF-ctx' : 'none'));
 
-        // f3_chop now reflects anchor position, not candle momentum.
+        // f3_chop reflects SF execution context only (AF-only eq is not caution).
         $f3_chop = $anchor_chop_caution ? 'caution' : 'clear';
+        // anchor_chop_blocked resolved below after confluence is known.
+        $anchor_chop_blocked = false; // initialise; set after confluence count
         $hta_override = $position_ratio < 0 || $position_ratio > 100;
         $fundamental_bias = $this->get_symbol_fundamental_bias($symbol);
         $fundamental_htf_bias = null;
@@ -6057,8 +6066,9 @@ final class SMC_SuperFib_Sniper_REST {
         } elseif (!$sequence[$direction]['mss']) {
             $status = 'ARMED';
         } elseif ($anchor_chop_blocked) {
-            // CRITICAL: Both SF and AF anchors place price in equilibrium (37.5–62.5%).
-            // Dual-anchor chop is a hard structural block — no directional basis exists.
+            // PATCH v1.1: Both SF and AF in eq AND structural confluence < 3.
+            // Weak dual-anchor chop is a hard structural block — no directional basis.
+            // When confluence >= 3, anchor_chop_blocked = false, falls through to READY.
             $status = 'ARMED';
         } elseif ($aov_equilibrium_blocked && $chop !== null && $chop >= 0.55) {
             // CRITICAL: HTF authority equilibrium is an aggressive gate only when
@@ -6135,11 +6145,26 @@ final class SMC_SuperFib_Sniper_REST {
         if ($sequence[$direction ?: 'LONG']['mss']) {
             $confluence[] = 'MSS';
         }
+        if (in_array($sequence[$direction ?: 'LONG']['displacement'], array('clean', 'strong'), true)) {
+            $confluence[] = 'displacement';
+        }
         if ($f3_chop === 'clear') {
             $confluence[] = 'F3-clear';
         }
         if ($hta_override) {
             $confluence[] = 'HTA-override';
+        }
+
+        // PATCH v1.1: Resolve deferred dual-anchor hard block.
+        // Count structural confirmations (excluding baseline HTA_SF/LTF_SF tags).
+        // Hard block only when BOTH anchors in eq AND structural score < 3.
+        // When score >= 3 (strong sweep+MSS/F3 evidence) allow through, capped at A.
+        if ($dual_anchor_eq) {
+            $structural_score = count(array_diff($confluence, array('HTA_SF', 'LTF_SF')));
+            $anchor_chop_blocked = ($structural_score < 3);
+            if ($anchor_chop_blocked) {
+                $status = 'ARMED';
+            }
         }
 
         $last_candle    = !empty($candles) ? end($candles) : null;
@@ -6165,7 +6190,15 @@ final class SMC_SuperFib_Sniper_REST {
             $gate = array(
                 'symbol' => $symbol,
                 'allow'  => 'BLOCKED',
-                'reason' => 'SF+AF dual equilibrium — anchor chop zone',
+                'reason' => 'SF+AF dual equilibrium — weak confluence anchor chop zone',
+                'state'  => $symbol_state,
+            );
+        } elseif ($dual_anchor_eq && !$anchor_chop_blocked) {
+            // PATCH v1.1: Dual-anchor eq but strong confluence — allow through, A-cap.
+            $gate = array(
+                'symbol' => $symbol,
+                'allow'  => $direction === 'LONG' ? 'BUY' : 'SELL',
+                'reason' => 'SF+AF dual equilibrium — strong confluence, A-cap applied',
                 'state'  => $symbol_state,
             );
         } else {
@@ -6207,7 +6240,7 @@ final class SMC_SuperFib_Sniper_REST {
             'direction' => $direction,
             'status' => $status,
             'confluence' => $confluence,
-            'verdict' => $this->verdict($status, $confluence, $anchor_chop_caution),
+            'verdict' => $this->verdict($status, $confluence, $anchor_chop_caution, $dual_anchor_eq),
             'computedBy' => 'backend',
             // CRITICAL HARDENING: Never backend-confirm a signal unless status is READY
             // and every hard backend gate is OK. Without this guard,
@@ -8423,12 +8456,18 @@ final class SMC_SuperFib_Sniper_REST {
         return 'DISCOUNT';
     }
 
-    private function verdict($status, $confluence, $anchor_chop_caution) {
+    // PATCH v1.1: Added $dual_anchor_eq param to apply A-cap for strong
+    // dual-anchor eq setups that pass the confluence threshold.
+    private function verdict($status, $confluence, $anchor_chop_caution, $dual_anchor_eq = false) {
         $structural = array_values(array_diff($confluence, array('HTA_SF', 'LTF_SF')));
-        // -1 soft penalty for single-anchor caution (was -2 hard for candle chop > 0.7).
-        // Dual-anchor HARD BLOCK never reaches verdict() — status is forced ARMED before this.
+        // SF-only chop retains -1 penalty. AF-only chop carries no penalty (context only).
+        // Dual-anchor HARD BLOCK (weak confluence) never reaches verdict() as READY.
         $score = count($structural) - ($anchor_chop_caution ? 1 : 0);
         if ($status === 'READY' && $score >= 3) {
+            // PATCH v1.1: Dual-anchor eq with strong confluence → cap at A (not A+).
+            if ($dual_anchor_eq) {
+                return 'A';
+            }
             return 'A+';
         }
         if ($status === 'READY') {
@@ -8499,9 +8538,9 @@ final class SMC_SuperFib_Sniper_REST {
 
         if ($status === 'READY' && !$data_live) return 'READY_NOT_CONFIRMED_STALE_DATA';
 
-        // CRITICAL HARDENING: Gate is BLOCKED when both SF and AF anchors place price
-        // in equilibrium (37.5–62.5%). This is the ICT-aligned dual-anchor chop block.
-        // Single-anchor caution does NOT block — it only applies a score penalty in verdict().
+        // PATCH v1.1: Gate BLOCKED only when both SF and AF in eq AND structural
+        // confluence < 3 (anchor_chop_blocked resolved post-confluence above).
+        // AF-only eq is never a blocker. Strong dual-anchor eq (>=3 structural) passes.
         if ($anchor_chop_blocked) return 'ANCHOR_CHOP_BLOCKED';
 
         // CRITICAL HARDENING: HTF fundamental counter-bias is a hard readiness veto.
