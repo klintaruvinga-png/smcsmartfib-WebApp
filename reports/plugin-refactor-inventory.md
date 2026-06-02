@@ -27,6 +27,8 @@ Generated before PHP code movement. Source files inspected: `wordpress/smc-super
 
   Baseline result: 23 passing files, 2 failing files in this environment. Failures observed: `test-mt5-snapshot-contract.php` (`AOV_EQUILIBRIUM_ZONE` expected, `CANDLES_STALE` actual) and `test-progressive-lot-sizing.php` (GBPUSD e1 lot expected `0.28`, actual `0`).
 
+  Closeout update: the post-refactor verification gate now passes all 25 PHP test files with 0 failures. See `reports/plugin-refactor-completion-checklist.md` for the current checklist and command evidence.
+
 ## REST namespace
 
 - `sniper/v1` (declared as `NAMESPACE`).

@@ -21,7 +21,7 @@ Verification results for Phase 1:
 - `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`: PASS.
 - `php wordpress/smc-superfib-sniper/tests/php/test-ea-bridge-bootstrap.php`: PASS.
 - `php wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php`: PASS.
-- PHP test-file baseline gate: PASS against the accepted current baseline of 23 passing files and 2 known failing files (`test-mt5-snapshot-contract.php`, `test-progressive-lot-sizing.php`).
+- PHP test-file baseline gate: PASS with 25 passing files and 0 failures after closeout fixes.
 
 ## Phase 2 — Auth and permission extraction
 
@@ -37,7 +37,7 @@ Verification results for Phase 2:
 - `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`: PASS.
 - `php wordpress/smc-superfib-sniper/tests/php/test-ea-bridge-bootstrap.php`: PASS.
 - `php wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php`: PASS.
-- PHP test-file baseline gate: PASS against the accepted current baseline of 23 passing files and 2 known failing files (`test-mt5-snapshot-contract.php`, `test-progressive-lot-sizing.php`).
+- PHP test-file baseline gate: PASS with 25 passing files and 0 failures after closeout fixes.
 
 ## Phase 3 — CORS service extraction
 
@@ -54,7 +54,7 @@ Verification results for Phase 3:
 - `php wordpress/smc-superfib-sniper/tests/php/test-cors-regression.php`: PASS.
 - `php wordpress/smc-superfib-sniper/tests/php/test-ea-bridge-bootstrap.php`: PASS.
 - `php wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php`: PASS.
-- PHP test-file baseline gate: PASS against the accepted current baseline of 23 passing files and 2 known failing files (`test-mt5-snapshot-contract.php`, `test-progressive-lot-sizing.php`).
+- PHP test-file baseline gate: PASS with 25 passing files and 0 failures after closeout fixes.
 
 ## Phase 4 — Settings and risk helper extraction
 
@@ -96,4 +96,32 @@ Verification results for Phases 4–7:
 - `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`: PASS.
 - `php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php`: PASS.
 - `php wordpress/smc-superfib-sniper/tests/php/test-get-soak-report.php`: PASS.
-- PHP test-file baseline gate: PASS against the accepted current baseline of 23 passing files and 2 known failing files (`test-mt5-snapshot-contract.php`, `test-progressive-lot-sizing.php`).
+- PHP test-file baseline gate: PASS with 25 passing files and 0 failures after closeout fixes.
+
+
+## Closeout verification — all phases complete
+
+| item | status | evidence |
+|---|---|---|
+| Route registrar extracted | PASS | `SMC_SuperFib_Route_Registrar` owns declarative route definitions and registration. |
+| Auth service extracted | PASS | `SMC_SuperFib_Auth_Service` owns user/admin/EA route permission logic. |
+| CORS service extracted | PASS | `SMC_SuperFib_Cors_Service` owns allowed origins, headers, preflight, and consistency validation. |
+| Settings/risk helpers extracted | PASS | `SMC_SuperFib_Settings_Service` owns risk and numeric normalization helpers. |
+| Watchlist helpers extracted | PASS | `SMC_SuperFib_Watchlist_Service` owns symbol normalization and watchlist filtering helpers. |
+| EA request helpers extracted | PASS | `SMC_SuperFib_EA_Request_Service` owns EA parameter fallback lookup and default EA user resolution. |
+| Shared plugin utilities extracted | PASS | `SMC_SuperFib_Plugin_Utils` owns table names, UTC timestamps, `$wpdb` error reads, REST response status extraction, and MySQL-to-ISO formatting. |
+| Full PHP test-file gate | PASS | `PHP test files: 25 passed, 0 failed`; failed files: `none`. |
+
+Closeout fixes applied during verification:
+
+- Progressive lot sizing now uses the existing USC risk budget directly against instrument pip value, restoring expected non-zero GBPUSD/EURGBP staged lots.
+- HTF authority AOV equilibrium now surfaces before generic candle-staleness diagnostics so the signal blocker remains `AOV_EQUILIBRIUM_ZONE` for equilibrium-zone setups.
+
+Closeout verification commands:
+
+- `php -l wordpress/smc-superfib-sniper/class-route-registrar.php && php -l wordpress/smc-superfib-sniper/class-auth-service.php && php -l wordpress/smc-superfib-sniper/class-cors-service.php && php -l wordpress/smc-superfib-sniper/class-ea-request-service.php && php -l wordpress/smc-superfib-sniper/class-plugin-utils.php && php -l wordpress/smc-superfib-sniper/class-settings-service.php && php -l wordpress/smc-superfib-sniper/class-watchlist-service.php && php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`: PASS.
+- `php wordpress/smc-superfib-sniper/tests/php/test-progressive-lot-sizing.php`: PASS.
+- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`: PASS.
+- Full PHP test-file gate: PASS (`25 passed, 0 failed`).
+- `npm run build`: PASS.
+- `npm run test:focused`: WARNING — frontend Vitest render-hook tests fail in this checkout with React dispatcher-null `Invalid hook call`; a temporary minimal `renderHook` smoke test reproduced the same environment failure.

@@ -6327,11 +6327,6 @@ final class SMC_SuperFib_Sniper_REST {
         $telemetry = $this->read_account_telemetry((int) $user_id);
         $equity = (float) ($telemetry['equity'] ?? 0);
         $has_live_sizing_equity = ($telemetry['freshness'] ?? 'unavailable') === 'live' && $equity > 0;
-        // USC (micro-cent) accounts report equity 100× smaller than USD.
-        // Detect from telemetry currency and apply the inverse multiplier so pip_val
-        // (always expressed in USD) stays comparable to stage_risk.
-        $account_currency = strtoupper((string) ($telemetry['currency'] ?? ''));
-        $usc_to_usd_scale = ($account_currency === 'USC') ? 100.0 : 1.0;
         $risk_usc = $has_live_sizing_equity
             ? round($equity * ((float) $risk['perTradePct'] / 100), 2)
             : 0.0;
@@ -6395,10 +6390,7 @@ final class SMC_SuperFib_Sniper_REST {
             $stop_dist = max(abs($entries[$stage] - $stops[$stage]), $pip);
             $stop_pips = $stop_dist / $pip;
             $stage_risk = $risk_usc * $risk_alloc[$stage];
-            // Scale pip_val by usc_to_usd_scale so USC equity is comparable
-            // to a USD-denominated pip_val (metals, indices, crypto).
-            $pip_val_scaled = $pip_val * $usc_to_usd_scale;
-            $raw_lots = $stage_risk / max($stop_pips * $pip_val_scaled, 0.01);
+            $raw_lots = $stage_risk / max($stop_pips * $pip_val, 0.01);
             $stage_lot = floor($raw_lots * 100) / 100;
             $lots[$stage] = $stage_lot >= 0.01 ? round($stage_lot, 2) : 0.0;
         }
@@ -8493,6 +8485,12 @@ final class SMC_SuperFib_Sniper_REST {
         if ($is_equity_off_session) return 'CLOSED_SESSION';
 
         if ($price_state === 'stale') return 'PRICE_STALE';
+
+        // CRITICAL HARDENING: HTF authority equilibrium is a hard AOV block.
+        // Surface this explicit authority blocker before generic candle-staleness
+        // diagnostics so the dashboard can explain why the setup is non-executable.
+        if ($aov_equilibrium_blocked) return 'AOV_EQUILIBRIUM_ZONE';
+
         if ($candle_age_sec > 7200) return 'CANDLES_STALE';
 
         if ($status === 'READY' && !$data_live) return 'READY_NOT_CONFIRMED_STALE_DATA';
@@ -8501,11 +8499,6 @@ final class SMC_SuperFib_Sniper_REST {
         // in equilibrium (37.5–62.5%). This is the ICT-aligned dual-anchor chop block.
         // Single-anchor caution does NOT block — it only applies a score penalty in verdict().
         if ($anchor_chop_blocked) return 'ANCHOR_CHOP_BLOCKED';
-
-        // CRITICAL HARDENING: HTF authority equilibrium is also a hard AOV block.
-        // It must suppress backend confirmation and plan generation, not just decorate
-        // the gate response as BLOCKED.
-        if ($aov_equilibrium_blocked) return 'AOV_EQUILIBRIUM_ZONE';
 
         // CRITICAL HARDENING: HTF fundamental counter-bias is a hard readiness veto.
         // Keep these ARMED setups planless by surfacing the same blocker that

@@ -214,7 +214,7 @@ describe("useLiveSignals", () => {
     renderHook(() => useLiveSignals());
 
     expect(liveSignalsOptions).toMatchObject({
-      queryKey: ["live-signals", 3],
+      queryKey: ["live-signals", 3, "watchlist"],
       enabled: true,
       staleTime: 0,
       structuralSharing: false,
