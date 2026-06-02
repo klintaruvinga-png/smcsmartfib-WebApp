@@ -56,6 +56,44 @@ Verification results for Phase 3:
 - `php wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php`: PASS.
 - PHP test-file baseline gate: PASS against the accepted current baseline of 23 passing files and 2 known failing files (`test-mt5-snapshot-contract.php`, `test-progressive-lot-sizing.php`).
 
-## Phase 4–7
+## Phase 4 — Settings and risk helper extraction
 
-Not started in this patch. The next behavior-preserving extraction should target another self-contained service area and keep the same baseline gate expectation unless the two known failures are resolved separately.
+| file | change |
+|---|---|
+| `wordpress/smc-superfib-sniper/class-settings-service.php` | Added `SMC_SuperFib_Settings_Service` to own risk-allocation bounds, integer/float range helpers, and signal-board-size normalization. |
+| `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | Requires the settings service and keeps the reflected private settings/risk helper methods as compatibility delegates. |
+
+## Phase 5 — Watchlist helper extraction
+
+| file | change |
+|---|---|
+| `wordpress/smc-superfib-sniper/class-watchlist-service.php` | Added `SMC_SuperFib_Watchlist_Service` to own watchlist symbol sanitization, supported-symbol checks, and validated watchlist filtering. |
+| `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | Requires the watchlist service and keeps the reflected private watchlist helper methods as compatibility delegates. |
+
+## Phase 6 — EA request helper extraction
+
+| file | change |
+|---|---|
+| `wordpress/smc-superfib-sniper/class-ea-request-service.php` | Added `SMC_SuperFib_EA_Request_Service` to own EA request parameter fallback lookup and default EA user resolution. |
+| `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | Requires the EA request service and delegates the private EA request helpers used across ingest endpoints. |
+
+## Phase 7 — Shared plugin utility extraction
+
+| file | change |
+|---|---|
+| `wordpress/smc-superfib-sniper/class-plugin-utils.php` | Added `SMC_SuperFib_Plugin_Utils` to own table-name composition, UTC MySQL timestamps, `$wpdb` error reads, REST response status extraction, and MySQL-to-ISO formatting. |
+| `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | Requires the utility service and keeps existing private utility helper names as delegates for behavior-preserving callers. |
+| `reports/plugin-refactor-phase-summaries.md` | Recorded Phases 4–7 scope and verification status. |
+
+Verification results for Phases 4–7:
+
+- `php -l wordpress/smc-superfib-sniper/class-settings-service.php`: PASS.
+- `php -l wordpress/smc-superfib-sniper/class-watchlist-service.php`: PASS.
+- `php -l wordpress/smc-superfib-sniper/class-ea-request-service.php`: PASS.
+- `php -l wordpress/smc-superfib-sniper/class-plugin-utils.php`: PASS.
+- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`: PASS.
+- `php wordpress/smc-superfib-sniper/tests/php/test-settings-risk-fallbacks.php`: PASS.
+- `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`: PASS.
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php && php wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php`: PASS.
+- `php wordpress/smc-superfib-sniper/tests/php/test-get-soak-report.php`: PASS.
+- PHP test-file baseline gate: PASS against the accepted current baseline of 23 passing files and 2 known failing files (`test-mt5-snapshot-contract.php`, `test-progressive-lot-sizing.php`).

@@ -13,6 +13,10 @@ if (!defined('ABSPATH')) {
 require_once __DIR__ . '/class-market-data-service.php';
 require_once __DIR__ . '/class-auth-service.php';
 require_once __DIR__ . '/class-cors-service.php';
+require_once __DIR__ . '/class-ea-request-service.php';
+require_once __DIR__ . '/class-plugin-utils.php';
+require_once __DIR__ . '/class-settings-service.php';
+require_once __DIR__ . '/class-watchlist-service.php';
 require_once __DIR__ . '/class-route-registrar.php';
 
 final class SMC_SuperFib_Sniper_REST {
@@ -1001,27 +1005,22 @@ final class SMC_SuperFib_Sniper_REST {
         return $service;
     }
 
-    private function ea_request_value(WP_REST_Request $request, array $payload, $key, $default = null) {
-        if (array_key_exists($key, $payload)) {
-            return $payload[$key];
+    private function ea_request_service() {
+        static $service = null;
+        if ($service === null) {
+            $service = new SMC_SuperFib_EA_Request_Service();
         }
 
-        $value = $request->get_param($key);
-        return $value !== null ? $value : $default;
+        return $service;
+    }
+
+    private function ea_request_value(WP_REST_Request $request, array $payload, $key, $default = null) {
+        return $this->ea_request_service()->request_value($request, $payload, $key, $default);
     }
 
     private function resolve_ea_user_id(): int
     {
-        // EA key is global — resolve to the admin user
-        // who owns the plugin installation
-        $admin = get_users(array(
-            'role'    => 'administrator',
-            'number'  => 1,
-            'orderby' => 'ID',
-            'order'   => 'ASC',
-            'fields'  => array('ID'),
-        ));
-        return !empty($admin) ? (int) $admin[0]->ID : 1;
+        return $this->ea_request_service()->resolve_ea_user_id();
     }
 
     private static function cors_service() {
@@ -8767,20 +8766,30 @@ final class SMC_SuperFib_Sniper_REST {
         return isset($specs[$key]) ? $specs[$key] : null;
     }
 
+    private function watchlist_service() {
+        static $service = null;
+        if ($service === null) {
+            $service = new SMC_SuperFib_Watchlist_Service();
+        }
+
+        return $service;
+    }
+
     private function is_supported_symbol($symbol) {
         $key = $this->map_symbol_aliases($symbol);
-        $specs = $this->instrument_specs();
-        return isset($specs[$key]);
+        return $this->watchlist_service()->is_supported_symbol($key, $this->instrument_specs());
     }
 
     private function validate_watchlist_symbols($symbols) {
-        $out = array();
-        foreach ($this->sanitize_symbols($symbols) as $sym) {
-            if ($this->is_supported_symbol($sym)) {
-                $out[] = $sym;
+        return $this->watchlist_service()->validate_watchlist_symbols(
+            $symbols,
+            function ($items) {
+                return $this->sanitize_symbols($items);
+            },
+            function ($symbol) {
+                return $this->is_supported_symbol($symbol);
             }
-        }
-        return $out;
+        );
     }
 
     private function save_watchlist($user_id, $watchlist) {
@@ -8793,44 +8802,27 @@ final class SMC_SuperFib_Sniper_REST {
         ));
     }
 
+    private function settings_service() {
+        static $service = null;
+        if ($service === null) {
+            $service = new SMC_SuperFib_Settings_Service();
+        }
+
+        return $service;
+    }
+
     private function sanitize_symbols($symbols) {
-        if (!is_array($symbols)) {
-            return array();
-        }
-        $out = array();
-        foreach ($symbols as $symbol) {
-            $clean = $this->map_symbol_aliases($symbol);
-            // Reject empty strings and suspiciously long tokens (longest real symbol is ~10 chars).
-            if ($clean === '' || strlen($clean) > 12) {
-                continue;
-            }
-            if (!in_array($clean, $out, true)) {
-                $out[] = $clean;
-            }
-        }
-        return array_slice($out, 0, 24);
+        return $this->watchlist_service()->sanitize_symbols($symbols, function ($symbol) {
+            return $this->map_symbol_aliases($symbol);
+        });
     }
 
     private function sanitize_risk_allocation($payload, $fallback) {
-        if (!is_array($payload)) {
-            return $fallback;
-        }
-        return array(
-            'perTradePct' => $this->float_between($payload, 'perTradePct', 0.1, 5.0, $fallback['perTradePct']),
-            'dailyMaxPct' => $this->float_between($payload, 'dailyMaxPct', 0.1, 20.0, $fallback['dailyMaxPct']),
-            'ddCapPct' => $this->float_between($payload, 'ddCapPct', 0.1, 50.0, $fallback['ddCapPct']),
-        );
+        return $this->settings_service()->sanitize_risk_allocation($payload, $fallback);
     }
 
     private function sanitize_signal_board_size($value): int {
-        $size = (int) $value;
-        if ($size <= 3) {
-            return 3;
-        }
-        if ($size <= 5) {
-            return 5;
-        }
-        return 10;
+        return $this->settings_service()->sanitize_signal_board_size($value);
     }
 
     private function resolve_signal_board_size(int $user_id): int {
@@ -8843,17 +8835,11 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function int_between($payload, $key, $min, $max, $fallback) {
-        if (!is_array($payload) || !isset($payload[$key])) {
-            return $fallback;
-        }
-        return max($min, min($max, (int) $payload[$key]));
+        return $this->settings_service()->int_between($payload, $key, $min, $max, $fallback);
     }
 
     private function float_between($payload, $key, $min, $max, $fallback) {
-        if (!is_array($payload) || !isset($payload[$key])) {
-            return $fallback;
-        }
-        return max($min, min($max, (float) $payload[$key]));
+        return $this->settings_service()->float_between($payload, $key, $min, $max, $fallback);
     }
 
     private function twelve_symbol($symbol) {
@@ -9100,13 +9086,21 @@ final class SMC_SuperFib_Sniper_REST {
         }
     }
 
+    private function plugin_utils() {
+        static $utils = null;
+        if ($utils === null) {
+            $utils = new SMC_SuperFib_Plugin_Utils();
+        }
+
+        return $utils;
+    }
+
     private function table($name) {
-        global $wpdb;
-        return $wpdb->prefix . 'smc_sf_' . $name;
+        return $this->plugin_utils()->table($name);
     }
 
     private function now_mysql() {
-        return gmdate('Y-m-d H:i:s');
+        return $this->plugin_utils()->now_mysql();
     }
 
     private function soak_get_var($query) {
@@ -9247,27 +9241,11 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function wpdb_last_error() {
-        global $wpdb;
-        if (is_object($wpdb) && property_exists($wpdb, 'last_error') && $wpdb->last_error !== '') {
-            return (string) $wpdb->last_error;
-        }
-        return null;
+        return $this->plugin_utils()->wpdb_last_error();
     }
 
     private function rest_response_status_code($response) {
-        if (!($response instanceof WP_REST_Response)) {
-            return 200;
-        }
-
-        if (method_exists($response, 'get_status')) {
-            return (int) $response->get_status();
-        }
-
-        if (property_exists($response, 'status')) {
-            return (int) $response->status;
-        }
-
-        return 200;
+        return $this->plugin_utils()->rest_response_status_code($response);
     }
 
     private function no_cache_response($payload) {
@@ -9282,10 +9260,7 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function to_iso($mysql_time) {
-        if (!$mysql_time) {
-            return null;
-        }
-        return gmdate('c', strtotime($mysql_time . ' UTC'));
+        return $this->plugin_utils()->to_iso($mysql_time);
     }
 }
 
