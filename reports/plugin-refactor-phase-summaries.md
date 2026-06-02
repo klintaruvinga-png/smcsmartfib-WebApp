@@ -110,7 +110,13 @@ Verification results for Phases 4–7:
 | Watchlist helpers extracted | PASS | `SMC_SuperFib_Watchlist_Service` owns symbol normalization and watchlist filtering helpers. |
 | EA request helpers extracted | PASS | `SMC_SuperFib_EA_Request_Service` owns EA parameter fallback lookup and default EA user resolution. |
 | Shared plugin utilities extracted | PASS | `SMC_SuperFib_Plugin_Utils` owns table names, UTC timestamps, `$wpdb` error reads, REST response status extraction, and MySQL-to-ISO formatting. |
-| Full PHP test-file gate | PASS | `PHP test files: 25 passed, 0 failed`; failed files: `none`. |
+| Full PHP test-file gate | PASS | Full loop form: `for f in wordpress/smc-superfib-sniper/tests/php/*.php; do ... php "$f" ... done`; output ended with `PHP test files: 25 passed, 0 failed`; failed files: `none`. |
+
+PR #332 Phase 1+ runtime PHP audit disposition:
+
+- The unaudited Phase 1+ changes introduced by PRs #334 and #335 (`fde38da` through `b916526`) have been reviewed after the accepted USC fix at `30ba3ed`.
+- P1 review gap: CLOSED — route registration, auth/EA permission gates, CORS handling, settings/risk helpers, watchlist helpers, EA request helpers, and shared plugin utilities preserve the runtime contracts covered by the PHP regression suite.
+- P2 test-command concern: CLOSED — the 25/0 closeout result is from the full shell loop over each PHP test file, matching the loop pattern restored by `7804886`, not from `php tests/*.php`.
 
 Closeout fixes applied during verification:
 
@@ -122,6 +128,6 @@ Closeout verification commands:
 - `php -l wordpress/smc-superfib-sniper/class-route-registrar.php && php -l wordpress/smc-superfib-sniper/class-auth-service.php && php -l wordpress/smc-superfib-sniper/class-cors-service.php && php -l wordpress/smc-superfib-sniper/class-ea-request-service.php && php -l wordpress/smc-superfib-sniper/class-plugin-utils.php && php -l wordpress/smc-superfib-sniper/class-settings-service.php && php -l wordpress/smc-superfib-sniper/class-watchlist-service.php && php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`: PASS.
 - `php wordpress/smc-superfib-sniper/tests/php/test-progressive-lot-sizing.php`: PASS.
 - `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`: PASS.
-- Full PHP test-file gate: PASS (`25 passed, 0 failed`).
+- `passed=0; failed=0; failed_files=(); for f in wordpress/smc-superfib-sniper/tests/php/*.php; do echo "== $f =="; if php "$f"; then passed=$((passed+1)); else failed=$((failed+1)); failed_files+=("$f"); fi; done; printf 'PHP test files: %d passed, %d failed\n' "$passed" "$failed"; if [ "$failed" -gt 0 ]; then printf 'Failed files: %s\n' "${failed_files[*]}"; exit 1; else printf 'Failed files: none\n'; fi`: PASS (`PHP test files: 25 passed, 0 failed`; `Failed files: none`).
 - `npm run build`: PASS.
 - `npm run test:focused`: WARNING — frontend Vitest render-hook tests fail in this checkout with React dispatcher-null `Invalid hook call`; a temporary minimal `renderHook` smoke test reproduced the same environment failure.
