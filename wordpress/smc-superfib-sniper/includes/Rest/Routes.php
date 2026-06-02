@@ -312,5 +312,71 @@ class Routes {
             'callback' => array($instance, 'post_fundamentals_refresh'),
             'permission_callback' => array($instance, 'permission_user'),
         ));
+
+        register_rest_route($namespace, '/fundamentals/bias', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => array($instance, 'get_fundamentals_bias'),
+            'permission_callback' => array($instance, 'permission_user'),
+        ));
+
+        register_rest_route($namespace, '/ea/signal-candidates', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($instance, 'post_ea_signal_candidates'),
+            'permission_callback' => array($instance, 'permission_ea_bridge'),
+        ));
+
+        register_rest_route($namespace, '/market-data/signal-drift', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => array($instance, 'get_market_data_signal_drift'),
+            'permission_callback' => array($instance, 'permission_user'),
+        ));
+
+        register_rest_route($namespace, '/ea/execution-queue', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => array($instance, 'get_ea_execution_queue'),
+            'permission_callback' => array($instance, 'permission_ea_bridge'),
+        ));
+
+        register_rest_route($namespace, '/ea/execution-ack', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($instance, 'post_ea_execution_ack'),
+            'permission_callback' => array($instance, 'permission_ea_bridge'),
+        ));
+
+        register_rest_route($namespace, '/user/execution-request', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($instance, 'post_user_execution_request'),
+            'permission_callback' => array($instance, 'permission_user'),
+        ));
+
+        register_rest_route($namespace, '/user/execution-audit', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => array($instance, 'get_user_execution_audit'),
+            'permission_callback' => array($instance, 'permission_user'),
+        ));
+
+        register_rest_route($namespace, '/user/approval-queue', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => array($instance, 'get_user_approval_queue'),
+            'permission_callback' => array($instance, 'permission_user'),
+        ));
+
+        register_rest_route($namespace, '/user/approval-queue/review', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($instance, 'post_approval_queue_review'),
+            'permission_callback' => array($instance, 'permission_user'),
+        ));
+
+        register_rest_route($namespace, '/user/license', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => array($instance, 'get_user_license'),
+            'permission_callback' => array($instance, 'permission_user'),
+        ));
+
+        register_rest_route($namespace, '/admin/license/set-tier', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($instance, 'post_admin_set_license_tier'),
+            'permission_callback' => array($instance, 'permission_admin'),
+        ));
     }
 }
