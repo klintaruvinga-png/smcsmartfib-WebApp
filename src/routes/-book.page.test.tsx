@@ -37,7 +37,10 @@ describe("BookPage", () => {
       settingsLoadError: null,
       retrySettingsLoad: vi.fn(),
     });
+    hookMocks.useAccountTelemetry.mockReturnValue({ data: { currency: "USD" } });
   });
+
+  it("groups live positions by symbol regardless of direction", () => {
 
   it("shows a degraded state when backend trade telemetry is unreachable", () => {
     hookMocks.useStableUserTrades.mockReturnValue({
