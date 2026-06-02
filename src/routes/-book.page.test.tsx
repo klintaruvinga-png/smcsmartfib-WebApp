@@ -54,7 +54,7 @@ describe("BookPage", () => {
     ).toBeTruthy();
   });
 
-  it("groups live positions by symbol and direction", () => {
+  it("groups live positions by symbol regardless of direction", () => {
     hookMocks.useStableUserTrades.mockReturnValue({
       data: {
         positions: [
