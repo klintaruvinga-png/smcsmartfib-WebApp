@@ -45,19 +45,39 @@ if (!file_exists($mt5File) || !file_exists($pineFile)) {
     exit(1);
 }
 
-$mt5Data = json_decode(file_get_contents($mt5File), true);
-$pineData = json_decode(file_get_contents($pineFile), true);
+function readJsonInput(string $file, string $label): array
+{
+    $contents = file_get_contents($file);
+    $data = json_decode($contents, true);
 
-if (!$mt5Data || !$pineData) {
-    echo json_encode([
-        'error' => 'Failed to parse JSON input files'
-    ], JSON_PRETTY_PRINT) . "\n";
-    exit(1);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        echo json_encode([
+            'error' => 'Failed to parse JSON input file',
+            'input' => $label,
+            'message' => json_last_error_msg()
+        ], JSON_PRETTY_PRINT) . "\n";
+        exit(1);
+    }
+
+    return is_array($data) ? $data : [];
 }
 
+function extractSignalRecords(array $data): array
+{
+    if (isset($data['signals']) && is_array($data['signals'])) {
+        return $data['signals'];
+    }
+
+    return array_values($data) === $data ? $data : [];
+}
+
+$mt5Data = readJsonInput($mt5File, 'mt5');
+$pineData = readJsonInput($pineFile, 'pine');
+
 // Extract signal records (expected format: array of { id, symbol, direction, entry_price, ... })
-$mt5Signals = is_array($mt5Data) ? $mt5Data : ($mt5Data['signals'] ?? []);
-$pineSignals = is_array($pineData) ? $pineData : ($pineData['signals'] ?? []);
+// Handles both keyed { "signals": [...] } and bare array payloads.
+$mt5Signals = extractSignalRecords($mt5Data);
+$pineSignals = extractSignalRecords($pineData);
 
 // Constants
 const EXACT_ENTRY_PIPS = 20;    // Entry within 20 pips = EXACT
@@ -101,6 +121,7 @@ $exactEntries = 0;
 $driftEntries = 0;
 $mismatches = 0;
 $noPineCounterpart = 0;
+$noMt5Counterpart = 0;
 $totalSignals = 0;
 
 $allKeys = array_unique(array_merge(array_keys($mt5Index), array_keys($pineIndex)));
@@ -110,7 +131,8 @@ foreach ($allKeys as $key) {
     $pineBatch = $pineIndex[$key] ?? [];
 
     if (empty($mt5Batch)) {
-        $noPineCounterpart += count($pineBatch);
+        $noMt5Counterpart += count($pineBatch);
+        $mismatches += count($pineBatch);
         foreach ($pineBatch as $signal) {
             $matches[] = [
                 'symbol' => $signal['symbol'],
@@ -123,6 +145,9 @@ foreach ($allKeys as $key) {
     }
 
     if (empty($pineBatch)) {
+        $noPineCounterpart += count($mt5Batch);
+        $mismatches += count($mt5Batch);
+        $totalSignals += count($mt5Batch);
         foreach ($mt5Batch as $signal) {
             $matches[] = [
                 'symbol' => $signal['symbol'],
@@ -228,6 +253,7 @@ $report = [
     'drift_entries' => $driftEntries,
     'mismatches' => $mismatches,
     'no_pine_counterpart' => $noPineCounterpart,
+    'no_mt5_counterpart' => $noMt5Counterpart,
     'gate_criteria' => [
         'direction_parity_gte_95_pct' => $directionalParityPct >= 95,
         'mismatches_eq_0' => $mismatches === 0
