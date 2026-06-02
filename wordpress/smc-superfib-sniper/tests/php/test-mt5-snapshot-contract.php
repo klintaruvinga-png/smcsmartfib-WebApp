@@ -770,7 +770,8 @@ function seed_dual_anchor_strong_confluence_fixture($wpdb, $user_id, $symbol) {
     $snapshotTable = $wpdb->prefix . 'smc_sf_snapshots';
     $candleTable = $wpdb->prefix . 'smc_sf_candles';
     $now = time();
-    $currentDayStart = (int) strtotime('today 00:00 UTC');
+    $latestDisplacementCandle = (int) (floor(($now - 900) / 900) * 900);
+    $intradayStart = $latestDisplacementCandle - (34 * 900);
 
     $wpdb->replace($snapshotTable, array(
         'user_id' => $user_id,
@@ -797,21 +798,21 @@ function seed_dual_anchor_strong_confluence_fixture($wpdb, $user_id, $symbol) {
     }
 
     for ($dayOffset = 3; $dayOffset >= 1; $dayOffset--) {
-        $push($currentDayStart - ($dayOffset * 86400) + 12 * 3600, 1.1000, 1.1300, 1.0800, 1.1050);
+        $push(strtotime('today 12:00 UTC') - ($dayOffset * 86400), 1.1000, 1.2000, 1.0000, 1.1050);
     }
 
     for ($i = 0; $i < 25; $i++) {
-        $timestamp = $currentDayStart + ($i * 900);
+        $timestamp = $intradayStart + ($i * 900);
         $push($timestamp, 1.1020, 1.1060, 1.0010, 1.1040);
     }
 
     for ($i = 0; $i < 9; $i++) {
-        $timestamp = $currentDayStart + (($i + 25) * 900);
+        $timestamp = $intradayStart + (($i + 25) * 900);
         $low = $i === 0 ? 0.9900 : 1.1010;
         $push($timestamp, 1.1020, 1.1060, $low, 1.1040);
     }
 
-    $push((int) (floor(($now - 900) / 900) * 900), 1.1000, 1.1100, 1.1000, 1.1080);
+    $push($latestDisplacementCandle, 1.1000, 1.1100, 1.1000, 1.1080);
 
     foreach ($rows as $row) {
         $wpdb->replace($candleTable, array(
@@ -2232,6 +2233,13 @@ assert_same('ACTIVE_PENDING_ORDER', $pendingOrderState['diagnostic']['lifecycle'
 
 $dualAnchorSymbol = 'DUALOK';
 seed_dual_anchor_strong_confluence_fixture($wpdb, 7, $dualAnchorSymbol);
+$dualAnchorMaxCandleTime = 0;
+foreach ($wpdb->tables[$candleTable] ?? array() as $row) {
+    if (($row['symbol'] ?? null) === $dualAnchorSymbol && ($row['timeframe'] ?? null) === '15min') {
+        $dualAnchorMaxCandleTime = max($dualAnchorMaxCandleTime, strtotime((string) ($row['candle_time'] ?? '')));
+    }
+}
+assert_true($dualAnchorMaxCandleTime <= (int) (floor((time() - 900) / 900) * 900), 'Dual-anchor fixture must not seed future candles ahead of the final displacement bar');
 $dualAnchorState = $buildSymbolState->invoke($instance, 7, $dualAnchorSymbol, array(
     'symbol' => $dualAnchorSymbol,
     'bid' => 1.1078,
