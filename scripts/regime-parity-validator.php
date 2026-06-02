@@ -45,19 +45,39 @@ if (!file_exists($mt5File) || !file_exists($pineFile)) {
     exit(1);
 }
 
-$mt5Data = json_decode(file_get_contents($mt5File), true);
-$pineData = json_decode(file_get_contents($pineFile), true);
+function readJsonInput(string $file, string $label): array
+{
+    $contents = file_get_contents($file);
+    $data = json_decode($contents, true);
 
-if (!$mt5Data || !$pineData) {
-    echo json_encode([
-        'error' => 'Failed to parse JSON input files'
-    ], JSON_PRETTY_PRINT) . "\n";
-    exit(1);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        echo json_encode([
+            'error' => 'Failed to parse JSON input file',
+            'input' => $label,
+            'message' => json_last_error_msg()
+        ], JSON_PRETTY_PRINT) . "\n";
+        exit(1);
+    }
+
+    return is_array($data) ? $data : [];
 }
 
+function extractRegimeRecords(array $data): array
+{
+    if (isset($data['regimes']) && is_array($data['regimes'])) {
+        return $data['regimes'];
+    }
+
+    return array_values($data) === $data ? $data : [];
+}
+
+$mt5Data = readJsonInput($mt5File, 'mt5');
+$pineData = readJsonInput($pineFile, 'pine');
+
 // Extract regime records (expected format: array of { symbol, htf_bias, ltf_regime, chop_score, ... })
-$mt5Regimes = is_array($mt5Data) ? $mt5Data : ($mt5Data['regimes'] ?? []);
-$pineRegimes = is_array($pineData) ? $pineData : ($pineData['regimes'] ?? []);
+// Handles both keyed { "regimes": [...] } and bare array payloads.
+$mt5Regimes = extractRegimeRecords($mt5Data);
+$pineRegimes = extractRegimeRecords($pineData);
 
 // Index by symbol for fast lookup
 $mt5Index = [];
