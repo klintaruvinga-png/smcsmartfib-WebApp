@@ -5211,12 +5211,15 @@ final class SMC_SuperFib_Sniper_REST {
             is_array($snapshot['diagnostics'] ?? null) ? $snapshot['diagnostics'] : array()
         );
         $board_size = $this->resolve_signal_board_size($user_id);
+        // Count scope: global requests report the full board; watchlist requests report only
+        // the watchlist-scoped count so totalActive stays consistent with the signals returned.
+        $count_symbols = ($scope === 'global') ? array() : $watchlist_symbols;
         return $this->no_cache_response(array(
             'signals' => $this->read_live_signal_board((int) $user_id, $symbols, $board_size),
             'polledAt' => gmdate('c'),
             'meta' => array(
                 'boardSize' => $board_size,
-                'totalActive' => $this->count_live_signal_board((int) $user_id, array()),
+                'totalActive' => $this->count_live_signal_board((int) $user_id, $count_symbols),
             ),
         ));
     }
