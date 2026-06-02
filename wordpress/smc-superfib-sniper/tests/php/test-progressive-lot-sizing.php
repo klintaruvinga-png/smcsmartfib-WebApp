@@ -6,7 +6,7 @@ function progressive_price($high, $low, $ratio) {
     return round((float) $high - (((float) $ratio / 100) * ((float) $high - (float) $low)), 8);
 }
 
-function progressive_expected_plan($risk_usc, $high, $low, $direction, $pip, $pip_val) {
+function progressive_expected_plan($risk_usc, $high, $low, $direction, $pip, $pip_val, $currency = 'USC') {
     $entry_ratios = $direction === 'LONG' ? array('e1' => 62.5, 'e2' => 75.0, 'e3' => 100.0) : array('e1' => 25.0, 'e2' => 0.0, 'e3' => -25.0);
     $stop_ratios = $direction === 'LONG' ? array('e1' => 75.0, 'e2' => 100.0, 'e3' => 125.0) : array('e1' => 0.0, 'e2' => -25.0, 'e3' => -62.5);
     $alloc = array('e1' => 0.20, 'e2' => 0.30, 'e3' => 0.50);
@@ -15,6 +15,8 @@ function progressive_expected_plan($risk_usc, $high, $low, $direction, $pip, $pi
     $stops = array();
     $lots = array();
     $stage_risk_amounts = array();
+    $account_currency = strtoupper(trim((string) $currency));
+    $sizing_risk = $account_currency === 'USC' ? ($risk_usc / 100) : $risk_usc;
 
     foreach (array('e1', 'e2', 'e3') as $stage) {
         $entries[$stage] = progressive_price($high, $low, $entry_ratios[$stage]);
@@ -33,7 +35,7 @@ function progressive_expected_plan($risk_usc, $high, $low, $direction, $pip, $pi
         $stop = $stops[$stage];
         $stop_dist = max(abs($entry - $stop), $pip);
         $stop_pips = $stop_dist / $pip;
-        $stage_risk = $risk_usc * $alloc[$stage];
+        $stage_risk = $sizing_risk * $alloc[$stage];
         $raw_lots = $stage_risk / max($stop_pips * $pip_val, 0.01);
         $stage_lot = floor($raw_lots * 100) / 100;
         $lots[$stage] = $stage_lot >= 0.01 ? round($stage_lot, 2) : 0.0;
@@ -55,7 +57,8 @@ function progressive_expected_plan($risk_usc, $high, $low, $direction, $pip, $pi
         $stop = $stops[$stage];
         $stop_dist = max(abs($entry - $stop), $pip);
         $stop_pips = $stop_dist / $pip;
-        $stage_risk_amounts[$stage] = round($lots[$stage] * $stop_pips * $pip_val, 2);
+        $risk_amount = round($lots[$stage] * $stop_pips * $pip_val, 2);
+        $stage_risk_amounts[$stage] = $account_currency === 'USC' ? round($risk_amount * 100, 2) : $risk_amount;
     }
 
     return array(
@@ -120,11 +123,11 @@ fib_test_seed_account_blob(101, array(
         'updatedAt' => gmdate('c'),
     ),
     'account' => array(
-        'equityUSC' => 100000.0,
+        'equityUSC' => 10000000.0,
         'updatedAt' => gmdate('c'),
     ),
 ));
-progressive_seed_account_telemetry(101, 100000.0);
+progressive_seed_account_telemetry(101, 10000000.0);
 fib_test_seed_snapshot(101, 'GBPUSD', 1.2742);
 
 $gbpusd_plan = progressive_build_plan(101, array(
@@ -133,7 +136,7 @@ $gbpusd_plan = progressive_build_plan(101, array(
     'direction' => 'LONG',
 ), 1.3000, 1.2600);
 
-$expected_gbpusd = progressive_expected_plan(1000.0, 1.3000, 1.2600, 'LONG', 0.0001, 10.0);
+$expected_gbpusd = progressive_expected_plan(100000.0, 1.3000, 1.2600, 'LONG', 0.0001, 10.0);
 foreach ($expected_gbpusd['entries'] as $stage => $expected_entry) {
     fib_test_assert_near($expected_entry, $gbpusd_plan['entries'][$stage], 0.000001, 'GBPUSD entry mismatch for ' . $stage);
 }
@@ -143,12 +146,44 @@ foreach ($expected_gbpusd['stops'] as $stage => $expected_stop) {
 foreach ($expected_gbpusd['lots'] as $stage => $expected_lot) {
     fib_test_assert_near($expected_lot, $gbpusd_plan['lotSize'][$stage], 0.000001, 'GBPUSD lot mismatch for ' . $stage);
 }
-fib_test_assert_same(1000.0, $gbpusd_plan['riskUSC'], 'GBPUSD riskUSC should be derived from account equity and per-trade risk');
+fib_test_assert_same(100000.0, $gbpusd_plan['riskUSC'], 'GBPUSD riskUSC should be derived from account equity and per-trade risk');
 fib_test_assert_true($gbpusd_plan['lotSize']['e1'] < $gbpusd_plan['lotSize']['e2'], 'GBPUSD E2 lot must exceed E1');
 fib_test_assert_true($gbpusd_plan['lotSize']['e2'] < $gbpusd_plan['lotSize']['e3'], 'GBPUSD E3 lot must exceed E2');
 fib_test_assert_true($gbpusd_plan['entries']['e2'] > $gbpusd_plan['stops']['e1'], 'GBPUSD BUY E2 must sit above the E1 stop');
 fib_test_assert_true($gbpusd_plan['entries']['e3'] > $gbpusd_plan['stops']['e2'], 'GBPUSD BUY E3 must sit above the E2 stop');
 fib_test_assert_true($expected_gbpusd['totalRisk'] <= $gbpusd_plan['riskUSC'], 'GBPUSD staged risk must stay within the configured family risk cap');
+
+fib_test_reset_env(111);
+fib_test_seed_account_blob(111, array(
+    'riskProfile' => array(
+        'tier' => 'balanced',
+        'maxConcurrentTrades' => 3,
+        'perTradePct' => 1.0,
+        'dailyMaxPct' => 2.0,
+        'ddCapPct' => 6.0,
+        'cooldownMin' => 30,
+        'updatedAt' => gmdate('c'),
+    ),
+    'account' => array(
+        'equityUSC' => 100000.0,
+        'updatedAt' => gmdate('c'),
+    ),
+));
+progressive_seed_account_telemetry(111, 100000.0);
+fib_test_seed_snapshot(111, 'GBPUSD', 1.2742);
+
+$cent_account_plan = progressive_build_plan(111, array(
+    'id' => 'sig-usc-cent-account',
+    'symbol' => 'GBPUSD',
+    'direction' => 'LONG',
+), 1.3000, 1.2600);
+
+$expected_cent_account = progressive_expected_plan(1000.0, 1.3000, 1.2600, 'LONG', 0.0001, 10.0);
+foreach ($expected_cent_account['lots'] as $stage => $expected_lot) {
+    fib_test_assert_near($expected_lot, $cent_account_plan['lotSize'][$stage], 0.000001, 'USC cent account lot mismatch for ' . $stage);
+}
+fib_test_assert_same(1000.0, $cent_account_plan['riskUSC'], 'USC cent account riskUSC should keep the cent-denominated risk budget');
+fib_test_assert_true($expected_cent_account['totalRisk'] <= $cent_account_plan['riskUSC'], 'USC cent account staged risk must stay within the USC risk cap');
 
 fib_test_reset_env(202);
 fib_test_seed_account_blob(202, array(
@@ -162,11 +197,11 @@ fib_test_seed_account_blob(202, array(
         'updatedAt' => gmdate('c'),
     ),
     'account' => array(
-        'equityUSC' => 80000.0,
+        'equityUSC' => 8000000.0,
         'updatedAt' => gmdate('c'),
     ),
 ));
-progressive_seed_account_telemetry(202, 80000.0);
+progressive_seed_account_telemetry(202, 8000000.0);
 fib_test_seed_snapshot(202, 'GBPUSD', 1.2675);
 
 $eurgbp_plan = progressive_build_plan(202, array(
@@ -176,8 +211,8 @@ $eurgbp_plan = progressive_build_plan(202, array(
 ), 0.8610, 0.8450);
 
 $gbp_quote_pip_value = round((100000 * 0.0001) * 1.2675, 6);
-$expected_eurgbp = progressive_expected_plan(600.0, 0.8610, 0.8450, 'SHORT', 0.0001, $gbp_quote_pip_value);
-$fallback_eurgbp = progressive_expected_plan(600.0, 0.8610, 0.8450, 'SHORT', 0.0001, 10.0);
+$expected_eurgbp = progressive_expected_plan(60000.0, 0.8610, 0.8450, 'SHORT', 0.0001, $gbp_quote_pip_value);
+$fallback_eurgbp = progressive_expected_plan(60000.0, 0.8610, 0.8450, 'SHORT', 0.0001, 10.0);
 foreach ($expected_eurgbp['entries'] as $stage => $expected_entry) {
     fib_test_assert_near($expected_entry, $eurgbp_plan['entries'][$stage], 0.000001, 'EURGBP entry mismatch for ' . $stage);
 }
@@ -244,7 +279,7 @@ fib_test_seed_account_blob(404, array(
         'updatedAt' => gmdate('c', time() - 301),
     ),
 ));
-progressive_seed_account_telemetry(404, 50000.0);
+progressive_seed_account_telemetry(404, 5000000.0);
 fib_test_seed_snapshot(404, 'GBPUSD', 1.2742);
 
 $telemetry_authority_plan = progressive_build_plan(404, array(
@@ -253,11 +288,11 @@ $telemetry_authority_plan = progressive_build_plan(404, array(
     'direction' => 'LONG',
 ), 1.3000, 1.2600);
 
-$expected_telemetry_authority = progressive_expected_plan(500.0, 1.3000, 1.2600, 'LONG', 0.0001, 10.0);
+$expected_telemetry_authority = progressive_expected_plan(50000.0, 1.3000, 1.2600, 'LONG', 0.0001, 10.0);
 foreach ($expected_telemetry_authority['lots'] as $stage => $expected_lot) {
     fib_test_assert_near($expected_lot, $telemetry_authority_plan['lotSize'][$stage], 0.000001, 'Telemetry authority lot mismatch for ' . $stage);
 }
-fib_test_assert_same(500.0, $telemetry_authority_plan['riskUSC'], 'Telemetry authority riskUSC must be derived from live telemetry equity');
+fib_test_assert_same(50000.0, $telemetry_authority_plan['riskUSC'], 'Telemetry authority riskUSC must be derived from live telemetry equity');
 fib_test_assert_same('ACTIVE', $telemetry_authority_plan['state'], 'Live telemetry with positive equity must keep the plan ACTIVE');
 
 fib_test_reset_env(505);

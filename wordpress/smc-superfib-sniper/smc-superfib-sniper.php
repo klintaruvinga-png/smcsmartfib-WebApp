@@ -6335,6 +6335,10 @@ final class SMC_SuperFib_Sniper_REST {
         $spec = $this->get_instrument_spec($sym);
         $pip = $spec ? (float) $spec['pip_size'] : 0.0001;
         $pip_val = $spec ? $this->pip_value_per_standard_lot($user_id, $sym, $spec) : 10.0;
+        $account_currency = strtoupper(trim((string) ($telemetry['currency'] ?? '')));
+        // MT5 cent accounts report equity/risk in USC, while pip values are USD-denominated.
+        // Convert USC cents back to USD before dividing by pip value so lot sizing is not 100x too large.
+        $sizing_risk = $account_currency === 'USC' ? ($risk_usc / 100) : $risk_usc;
         $is_reference_instrument = is_array($spec) && (($spec['type'] ?? '') === 'reference');
 
         // Compute swings for SL using the candles already fetched by build_symbol_state().
@@ -6389,7 +6393,7 @@ final class SMC_SuperFib_Sniper_REST {
             }
             $stop_dist = max(abs($entries[$stage] - $stops[$stage]), $pip);
             $stop_pips = $stop_dist / $pip;
-            $stage_risk = $risk_usc * $risk_alloc[$stage];
+            $stage_risk = $sizing_risk * $risk_alloc[$stage];
             $raw_lots = $stage_risk / max($stop_pips * $pip_val, 0.01);
             $stage_lot = floor($raw_lots * 100) / 100;
             $lots[$stage] = $stage_lot >= 0.01 ? round($stage_lot, 2) : 0.0;
