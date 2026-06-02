@@ -71,6 +71,7 @@ export function PlanCandidateCard({
           lot: formatLotSize(plan.lotSize.e1),
           stop: fmtPrice(plan.stops?.e1 ?? plan.sl, signal.symbol),
           target: formatOptionalPrice(plan.tps?.tp1, signal.symbol),
+          rr: formatOptionalRatio(plan.rr?.tp1),
         },
         {
           stage: "E2",
@@ -78,6 +79,7 @@ export function PlanCandidateCard({
           lot: formatLotSize(plan.lotSize.e2),
           stop: fmtPrice(plan.stops?.e2 ?? plan.sl, signal.symbol),
           target: formatOptionalPrice(plan.tps?.tp2, signal.symbol),
+          rr: formatOptionalRatio(plan.rr?.tp2),
         },
         {
           stage: "E3",
@@ -85,6 +87,7 @@ export function PlanCandidateCard({
           lot: formatLotSize(plan.lotSize.e3),
           stop: fmtPrice(plan.stops?.e3 ?? plan.sl, signal.symbol),
           target: formatOptionalPrice(plan.tps?.tp3, signal.symbol),
+          rr: formatOptionalRatio(plan.rr?.tp3),
         },
       ]
     : null;
