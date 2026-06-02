@@ -93,6 +93,7 @@ foreach ($symbols as $symbol) {
     $pine = $pineIndex[$symbol] ?? null;
 
     if (!$mt5 || !$pine) {
+        $criticalMismatches++;
         $matches[] = [
             'symbol' => $symbol,
             'status' => 'MISSING_COUNTERPART',
