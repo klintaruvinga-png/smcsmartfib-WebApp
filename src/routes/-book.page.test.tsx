@@ -91,7 +91,8 @@ describe("BookPage", () => {
 
     render(<BookPage />);
 
-    expect(screen.getAllByText("EURUSD")).toHaveLength(2);
+    // Symbol appears once as group header (no longer split by direction)
+    expect(screen.getAllByText("EURUSD")).toHaveLength(1);
     expect(screen.getAllByText("LONG").length).toBeGreaterThan(0);
     expect(screen.getAllByText("SHORT").length).toBeGreaterThan(0);
   });
