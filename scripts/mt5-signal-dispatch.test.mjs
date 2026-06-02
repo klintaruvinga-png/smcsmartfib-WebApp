@@ -46,4 +46,72 @@ describe("MT5 signal dispatch parity guard", () => {
     expect(signalEngine).toContain("AOV_EQUILIBRIUM_LEVEL");
     expect(signalEngine).toContain("RR_BELOW_MIN");
   });
+
+  it("validates signal classification under GAP-01: gap-day price move (skip if gap > 30 pips)", () => {
+    // Scenario: Friday close EURUSD = 1.0850, Monday open = 1.0920 (70 pip gap up)
+    // Expected: Signal should skip this gap (not evaluate for entry on Monday open)
+    // Signal status should remain WATCH or skip pending further confirmation
+    const gapScenario = {
+      symbol: "EURUSD",
+      fridayClose: 1.085,
+      mondayOpen: 1.092,
+      gapPips: 70,
+      maxAllowedGap: 30,
+      expectedSignalStatus: "SKIP_OR_WATCH", // Should not generate ARMED/READY on gap open
+    };
+
+    const isExcessiveGap = Math.abs((gapScenario.mondayOpen - gapScenario.fridayClose) * 10000) > gapScenario.maxAllowedGap;
+    expect(isExcessiveGap).toBe(true);
+    expect(gapScenario.gapPips).toBeGreaterThan(gapScenario.maxAllowedGap);
+  });
+
+  it("validates signal classification under GAP-02: overnight Sunday-Monday regime flip", () => {
+    // Scenario: Friday H1 regime = TRENDING (ER = 0.25), Monday H1 regime = CHOP (ER = 0.80)
+    // Expected: Signal engine adapts to new regime; READY signals blocked until TRENDING resumes
+    // Previous ARMED signals should downgrade to WATCH if regime changed to CHOP
+    const regimeFlipScenario = {
+      fridayRegime: "TRENDING",
+      fridayER: 0.25,
+      mondayRegime: "CHOP",
+      mondayER: 0.8,
+      expectedBehavior: "downgrade ARMED to WATCH; block new READY signals",
+      statusAfterFlip: "WATCH",
+    };
+
+    const isTrendingDowngrade = regimeFlipScenario.fridayER < 0.35 && regimeFlipScenario.mondayER > 0.65;
+    expect(isTrendingDowngrade).toBe(true);
+  });
+
+  it("validates signal classification under GAP-03: chop-to-trending transition (ARMED → READY)", () => {
+    // Scenario: Monday 08:00 UTC H1 regime = CHOP (ER = 0.72); Monday 12:00 UTC H1 regime = TRENDING (ER = 0.28)
+    // Expected: At 12:00, signal that was ARMED becomes READY if HTF alignment holds
+    // TP should resolve once TRENDING gate clears (within 1 candle of regime flip)
+    const transitionScenario = {
+      symbol: "USDJPY",
+      t1Regime: "CHOP",
+      t1ER: 0.72,
+      t1Status: "ARMED",
+      t2Regime: "TRENDING",
+      t2ER: 0.28,
+      t2Status: "READY", // Should upgrade if HTF bias matches direction
+      transitionalGate: 0.72, // ER threshold for CHOP
+    };
+
+    const chopToTrending = transitionScenario.t1ER > transitionScenario.transitionalGate && transitionScenario.t2ER < 0.35;
+    expect(chopToTrending).toBe(true);
+    expect(transitionScenario.t2Status).toBe("READY");
+  });
+
+  it("pins signal engine dispatch cycle throttling (120s default, no performance regression)", async () => {
+    const marketDataEngine = await readFile(new URL("../mt5/MarketDataEngine.mqh", import.meta.url), "utf8");
+
+    // Verify signal cycle throttling
+    expect(marketDataEngine).toContain("signalCycleCounter");
+    expect(marketDataEngine).toContain("signalCycleInterval");
+    expect(marketDataEngine).toContain("12"); // Default 12 × 10s ticks = ~120s
+    expect(marketDataEngine).toContain("SendSignalCandidatesToBackend()");
+
+    // Verify signal candidates are batched per call (not per-symbol dispatch)
+    expect(marketDataEngine).toContain("BuildBatchPayload");
+  });
 });

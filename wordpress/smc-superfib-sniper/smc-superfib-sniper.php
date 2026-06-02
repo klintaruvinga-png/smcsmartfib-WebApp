@@ -5819,7 +5819,16 @@ final class SMC_SuperFib_Sniper_REST {
 
             $opposite_row = $this->find_display_row_by_symbol_direction($active_rows, $symbol, strtoupper((string) ($candidate['direction'] ?? '')), false);
             if ($opposite_row !== null) {
-                if ($status !== 'READY' || $quality_score < ((float) ($opposite_row['quality_score'] ?? 0) + 150)) {
+                $opposite_lifecycle = strtoupper((string) ($opposite_row['lifecycle_state'] ?? ''));
+                $opposite_is_stale = $opposite_lifecycle === 'STALE_HELD';
+                // READY signals can displace a weaker opposite row (quality + 150 threshold).
+                // WATCH/ARMED signals cannot displace an active opposite row — but if the
+                // opposite row is STALE_HELD it is no longer actively executable, so allow
+                // the new direction signal to be promoted alongside it.
+                if ($status === 'READY' && $quality_score < ((float) ($opposite_row['quality_score'] ?? 0) + 150)) {
+                    continue;
+                }
+                if ($status !== 'READY' && !$opposite_is_stale) {
                     continue;
                 }
             }
@@ -6088,6 +6097,8 @@ final class SMC_SuperFib_Sniper_REST {
             'invalidation_reason' => null,
             'first_seen_at' => $existing['first_seen_at'] ?? $now,
             'last_confirmed_at' => $now,
+            'backend_confirmed' => (int) (strtoupper((string) ($candidate['status'] ?? '')) === 'READY'
+                && (bool) ($signal['backendConfirmed'] ?? false)),
             'last_blueprint_at' => (bool) ($signal['backendConfirmed'] ?? false)
                 ? $now
                 : ($existing['last_blueprint_at'] ?? null),
@@ -6163,9 +6174,12 @@ final class SMC_SuperFib_Sniper_REST {
             return false;
         }
 
-        $engine = is_array($signal['engine'] ?? null) ? $signal['engine'] : array();
-        $engine_blocker = strtoupper((string) ($signal['engineBlocker'] ?? ($engine['engineBlocker'] ?? '')));
-        return $engine_blocker === 'OK';
+        // Engine blocker controls execution eligibility, not board visibility.
+        // A signal with a blocker (e.g. PRICE_NOT_MT5_FRESH, AOV_EQUILIBRIUM_ZONE) should
+        // still be promoted to the display board so Signal Engine and Plan pages show the
+        // symbol with its correct blocked/watching state. canExecuteSignal is enforced by
+        // the frontend using backendConfirmed and the execution endpoint independently.
+        return true;
     }
 
     private function read_live_signal_board(int $user_id, array $symbols, ?int $board_size = null): array {
@@ -6213,7 +6227,7 @@ final class SMC_SuperFib_Sniper_REST {
             'confluence' => array_values($confluence),
             'verdict' => strtoupper((string) ($row['verdict'] ?? 'C')),
             'computedBy' => 'backend',
-            'backendConfirmed' => strtoupper((string) ($row['status'] ?? '')) === 'READY',
+            'backendConfirmed' => (bool) ((int) ($row['backend_confirmed'] ?? 0)),
             'engineBlocker' => $engine_blocker,
             'createdAt' => $this->to_iso((string) ($row['first_seen_at'] ?? '')),
             'qualityScore' => (float) ($row['quality_score'] ?? 0),

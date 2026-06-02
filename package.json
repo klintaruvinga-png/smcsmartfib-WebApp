@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "check:mql": "node ./mt5/check-mql-includes.mjs",
+    "test:focused": "vitest run src/hooks/useSniperData.test.tsx src/hooks/useSniperData.watchlist.test.tsx src/lib/api/sniperClient.test.ts src/routes/-live.test.ts src/routes/-signals.page.test.tsx scripts/mt5-regime-replay.test.mjs scripts/mt5-signal-dispatch.test.mjs scripts/pipeline-watcher.test.mjs scripts/workflow-state.test.mjs",
     "pipeline": "node scripts/pipeline-watcher.js",
     "pipeline:start": "node scripts/start-pipeline-runner.js",
     "pipeline:reset": "node scripts/reset-pipeline.js",
