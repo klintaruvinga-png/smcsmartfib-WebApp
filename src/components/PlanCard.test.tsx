@@ -71,6 +71,25 @@ describe("PlanCandidateCard", () => {
       (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
     ).toBe(false);
   });
+
+  it("preserves below-minimum lot precision instead of rounding up to the executable threshold", () => {
+    render(
+      <PlanCandidateCard
+        signal={{ ...signal, symbol: "XAUUSD", direction: "SHORT" }}
+        plan={{
+          ...plan,
+          symbol: "XAUUSD",
+          lotSize: { e1: 0.099, e2: 0.1, e3: 0.15 },
+        }}
+        planComplete
+      />,
+    );
+
+    const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
+    expect(cardText).toContain("0.099 lot");
+    expect(cardText).toContain("Below min 0.10");
+    expect(cardText).not.toContain("0.10 lotBelow min 0.10");
+  });
 });
 
 const signal: SignalCandidate = {

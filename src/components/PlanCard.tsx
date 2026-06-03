@@ -69,7 +69,7 @@ export function PlanCandidateCard({
         {
           stage: "E1",
           entry: fmtPrice(plan.entries.e1, signal.symbol),
-          lot: formatLotSize(plan.lotSize.e1),
+          lot: formatLotSize(plan.lotSize.e1, minExecutableLot),
           lotBelowMinimum: !isExecutableStageLotValue(plan.lotSize.e1, planSymbol),
           stop: fmtPrice(plan.stops?.e1 ?? plan.sl, signal.symbol),
           target: formatOptionalPrice(plan.tps?.tp1, signal.symbol),
@@ -86,7 +86,7 @@ export function PlanCandidateCard({
         {
           stage: "E2",
           entry: fmtPrice(plan.entries.e2, signal.symbol),
-          lot: formatLotSize(plan.lotSize.e2),
+          lot: formatLotSize(plan.lotSize.e2, minExecutableLot),
           lotBelowMinimum: !isExecutableStageLotValue(plan.lotSize.e2, planSymbol),
           stop: fmtPrice(plan.stops?.e2 ?? plan.sl, signal.symbol),
           target: formatOptionalPrice(plan.tps?.tp2, signal.symbol),
@@ -103,7 +103,7 @@ export function PlanCandidateCard({
         {
           stage: "E3",
           entry: fmtPrice(plan.entries.e3, signal.symbol),
-          lot: formatLotSize(plan.lotSize.e3),
+          lot: formatLotSize(plan.lotSize.e3, minExecutableLot),
           lotBelowMinimum: !isExecutableStageLotValue(plan.lotSize.e3, planSymbol),
           stop: fmtPrice(plan.stops?.e3 ?? plan.sl, signal.symbol),
           target: formatOptionalPrice(plan.tps?.tp3, signal.symbol),
@@ -601,7 +601,7 @@ function getStageStatus({
   return { label: "Ready", tone: "ready" };
 }
 
-function formatLotSize(value: number | undefined) {
+function formatLotSize(value: number | undefined, minExecutableLot: number) {
   if (!isFiniteNumber(value)) {
     return "--";
   }
@@ -610,11 +610,20 @@ function formatLotSize(value: number | undefined) {
     return "--";
   }
 
-  if (value < 0.01) {
-    return `${value.toFixed(3)} lot`;
+  if (value < minExecutableLot) {
+    return `${formatBelowMinimumLotValue(value)} lot`;
   }
 
   return `${value.toFixed(2)} lot`;
+}
+
+function formatBelowMinimumLotValue(value: number): string {
+  const raw = value.toString();
+  if (!raw.includes("e")) {
+    return raw;
+  }
+
+  return value.toFixed(8).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 function formatOptionalPrice(value: number | undefined, symbol?: string) {
