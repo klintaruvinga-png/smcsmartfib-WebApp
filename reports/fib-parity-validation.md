@@ -41,3 +41,26 @@ Action: Continue the 30-day MT5 soak, then capture Pine snapshots and run:
   php scripts/parity-validator.php --mt5-file mt5-levels.json --pine-file pine-levels.json --out reports/phase4-gate.json
 Gate: PASS requires overall_parity_pct >= 99, critical_mismatches_count = 0, and 384 rows across 24 (symbol,timeframe,family) groups
 ```
+
+## Latest live paired-export validation
+
+- Date: 2026-06-03
+- Command: `php scripts/parity-validator.php --mt5-file reports/phase4-parity/mt5-levels.json --pine-file reports/phase4-parity/pine-levels.json --out reports/phase4-parity/phase4-gate.json`
+- Result: `FAIL`
+- Overall parity: `40.89%`
+- Tuples compared: `384`
+- Exact matches: `144`
+- Acceptable drifts: `13`
+- Critical mismatches: `227`
+- Gate artifact: `reports/phase4-parity/phase4-gate.json`
+
+### Interpretation
+
+The validator confirms the live paired MT5 vs Pine corpus is not aligned. Large price drifts exceed the Phase 4 tolerance threshold (`0.001`) across several `EURUSD` M15 and H1 fib levels, particularly in `LTF_SF` and `HTF_AF`.
+
+### Next action
+
+- Investigate MT5 export input and session/timeframe alignment
+- Confirm the Pine reference capture timestamp matches the MT5 export snapshot
+- Re-run the validator after fixing the drift source
+

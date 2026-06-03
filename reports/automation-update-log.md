@@ -6,6 +6,14 @@ and the permanent guard installed to prevent recurrence. New entries are prepend
 
 ---
 
+## [2026-06-03] Phase 4 live paired-export parity re-run completed; gate FAIL 40.89%
+
+- **Update:** Validator re-run completed with the same paired export corpus in `reports/phase4-parity`.
+- **Result:** `reports/phase4-parity/phase4-gate.json` reports `gate=FAIL`, `overall_parity_pct=40.89`, and `critical_mismatches_count=227`.
+- **Findings:** The live corpus still contains significant MT5/Pine pricing drift relative to the Phase 4 tolerance (`0.001`), especially on `EURUSD` fib levels.
+- **Next action:** Preserve the current export snapshots, investigate session/timeframe alignment and price source handling, then re-run after correction.
+- **Note:** This is the second validation run using live paired MT5/Pine data and confirms the Phase 4 gate remains blocked.
+
 ## [2026-06-02] Phase 4 live paired-export parity run completed; gate FAIL 40.89%
 
 - **Update:** Fresh `pine-levels.json` was copied into `reports/phase4-parity/pine-levels.json`; both `reports/phase4-parity/mt5-levels.json` and `reports/phase4-parity/pine-levels.json` contain 384 rows.
