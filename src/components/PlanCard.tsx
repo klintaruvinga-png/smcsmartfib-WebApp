@@ -136,9 +136,6 @@ export function PlanCandidateCard({
             {signal.lifecycleState && signal.lifecycleState !== "DISPLAY_ACTIVE" && (
               <MetaPill>{signal.lifecycleState}</MetaPill>
             )}
-            {typeof signal.qualityScore === "number" && (
-              <MetaPill>QS {Math.round(signal.qualityScore)}</MetaPill>
-            )}
             <FreshnessBadge state={price?.state ?? "pending-sync"} />
             <MetaPill title={signal.id}>#{shortSignalId(signal.id)}</MetaPill>
             <span className="text-xs text-mute font-mono">{relTime(signal.createdAt)}</span>
