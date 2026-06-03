@@ -19,12 +19,10 @@
  *   Monthly   -> Quarterly
  *   Quarterly -> Yearly
  *
- * Minimum candle history required per timeframe (to satisfy 3 completed authority sessions):
- *   M15 -> authority=Weekly  -> need >= 3 completed weeks  -> ~21 days
- *   H1  -> authority=Monthly -> need >= 3 completed months -> ~90 days
- *   H4  -> authority=Quarterly -> need >= 3 completed quarters -> ~270 days
- *   D1  -> authority=Yearly  -> need >= 3 completed years  -> ~1095 days
- * Candle files shorter than these depths will cause a FAIL on HTF_AF for that timeframe.
+ * Minimum candle history required per timeframe (to satisfy completed sessions):
+ *   LTF_SF needs up to 3 completed session-TF sessions.
+ *   HTF_AF needs the most recent completed authority-TF session (auth_f1).
+ * Candle files shorter than these depths will cause a FAIL for the affected anchor.
  *
  * LTF_SF anchor: F1/F2/F3 weighted composite of 3 most recent completed
  *   sessions at sessionTf granularity.
@@ -32,7 +30,7 @@
  *            2 sessions = F1:0.55, F2:0.45
  *            1 session  = F1:1.00
  *
- * HTF_AF anchor: raw high/low of the 3rd most recent completed authority session.
+ * HTF_AF anchor: raw high/low of the most recent completed authority session (auth_f1).
  *
  * Outputs:
  *   reports/phase4-parity/pine-levels.json          - pure 384-row validator array
@@ -295,19 +293,20 @@ function computeLtfAnchorWithCompression(candles, sessionTf, threshold) {
 }
 
 // ---- HTF_AF anchor with compression filtering ----
-// Mirrors EA ComputeHTFAnchor: reject if (idx3.high - idx3.low) < threshold.
+// Mirrors Pine v13.1.3 HTF Authority AF: draw from auth_f1, the most recent
+// completed authority session. Reject if (auth_f1.high - auth_f1.low) < threshold.
 function computeHtfAnchorWithCompression(candles, authorityTf, threshold) {
     const sessions = buildCompletedSessions(candles, authorityTf);
     const n = sessions.length;
-    if (n < 3) return null;
+    if (n < 1) return null;
 
-    const idx3 = sessions[n - 3];
-    if ((idx3.high - idx3.low) < threshold) return null;
+    const authF1 = sessions[n - 1];
+    if ((authF1.high - authF1.low) < threshold) return null;
 
     return {
-        high: idx3.high,
-        low:  idx3.low,
-        dbg: { anchor_key: idx3.key }
+        high: authF1.high,
+        low:  authF1.low,
+        dbg: { anchor_key: authF1.key, anchor: 'auth_f1' }
     };
 }
 
