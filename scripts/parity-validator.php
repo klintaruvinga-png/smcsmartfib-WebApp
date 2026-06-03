@@ -150,7 +150,6 @@ function ensure_symbol_timeframe_bucket(array &$bySymbol, $symbol, $timeframe) {
 
 function record_bucket_mismatch(array &$bySymbol, $symbol, $timeframe, array $mismatch) {
     ensure_symbol_timeframe_bucket($bySymbol, $symbol, $timeframe);
-    $bySymbol[$symbol][$timeframe]['total']++;
     $bySymbol[$symbol][$timeframe]['critical']++;
     $bySymbol[$symbol][$timeframe]['mismatches'][] = $mismatch;
 }
@@ -238,6 +237,7 @@ function run_parity_comparison(array $mt5Levels, array $pineLevels, $runDate) {
             $reason = (!$mt5Present && !$pinePresent)
                 ? 'missing_required_tuple_in_both_sources'
                 : (!$mt5Present ? 'missing_required_mt5_output' : 'missing_required_pine_reference');
+            $bySymbol[$sym][$tf]['total']++;
             $criticalMismatches[] = array(
                 'symbol' => $sym,
                 'timeframe' => $tf,
@@ -329,6 +329,7 @@ function run_parity_comparison(array $mt5Levels, array $pineLevels, $runDate) {
             $reason = (!$mt5Present && !$pinePresent)
                 ? 'missing_tuple_in_both_sources'
                 : (!$mt5Present ? 'missing_mt5_output' : 'missing_pine_reference');
+            $bySymbol[$sym][$tf]['total']++;
             $criticalMismatches[] = array(
                 'symbol' => $sym,
                 'timeframe' => $tf,
