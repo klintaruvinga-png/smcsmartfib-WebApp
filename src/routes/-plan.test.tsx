@@ -67,6 +67,32 @@ vi.mock("@/components/sniper/WalletOverview", () => ({
   WalletOverview: () => <div>Wallet overview</div>,
 }));
 
+vi.mock("@/components/sniper/TradingLoadingScreen", async () => {
+  const React = await import("react");
+
+  return {
+    TradingLoadingScreen: ({
+      backendReady,
+      onReady,
+    }: {
+      backendReady: boolean;
+      onReady: () => void;
+    }) => {
+      React.useEffect(() => {
+        if (backendReady) {
+          onReady();
+        }
+      }, [backendReady, onReady]);
+
+      return <div>Checking backend readiness...</div>;
+    },
+  };
+});
+
+vi.mock("@/components/sniper/PlanBoardSkeleton", () => ({
+  PlanBoardSkeleton: () => <div>Readiness Status</div>,
+}));
+
 vi.mock("@/lib/api/sniperClient", () => ({
   apiClient: {
     postExecuteSignals: vi.fn(),
@@ -466,6 +492,60 @@ describe("PlanPage ranking and execution guards", () => {
     ).toBeNull();
   });
 
+  it("shows settings errors before any loading screen when queries are still pending", () => {
+    hookMocks.usePollingUiState.mockReturnValue({
+      backendReady: false,
+      pendingSettingsLoad: false,
+      missingBackendUrl: false,
+      settingsLoadFailed: true,
+      settingsLoadError: "settings fetch failed",
+      pollMs: null,
+      retrySettingsLoad: vi.fn(),
+    });
+    hookMocks.useDisplaySignals.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    });
+    hookMocks.useLadders.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    });
+    mockWatchlist([]);
+
+    render(<PlanPage />);
+
+    expect(
+      screen.getByText("Unable to load Account settings. Retry before loading signal plans."),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Loading signal data and blueprints/i)).toBeNull();
+  });
+
+  it("shows the phase 1 readiness screen while backend readiness is not confirmed", () => {
+    hookMocks.usePollingUiState.mockReturnValue({
+      backendReady: false,
+      pendingSettingsLoad: true,
+      missingBackendUrl: false,
+      settingsLoadFailed: false,
+      settingsLoadError: null,
+      pollMs: null,
+      retrySettingsLoad: vi.fn(),
+    });
+    hookMocks.useDisplaySignals.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    });
+    hookMocks.useLadders.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    });
+    mockWatchlist([]);
+
+    render(<PlanPage />);
+
+    expect(screen.getByText("Checking backend readiness...")).toBeTruthy();
+    expect(screen.queryByText("Readiness Status")).toBeNull();
+  });
+
   it("matches broker-suffixed signal symbols against the canonical watchlist", () => {
     renderPlanPage({
       signals: [buildSignal({ id: "sig-001", symbol: "GBPUSD.pro" as Symbol, verdict: "A+" })],
@@ -715,7 +795,11 @@ describe("PlanPage ranking and execution guards", () => {
   });
 
   it("falls back to global board when watchlist returns zero candidates", () => {
-    const globalSig = buildSignal({ id: "sig-global-001", symbol: "AUDJPY" as Symbol, backendConfirmed: true });
+    const globalSig = buildSignal({
+      id: "sig-global-001",
+      symbol: "AUDJPY" as Symbol,
+      backendConfirmed: true,
+    });
     renderPlanPage({
       signals: [],
       ladders: [],
@@ -723,14 +807,20 @@ describe("PlanPage ranking and execution guards", () => {
       globalSignals: [globalSig],
     });
 
-    expect(screen.getByText(/No watchlist candidates — showing global board fallback/)).toBeTruthy();
+    expect(
+      screen.getByText(/No watchlist candidates — showing global board fallback/),
+    ).toBeTruthy();
     expect(getRenderedCards()).toHaveLength(1);
     expect(getRenderedCards()[0]?.textContent).toContain("AUDJPY");
     expect(screen.queryByText("No active watchlist candidates found.")).toBeNull();
   });
 
   it("never marks global fallback rows as backendConfirmed", () => {
-    const globalSig = buildSignal({ id: "sig-global-002", symbol: "AUDJPY" as Symbol, backendConfirmed: true });
+    const globalSig = buildSignal({
+      id: "sig-global-002",
+      symbol: "AUDJPY" as Symbol,
+      backendConfirmed: true,
+    });
     renderPlanPage({
       signals: [],
       ladders: [],
@@ -738,7 +828,9 @@ describe("PlanPage ranking and execution guards", () => {
       globalSignals: [globalSig],
     });
 
-    expect(screen.getByText(/No watchlist candidates — showing global board fallback/)).toBeTruthy();
+    expect(
+      screen.getByText(/No watchlist candidates — showing global board fallback/),
+    ).toBeTruthy();
     const card = getRenderedCards()[0];
     expect(card).toBeTruthy();
     expect(card?.textContent).not.toContain("backend-confirmed");
@@ -752,9 +844,9 @@ describe("PlanPage ranking and execution guards", () => {
       globalSignals: [],
     });
 
+    expect(screen.getByText("No active watchlist candidates found.")).toBeTruthy();
     expect(
-      screen.getByText("No active watchlist candidates found."),
-    ).toBeTruthy();
-    expect(screen.queryByText(/No watchlist candidates — showing global board fallback/)).toBeNull();
+      screen.queryByText(/No watchlist candidates — showing global board fallback/),
+    ).toBeNull();
   });
 });
