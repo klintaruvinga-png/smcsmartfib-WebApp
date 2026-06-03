@@ -517,13 +517,15 @@ function StatRow({
   valueClass?: string;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <span className="text-[11px] font-mono uppercase tracking-wider text-mute">{label}</span>
-      <div className="text-right">
+    <div className="flex items-start gap-3">
+      <span className="text-[11px] font-mono uppercase tracking-wider text-mute min-w-[3.5rem] shrink-0">
+        {label}
+      </span>
+      <div className="flex flex-col">
+        {sub && <div className="text-[10px] font-mono text-mute">{sub}</div>}
         <div className={cn("font-mono text-sm font-semibold", valueClass ?? "text-tx")}>
           {value}
         </div>
-        {sub && <div className="text-[10px] font-mono text-mute">{sub}</div>}
       </div>
     </div>
   );
