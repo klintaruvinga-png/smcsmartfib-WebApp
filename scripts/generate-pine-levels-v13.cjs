@@ -200,48 +200,110 @@ function buildCompletedSessions(candles, sessionTf) {
     return sessions;
 }
 
-// ---- LTF_SF anchor ----
-// F1 = most recent completed, F2 = 2nd, F3 = 3rd.
-// Recency-weighted composite high/low.
-function computeLtfAnchor(candles, sessionTf) {
+// ---- Compression threshold - matches EA CompressionThreshold() / PHP fib_compression_threshold() ----
+// EA: pip_size * min_pips (JPY=40, else=20)
+// Regression note: pip_size is hardcoded, not derived from broker SYMBOL_POINT, to match
+// the EA regression fix that guards against brokers reporting SYMBOL_POINT=0.001 for JPY.
+function pipSizeForSymbol(symbol) {
+    if (/JPY$/.test(symbol)) return 0.01;
+    if (symbol === 'XAUUSD' || symbol === 'XAGUSD') return 0.01;
+    return 0.0001;
+}
+
+function compressionThreshold(symbol) {
+    const minPips = /JPY$/.test(symbol) ? 40.0 : 20.0;
+    return minPips * pipSizeForSymbol(symbol);
+}
+
+// Per-session compression check. Mirrors EA f1v/f2v/f3v logic.
+function sessionPassesCompression(session, threshold) {
+    return session && (session.high - session.low) >= threshold;
+}
+
+// ---- LTF_SF anchor with per-session compression filtering ----
+// Mirrors EA ComputeLTFAnchor exactly:
+//   - filter F1/F2/F3 individually against compression threshold
+//   - weight only sessions that pass
+//   - reject final composite if (out_high - out_low) < threshold
+function computeLtfAnchorWithCompression(candles, sessionTf, threshold) {
     const sessions = buildCompletedSessions(candles, sessionTf);
     const n = sessions.length;
     if (n === 0) return null;
 
-    const f1 = sessions[n - 1];
+    const f1 = n >= 1 ? sessions[n - 1] : null;
     const f2 = n >= 2 ? sessions[n - 2] : null;
     const f3 = n >= 3 ? sessions[n - 3] : null;
 
-    let high, low;
-    if (n >= 3) {
-        high = 0.40 * f1.high + 0.35 * f2.high + 0.25 * f3.high;
-        low  = 0.40 * f1.low  + 0.35 * f2.low  + 0.25 * f3.low;
-    } else if (n === 2) {
-        high = 0.55 * f1.high + 0.45 * f2.high;
-        low  = 0.55 * f1.low  + 0.45 * f2.low;
+    const f1v = sessionPassesCompression(f1, threshold);
+    const f2v = sessionPassesCompression(f2, threshold);
+    const f3v = sessionPassesCompression(f3, threshold);
+
+    const validCount = (f1v ? 1 : 0) + (f2v ? 1 : 0) + (f3v ? 1 : 0);
+    if (validCount < 1) return null;
+
+    let wf1 = 0;
+    let wf2 = 0;
+    let wf3 = 0;
+    if (validCount === 3) {
+        wf1 = 0.40;
+        wf2 = 0.35;
+        wf3 = 0.25;
+    } else if (validCount === 2) {
+        if (f1v) {
+            wf1 = 0.55;
+            wf2 = f2v ? 0.45 : 0.0;
+            wf3 = f3v ? 0.45 : 0.0;
+        } else {
+            wf1 = 0.0;
+            wf2 = 0.55;
+            wf3 = 0.45;
+        }
     } else {
-        high = f1.high;
-        low  = f1.low;
+        wf1 = f1v ? 1.0 : 0.0;
+        wf2 = f2v ? 1.0 : 0.0;
+        wf3 = f3v ? 1.0 : 0.0;
     }
+
+    const wt = wf1 + wf2 + wf3;
+    if (wt <= 0) return null;
+
+    let sumH = 0;
+    let sumL = 0;
+    if (f1v && wf1 > 0) { sumH += f1.high * wf1; sumL += f1.low * wf1; }
+    if (f2v && wf2 > 0) { sumH += f2.high * wf2; sumL += f2.low * wf2; }
+    if (f3v && wf3 > 0) { sumH += f3.high * wf3; sumL += f3.low * wf3; }
+
+    const high = sumH / wt;
+    const low  = sumL / wt;
+
+    if ((high - low) < threshold) return null;
 
     return {
         high, low,
         dbg: {
-            f1_key: f1.key,
+            f1_key: f1 ? f1.key : null,
             f2_key: f2 ? f2.key : null,
             f3_key: f3 ? f3.key : null,
+            f1v,
+            f2v,
+            f3v,
+            wf1,
+            wf2,
+            wf3,
         }
     };
 }
 
-// ---- HTF_AF anchor ----
-// Raw high/low of the 3rd most recent completed authority session (idx3).
-function computeHtfAnchor(candles, authorityTf) {
+// ---- HTF_AF anchor with compression filtering ----
+// Mirrors EA ComputeHTFAnchor: reject if (idx3.high - idx3.low) < threshold.
+function computeHtfAnchorWithCompression(candles, authorityTf, threshold) {
     const sessions = buildCompletedSessions(candles, authorityTf);
     const n = sessions.length;
     if (n < 3) return null;
 
     const idx3 = sessions[n - 3];
+    if ((idx3.high - idx3.low) < threshold) return null;
+
     return {
         high: idx3.high,
         low:  idx3.low,
@@ -336,9 +398,10 @@ function main() {
             const sessionTf   = toSessionTf(tf);
             const authorityTf = toAuthorityTf(sessionTf);
             const candles     = loadCandles(sym, tf);
+            const threshold   = compressionThreshold(sym);
 
-            const ltf = computeLtfAnchor(candles, sessionTf);
-            const htf = computeHtfAnchor(candles, authorityTf);
+            const ltf = computeLtfAnchorWithCompression(candles, sessionTf, threshold);
+            const htf = computeHtfAnchorWithCompression(candles, authorityTf, threshold);
 
             if (!ltf && !htf) {
                 console.error(`FAIL: no anchor computable for ${sym} ${tf}`);
@@ -359,6 +422,7 @@ function main() {
                     symbol: sym, timeframe: tf, family,
                     session_tf: sessionTf,
                     authority_tf: authorityTf,
+                    compression_threshold: threshold,
                     anchor_high: anchor.high,
                     anchor_low:  anchor.low,
                     dbg: anchor.dbg,
