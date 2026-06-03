@@ -33,8 +33,8 @@
  * HTF_AF anchor: raw high/low of the most recent completed authority session (auth_f1).
  *
  * Outputs:
- *   reports/phase4-parity/pine-levels.json          - pure 384-row validator array
- *   reports/phase4-parity/pine-levels.metadata.json - debug/audit metadata
+ *   <reports-dir>/pine-levels.json          - pure 384-row validator array
+ *   <reports-dir>/pine-levels.metadata.json - debug/audit metadata
  *
  * Guards:
  *   - Fails if any required candle file is missing
@@ -42,7 +42,7 @@
  *   - Fails if output row count != 384
  *
  * Usage (from repo root):
- *   node scripts/generate-pine-levels-v13.cjs [--candle-dir <path>] [--mt5-file <path>]
+ *   node scripts/generate-pine-levels-v13.cjs [--candle-dir <path>] [--mt5-file <path>] [--reports-dir <path>]
  */
 
 'use strict';
@@ -51,10 +51,7 @@ const fs   = require('fs');
 const path = require('path');
 
 // ---- Config ----
-const REPO_ROOT      = path.resolve(__dirname, '..');
-const REPORTS_DIR    = path.join(REPO_ROOT, 'reports', 'phase4-parity');
-const OUTPUT_LEVELS  = path.join(REPORTS_DIR, 'pine-levels.json');
-const OUTPUT_META    = path.join(REPORTS_DIR, 'pine-levels.metadata.json');
+const REPO_ROOT = path.resolve(__dirname, '..');
 
 const args = process.argv.slice(2);
 function getArg(flag) {
@@ -67,8 +64,11 @@ function getArg(flag) {
     }
     return value;
 }
-const CANDLE_DIR = getArg('--candle-dir') || path.join(REPO_ROOT, 'data');
-const MT5_FILE   = getArg('--mt5-file')   || path.join(REPO_ROOT, 'reports', 'phase4-parity', 'mt5-levels.json');
+const REPORTS_DIR   = path.resolve(getArg('--reports-dir') || path.join(REPO_ROOT, 'reports', 'phase4-parity'));
+const OUTPUT_LEVELS = path.join(REPORTS_DIR, 'pine-levels.json');
+const OUTPUT_META   = path.join(REPORTS_DIR, 'pine-levels.metadata.json');
+const CANDLE_DIR    = path.resolve(getArg('--candle-dir') || path.join(REPO_ROOT, 'data'));
+const MT5_FILE      = path.resolve(getArg('--mt5-file') || path.join(REPORTS_DIR, 'mt5-levels.json'));
 
 const SYMBOLS    = ['EURUSD', 'USDJPY', 'XAUUSD'];
 const TIMEFRAMES = ['M15', 'H1', 'H4', 'D1'];
@@ -372,6 +372,7 @@ function checkStaleness(mt5Mtime) {
 function main() {
     console.log('[generate-pine-levels-v13] Starting...');
     console.log(`  candle-dir : ${CANDLE_DIR}`);
+    console.log(`  reports-dir: ${REPORTS_DIR}`);
     console.log(`  mt5-file   : ${MT5_FILE}`);
 
     // Read mt5 file mtime for staleness guard
