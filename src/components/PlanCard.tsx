@@ -180,9 +180,6 @@ export function PlanCandidateCard({
           ) : (
             <MetaChip tone="neutral">NO BLUEPRINT</MetaChip>
           )}
-          <MetaChip tone={signal.backendConfirmed ? "buy" : "warn"}>
-            {signal.backendConfirmed ? "BACKEND OK" : "UNCONFIRMED"}
-          </MetaChip>
         </div>
       </div>
 
