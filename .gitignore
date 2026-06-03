@@ -57,3 +57,4 @@ reports/codex-review.json
 reports/.claude-hardening-blocked.json
 reports/.manual-session
 src/routeTree.gen.ts
+src/routeTree.gen.ts
