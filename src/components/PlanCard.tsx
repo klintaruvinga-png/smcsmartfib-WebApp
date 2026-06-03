@@ -2,7 +2,7 @@ import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { VerdictBadge } from "@/components/sniper/VerdictBadge";
 import { DivergenceBanner, WarningLine } from "@/components/sniper/Warnings";
-import { fmtPct, fmtPrice, fmtCurrency, fmtZAR, relTime } from "@/lib/format";
+import { fmtPct, fmtPrice, fmtCurrency, fmtLocalCurrency, relTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api/sniperClient";
 import { useAccountTelemetry } from "@/hooks/useSniperData";
@@ -279,7 +279,7 @@ export function PlanCandidateCard({
                 <StatRow
                   label="Risk"
                   value={fmtCurrency(plan.riskUSC, accountTelemetry?.currency)}
-                  sub={fmtZAR(plan.riskZAR)}
+                  sub={fmtLocalCurrency(plan.riskZAR, "ZAR")}
                 />
                 <StatRow
                   label="DD impact"
@@ -573,5 +573,6 @@ function formatOptionalPrice(value: number | undefined, symbol?: string) {
 }
 
 function formatOptionalRatio(value: number | undefined) {
-  return isFiniteNumber(value) ? `R ${value.toFixed(2)}` : "R --";
+  if (!isFiniteNumber(value)) return "1:--";
+  return Number.isInteger(value) ? `1:${value}` : `1:${value.toFixed(2)}`;
 }
