@@ -45,3 +45,36 @@ Date: 2026-06-03
 - `reports/phase4-parity/phase4-gate.json`
 - `reports/fib-parity-validation.md`
 - `reports/automation-update-log.md`
+
+## Post-PR344 MT5 export status (2026-06-03)
+
+Post-PR344 MT5 export captured successfully.
+
+Official Phase 4 subset coverage: 384/384.
+
+Expanded audit corpus coverage: 624/640, missing NAS100 D1 HTF_AF.
+
+Validator run against existing pine-levels.json failed at 32.03%, but this is not a valid final parity result until Pine is recaptured from the same UTC snapshot as the new MT5 export.
+
+2026-06-03 — Post-PR344 MT5 fib export captured.
+
+EA compile confirmed clean: 0 errors, 0 warnings.
+
+Official Phase 4 gate subset exported successfully:
+EURUSD, USDJPY, XAUUSD across M15/H1/H4/D1 and LTF_SF/HTF_AF.
+Coverage: 384/384 rows.
+
+Expanded audit corpus exported:
+EURUSD, USDJPY, XAUUSD, BTCUSD, NAS100.
+Coverage: 624/640 rows.
+Missing supplemental group: NAS100 D1 HTF_AF = 16 ratios.
+Official gate subset unaffected.
+
+Validator run:
+`php scripts/parity-validator.php --mt5-file reports/phase4-parity/mt5-levels.json --pine-file reports/phase4-parity/pine-levels.json --out reports/phase4-parity/phase4-gate-post-ec5eee8.json`
+
+Result: FAIL, overall_parity_pct=32.03%.
+
+Important: this is not a valid final post-PR344 parity result because mt5-levels.json was captured on 2026-06-03 04:43:25 while pine-levels.json was last written on 2026-06-02 04:31:33. Pine reference must be recaptured from the same UTC window before judging PR344 parity impact.
+
+Phase 4 remains blocked pending synchronized MT5/Pine capture.

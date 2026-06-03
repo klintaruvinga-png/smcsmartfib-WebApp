@@ -1,5 +1,901 @@
 [
     {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "HTF_AF",
+        "ratio":  -200,
+        "price":  101254.038
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "HTF_AF",
+        "ratio":  -162.5,
+        "price":  90664.788
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "HTF_AF",
+        "ratio":  -100,
+        "price":  73016.038
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "HTF_AF",
+        "ratio":  -62.5,
+        "price":  62426.788
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "HTF_AF",
+        "ratio":  -25,
+        "price":  51837.538
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "HTF_AF",
+        "ratio":  0,
+        "price":  44778.038
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "HTF_AF",
+        "ratio":  25,
+        "price":  37718.538
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "HTF_AF",
+        "ratio":  50,
+        "price":  30659.038
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "HTF_AF",
+        "ratio":  62.5,
+        "price":  27129.288
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "HTF_AF",
+        "ratio":  75,
+        "price":  23599.538
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "HTF_AF",
+        "ratio":  100,
+        "price":  16540.038
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "HTF_AF",
+        "ratio":  125,
+        "price":  9480.538
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "HTF_AF",
+        "ratio":  162.5,
+        "price":  -1108.712
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "HTF_AF",
+        "ratio":  200,
+        "price":  -11697.962
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "HTF_AF",
+        "ratio":  262.5,
+        "price":  -29346.712
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "HTF_AF",
+        "ratio":  300,
+        "price":  -39935.962
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  -200,
+        "price":  186596.1315
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  -162.5,
+        "price":  173071.7814
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  -100,
+        "price":  150531.1979
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  -62.5,
+        "price":  137006.8478
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  -25,
+        "price":  123482.4977
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  0,
+        "price":  114466.2643
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  25,
+        "price":  105450.0309
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  50,
+        "price":  96433.7975
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  62.5,
+        "price":  91925.6808
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  75,
+        "price":  87417.5641
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  100,
+        "price":  78401.3307
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  125,
+        "price":  69385.0973
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  162.5,
+        "price":  55860.7472
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  200,
+        "price":  42336.3971
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  262.5,
+        "price":  19795.8136
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  300,
+        "price":  6271.4635
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  -200,
+        "price":  98073.878
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  -162.5,
+        "price":  93931.883
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  -100,
+        "price":  87028.558
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  -62.5,
+        "price":  82886.563
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  -25,
+        "price":  78744.568
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  0,
+        "price":  75983.238
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  25,
+        "price":  73221.908
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  50,
+        "price":  70460.578
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  62.5,
+        "price":  69079.913
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  75,
+        "price":  67699.248
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  100,
+        "price":  64937.918
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  125,
+        "price":  62176.588
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  162.5,
+        "price":  58034.593
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  200,
+        "price":  53892.598
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  262.5,
+        "price":  46989.273
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  300,
+        "price":  42847.278
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  -200,
+        "price":  89045.5008
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  -162.5,
+        "price":  87182.164988
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  -100,
+        "price":  84076.6053
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  -62.5,
+        "price":  82213.269488
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  -25,
+        "price":  80349.933675
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  0,
+        "price":  79107.7098
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  25,
+        "price":  77865.485925
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  50,
+        "price":  76623.26205
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  62.5,
+        "price":  76002.150113
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  75,
+        "price":  75381.038175
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  100,
+        "price":  74138.8143
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  125,
+        "price":  72896.590425
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  162.5,
+        "price":  71033.254612
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  200,
+        "price":  69169.9188
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  262.5,
+        "price":  66064.359112
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  300,
+        "price":  64201.0233
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  -200,
+        "price":  163614.681
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  -162.5,
+        "price":  156288.950625
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  -100,
+        "price":  144079.4
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  -62.5,
+        "price":  136753.669625
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  -25,
+        "price":  129427.93925
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  0,
+        "price":  124544.119
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  25,
+        "price":  119660.29875
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  50,
+        "price":  114776.4785
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  62.5,
+        "price":  112334.568375
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  75,
+        "price":  109892.65825
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  100,
+        "price":  105008.838
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  125,
+        "price":  100125.01775
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  162.5,
+        "price":  92799.287375
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  200,
+        "price":  85473.557
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  262.5,
+        "price":  73264.006375
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  300,
+        "price":  65938.276
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  -200,
+        "price":  103347.765
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  -162.5,
+        "price":  98956.129125
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  -100,
+        "price":  91636.736
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  -62.5,
+        "price":  87245.100125
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  -25,
+        "price":  82853.46425
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  0,
+        "price":  79925.707
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  25,
+        "price":  76997.94975
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  50,
+        "price":  74070.1925
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  62.5,
+        "price":  72606.313875
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  75,
+        "price":  71142.43525
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  100,
+        "price":  68214.678
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  125,
+        "price":  65286.92075
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  162.5,
+        "price":  60895.284875
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  200,
+        "price":  56503.649
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  262.5,
+        "price":  49184.255875
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  300,
+        "price":  44792.62
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  -200,
+        "price":  92931.063
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  -162.5,
+        "price":  90899.801625
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  -100,
+        "price":  87514.366
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  -62.5,
+        "price":  85483.104625
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  -25,
+        "price":  83451.84325
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  0,
+        "price":  82097.669
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  25,
+        "price":  80743.49475
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  50,
+        "price":  79389.3205
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  62.5,
+        "price":  78712.233375
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  75,
+        "price":  78035.14625
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  100,
+        "price":  76680.972
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  125,
+        "price":  75326.79775
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  162.5,
+        "price":  73295.536375
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  200,
+        "price":  71264.275
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  262.5,
+        "price":  67878.839375
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  300,
+        "price":  65847.578
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  -200,
+        "price":  80032.4491
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  -162.5,
+        "price":  78719.15485
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  -100,
+        "price":  76530.3311
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  -62.5,
+        "price":  75217.03685
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  -25,
+        "price":  73903.7426
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  0,
+        "price":  73028.2131
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  25,
+        "price":  72152.6836
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  50,
+        "price":  71277.1541
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  62.5,
+        "price":  70839.38935
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  75,
+        "price":  70401.6246
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  100,
+        "price":  69526.0951
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  125,
+        "price":  68650.5656
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  162.5,
+        "price":  67337.27135
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  200,
+        "price":  66023.9771
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  262.5,
+        "price":  63835.15335
+    },
+    {
+        "symbol":  "BTCUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  300,
+        "price":  62521.8591
+    },
+    {
         "symbol":  "EURUSD",
         "timeframe":  "D1",
         "family":  "HTF_AF",
@@ -894,6 +1790,790 @@
         "family":  "LTF_SF",
         "ratio":  300,
         "price":  1.15085
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  -200,
+        "price":  31589.2725
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  -162.5,
+        "price":  30524.139375
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  -100,
+        "price":  28748.9175
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  -62.5,
+        "price":  27683.784375
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  -25,
+        "price":  26618.65125
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  0,
+        "price":  25908.5625
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  25,
+        "price":  25198.47375
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  50,
+        "price":  24488.385
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  62.5,
+        "price":  24133.340625
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  75,
+        "price":  23778.29625
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  100,
+        "price":  23068.2075
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  125,
+        "price":  22358.11875
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  162.5,
+        "price":  21292.985625
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  200,
+        "price":  20227.8525
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  262.5,
+        "price":  18452.630625
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "D1",
+        "family":  "LTF_SF",
+        "ratio":  300,
+        "price":  17387.4975
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  -200,
+        "price":  30084.5
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  -162.5,
+        "price":  29174.15
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  -100,
+        "price":  27656.9
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  -62.5,
+        "price":  26746.55
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  -25,
+        "price":  25836.2
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  0,
+        "price":  25229.3
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  25,
+        "price":  24622.4
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  50,
+        "price":  24015.5
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  62.5,
+        "price":  23712.05
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  75,
+        "price":  23408.6
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  100,
+        "price":  22801.7
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  125,
+        "price":  22194.8
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  162.5,
+        "price":  21284.45
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  200,
+        "price":  20374.1
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  262.5,
+        "price":  18856.85
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "HTF_AF",
+        "ratio":  300,
+        "price":  17946.5
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  -200,
+        "price":  32189.71
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  -162.5,
+        "price":  31797.79
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  -100,
+        "price":  31144.59
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  -62.5,
+        "price":  30752.67
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  -25,
+        "price":  30360.75
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  0,
+        "price":  30099.47
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  25,
+        "price":  29838.19
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  50,
+        "price":  29576.91
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  62.5,
+        "price":  29446.27
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  75,
+        "price":  29315.63
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  100,
+        "price":  29054.35
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  125,
+        "price":  28793.07
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  162.5,
+        "price":  28401.15
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  200,
+        "price":  28009.23
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  262.5,
+        "price":  27356.03
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H1",
+        "family":  "LTF_SF",
+        "ratio":  300,
+        "price":  26964.11
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  -200,
+        "price":  29659.4
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  -162.5,
+        "price":  28750.7375
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  -100,
+        "price":  27236.3
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  -62.5,
+        "price":  26327.6375
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  -25,
+        "price":  25418.975
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  0,
+        "price":  24813.2
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  25,
+        "price":  24207.425
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  50,
+        "price":  23601.65
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  62.5,
+        "price":  23298.7625
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  75,
+        "price":  22995.875
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  100,
+        "price":  22390.1
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  125,
+        "price":  21784.325
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  162.5,
+        "price":  20875.6625
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  200,
+        "price":  19967
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  262.5,
+        "price":  18452.5625
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "HTF_AF",
+        "ratio":  300,
+        "price":  17543.9
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  -200,
+        "price":  34754.9875
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  -162.5,
+        "price":  33523.080625
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  -100,
+        "price":  31469.9025
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  -62.5,
+        "price":  30237.995625
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  -25,
+        "price":  29006.08875
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  0,
+        "price":  28184.8175
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  25,
+        "price":  27363.54625
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  50,
+        "price":  26542.275
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  62.5,
+        "price":  26131.639375
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  75,
+        "price":  25721.00375
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  100,
+        "price":  24899.7325
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  125,
+        "price":  24078.46125
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  162.5,
+        "price":  22846.554375
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  200,
+        "price":  21614.6475
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  262.5,
+        "price":  19561.469375
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "H4",
+        "family":  "LTF_SF",
+        "ratio":  300,
+        "price":  18329.5625
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  -200,
+        "price":  31778.25
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  -162.5,
+        "price":  31388.26875
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  -100,
+        "price":  30738.3
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  -62.5,
+        "price":  30348.31875
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  -25,
+        "price":  29958.3375
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  0,
+        "price":  29698.35
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  25,
+        "price":  29438.3625
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  50,
+        "price":  29178.375
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  62.5,
+        "price":  29048.38125
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  75,
+        "price":  28918.3875
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  100,
+        "price":  28658.4
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  125,
+        "price":  28398.4125
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  162.5,
+        "price":  28008.43125
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  200,
+        "price":  27618.45
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  262.5,
+        "price":  26968.48125
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "ratio":  300,
+        "price":  26578.5
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  -200,
+        "price":  31375.8825
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  -162.5,
+        "price":  31241.66625
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  -100,
+        "price":  31017.9725
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  -62.5,
+        "price":  30883.75625
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  -25,
+        "price":  30749.54
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  0,
+        "price":  30660.0625
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  25,
+        "price":  30570.585
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  50,
+        "price":  30481.1075
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  62.5,
+        "price":  30436.36875
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  75,
+        "price":  30391.63
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  100,
+        "price":  30302.1525
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  125,
+        "price":  30212.675
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  162.5,
+        "price":  30078.45875
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  200,
+        "price":  29944.2425
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  262.5,
+        "price":  29720.54875
+    },
+    {
+        "symbol":  "NAS100",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "ratio":  300,
+        "price":  29586.3325
     },
     {
         "symbol":  "USDJPY",
