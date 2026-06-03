@@ -417,7 +417,8 @@ Write-Step "Generating Pine v13-compatible reference levels"
 $nodeArgs = @(
     (Join-Path "scripts" "generate-pine-levels-v13.cjs"),
     "--candle-dir", $candleRoot,
-    "--mt5-file", $mt5LevelsFile
+    "--mt5-file", $mt5LevelsFile,
+    "--reports-dir", $reportsRoot
 )
 Invoke-ExternalCommand "node" $nodeArgs "Pine generator failed"
 

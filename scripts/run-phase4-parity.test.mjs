@@ -44,6 +44,8 @@ describe('run-phase4-parity.ps1 automation contract', () => {
     expect(source).toContain('generate-pine-levels-v13.cjs');
     expect(source).toContain('--candle-dir');
     expect(source).toContain('--mt5-file');
+    expect(source).toContain('--reports-dir');
+    expect(source).toMatch(/"--reports-dir",\s*\$reportsRoot/);
     expect(source).toContain('parity-validator.php');
     expect(source).toContain('--pine-file');
     expect(source).toContain('--out');
