@@ -96,6 +96,14 @@ if (!class_exists('WP_REST_Request')) {
     }
 }
 
+if (!class_exists('WP_REST_Server')) {
+    class WP_REST_Server {
+        const READABLE = 'GET';
+        const CREATABLE = 'POST';
+        const DELETABLE = 'DELETE';
+    }
+}
+
 if (!class_exists('WP_REST_Response')) {
     class WP_REST_Response {
         public $data;
@@ -233,12 +241,14 @@ if (!class_exists('TestWpdb')) {
             $table = '';
             $where = '';
             $order_by = '';
+            $limit = null;
 
-            if (preg_match('/SELECT\s+(.+?)\s+FROM\s+([^\s]+)(?:\s+WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?(?:\s+LIMIT\s+\d+)?\s*$/i', trim($query), $matches)) {
+            if (preg_match('/SELECT\s+(.+?)\s+FROM\s+([^\s]+)(?:\s+WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?(?:\s+LIMIT\s+(\d+))?\s*$/i', trim($query), $matches)) {
                 $fields = trim($matches[1]);
                 $table = $matches[2];
                 $where = isset($matches[3]) ? trim($matches[3]) : '';
                 $order_by = isset($matches[4]) ? trim($matches[4]) : '';
+                $limit = isset($matches[5]) && $matches[5] !== '' ? (int) $matches[5] : null;
             }
 
             $rows = array_values(isset($this->tables[$table]) ? $this->tables[$table] : array());
@@ -268,6 +278,10 @@ if (!class_exists('TestWpdb')) {
                     $comparison = strcmp((string) $left_value, (string) $right_value);
                     return $direction === 'DESC' ? -1 * $comparison : $comparison;
                 });
+            }
+
+            if ($limit !== null) {
+                $rows = array_slice($rows, 0, $limit);
             }
 
             return array($fields, $rows);

@@ -8,17 +8,11 @@
     2. Resolves WordPress auth from SMC_BACKEND / SMC_WP_USER / SMC_APP_PW,
        or prompts with Get-Credential when credentials are missing.
     3. Exports MT5 fib levels through the existing backend fib-levels endpoint.
-    4. Checks candle file presence and warns on stale candles.
-    5. Runs the Pine v13 reference generator.
-    6. Runs the parity validator.
-    7. Writes timestamped JSON/Markdown gate artifacts and appends the tracker.
-
-    Known limitation: candle export is a placeholder/manual step. The current
-    backend MT5 export endpoint only returns fib levels, not the candle windows
-    the EA used. Until a /candles endpoint or a separate export-mt5-candles.ps1
-    exists, candle files must be placed manually in CandleDir before this runner
-    executes. The staleness guard in the Pine generator will catch stale files
-    before the validator runs.
+    4. Exports fresh MT5 candles through scripts/export-mt5-candles.ps1.
+    5. Checks candle file presence and warns on stale candles.
+    6. Runs the Pine v13 reference generator.
+    7. Runs the parity validator.
+    8. Writes timestamped JSON/Markdown gate artifacts and appends the tracker.
 
     Requires: Node.js, PHP CLI, PowerShell 5.1+
 
@@ -48,6 +42,12 @@
     Runs preflight checks and the Pine generator only against existing candle and
     MT5 level files, skipping MT5 export and skipping validator/report writes.
 
+.PARAMETER SkipCandleExport
+    Skips remote candle export and uses existing CandleDir files.
+
+.PARAMETER CandleLimit
+    Number of candles to request per symbol/timeframe from the backend candle endpoint.
+
 .EXAMPLE
     # Full run using env vars
     $env:SMC_WP_USER = "admin"; $env:SMC_APP_PW = "xxxx xxxx"
@@ -71,9 +71,11 @@ param(
     [string]$AppPw = "",
     [string]$CandleDir = "data",
     [string]$ReportsDir = "reports/phase4-parity",
+    [int]$CandleLimit = 600,
     [switch]$ExpandedAudit,
     [switch]$NoPrompt,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [switch]$SkipCandleExport
 )
 
 Set-StrictMode -Version Latest
@@ -239,8 +241,7 @@ function Get-CandleLastUtc([string]$PathValue) {
 }
 
 function Test-CandleFiles([string]$CandleRoot, [string[]]$Symbols, [DateTime]$ReferenceUtc) {
-    Write-Step "Checking candle files (manual step until /candles endpoint exists)"
-    Write-Warn "Candle export is a manual step: place {SYMBOL}_{TF}.json files in $CandleRoot until /candles endpoint or export-mt5-candles.ps1 exists."
+    Write-Step "Checking candle files"
     Write-Warn "The staleness guard in the Pine generator will hard-fail stale files before the validator runs."
 
     $timeframes = @("M15", "H1", "H4", "D1")
@@ -291,6 +292,9 @@ if (-not (Test-Path -LiteralPath "scripts/generate-pine-levels-v13.cjs")) {
 }
 if (-not (Test-Path -LiteralPath "scripts/parity-validator.php")) {
     Write-Fail "Parity validator not found at scripts/parity-validator.php"
+}
+if (-not (Test-Path -LiteralPath "scripts/export-mt5-candles.ps1")) {
+    Write-Fail "MT5 candle exporter not found at scripts/export-mt5-candles.ps1"
 }
 Write-Ok "Repo root confirmed"
 
@@ -397,6 +401,28 @@ if (-not $DryRun) {
             ConvertTo-Json -Depth 10 |
             Set-Content -LiteralPath $mt5ExpandedFile -Encoding UTF8
         Write-Ok "MT5 expanded: $($combined.Count) rows -> $mt5ExpandedFile"
+    }
+
+    if (-not $SkipCandleExport) {
+        Write-Step "Exporting MT5 candles"
+        $exporterScript = Join-Path (Get-Location) "scripts/export-mt5-candles.ps1"
+        $candleArgs = @(
+            "-Backend", $Backend,
+            "-WpUser", $WpUser,
+            "-AppPw", $AppPw,
+            "-CandleDir", $candleRoot,
+            "-Limit", $CandleLimit,
+            "-Symbols"
+        ) + $symbols + @("-Timeframes", "M15", "H1", "H4", "D1")
+        if ($NoPrompt) {
+            $candleArgs += "-NoPrompt"
+        }
+        & $exporterScript @candleArgs
+        if ($LASTEXITCODE -ne 0) {
+            Write-Fail "MT5 candle export failed (exit code $LASTEXITCODE)"
+        }
+    } else {
+        Write-Warn "Skipping MT5 candle export because -SkipCandleExport is active"
     }
 
     $referenceUtc = (Get-Item -LiteralPath $mt5LevelsFile).LastWriteTimeUtc
