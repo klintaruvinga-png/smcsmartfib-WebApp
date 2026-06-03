@@ -312,7 +312,9 @@ class SMC_MarketData_Service
 
     private function aggregate_mt5_m1_candles($user_id, $symbol, $bucket_seconds, $count)
     {
-        $m1_limit = max(1, $count * max(1, (int) floor($bucket_seconds / 60)));
+        $minutes_per_bucket = max(1, (int) floor($bucket_seconds / 60));
+        $overfetch_buckets = max(2, min(10, (int) ceil($count * 0.1)));
+        $m1_limit = max(1, ($count + $overfetch_buckets) * $minutes_per_bucket);
         $rows = $this->wpdb->get_results($this->wpdb->prepare(
             "SELECT * FROM {$this->table_prefix}candles WHERE user_id = %d AND symbol = %s AND timeframe = %s AND source = %s ORDER BY candle_time DESC LIMIT %d",
             $user_id,
@@ -327,6 +329,7 @@ class SMC_MarketData_Service
         }
 
         $buckets = array();
+        $bucket_minutes = array();
         $now = time();
         foreach (array_reverse($rows) as $row) {
             $ts = strtotime((string) $row['candle_time'] . ' UTC');
@@ -334,10 +337,16 @@ class SMC_MarketData_Service
                 continue;
             }
 
+            $minute_start = (int) (floor($ts / 60) * 60);
             $bucket_start = (int) (floor($ts / $bucket_seconds) * $bucket_seconds);
             if (($bucket_start + $bucket_seconds) > $now) {
                 continue;
             }
+
+            if (!isset($bucket_minutes[$bucket_start])) {
+                $bucket_minutes[$bucket_start] = array();
+            }
+            $bucket_minutes[$bucket_start][$minute_start] = true;
 
             if (!isset($buckets[$bucket_start])) {
                 $buckets[$bucket_start] = array(
@@ -355,6 +364,17 @@ class SMC_MarketData_Service
             $buckets[$bucket_start]['low'] = min($buckets[$bucket_start]['low'], (float) $row['low']);
             $buckets[$bucket_start]['close'] = (float) $row['close'];
             $buckets[$bucket_start]['volume'] += isset($row['volume']) ? (int) $row['volume'] : 0;
+        }
+
+        if (empty($buckets)) {
+            return array();
+        }
+
+        foreach ($buckets as $bucket_start => $_bucket) {
+            $minute_count = isset($bucket_minutes[$bucket_start]) ? count($bucket_minutes[$bucket_start]) : 0;
+            if ($minute_count !== $minutes_per_bucket) {
+                unset($buckets[$bucket_start]);
+            }
         }
 
         if (empty($buckets)) {
