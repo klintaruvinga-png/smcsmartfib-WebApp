@@ -15,10 +15,10 @@ import { useStreamingTicks } from "@/hooks/useStreamingTicks";
 import { fmtPrice, fmtPct } from "@/lib/format";
 import { tickMotionHoldMs, tickMotionStyle, type TickMotionOptions } from "@/lib/tickMotion";
 import { SyncChip, SignalStatusChip } from "@/components/sniper/Chips";
+import { BrandPulseLogo } from "@/components/sniper/BrandPulseLogo";
 import { cn, deduplicateById } from "@/lib/utils";
 import type { PairPrice } from "@/types/sniper";
 import {
-  Activity,
   BarChart3,
   Briefcase,
   Crosshair,
@@ -199,9 +199,7 @@ function HeaderChips() {
 function BrandMark({ compactUntilLg = false }: { compactUntilLg?: boolean }) {
   return (
     <Link to="/plan" className="flex items-center gap-2.5 shrink-0">
-      <div className="brand-mark flex h-8 w-8 items-center justify-center rounded-md">
-        <Activity className="h-4 w-4 text-[#1a1208]" strokeWidth={2.5} />
-      </div>
+      <BrandPulseLogo size="sm" />
       <div className={cn("flex flex-col leading-tight", compactUntilLg && "hidden lg:flex")}>
         <span className="text-sm font-semibold tracking-tight text-tx">SMC SuperFIB</span>
         <span className="text-[10px] tracking-[0.18em] text-mute font-mono">

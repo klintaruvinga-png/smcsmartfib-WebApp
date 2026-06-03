@@ -1,13 +1,6 @@
 import { useEffect, useState } from "react";
-
-const MESSAGES = [
-  "Lighting candles...",
-  "Calibrating Fibonacci levels...",
-  "Scanning for liquidity voids...",
-  "Checking backend readiness...",
-  "Building your signal board...",
-  "Waiting for backend confirmation...",
-] as const;
+import { BrandPulseLogo } from "@/components/sniper/BrandPulseLogo";
+import { ALL_LOADING_MESSAGES, nextRandomIndex } from "@/components/sniper/loadingMessages";
 
 type TradingLoadingScreenProps = {
   backendReady: boolean;
@@ -23,9 +16,10 @@ export function TradingLoadingScreen({
   const [messageIndex, setMessageIndex] = useState(0);
   const [holdElapsed, setHoldElapsed] = useState(false);
 
+  // Randomized message rotation with no repeated consecutive messages.
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      setMessageIndex((index) => (index + 1) % MESSAGES.length);
+      setMessageIndex((index) => nextRandomIndex(index, ALL_LOADING_MESSAGES.length));
     }, 2500);
 
     return () => window.clearInterval(intervalId);
@@ -45,39 +39,10 @@ export function TradingLoadingScreen({
 
   return (
     <div className="flex min-h-[60vh] select-none flex-col items-center justify-center gap-8">
-      <div className="flex flex-col items-center gap-3">
-        <div className="brand-mark flex h-14 w-14 items-center justify-center rounded-lg shadow-lg">
-          <svg
-            viewBox="0 0 32 32"
-            className="h-7 w-7"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
-            <line
-              x1="16"
-              y1="4"
-              x2="16"
-              y2="28"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              className="text-accent-2 opacity-50"
-            />
-            <rect
-              x="10"
-              y="10"
-              width="12"
-              height="12"
-              rx="1.5"
-              fill="currentColor"
-              className="text-accent"
-              style={{ animation: "candle-body 1.8s ease-out forwards" }}
-            />
-          </svg>
-        </div>
+      <div className="flex flex-col items-center gap-4">
+        <BrandPulseLogo size="lg" animated />
         <div className="text-center">
-          <div className="text-sm font-semibold tracking-tight text-tx">SMC SuperFIB</div>
+          <div className="text-base font-semibold tracking-tight text-tx">SMC SuperFIB</div>
           <div className="mt-0.5 text-[10px] font-mono uppercase tracking-[0.18em] text-mute">
             Signal Intelligence Platform
           </div>
@@ -96,7 +61,7 @@ export function TradingLoadingScreen({
         className="text-xs font-mono tracking-wide text-mute"
         style={{ animation: "fade-in 0.4s ease-out" }}
       >
-        {MESSAGES[messageIndex]}
+        {ALL_LOADING_MESSAGES[messageIndex]}
       </div>
     </div>
   );

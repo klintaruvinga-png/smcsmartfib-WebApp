@@ -1,6 +1,20 @@
+import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QUIRKY_LOADING_MESSAGES, nextRandomIndex } from "@/components/sniper/loadingMessages";
 
 export function PlanBoardSkeleton() {
+  const [messageIndex, setMessageIndex] = useState(0);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setMessageIndex((index) => nextRandomIndex(index, QUIRKY_LOADING_MESSAGES.length));
+    }, 2200);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  const message = QUIRKY_LOADING_MESSAGES[messageIndex];
+
   return (
     <div className="space-y-5">
       <WalletOverviewSkeleton />
@@ -11,8 +25,20 @@ export function PlanBoardSkeleton() {
           <span className="text-xs font-mono tracking-wide text-accent/80">Readiness Status</span>
         </div>
         <div className="mt-1.5 space-y-0.5">
-          <p className="text-xs text-mute">Waiting for backend-confirmed blueprints...</p>
-          <p className="text-xs font-mono text-dim">Do not execute until confirmation arrives.</p>
+          <p className="text-xs text-mute">
+            Loading backend-confirmed plans
+            <span className="loading-dots" />
+          </p>
+          <p
+            key={message}
+            className="text-xs font-mono text-dim"
+            style={{ animation: "fade-in 0.35s ease-out" }}
+          >
+            {message}
+          </p>
+          <p className="text-xs font-mono text-warn/80">
+            Do not execute until confirmation arrives.
+          </p>
         </div>
       </div>
 
