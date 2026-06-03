@@ -26,3 +26,9 @@ This repository includes local skill documents under `skills/` that shape how ta
 
 ## Rule
 If there is even a small chance a skill applies, consult the corresponding document before acting.
+
+## Completion Workflow
+- For completed coding tasks, create or work on a `codex/` branch before delivery.
+- Stage only files that belong to the task.
+- Commit verified changes, push the branch, and open a draft pull request unless the user explicitly asks not to.
+- Include verification commands and results in the handoff.
