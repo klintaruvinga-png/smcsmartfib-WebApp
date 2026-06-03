@@ -228,11 +228,11 @@ export function PlanCandidateCard({
 
       {plan ? (
         <div className="rounded-lg border border-bd bg-bg1/50 overflow-hidden">
-          <div className="grid gap-px bg-bd/60 xl:grid-cols-[1.8fr_1fr_1fr_1fr]">
+          <div className="grid gap-px bg-bd/60 lg:grid-cols-2 xl:grid-cols-[1.8fr_1fr_1fr_1fr]">
             <PlanPanel title="Entries" tone="info">
               <div className="overflow-x-auto -mx-3 px-3">
-                <div className="grid grid-cols-[auto_repeat(5,minmax(0,1fr))] gap-x-2 gap-y-2 text-[10px] font-mono min-w-[360px]">
-                  <SectionHeaderCell />
+                <div className="grid grid-cols-6 gap-x-2 gap-y-2 text-[10px] font-mono min-w-[300px]">
+                  <SectionHeaderCell>Stg</SectionHeaderCell>
                   <SectionHeaderCell>Entry</SectionHeaderCell>
                   <SectionHeaderCell>Lot</SectionHeaderCell>
                   <SectionHeaderCell>SL</SectionHeaderCell>
