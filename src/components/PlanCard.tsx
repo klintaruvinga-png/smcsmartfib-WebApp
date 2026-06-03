@@ -232,7 +232,7 @@ export function PlanCandidateCard({
             <PlanPanel title="Entries" tone="info">
               <div className="overflow-x-auto -mx-3 px-3">
                 <div className="grid grid-cols-6 gap-x-2 gap-y-2 text-[10px] font-mono min-w-[300px]">
-                  <SectionHeaderCell>Stg</SectionHeaderCell>
+                  <SectionHeaderCell>ENTRY</SectionHeaderCell>
                   <SectionHeaderCell>Entry</SectionHeaderCell>
                   <SectionHeaderCell>Lot</SectionHeaderCell>
                   <SectionHeaderCell>SL</SectionHeaderCell>
