@@ -112,14 +112,18 @@ public:
         string authorityTf = GetAuthorityTF(sessionTf);
 
         double ltfHigh, ltfLow;
+        long   _sigLtfF1 = 0, _sigLtfF2 = 0, _sigLtfF3 = 0;
         bool ltfValid = ComputeLTFAnchor(rates, copied, chartTfSeconds,
                                          sessionTf, compression,
-                                         ltfHigh, ltfLow);
+                                         ltfHigh, ltfLow,
+                                         _sigLtfF1, _sigLtfF2, _sigLtfF3);
 
         double htfHigh, htfLow;
+        long   _sigHtfKey = 0;
         bool htfValid = ComputeHTFAnchor(rates, copied, chartTfSeconds,
                                          authorityTf, compression,
-                                         htfHigh, htfLow);
+                                         htfHigh, htfLow,
+                                         _sigHtfKey);
 
         int levelCount = 0;
         if (ltfValid)
@@ -219,26 +223,42 @@ public:
 
         // ---- LTF_SF anchor ----
         double ltf_high, ltf_low;
+        long   ltf_f1_key, ltf_f2_key, ltf_f3_key;
         bool   ltf_valid = ComputeLTFAnchor(rates, copied, chart_tf_seconds,
                                              session_tf, compression,
-                                             ltf_high, ltf_low);
+                                             ltf_high, ltf_low,
+                                             ltf_f1_key, ltf_f2_key, ltf_f3_key);
 
         // ---- HTF_AF anchor ----
         double htf_high, htf_low;
+        long   htf_anchor_key;
         bool   htf_valid = ComputeHTFAnchor(rates, copied, chart_tf_seconds,
                                              authority_tf, compression,
-                                             htf_high, htf_low);
+                                             htf_high, htf_low,
+                                             htf_anchor_key);
 
         if (!ltf_valid && !htf_valid)
             return "";
 
+        // anchor_debug confirms EA and Pine drew fibs from the same
+        // historical session windows.
+        string dbg = "{";
+        dbg += "\"session_tf\":\"" + session_tf + "\",";
+        dbg += "\"authority_tf\":\"" + authority_tf + "\",";
+        dbg += "\"ltf_f1_key\":" + IntegerToString(ltf_f1_key) + ",";
+        dbg += "\"ltf_f2_key\":" + IntegerToString(ltf_f2_key) + ",";
+        dbg += "\"ltf_f3_key\":" + IntegerToString(ltf_f3_key) + ",";
+        dbg += "\"htf_anchor_key\":" + IntegerToString(htf_anchor_key);
+        dbg += "}";
+
         string json = "{";
-        json += "\"user_id\":"         + IntegerToString(userId)   + ",";
-        json += "\"symbol\":\""        + normSymbol                 + "\",";
-        json += "\"timeframe\":\""     + tfName                     + "\",";
+        json += "\"user_id\":" + IntegerToString(userId) + ",";
+        json += "\"symbol\":\"" + normSymbol + "\",";
+        json += "\"timeframe\":\"" + tfName + "\",";
         json += "\"chart_tf_seconds\":" + IntegerToString(chart_tf_seconds) + ",";
-        json += "\"ltf_sf\":"          + BuildLevelsJson(ltf_valid, ltf_high, ltf_low, "LTF_SF") + ",";
-        json += "\"htf_af\":"          + BuildLevelsJson(htf_valid, htf_high, htf_low, "HTF_AF");
+        json += "\"anchor_debug\":" + dbg + ",";
+        json += "\"ltf_sf\":" + BuildLevelsJson(ltf_valid, ltf_high, ltf_low, "LTF_SF") + ",";
+        json += "\"htf_af\":" + BuildLevelsJson(htf_valid, htf_high, htf_low, "HTF_AF");
         json += "}";
 
         return json;
@@ -282,10 +302,8 @@ public:
 
         if (session_tf == "Weekly")
         {
-            int isoWeek = GetISOWeek(dt);
-            int isoYear = dt.year;
-            if (isoWeek > 50 && dt.mon == 1)  isoYear--;
-            if (isoWeek < 3  && dt.mon == 12) isoYear++;
+            int isoWeek, isoYear;
+            GetISOWeekYear(dt, isoWeek, isoYear);
             return (long)isoYear * 100 + (long)isoWeek;
         }
 
@@ -302,23 +320,41 @@ public:
         return (long)dt.year;
     }
 
-    // Approximate ISO week number matching PHP's gmdate('W')
-    int GetISOWeek(MqlDateTime& dt)
+    // ISO week + year using the Thursday-pivot algorithm. This matches
+    // PHP gmdate('o') / gmdate('W') without post-hoc year correction.
+    void GetISOWeekYear(MqlDateTime& dt, int& isoWeek, int& isoYear)
     {
-        // Day of year
         int monthDays[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
         bool leap = (dt.year % 4 == 0 && (dt.year % 100 != 0 || dt.year % 400 == 0));
+
         int dayOfYear = dt.day;
         for (int m = 1; m < dt.mon; m++)
             dayOfYear += (m == 2 && leap) ? 29 : monthDays[m - 1];
 
-        // ISO: week starts Monday; day_of_week: 0=Sun,1=Mon,...,6=Sat
-        int dow = dt.day_of_week;
-        int monDow = (dow == 0) ? 6 : (dow - 1);  // 0=Mon, 6=Sun
-        int week = (dayOfYear + 6 - monDow) / 7;
-        if (week < 1)  week = 52;
-        if (week > 52) week = 1;
-        return week;
+        // Monday-based DOW: 0=Mon, 6=Sun
+        int dow    = dt.day_of_week;
+        int monDow = (dow == 0) ? 6 : (dow - 1);
+
+        int thursdayOrd = dayOfYear + (3 - monDow);
+        int daysInYear  = leap ? 366 : 365;
+
+        if (thursdayOrd <= 0)
+        {
+            isoYear = dt.year - 1;
+            bool prevLeap = ((isoYear % 4 == 0) && ((isoYear % 100 != 0) || (isoYear % 400 == 0)));
+            thursdayOrd += prevLeap ? 366 : 365;
+            isoWeek = (thursdayOrd + 6) / 7;
+        }
+        else if (thursdayOrd > daysInYear)
+        {
+            isoYear = dt.year + 1;
+            isoWeek = 1;
+        }
+        else
+        {
+            isoYear = dt.year;
+            isoWeek = (thursdayOrd + 6) / 7;
+        }
     }
 
     // ---- Session store helpers ----
@@ -357,10 +393,13 @@ public:
     // Mirrors PHP: resolve_session_anchors() + superfib_composite_anchor()
     // Session TF groups candles into completed sessions; most recent 3 get
     // recency weights (F1=0.40/0.35/0.25 for 3, 0.55/0.45 for 2, 1.0 for 1).
+    // dbg_f1/f2/f3_key returns the completed session keys used by F1/F2/F3.
     bool ComputeLTFAnchor(MqlRates& rates[], int count, int chart_tf_seconds,
                           string session_tf, double compression,
-                          double& out_high, double& out_low)
+                          double& out_high, double& out_low,
+                          long& dbg_f1_key, long& dbg_f2_key, long& dbg_f3_key)
     {
+        dbg_f1_key = 0; dbg_f2_key = 0; dbg_f3_key = 0;
         ClearSessions();
 
         for (int i = 0; i < count; i++)
@@ -383,6 +422,10 @@ public:
         int f1 = completedCount - 1;
         int f2 = completedCount - 2;
         int f3 = completedCount - 3;
+
+        if (f1 >= 0) dbg_f1_key = sessionKeys[f1];
+        if (f2 >= 0) dbg_f2_key = sessionKeys[f2];
+        if (f3 >= 0) dbg_f3_key = sessionKeys[f3];
 
         bool f1v = (f1 >= 0) && ((sessionHighs[f1] - sessionLows[f1]) >= compression);
         bool f2v = (f2 >= 0) && ((sessionHighs[f2] - sessionLows[f2]) >= compression);
@@ -442,8 +485,10 @@ public:
     // anchor = the 3rd most recent completed session's raw extremes.
     bool ComputeHTFAnchor(MqlRates& rates[], int count, int chart_tf_seconds,
                           string authority_tf, double compression,
-                          double& out_high, double& out_low)
+                          double& out_high, double& out_low,
+                          long& dbg_anchor_key)
     {
+        dbg_anchor_key = 0;
         ClearSessions();
 
         for (int i = 0; i < count; i++)
@@ -466,6 +511,7 @@ public:
         if (idx3 < 0)
             return false;
 
+        dbg_anchor_key = sessionKeys[idx3];
         out_high = sessionHighs[idx3];
         out_low  = sessionLows[idx3];
 
