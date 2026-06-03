@@ -12,6 +12,7 @@
  *   7. Missing regime counterpart causes gate=FAIL
  *   8. Display schema plugin uses the stable smc-superfib-sniper slug
  *   9. Display schema SQL includes backend_confirmed column
+ *   10. Phase 4 bucket totals count critical mismatches once
  */
 
 $pass = 0;
@@ -65,6 +66,10 @@ function run_signal_validator(array $mt5Payload, array $pinePayload): array {
 
 function run_regime_validator(array $mt5Payload, array $pinePayload): array {
     return run_validator('regime-parity-validator.php', $mt5Payload, $pinePayload, 'reg');
+}
+
+function run_phase4_validator(array $mt5Payload, array $pinePayload): array {
+    return run_validator('parity-validator.php', $mt5Payload, $pinePayload, 'fib');
 }
 
 function resolve_plugin_file(): string {
@@ -159,6 +164,19 @@ if (file_exists($pluginFile)) {
     }
     assert_eq('Display schema SQL contains backend_confirmed column', true, $found);
 }
+
+// ---------------------------------------------------------------------------
+// TEST 10: Phase 4 bucket totals count critical mismatches once
+// ---------------------------------------------------------------------------
+$r = run_phase4_validator(
+    [
+        ['symbol' => 'EURUSD', 'timeframe' => 'M15', 'family' => 'LTF_SF', 'ratio' => -200, 'price' => 1.1000],
+    ],
+    [
+        ['symbol' => 'EURUSD', 'timeframe' => 'M15', 'family' => 'LTF_SF', 'ratio' => -200, 'price' => 1.2000],
+    ]
+);
+assert_eq('Phase 4 validator: bucket total counts critical tuple once', 32, $r['by_symbol']['EURUSD']['M15']['total'] ?? null);
 
 // ---------------------------------------------------------------------------
 // Summary
