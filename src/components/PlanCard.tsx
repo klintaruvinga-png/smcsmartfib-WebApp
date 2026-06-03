@@ -136,9 +136,6 @@ export function PlanCandidateCard({
             {signal.lifecycleState && signal.lifecycleState !== "DISPLAY_ACTIVE" && (
               <MetaPill>{signal.lifecycleState}</MetaPill>
             )}
-            {typeof signal.qualityScore === "number" && (
-              <MetaPill>QS {Math.round(signal.qualityScore)}</MetaPill>
-            )}
             <FreshnessBadge state={price?.state ?? "pending-sync"} />
             <MetaPill title={signal.id}>#{shortSignalId(signal.id)}</MetaPill>
             <span className="text-xs text-mute font-mono">{relTime(signal.createdAt)}</span>
@@ -183,9 +180,6 @@ export function PlanCandidateCard({
           ) : (
             <MetaChip tone="neutral">NO BLUEPRINT</MetaChip>
           )}
-          <MetaChip tone={signal.backendConfirmed ? "buy" : "warn"}>
-            {signal.backendConfirmed ? "BACKEND OK" : "UNCONFIRMED"}
-          </MetaChip>
         </div>
       </div>
 
@@ -196,12 +190,6 @@ export function PlanCandidateCard({
         </DivergenceBanner>
       )}
 
-      {pendingBlueprint && (
-        <WarningLine level="warn">
-          Blueprint is unconfirmed. Visible for planning only — execution remains disabled until the
-          backend confirms this signal.
-        </WarningLine>
-      )}
 
       {watchBlueprint && (
         <WarningLine level="watch">
@@ -240,11 +228,11 @@ export function PlanCandidateCard({
 
       {plan ? (
         <div className="rounded-lg border border-bd bg-bg1/50 overflow-hidden">
-          <div className="grid gap-px bg-bd/60 xl:grid-cols-[1.8fr_1fr_1fr_1fr]">
+          <div className="grid gap-px bg-bd/60 lg:grid-cols-2 xl:grid-cols-[1.8fr_1fr_1fr_1fr]">
             <PlanPanel title="Entries" tone="info">
               <div className="overflow-x-auto -mx-3 px-3">
-                <div className="grid grid-cols-[auto_repeat(5,minmax(0,1fr))] gap-x-2 gap-y-2 text-[10px] font-mono min-w-[360px]">
-                  <SectionHeaderCell />
+                <div className="grid grid-cols-6 gap-x-2 gap-y-2 text-[10px] font-mono min-w-[300px]">
+                  <SectionHeaderCell>Stg</SectionHeaderCell>
                   <SectionHeaderCell>Entry</SectionHeaderCell>
                   <SectionHeaderCell>Lot</SectionHeaderCell>
                   <SectionHeaderCell>SL</SectionHeaderCell>
