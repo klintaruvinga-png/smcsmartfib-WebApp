@@ -190,12 +190,6 @@ export function PlanCandidateCard({
         </DivergenceBanner>
       )}
 
-      {pendingBlueprint && (
-        <WarningLine level="warn">
-          Blueprint is unconfirmed. Visible for planning only — execution remains disabled until the
-          backend confirms this signal.
-        </WarningLine>
-      )}
 
       {watchBlueprint && (
         <WarningLine level="watch">
