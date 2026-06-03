@@ -37,18 +37,19 @@ function write_json_file(array $payload, string $prefix): string {
     return $path;
 }
 
-function run_validator(string $scriptName, array $mt5Payload, array $pinePayload, string $prefix): array {
+function run_validator(string $scriptName, array $mt5Payload, array $pinePayload, string $prefix, ?string $runTs = null): array {
     $tmpMt5 = write_json_file($mt5Payload, "mt5{$prefix}_");
     $tmpPine = write_json_file($pinePayload, "pine{$prefix}_");
     $tmpOut = tempnam(sys_get_temp_dir(), "rpt{$prefix}_");
 
     $script = __DIR__ . "/{$scriptName}";
     $command = sprintf(
-        'php %s --mt5-file %s --pine-file %s --out %s 2>&1',
+        'php %s --mt5-file %s --pine-file %s --out %s%s 2>&1',
         escapeshellarg($script),
         escapeshellarg($tmpMt5),
         escapeshellarg($tmpPine),
-        escapeshellarg($tmpOut)
+        escapeshellarg($tmpOut),
+        $runTs !== null ? ' --run-ts ' . escapeshellarg($runTs) : ''
     );
     exec($command, $output, $rc);
 
@@ -70,6 +71,10 @@ function run_regime_validator(array $mt5Payload, array $pinePayload): array {
 
 function run_phase4_validator(array $mt5Payload, array $pinePayload): array {
     return run_validator('parity-validator.php', $mt5Payload, $pinePayload, 'fib');
+}
+
+function run_phase4_validator_at(array $mt5Payload, array $pinePayload, string $runTs): array {
+    return run_validator('parity-validator.php', $mt5Payload, $pinePayload, 'fib', $runTs);
 }
 
 function resolve_plugin_file(): string {
@@ -177,6 +182,22 @@ $r = run_phase4_validator(
     ]
 );
 assert_eq('Phase 4 validator: bucket total counts critical tuple once', 32, $r['by_symbol']['EURUSD']['M15']['total'] ?? null);
+
+// ---------------------------------------------------------------------------
+// TEST 11: Phase 4 run_ts is caller-controlled and run_date derives from it
+// ---------------------------------------------------------------------------
+$runTs = '2026-06-03T12:34:56.7890000Z';
+$r = run_phase4_validator_at(
+    [
+        ['symbol' => 'EURUSD', 'timeframe' => 'M15', 'family' => 'LTF_SF', 'ratio' => -200, 'price' => 1.1000],
+    ],
+    [
+        ['symbol' => 'EURUSD', 'timeframe' => 'M15', 'family' => 'LTF_SF', 'ratio' => -200, 'price' => 1.1000],
+    ],
+    $runTs
+);
+assert_eq('Phase 4 validator: run_ts is preserved from --run-ts', $runTs, $r['run_ts'] ?? null);
+assert_eq('Phase 4 validator: run_date derives from run_ts', '2026-06-03', $r['run_date'] ?? null);
 
 // ---------------------------------------------------------------------------
 // Summary

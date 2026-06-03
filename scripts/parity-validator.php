@@ -7,7 +7,7 @@
  * output for the same candle input, and produces a machine-readable JSON gate report.
  *
  * Usage:
- *   php scripts/parity-validator.php [--mt5-file <path>] [--pine-file <path>] [--out <path>]
+ *   php scripts/parity-validator.php [--mt5-file <path>] [--pine-file <path>] [--out <path>] [--run-ts <iso8601>]
  *
  * Input files are JSON arrays of fib entries:
  *   [ { "symbol": "EURUSD", "timeframe": "M15", "family": "LTF_SF", "ratio": 0, "price": 1.12345 }, ... ]
@@ -27,12 +27,13 @@ const ACCEPTABLE_DRIFT      = 0.001;
 const PARITY_GATE_PCT       = 99.0;
 
 // ---- Bootstrap ----
-$opts = getopt('', array('mt5-file:', 'pine-file:', 'out:'));
+$opts = getopt('', array('mt5-file:', 'pine-file:', 'out:', 'run-ts:'));
 $mt5File  = isset($opts['mt5-file'])  ? $opts['mt5-file']  : null;
 $pineFile = isset($opts['pine-file']) ? $opts['pine-file'] : null;
 $outFile  = isset($opts['out'])       ? $opts['out']       : null;
 
-$runDate = gmdate('Y-m-d');
+$runTs = isset($opts['run-ts']) ? $opts['run-ts'] : gmdate('c');
+$runDate = substr($runTs, 0, 10);
 
 if ($mt5File === null && $pineFile === null) {
     // ---- Self-test mode: use PHP engine as both source and target ----
@@ -48,7 +49,7 @@ if ($mt5File === null && $pineFile === null) {
 }
 
 // ---- Run comparison ----
-$report = run_parity_comparison($mt5Levels, $pineLevels, $runDate);
+$report = run_parity_comparison($mt5Levels, $pineLevels, $runDate, $runTs);
 
 // ---- Output ----
 $json = json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
@@ -199,7 +200,7 @@ function generate_synthetic_levels() {
  * Compare MT5 levels against Pine reference levels.
  * Returns the gate report array.
  */
-function run_parity_comparison(array $mt5Levels, array $pineLevels, $runDate) {
+function run_parity_comparison(array $mt5Levels, array $pineLevels, $runDate, $runTs) {
     $requiredTuples = phase4_required_tuples();
     $mt5Index = build_levels_index($mt5Levels);
     $pineIndex = build_levels_index($pineLevels);
@@ -418,6 +419,7 @@ function run_parity_comparison(array $mt5Levels, array $pineLevels, $runDate) {
 
     return array(
         'run_date' => $runDate,
+        'run_ts' => $runTs,
         'overall_parity_pct' => $overallParity,
         'gate' => $gate,
         'total_tuples' => $totalTuples,

@@ -42,7 +42,7 @@
  *   - Fails if output row count != 384
  *
  * Usage (from repo root):
- *   node scripts/generate-pine-levels-v13.cjs [--candle-dir <path>] [--mt5-file <path>] [--reports-dir <path>]
+ *   node scripts/generate-pine-levels-v13.cjs [--candle-dir <path>] [--mt5-file <path>] [--reports-dir <path>] [--run-ts <iso8601>]
  */
 
 'use strict';
@@ -65,6 +65,7 @@ function getArg(flag) {
     return value;
 }
 const REPORTS_DIR   = path.resolve(getArg('--reports-dir') || path.join(REPO_ROOT, 'reports', 'phase4-parity'));
+const RUN_TS        = getArg('--run-ts') || new Date().toISOString();
 const OUTPUT_LEVELS = path.join(REPORTS_DIR, 'pine-levels.json');
 const OUTPUT_META   = path.join(REPORTS_DIR, 'pine-levels.metadata.json');
 const CANDLE_DIR    = path.resolve(getArg('--candle-dir') || path.join(REPO_ROOT, 'data'));
@@ -447,7 +448,7 @@ function main() {
         version:      'v13.1.3',
         source:       'local-candles-pine-v13-compatible',
         authority:    'NOT a live TradingView/Pine export - locally computed Pine v13-compatible reference',
-        generated_at: new Date().toISOString(),
+        generated_at: RUN_TS,
         candle_dir:   CANDLE_DIR,
         mt5_file:     MT5_FILE,
         mt5_mtime:    mt5Mtime.toISOString(),

@@ -311,7 +311,9 @@ $candleRoot = ConvertTo-AbsolutePath $CandleDir
 New-Item -ItemType Directory -Path $reportsRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $candleRoot -Force | Out-Null
 
-$timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
+$runInstant = [DateTimeOffset]::UtcNow
+$runTs = $runInstant.ToString("o")
+$timestamp = $runInstant.ToString("yyyy-MM-dd_HHmmss")
 $officialSymbols = @("EURUSD", "USDJPY", "XAUUSD")
 $expandedSymbols = @("EURUSD", "USDJPY", "XAUUSD", "BTCUSD", "NAS100")
 $symbols = if ($ExpandedAudit) { $expandedSymbols } else { $officialSymbols }
@@ -418,7 +420,8 @@ $nodeArgs = @(
     (Join-Path "scripts" "generate-pine-levels-v13.cjs"),
     "--candle-dir", $candleRoot,
     "--mt5-file", $mt5LevelsFile,
-    "--reports-dir", $reportsRoot
+    "--reports-dir", $reportsRoot,
+    "--run-ts", $runTs
 )
 Invoke-ExternalCommand "node" $nodeArgs "Pine generator failed"
 
@@ -445,7 +448,8 @@ $phpArgs = @(
     (Join-Path "scripts" "parity-validator.php"),
     "--mt5-file", $mt5LevelsFile,
     "--pine-file", $pineLevelsFile,
-    "--out", $gateFile
+    "--out", $gateFile,
+    "--run-ts", $runTs
 )
 $validatorExitCode = Start-ExternalCommand "php" $phpArgs
 
