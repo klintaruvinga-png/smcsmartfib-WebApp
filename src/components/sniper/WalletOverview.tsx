@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAccountTelemetry } from "@/hooks/useSniperData";
 import { fmtCurrency } from "@/lib/format";
 import { FreshnessBadge } from "./FreshnessBadge";
@@ -16,7 +17,20 @@ export function WalletOverview() {
               Account
             </h2>
           </div>
-          <div className="text-[10px] text-mute">Loading...</div>
+          <Skeleton className="h-4 w-16 bg-bg3" />
+        </div>
+        <div className="overflow-hidden rounded-lg border border-bd bg-bg1/60">
+          <div className="grid grid-cols-2 divide-y divide-bd lg:grid-cols-4 lg:divide-x lg:divide-y-0 [&>*]:border-bd">
+            {(["EQUITY", "BALANCE", "FLOATING P/L", "MARGIN LEVEL"] as const).map((label) => (
+              <div key={label} className="space-y-2 px-4 py-3 lg:px-5 lg:py-4">
+                <div className="text-[10px] font-mono uppercase tracking-[0.16em] text-mute font-semibold">
+                  {label}
+                </div>
+                <Skeleton className="h-7 w-24 bg-bg3" />
+                <Skeleton className="h-3 w-16 bg-bg3" />
+              </div>
+            ))}
+          </div>
         </div>
       </section>
     );
@@ -65,13 +79,21 @@ export function WalletOverview() {
             label="EQUITY"
             value={fmtCurrency(account.equity, cur)}
             valueClass="text-buy"
-            sub={<span className="text-mute">1% = {onePctEquity.toFixed(2)} {cur}</span>}
+            sub={
+              <span className="text-mute">
+                1% = {onePctEquity.toFixed(2)} {cur}
+              </span>
+            }
           />
           <Cell
             label="BALANCE"
             value={fmtCurrency(account.balance, cur)}
             valueClass="text-info"
-            sub={<span className="text-mute">1% = {onePctBalance.toFixed(2)} {cur}</span>}
+            sub={
+              <span className="text-mute">
+                1% = {onePctBalance.toFixed(2)} {cur}
+              </span>
+            }
           />
           <Cell
             label="FLOATING P/L"

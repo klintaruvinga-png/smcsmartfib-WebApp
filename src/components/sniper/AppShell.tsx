@@ -309,14 +309,22 @@ function Header() {
 
 export function AppShell() {
   useUserSettings();
+  const isNavigating = useRouterState({ select: (state) => state.status === "pending" });
 
   return (
     <div className="flex min-h-screen">
       <LeftRail />
       <div className="flex min-w-0 flex-1 flex-col">
         <Header />
-        <main className="flex-1 px-3 py-4 pb-20 md:pb-4 lg:px-6 lg:py-6 max-w-[1400px] w-full mx-auto">
-          <Outlet />
+        <main className="relative flex-1 px-3 py-4 pb-20 md:pb-4 lg:px-6 lg:py-6 max-w-[1400px] w-full mx-auto">
+          {isNavigating && (
+            <div className="absolute inset-x-0 top-0 z-10 h-0.5 -mx-3 overflow-hidden bg-accent/20 lg:-mx-6">
+              <div className="nav-progress-bar h-full w-1/3 bg-accent" />
+            </div>
+          )}
+          <div className={cn("transition-opacity duration-150", isNavigating && "opacity-75")}>
+            <Outlet />
+          </div>
         </main>
         <BottomNav />
       </div>

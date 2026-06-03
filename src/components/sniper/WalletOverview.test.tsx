@@ -63,4 +63,20 @@ describe("WalletOverview", () => {
 
     expect(screen.getByText(/Account data unavailable/)).toBeTruthy();
   });
+
+  it("renders account-shaped skeleton cells while telemetry is loading", () => {
+    hookMocks.useAccountTelemetry.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      error: null,
+    });
+
+    render(<WalletOverview />);
+
+    expect(screen.getByText("EQUITY")).toBeTruthy();
+    expect(screen.getByText("BALANCE")).toBeTruthy();
+    expect(screen.getByText("FLOATING P/L")).toBeTruthy();
+    expect(screen.getByText("MARGIN LEVEL")).toBeTruthy();
+    expect(screen.queryByText("Loading...")).toBeNull();
+  });
 });

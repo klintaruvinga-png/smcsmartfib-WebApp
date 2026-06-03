@@ -9,13 +9,15 @@ import {
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { SettingsQueryErrorState } from "@/components/sniper/SettingsQueryErrorState";
 import { DivergenceBanner } from "@/components/sniper/Warnings";
-import { AlertTriangle, Loader2, Search } from "lucide-react";
-import { useState } from "react";
+import { AlertTriangle, Search } from "lucide-react";
+import { useCallback, useState } from "react";
 import { deduplicateById } from "@/lib/utils";
 import { WalletOverview } from "@/components/sniper/WalletOverview";
 import { isTradePlanComplete } from "./-plan.utils";
 import type { SignalCandidate, TradePlan } from "@/types/sniper";
 import { PlanCandidateCard } from "@/components/PlanCard";
+import { PlanBoardSkeleton } from "@/components/sniper/PlanBoardSkeleton";
+import { TradingLoadingScreen } from "@/components/sniper/TradingLoadingScreen";
 
 type RankedCandidate = {
   signal: SignalCandidate;
@@ -41,6 +43,8 @@ function rankCandidates(candidates: RankedCandidate[]): RankedCandidate[] {
 
 export function PlanPage() {
   const [boardSize, setBoardSize] = useState<3 | 5 | 10>(3);
+  const [phase1Done, setPhase1Done] = useState(false);
+  const handlePhase1Ready = useCallback(() => setPhase1Done(true), []);
   const { data: liveSignals, isLoading: signalsLoading } = useDisplaySignals(boardSize);
   const signals = liveSignals?.signals;
   const totalActiveSignals = liveSignals?.meta?.totalActive ?? signals?.length ?? 0;
@@ -52,6 +56,7 @@ export function PlanPage() {
   } = useLadders();
   const { data: snapshot } = useSnapshot();
   const {
+    backendReady,
     pendingSettingsLoad,
     missingBackendUrl,
     settingsLoadFailed,
@@ -83,38 +88,32 @@ export function PlanPage() {
   const needsGlobalFallback = rankedWatchlistCandidates.length === 0;
   const { data: globalSignalsData, isLoading: globalSignalsLoading } = useDisplaySignals(
     boardSize,
-    needsGlobalFallback ? 'global' : undefined,
+    needsGlobalFallback ? "global" : undefined,
   );
   const globalSignals = needsGlobalFallback ? (globalSignalsData?.signals ?? []) : [];
   const uniqueGlobalSignals = deduplicateById(globalSignals);
-  const globalCandidatePool: RankedCandidate[] = uniqueGlobalSignals.map((signal, originalIndex) => {
-    const candidatePlan = laddersBySignalId.get(signal.id) ?? null;
-    return {
-      signal: { ...signal, backendConfirmed: false },
-      plan: candidatePlan,
-      hasPlan: candidatePlan !== null,
-      planComplete: false,
-      originalIndex,
-    };
-  });
+  const globalCandidatePool: RankedCandidate[] = uniqueGlobalSignals.map(
+    (signal, originalIndex) => {
+      const candidatePlan = laddersBySignalId.get(signal.id) ?? null;
+      return {
+        signal: { ...signal, backendConfirmed: false },
+        plan: candidatePlan,
+        hasPlan: candidatePlan !== null,
+        planComplete: false,
+        originalIndex,
+      };
+    },
+  );
   const rankedGlobalCandidates = rankCandidates(globalCandidatePool);
 
   const topCandidates =
     rankedWatchlistCandidates.length > 0 ? rankedWatchlistCandidates.slice(0, boardSize) : [];
-  const isUsingGlobalFallback = rankedWatchlistCandidates.length === 0 && rankedGlobalCandidates.length > 0;
+  const isUsingGlobalFallback =
+    rankedWatchlistCandidates.length === 0 && rankedGlobalCandidates.length > 0;
   const divergentCount = topCandidates.filter(
     ({ signal }) => signal.computedBy === "frontend" && !signal.backendConfirmed,
   ).length;
   const firstWatchlistCandidate = rankedWatchlistCandidates[0];
-
-  if (pendingSettingsLoad || signalsLoading || laddersLoading || (needsGlobalFallback && globalSignalsLoading)) {
-    return (
-      <div className="flex items-center gap-2 text-mute text-sm">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Loading signal data and blueprints...
-      </div>
-    );
-  }
 
   if (settingsLoadFailed) {
     return (
@@ -132,6 +131,19 @@ export function PlanPage() {
         Configure a backend URL in Account before loading signal plans.
       </div>
     );
+  }
+
+  if (!phase1Done) {
+    return <TradingLoadingScreen backendReady={backendReady} onReady={handlePhase1Ready} />;
+  }
+
+  if (
+    pendingSettingsLoad ||
+    signalsLoading ||
+    laddersLoading ||
+    (needsGlobalFallback && globalSignalsLoading)
+  ) {
+    return <PlanBoardSkeleton />;
   }
 
   if (topCandidates.length === 0 && !isUsingGlobalFallback) {
@@ -295,15 +307,17 @@ export function PlanPage() {
       )}
 
       <div className="space-y-4">
-        {(isUsingGlobalFallback ? rankedGlobalCandidates.slice(0, boardSize) : topCandidates).map((candidate) => (
-          <PlanCandidateCard
-            key={candidate.signal.id}
-            signal={candidate.signal}
-            plan={candidate.plan}
-            price={snapshot?.prices.find((entry) => entry.symbol === candidate.signal.symbol)}
-            planComplete={candidate.planComplete}
-          />
-        ))}
+        {(isUsingGlobalFallback ? rankedGlobalCandidates.slice(0, boardSize) : topCandidates).map(
+          (candidate) => (
+            <PlanCandidateCard
+              key={candidate.signal.id}
+              signal={candidate.signal}
+              plan={candidate.plan}
+              price={snapshot?.prices.find((entry) => entry.symbol === candidate.signal.symbol)}
+              planComplete={candidate.planComplete}
+            />
+          ),
+        )}
       </div>
     </div>
   );
