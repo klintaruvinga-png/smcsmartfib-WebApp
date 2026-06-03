@@ -256,6 +256,129 @@ class SMC_MarketData_Service
     }
 
     /**
+     * Get Phase 4 parity candles from MT5 only.
+     *
+     * Uses direct MT5 timeframe rows when present, otherwise aggregates
+     * canonical MT5 M1 candles into UTC buckets. Never reads fallback candles.
+     *
+     * @param int $user_id
+     * @param string $symbol
+     * @param string $timeframe M15|H1|H4|D1
+     * @param int $count Number of output candles
+     * @return array
+     */
+    public function get_phase4_candles($user_id, $symbol, $timeframe, $count = 600)
+    {
+        $symbol = strtoupper(sanitize_text_field($symbol));
+        $timeframe = strtoupper(sanitize_text_field($timeframe));
+        $count = max(1, min(2000, (int) $count));
+
+        $map = array(
+            'M15' => array('db' => '15min', 'seconds' => 900),
+            'H1' => array('db' => '1h', 'seconds' => 3600),
+            'H4' => array('db' => '4h', 'seconds' => 14400),
+            'D1' => array('db' => '1day', 'seconds' => 86400),
+        );
+
+        if (!isset($map[$timeframe])) {
+            return array();
+        }
+
+        $direct = $this->get_mt5_candles_for_timeframe($user_id, $symbol, $map[$timeframe]['db'], $count);
+        if (!empty($direct)) {
+            return $direct;
+        }
+
+        return $this->aggregate_mt5_m1_candles($user_id, $symbol, (int) $map[$timeframe]['seconds'], $count);
+    }
+
+    private function get_mt5_candles_for_timeframe($user_id, $symbol, $timeframe, $count)
+    {
+        $rows = $this->wpdb->get_results($this->wpdb->prepare(
+            "SELECT * FROM {$this->table_prefix}candles WHERE user_id = %d AND symbol = %s AND timeframe = %s AND source = %s ORDER BY candle_time DESC LIMIT %d",
+            $user_id,
+            $symbol,
+            $timeframe,
+            'mt5',
+            $count
+        ), ARRAY_A);
+
+        if (empty($rows)) {
+            return array();
+        }
+
+        return array_map(array($this, 'map_candle_row'), array_reverse($rows));
+    }
+
+    private function aggregate_mt5_m1_candles($user_id, $symbol, $bucket_seconds, $count)
+    {
+        $m1_limit = max(1, $count * max(1, (int) floor($bucket_seconds / 60)));
+        $rows = $this->wpdb->get_results($this->wpdb->prepare(
+            "SELECT * FROM {$this->table_prefix}candles WHERE user_id = %d AND symbol = %s AND timeframe = %s AND source = %s ORDER BY candle_time DESC LIMIT %d",
+            $user_id,
+            $symbol,
+            '1min',
+            'mt5',
+            $m1_limit
+        ), ARRAY_A);
+
+        if (empty($rows)) {
+            return array();
+        }
+
+        $buckets = array();
+        $now = time();
+        foreach (array_reverse($rows) as $row) {
+            $ts = strtotime((string) $row['candle_time'] . ' UTC');
+            if ($ts === false) {
+                continue;
+            }
+
+            $bucket_start = (int) (floor($ts / $bucket_seconds) * $bucket_seconds);
+            if (($bucket_start + $bucket_seconds) > $now) {
+                continue;
+            }
+
+            if (!isset($buckets[$bucket_start])) {
+                $buckets[$bucket_start] = array(
+                    'time' => $this->to_utc_z($bucket_start),
+                    'open' => (float) $row['open'],
+                    'high' => (float) $row['high'],
+                    'low' => (float) $row['low'],
+                    'close' => (float) $row['close'],
+                    'volume' => isset($row['volume']) ? (int) $row['volume'] : 0,
+                );
+                continue;
+            }
+
+            $buckets[$bucket_start]['high'] = max($buckets[$bucket_start]['high'], (float) $row['high']);
+            $buckets[$bucket_start]['low'] = min($buckets[$bucket_start]['low'], (float) $row['low']);
+            $buckets[$bucket_start]['close'] = (float) $row['close'];
+            $buckets[$bucket_start]['volume'] += isset($row['volume']) ? (int) $row['volume'] : 0;
+        }
+
+        if (empty($buckets)) {
+            return array();
+        }
+
+        ksort($buckets);
+        return array_slice(array_values($buckets), -1 * $count);
+    }
+
+    private function map_candle_row($row)
+    {
+        $ts = strtotime((string) $row['candle_time'] . ' UTC');
+        return array(
+            'time' => $ts !== false ? $this->to_utc_z($ts) : null,
+            'open' => (float) $row['open'],
+            'high' => (float) $row['high'],
+            'low' => (float) $row['low'],
+            'close' => (float) $row['close'],
+            'volume' => isset($row['volume']) ? (int) $row['volume'] : 0,
+        );
+    }
+
+    /**
      * Check if MT5 data is available (has received ticks)
      * 
      * @param int $user_id
@@ -504,6 +627,11 @@ class SMC_MarketData_Service
         if (!$mysql_time)
             return null;
         return gmdate('c', strtotime($mysql_time . ' UTC'));
+    }
+
+    private function to_utc_z($timestamp)
+    {
+        return gmdate('Y-m-d\TH:i:s\Z', (int) $timestamp);
     }
 
     private function normalize_market_timestamp($raw_time, $fallback = null)

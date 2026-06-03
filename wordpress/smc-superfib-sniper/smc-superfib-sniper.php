@@ -3105,6 +3105,39 @@ final class SMC_SuperFib_Sniper_REST {
         ));
     }
 
+    public function get_market_data_candles(WP_REST_Request $request) {
+        $user_id = get_current_user_id();
+        $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper(sanitize_text_field((string) $request->get_param('symbol'))));
+
+        if ($symbol === '') {
+            return new WP_Error('missing_symbol', 'symbol query parameter is required', array('status' => 400));
+        }
+
+        $timeframe = strtoupper(sanitize_text_field((string) $request->get_param('timeframe')));
+        $allowed_timeframes = array('M15', 'H1', 'H4', 'D1');
+        if ($timeframe === '' || !in_array($timeframe, $allowed_timeframes, true)) {
+            return new WP_Error('invalid_timeframe', 'timeframe must be one of M15,H1,H4,D1', array('status' => 400));
+        }
+
+        $limit = (int) $request->get_param('limit');
+        if ($limit <= 0) {
+            $limit = 600;
+        }
+        $limit = max(1, min(2000, $limit));
+
+        $svc = new SMC_MarketData_Service();
+        $candles = $svc->get_phase4_candles($user_id, $symbol, $timeframe, $limit);
+        if (empty($candles)) {
+            return new WP_Error('mt5_candles_unavailable', 'No MT5 candles are available for the requested symbol/timeframe', array(
+                'status' => 404,
+                'symbol' => $symbol,
+                'timeframe' => $timeframe,
+            ));
+        }
+
+        return $this->no_cache_response($candles);
+    }
+
     // =========================================================================
     // Phase 5: Regime & Chop Engine handlers
     // =========================================================================

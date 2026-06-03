@@ -96,6 +96,14 @@ if (!class_exists('WP_REST_Request')) {
     }
 }
 
+if (!class_exists('WP_REST_Server')) {
+    class WP_REST_Server {
+        const READABLE = 'GET';
+        const CREATABLE = 'POST';
+        const DELETABLE = 'DELETE';
+    }
+}
+
 if (!class_exists('WP_REST_Response')) {
     class WP_REST_Response {
         public $data;

@@ -77,6 +77,7 @@ final class SMC_SuperFib_Route_Registrar {
             array('path' => '/ea/license-check', 'methods' => WP_REST_Server::READABLE, 'callback' => 'get_ea_license_check', 'permission' => 'ea_bridge'),
             array('path' => '/ea/fib-levels', 'methods' => WP_REST_Server::CREATABLE, 'callback' => 'post_ea_fib_levels', 'permission' => 'ea_bridge'),
             array('path' => '/market-data/fib-levels', 'methods' => WP_REST_Server::READABLE, 'callback' => 'get_market_data_fib_levels'),
+            array('path' => '/market-data/candles', 'methods' => WP_REST_Server::READABLE, 'callback' => 'get_market_data_candles'),
             array('path' => '/ea/regime-snapshot', 'methods' => WP_REST_Server::CREATABLE, 'callback' => 'post_ea_regime_snapshot', 'permission' => 'ea_bridge'),
             array('path' => '/market-data/regime', 'methods' => WP_REST_Server::READABLE, 'callback' => 'get_market_data_regime'),
             array('path' => '/fundamentals/refresh', 'methods' => WP_REST_Server::CREATABLE, 'callback' => 'post_fundamentals_refresh'),

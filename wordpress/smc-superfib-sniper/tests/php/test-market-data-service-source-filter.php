@@ -35,6 +35,31 @@ if (!class_exists('TestWpdb')) {
         }
 
         public function get_results($query, $output = ARRAY_A) {
+            if (preg_match("/SELECT \\* FROM ([^ ]+) WHERE user_id = (\\d+) AND symbol = '([^']+)' AND timeframe = '([^']+)' AND source = '([^']+)' ORDER BY candle_time (ASC|DESC) LIMIT (\\d+)/", $query, $m)) {
+                $table = $m[1];
+                $user_id = (int) $m[2];
+                $symbol = $m[3];
+                $timeframe = $m[4];
+                $source = $m[5];
+                $direction = strtoupper($m[6]);
+                $limit = (int) $m[7];
+                $rows = array();
+                foreach ($this->tables[$table] ?? array() as $row) {
+                    if ((int) ($row['user_id'] ?? 0) !== $user_id) {
+                        continue;
+                    }
+                    if (($row['symbol'] ?? '') !== $symbol || ($row['timeframe'] ?? '') !== $timeframe || ($row['source'] ?? '') !== $source) {
+                        continue;
+                    }
+                    $rows[] = $row;
+                }
+                usort($rows, function ($left, $right) use ($direction) {
+                    $cmp = strcmp((string) ($left['candle_time'] ?? ''), (string) ($right['candle_time'] ?? ''));
+                    return $direction === 'DESC' ? -1 * $cmp : $cmp;
+                });
+                return array_slice($rows, 0, $limit);
+            }
+
             return array();
         }
 
@@ -264,5 +289,47 @@ assert_true(
 $storedUtcCandle = $wpdb->tables[$candleTable]['7|USDJPY|1min|2026-05-16 08:16:00'] ?? null;
 assert_true(is_array($storedUtcCandle), 'store_candle_m1 must persist UTC-suffixed MT5 candle rows');
 assert_same('2026-05-16 08:16:00', $storedUtcCandle['candle_time'] ?? null, 'store_candle_m1 must normalize UTC-suffixed timestamps instead of falling back to receipt time');
+
+for ($i = 0; $i < 30; $i++) {
+    $bucket = $i < 15 ? 0 : 15;
+    $minute = $i % 15;
+    $timestamp = sprintf('2026-06-03 08:%02d:00', $bucket + $minute);
+    $wpdb->replace($candleTable, array(
+        'user_id' => 7,
+        'symbol' => 'EURUSD',
+        'timeframe' => '1min',
+        'candle_time' => $timestamp,
+        'open' => 1.1000 + ($i * 0.0001),
+        'high' => 1.1010 + ($i * 0.0001),
+        'low' => 1.0990 - ($i * 0.0001),
+        'close' => 1.1005 + ($i * 0.0001),
+        'volume' => '2',
+        'source' => 'mt5',
+        'created_at' => '2026-06-03 08:30:00',
+    ));
+}
+$wpdb->replace($candleTable, array(
+    'user_id' => 7,
+    'symbol' => 'EURUSD',
+    'timeframe' => '1min',
+    'candle_time' => '2026-06-03 08:45:00',
+    'open' => 9.0,
+    'high' => 9.0,
+    'low' => 9.0,
+    'close' => 9.0,
+    'volume' => '999',
+    'source' => 'twelve-data',
+    'created_at' => '2026-06-03 08:30:00',
+));
+
+$phase4Candles = $service->get_phase4_candles(7, 'EURUSD', 'M15', 2);
+assert_same(2, count($phase4Candles), 'Phase 4 candle export must aggregate two M15 buckets from MT5 M1 candles');
+assert_same('2026-06-03T08:00:00Z', $phase4Candles[0]['time'], 'Phase 4 M15 candle time must be UTC bucket start');
+assert_same(1.1, $phase4Candles[0]['open'], 'Phase 4 M15 open must be the first MT5 M1 open');
+assert_same(1.1024, $phase4Candles[0]['high'], 'Phase 4 M15 high must be the max MT5 M1 high and exclude TwelveData rows');
+assert_same(1.0976, $phase4Candles[0]['low'], 'Phase 4 M15 low must be the min MT5 M1 low and exclude TwelveData rows');
+assert_same(1.1019, $phase4Candles[0]['close'], 'Phase 4 M15 close must be the last MT5 M1 close');
+assert_same(30, $phase4Candles[0]['volume'], 'Phase 4 M15 volume must sum MT5 M1 volume');
+assert_same('2026-06-03T08:15:00Z', $phase4Candles[1]['time'], 'Phase 4 candles must be sorted ascending by UTC bucket start');
 
 fwrite(STDOUT, 'market data service source filter checks passed' . PHP_EOL);
