@@ -39,12 +39,29 @@ const INSTRUMENT_TYPES: Record<string, InstrumentType> = {
 
 export const MIN_EXECUTABLE_STAGE_LOT = 0.01;
 
+const BROKER_SUFFIXES = ["MICRO", "PRO", "ECN", "STP", "RAW", "M", "R", "C"] as const;
+
+function resolveKnownPlanToken(token: string): string | null {
+  const aliased = SYMBOL_ALIASES[token] ?? token;
+  return aliased in INSTRUMENT_TYPES || token in SYMBOL_ALIASES ? aliased : null;
+}
+
 function normalizePlanSymbol(symbol: string | null | undefined): string {
   const token = (symbol ?? "")
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "");
-  return SYMBOL_ALIASES[token] ?? token;
+  const directMatch = resolveKnownPlanToken(token);
+  if (directMatch) return directMatch;
+
+  for (const suffix of BROKER_SUFFIXES) {
+    if (!token.endsWith(suffix) || token.length <= suffix.length) continue;
+
+    const suffixStrippedMatch = resolveKnownPlanToken(token.slice(0, -suffix.length));
+    if (suffixStrippedMatch) return suffixStrippedMatch;
+  }
+
+  return token;
 }
 
 export function getMinExecutableStageLot(symbol?: string): number {
