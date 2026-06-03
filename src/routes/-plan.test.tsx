@@ -518,14 +518,15 @@ describe("PlanPage ranking and execution guards", () => {
     expect(screen.queryByText("0.00 lot")).toBeNull();
     expect(screen.queryByText("0.01 lot")).toBeNull();
     expect(cardText).toContain("0.12 lot");
-    expect(cardText).toContain("Below 0.01 lot");
+    expect(cardText).toContain("0.009 lot");
+    expect(cardText).toContain("Below min 0.01");
     expect(
       screen.getByText(
-        /Backend plan contains stage lots below 0\.01\. The backend will skip those stages and queue any remaining executable legs\./,
+        /Some stages are below the 0\.01 minimum lot for GBPUSD\. The backend will skip those stages and queue any remaining executable legs\./,
       ),
     ).toBeTruthy();
     expect(
-      screen.queryByText(/No backend stage lots meet the 0\.01 execution minimum\./),
+      screen.queryByText(/No backend stage lots meet the 0\.01 minimum lot for GBPUSD\./),
     ).toBeNull();
     expect(
       (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
@@ -543,7 +544,7 @@ describe("PlanPage ranking and execution guards", () => {
     });
 
     expect(
-      screen.getByText(/No backend stage lots meet the 0\.01 execution minimum\./),
+      screen.getByText(/No backend stage lots meet the 0\.01 minimum lot for GBPUSD\./),
     ).toBeTruthy();
     expect(
       (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
@@ -563,9 +564,9 @@ describe("PlanPage ranking and execution guards", () => {
     });
 
     const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
-    expect(cardText).toContain("Below 0.10 lot");
+    expect(cardText).toContain("Below min 0.10");
     expect(
-      screen.getByText(/No backend stage lots meet the 0\.10 execution minimum\./),
+      screen.getByText(/No backend stage lots meet the 0\.10 minimum lot for BTCUSD\./),
     ).toBeTruthy();
     expect(
       (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,

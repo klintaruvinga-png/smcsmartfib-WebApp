@@ -37,6 +37,40 @@ describe("PlanCandidateCard", () => {
     expect(screen.queryByText(/^R\s/)).toBeNull();
     expect(screen.queryByText("R --")).toBeNull();
   });
+
+  it("renders XAUUSD stage minimums inside compact entry rows without a separate pending ladder block", () => {
+    render(
+      <PlanCandidateCard
+        signal={{ ...signal, symbol: "XAUUSD", direction: "SHORT" }}
+        plan={{
+          ...plan,
+          symbol: "XAUUSD",
+          entries: { e1: 0.59041, e2: 0.58981, e3: 0.58829 },
+          sl: 0.58879,
+          stops: { e1: 0.58966, e2: 0.58814, e3: 0.58662 },
+          tps: { tp1: 0.59117, tp2: 0.59269, tp3: 0.5942 },
+          rr: { tp1: 1, tp2: 3, tp3: 5 },
+          lotSize: { e1: 0.08, e2: 0.09, e3: 0.15 },
+          drawdownImpactPct: 0.5,
+          state: "ACTIVE",
+          stageFills: { e1: false, e2: false, e3: false },
+        }}
+        planComplete
+      />,
+    );
+
+    const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
+    expect(cardText).toContain("0.08 lot");
+    expect(cardText).toContain("0.09 lot");
+    expect(cardText).toContain("0.15 lot");
+    expect(screen.getAllByText("Below min 0.10")).toHaveLength(2);
+    expect(screen.getByText("Ready")).toBeTruthy();
+    expect(screen.queryByText("Ladder Status")).toBeNull();
+    expect(cardText).not.toContain("E1 Pending");
+    expect(
+      (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
+    ).toBe(false);
+  });
 });
 
 const signal: SignalCandidate = {

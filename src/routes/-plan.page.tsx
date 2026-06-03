@@ -32,13 +32,10 @@ type RenderableCandidate = RankedCandidate & {
   hasPlan: true;
 };
 
-// Rank candidates: planComplete > hasPlan > no-plan; ties broken by original board position.
+// Preserve the backend/display board ranking. Plan completeness affects card execution state, not
+// whether a lower-ranked signal jumps ahead of a higher-ranked one.
 function rankCandidates(candidates: RankedCandidate[]): RankedCandidate[] {
-  return [...candidates].sort((a, b) => {
-    if (a.planComplete !== b.planComplete) return a.planComplete ? -1 : 1;
-    if (a.hasPlan !== b.hasPlan) return a.hasPlan ? -1 : 1;
-    return a.originalIndex - b.originalIndex;
-  });
+  return [...candidates].sort((a, b) => a.originalIndex - b.originalIndex);
 }
 
 export function PlanPage() {

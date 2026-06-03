@@ -55,7 +55,6 @@ export function PlanCandidateCard({
   const skippedStageLots = plan ? hasSkippedStageLots(plan) : false;
   const planSymbol = plan?.symbol ?? signal.symbol;
   const minExecutableLot = getMinExecutableStageLot(planSymbol);
-  const familyPill = plan?.executionSource ?? plan?.ladder?.e1.family;
   const pendingBlueprint = plan?.source === "pending-blueprint";
   const watchBlueprint = plan?.source === "watch-blueprint";
   const canExecuteSignal =
@@ -70,26 +69,53 @@ export function PlanCandidateCard({
         {
           stage: "E1",
           entry: fmtPrice(plan.entries.e1, signal.symbol),
-          lot: formatLotSize(plan.lotSize.e1, planSymbol),
+          lot: formatLotSize(plan.lotSize.e1),
+          lotBelowMinimum: !isExecutableStageLotValue(plan.lotSize.e1, planSymbol),
           stop: fmtPrice(plan.stops?.e1 ?? plan.sl, signal.symbol),
           target: formatOptionalPrice(plan.tps?.tp1, signal.symbol),
           rr: formatOptionalRatio(plan.rr?.tp1),
+          status: getStageStatus({
+            filled: plan.stageFills?.e1,
+            lot: plan.lotSize.e1,
+            minLot: minExecutableLot,
+            planState: plan.state,
+            planSource: plan.source,
+            symbol: planSymbol,
+          }),
         },
         {
           stage: "E2",
           entry: fmtPrice(plan.entries.e2, signal.symbol),
-          lot: formatLotSize(plan.lotSize.e2, planSymbol),
+          lot: formatLotSize(plan.lotSize.e2),
+          lotBelowMinimum: !isExecutableStageLotValue(plan.lotSize.e2, planSymbol),
           stop: fmtPrice(plan.stops?.e2 ?? plan.sl, signal.symbol),
           target: formatOptionalPrice(plan.tps?.tp2, signal.symbol),
           rr: formatOptionalRatio(plan.rr?.tp2),
+          status: getStageStatus({
+            filled: plan.stageFills?.e2,
+            lot: plan.lotSize.e2,
+            minLot: minExecutableLot,
+            planState: plan.state,
+            planSource: plan.source,
+            symbol: planSymbol,
+          }),
         },
         {
           stage: "E3",
           entry: fmtPrice(plan.entries.e3, signal.symbol),
-          lot: formatLotSize(plan.lotSize.e3, planSymbol),
+          lot: formatLotSize(plan.lotSize.e3),
+          lotBelowMinimum: !isExecutableStageLotValue(plan.lotSize.e3, planSymbol),
           stop: fmtPrice(plan.stops?.e3 ?? plan.sl, signal.symbol),
           target: formatOptionalPrice(plan.tps?.tp3, signal.symbol),
           rr: formatOptionalRatio(plan.rr?.tp3),
+          status: getStageStatus({
+            filled: plan.stageFills?.e3,
+            lot: plan.lotSize.e3,
+            minLot: minExecutableLot,
+            planState: plan.state,
+            planSource: plan.source,
+            symbol: planSymbol,
+          }),
         },
       ]
     : null;
@@ -112,7 +138,6 @@ export function PlanCandidateCard({
         },
       ]
     : null;
-  const showLadderStatus = Boolean(plan?.state || plan?.stageFills);
 
   return (
     <section
@@ -157,26 +182,29 @@ export function PlanCandidateCard({
             {price ? fmtPrice(value ?? price.mid, signal.symbol) : "--"}
           </span>
           {plan ? (
-            <MetaChip
-              tone={
-                plan.source === "backend-blueprint"
-                  ? "buy"
-                  : pendingBlueprint
-                    ? "pending"
-                    : watchBlueprint
-                      ? "info"
-                      : "violet"
-              }
-            >
-              {pendingBlueprint && <Lock className="h-3 w-3" />}
-              {pendingBlueprint
-                ? "UNCONFIRMED"
-                : watchBlueprint
-                  ? "WATCH BLUEPRINT"
-                  : plan.source === "backend-blueprint"
-                    ? "CONFIRMED"
-                    : plan.source}
-            </MetaChip>
+            <>
+              <MetaChip
+                tone={
+                  plan.source === "backend-blueprint"
+                    ? "buy"
+                    : pendingBlueprint
+                      ? "pending"
+                      : watchBlueprint
+                        ? "info"
+                        : "violet"
+                }
+              >
+                {pendingBlueprint && <Lock className="h-3 w-3" />}
+                {pendingBlueprint
+                  ? "PENDING BLUEPRINT"
+                  : watchBlueprint
+                    ? "WATCH BLUEPRINT"
+                    : plan.source === "backend-blueprint"
+                      ? "CONFIRMED"
+                      : plan.source}
+              </MetaChip>
+              {!signal.backendConfirmed && <MetaChip tone="pending">UNCONFIRMED</MetaChip>}
+            </>
           ) : (
             <MetaChip tone="neutral">NO BLUEPRINT</MetaChip>
           )}
@@ -189,7 +217,6 @@ export function PlanCandidateCard({
           backend confirmation.
         </DivergenceBanner>
       )}
-
 
       {watchBlueprint && (
         <WarningLine level="watch">
@@ -214,89 +241,68 @@ export function PlanCandidateCard({
 
       {skippedStageLots && plan && (
         <WarningLine level="warn">
-          Backend plan contains stage lots below {minExecutableLot.toFixed(2)}. The backend will
-          skip those stages and queue any remaining executable legs.
+          Some stages are below the {minExecutableLot.toFixed(2)} minimum lot for {planSymbol}. The
+          backend will skip those stages and queue any remaining executable legs.
         </WarningLine>
       )}
 
       {!executableStageLots && plan && (
         <WarningLine level="warn">
-          No backend stage lots meet the {minExecutableLot.toFixed(2)} execution minimum. Execution
-          blocked until the backend publishes executable sizing.
+          No backend stage lots meet the {minExecutableLot.toFixed(2)} minimum lot for {planSymbol}.
+          Execution blocked until the backend publishes executable sizing.
         </WarningLine>
       )}
 
       {plan ? (
         <div className="rounded-lg border border-bd bg-bg1/50 overflow-hidden">
-          <div className="grid gap-px bg-bd/60 lg:grid-cols-2 xl:grid-cols-[1.8fr_1fr_1fr_1fr]">
-            <PlanPanel title="Entries" tone="info">
-              <div className="overflow-x-auto -mx-3 px-3">
-                <div className="grid grid-cols-6 gap-x-2 gap-y-2 text-[10px] font-mono min-w-[300px]">
-                  <SectionHeaderCell>ENTRY</SectionHeaderCell>
-                  <SectionHeaderCell>Entry</SectionHeaderCell>
-                  <SectionHeaderCell>Lot</SectionHeaderCell>
-                  <SectionHeaderCell>SL</SectionHeaderCell>
-                  <SectionHeaderCell>TP</SectionHeaderCell>
-                  <SectionHeaderCell>RR</SectionHeaderCell>
-                  {entryRows!.map((row) => (
-                    <EntryRow key={row.stage} {...row} />
-                  ))}
-                </div>
+          <div className="border-b border-bd bg-bg1/70 px-3 py-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-[11px] font-mono uppercase tracking-wider text-info/80">
+                Entries
               </div>
-            </PlanPanel>
-
-            <PlanPanel title="Targets" tone="buy">
-              <div className="space-y-2">
-                {targetRows!.map((target) => (
-                  <StatRow
-                    key={target.label}
-                    label={target.label}
-                    value={target.price}
-                    sub={target.ratio}
-                    valueClass="text-buy"
-                  />
-                ))}
+              <div className="flex items-center gap-2">
+                {plan.state && <MetaPill>{plan.state}</MetaPill>}
+                {(plan.executionSource ?? plan.ladder?.e1.family) && (
+                  <MetaPill>{plan.executionSource ?? plan.ladder?.e1.family}</MetaPill>
+                )}
               </div>
-            </PlanPanel>
+            </div>
+            <div className="mt-2 space-y-1.5">
+              {entryRows!.map((row) => (
+                <ExecutionStageRow key={row.stage} {...row} />
+              ))}
+            </div>
+          </div>
 
-            <PlanPanel title="Stop & Risk" tone="sell">
-              <div className="space-y-2">
-                <StatRow
-                  label="SL"
-                  value={fmtPrice(plan.sl, signal.symbol)}
-                  valueClass="text-sell"
-                />
-                <StatRow
-                  label="Risk"
-                  value={fmtCurrency(plan.riskUSC, accountTelemetry?.currency)}
-                  sub={fmtLocalCurrency(plan.riskZAR, "ZAR")}
-                />
-                <StatRow
-                  label="DD impact"
-                  value={fmtPct(plan.drawdownImpactPct)}
-                  sub="of equity"
-                  valueClass="text-warn"
-                />
-              </div>
-            </PlanPanel>
+          <div className="grid gap-px bg-bd/60 md:grid-cols-[1.3fr_1fr]">
+            <TicketSummarySection title="Risk" tone="sell">
+              <InlineMetric
+                label="SL"
+                value={fmtPrice(plan.sl, signal.symbol)}
+                valueClass="text-sell"
+              />
+              <InlineMetric
+                label="Risk"
+                value={`${fmtCurrency(plan.riskUSC, accountTelemetry?.currency)} / ${fmtLocalCurrency(plan.riskZAR, "ZAR")}`}
+              />
+              <InlineMetric
+                label="DD"
+                value={fmtPct(plan.drawdownImpactPct)}
+                valueClass="text-warn"
+              />
+            </TicketSummarySection>
 
-            {showLadderStatus && (
-              <PlanPanel title="Ladder Status" tone="neutral">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-2 text-xs">
-                    <span className="font-mono uppercase tracking-wider text-mute">State</span>
-                    <span className="font-mono text-sm font-semibold">{plan.state ?? "--"}</span>
-                  </div>
-                  {plan.stageFills && (
-                    <div className="grid grid-cols-3 gap-2">
-                      <StageStatusChip label="E1" filled={plan.stageFills.e1} />
-                      <StageStatusChip label="E2" filled={plan.stageFills.e2} />
-                      <StageStatusChip label="E3" filled={plan.stageFills.e3} />
-                    </div>
-                  )}
-                </div>
-              </PlanPanel>
-            )}
+            <TicketSummarySection title="Targets" tone="buy">
+              {targetRows!.map((target) => (
+                <InlineMetric
+                  key={target.label}
+                  label={target.label}
+                  value={target.price}
+                  sub={target.ratio}
+                  valueClass="text-buy"
+                />
+              ))}
+            </TicketSummarySection>
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-bd bg-bg1/40 px-3 py-3">
@@ -358,37 +364,30 @@ export function PlanCandidateCard({
 
       {!signal.backendConfirmed && (
         <WarningLine level="warn">
-          Execution disabled until backend confirms this signal blueprint.
+          Execution remains disabled until backend confirmation.
         </WarningLine>
       )}
     </section>
   );
 }
 
-function PlanPanel({
+function TicketSummarySection({
   title,
   tone,
   children,
 }: {
   title: string;
-  tone: "buy" | "sell" | "info" | "neutral";
+  tone: "buy" | "sell";
   children: ReactNode;
 }) {
-  const accent =
-    tone === "buy"
-      ? "text-buy/80"
-      : tone === "sell"
-        ? "text-sell/80"
-        : tone === "info"
-          ? "text-info/80"
-          : "text-mute";
+  const accent = tone === "buy" ? "text-buy/80" : "text-sell/80";
 
   return (
-    <div className="bg-bg1/50 p-3">
-      <div className={cn("mb-3 text-[11px] font-mono uppercase tracking-wider", accent)}>
+    <div className="bg-bg1/50 px-3 py-2.5">
+      <div className={cn("mb-1.5 text-[11px] font-mono uppercase tracking-wider", accent)}>
         {title}
       </div>
-      {children}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">{children}</div>
     </div>
   );
 }
@@ -474,38 +473,56 @@ function MetaChip({
   );
 }
 
-function SectionHeaderCell({ children }: { children?: ReactNode }) {
-  return <div className="text-mute uppercase tracking-wider">{children}</div>;
-}
-
-function EntryRow({
+function ExecutionStageRow({
   stage,
   entry,
   lot,
+  lotBelowMinimum,
   stop,
   target,
   rr,
+  status,
 }: {
   stage: string;
   entry: string;
   lot: string;
+  lotBelowMinimum: boolean;
   stop: string;
   target: string;
   rr: string;
+  status: StageStatus;
 }) {
   return (
-    <>
-      <div className="text-dim">{stage}</div>
-      <div className="text-tx">{entry}</div>
-      <div className="text-tx">{lot}</div>
-      <div className="text-tx">{stop}</div>
-      <div className="text-buy">{target}</div>
-      <div className="text-info">{rr}</div>
-    </>
+    <div className="grid gap-2 rounded border border-bd/70 bg-bg2/40 px-2.5 py-2 text-[11px] font-mono sm:grid-cols-[2.25rem_1fr_.9fr_1fr_1fr_.65fr_auto] sm:items-center">
+      <div className="font-semibold text-dim">{stage}</div>
+      <StageMetric label="Entry" value={entry} />
+      <StageMetric label="Lot" value={lot} valueClass={lotBelowMinimum ? "text-warn" : "text-tx"} />
+      <StageMetric label="SL" value={stop} valueClass="text-sell" />
+      <StageMetric label="TP" value={target} valueClass="text-buy" />
+      <StageMetric label="RR" value={rr} valueClass="text-info" />
+      <StageStatusBadge status={status} />
+    </div>
   );
 }
 
-function StatRow({
+function StageMetric({
+  label,
+  value,
+  valueClass,
+}: {
+  label: string;
+  value: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-2 sm:block">
+      <span className="text-[9px] uppercase tracking-wider text-mute sm:hidden">{label}</span>
+      <span className={cn("tabular-nums", valueClass ?? "text-tx")}>{value}</span>
+    </div>
+  );
+}
+
+function InlineMetric({
   label,
   value,
   sub,
@@ -517,30 +534,32 @@ function StatRow({
   valueClass?: string;
 }) {
   return (
-    <div className="flex items-start gap-3">
-      <span className="text-[11px] font-mono uppercase tracking-wider text-mute min-w-[3.5rem] shrink-0">
-        {label}
-      </span>
-      <div className="flex flex-col">
-        {sub && <div className="text-[10px] font-mono text-mute">{sub}</div>}
-        <div className={cn("font-mono text-sm font-semibold", valueClass ?? "text-tx")}>
-          {value}
-        </div>
-      </div>
+    <div className="flex items-baseline gap-1.5 font-mono">
+      <span className="text-[10px] uppercase tracking-wider text-mute">{label}</span>
+      <span className={cn("font-semibold tabular-nums", valueClass ?? "text-tx")}>{value}</span>
+      {sub && <span className="text-[10px] text-info">{sub}</span>}
     </div>
   );
 }
 
-function StageStatusChip({ label, filled }: { label: string; filled: boolean }) {
+type StageStatus = {
+  label: string;
+  tone: "ready" | "pending" | "blocked" | "filled";
+};
+
+function StageStatusBadge({ status }: { status: StageStatus }) {
   return (
-    <div
+    <span
       className={cn(
-        "rounded px-2 py-1 text-center text-xs font-mono",
-        filled ? "bg-buy/20 text-buy" : "bg-bg2 text-dim",
+        "inline-flex w-fit items-center justify-center rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+        status.tone === "ready" && "border-buy/40 bg-buy/10 text-buy",
+        status.tone === "pending" && "border-info/40 bg-info/10 text-info",
+        status.tone === "blocked" && "border-warn/40 bg-warn/10 text-warn",
+        status.tone === "filled" && "border-buy/50 bg-buy/20 text-buy",
       )}
     >
-      {label} {filled ? "Filled" : "Pending"}
-    </div>
+      {status.label}
+    </span>
   );
 }
 
@@ -548,13 +567,51 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function formatLotSize(value: number | undefined, symbol?: string) {
+function getStageStatus({
+  filled,
+  lot,
+  minLot,
+  planState,
+  planSource,
+  symbol,
+}: {
+  filled?: boolean;
+  lot: number | undefined;
+  minLot: number;
+  planState?: TradePlan["state"];
+  planSource: TradePlan["source"];
+  symbol?: string;
+}): StageStatus {
+  if (filled) {
+    return { label: "Filled", tone: "filled" };
+  }
+
+  if (!isExecutableStageLotValue(lot, symbol)) {
+    return { label: `Below min ${minLot.toFixed(2)}`, tone: "blocked" };
+  }
+
+  if (planState === "INVALID") {
+    return { label: "Blocked", tone: "blocked" };
+  }
+
+  if (planSource === "pending-blueprint" || planSource === "watch-blueprint") {
+    return { label: "Pending", tone: "pending" };
+  }
+
+  return { label: "Ready", tone: "ready" };
+}
+
+function formatLotSize(value: number | undefined) {
   if (!isFiniteNumber(value)) {
     return "--";
   }
 
-  if (!isExecutableStageLotValue(value, symbol)) {
-    return `Below ${getMinExecutableStageLot(symbol).toFixed(2)} lot`;
+  if (value <= 0) {
+    return "--";
+  }
+
+  if (value < 0.01) {
+    return `${value.toFixed(3)} lot`;
   }
 
   return `${value.toFixed(2)} lot`;
