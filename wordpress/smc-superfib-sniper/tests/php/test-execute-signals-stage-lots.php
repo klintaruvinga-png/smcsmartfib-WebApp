@@ -48,12 +48,21 @@ $all_zero_signal = array(
     'status' => 'READY',
     'backend_confirmed' => 1,
 );
+$crypto_signal = array(
+    'id' => 'sig-crypto',
+    'user_id' => 77,
+    'symbol' => 'BTCUSD',
+    'direction' => 'LONG',
+    'status' => 'READY',
+    'backend_confirmed' => 1,
+);
 
 fib_test_seed_row('signals', $ready_signal);
 fib_test_seed_row('signals', $unconfirmed_signal);
 fib_test_seed_row('signals', $not_ready_signal);
 fib_test_seed_row('signals', $mixed_signal);
 fib_test_seed_row('signals', $all_zero_signal);
+fib_test_seed_row('signals', $crypto_signal);
 
 $plan = array(
     'entries' => array('e1' => 1.2505, 'e2' => 1.248, 'e3' => 1.2455),
@@ -100,18 +109,29 @@ fib_test_seed_row('trade_plans', array(
         'tps' => array('tp1' => 1.243, 'tp2' => 1.2475, 'tp3' => 1.254),
     )),
 ));
+fib_test_seed_row('trade_plans', array(
+    'signal_id' => 'sig-crypto',
+    'user_id' => 77,
+    'plan' => wp_json_encode(array(
+        'entries' => array('e1' => 68100.0, 'e2' => 67950.0, 'e3' => 67800.0),
+        'lotSize' => array('e1' => 0.01, 'e2' => 0.10, 'e3' => 0.09),
+        'stops' => array('e1' => 67500.0, 'e2' => 67400.0, 'e3' => 67300.0),
+        'sl' => 67400.0,
+        'tps' => array('tp1' => 68600.0, 'tp2' => 68900.0, 'tp3' => 69200.0),
+    )),
+));
 
 $instance = fib_test_make_rest_instance();
 $response = $instance->post_execute_signals(new WP_REST_Request(array(
-    'signalIds' => array('sig-ready', 'sig-unconfirmed', 'sig-armed', 'sig-mixed', 'sig-all-zero'),
+    'signalIds' => array('sig-ready', 'sig-unconfirmed', 'sig-armed', 'sig-mixed', 'sig-all-zero', 'sig-crypto'),
 )));
 $data = fib_test_response_data($response);
 
 fib_test_assert_same(true, $data['ok'], 'Execute signals response should report success');
-fib_test_assert_same(4, $data['queued'], 'Only executable READY/backend-confirmed stages should be queued');
+fib_test_assert_same(5, $data['queued'], 'Only executable READY/backend-confirmed stages should be queued');
 
 $queued_rows = fib_test_table_rows('trade_queue');
-fib_test_assert_same(4, count($queued_rows), 'Only executable READY/backend-confirmed stages should persist queue rows');
+fib_test_assert_same(5, count($queued_rows), 'Only executable READY/backend-confirmed stages should persist queue rows');
 
 $expected_stage_map = array(
     'e1' => array('lots' => 0.11, 'tp' => 1.258, 'sl' => 1.241),
@@ -153,12 +173,27 @@ fib_test_assert_true(is_array($mixed_row), 'Mixed-lot signal should queue the on
 $mixed_payload = json_decode($mixed_row['payload'], true);
 fib_test_assert_near(0.12, $mixed_payload['lots'], 0.000001, 'Mixed-lot stage should keep the executable stage lot size');
 
+$crypto_order_id = stage_order_id('sig-crypto', 'e2');
+$crypto_row = null;
+foreach ($queued_rows as $row) {
+    if (($row['id'] ?? null) === $crypto_order_id) {
+        $crypto_row = $row;
+        break;
+    }
+}
+
+fib_test_assert_true(is_array($crypto_row), 'Crypto signal should queue only the 0.10 lot stage');
+$crypto_payload = json_decode($crypto_row['payload'], true);
+fib_test_assert_near(0.10, $crypto_payload['lots'], 0.000001, 'Crypto executable stage should preserve the 0.10 lot size');
+
 foreach (array(
     stage_order_id('sig-mixed', 'e1'),
     stage_order_id('sig-mixed', 'e3'),
     stage_order_id('sig-all-zero', 'e1'),
     stage_order_id('sig-all-zero', 'e2'),
     stage_order_id('sig-all-zero', 'e3'),
+    stage_order_id('sig-crypto', 'e1'),
+    stage_order_id('sig-crypto', 'e3'),
 ) as $unexpected_order_id) {
     $unexpected_row = array_values(array_filter($queued_rows, function ($row) use ($unexpected_order_id) {
         return ($row['id'] ?? null) === $unexpected_order_id;

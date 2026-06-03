@@ -12,10 +12,10 @@ import { tickMotionHoldMs, tickMotionStyle, type TickMotionOptions } from "@/lib
 import type { PairPrice, SignalCandidate, TradePlan } from "@/types/sniper";
 import type { ReactNode } from "react";
 import {
+  getMinExecutableStageLot,
   hasExecutableStageLots,
   hasSkippedStageLots,
   isExecutableStageLotValue,
-  MIN_EXECUTABLE_STAGE_LOT,
 } from "@/routes/-plan.utils";
 
 const PLAN_CARD_TICK_MOTION: TickMotionOptions = {
@@ -53,6 +53,8 @@ export function PlanCandidateCard({
   const divergence = signal.computedBy === "frontend" && !signal.backendConfirmed;
   const executableStageLots = plan ? hasExecutableStageLots(plan) : true;
   const skippedStageLots = plan ? hasSkippedStageLots(plan) : false;
+  const planSymbol = plan?.symbol ?? signal.symbol;
+  const minExecutableLot = getMinExecutableStageLot(planSymbol);
   const familyPill = plan?.executionSource ?? plan?.ladder?.e1.family;
   const pendingBlueprint = plan?.source === "pending-blueprint";
   const watchBlueprint = plan?.source === "watch-blueprint";
@@ -68,7 +70,7 @@ export function PlanCandidateCard({
         {
           stage: "E1",
           entry: fmtPrice(plan.entries.e1, signal.symbol),
-          lot: formatLotSize(plan.lotSize.e1),
+          lot: formatLotSize(plan.lotSize.e1, planSymbol),
           stop: fmtPrice(plan.stops?.e1 ?? plan.sl, signal.symbol),
           target: formatOptionalPrice(plan.tps?.tp1, signal.symbol),
           rr: formatOptionalRatio(plan.rr?.tp1),
@@ -76,7 +78,7 @@ export function PlanCandidateCard({
         {
           stage: "E2",
           entry: fmtPrice(plan.entries.e2, signal.symbol),
-          lot: formatLotSize(plan.lotSize.e2),
+          lot: formatLotSize(plan.lotSize.e2, planSymbol),
           stop: fmtPrice(plan.stops?.e2 ?? plan.sl, signal.symbol),
           target: formatOptionalPrice(plan.tps?.tp2, signal.symbol),
           rr: formatOptionalRatio(plan.rr?.tp2),
@@ -84,7 +86,7 @@ export function PlanCandidateCard({
         {
           stage: "E3",
           entry: fmtPrice(plan.entries.e3, signal.symbol),
-          lot: formatLotSize(plan.lotSize.e3),
+          lot: formatLotSize(plan.lotSize.e3, planSymbol),
           stop: fmtPrice(plan.stops?.e3 ?? plan.sl, signal.symbol),
           target: formatOptionalPrice(plan.tps?.tp3, signal.symbol),
           rr: formatOptionalRatio(plan.rr?.tp3),
@@ -224,15 +226,15 @@ export function PlanCandidateCard({
 
       {skippedStageLots && plan && (
         <WarningLine level="warn">
-          Backend plan contains stage lots below {MIN_EXECUTABLE_STAGE_LOT.toFixed(2)}. The backend
-          will skip those stages and queue any remaining executable legs.
+          Backend plan contains stage lots below {minExecutableLot.toFixed(2)}. The backend will
+          skip those stages and queue any remaining executable legs.
         </WarningLine>
       )}
 
       {!executableStageLots && plan && (
         <WarningLine level="warn">
-          No backend stage lots meet the {MIN_EXECUTABLE_STAGE_LOT.toFixed(2)} execution minimum.
-          Execution blocked until the backend publishes executable sizing.
+          No backend stage lots meet the {minExecutableLot.toFixed(2)} execution minimum. Execution
+          blocked until the backend publishes executable sizing.
         </WarningLine>
       )}
 
@@ -556,13 +558,13 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function formatLotSize(value: number | undefined) {
+function formatLotSize(value: number | undefined, symbol?: string) {
   if (!isFiniteNumber(value)) {
     return "--";
   }
 
-  if (!isExecutableStageLotValue(value)) {
-    return `Below ${MIN_EXECUTABLE_STAGE_LOT.toFixed(2)} lot`;
+  if (!isExecutableStageLotValue(value, symbol)) {
+    return `Below ${getMinExecutableStageLot(symbol).toFixed(2)} lot`;
   }
 
   return `${value.toFixed(2)} lot`;

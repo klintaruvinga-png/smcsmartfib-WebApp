@@ -107,7 +107,12 @@ vi.mock("sonner", () => ({
 }));
 
 import { PlanPage } from "./-plan.page";
-import { hasExecutableStageLots, isTradePlanComplete } from "./-plan.utils";
+import {
+  getMinExecutableStageLot,
+  hasExecutableStageLots,
+  isExecutableStageLotValue,
+  isTradePlanComplete,
+} from "./-plan.utils";
 
 function buildSignal(overrides: Partial<SignalCandidate> = {}): SignalCandidate {
   return {
@@ -260,6 +265,69 @@ describe("hasExecutableStageLots", () => {
       hasExecutableStageLots(
         buildPlan({
           lotSize: { e1: 0, e2: 0.009, e3: 0 },
+        }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("getMinExecutableStageLot", () => {
+  const cases: Array<[string | undefined, number]> = [
+    ["EURUSD", 0.01],
+    ["GBPJPY", 0.01],
+    ["AUDUSD", 0.01],
+    [undefined, 0.01],
+    ["XAUUSD", 0.1],
+    ["GOLD", 0.1],
+    ["BTCUSD", 0.1],
+    ["ETHUSD", 0.1],
+    ["SOLUSD", 0.1],
+    ["US30", 0.1],
+    ["Wall Street 30", 0.1],
+    ["NAS100", 0.1],
+    ["US Tech 100", 0.1],
+    ["US SP 500", 0.1],
+    ["SPX500", 0.1],
+    ["GER40", 0.1],
+    ["DAX40", 0.1],
+  ];
+
+  it.each(cases)("resolves executable minimum for %s", (symbol, expected) => {
+    expect(getMinExecutableStageLot(symbol)).toBe(expected);
+  });
+});
+
+describe("isExecutableStageLotValue symbol-aware boundaries", () => {
+  const cases: Array<[number, string, boolean]> = [
+    [0.01, "BTCUSD", false],
+    [0.099, "BTCUSD", false],
+    [0.1, "BTCUSD", true],
+    [0.11, "BTCUSD", true],
+    [0.01, "XAUUSD", false],
+    [0.1, "XAUUSD", true],
+    [0.009, "EURUSD", false],
+    [0.01, "EURUSD", true],
+  ];
+
+  it.each(cases)("classifies lot %s for %s as executable=%s", (lot, symbol, expected) => {
+    expect(isExecutableStageLotValue(lot, symbol)).toBe(expected);
+  });
+
+  it("uses the plan symbol when checking executable stage lots", () => {
+    expect(
+      hasExecutableStageLots(
+        buildPlan({
+          symbol: "BTCUSD",
+          lotSize: { e1: 0.01, e2: 0.09, e3: 0.1 },
+        }),
+      ),
+    ).toBe(true);
+
+    expect(
+      hasExecutableStageLots(
+        buildPlan({
+          symbol: "BTCUSD",
+          lotSize: { e1: 0.01, e2: 0.09, e3: 0 },
         }),
       ),
     ).toBe(false);
@@ -461,6 +529,28 @@ describe("PlanPage ranking and execution guards", () => {
 
     expect(
       screen.getByText(/No backend stage lots meet the 0\.01 execution minimum\./),
+    ).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("uses the symbol-specific minimum in lot labels and execution warnings", () => {
+    renderPlanPage({
+      signals: [buildSignal({ symbol: "BTCUSD" })],
+      ladders: [
+        buildPlan({
+          symbol: "BTCUSD",
+          lotSize: { e1: 0.01, e2: 0.09, e3: 0 },
+        }),
+      ],
+      watchlist: ["BTCUSD"],
+    });
+
+    const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
+    expect(cardText).toContain("Below 0.10 lot");
+    expect(
+      screen.getByText(/No backend stage lots meet the 0\.10 execution minimum\./),
     ).toBeTruthy();
     expect(
       (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,

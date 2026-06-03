@@ -5045,9 +5045,10 @@ final class SMC_SuperFib_Sniper_REST {
             }
 
             $plan = json_decode($plan_row['plan'], true);
+            $min_lot = $this->get_min_executable_lot($signal['symbol'] ?? '');
             foreach (array('e1', 'e2', 'e3') as $stage) {
                 $stage_lots = isset($plan['lotSize'][$stage]) ? (float) $plan['lotSize'][$stage] : 0.0;
-                if ($stage_lots < 0.01) {
+                if ($stage_lots < $min_lot) {
                     continue;
                 }
 
@@ -6636,6 +6637,12 @@ final class SMC_SuperFib_Sniper_REST {
             // Metals
             'GOLD'        => 'XAUUSD',
             'SILVER'      => 'XAGUSD',
+            // Germany 40 / DAX broker aliases
+            'GER40'       => 'GER40',
+            'DAX'         => 'GER40',
+            'DAX40'       => 'GER40',
+            'GERMANY40'   => 'GER40',
+            'DEDE40'      => 'GER40',
         );
         $normalized = $this->normalize_symbol_token($symbol);
         return isset($aliases[$normalized]) ? $aliases[$normalized] : $normalized;
@@ -8782,6 +8789,7 @@ final class SMC_SuperFib_Sniper_REST {
             'US30'   => array('type' => 'index',  'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
             'NAS100' => array('type' => 'index',  'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
             'SPX500' => array('type' => 'index',  'pip_size' => 0.1,    'contract_size' => 1, 'pip_val' => 0.1),
+            'GER40'  => array('type' => 'index',  'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
             // MACRO / REFERENCE — no lot sizing; informational only
             'DXYUSD' => array('type' => 'reference', 'pip_size' => 0.001, 'contract_size' => 0, 'pip_val' => 0.0),
             // EXOTIC FOREX
@@ -8800,6 +8808,12 @@ final class SMC_SuperFib_Sniper_REST {
         $key = $this->map_symbol_aliases($symbol);
         $specs = $this->instrument_specs();
         return isset($specs[$key]) ? $specs[$key] : null;
+    }
+
+    private function get_min_executable_lot($symbol) {
+        $spec = $this->get_instrument_spec($symbol);
+        $type = is_array($spec) ? (string) ($spec['type'] ?? '') : '';
+        return in_array($type, array('metal', 'crypto', 'index'), true) ? 0.10 : 0.01;
     }
 
     private function watchlist_service() {
