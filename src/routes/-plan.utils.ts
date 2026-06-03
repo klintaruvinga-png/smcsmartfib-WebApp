@@ -39,7 +39,7 @@ const INSTRUMENT_TYPES: Record<string, InstrumentType> = {
 
 export const MIN_EXECUTABLE_STAGE_LOT = 0.01;
 
-const BROKER_SUFFIXES = ["MICRO", "PRO", "ECN", "STP", "RAW", "M", "R", "C"] as const;
+const BROKER_SUFFIXES = ["MICRO", "PRO", "ECN", "STP", "RAW", "M", "R", "A", "B", "C"] as const;
 
 function resolveKnownPlanToken(token: string): string | null {
   const aliased = SYMBOL_ALIASES[token] ?? token;
