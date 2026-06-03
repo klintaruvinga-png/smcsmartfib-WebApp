@@ -23,4 +23,13 @@ describe('generate-pine-levels-v13.cjs output contract', () => {
     expect(source).toMatch(/const MT5_FILE\s*=\s*path\.resolve\(getArg\('--mt5-file'\) \|\| path\.join\(REPORTS_DIR, 'mt5-levels\.json'\)\)/);
     expect(source).not.toMatch(/const OUTPUT_LEVELS\s*=\s*path\.join\(REPO_ROOT, 'reports', 'phase4-parity', 'pine-levels\.json'\)/);
   });
+
+  test('uses caller supplied run timestamp for generated metadata', () => {
+    const source = readGenerator();
+
+    expect(source).toContain("getArg('--run-ts') || new Date().toISOString()");
+    expect(source).toMatch(/const RUN_TS\s*=/);
+    expect(source).toContain('generated_at: RUN_TS');
+    expect(source).not.toContain('generated_at: new Date().toISOString()');
+  });
 });

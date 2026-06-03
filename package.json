@@ -17,7 +17,10 @@
     "pipeline:start": "node scripts/start-pipeline-runner.js",
     "pipeline:reset": "node scripts/reset-pipeline.js",
     "prepare": "git config core.hooksPath .githooks || true",
-    "validate:impl": "node scripts/validate-implementation.mjs"
+    "validate:impl": "node scripts/validate-implementation.mjs",
+    "parity": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-phase4-parity.ps1",
+    "parity:dry": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-phase4-parity.ps1 -DryRun",
+    "parity:expanded": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-phase4-parity.ps1 -ExpandedAudit"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",

@@ -4,6 +4,7 @@ import path from 'node:path';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const scriptPath = path.join(repoRoot, 'scripts', 'run-phase4-parity.ps1');
+const packageJsonPath = path.join(repoRoot, 'package.json');
 
 describe('run-phase4-parity.ps1 automation contract', () => {
   const readScript = () => fs.readFileSync(scriptPath, 'utf8');
@@ -51,6 +52,17 @@ describe('run-phase4-parity.ps1 automation contract', () => {
     expect(source).toContain('--out');
   });
 
+  test('captures one canonical run timestamp and passes it to Node and PHP tools', () => {
+    const source = readScript();
+
+    expect(source).toContain('$runInstant = [DateTimeOffset]::UtcNow');
+    expect(source).toMatch(/\$runTs\s*=\s*\$runInstant\.ToString\("o"\)/);
+    expect(source).toMatch(/\$timestamp\s*=\s*\$runInstant\.ToString\("yyyy-MM-dd_HHmmss"\)/);
+    expect(source).toMatch(/"--run-ts",\s*\$runTs/);
+    expect(source.match(/"--run-ts",\s*\$runTs/g)).toHaveLength(2);
+    expect(source).not.toContain('Get-Date -Format "yyyy-MM-dd_HHmmss"');
+  });
+
   test('writes timestamped gate artifacts and updates the tracker', () => {
     const source = readScript();
 
@@ -69,5 +81,13 @@ describe('run-phase4-parity.ps1 automation contract', () => {
     expect(source).toContain('NAS100');
     expect(source).toContain('skipping MT5 export');
     expect(source).toContain('skipping validator');
+  });
+
+  test('package scripts expose short Windows PowerShell parity aliases', () => {
+    const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+
+    expect(pkg.scripts.parity).toBe('powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-phase4-parity.ps1');
+    expect(pkg.scripts['parity:dry']).toBe('powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-phase4-parity.ps1 -DryRun');
+    expect(pkg.scripts['parity:expanded']).toBe('powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-phase4-parity.ps1 -ExpandedAudit');
   });
 });
