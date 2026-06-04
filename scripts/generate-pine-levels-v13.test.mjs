@@ -80,6 +80,97 @@ describe('generate-pine-levels-v13.cjs output contract', () => {
     expect(new Set(levels.map((row) => row.timeframe))).toEqual(new Set(['H1']));
   });
 
+  test('writes standalone anchor debug records without changing level rows', () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'smc-pine-anchor-debug-'));
+    const candleDir = path.join(tempRoot, 'data');
+    const reportsDir = path.join(tempRoot, 'reports');
+    fs.mkdirSync(candleDir, { recursive: true });
+    fs.mkdirSync(reportsDir, { recursive: true });
+
+    const candles = [];
+    const start = Date.UTC(2026, 4, 18, 0, 0, 0);
+    const end = Date.UTC(2026, 5, 8, 0, 0, 0);
+    let i = 0;
+    for (let timeMs = start; timeMs <= end; timeMs += 15 * 60 * 1000) {
+      const dayOffset = Math.floor(i / 96);
+      const base = 1.12 + dayOffset * 0.002 + (i % 96) * 0.00001;
+      candles.push({
+        time: new Date(timeMs).toISOString(),
+        open: base,
+        high: base + 0.003,
+        low: base - 0.003,
+        close: base + 0.0001,
+      });
+      i++;
+    }
+
+    fs.writeFileSync(path.join(candleDir, 'EURUSD_M15.json'), JSON.stringify(candles));
+    const mt5File = path.join(reportsDir, 'mt5-levels.json');
+    fs.writeFileSync(mt5File, '[]');
+    const mt5Mtime = new Date(end + 60 * 1000);
+    fs.utimesSync(mt5File, mt5Mtime, mt5Mtime);
+
+    execFileSync(process.execPath, [
+      generatorPath,
+      '--candle-dir', candleDir,
+      '--mt5-file', mt5File,
+      '--reports-dir', reportsDir,
+      '--run-ts', '2026-06-05T00:00:00.000Z',
+      '--symbols', 'EURUSD',
+      '--timeframes', 'M15',
+    ], { encoding: 'utf8' });
+
+    const levels = JSON.parse(fs.readFileSync(path.join(reportsDir, 'pine-levels.json'), 'utf8'));
+    expect(levels).toHaveLength(32);
+    expect(levels[0]).toEqual(expect.objectContaining({
+      symbol: 'EURUSD',
+      timeframe: 'M15',
+      family: expect.any(String),
+      ratio: expect.any(Number),
+      price: expect.any(Number),
+    }));
+    expect(levels[0]).not.toHaveProperty('anchor_debug');
+
+    const debug = JSON.parse(fs.readFileSync(path.join(reportsDir, 'pine-anchor-debug.json'), 'utf8'));
+    expect(debug).toHaveLength(2);
+
+    const ltf = debug.find((row) => row.family === 'LTF_SF');
+    expect(ltf).toEqual(expect.objectContaining({
+      symbol: 'EURUSD',
+      timeframe: 'M15',
+      family: 'LTF_SF',
+      session_tf: 'Daily',
+      authority_tf: 'Weekly',
+      compression_threshold: 0.002,
+      anchor_high: expect.any(Number),
+      anchor_low: expect.any(Number),
+      anchor_range: expect.any(Number),
+    }));
+    expect(ltf.components.map((component) => component.slot)).toEqual(['F1', 'F2', 'F3']);
+    expect(ltf.components[0]).toEqual(expect.objectContaining({
+      key: expect.any(Number),
+      high: expect.any(Number),
+      low: expect.any(Number),
+      range: expect.any(Number),
+      compression_pass: true,
+      weight: expect.any(Number),
+      candle_count: expect.any(Number),
+      first_candle: expect.stringMatching(/^2026-/),
+      last_candle: expect.stringMatching(/^2026-/),
+    }));
+
+    const htf = debug.find((row) => row.family === 'HTF_AF');
+    expect(htf).toEqual(expect.objectContaining({
+      source: 'auth_f1',
+      key: expect.any(Number),
+      high: expect.any(Number),
+      low: expect.any(Number),
+      candle_count: expect.any(Number),
+      first_candle: expect.stringMatching(/^2026-/),
+      last_candle: expect.stringMatching(/^2026-/),
+    }));
+  });
+
   test('rounds jittered M15 source times before assigning aggregation buckets', () => {
     const source = readGenerator();
     const helperStart = source.includes('function roundToNearestMinuteMs')

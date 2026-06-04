@@ -35,6 +35,7 @@
  * Outputs:
  *   <reports-dir>/pine-levels.json          - pure 384-row validator array
  *   <reports-dir>/pine-levels.metadata.json - debug/audit metadata
+ *   <reports-dir>/pine-anchor-debug.json    - anchor ingredient diagnostics
  *
  * Guards:
  *   - Fails if any required M15 source candle file is missing
@@ -68,6 +69,7 @@ const REPORTS_DIR   = path.resolve(getArg('--reports-dir') || path.join(REPO_ROO
 const RUN_TS        = getArg('--run-ts') || new Date().toISOString();
 const OUTPUT_LEVELS = path.join(REPORTS_DIR, 'pine-levels.json');
 const OUTPUT_META   = path.join(REPORTS_DIR, 'pine-levels.metadata.json');
+const OUTPUT_ANCHOR_DEBUG = path.join(REPORTS_DIR, 'pine-anchor-debug.json');
 const CANDLE_DIR    = path.resolve(getArg('--candle-dir') || path.join(REPO_ROOT, 'data'));
 const MT5_FILE      = path.resolve(getArg('--mt5-file') || path.join(REPORTS_DIR, 'mt5-levels.json'));
 
@@ -269,11 +271,22 @@ function buildCompletedSessions(candles, sessionTf) {
         const key = getSessionKey(c.timeMs, sessionTf);
         if (!cur || cur.key !== key) {
             if (cur) sessions.push(cur);
-            cur = { key, high: c.high, low: c.low, open: c.open, close: c.close, startMs: c.timeMs };
+            cur = {
+                key,
+                high: c.high,
+                low: c.low,
+                open: c.open,
+                close: c.close,
+                startMs: c.timeMs,
+                endMs: c.timeMs,
+                candleCount: 1,
+            };
         } else {
             cur.high  = Math.max(cur.high, c.high);
             cur.low   = Math.min(cur.low, c.low);
             cur.close = c.close;
+            cur.endMs = c.timeMs;
+            cur.candleCount++;
         }
     }
     if (cur) sessions.push(cur);
@@ -302,6 +315,29 @@ function compressionThreshold(symbol) {
 // Per-session compression check. Mirrors EA f1v/f2v/f3v logic.
 function sessionPassesCompression(session, threshold) {
     return session && (session.high - session.low) >= threshold;
+}
+
+function isoOrBlank(timeMs) {
+    return Number.isFinite(timeMs) ? new Date(timeMs).toISOString() : '';
+}
+
+function sessionRange(session) {
+    return session ? session.high - session.low : null;
+}
+
+function buildAnchorComponent(slot, session, compressionPass, weight) {
+    return {
+        slot,
+        key: session ? session.key : null,
+        high: session ? session.high : null,
+        low: session ? session.low : null,
+        range: sessionRange(session),
+        compression_pass: !!compressionPass,
+        weight,
+        candle_count: session ? session.candleCount : 0,
+        first_candle: session ? isoOrBlank(session.startMs) : '',
+        last_candle: session ? isoOrBlank(session.endMs) : '',
+    };
 }
 
 // ---- LTF_SF anchor with per-session compression filtering ----
@@ -364,6 +400,11 @@ function computeLtfAnchorWithCompression(candles, sessionTf, threshold) {
 
     return {
         high, low,
+        components: [
+            buildAnchorComponent('F1', f1, f1v, wf1),
+            buildAnchorComponent('F2', f2, f2v, wf2),
+            buildAnchorComponent('F3', f3, f3v, wf3),
+        ],
         dbg: {
             f1_key: f1 ? f1.key : null,
             f2_key: f2 ? f2.key : null,
@@ -392,7 +433,44 @@ function computeHtfAnchorWithCompression(candles, authorityTf, threshold) {
     return {
         high: authF1.high,
         low:  authF1.low,
+        authority_component: {
+            source: 'auth_f1',
+            key: authF1.key,
+            high: authF1.high,
+            low: authF1.low,
+            range: authF1.high - authF1.low,
+            candle_count: authF1.candleCount,
+            first_candle: isoOrBlank(authF1.startMs),
+            last_candle: isoOrBlank(authF1.endMs),
+        },
         dbg: { anchor_key: authF1.key, anchor: 'auth_f1' }
+    };
+}
+
+function buildAnchorDebugRecord(symbol, timeframe, family, sessionTf, authorityTf, threshold, anchor) {
+    const base = {
+        symbol,
+        timeframe,
+        family,
+        session_tf: sessionTf,
+        authority_tf: authorityTf,
+        anchor_high: anchor.high,
+        anchor_low: anchor.low,
+        anchor_range: anchor.high - anchor.low,
+        compression_threshold: threshold,
+    };
+
+    if (family === 'LTF_SF') {
+        return {
+            ...base,
+            components: anchor.components,
+        };
+    }
+
+    return {
+        ...base,
+        ...anchor.authority_component,
+        components: [],
     };
 }
 
@@ -485,6 +563,7 @@ function main() {
     console.log('[generate-pine-levels-v13] Computing levels...');
     const levels   = [];
     const metaRows = [];
+    const anchorDebugRows = [];
 
     for (const sym of SYMBOLS) {
         const sourceCandles = loadSourceCandles(sym);
@@ -528,6 +607,7 @@ function main() {
                     anchor_low:  anchor.low,
                     dbg: anchor.dbg,
                 });
+                anchorDebugRows.push(buildAnchorDebugRecord(sym, tf, family, sessionTf, authorityTf, threshold, anchor));
             }
         }
     }
@@ -563,6 +643,8 @@ function main() {
     };
     fs.writeFileSync(OUTPUT_META, JSON.stringify(metadata, null, 2));
     console.log(`[generate-pine-levels-v13] Wrote metadata -> ${OUTPUT_META}`);
+    fs.writeFileSync(OUTPUT_ANCHOR_DEBUG, JSON.stringify(anchorDebugRows, null, 2));
+    console.log(`[generate-pine-levels-v13] Wrote anchor debug -> ${OUTPUT_ANCHOR_DEBUG}`);
     console.log('[generate-pine-levels-v13] Done.');
 }
 
