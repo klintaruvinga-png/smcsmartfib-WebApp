@@ -54,7 +54,10 @@ export function PlanCandidateCard({
   const executableStageLots = plan ? hasExecutableStageLots(plan) : true;
   const skippedStageLots = plan ? hasSkippedStageLots(plan) : false;
   const planSymbol = plan?.symbol ?? signal.symbol;
-  const minExecutableLot = getMinExecutableStageLot(planSymbol);
+  const minExecutableLot =
+    plan?.minExecutableLot && Number.isFinite(plan.minExecutableLot) && plan.minExecutableLot > 0
+      ? plan.minExecutableLot
+      : getMinExecutableStageLot(planSymbol);
   const pendingBlueprint = plan?.source === "pending-blueprint";
   const watchBlueprint = plan?.source === "watch-blueprint";
   const canExecuteSignal =
@@ -70,7 +73,11 @@ export function PlanCandidateCard({
           stage: "E1",
           entry: fmtPrice(plan.entries.e1, signal.symbol),
           lot: formatLotSize(plan.lotSize.e1, minExecutableLot),
-          lotBelowMinimum: !isExecutableStageLotValue(plan.lotSize.e1, planSymbol),
+          lotBelowMinimum: !isExecutableStageLotValue(
+            plan.lotSize.e1,
+            planSymbol,
+            minExecutableLot,
+          ),
           stop: fmtPrice(plan.stops?.e1 ?? plan.sl, signal.symbol),
           target: formatOptionalPrice(plan.tps?.tp1, signal.symbol),
           rr: formatOptionalRatio(plan.rr?.tp1),
@@ -80,14 +87,17 @@ export function PlanCandidateCard({
             minLot: minExecutableLot,
             planState: plan.state,
             planSource: plan.source,
-            symbol: planSymbol,
           }),
         },
         {
           stage: "E2",
           entry: fmtPrice(plan.entries.e2, signal.symbol),
           lot: formatLotSize(plan.lotSize.e2, minExecutableLot),
-          lotBelowMinimum: !isExecutableStageLotValue(plan.lotSize.e2, planSymbol),
+          lotBelowMinimum: !isExecutableStageLotValue(
+            plan.lotSize.e2,
+            planSymbol,
+            minExecutableLot,
+          ),
           stop: fmtPrice(plan.stops?.e2 ?? plan.sl, signal.symbol),
           target: formatOptionalPrice(plan.tps?.tp2, signal.symbol),
           rr: formatOptionalRatio(plan.rr?.tp2),
@@ -97,14 +107,17 @@ export function PlanCandidateCard({
             minLot: minExecutableLot,
             planState: plan.state,
             planSource: plan.source,
-            symbol: planSymbol,
           }),
         },
         {
           stage: "E3",
           entry: fmtPrice(plan.entries.e3, signal.symbol),
           lot: formatLotSize(plan.lotSize.e3, minExecutableLot),
-          lotBelowMinimum: !isExecutableStageLotValue(plan.lotSize.e3, planSymbol),
+          lotBelowMinimum: !isExecutableStageLotValue(
+            plan.lotSize.e3,
+            planSymbol,
+            minExecutableLot,
+          ),
           stop: fmtPrice(plan.stops?.e3 ?? plan.sl, signal.symbol),
           target: formatOptionalPrice(plan.tps?.tp3, signal.symbol),
           rr: formatOptionalRatio(plan.rr?.tp3),
@@ -114,7 +127,6 @@ export function PlanCandidateCard({
             minLot: minExecutableLot,
             planState: plan.state,
             planSource: plan.source,
-            symbol: planSymbol,
           }),
         },
       ]
@@ -573,20 +585,18 @@ function getStageStatus({
   minLot,
   planState,
   planSource,
-  symbol,
 }: {
   filled?: boolean;
   lot: number | undefined;
   minLot: number;
   planState?: TradePlan["state"];
   planSource: TradePlan["source"];
-  symbol?: string;
 }): StageStatus {
   if (filled) {
     return { label: "Filled", tone: "filled" };
   }
 
-  if (!isExecutableStageLotValue(lot, symbol)) {
+  if (!isFiniteNumber(lot) || lot < minLot) {
     return { label: `Below min ${minLot.toFixed(2)}`, tone: "blocked" };
   }
 

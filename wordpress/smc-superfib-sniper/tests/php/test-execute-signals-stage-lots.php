@@ -56,6 +56,30 @@ $crypto_signal = array(
     'status' => 'READY',
     'backend_confirmed' => 1,
 );
+$usdzar_signal = array(
+    'id' => 'sig-usdzar',
+    'user_id' => 77,
+    'symbol' => 'USDZAR',
+    'direction' => 'SHORT',
+    'status' => 'READY',
+    'backend_confirmed' => 1,
+);
+$usdzar_suffix_signal = array(
+    'id' => 'sig-usdzar-suffix',
+    'user_id' => 77,
+    'symbol' => 'USDZAR.pro',
+    'direction' => 'SHORT',
+    'status' => 'READY',
+    'backend_confirmed' => 1,
+);
+$synced_forex_signal = array(
+    'id' => 'sig-synced-forex',
+    'user_id' => 77,
+    'symbol' => 'EURUSD',
+    'direction' => 'LONG',
+    'status' => 'READY',
+    'backend_confirmed' => 1,
+);
 
 fib_test_seed_row('signals', $ready_signal);
 fib_test_seed_row('signals', $unconfirmed_signal);
@@ -63,6 +87,9 @@ fib_test_seed_row('signals', $not_ready_signal);
 fib_test_seed_row('signals', $mixed_signal);
 fib_test_seed_row('signals', $all_zero_signal);
 fib_test_seed_row('signals', $crypto_signal);
+fib_test_seed_row('signals', $usdzar_signal);
+fib_test_seed_row('signals', $usdzar_suffix_signal);
+fib_test_seed_row('signals', $synced_forex_signal);
 
 $plan = array(
     'entries' => array('e1' => 1.2505, 'e2' => 1.248, 'e3' => 1.2455),
@@ -120,18 +147,60 @@ fib_test_seed_row('trade_plans', array(
         'tps' => array('tp1' => 68600.0, 'tp2' => 68900.0, 'tp3' => 69200.0),
     )),
 ));
+fib_test_seed_row('trade_plans', array(
+    'signal_id' => 'sig-usdzar',
+    'user_id' => 77,
+    'plan' => wp_json_encode(array(
+        'entries' => array('e1' => 16.30725, 'e2' => 16.34590, 'e3' => 16.38470),
+        'lotSize' => array('e1' => 0.01, 'e2' => 0.09, 'e3' => 0.10),
+        'stops' => array('e1' => 16.34605, 'e2' => 16.38485, 'e3' => 16.44306),
+        'sl' => 16.32718,
+        'tps' => array('tp1' => 16.26844, 'tp2' => 16.22964, 'tp3' => 16.19084),
+    )),
+));
+fib_test_seed_row('trade_plans', array(
+    'signal_id' => 'sig-usdzar-suffix',
+    'user_id' => 77,
+    'plan' => wp_json_encode(array(
+        'entries' => array('e1' => 16.30725, 'e2' => 16.34590, 'e3' => 16.38470),
+        'lotSize' => array('e1' => 0.01, 'e2' => 0.09, 'e3' => 0.10),
+        'stops' => array('e1' => 16.34605, 'e2' => 16.38485, 'e3' => 16.44306),
+        'sl' => 16.32718,
+        'tps' => array('tp1' => 16.26844, 'tp2' => 16.22964, 'tp3' => 16.19084),
+    )),
+));
+fib_test_seed_row('trade_plans', array(
+    'signal_id' => 'sig-synced-forex',
+    'user_id' => 77,
+    'plan' => wp_json_encode(array(
+        'entries' => array('e1' => 1.101, 'e2' => 1.1005, 'e3' => 1.1000),
+        'lotSize' => array('e1' => 0.01, 'e2' => 0.09, 'e3' => 0.10),
+        'stops' => array('e1' => 1.095, 'e2' => 1.0945, 'e3' => 1.0940),
+        'sl' => 1.095,
+        'tps' => array('tp1' => 1.106, 'tp2' => 1.108, 'tp3' => 1.110),
+    )),
+));
+fib_test_seed_row('symbol_sync', array(
+    'user_id' => 77,
+    'account_id' => 'acct-1',
+    'terminal_id' => 'term-1',
+    'broker_symbol' => 'EURUSD.z',
+    'normalized_symbol' => 'EURUSD',
+    'min_lot' => 0.10,
+    'last_seen_at' => '2026-06-04T10:00:00Z',
+));
 
 $instance = fib_test_make_rest_instance();
 $response = $instance->post_execute_signals(new WP_REST_Request(array(
-    'signalIds' => array('sig-ready', 'sig-unconfirmed', 'sig-armed', 'sig-mixed', 'sig-all-zero', 'sig-crypto'),
+    'signalIds' => array('sig-ready', 'sig-unconfirmed', 'sig-armed', 'sig-mixed', 'sig-all-zero', 'sig-crypto', 'sig-usdzar', 'sig-usdzar-suffix', 'sig-synced-forex'),
 )));
 $data = fib_test_response_data($response);
 
 fib_test_assert_same(true, $data['ok'], 'Execute signals response should report success');
-fib_test_assert_same(5, $data['queued'], 'Only executable READY/backend-confirmed stages should be queued');
+fib_test_assert_same(8, $data['queued'], 'Only executable READY/backend-confirmed stages should be queued');
 
 $queued_rows = fib_test_table_rows('trade_queue');
-fib_test_assert_same(5, count($queued_rows), 'Only executable READY/backend-confirmed stages should persist queue rows');
+fib_test_assert_same(8, count($queued_rows), 'Only executable READY/backend-confirmed stages should persist queue rows');
 
 $expected_stage_map = array(
     'e1' => array('lots' => 0.11, 'tp' => 1.258, 'sl' => 1.241),
@@ -186,6 +255,45 @@ fib_test_assert_true(is_array($crypto_row), 'Crypto signal should queue only the
 $crypto_payload = json_decode($crypto_row['payload'], true);
 fib_test_assert_near(0.10, $crypto_payload['lots'], 0.000001, 'Crypto executable stage should preserve the 0.10 lot size');
 
+$usdzar_order_id = stage_order_id('sig-usdzar', 'e3');
+$usdzar_row = null;
+foreach ($queued_rows as $row) {
+    if (($row['id'] ?? null) === $usdzar_order_id) {
+        $usdzar_row = $row;
+        break;
+    }
+}
+
+fib_test_assert_true(is_array($usdzar_row), 'USDZAR must queue only the 0.10 lot stage');
+$usdzar_payload = json_decode($usdzar_row['payload'], true);
+fib_test_assert_near(0.10, $usdzar_payload['lots'], 0.000001, 'USDZAR executable stage should preserve the 0.10 lot size');
+
+$usdzar_suffix_order_id = stage_order_id('sig-usdzar-suffix', 'e3');
+$usdzar_suffix_row = null;
+foreach ($queued_rows as $row) {
+    if (($row['id'] ?? null) === $usdzar_suffix_order_id) {
+        $usdzar_suffix_row = $row;
+        break;
+    }
+}
+
+fib_test_assert_true(is_array($usdzar_suffix_row), 'USDZAR broker-suffix symbol must queue only the 0.10 lot stage');
+$usdzar_suffix_payload = json_decode($usdzar_suffix_row['payload'], true);
+fib_test_assert_near(0.10, $usdzar_suffix_payload['lots'], 0.000001, 'USDZAR broker-suffix executable stage should preserve the 0.10 lot size');
+
+$synced_forex_order_id = stage_order_id('sig-synced-forex', 'e3');
+$synced_forex_row = null;
+foreach ($queued_rows as $row) {
+    if (($row['id'] ?? null) === $synced_forex_order_id) {
+        $synced_forex_row = $row;
+        break;
+    }
+}
+
+fib_test_assert_true(is_array($synced_forex_row), 'Broker-synced forex min lot must queue only the 0.10 lot stage');
+$synced_forex_payload = json_decode($synced_forex_row['payload'], true);
+fib_test_assert_near(0.10, $synced_forex_payload['lots'], 0.000001, 'Broker-synced forex executable stage should preserve the 0.10 lot size');
+
 foreach (array(
     stage_order_id('sig-mixed', 'e1'),
     stage_order_id('sig-mixed', 'e3'),
@@ -194,6 +302,12 @@ foreach (array(
     stage_order_id('sig-all-zero', 'e3'),
     stage_order_id('sig-crypto', 'e1'),
     stage_order_id('sig-crypto', 'e3'),
+    stage_order_id('sig-usdzar', 'e1'),
+    stage_order_id('sig-usdzar', 'e2'),
+    stage_order_id('sig-usdzar-suffix', 'e1'),
+    stage_order_id('sig-usdzar-suffix', 'e2'),
+    stage_order_id('sig-synced-forex', 'e1'),
+    stage_order_id('sig-synced-forex', 'e2'),
 ) as $unexpected_order_id) {
     $unexpected_row = array_values(array_filter($queued_rows, function ($row) use ($unexpected_order_id) {
         return ($row['id'] ?? null) === $unexpected_order_id;

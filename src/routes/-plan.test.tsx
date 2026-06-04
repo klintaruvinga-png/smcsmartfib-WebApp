@@ -298,6 +298,8 @@ describe("getMinExecutableStageLot", () => {
     ["SPX500", 0.1],
     ["GER40", 0.1],
     ["DAX40", 0.1],
+    ["USDZAR", 0.1],
+    ["USDZAR.pro", 0.1],
   ];
 
   it.each(cases)("resolves executable minimum for %s", (symbol, expected) => {
@@ -320,6 +322,9 @@ describe("isExecutableStageLotValue symbol-aware boundaries", () => {
     [0.01, "XAUUSDm", false],
     [0.01, "XAUUSD.a", false],
     [0.1, "NAS100.r", true],
+    [0.01, "USDZAR", false],
+    [0.099, "USDZAR", false],
+    [0.1, "USDZAR", true],
     [0.009, "EURUSD", false],
     [0.01, "EURUSD", true],
   ];
@@ -342,6 +347,28 @@ describe("isExecutableStageLotValue symbol-aware boundaries", () => {
       hasExecutableStageLots(
         buildPlan({
           symbol: "BTCUSD",
+          lotSize: { e1: 0.01, e2: 0.09, e3: 0 },
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("uses backend-published plan minimums when checking executable stage lots", () => {
+    expect(
+      hasExecutableStageLots(
+        buildPlan({
+          symbol: "EURUSD",
+          minExecutableLot: 0.1,
+          lotSize: { e1: 0.01, e2: 0.09, e3: 0.1 },
+        }),
+      ),
+    ).toBe(true);
+
+    expect(
+      hasExecutableStageLots(
+        buildPlan({
+          symbol: "EURUSD",
+          minExecutableLot: 0.1,
           lotSize: { e1: 0.01, e2: 0.09, e3: 0 },
         }),
       ),

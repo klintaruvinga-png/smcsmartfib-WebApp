@@ -90,6 +90,27 @@ describe("PlanCandidateCard", () => {
     expect(cardText).toContain("Below min 0.10");
     expect(cardText).not.toContain("0.10 lotBelow min 0.10");
   });
+
+  it("uses backend-published executable minimums when classifying stage lots", () => {
+    render(
+      <PlanCandidateCard
+        signal={{ ...signal, symbol: "EURUSD" }}
+        plan={{
+          ...plan,
+          symbol: "EURUSD",
+          minExecutableLot: 0.1,
+          lotSize: { e1: 0.09, e2: 0.1, e3: 0.15 },
+        }}
+        planComplete
+      />,
+    );
+
+    const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
+    expect(cardText).toContain("Some stages are below the 0.10 minimum lot for EURUSD.");
+    expect(cardText).toContain("0.09 lot");
+    expect(screen.getByText("Below min 0.10")).toBeTruthy();
+    expect(screen.getAllByText("Ready")).toHaveLength(2);
+  });
 });
 
 const signal: SignalCandidate = {

@@ -5078,7 +5078,7 @@ final class SMC_SuperFib_Sniper_REST {
             }
 
             $plan = json_decode($plan_row['plan'], true);
-            $min_lot = $this->get_min_executable_lot($signal['symbol'] ?? '');
+            $min_lot = $this->get_min_executable_lot($signal['symbol'] ?? '', $user_id);
             foreach (array('e1', 'e2', 'e3') as $stage) {
                 $stage_lots = isset($plan['lotSize'][$stage]) ? (float) $plan['lotSize'][$stage] : 0.0;
                 if ($stage_lots < $min_lot) {
@@ -6402,6 +6402,7 @@ final class SMC_SuperFib_Sniper_REST {
         $spec = $this->get_instrument_spec($sym);
         $pip = $spec ? (float) $spec['pip_size'] : 0.0001;
         $pip_val = $spec ? $this->pip_value_per_standard_lot($user_id, $sym, $spec) : 10.0;
+        $min_executable_lot = $this->get_min_executable_lot($sym, $user_id);
         $account_currency = strtoupper(trim((string) ($telemetry['currency'] ?? '')));
         // MT5 cent accounts report equity/risk in USC, while pip values are USD-denominated.
         // Convert USC cents back to USD before dividing by pip value so lot sizing is not 100x too large.
@@ -6483,6 +6484,7 @@ final class SMC_SuperFib_Sniper_REST {
             'tps' => $tps,
             'rr' => $rr,
             'lotSize' => $lots,
+            'minExecutableLot' => $min_executable_lot,
             'ladder' => $ladder,
             'riskUSC' => $risk_usc,
             'riskZAR' => $has_live_sizing_equity ? round($risk_usc * 18.5, 2) : 0.0,
@@ -6678,7 +6680,43 @@ final class SMC_SuperFib_Sniper_REST {
             'DEDE40'      => 'GER40',
         );
         $normalized = $this->normalize_symbol_token($symbol);
-        return isset($aliases[$normalized]) ? $aliases[$normalized] : $normalized;
+        if (isset($aliases[$normalized])) {
+            return $aliases[$normalized];
+        }
+
+        $stripped = $this->strip_known_broker_suffix($normalized, $aliases);
+        return isset($aliases[$stripped]) ? $aliases[$stripped] : $stripped;
+    }
+
+    private function strip_known_broker_suffix($symbol, array $aliases) {
+        static $suffixes = array('MICRO', 'PRO', 'ECN', 'STP', 'RAW', 'M', 'C', 'A', 'B');
+        foreach ($suffixes as $suffix) {
+            $suffix_len = strlen($suffix);
+            if (strlen($symbol) <= $suffix_len || substr($symbol, -$suffix_len) !== $suffix) {
+                continue;
+            }
+
+            $trimmed = substr($symbol, 0, -$suffix_len);
+            if (isset($aliases[$trimmed]) || $this->is_known_symbol_shape($trimmed)) {
+                return $trimmed;
+            }
+        }
+
+        return $symbol;
+    }
+
+    private function is_known_symbol_shape($symbol) {
+        static $non_fx_symbols = array(
+            'NAS100' => true,
+            'US30' => true,
+            'SPX500' => true,
+            'UK100' => true,
+            'GER40' => true,
+            'USOIL' => true,
+            'UKOIL' => true,
+        );
+
+        return preg_match('/^[A-Z]{6}$/', $symbol) === 1 || isset($non_fx_symbols[$symbol]);
     }
 
     private function reference_mid_from_market($market_mids, $symbol) {
@@ -8826,7 +8864,7 @@ final class SMC_SuperFib_Sniper_REST {
             // MACRO / REFERENCE — no lot sizing; informational only
             'DXYUSD' => array('type' => 'reference', 'pip_size' => 0.001, 'contract_size' => 0, 'pip_val' => 0.0),
             // EXOTIC FOREX
-            'USDZAR' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0),
+            'USDZAR' => array('type' => 'forex', 'pip_size' => 0.0001, 'contract_size' => 100000, 'pip_val' => 10.0, 'min_lot' => 0.10),
             // CRYPTO — contract sizes vary by broker; defaults use $1/point/lot
             'BTCUSD' => array('type' => 'crypto', 'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
             'ETHUSD' => array('type' => 'crypto', 'pip_size' => 1.0,    'contract_size' => 1, 'pip_val' => 1.0),
@@ -8843,10 +8881,38 @@ final class SMC_SuperFib_Sniper_REST {
         return isset($specs[$key]) ? $specs[$key] : null;
     }
 
-    private function get_min_executable_lot($symbol) {
+    private function get_min_executable_lot($symbol, $user_id = 0) {
+        $synced_min_lot = $this->get_synced_min_lot($user_id, $symbol);
+        if ($synced_min_lot > 0) {
+            return $synced_min_lot;
+        }
+
         $spec = $this->get_instrument_spec($symbol);
+        if (is_array($spec) && isset($spec['min_lot']) && (float) $spec['min_lot'] > 0) {
+            return (float) $spec['min_lot'];
+        }
+
         $type = is_array($spec) ? (string) ($spec['type'] ?? '') : '';
         return in_array($type, array('metal', 'crypto', 'index'), true) ? 0.10 : 0.01;
+    }
+
+    private function get_synced_min_lot($user_id, $symbol) {
+        $user_id = (int) $user_id;
+        if ($user_id <= 0) {
+            return 0.0;
+        }
+
+        global $wpdb;
+
+        $normalized_symbol = $this->map_symbol_aliases($symbol);
+        $row = $wpdb->get_row($wpdb->prepare(
+            "SELECT min_lot FROM {$this->table('symbol_sync')} WHERE user_id = %d AND normalized_symbol = %s ORDER BY last_seen_at DESC LIMIT 1",
+            $user_id,
+            $normalized_symbol
+        ), ARRAY_A);
+
+        $min_lot = is_array($row) && isset($row['min_lot']) ? (float) $row['min_lot'] : 0.0;
+        return $min_lot > 0 ? $min_lot : 0.0;
     }
 
     private function watchlist_service() {

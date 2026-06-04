@@ -37,13 +37,21 @@ const INSTRUMENT_TYPES: Record<string, InstrumentType> = {
   GER40: "index",
 };
 
+const SYMBOL_MIN_EXECUTABLE_LOTS: Record<string, number> = {
+  USDZAR: 0.1,
+};
+
 export const MIN_EXECUTABLE_STAGE_LOT = 0.01;
 
 const BROKER_SUFFIXES = ["MICRO", "PRO", "ECN", "STP", "RAW", "M", "R", "A", "B", "C"] as const;
 
 function resolveKnownPlanToken(token: string): string | null {
   const aliased = SYMBOL_ALIASES[token] ?? token;
-  return aliased in INSTRUMENT_TYPES || token in SYMBOL_ALIASES ? aliased : null;
+  return aliased in INSTRUMENT_TYPES ||
+    aliased in SYMBOL_MIN_EXECUTABLE_LOTS ||
+    token in SYMBOL_ALIASES
+    ? aliased
+    : null;
 }
 
 function normalizePlanSymbol(symbol: string | null | undefined): string {
@@ -66,19 +74,35 @@ function normalizePlanSymbol(symbol: string | null | undefined): string {
 
 export function getMinExecutableStageLot(symbol?: string): number {
   const token = normalizePlanSymbol(symbol);
+  if (token in SYMBOL_MIN_EXECUTABLE_LOTS) {
+    return SYMBOL_MIN_EXECUTABLE_LOTS[token];
+  }
+
   const instrumentType = INSTRUMENT_TYPES[token] ?? "forex";
   return instrumentType === "metal" || instrumentType === "crypto" || instrumentType === "index"
     ? 0.1
     : MIN_EXECUTABLE_STAGE_LOT;
 }
 
+function resolveMinExecutableStageLot(symbol?: string, override?: unknown): number {
+  return typeof override === "number" && Number.isFinite(override) && override > 0
+    ? override
+    : getMinExecutableStageLot(symbol);
+}
+
 function isPositiveFinite(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
-export function isExecutableStageLotValue(value: unknown, symbol?: string): value is number {
+export function isExecutableStageLotValue(
+  value: unknown,
+  symbol?: string,
+  minExecutableLot?: number,
+): value is number {
   return (
-    typeof value === "number" && Number.isFinite(value) && value >= getMinExecutableStageLot(symbol)
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= resolveMinExecutableStageLot(symbol, minExecutableLot)
   );
 }
 
@@ -98,9 +122,13 @@ function stageLotValues(plan: TradePlan) {
 }
 
 export function hasExecutableStageLots(plan: TradePlan): boolean {
-  return stageLotValues(plan).some((value) => isExecutableStageLotValue(value, plan.symbol));
+  return stageLotValues(plan).some((value) =>
+    isExecutableStageLotValue(value, plan.symbol, plan.minExecutableLot),
+  );
 }
 
 export function hasSkippedStageLots(plan: TradePlan): boolean {
-  return stageLotValues(plan).some((value) => !isExecutableStageLotValue(value, plan.symbol));
+  return stageLotValues(plan).some(
+    (value) => !isExecutableStageLotValue(value, plan.symbol, plan.minExecutableLot),
+  );
 }
