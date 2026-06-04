@@ -1,3 +1,39 @@
+# GitHub Copilot Agent Instructions for SMC SuperFIB Dashboard
+
+This file provides guidance for GitHub Copilot Agent in this repo.
+
+## Primary Instruction
+- Follow `AGENTS.md` as the canonical cross-agent operating model.
+- Use `docs/agents/skill-index.md` as the shared skill guide.
+- Translate Claude skill wording into normal implementation behavior.
+- Do not rely on Claude-specific slash commands or skill syntax.
+
+## Skill Use
+- When a request maps to a skill, choose the corresponding workflow from `docs/agents/skill-index.md`.
+- Prefer small, testable vertical slices.
+- Keep changes scoped and avoid broad unrelated cleanup.
+- If the task looks like a design or architecture request, use the appropriate skill from `docs/agents/skill-index.md`.
+
+## Evidence and Testing
+- Do not invent repo behavior or test results.
+- When validating, cite the exact command and output.
+- If runtime validation cannot be run due to environment constraints, say so clearly.
+
+## Branch and PR Guidance
+- Target a feature branch, not `main`, unless explicitly directed.
+- Commit only files related to the current task.
+- Respect repo guardrails in `AGENTS.md` for workflows, automation, and state files.
+
+## Existing PR Guidance
+- Always run `gh pr create --fill` after pushing a branch when creating a PR.
+- If a PR already exists for the branch, skip silently and do not error.
+- Create a normal open PR, not a draft PR, unless the user explicitly asks for a draft.
+- In PR bodies, include issue summary, root cause, files changed, regression protections, parity impact, and systems intentionally not touched.
+
+## When Not to Create a PR
+- Never create a PR from `main` or `master` directly.
+- Do not create a PR if the task was only reading or analyzing files with no changes made.
+
 # Workflow Governance Rules
 
 ## Intake Trigger Check (MANDATORY)

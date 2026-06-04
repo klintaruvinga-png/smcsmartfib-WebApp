@@ -1,3 +1,40 @@
+# Claude Code Instructions for SMC SuperFIB Dashboard
+
+This repository supports interchangeable use of Claude Code, Codex, and GitHub Copilot Agent.
+
+## Read Before Acting
+1. Start with `AGENTS.md`.
+2. Then review `docs/agents/skill-index.md` and `CONTEXT.md`.
+3. If the task is workflow or state-related, also read `docs/agents/workflow.md`.
+
+## How Claude Should Work Here
+- Treat `.claude/skills/*` as supplemental guidance, not the only source.
+- The canonical cross-agent model is `AGENTS.md` and `docs/agents/skill-index.md`.
+- Do not assume other agents can execute Claude-specific slash commands or proprietary skill syntax.
+- Skills are workflow patterns, not command syntax.
+
+## Skill Behavior
+- When a user asks for a skill-like operation, follow the skill workflow described in `docs/agents/skill-index.md`.
+- Use `.claude/skills/<skill>/SKILL.md` only as an internal implementation reference for Claude.
+- Keep output aligned with cross-agent expectations and avoid Claude-only framing.
+
+## Evidence and Validation
+- Cite exact commands and outputs for tests and validations.
+- Do not claim a test or verification passed without running it.
+- For docs or workflow changes, explain what was checked and why no runtime command was available if applicable.
+
+## Branch and PR Behavior
+- Follow the repo’s branch discipline and do not create PRs from `main` unless explicitly directed.
+- Prefer descriptive feature branches.
+- Commit only files relevant to the task.
+- If a PR is needed, include exact validation commands and results in the body.
+
+## Existing Repo Guidance
+This repo also contains `.github/copilot-instructions.md` for Copilot and `.github/AGENTS.md` for agent-specific artifacts. Use those only as supplementary references.
+
+## Local Skill Note
+Claude Code may use `.claude/skills/*`, but the workflow must remain aligned with `docs/agents/skill-index.md` so that Codex and Copilot can follow the same guidance.
+
 ## Autonomous PR Creation
 
 After completing any code patch, branch creation, and push, Claude must
