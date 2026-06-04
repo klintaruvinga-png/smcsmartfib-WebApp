@@ -34,6 +34,9 @@ private:
     long   sessionKeys[2048];
     double sessionHighs[2048];
     double sessionLows[2048];
+    int    sessionCandleCounts[2048];
+    datetime sessionFirstTimes[2048];
+    datetime sessionLastTimes[2048];
     int    sessionCount;
 
 public:
@@ -48,6 +51,9 @@ public:
         ArrayInitialize(sessionKeys,  0);
         ArrayInitialize(sessionHighs, 0.0);
         ArrayInitialize(sessionLows,  0.0);
+        ArrayInitialize(sessionCandleCounts, 0);
+        ArrayInitialize(sessionFirstTimes, 0);
+        ArrayInitialize(sessionLastTimes, 0);
     }
 
     ~FibEngine() {}
@@ -113,17 +119,21 @@ public:
 
         double ltfHigh, ltfLow;
         long   _sigLtfF1 = 0, _sigLtfF2 = 0, _sigLtfF3 = 0;
+        string _sigLtfDebug = "";
         bool ltfValid = ComputeLTFAnchor(rates, copied, chartTfSeconds,
                                          sessionTf, compression,
                                          ltfHigh, ltfLow,
-                                         _sigLtfF1, _sigLtfF2, _sigLtfF3);
+                                         _sigLtfF1, _sigLtfF2, _sigLtfF3,
+                                         _sigLtfDebug);
 
         double htfHigh, htfLow;
         long   _sigHtfKey = 0;
+        string _sigHtfDebug = "";
         bool htfValid = ComputeHTFAnchor(rates, copied, chartTfSeconds,
                                          authorityTf, compression,
                                          htfHigh, htfLow,
-                                         _sigHtfKey);
+                                         _sigHtfKey,
+                                         _sigHtfDebug);
 
         int levelCount = 0;
         if (ltfValid)
@@ -224,18 +234,22 @@ public:
         // ---- LTF_SF anchor ----
         double ltf_high, ltf_low;
         long   ltf_f1_key, ltf_f2_key, ltf_f3_key;
+        string ltf_debug_json = "";
         bool   ltf_valid = ComputeLTFAnchor(rates, copied, chart_tf_seconds,
                                              session_tf, compression,
                                              ltf_high, ltf_low,
-                                             ltf_f1_key, ltf_f2_key, ltf_f3_key);
+                                             ltf_f1_key, ltf_f2_key, ltf_f3_key,
+                                             ltf_debug_json);
 
         // ---- HTF_AF anchor ----
         double htf_high, htf_low;
         long   htf_anchor_key;
+        string htf_debug_json = "";
         bool   htf_valid = ComputeHTFAnchor(rates, copied, chart_tf_seconds,
                                              authority_tf, compression,
                                              htf_high, htf_low,
-                                             htf_anchor_key);
+                                             htf_anchor_key,
+                                             htf_debug_json);
 
         if (!ltf_valid && !htf_valid)
             return "";
@@ -243,12 +257,17 @@ public:
         // anchor_debug confirms EA and Pine drew fibs from the same
         // historical session windows.
         string dbg = "{";
-        dbg += "\"session_tf\":\"" + session_tf + "\",";
-        dbg += "\"authority_tf\":\"" + authority_tf + "\",";
-        dbg += "\"ltf_f1_key\":" + IntegerToString(ltf_f1_key) + ",";
-        dbg += "\"ltf_f2_key\":" + IntegerToString(ltf_f2_key) + ",";
-        dbg += "\"ltf_f3_key\":" + IntegerToString(ltf_f3_key) + ",";
-        dbg += "\"htf_anchor_key\":" + IntegerToString(htf_anchor_key);
+        bool dbgFirst = true;
+        if (ltf_valid)
+        {
+            dbg += "\"LTF_SF\":" + ltf_debug_json;
+            dbgFirst = false;
+        }
+        if (htf_valid)
+        {
+            if (!dbgFirst) dbg += ",";
+            dbg += "\"HTF_AF\":" + htf_debug_json;
+        }
         dbg += "}";
 
         string json = "{";
@@ -371,21 +390,111 @@ public:
         return -1;
     }
 
-    void AddOrUpdateSession(long key, double high, double low)
+    void AddOrUpdateSession(long key, double high, double low, datetime candle_time)
     {
         int idx = FindSession(key);
         if (idx >= 0)
         {
             if (high > sessionHighs[idx]) sessionHighs[idx] = high;
             if (low  < sessionLows[idx])  sessionLows[idx]  = low;
+            if (sessionFirstTimes[idx] == 0 || candle_time < sessionFirstTimes[idx])
+                sessionFirstTimes[idx] = candle_time;
+            if (sessionLastTimes[idx] == 0 || candle_time > sessionLastTimes[idx])
+                sessionLastTimes[idx] = candle_time;
+            sessionCandleCounts[idx]++;
         }
         else if (sessionCount < MAX_SESSIONS)
         {
             sessionKeys[sessionCount]  = key;
             sessionHighs[sessionCount] = high;
             sessionLows[sessionCount]  = low;
+            sessionCandleCounts[sessionCount] = 1;
+            sessionFirstTimes[sessionCount] = candle_time;
+            sessionLastTimes[sessionCount] = candle_time;
             sessionCount++;
         }
+    }
+
+    string BoolJson(bool value)
+    {
+        return value ? "true" : "false";
+    }
+
+    string DoubleJson(double value)
+    {
+        return DoubleToString(value, 8);
+    }
+
+    string IsoUtcString(datetime broker_time)
+    {
+        if (broker_time <= 0)
+            return "";
+
+        MqlDateTime dt;
+        TimeToStruct(ToUTC(broker_time), dt);
+        return StringFormat("%04d-%02d-%02dT%02d:%02d:%02dZ",
+                            dt.year, dt.mon, dt.day, dt.hour, dt.min, dt.sec);
+    }
+
+    string BuildLTFComponentJson(string slot, int idx, bool compression_pass, double weight)
+    {
+        string json = "{";
+        json += "\"slot\":\"" + slot + "\",";
+        json += "\"key\":" + (idx >= 0 ? IntegerToString(sessionKeys[idx]) : "null") + ",";
+        json += "\"high\":" + (idx >= 0 ? DoubleJson(sessionHighs[idx]) : "null") + ",";
+        json += "\"low\":" + (idx >= 0 ? DoubleJson(sessionLows[idx]) : "null") + ",";
+        json += "\"range\":" + (idx >= 0 ? DoubleJson(sessionHighs[idx] - sessionLows[idx]) : "null") + ",";
+        json += "\"compression_pass\":" + BoolJson(compression_pass) + ",";
+        json += "\"weight\":" + DoubleJson(weight) + ",";
+        json += "\"candle_count\":" + (idx >= 0 ? IntegerToString(sessionCandleCounts[idx]) : "0") + ",";
+        json += "\"first_candle\":\"" + (idx >= 0 ? IsoUtcString(sessionFirstTimes[idx]) : "") + "\",";
+        json += "\"last_candle\":\"" + (idx >= 0 ? IsoUtcString(sessionLastTimes[idx]) : "") + "\"";
+        json += "}";
+        return json;
+    }
+
+    string BuildLTFAnchorDebugJson(string session_tf, string authority_tf, double compression,
+                                   double anchor_high, double anchor_low,
+                                   int f1, int f2, int f3,
+                                   bool f1v, bool f2v, bool f3v,
+                                   double wf1, double wf2, double wf3)
+    {
+        string json = "{";
+        json += "\"session_tf\":\"" + session_tf + "\",";
+        json += "\"authority_tf\":\"" + authority_tf + "\",";
+        json += "\"anchor_high\":" + DoubleJson(anchor_high) + ",";
+        json += "\"anchor_low\":" + DoubleJson(anchor_low) + ",";
+        json += "\"anchor_range\":" + DoubleJson(anchor_high - anchor_low) + ",";
+        json += "\"compression_threshold\":" + DoubleJson(compression) + ",";
+        json += "\"components\":[";
+        json += BuildLTFComponentJson("F1", f1, f1v, wf1) + ",";
+        json += BuildLTFComponentJson("F2", f2, f2v, wf2) + ",";
+        json += BuildLTFComponentJson("F3", f3, f3v, wf3);
+        json += "]";
+        json += "}";
+        return json;
+    }
+
+    string BuildHTFAnchorDebugJson(string session_tf, string authority_tf, double compression, int idx,
+                                   double anchor_high, double anchor_low)
+    {
+        string json = "{";
+        json += "\"session_tf\":\"" + session_tf + "\",";
+        json += "\"authority_tf\":\"" + authority_tf + "\",";
+        json += "\"anchor_high\":" + DoubleJson(anchor_high) + ",";
+        json += "\"anchor_low\":" + DoubleJson(anchor_low) + ",";
+        json += "\"anchor_range\":" + DoubleJson(anchor_high - anchor_low) + ",";
+        json += "\"compression_threshold\":" + DoubleJson(compression) + ",";
+        json += "\"source\":\"auth_f1\",";
+        json += "\"htf_anchor_key\":" + (idx >= 0 ? IntegerToString(sessionKeys[idx]) : "null") + ",";
+        json += "\"high\":" + DoubleJson(anchor_high) + ",";
+        json += "\"low\":" + DoubleJson(anchor_low) + ",";
+        json += "\"range\":" + DoubleJson(anchor_high - anchor_low) + ",";
+        json += "\"candle_count\":" + (idx >= 0 ? IntegerToString(sessionCandleCounts[idx]) : "0") + ",";
+        json += "\"first_candle\":\"" + (idx >= 0 ? IsoUtcString(sessionFirstTimes[idx]) : "") + "\",";
+        json += "\"last_candle\":\"" + (idx >= 0 ? IsoUtcString(sessionLastTimes[idx]) : "") + "\"";
+        json += "}";
+        return json;
     }
 
     // ---- LTF_SF anchor computation ----
@@ -397,15 +506,17 @@ public:
     bool ComputeLTFAnchor(MqlRates& rates[], int count, int chart_tf_seconds,
                           string session_tf, double compression,
                           double& out_high, double& out_low,
-                          long& dbg_f1_key, long& dbg_f2_key, long& dbg_f3_key)
+                          long& dbg_f1_key, long& dbg_f2_key, long& dbg_f3_key,
+                          string& dbg_anchor_json)
     {
         dbg_f1_key = 0; dbg_f2_key = 0; dbg_f3_key = 0;
+        dbg_anchor_json = "";
         ClearSessions();
 
         for (int i = 0; i < count; i++)
         {
             long key = GetSessionKey(rates[i].time, session_tf);
-            AddOrUpdateSession(key, rates[i].high, rates[i].low);
+            AddOrUpdateSession(key, rates[i].high, rates[i].low, rates[i].time);
         }
 
         if (sessionCount <= 1)
@@ -475,6 +586,12 @@ public:
         if ((out_high - out_low) < compression)
             return false;
 
+        dbg_anchor_json = BuildLTFAnchorDebugJson(session_tf, GetAuthorityTF(session_tf), compression,
+                                                  out_high, out_low,
+                                                  f1, f2, f3,
+                                                  f1v, f2v, f3v,
+                                                  wf1, wf2, wf3);
+
         return true;
     }
 
@@ -487,15 +604,17 @@ public:
     bool ComputeHTFAnchor(MqlRates& rates[], int count, int chart_tf_seconds,
                           string authority_tf, double compression,
                           double& out_high, double& out_low,
-                          long& dbg_anchor_key)
+                          long& dbg_anchor_key,
+                          string& dbg_anchor_json)
     {
         dbg_anchor_key = 0;
+        dbg_anchor_json = "";
         ClearSessions();
 
         for (int i = 0; i < count; i++)
         {
             long key = GetSessionKey(rates[i].time, authority_tf);
-            AddOrUpdateSession(key, rates[i].high, rates[i].low);
+            AddOrUpdateSession(key, rates[i].high, rates[i].low, rates[i].time);
         }
 
         // Pine: requires at least one completed authority session.
@@ -517,6 +636,9 @@ public:
 
         if ((out_high - out_low) < compression)
             return false;
+
+        dbg_anchor_json = BuildHTFAnchorDebugJson(GetSessionTF(chart_tf_seconds), authority_tf, compression,
+                                                  idx1, out_high, out_low);
 
         return true;
     }
