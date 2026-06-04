@@ -47,7 +47,7 @@ describe('run-phase4-parity.ps1 automation contract', () => {
     expect(source).toContain('scripts/export-mt5-candles.ps1');
     expect(source).toMatch(/if \(-not \$SkipCandleExport\)/);
     expect(source).toMatch(/CandleDir\s*=\s*\$candleRoot/);
-    expect(source).toMatch(/Limit\s*=\s*\$CandleLimit/);
+    expect(source).toMatch(/Limit\s*=\s*\$candleExportLimit/);
     expect(source).toMatch(/Timeframes\s*=\s*\[string\[\]\]\$candleExportTimeframes/);
     expect(source.indexOf('export-mt5-candles.ps1')).toBeLessThan(source.indexOf('Test-CandleFiles $candleRoot'));
   });
@@ -56,9 +56,27 @@ describe('run-phase4-parity.ps1 automation contract', () => {
     const source = readScript();
 
     expect(source).toContain('$candleExportTimeframes = @("M15")');
-    expect(source).toContain('Test-CandleFiles $candleRoot $symbols $candleExportTimeframes $referenceUtc');
+    expect(source).toContain('Test-CandleFiles $candleRoot $gateSymbols $candleExportTimeframes $referenceUtc');
     expect(source).toMatch(/"--timeframes",\s*\(\$timeframes -join ","\)/);
-    expect(source).toMatch(/\$combined \| Where-Object \{ \(\$symbols -contains \$_.symbol\) -and \(\$timeframes -contains \$_.timeframe\) \}/);
+    expect(source).toMatch(/\$combined \| Where-Object \{ \(\$gateSymbols -contains \$_.symbol\) -and \(\$timeframes -contains \$_.timeframe\) \}/);
+  });
+
+  test('keeps expanded audit out of the official gate unless symbols are explicitly overridden', () => {
+    const source = readScript();
+
+    expect(source).toContain('$gateSymbols = if ($Symbols.Count -gt 0) { $symbols } else { $officialSymbols }');
+    expect(source).toContain('$mt5ExpectedRows = $gateSymbols.Count * $timeframes.Count * 2 * 16');
+    expect(source).toMatch(/"--symbols",\s*\(\$gateSymbols -join ","\)/);
+    expect(source).toMatch(/Symbols\s*=\s*\[string\[\]\]\$gateSymbols/);
+  });
+
+  test('requests enough M15 history for derived higher-timeframe anchors', () => {
+    const source = readScript();
+
+    expect(source).toContain('function Get-RequiredM15CandleLimit([string[]]$OutputTimeframes)');
+    expect(source).toContain('if ($normalized -contains "D1") { return 60000 }');
+    expect(source).toContain('$candleExportLimit = [Math]::Max($CandleLimit, (Get-RequiredM15CandleLimit $timeframes))');
+    expect(source).toMatch(/Limit\s*=\s*\$candleExportLimit/);
   });
 
   test('uses existing generator and validator with the required file arguments', () => {
@@ -130,5 +148,6 @@ describe('export-mt5-candles.ps1 automation contract', () => {
     expect(source).toContain('D1');
     expect(source).toContain('NoPrompt');
     expect(source).toMatch(/time\/open\/high\/low\/close/);
+    expect(source).toContain('[Math]::Min(100000, $Limit)');
   });
 });

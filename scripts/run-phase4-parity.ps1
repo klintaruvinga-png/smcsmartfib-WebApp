@@ -294,6 +294,14 @@ function Test-CandleFiles([string]$CandleRoot, [string[]]$Symbols, [string[]]$Ac
     }
 }
 
+function Get-RequiredM15CandleLimit([string[]]$OutputTimeframes) {
+    $normalized = $OutputTimeframes | ForEach-Object { $_.Trim().ToUpperInvariant() }
+    if ($normalized -contains "D1") { return 60000 }
+    if ($normalized -contains "H4") { return 25000 }
+    if ($normalized -contains "H1") { return 10000 }
+    return 2000
+}
+
 Write-Step "Checking repo root"
 if (-not (Test-Path -LiteralPath "mt5/FibEngine.mqh")) {
     Write-Fail "Must be run from repo root (mt5/FibEngine.mqh not found)"
@@ -341,6 +349,7 @@ if ($Symbols.Count -gt 0) {
 } else {
     $symbols = $officialSymbols
 }
+$gateSymbols = if ($Symbols.Count -gt 0) { $symbols } else { $officialSymbols }
 
 # -Timeframes overrides MT5 row filtering + Pine generator output.
 # Candle export stays M15-only; the generator derives Pine helper feeds from M15.
@@ -350,6 +359,7 @@ if ($Timeframes.Count -gt 0) {
     $timeframes = $defaultTimeframes
 }
 $candleExportTimeframes = @("M15")
+$candleExportLimit = [Math]::Max($CandleLimit, (Get-RequiredM15CandleLimit $timeframes))
 
 $mt5LevelsFile = Join-Path $reportsRoot "mt5-levels.json"
 $mt5ExpandedFile = Join-Path $reportsRoot "mt5-levels-expanded.json"
@@ -412,7 +422,7 @@ if (-not $DryRun) {
         }
     }
 
-    $official = @($combined | Where-Object { ($symbols -contains $_.symbol) -and ($timeframes -contains $_.timeframe) })
+    $official = @($combined | Where-Object { ($gateSymbols -contains $_.symbol) -and ($timeframes -contains $_.timeframe) })
     $official |
         Sort-Object symbol, timeframe, family, ratio |
         ConvertTo-Json -Depth 10 |
@@ -420,7 +430,7 @@ if (-not $DryRun) {
 
     $mt5Rows = @($official).Count
     # Dynamic: symbols × timeframes × 2 families × 16 ratios. Respects -Symbols/-Timeframes overrides.
-    $mt5ExpectedRows = $symbols.Count * $timeframes.Count * 2 * 16
+    $mt5ExpectedRows = $gateSymbols.Count * $timeframes.Count * 2 * 16
     Write-Ok "MT5 official: $mt5Rows rows -> $mt5LevelsFile (expected $mt5ExpectedRows)"
     if ($mt5Rows -ne $mt5ExpectedRows) {
         Write-Fail "MT5 official row count $mt5Rows != $mt5ExpectedRows"
@@ -445,8 +455,8 @@ if (-not $DryRun) {
             WpUser     = $WpUser
             AppPw      = $AppPw
             CandleDir  = $candleRoot
-            Limit      = $CandleLimit
-            Symbols    = [string[]]$symbols
+            Limit      = $candleExportLimit
+            Symbols    = [string[]]$gateSymbols
             Timeframes = [string[]]$candleExportTimeframes
         }
         if ($NoPrompt) {
@@ -461,7 +471,7 @@ if (-not $DryRun) {
     }
 
     $referenceUtc = (Get-Item -LiteralPath $mt5LevelsFile).LastWriteTimeUtc
-    Test-CandleFiles $candleRoot $symbols $candleExportTimeframes $referenceUtc
+    Test-CandleFiles $candleRoot $gateSymbols $candleExportTimeframes $referenceUtc
 } else {
     Write-Step "DryRun mode - skipping MT5 export"
     if (-not (Test-Path -LiteralPath $mt5LevelsFile)) {
@@ -473,7 +483,7 @@ if (-not $DryRun) {
     Write-Ok "Using existing MT5 levels: $mt5LevelsFile ($mt5Rows rows)"
 
     $referenceUtc = (Get-Item -LiteralPath $mt5LevelsFile).LastWriteTimeUtc
-    Test-CandleFiles $candleRoot $symbols $candleExportTimeframes $referenceUtc
+    Test-CandleFiles $candleRoot $gateSymbols $candleExportTimeframes $referenceUtc
 }
 
 Write-Step "Generating Pine v13-compatible reference levels"
@@ -483,7 +493,7 @@ $nodeArgs = @(
     "--mt5-file", $mt5LevelsFile,
     "--reports-dir", $reportsRoot,
     "--run-ts", $runTs,
-    "--symbols",    ($symbols -join ","),
+    "--symbols",    ($gateSymbols -join ","),
     "--timeframes", ($timeframes -join ",")
 )
 Invoke-ExternalCommand "node" $nodeArgs "Pine generator failed"
@@ -493,7 +503,7 @@ if (-not (Test-Path -LiteralPath $pineLevelsFile)) {
 }
 
 $pineRows = @((Get-Content -LiteralPath $pineLevelsFile -Raw | ConvertFrom-Json)).Count
-$pineExpectedRows = $symbols.Count * $timeframes.Count * 2 * 16
+$pineExpectedRows = $gateSymbols.Count * $timeframes.Count * 2 * 16
 Write-Ok "Pine levels: $pineRows rows -> $pineLevelsFile (expected $pineExpectedRows)"
 if ($pineRows -ne $pineExpectedRows) {
     Write-Fail "Pine row count $pineRows != $pineExpectedRows"

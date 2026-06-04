@@ -92,7 +92,7 @@ function Get-TimeframeSeconds([string]$Timeframe) {
 $Backend = (Resolve-ConfigValue $Backend "SMC_BACKEND" "https://trader.stokvelsociety.co.za").TrimEnd("/")
 $WpUser = Resolve-ConfigValue $WpUser "SMC_WP_USER" ""
 $AppPw = Resolve-ConfigValue $AppPw "SMC_APP_PW" ""
-$Limit = [Math]::Max(1, [Math]::Min(2000, $Limit))
+$Limit = [Math]::Max(1, [Math]::Min(100000, $Limit))
 $candleRoot = ConvertTo-AbsolutePath $CandleDir
 New-Item -ItemType Directory -Path $candleRoot -Force | Out-Null
 
