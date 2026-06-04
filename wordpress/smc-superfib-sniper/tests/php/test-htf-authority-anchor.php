@@ -76,4 +76,30 @@ fib_test_assert_same(true, $anchor['valid'], 'Yearly->Yearly anchor should be va
 fib_test_assert_near(400.0, $anchor['high'], 0.000001, 'Yearly->Yearly high mismatch');
 fib_test_assert_near(40.0, $anchor['low'], 0.000001, 'Yearly->Yearly low mismatch');
 
+$singleCompletedPlusActive = array(
+    fib_test_make_candle('2026-04-27 12:00:00 UTC', 40, 4),
+    fib_test_make_candle('2026-05-04 12:00:00 UTC', 50, 5),
+);
+$anchor = $service->resolve_htf_authority_anchor($singleCompletedPlusActive, 900);
+fib_test_assert_same(true, $anchor['valid'], 'Single completed HTF anchor should be valid');
+fib_test_assert_near(40.0, $anchor['high'], 0.000001, 'Single completed HTF high mismatch');
+fib_test_assert_near(4.0, $anchor['low'], 0.000001, 'Single completed HTF low mismatch');
+
+$onlyActiveSession = array(
+    fib_test_make_candle('2026-05-04 12:00:00 UTC', 50, 5),
+);
+$anchor = $service->resolve_htf_authority_anchor($onlyActiveSession, 900);
+fib_test_assert_same(false, $anchor['valid'], 'Only active HTF session should be invalid');
+
+$aggregatedMostRecentCompleted = array(
+    fib_test_make_candle('2026-04-13 12:00:00 UTC', 20, 2),
+    fib_test_make_candle('2026-04-20 12:00:00 UTC', 31, 3),
+    fib_test_make_candle('2026-04-21 12:00:00 UTC', 35, 2.5),
+    fib_test_make_candle('2026-04-27 12:00:00 UTC', 50, 5),
+);
+$anchor = $service->resolve_htf_authority_anchor($aggregatedMostRecentCompleted, 900);
+fib_test_assert_same(true, $anchor['valid'], 'Aggregated most recent completed HTF anchor should be valid');
+fib_test_assert_near(35.0, $anchor['high'], 0.000001, 'Aggregated most recent completed HTF high mismatch');
+fib_test_assert_near(2.5, $anchor['low'], 0.000001, 'Aggregated most recent completed HTF low mismatch');
+
 fwrite(STDOUT, 'htf authority anchor checks passed' . PHP_EOL);

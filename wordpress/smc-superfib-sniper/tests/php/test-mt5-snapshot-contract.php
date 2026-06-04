@@ -793,7 +793,7 @@ function seed_dual_anchor_strong_confluence_fixture($wpdb, $user_id, $symbol) {
 
     for ($weekOffset = 5; $weekOffset >= 1; $weekOffset--) {
         $timestamp = strtotime('monday this week 12:00 UTC') - ($weekOffset * 7 * 86400);
-        $isAuthorityWeek = $weekOffset === 3;
+        $isAuthorityWeek = $weekOffset === 1;
         $push($timestamp, 1.0900, $isAuthorityWeek ? 1.2000 : 1.1120, $isAuthorityWeek ? 1.0000 : 1.0850, 1.1000);
     }
 
@@ -2290,7 +2290,7 @@ for ($weekOffset = 5; $weekOffset >= 0; $weekOffset--) {
             $isFirstClamped = ($clampedCurrentWeekCandles === 0);
             $clampedCurrentWeekCandles++;
         }
-        $isAuthorityWeek = $weekOffset === 3;
+        $isAuthorityWeek = $weekOffset === 1 && $dayOffset === 0;
         $open = $candleIndex === 0 ? 1.0000 : 1.0900 + ($candleIndex * 0.0002);
         $close = $isFirstClamped ? 1.1020 : $open + 0.0001;
         $wpdb->replace($candleTable, array(
