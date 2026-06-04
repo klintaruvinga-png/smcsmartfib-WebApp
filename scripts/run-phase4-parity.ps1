@@ -48,6 +48,16 @@
 .PARAMETER CandleLimit
     Number of candles to request per symbol/timeframe from the backend candle endpoint.
 
+.PARAMETER Symbols
+    Override the symbol list (PowerShell string array).
+    Default: EURUSD USDJPY XAUUSD. Use when broker does not support all default symbols.
+    e.g. -Symbols EURUSD,USDJPY
+
+.PARAMETER Timeframes
+    Override the output timeframe list for MT5 row filtering and Pine generation.
+    Default: M15 H1 H4 D1. Pine helper candles are derived from exported M15 source candles.
+    e.g. -Timeframes M15
+
 .EXAMPLE
     # Full run using env vars
     $env:SMC_WP_USER = "admin"; $env:SMC_APP_PW = "xxxx xxxx"
@@ -72,6 +82,8 @@ param(
     [string]$CandleDir = "data",
     [string]$ReportsDir = "reports/phase4-parity",
     [int]$CandleLimit = 600,
+    [string[]]$Symbols    = @(),
+    [string[]]$Timeframes = @(),
     [switch]$ExpandedAudit,
     [switch]$NoPrompt,
     [switch]$DryRun,
@@ -240,21 +252,20 @@ function Get-CandleLastUtc([string]$PathValue) {
     return $latest
 }
 
-function Test-CandleFiles([string]$CandleRoot, [string[]]$Symbols, [DateTime]$ReferenceUtc) {
+function Test-CandleFiles([string]$CandleRoot, [string[]]$Symbols, [string[]]$ActiveTimeframes, [DateTime]$ReferenceUtc) {
     Write-Step "Checking candle files"
     Write-Warn "The staleness guard in the Pine generator will hard-fail stale files before the validator runs."
 
-    $timeframes = @("M15", "H1", "H4", "D1")
     $staleWindows = @{
         M15 = New-TimeSpan -Minutes 15
-        H1 = New-TimeSpan -Hours 1
-        H4 = New-TimeSpan -Hours 4
-        D1 = New-TimeSpan -Days 1
+        H1  = New-TimeSpan -Hours 1
+        H4  = New-TimeSpan -Hours 4
+        D1  = New-TimeSpan -Days 1
     }
 
     $allPresent = $true
     foreach ($sym in $Symbols) {
-        foreach ($tf in $timeframes) {
+        foreach ($tf in $ActiveTimeframes) {
             $fileName = "${sym}_${tf}.json"
             $pathValue = Join-Path $CandleRoot $fileName
             if (-not (Test-Path -LiteralPath $pathValue)) {
@@ -269,7 +280,7 @@ function Test-CandleFiles([string]$CandleRoot, [string[]]$Symbols, [DateTime]$Re
                 continue
             }
 
-            $maxAge = $staleWindows[$tf]
+            $maxAge = if ($staleWindows.ContainsKey($tf)) { $staleWindows[$tf] } else { New-TimeSpan -Hours 1 }
             if ($lastUtc -lt $ReferenceUtc.Subtract($maxAge)) {
                 Write-Warn ("Possibly stale candle file: {0} last={1:o} reference={2:o} max_gap={3}s" -f $pathValue, $lastUtc, $ReferenceUtc, [int]$maxAge.TotalSeconds)
             } else {
@@ -318,9 +329,27 @@ New-Item -ItemType Directory -Path $candleRoot -Force | Out-Null
 $runInstant = [DateTimeOffset]::UtcNow
 $runTs = $runInstant.ToString("o")
 $timestamp = $runInstant.ToString("yyyy-MM-dd_HHmmss")
-$officialSymbols = @("EURUSD", "USDJPY", "XAUUSD")
-$expandedSymbols = @("EURUSD", "USDJPY", "XAUUSD", "BTCUSD", "NAS100")
-$symbols = if ($ExpandedAudit) { $expandedSymbols } else { $officialSymbols }
+$officialSymbols   = @("EURUSD", "USDJPY", "XAUUSD")
+$expandedSymbols   = @("EURUSD", "USDJPY", "XAUUSD", "BTCUSD", "NAS100")
+$defaultTimeframes = @("M15", "H1", "H4", "D1")
+
+# -Symbols overrides official/expanded. Use for broker-specific runs, e.g. when XAUUSD is unsupported.
+if ($Symbols.Count -gt 0) {
+    $symbols = $Symbols | ForEach-Object { $_.Trim().ToUpperInvariant() } | Where-Object { $_ -ne "" }
+} elseif ($ExpandedAudit) {
+    $symbols = $expandedSymbols
+} else {
+    $symbols = $officialSymbols
+}
+
+# -Timeframes overrides MT5 row filtering + Pine generator output.
+# Candle export stays M15-only; the generator derives Pine helper feeds from M15.
+if ($Timeframes.Count -gt 0) {
+    $timeframes = $Timeframes | ForEach-Object { $_.Trim().ToUpperInvariant() } | Where-Object { $_ -ne "" }
+} else {
+    $timeframes = $defaultTimeframes
+}
+$candleExportTimeframes = @("M15")
 
 $mt5LevelsFile = Join-Path $reportsRoot "mt5-levels.json"
 $mt5ExpandedFile = Join-Path $reportsRoot "mt5-levels-expanded.json"
@@ -383,41 +412,47 @@ if (-not $DryRun) {
         }
     }
 
-    $official = @($combined | Where-Object { $officialSymbols -contains $_.symbol })
+    $official = @($combined | Where-Object { ($symbols -contains $_.symbol) -and ($timeframes -contains $_.timeframe) })
     $official |
         Sort-Object symbol, timeframe, family, ratio |
         ConvertTo-Json -Depth 10 |
         Set-Content -LiteralPath $mt5LevelsFile -Encoding UTF8
 
     $mt5Rows = @($official).Count
-    Write-Ok "MT5 official: $mt5Rows rows -> $mt5LevelsFile"
-    if ($mt5Rows -ne 384) {
-        Write-Fail "MT5 official row count $mt5Rows != 384"
+    # Dynamic: symbols × timeframes × 2 families × 16 ratios. Respects -Symbols/-Timeframes overrides.
+    $mt5ExpectedRows = $symbols.Count * $timeframes.Count * 2 * 16
+    Write-Ok "MT5 official: $mt5Rows rows -> $mt5LevelsFile (expected $mt5ExpectedRows)"
+    if ($mt5Rows -ne $mt5ExpectedRows) {
+        Write-Fail "MT5 official row count $mt5Rows != $mt5ExpectedRows"
     }
 
     if ($ExpandedAudit) {
-        $combined |
+        $expanded = @($combined | Where-Object { $timeframes -contains $_.timeframe })
+        $expanded |
             Sort-Object symbol, timeframe, family, ratio |
             ConvertTo-Json -Depth 10 |
             Set-Content -LiteralPath $mt5ExpandedFile -Encoding UTF8
-        Write-Ok "MT5 expanded: $($combined.Count) rows -> $mt5ExpandedFile"
+        Write-Ok "MT5 expanded: $($expanded.Count) rows -> $mt5ExpandedFile"
     }
 
     if (-not $SkipCandleExport) {
         Write-Step "Exporting MT5 candles"
         $exporterScript = Join-Path (Get-Location) "scripts/export-mt5-candles.ps1"
-        $candleArgs = @(
-            "-Backend", $Backend,
-            "-WpUser", $WpUser,
-            "-AppPw", $AppPw,
-            "-CandleDir", $candleRoot,
-            "-Limit", $CandleLimit,
-            "-Symbols"
-        ) + $symbols + @("-Timeframes", "M15", "H1", "H4", "D1")
-        if ($NoPrompt) {
-            $candleArgs += "-NoPrompt"
+        # Hashtable splat: [string[]] params need this or only the first element is received.
+        # Flat-array positional splatting (@array) breaks multi-value named params.
+        $candleParams = @{
+            Backend    = $Backend
+            WpUser     = $WpUser
+            AppPw      = $AppPw
+            CandleDir  = $candleRoot
+            Limit      = $CandleLimit
+            Symbols    = [string[]]$symbols
+            Timeframes = [string[]]$candleExportTimeframes
         }
-        & $exporterScript @candleArgs
+        if ($NoPrompt) {
+            $candleParams["NoPrompt"] = $true
+        }
+        & $exporterScript @candleParams
         if ($LASTEXITCODE -ne 0) {
             Write-Fail "MT5 candle export failed (exit code $LASTEXITCODE)"
         }
@@ -426,7 +461,7 @@ if (-not $DryRun) {
     }
 
     $referenceUtc = (Get-Item -LiteralPath $mt5LevelsFile).LastWriteTimeUtc
-    Test-CandleFiles $candleRoot $officialSymbols $referenceUtc
+    Test-CandleFiles $candleRoot $symbols $candleExportTimeframes $referenceUtc
 } else {
     Write-Step "DryRun mode - skipping MT5 export"
     if (-not (Test-Path -LiteralPath $mt5LevelsFile)) {
@@ -438,7 +473,7 @@ if (-not $DryRun) {
     Write-Ok "Using existing MT5 levels: $mt5LevelsFile ($mt5Rows rows)"
 
     $referenceUtc = (Get-Item -LiteralPath $mt5LevelsFile).LastWriteTimeUtc
-    Test-CandleFiles $candleRoot $officialSymbols $referenceUtc
+    Test-CandleFiles $candleRoot $symbols $candleExportTimeframes $referenceUtc
 }
 
 Write-Step "Generating Pine v13-compatible reference levels"
@@ -447,7 +482,9 @@ $nodeArgs = @(
     "--candle-dir", $candleRoot,
     "--mt5-file", $mt5LevelsFile,
     "--reports-dir", $reportsRoot,
-    "--run-ts", $runTs
+    "--run-ts", $runTs,
+    "--symbols",    ($symbols -join ","),
+    "--timeframes", ($timeframes -join ",")
 )
 Invoke-ExternalCommand "node" $nodeArgs "Pine generator failed"
 
@@ -456,9 +493,10 @@ if (-not (Test-Path -LiteralPath $pineLevelsFile)) {
 }
 
 $pineRows = @((Get-Content -LiteralPath $pineLevelsFile -Raw | ConvertFrom-Json)).Count
-Write-Ok "Pine levels: $pineRows rows -> $pineLevelsFile"
-if ($pineRows -ne 384) {
-    Write-Fail "Pine row count $pineRows != 384"
+$pineExpectedRows = $symbols.Count * $timeframes.Count * 2 * 16
+Write-Ok "Pine levels: $pineRows rows -> $pineLevelsFile (expected $pineExpectedRows)"
+if ($pineRows -ne $pineExpectedRows) {
+    Write-Fail "Pine row count $pineRows != $pineExpectedRows"
 }
 
 if ($DryRun) {

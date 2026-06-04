@@ -19,10 +19,10 @@
  *   Monthly   -> Quarterly
  *   Quarterly -> Yearly
  *
- * Minimum candle history required per timeframe (to satisfy completed sessions):
+ * Minimum M15 candle history required (to satisfy completed sessions):
  *   LTF_SF needs up to 3 completed session-TF sessions.
  *   HTF_AF needs the most recent completed authority-TF session (auth_f1).
- * Candle files shorter than these depths will cause a FAIL for the affected anchor.
+ * M15 candle history shorter than these depths will cause a FAIL for the affected anchor.
  *
  * LTF_SF anchor: F1/F2/F3 weighted composite of 3 most recent completed
  *   sessions at sessionTf granularity.
@@ -37,9 +37,9 @@
  *   <reports-dir>/pine-levels.metadata.json - debug/audit metadata
  *
  * Guards:
- *   - Fails if any required candle file is missing
- *   - Fails if any candle file's last candle is older than staleness threshold
- *   - Fails if output row count != 384
+ *   - Fails if any required M15 source candle file is missing
+ *   - Fails if any M15 source candle file's last candle is older than staleness threshold
+ *   - Fails if output row count does not match symbols x timeframes x families x ratios
  *
  * Usage (from repo root):
  *   node scripts/generate-pine-levels-v13.cjs [--candle-dir <path>] [--mt5-file <path>] [--reports-dir <path>] [--run-ts <iso8601>]
@@ -71,9 +71,16 @@ const OUTPUT_META   = path.join(REPORTS_DIR, 'pine-levels.metadata.json');
 const CANDLE_DIR    = path.resolve(getArg('--candle-dir') || path.join(REPO_ROOT, 'data'));
 const MT5_FILE      = path.resolve(getArg('--mt5-file') || path.join(REPORTS_DIR, 'mt5-levels.json'));
 
-const SYMBOLS    = ['EURUSD', 'USDJPY', 'XAUUSD'];
-const TIMEFRAMES = ['M15', 'H1', 'H4', 'D1'];
+// Default symbols/timeframes preserved; override via --symbols / --timeframes CLI flags.
+// e.g. node generate-pine-levels-v13.cjs --symbols EURUSD,USDJPY --timeframes M15
+const _symbolsArg    = getArg('--symbols');
+const _timeframesArg = getArg('--timeframes');
+const SYMBOLS    = _symbolsArg    ? _symbolsArg.split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
+                                  : ['EURUSD', 'USDJPY', 'XAUUSD'];
+const TIMEFRAMES = _timeframesArg ? _timeframesArg.split(',').map(t => t.trim().toUpperCase()).filter(Boolean)
+                                  : ['M15', 'H1', 'H4', 'D1'];
 const RATIOS     = [-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300];
+const SOURCE_TIMEFRAME = 'M15';
 
 // Staleness: how far behind the last candle is allowed to be per timeframe
 // (in milliseconds). Candle files older than this relative to mt5-levels.json
@@ -95,6 +102,18 @@ function toSessionTf(timeframe) {
 function toAuthorityTf(sessionTf) {
     const map = { Daily: 'Weekly', Weekly: 'Monthly', Monthly: 'Quarterly', Quarterly: 'Yearly' };
     if (!map[sessionTf]) throw new Error(`Unsupported sessionTf: ${sessionTf}`);
+    return map[sessionTf];
+}
+
+function helperTimeframeForSessionTf(sessionTf) {
+    const map = {
+        Daily: 'M15',
+        Weekly: 'H1',
+        Monthly: 'D1',
+        Quarterly: 'D1',
+        Yearly: 'D1',
+    };
+    if (!map[sessionTf]) throw new Error(`Unsupported helper sessionTf: ${sessionTf}`);
     return map[sessionTf];
 }
 
@@ -157,7 +176,7 @@ function getSessionKey(timeMs, sessionTf) {
 // ---- Candle normalizer ----
 function normalizeCandle(raw) {
     const timeMs = (() => {
-        const t = raw.time ?? raw.timestamp ?? raw.ts ?? raw.t;
+        const t = raw.timeMs ?? raw.time ?? raw.timestamp ?? raw.ts ?? raw.t;
         if (t == null) return null;
         const n = Number(t);
         if (Number.isFinite(n)) return n < 1e12 ? n * 1000 : n;
@@ -170,6 +189,60 @@ function normalizeCandle(raw) {
     const close = Number(raw.close ?? raw.c);
     if (!Number.isFinite(timeMs) || !Number.isFinite(high) || !Number.isFinite(low)) return null;
     return { timeMs, open, high, low, close };
+}
+
+function bucketStartMs(timeMs, tf) {
+    const d = new Date(timeMs);
+    const y = d.getUTCFullYear();
+    const m = d.getUTCMonth();
+    const day = d.getUTCDate();
+    const hour = d.getUTCHours();
+    const minute = d.getUTCMinutes();
+
+    if (tf === 'M15') {
+        return Date.UTC(y, m, day, hour, Math.floor(minute / 15) * 15, 0, 0);
+    }
+    if (tf === 'H1') {
+        return Date.UTC(y, m, day, hour, 0, 0, 0);
+    }
+    if (tf === 'H4') {
+        return Date.UTC(y, m, day, Math.floor(hour / 4) * 4, 0, 0, 0);
+    }
+    if (tf === 'D1') {
+        return Date.UTC(y, m, day, 0, 0, 0, 0);
+    }
+    throw new Error(`Unsupported aggregation timeframe: ${tf}`);
+}
+
+function aggregateCandles(candles, tf) {
+    const norm = candles.map(normalizeCandle).filter(Boolean).sort((a, b) => a.timeMs - b.timeMs);
+    const aggregated = [];
+    let cur = null;
+
+    for (const c of norm) {
+        const timeMs = bucketStartMs(c.timeMs, tf);
+        if (!cur || cur.timeMs !== timeMs) {
+            if (cur) aggregated.push(cur);
+            cur = { timeMs, open: c.open, high: c.high, low: c.low, close: c.close };
+        } else {
+            cur.high = Math.max(cur.high, c.high);
+            cur.low = Math.min(cur.low, c.low);
+            cur.close = c.close;
+        }
+    }
+
+    if (cur) aggregated.push(cur);
+    return aggregated;
+}
+
+function buildHelperFeeds(sourceCandles) {
+    const m15 = aggregateCandles(sourceCandles, 'M15');
+    return {
+        M15: m15,
+        H1: aggregateCandles(m15, 'H1'),
+        H4: aggregateCandles(m15, 'H4'),
+        D1: aggregateCandles(m15, 'D1'),
+    };
 }
 
 // ---- Build completed sessions ----
@@ -338,34 +411,35 @@ function loadCandles(symbol, tf) {
     return raw;
 }
 
+function loadSourceCandles(symbol) {
+    return loadCandles(symbol, SOURCE_TIMEFRAME);
+}
+
 // ---- Staleness guard ----
 function checkStaleness(mt5Mtime) {
     // mt5Mtime = Date object of mt5-levels.json last modification
     for (const sym of SYMBOLS) {
-        for (const tf of TIMEFRAMES) {
-            const candles = loadCandles(sym, tf);
-            const norm = candles.map(normalizeCandle).filter(Boolean);
-            if (!norm.length) {
-                console.error(`FAIL: no valid candles in ${path.join(CANDLE_DIR, `${sym}_${tf}.json`)}`);
-                process.exit(1);
-            }
-            const lastMs   = Math.max(...norm.map(c => c.timeMs));
-            const staleMs  = STALE_MS[tf];
-            const mt5Ms    = mt5Mtime.getTime();
-            // Guard: last candle must be within staleMs of mt5 export time
-            // (last candle should be "recent" - within one period of mt5 mtime)
-            if (lastMs < mt5Ms - staleMs) {
-                const lastDate = new Date(lastMs).toISOString();
-                const mt5Date  = mt5Mtime.toISOString();
-                console.error(
-                    `FAIL: stale candles in ${sym}_${tf}.json - ` +
-                    `last candle ${lastDate}, mt5 export ${mt5Date}, ` +
-                    `max allowed gap: ${staleMs / 1000}s`
-                );
-                process.exit(1);
-            }
-            console.log(`  [staleness OK] ${sym} ${tf}: last candle ${new Date(lastMs).toISOString()}`);
+        const candles = loadSourceCandles(sym);
+        const norm = candles.map(normalizeCandle).filter(Boolean);
+        if (!norm.length) {
+            console.error(`FAIL: no valid candles in ${path.join(CANDLE_DIR, `${sym}_${SOURCE_TIMEFRAME}.json`)}`);
+            process.exit(1);
         }
+        const lastMs   = Math.max(...norm.map(c => c.timeMs));
+        const staleMs  = STALE_MS[SOURCE_TIMEFRAME];
+        const mt5Ms    = mt5Mtime.getTime();
+        // Guard: last source candle must be within one M15 period of mt5 mtime.
+        if (lastMs < mt5Ms - staleMs) {
+            const lastDate = new Date(lastMs).toISOString();
+            const mt5Date  = mt5Mtime.toISOString();
+            console.error(
+                `FAIL: stale candles in ${sym}_${SOURCE_TIMEFRAME}.json - ` +
+                `last candle ${lastDate}, mt5 export ${mt5Date}, ` +
+                `max allowed gap: ${staleMs / 1000}s`
+            );
+            process.exit(1);
+        }
+        console.log(`  [staleness OK] ${sym} ${SOURCE_TIMEFRAME}: last candle ${new Date(lastMs).toISOString()}`);
     }
 }
 
@@ -395,14 +469,20 @@ function main() {
     const metaRows = [];
 
     for (const sym of SYMBOLS) {
+        const sourceCandles = loadSourceCandles(sym);
+        const helperFeeds = buildHelperFeeds(sourceCandles);
+
         for (const tf of TIMEFRAMES) {
             const sessionTf   = toSessionTf(tf);
             const authorityTf = toAuthorityTf(sessionTf);
-            const candles     = loadCandles(sym, tf);
+            const ltfHelperTf = helperTimeframeForSessionTf(sessionTf);
+            const htfHelperTf = helperTimeframeForSessionTf(authorityTf);
+            const ltfCandles  = helperFeeds[ltfHelperTf];
+            const htfCandles  = helperFeeds[htfHelperTf];
             const threshold   = compressionThreshold(sym);
 
-            const ltf = computeLtfAnchorWithCompression(candles, sessionTf, threshold);
-            const htf = computeHtfAnchorWithCompression(candles, authorityTf, threshold);
+            const ltf = computeLtfAnchorWithCompression(ltfCandles, sessionTf, threshold);
+            const htf = computeHtfAnchorWithCompression(htfCandles, authorityTf, threshold);
 
             if (!ltf && !htf) {
                 console.error(`FAIL: no anchor computable for ${sym} ${tf}`);
@@ -423,6 +503,8 @@ function main() {
                     symbol: sym, timeframe: tf, family,
                     session_tf: sessionTf,
                     authority_tf: authorityTf,
+                    ltf_helper_tf: ltfHelperTf,
+                    htf_helper_tf: htfHelperTf,
                     compression_threshold: threshold,
                     anchor_high: anchor.high,
                     anchor_low:  anchor.low,
@@ -432,9 +514,11 @@ function main() {
         }
     }
 
-    // Row count guard
-    if (levels.length !== 384) {
-        console.error(`FAIL: expected 384 output rows, got ${levels.length}`);
+    // Row count guard: symbols × timeframes × 2 families × 16 ratios.
+    // Computed dynamically so --symbols / --timeframes overrides are respected.
+    const EXPECTED_ROWS = SYMBOLS.length * TIMEFRAMES.length * 2 * RATIOS.length;
+    if (levels.length !== EXPECTED_ROWS) {
+        console.error(`FAIL: expected ${EXPECTED_ROWS} output rows, got ${levels.length}`);
         process.exit(1);
     }
 
@@ -452,6 +536,8 @@ function main() {
         candle_dir:   CANDLE_DIR,
         mt5_file:     MT5_FILE,
         mt5_mtime:    mt5Mtime.toISOString(),
+        source_timeframe: SOURCE_TIMEFRAME,
+        helper_feed_ladder: { Daily: 'M15', Weekly: 'H1', Monthly: 'D1', Quarterly: 'D1', Yearly: 'D1' },
         session_ladder: { M15: 'Daily', H1: 'Weekly', H4: 'Monthly', D1: 'Quarterly' },
         authority_ladder: { Daily: 'Weekly', Weekly: 'Monthly', Monthly: 'Quarterly', Quarterly: 'Yearly' },
         output_rows:  levels.length,

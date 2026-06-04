@@ -1,6 +1,6 @@
 //@version=6
 const string INDICATOR_NAME = "SMC SuperFib"
-const string INDICATOR_BUILD = "v13.1.3 - HTF F3 authority + level mirror patch"
+const string INDICATOR_BUILD = "v13.1.3 - HTF auth_f1 authority + level mirror patch"
 indicator(INDICATOR_NAME + " " + INDICATOR_BUILD + " Smart Layout", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500, max_bars_back=5000)
 
 var GD = "Display"
@@ -17,7 +17,7 @@ _auto_session_tf =
      _tf_secs_for_session <= 14400 ? "Monthly"   :
      _tf_secs_for_session <= 86400 ? "Quarterly" : "Yearly"
 session_tf = session_tf_override_on ? session_tf_override : _auto_session_tf
-// v13.2: HTF Authority Fib (AF) is the F3 from the next higher session.
+// v13.2: HTF Authority Fib (AF) is auth_f1 from the next higher session.
 string _authority_session_tf =
      session_tf == "Daily"      ? "Weekly"   :
      session_tf == "Weekly"     ? "Monthly"  :
@@ -606,7 +606,7 @@ if not na(raw_time)
 if not na(auth_raw_time)
     int auth_new_key = get_period_key(auth_raw_time, _authority_session_tf)
     if auth_new_key != auth_cur_key and auth_cur_key != 0
-        // v13.2 HTF AF uses the F3 range from the next higher timeframe.
+        // v13.2 HTF AF accumulates sessions; draw anchor is auth_f1 (auth_s1), not F3.
         auth_s3_high   := auth_s2_high
         auth_s3_low    := auth_s2_low
         auth_s3_open   := auth_s2_open

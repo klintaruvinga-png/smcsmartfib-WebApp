@@ -46,9 +46,19 @@ describe('run-phase4-parity.ps1 automation contract', () => {
     expect(source).toMatch(/\[int\]\$CandleLimit\s*=/);
     expect(source).toContain('scripts/export-mt5-candles.ps1');
     expect(source).toMatch(/if \(-not \$SkipCandleExport\)/);
-    expect(source).toMatch(/"-CandleDir",\s*\$candleRoot/);
-    expect(source).toMatch(/"-Limit",\s*\$CandleLimit/);
+    expect(source).toMatch(/CandleDir\s*=\s*\$candleRoot/);
+    expect(source).toMatch(/Limit\s*=\s*\$CandleLimit/);
+    expect(source).toMatch(/Timeframes\s*=\s*\[string\[\]\]\$candleExportTimeframes/);
     expect(source.indexOf('export-mt5-candles.ps1')).toBeLessThan(source.indexOf('Test-CandleFiles $candleRoot'));
+  });
+
+  test('uses M15 as the only exported candle source while preserving output timeframe selection', () => {
+    const source = readScript();
+
+    expect(source).toContain('$candleExportTimeframes = @("M15")');
+    expect(source).toContain('Test-CandleFiles $candleRoot $symbols $candleExportTimeframes $referenceUtc');
+    expect(source).toMatch(/"--timeframes",\s*\(\$timeframes -join ","\)/);
+    expect(source).toMatch(/\$combined \| Where-Object \{ \(\$symbols -contains \$_.symbol\) -and \(\$timeframes -contains \$_.timeframe\) \}/);
   });
 
   test('uses existing generator and validator with the required file arguments', () => {
