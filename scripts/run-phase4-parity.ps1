@@ -527,7 +527,9 @@ $phpArgs = @(
     "--mt5-file", $mt5LevelsFile,
     "--pine-file", $pineLevelsFile,
     "--out", $gateFile,
-    "--run-ts", $runTs
+    "--run-ts", $runTs,
+    "--symbols", ($gateSymbols -join ","),
+    "--timeframes", ($timeframes -join ",")
 )
 $validatorExitCode = Start-ExternalCommand "php" $phpArgs
 

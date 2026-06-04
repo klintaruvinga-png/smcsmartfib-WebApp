@@ -27,12 +27,21 @@ const ACCEPTABLE_DRIFT      = 0.001;
 const PARITY_GATE_PCT       = 99.0;
 
 // ---- Bootstrap ----
-$opts = getopt('', array('mt5-file:', 'pine-file:', 'out:', 'run-ts:'));
+$opts = getopt('', array('mt5-file:', 'pine-file:', 'out:', 'run-ts:', 'symbols:', 'timeframes:'));
 $mt5File  = isset($opts['mt5-file'])  ? $opts['mt5-file']  : null;
 $pineFile = isset($opts['pine-file']) ? $opts['pine-file'] : null;
 $outFile  = isset($opts['out'])       ? $opts['out']       : null;
 
 $runTs = isset($opts['run-ts']) ? $opts['run-ts'] : gmdate('c');
+
+// Scope overrides: passed by run-phase4-parity.ps1 --symbols / --timeframes.
+// Defaults match the full official gate so the validator can still run standalone.
+$SCOPE_SYMBOLS    = isset($opts['symbols'])    && trim($opts['symbols'])    !== ''
+                    ? array_values(array_filter(array_map('trim', explode(',', $opts['symbols']))))
+                    : array('EURUSD', 'USDJPY', 'XAUUSD');
+$SCOPE_TIMEFRAMES = isset($opts['timeframes']) && trim($opts['timeframes']) !== ''
+                    ? array_values(array_filter(array_map('trim', explode(',', $opts['timeframes']))))
+                    : array('M15', 'H1', 'H4', 'D1');
 $runDate = substr($runTs, 0, 10);
 
 if ($mt5File === null && $pineFile === null) {
@@ -83,11 +92,13 @@ function load_levels_file($path) {
 }
 
 function phase4_required_symbols() {
-    return array('EURUSD', 'USDJPY', 'XAUUSD');
+    global $SCOPE_SYMBOLS;
+    return $SCOPE_SYMBOLS;
 }
 
 function phase4_required_timeframes() {
-    return array('M15', 'H1', 'H4', 'D1');
+    global $SCOPE_TIMEFRAMES;
+    return $SCOPE_TIMEFRAMES;
 }
 
 function phase4_required_families() {

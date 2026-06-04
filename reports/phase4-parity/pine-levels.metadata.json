@@ -3,10 +3,10 @@
   "version": "v13.1.3",
   "source": "local-candles-pine-v13-compatible",
   "authority": "NOT a live TradingView/Pine export - locally computed Pine v13-compatible reference",
-  "generated_at": "2026-06-04T11:20:56.3066232+00:00",
+  "generated_at": "2026-06-04T11:45:28.1546942+00:00",
   "candle_dir": "C:\\Users\\LEONNA\\OneDrive\\All Final Softwares\\SMC SuperFib Dashboard\\smcsmartfib-WebApp\\data",
   "mt5_file": "C:\\Users\\LEONNA\\OneDrive\\All Final Softwares\\SMC SuperFib Dashboard\\smcsmartfib-WebApp\\reports\\phase4-parity\\mt5-levels.json",
-  "mt5_mtime": "2026-06-04T11:21:17.892Z",
+  "mt5_mtime": "2026-06-04T11:45:44.280Z",
   "source_timeframe": "M15",
   "helper_feed_ladder": {
     "Daily": "M15",

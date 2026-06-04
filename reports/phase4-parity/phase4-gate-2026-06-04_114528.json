@@ -1,0 +1,1025 @@
+{
+    "run_date": "2026-06-04",
+    "run_ts": "2026-06-04T11:45:28.1546942+00:00",
+    "overall_parity_pct": 54.17,
+    "gate": "FAIL",
+    "total_tuples": 96,
+    "exact_matches": 35,
+    "acceptable_drift": 17,
+    "critical_mismatches_count": 44,
+    "by_symbol": {
+        "EURUSD": {
+            "M15": {
+                "total": 32,
+                "exact": 18,
+                "acceptable": 14,
+                "critical": 0,
+                "parity_pct": 100,
+                "mismatches": []
+            }
+        },
+        "USDJPY": {
+            "M15": {
+                "total": 32,
+                "exact": 1,
+                "acceptable": 3,
+                "critical": 28,
+                "parity_pct": 12.5,
+                "mismatches": [
+                    {
+                        "family": "LTF_SF",
+                        "ratio": -200,
+                        "mt5_price": 161.44,
+                        "pine_price": 161.52399999999997,
+                        "drift": 0.08399999999997476,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": -162.5,
+                        "mt5_price": 161.1865,
+                        "pine_price": 161.25474999999997,
+                        "drift": 0.06824999999997772,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": -100,
+                        "mt5_price": 160.764,
+                        "pine_price": 160.80599999999998,
+                        "drift": 0.04199999999997317,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": -62.5,
+                        "mt5_price": 160.5105,
+                        "pine_price": 160.53674999999998,
+                        "drift": 0.026249999999976126,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": -25,
+                        "mt5_price": 160.257,
+                        "pine_price": 160.26749999999998,
+                        "drift": 0.010499999999979082,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 25,
+                        "mt5_price": 159.919,
+                        "pine_price": 159.9085,
+                        "drift": 0.010500000000007503,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 50,
+                        "mt5_price": 159.75,
+                        "pine_price": 159.72899999999998,
+                        "drift": 0.021000000000015007,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 62.5,
+                        "mt5_price": 159.6655,
+                        "pine_price": 159.63925,
+                        "drift": 0.026250000000004547,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 75,
+                        "mt5_price": 159.581,
+                        "pine_price": 159.5495,
+                        "drift": 0.03149999999999409,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 100,
+                        "mt5_price": 159.412,
+                        "pine_price": 159.37,
+                        "drift": 0.04200000000000159,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 125,
+                        "mt5_price": 159.243,
+                        "pine_price": 159.19050000000001,
+                        "drift": 0.05249999999998067,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 162.5,
+                        "mt5_price": 158.9895,
+                        "pine_price": 158.92125000000001,
+                        "drift": 0.06824999999997772,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 200,
+                        "mt5_price": 158.736,
+                        "pine_price": 158.65200000000002,
+                        "drift": 0.08399999999997476,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 262.5,
+                        "mt5_price": 158.3135,
+                        "pine_price": 158.20325000000003,
+                        "drift": 0.11024999999997931,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 300,
+                        "mt5_price": 158.06,
+                        "pine_price": 157.93400000000003,
+                        "drift": 0.12599999999997635,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "HTF_AF",
+                        "ratio": -200,
+                        "mt5_price": 161.442,
+                        "pine_price": 161.44899999999998,
+                        "drift": 0.0069999999999765805,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "HTF_AF",
+                        "ratio": -162.5,
+                        "mt5_price": 161.106375,
+                        "pine_price": 161.11225,
+                        "drift": 0.0058749999999747615,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "HTF_AF",
+                        "ratio": -100,
+                        "mt5_price": 160.547,
+                        "pine_price": 160.551,
+                        "drift": 0.003999999999990678,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "HTF_AF",
+                        "ratio": -62.5,
+                        "mt5_price": 160.211375,
+                        "pine_price": 160.21425,
+                        "drift": 0.0028749999999888587,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "HTF_AF",
+                        "ratio": -25,
+                        "mt5_price": 159.87575,
+                        "pine_price": 159.8775,
+                        "drift": 0.0017499999999870397,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "HTF_AF",
+                        "ratio": 0,
+                        "mt5_price": 159.652,
+                        "pine_price": 159.653,
+                        "drift": 0.0010000000000047748,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "HTF_AF",
+                        "ratio": 75,
+                        "mt5_price": 158.98075,
+                        "pine_price": 158.9795,
+                        "drift": 0.0012499999999988631,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "HTF_AF",
+                        "ratio": 100,
+                        "mt5_price": 158.757,
+                        "pine_price": 158.755,
+                        "drift": 0.0020000000000095497,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "HTF_AF",
+                        "ratio": 125,
+                        "mt5_price": 158.53325,
+                        "pine_price": 158.5305,
+                        "drift": 0.0027500000000202363,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "HTF_AF",
+                        "ratio": 162.5,
+                        "mt5_price": 158.197625,
+                        "pine_price": 158.19375,
+                        "drift": 0.0038749999999936335,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "HTF_AF",
+                        "ratio": 200,
+                        "mt5_price": 157.862,
+                        "pine_price": 157.857,
+                        "drift": 0.0049999999999954525,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "HTF_AF",
+                        "ratio": 262.5,
+                        "mt5_price": 157.302625,
+                        "pine_price": 157.29575,
+                        "drift": 0.006875000000007958,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "HTF_AF",
+                        "ratio": 300,
+                        "mt5_price": 156.967,
+                        "pine_price": 156.959,
+                        "drift": 0.008000000000009777,
+                        "reason": "price_drift_exceeds_0.001"
+                    }
+                ]
+            }
+        },
+        "XAUUSD": {
+            "M15": {
+                "total": 32,
+                "exact": 16,
+                "acceptable": 0,
+                "critical": 16,
+                "parity_pct": 50,
+                "mismatches": [
+                    {
+                        "family": "LTF_SF",
+                        "ratio": -200,
+                        "mt5_price": 4686.818,
+                        "pine_price": 4685.562500000002,
+                        "drift": 1.255499999998392,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": -162.5,
+                        "mt5_price": 4656.381125,
+                        "pine_price": 4655.405562500002,
+                        "drift": 0.9755624999979773,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": -100,
+                        "mt5_price": 4605.653,
+                        "pine_price": 4605.144000000001,
+                        "drift": 0.5089999999991051,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": -62.5,
+                        "mt5_price": 4575.216125,
+                        "pine_price": 4574.987062500001,
+                        "drift": 0.22906249999869033,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": -25,
+                        "mt5_price": 4544.77925,
+                        "pine_price": 4544.830125,
+                        "drift": 0.05087500000081491,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 0,
+                        "mt5_price": 4524.488,
+                        "pine_price": 4524.7255000000005,
+                        "drift": 0.2375000000001819,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 25,
+                        "mt5_price": 4504.19675,
+                        "pine_price": 4504.6208750000005,
+                        "drift": 0.4241250000004584,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 50,
+                        "mt5_price": 4483.9055,
+                        "pine_price": 4484.516250000001,
+                        "drift": 0.6107500000007349,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 62.5,
+                        "mt5_price": 4473.759875,
+                        "pine_price": 4474.4639375,
+                        "drift": 0.7040624999999636,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 75,
+                        "mt5_price": 4463.61425,
+                        "pine_price": 4464.411625,
+                        "drift": 0.7973750000001019,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 100,
+                        "mt5_price": 4443.323,
+                        "pine_price": 4444.307,
+                        "drift": 0.9839999999994689,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 125,
+                        "mt5_price": 4423.03175,
+                        "pine_price": 4424.202375,
+                        "drift": 1.1706249999997453,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 162.5,
+                        "mt5_price": 4392.594875,
+                        "pine_price": 4394.045437499999,
+                        "drift": 1.4505624999992506,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 200,
+                        "mt5_price": 4362.158,
+                        "pine_price": 4363.888499999999,
+                        "drift": 1.7304999999987558,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 262.5,
+                        "mt5_price": 4311.429875,
+                        "pine_price": 4313.626937499998,
+                        "drift": 2.1970624999985375,
+                        "reason": "price_drift_exceeds_0.001"
+                    },
+                    {
+                        "family": "LTF_SF",
+                        "ratio": 300,
+                        "mt5_price": 4280.993,
+                        "pine_price": 4283.469999999998,
+                        "drift": 2.4769999999980428,
+                        "reason": "price_drift_exceeds_0.001"
+                    }
+                ]
+            }
+        }
+    },
+    "critical_mismatches": [
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": -200,
+            "mt5_price": 161.44,
+            "pine_price": 161.52399999999997,
+            "drift": 0.08399999999997476,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": -162.5,
+            "mt5_price": 161.1865,
+            "pine_price": 161.25474999999997,
+            "drift": 0.06824999999997772,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": -100,
+            "mt5_price": 160.764,
+            "pine_price": 160.80599999999998,
+            "drift": 0.04199999999997317,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": -62.5,
+            "mt5_price": 160.5105,
+            "pine_price": 160.53674999999998,
+            "drift": 0.026249999999976126,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": -25,
+            "mt5_price": 160.257,
+            "pine_price": 160.26749999999998,
+            "drift": 0.010499999999979082,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 25,
+            "mt5_price": 159.919,
+            "pine_price": 159.9085,
+            "drift": 0.010500000000007503,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 50,
+            "mt5_price": 159.75,
+            "pine_price": 159.72899999999998,
+            "drift": 0.021000000000015007,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 62.5,
+            "mt5_price": 159.6655,
+            "pine_price": 159.63925,
+            "drift": 0.026250000000004547,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 75,
+            "mt5_price": 159.581,
+            "pine_price": 159.5495,
+            "drift": 0.03149999999999409,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 100,
+            "mt5_price": 159.412,
+            "pine_price": 159.37,
+            "drift": 0.04200000000000159,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 125,
+            "mt5_price": 159.243,
+            "pine_price": 159.19050000000001,
+            "drift": 0.05249999999998067,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 162.5,
+            "mt5_price": 158.9895,
+            "pine_price": 158.92125000000001,
+            "drift": 0.06824999999997772,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 200,
+            "mt5_price": 158.736,
+            "pine_price": 158.65200000000002,
+            "drift": 0.08399999999997476,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 262.5,
+            "mt5_price": 158.3135,
+            "pine_price": 158.20325000000003,
+            "drift": 0.11024999999997931,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 300,
+            "mt5_price": 158.06,
+            "pine_price": 157.93400000000003,
+            "drift": 0.12599999999997635,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "HTF_AF",
+            "ratio": -200,
+            "mt5_price": 161.442,
+            "pine_price": 161.44899999999998,
+            "drift": 0.0069999999999765805,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "HTF_AF",
+            "ratio": -162.5,
+            "mt5_price": 161.106375,
+            "pine_price": 161.11225,
+            "drift": 0.0058749999999747615,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "HTF_AF",
+            "ratio": -100,
+            "mt5_price": 160.547,
+            "pine_price": 160.551,
+            "drift": 0.003999999999990678,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "HTF_AF",
+            "ratio": -62.5,
+            "mt5_price": 160.211375,
+            "pine_price": 160.21425,
+            "drift": 0.0028749999999888587,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "HTF_AF",
+            "ratio": -25,
+            "mt5_price": 159.87575,
+            "pine_price": 159.8775,
+            "drift": 0.0017499999999870397,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "HTF_AF",
+            "ratio": 0,
+            "mt5_price": 159.652,
+            "pine_price": 159.653,
+            "drift": 0.0010000000000047748,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "HTF_AF",
+            "ratio": 75,
+            "mt5_price": 158.98075,
+            "pine_price": 158.9795,
+            "drift": 0.0012499999999988631,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "HTF_AF",
+            "ratio": 100,
+            "mt5_price": 158.757,
+            "pine_price": 158.755,
+            "drift": 0.0020000000000095497,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "HTF_AF",
+            "ratio": 125,
+            "mt5_price": 158.53325,
+            "pine_price": 158.5305,
+            "drift": 0.0027500000000202363,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "HTF_AF",
+            "ratio": 162.5,
+            "mt5_price": 158.197625,
+            "pine_price": 158.19375,
+            "drift": 0.0038749999999936335,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "HTF_AF",
+            "ratio": 200,
+            "mt5_price": 157.862,
+            "pine_price": 157.857,
+            "drift": 0.0049999999999954525,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "HTF_AF",
+            "ratio": 262.5,
+            "mt5_price": 157.302625,
+            "pine_price": 157.29575,
+            "drift": 0.006875000000007958,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "HTF_AF",
+            "ratio": 300,
+            "mt5_price": 156.967,
+            "pine_price": 156.959,
+            "drift": 0.008000000000009777,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "XAUUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": -200,
+            "mt5_price": 4686.818,
+            "pine_price": 4685.562500000002,
+            "drift": 1.255499999998392,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "XAUUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": -162.5,
+            "mt5_price": 4656.381125,
+            "pine_price": 4655.405562500002,
+            "drift": 0.9755624999979773,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "XAUUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": -100,
+            "mt5_price": 4605.653,
+            "pine_price": 4605.144000000001,
+            "drift": 0.5089999999991051,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "XAUUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": -62.5,
+            "mt5_price": 4575.216125,
+            "pine_price": 4574.987062500001,
+            "drift": 0.22906249999869033,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "XAUUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": -25,
+            "mt5_price": 4544.77925,
+            "pine_price": 4544.830125,
+            "drift": 0.05087500000081491,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "XAUUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 0,
+            "mt5_price": 4524.488,
+            "pine_price": 4524.7255000000005,
+            "drift": 0.2375000000001819,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "XAUUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 25,
+            "mt5_price": 4504.19675,
+            "pine_price": 4504.6208750000005,
+            "drift": 0.4241250000004584,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "XAUUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 50,
+            "mt5_price": 4483.9055,
+            "pine_price": 4484.516250000001,
+            "drift": 0.6107500000007349,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "XAUUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 62.5,
+            "mt5_price": 4473.759875,
+            "pine_price": 4474.4639375,
+            "drift": 0.7040624999999636,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "XAUUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 75,
+            "mt5_price": 4463.61425,
+            "pine_price": 4464.411625,
+            "drift": 0.7973750000001019,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "XAUUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 100,
+            "mt5_price": 4443.323,
+            "pine_price": 4444.307,
+            "drift": 0.9839999999994689,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "XAUUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 125,
+            "mt5_price": 4423.03175,
+            "pine_price": 4424.202375,
+            "drift": 1.1706249999997453,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "XAUUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 162.5,
+            "mt5_price": 4392.594875,
+            "pine_price": 4394.045437499999,
+            "drift": 1.4505624999992506,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "XAUUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 200,
+            "mt5_price": 4362.158,
+            "pine_price": 4363.888499999999,
+            "drift": 1.7304999999987558,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "XAUUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 262.5,
+            "mt5_price": 4311.429875,
+            "pine_price": 4313.626937499998,
+            "drift": 2.1970624999985375,
+            "reason": "price_drift_exceeds_0.001"
+        },
+        {
+            "symbol": "XAUUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 300,
+            "mt5_price": 4280.993,
+            "pine_price": 4283.469999999998,
+            "drift": 2.4769999999980428,
+            "reason": "price_drift_exceeds_0.001"
+        }
+    ],
+    "acceptable_drift_detail": [
+        {
+            "symbol": "EURUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": -200,
+            "mt5_price": 1.174047,
+            "pine_price": 1.1741515000000007,
+            "drift": 0.00010450000000061799
+        },
+        {
+            "symbol": "EURUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": -162.5,
+            "mt5_price": 1.172333,
+            "pine_price": 1.1724160000000006,
+            "drift": 8.300000000049934e-5
+        },
+        {
+            "symbol": "EURUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": -100,
+            "mt5_price": 1.169477,
+            "pine_price": 1.1695235000000004,
+            "drift": 4.6500000000282427e-5
+        },
+        {
+            "symbol": "EURUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": -62.5,
+            "mt5_price": 1.167762,
+            "pine_price": 1.1677880000000003,
+            "drift": 2.6000000000303558e-5
+        },
+        {
+            "symbol": "EURUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 25,
+            "mt5_price": 1.163763,
+            "pine_price": 1.1637385,
+            "drift": 2.450000000009389e-5
+        },
+        {
+            "symbol": "EURUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 50,
+            "mt5_price": 1.16262,
+            "pine_price": 1.1625815,
+            "drift": 3.850000000005238e-5
+        },
+        {
+            "symbol": "EURUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 62.5,
+            "mt5_price": 1.162049,
+            "pine_price": 1.162003,
+            "drift": 4.600000000021254e-5
+        },
+        {
+            "symbol": "EURUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 75,
+            "mt5_price": 1.161477,
+            "pine_price": 1.1614244999999999,
+            "drift": 5.2500000000232916e-5
+        },
+        {
+            "symbol": "EURUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 100,
+            "mt5_price": 1.160335,
+            "pine_price": 1.1602674999999998,
+            "drift": 6.750000000010914e-5
+        },
+        {
+            "symbol": "EURUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 125,
+            "mt5_price": 1.159192,
+            "pine_price": 1.1591104999999997,
+            "drift": 8.150000000028967e-5
+        },
+        {
+            "symbol": "EURUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 162.5,
+            "mt5_price": 1.157478,
+            "pine_price": 1.1573749999999996,
+            "drift": 0.00010300000000040832
+        },
+        {
+            "symbol": "EURUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 200,
+            "mt5_price": 1.155763,
+            "pine_price": 1.1556394999999995,
+            "drift": 0.00012350000000060923
+        },
+        {
+            "symbol": "EURUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 262.5,
+            "mt5_price": 1.152907,
+            "pine_price": 1.1527469999999993,
+            "drift": 0.0001600000000006041
+        },
+        {
+            "symbol": "EURUSD",
+            "timeframe": "M15",
+            "family": "LTF_SF",
+            "ratio": 300,
+            "mt5_price": 1.151193,
+            "pine_price": 1.1510114999999992,
+            "drift": 0.00018150000000072275
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "HTF_AF",
+            "ratio": 25,
+            "mt5_price": 159.42825,
+            "pine_price": 159.42849999999999,
+            "drift": 0.0002499999999940883
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "HTF_AF",
+            "ratio": 50,
+            "mt5_price": 159.2045,
+            "pine_price": 159.204,
+            "drift": 0.0004999999999881766
+        },
+        {
+            "symbol": "USDJPY",
+            "timeframe": "M15",
+            "family": "HTF_AF",
+            "ratio": 62.5,
+            "mt5_price": 159.092625,
+            "pine_price": 159.09175,
+            "drift": 0.0008750000000077307
+        }
+    ],
+    "required_coverage": {
+        "symbols": [
+            "EURUSD",
+            "USDJPY",
+            "XAUUSD"
+        ],
+        "timeframes": [
+            "M15"
+        ],
+        "families": [
+            "LTF_SF",
+            "HTF_AF"
+        ],
+        "ratios_per_group": 16,
+        "expected_tuple_count": 96,
+        "expected_group_count": 6,
+        "mt5_present_tuple_count": 96,
+        "pine_present_tuple_count": 96,
+        "mt5_present_group_count": 6,
+        "pine_present_group_count": 6,
+        "mt5_missing_tuple_count": 0,
+        "pine_missing_tuple_count": 0
+    },
+    "ignored_non_phase4_tuples": {
+        "mt5_count": 0,
+        "pine_count": 0
+    },
+    "thresholds": {
+        "exact_match": 1.0e-5,
+        "acceptable": 0.001,
+        "gate_pct": 99
+    }
+}
