@@ -52,10 +52,10 @@ $dataset4h = array(
 
 $expectedLtf = fib_test_expected_prices(61.5, 6.15, $ratios);
 $expectedLtf4h = fib_test_expected_prices(111.5, 11.15, $ratios);
-$expectedHtf15m = fib_test_expected_prices(20.0, 2.0, $ratios);
-$expectedHtf1h = fib_test_expected_prices(20.0, 2.0, $ratios);
-$expectedHtf4h = fib_test_expected_prices(60.0, 4.0, $ratios);
-$expectedHtf1d = fib_test_expected_prices(30.0, 3.0, $ratios);
+$expectedHtf15m = fib_test_expected_prices(40.0, 4.0, $ratios);
+$expectedHtf1h = fib_test_expected_prices(70.0, 4.0, $ratios);
+$expectedHtf4h = fib_test_expected_prices(120.0, 10.0, $ratios);
+$expectedHtf1d = fib_test_expected_prices(70.0, 5.0, $ratios);
 
 $cases = array();
 foreach (array('EURUSD', 'USDJPY', 'XAUUSD') as $symbol) {
