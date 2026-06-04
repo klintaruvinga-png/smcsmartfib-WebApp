@@ -276,6 +276,13 @@ describe("getMinExecutableStageLot", () => {
     ["EURUSD", 0.01],
     ["GBPJPY", 0.01],
     ["AUDUSD", 0.01],
+    ["EURGBP", 0.01],
+    ["GBPAUD", 0.01],
+    ["AUDCAD", 0.01],
+    ["CADJPY", 0.01],
+    ["CHFJPY", 0.01],
+    ["EURGBP.micro", 0.01],
+    ["EURGBP.cent", 0.01],
     [undefined, 0.01],
     ["XAUUSD", 0.1],
     ["XAUUSDm", 0.1],
@@ -300,6 +307,10 @@ describe("getMinExecutableStageLot", () => {
     ["DAX40", 0.1],
     ["USDZAR", 0.1],
     ["USDZAR.pro", 0.1],
+    ["USDZAR.micro", 0.01],
+    ["USDZAR.cent", 0.01],
+    ["USDZAR.m", 0.01],
+    ["USDZAR.c", 0.01],
   ];
 
   it.each(cases)("resolves executable minimum for %s", (symbol, expected) => {
@@ -325,8 +336,14 @@ describe("isExecutableStageLotValue symbol-aware boundaries", () => {
     [0.01, "USDZAR", false],
     [0.099, "USDZAR", false],
     [0.1, "USDZAR", true],
+    [0.01, "USDZAR.micro", true],
+    [0.01, "USDZAR.cent", true],
+    [0.01, "USDZAR.m", true],
+    [0.01, "USDZAR.c", true],
     [0.009, "EURUSD", false],
     [0.01, "EURUSD", true],
+    [0.009, "EURGBP.micro", false],
+    [0.01, "EURGBP.micro", true],
   ];
 
   it.each(cases)("classifies lot %s for %s as executable=%s", (lot, symbol, expected) => {

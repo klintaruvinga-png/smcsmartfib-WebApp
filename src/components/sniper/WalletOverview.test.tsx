@@ -22,17 +22,17 @@ describe("WalletOverview", () => {
     cleanup();
   });
 
-  it("renders backend account telemetry values read-only", () => {
+  it("renders USC telemetry in account currency with local-currency subtitles", () => {
     hookMocks.useAccountTelemetry.mockReturnValue({
       data: {
         accountId: "32206603",
         terminalId: "terminal-1",
-        balance: 12500,
-        equity: 12725,
+        balance: 5535.59,
+        equity: 9206.75,
         margin: 1500,
         freeMargin: 11225,
         marginLevel: 848.33,
-        floatingPl: 225,
+        floatingPl: 3671.16,
         currency: "USC",
         leverage: 500,
         eaVersion: "1.00",
@@ -47,9 +47,12 @@ describe("WalletOverview", () => {
     render(<WalletOverview />);
 
     expect(screen.getByText("Account")).toBeTruthy();
-    expect(screen.getByText("$12,725.00")).toBeTruthy();
-    expect(screen.getByText("$12,500.00")).toBeTruthy();
-    expect(screen.getByText("+225.00")).toBeTruthy();
+    expect(screen.getByText("USC 9,206.75")).toBeTruthy();
+    expect(screen.getByText("USC 5,535.59")).toBeTruthy();
+    expect(screen.getByText("+USC 3,671.16")).toBeTruthy();
+    expect(screen.getByText("Local ZAR 1,703.25")).toBeTruthy();
+    expect(screen.getByText("Local ZAR 1,024.08")).toBeTruthy();
+    expect(screen.queryByText("$9,206.75")).toBeNull();
   });
 
   it("shows the degraded backend-owned state when telemetry is unavailable", () => {

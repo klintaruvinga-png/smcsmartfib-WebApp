@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { fmtLocalCurrency } from "./format";
+import { fmtCurrency, fmtLocalCurrency } from "./format";
+
+describe("fmtCurrency", () => {
+  it("formats USC as account-currency cents instead of USD dollars", () => {
+    expect(fmtCurrency(46.04, "USC")).toBe("USC 46.04");
+    expect(fmtCurrency(46.04, "USC", true)).toBe("+USC 46.04");
+  });
+});
 
 describe("fmtLocalCurrency", () => {
   it("returns a placeholder for missing or non-finite values", () => {

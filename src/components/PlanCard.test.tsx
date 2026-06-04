@@ -111,6 +111,27 @@ describe("PlanCandidateCard", () => {
     expect(screen.getByText("Below min 0.10")).toBeTruthy();
     expect(screen.getAllByText("Ready")).toHaveLength(2);
   });
+
+  it("renders USC plan risk without treating cents as USD before local conversion", () => {
+    render(
+      <PlanCandidateCard
+        signal={signal}
+        plan={{
+          ...plan,
+          riskUSC: 46.04,
+          riskZAR: 8.52,
+        }}
+        planComplete
+      />,
+    );
+
+    const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
+    expect(cardText).toContain("USC 46.04");
+    expect(cardText).toContain("ZAR");
+    expect(cardText).toContain("8.52");
+    expect(cardText).not.toContain("$46.04");
+    expect(cardText).not.toContain("851");
+  });
 });
 
 const signal: SignalCandidate = {

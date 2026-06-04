@@ -15,8 +15,7 @@ function progressive_expected_plan($risk_usc, $high, $low, $direction, $pip, $pi
     $stops = array();
     $lots = array();
     $stage_risk_amounts = array();
-    $account_currency = strtoupper(trim((string) $currency));
-    $sizing_risk = $account_currency === 'USC' ? ($risk_usc / 100) : $risk_usc;
+    $sizing_risk = $risk_usc;
 
     foreach (array('e1', 'e2', 'e3') as $stage) {
         $entries[$stage] = progressive_price($high, $low, $entry_ratios[$stage]);
@@ -57,8 +56,7 @@ function progressive_expected_plan($risk_usc, $high, $low, $direction, $pip, $pi
         $stop = $stops[$stage];
         $stop_dist = max(abs($entry - $stop), $pip);
         $stop_pips = $stop_dist / $pip;
-        $risk_amount = round($lots[$stage] * $stop_pips * $pip_val, 2);
-        $stage_risk_amounts[$stage] = $account_currency === 'USC' ? round($risk_amount * 100, 2) : $risk_amount;
+        $stage_risk_amounts[$stage] = round($lots[$stage] * $stop_pips * $pip_val, 2);
     }
 
     return array(
@@ -231,6 +229,39 @@ fib_test_assert_true($eurgbp_plan['lotSize']['e2'] < $eurgbp_plan['lotSize']['e3
 fib_test_assert_true($eurgbp_plan['entries']['e2'] < $eurgbp_plan['stops']['e1'], 'EURGBP SELL E2 must sit below the E1 stop');
 fib_test_assert_true($eurgbp_plan['entries']['e3'] < $eurgbp_plan['stops']['e2'], 'EURGBP SELL E3 must sit below the E2 stop');
 fib_test_assert_true($expected_eurgbp['totalRisk'] <= $eurgbp_plan['riskUSC'], 'EURGBP staged risk must stay within the configured family risk cap');
+
+fib_test_reset_env(212);
+fib_test_seed_account_blob(212, array(
+    'riskProfile' => array(
+        'tier' => 'balanced',
+        'maxConcurrentTrades' => 3,
+        'perTradePct' => 0.5,
+        'dailyMaxPct' => 2.0,
+        'ddCapPct' => 6.0,
+        'cooldownMin' => 30,
+        'updatedAt' => gmdate('c'),
+    ),
+    'account' => array(
+        'equityUSC' => 9206.75,
+        'updatedAt' => gmdate('c'),
+    ),
+));
+progressive_seed_account_telemetry(212, 9206.75);
+fib_test_seed_snapshot(212, 'GBPUSD', 1.2675);
+
+$usc_eurgbp_plan = progressive_build_plan(212, array(
+    'id' => 'sig-usc-eurgbp',
+    'symbol' => 'EURGBP',
+    'direction' => 'SHORT',
+), 0.8610, 0.8450);
+
+fib_test_assert_same(46.03, $usc_eurgbp_plan['riskUSC'], 'USC account risk must remain cent-denominated');
+fib_test_assert_near(8.52, $usc_eurgbp_plan['riskZAR'], 0.01, 'USC account ZAR risk must convert cents through USD first');
+fib_test_assert_same(0.01, $usc_eurgbp_plan['minExecutableLot'], 'USC account forex plan should publish a 0.01 minimum lot');
+fib_test_assert_true(
+    max($usc_eurgbp_plan['lotSize']['e1'], $usc_eurgbp_plan['lotSize']['e2'], $usc_eurgbp_plan['lotSize']['e3']) >= 0.01,
+    'USC account EURGBP plan should produce at least one executable 0.01+ lot stage'
+);
 
 fib_test_reset_env(303);
 fib_test_seed_account_blob(303, array(

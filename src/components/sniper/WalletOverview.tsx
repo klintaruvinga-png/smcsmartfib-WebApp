@@ -4,6 +4,8 @@ import { useAccountTelemetry } from "@/hooks/useSniperData";
 import { fmtCurrency } from "@/lib/format";
 import { FreshnessBadge } from "./FreshnessBadge";
 
+const USD_TO_ZAR_RATE = 18.5;
+
 export function WalletOverview() {
   const { data: account, isLoading, error } = useAccountTelemetry();
 
@@ -56,8 +58,6 @@ export function WalletOverview() {
 
   const cur = account.currency;
   const floating = account.floatingPl;
-  const onePctBalance = account.balance * 0.01;
-  const onePctEquity = account.equity * 0.01;
   const marginLevel = account.marginLevel > 0 ? account.marginLevel : 0;
   const marginStrength = marginLevel > 1000 ? "Strong" : marginLevel > 200 ? "Healthy" : "Tight";
 
@@ -79,27 +79,19 @@ export function WalletOverview() {
             label="EQUITY"
             value={fmtCurrency(account.equity, cur)}
             valueClass="text-buy"
-            sub={
-              <span className="text-mute">
-                1% = {onePctEquity.toFixed(2)} {cur}
-              </span>
-            }
+            sub={<span className="text-mute">{formatLocalZar(account.equity, cur)}</span>}
           />
           <Cell
             label="BALANCE"
             value={fmtCurrency(account.balance, cur)}
             valueClass="text-info"
-            sub={
-              <span className="text-mute">
-                1% = {onePctBalance.toFixed(2)} {cur}
-              </span>
-            }
+            sub={<span className="text-mute">{formatLocalZar(account.balance, cur)}</span>}
           />
           <Cell
             label="FLOATING P/L"
-            value={`${floating >= 0 ? "+" : ""}${floating.toFixed(2)}`}
+            value={fmtCurrency(floating, cur, true)}
             valueClass={floating >= 0 ? "text-buy" : "text-sell"}
-            sub={<span className="text-mute">{cur} open exposure</span>}
+            sub={<span className="text-mute">{formatLocalZar(floating, cur)}</span>}
           />
           <Cell
             label="MARGIN LEVEL"
@@ -111,6 +103,18 @@ export function WalletOverview() {
       </div>
     </section>
   );
+}
+
+function accountCurrencyToUsd(value: number, currency?: string | null): number {
+  return (currency ?? "").toUpperCase() === "USC" ? value / 100 : value;
+}
+
+function formatLocalZar(value: number, currency?: string | null): string {
+  const zar = accountCurrencyToUsd(value, currency) * USD_TO_ZAR_RATE;
+  return `Local ZAR ${zar.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function Cell({

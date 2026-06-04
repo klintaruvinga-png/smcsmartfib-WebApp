@@ -6404,9 +6404,7 @@ final class SMC_SuperFib_Sniper_REST {
         $pip_val = $spec ? $this->pip_value_per_standard_lot($user_id, $sym, $spec) : 10.0;
         $min_executable_lot = $this->get_min_executable_lot($sym, $user_id);
         $account_currency = strtoupper(trim((string) ($telemetry['currency'] ?? '')));
-        // MT5 cent accounts report equity/risk in USC, while pip values are USD-denominated.
-        // Convert USC cents back to USD before dividing by pip value so lot sizing is not 100x too large.
-        $sizing_risk = $account_currency === 'USC' ? ($risk_usc / 100) : $risk_usc;
+        $sizing_risk = $risk_usc;
         $is_reference_instrument = is_array($spec) && (($spec['type'] ?? '') === 'reference');
 
         // Compute swings for SL using the candles already fetched by build_symbol_state().
@@ -6487,7 +6485,7 @@ final class SMC_SuperFib_Sniper_REST {
             'minExecutableLot' => $min_executable_lot,
             'ladder' => $ladder,
             'riskUSC' => $risk_usc,
-            'riskZAR' => $has_live_sizing_equity ? round($risk_usc * 18.5, 2) : 0.0,
+            'riskZAR' => $has_live_sizing_equity ? $this->account_currency_to_zar($risk_usc, $account_currency) : 0.0,
             'drawdownImpactPct' => $has_live_sizing_equity ? round(($risk_usc / $equity) * 100, 4) : 0.0,
             'source' => 'backend-blueprint',
             'executionSource' => 'LTF_SF',
@@ -8882,18 +8880,57 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function get_min_executable_lot($symbol, $user_id = 0) {
+        $spec = $this->get_instrument_spec($symbol);
+        $type = is_array($spec) ? (string) ($spec['type'] ?? '') : 'forex';
+        if ($type === 'forex' && $this->is_cent_or_micro_account_context($user_id, $symbol)) {
+            return 0.01;
+        }
+
         $synced_min_lot = $this->get_synced_min_lot($user_id, $symbol);
         if ($synced_min_lot > 0) {
             return $synced_min_lot;
         }
 
-        $spec = $this->get_instrument_spec($symbol);
         if (is_array($spec) && isset($spec['min_lot']) && (float) $spec['min_lot'] > 0) {
             return (float) $spec['min_lot'];
         }
 
-        $type = is_array($spec) ? (string) ($spec['type'] ?? '') : '';
         return in_array($type, array('metal', 'crypto', 'index'), true) ? 0.10 : 0.01;
+    }
+
+    private function is_cent_or_micro_account_context($user_id, $symbol) {
+        if ($this->symbol_has_cent_or_micro_suffix($symbol)) {
+            return true;
+        }
+
+        $user_id = (int) $user_id;
+        if ($user_id <= 0) {
+            return false;
+        }
+
+        $telemetry = $this->read_account_telemetry($user_id);
+        $currency = strtoupper(trim((string) ($telemetry['currency'] ?? '')));
+        return $currency === 'USC' || ($currency !== '' && substr($currency, -1) === 'C');
+    }
+
+    private function symbol_has_cent_or_micro_suffix($symbol) {
+        $token = $this->normalize_symbol_token($symbol);
+        foreach (array('MICRO', 'CENT', 'M', 'C') as $suffix) {
+            $suffix_len = strlen($suffix);
+            if (strlen($token) > $suffix_len && substr($token, -$suffix_len) === $suffix) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function account_currency_to_zar($amount, $currency) {
+        $usd_amount = strtoupper(trim((string) $currency)) === 'USC'
+            ? ((float) $amount / 100)
+            : (float) $amount;
+
+        return round($usd_amount * 18.5, 2);
     }
 
     private function get_synced_min_lot($user_id, $symbol) {

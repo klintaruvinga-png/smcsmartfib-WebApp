@@ -43,7 +43,21 @@ const SYMBOL_MIN_EXECUTABLE_LOTS: Record<string, number> = {
 
 export const MIN_EXECUTABLE_STAGE_LOT = 0.01;
 
-const BROKER_SUFFIXES = ["MICRO", "PRO", "ECN", "STP", "RAW", "M", "R", "A", "B", "C"] as const;
+const BROKER_SUFFIXES = [
+  "MICRO",
+  "CENT",
+  "PRO",
+  "ECN",
+  "STP",
+  "RAW",
+  "M",
+  "R",
+  "A",
+  "B",
+  "C",
+] as const;
+
+const CENT_ACCOUNT_SUFFIXES = ["MICRO", "CENT", "M", "C"] as const;
 
 function resolveKnownPlanToken(token: string): string | null {
   const aliased = SYMBOL_ALIASES[token] ?? token;
@@ -72,13 +86,29 @@ function normalizePlanSymbol(symbol: string | null | undefined): string {
   return token;
 }
 
+function hasCentOrMicroSuffix(symbol: string | null | undefined): boolean {
+  const token = (symbol ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+
+  return CENT_ACCOUNT_SUFFIXES.some(
+    (suffix) => token.endsWith(suffix) && token.length > suffix.length,
+  );
+}
+
 export function getMinExecutableStageLot(symbol?: string): number {
   const token = normalizePlanSymbol(symbol);
+  const instrumentType = INSTRUMENT_TYPES[token] ?? "forex";
+
+  if (hasCentOrMicroSuffix(symbol) && instrumentType === "forex") {
+    return MIN_EXECUTABLE_STAGE_LOT;
+  }
+
   if (token in SYMBOL_MIN_EXECUTABLE_LOTS) {
     return SYMBOL_MIN_EXECUTABLE_LOTS[token];
   }
 
-  const instrumentType = INSTRUMENT_TYPES[token] ?? "forex";
   return instrumentType === "metal" || instrumentType === "crypto" || instrumentType === "index"
     ? 0.1
     : MIN_EXECUTABLE_STAGE_LOT;
