@@ -105,16 +105,57 @@ export function WalletOverview() {
   );
 }
 
-function accountCurrencyToUsd(value: number, currency?: string | null): number {
-  return (currency ?? "").toUpperCase() === "USC" ? value / 100 : value;
-}
-
 function formatLocalZar(value: number, currency?: string | null): string {
-  const zar = accountCurrencyToUsd(value, currency) * USD_TO_ZAR_RATE;
+  const currencyInfo = parseAccountCurrency(currency);
+  const baseAmount = value / (currencyInfo.isCent ? 100 : 1);
+  const zar =
+    currencyInfo.base === "ZAR"
+      ? baseAmount
+      : currencyInfo.base === "USD"
+        ? baseAmount * USD_TO_ZAR_RATE
+        : null;
+
+  if (zar === null) {
+    return "Local ZAR --";
+  }
+
   return `Local ZAR ${zar.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+function parseAccountCurrency(currency?: string | null): { base: string; isCent: boolean } {
+  const raw = (currency ?? "").trim().toUpperCase();
+  let token = raw.replace(/[^A-Z]/g, "");
+  let isCent = false;
+
+  if (token === "USC") {
+    return { base: "USD", isCent: true };
+  }
+
+  for (const suffix of ["MICRO", "CENT"] as const) {
+    if (token.endsWith(suffix) && token.length > suffix.length) {
+      token = token.slice(0, -suffix.length);
+      isCent = true;
+      break;
+    }
+  }
+
+  if (!isCent && /(?:^|[.\s_-])[CM]$/.test(raw)) {
+    isCent = true;
+  }
+
+  if (!isCent && token.length > 3 && ["C", "M"].includes(token.at(-1) ?? "")) {
+    token = token.slice(0, -1);
+    isCent = true;
+  }
+
+  if (token === "EURO") {
+    token = "EUR";
+  }
+
+  return { base: token.slice(0, 3), isCent };
 }
 
 function Cell({

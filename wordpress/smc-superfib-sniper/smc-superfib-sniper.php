@@ -6485,7 +6485,7 @@ final class SMC_SuperFib_Sniper_REST {
             'minExecutableLot' => $min_executable_lot,
             'ladder' => $ladder,
             'riskUSC' => $risk_usc,
-            'riskZAR' => $has_live_sizing_equity ? $this->account_currency_to_zar($risk_usc, $account_currency) : 0.0,
+            'riskZAR' => $has_live_sizing_equity ? $this->account_currency_to_zar($user_id, $risk_usc, $account_currency) : 0.0,
             'drawdownImpactPct' => $has_live_sizing_equity ? round(($risk_usc / $equity) * 100, 4) : 0.0,
             'source' => 'backend-blueprint',
             'executionSource' => 'LTF_SF',
@@ -8909,8 +8909,8 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         $telemetry = $this->read_account_telemetry($user_id);
-        $currency = strtoupper(trim((string) ($telemetry['currency'] ?? '')));
-        return $currency === 'USC' || ($currency !== '' && substr($currency, -1) === 'C');
+        $currency_info = $this->parse_account_currency((string) ($telemetry['currency'] ?? ''));
+        return (bool) $currency_info['is_cent'];
     }
 
     private function symbol_has_cent_or_micro_suffix($symbol) {
@@ -8925,12 +8925,72 @@ final class SMC_SuperFib_Sniper_REST {
         return false;
     }
 
-    private function account_currency_to_zar($amount, $currency) {
-        $usd_amount = strtoupper(trim((string) $currency)) === 'USC'
-            ? ((float) $amount / 100)
-            : (float) $amount;
+    private function account_currency_to_zar($user_id, $amount, $currency) {
+        $currency_info = $this->parse_account_currency($currency);
+        $base_currency = $currency_info['base'];
+        $base_amount = (float) $amount / ($currency_info['is_cent'] ? 100 : 1);
 
-        return round($usd_amount * 18.5, 2);
+        if ($base_currency === 'ZAR') {
+            return round($base_amount, 2);
+        }
+
+        $rate = 0.0;
+        if ($base_currency !== '') {
+            $direct = $this->reference_mid($user_id, $base_currency . 'ZAR');
+            if ($direct > 0) {
+                $rate = $direct;
+            } else {
+                $inverse = $this->reference_mid($user_id, 'ZAR' . $base_currency);
+                if ($inverse > 0) {
+                    $rate = 1.0 / $inverse;
+                }
+            }
+        }
+
+        if ($rate <= 0 && $base_currency === 'USD') {
+            $rate = 18.5;
+        }
+
+        return $rate > 0 ? round($base_amount * $rate, 2) : 0.0;
+    }
+
+    private function parse_account_currency($currency) {
+        $raw = strtoupper(trim((string) $currency));
+        $token = preg_replace('/[^A-Z]/', '', $raw);
+        $is_cent = false;
+        $base = $token;
+
+        if ($token === 'USC') {
+            return array('base' => 'USD', 'is_cent' => true);
+        }
+
+        foreach (array('MICRO', 'CENT') as $suffix) {
+            $suffix_len = strlen($suffix);
+            if (strlen($base) > $suffix_len && substr($base, -$suffix_len) === $suffix) {
+                $base = substr($base, 0, -$suffix_len);
+                $is_cent = true;
+                break;
+            }
+        }
+
+        if (!$is_cent && preg_match('/(?:^|[\.\s_\-])(C|M)$/', $raw)) {
+            $is_cent = true;
+        }
+
+        if (!$is_cent && strlen($base) > 3 && in_array(substr($base, -1), array('C', 'M'), true)) {
+            $base = substr($base, 0, -1);
+            $is_cent = true;
+        }
+
+        if ($base === 'EURO') {
+            $base = 'EUR';
+        }
+
+        if (strlen($base) > 3) {
+            $base = substr($base, 0, 3);
+        }
+
+        return array('base' => $base, 'is_cent' => $is_cent);
     }
 
     private function get_synced_min_lot($user_id, $symbol) {

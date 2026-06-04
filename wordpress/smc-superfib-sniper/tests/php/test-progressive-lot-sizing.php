@@ -263,6 +263,65 @@ fib_test_assert_true(
     'USC account EURGBP plan should produce at least one executable 0.01+ lot stage'
 );
 
+fib_test_reset_env(213);
+fib_test_seed_account_blob(213, array(
+    'riskProfile' => array(
+        'tier' => 'balanced',
+        'maxConcurrentTrades' => 3,
+        'perTradePct' => 0.5,
+        'dailyMaxPct' => 2.0,
+        'ddCapPct' => 6.0,
+        'cooldownMin' => 30,
+        'updatedAt' => gmdate('c'),
+    ),
+    'account' => array(
+        'equityUSC' => 9206.75,
+        'updatedAt' => gmdate('c'),
+    ),
+));
+progressive_seed_account_telemetry(213, 9206.75, null, array('currency' => 'ZAR.c'));
+fib_test_seed_snapshot(213, 'GBPUSD', 1.2675);
+
+$zar_cent_eurgbp_plan = progressive_build_plan(213, array(
+    'id' => 'sig-zar-cent-eurgbp',
+    'symbol' => 'EURGBP',
+    'direction' => 'SHORT',
+), 0.8610, 0.8450);
+
+fib_test_assert_same(46.03, $zar_cent_eurgbp_plan['riskUSC'], 'ZAR.c account risk should remain broker-account denominated');
+fib_test_assert_near(0.46, $zar_cent_eurgbp_plan['riskZAR'], 0.01, 'ZAR.c account ZAR risk must divide cents without USD conversion');
+fib_test_assert_same(0.01, $zar_cent_eurgbp_plan['minExecutableLot'], 'ZAR.c account forex plan should publish a 0.01 minimum lot');
+
+fib_test_reset_env(214);
+fib_test_seed_account_blob(214, array(
+    'riskProfile' => array(
+        'tier' => 'balanced',
+        'maxConcurrentTrades' => 3,
+        'perTradePct' => 0.5,
+        'dailyMaxPct' => 2.0,
+        'ddCapPct' => 6.0,
+        'cooldownMin' => 30,
+        'updatedAt' => gmdate('c'),
+    ),
+    'account' => array(
+        'equityUSC' => 9206.75,
+        'updatedAt' => gmdate('c'),
+    ),
+));
+progressive_seed_account_telemetry(214, 9206.75, null, array('currency' => 'EUR Micro'));
+fib_test_seed_snapshot(214, 'GBPUSD', 1.2675);
+fib_test_seed_snapshot(214, 'EURZAR', 20.0);
+
+$eur_micro_eurgbp_plan = progressive_build_plan(214, array(
+    'id' => 'sig-eur-micro-eurgbp',
+    'symbol' => 'EURGBP',
+    'direction' => 'SHORT',
+), 0.8610, 0.8450);
+
+fib_test_assert_same(46.03, $eur_micro_eurgbp_plan['riskUSC'], 'EUR Micro account risk should remain broker-account denominated');
+fib_test_assert_near(9.21, $eur_micro_eurgbp_plan['riskZAR'], 0.01, 'EUR Micro account ZAR risk must divide cents and use EURZAR');
+fib_test_assert_same(0.01, $eur_micro_eurgbp_plan['minExecutableLot'], 'EUR Micro account forex plan should publish a 0.01 minimum lot');
+
 fib_test_reset_env(303);
 fib_test_seed_account_blob(303, array(
     'riskProfile' => array(
