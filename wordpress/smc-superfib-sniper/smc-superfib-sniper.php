@@ -6404,7 +6404,10 @@ final class SMC_SuperFib_Sniper_REST {
         $pip_val = $spec ? $this->pip_value_per_standard_lot($user_id, $sym, $spec) : 10.0;
         $min_executable_lot = $this->get_min_executable_lot($sym, $user_id);
         $account_currency = strtoupper(trim((string) ($telemetry['currency'] ?? '')));
-        $sizing_risk = $risk_usc;
+        // Display risk remains in the broker-reported account units (for example USC cents),
+        // but lot sizing divides by USD-denominated pip value, so cent accounts must size
+        // from their base currency amount to avoid 100x oversizing.
+        $sizing_risk = $this->account_currency_base_amount($risk_usc, $account_currency);
         $is_reference_instrument = is_array($spec) && (($spec['type'] ?? '') === 'reference');
 
         // Compute swings for SL using the candles already fetched by build_symbol_state().
@@ -8928,7 +8931,7 @@ final class SMC_SuperFib_Sniper_REST {
     private function account_currency_to_zar($user_id, $amount, $currency) {
         $currency_info = $this->parse_account_currency($currency);
         $base_currency = $currency_info['base'];
-        $base_amount = (float) $amount / ($currency_info['is_cent'] ? 100 : 1);
+        $base_amount = $this->account_currency_base_amount($amount, $currency);
 
         if ($base_currency === 'ZAR') {
             return round($base_amount, 2);
@@ -8952,6 +8955,11 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         return $rate > 0 ? round($base_amount * $rate, 2) : 0.0;
+    }
+
+    private function account_currency_base_amount($amount, $currency) {
+        $currency_info = $this->parse_account_currency($currency);
+        return (float) $amount / ($currency_info['is_cent'] ? 100 : 1);
     }
 
     private function parse_account_currency($currency) {
