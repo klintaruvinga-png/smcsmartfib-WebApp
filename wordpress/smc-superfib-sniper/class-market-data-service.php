@@ -39,8 +39,11 @@ class SMC_MarketData_Service
         $mid = ($bid + $ask) / 2;
         $timestamp = $this->normalize_market_timestamp(
             isset($tick['timestamp']) ? $tick['timestamp'] : null,
-            gmdate('Y-m-d H:i:s')
+            null
         );
+        if ($timestamp === null) {
+            return false;
+        }
         $freshness = $this->normalize_freshness(isset($tick['freshness']) ? $tick['freshness'] : 'LIVE');
         $state = $freshness === 'CLOSED' || $freshness === 'DISCONNECTED'
             ? 'offline'
@@ -74,7 +77,7 @@ class SMC_MarketData_Service
      */
     public function store_candle_m1($user_id, $symbol, $candle)
     {
-        if (!isset($candle['open'], $candle['high'], $candle['low'], $candle['close']))
+        if (!isset($candle['open'], $candle['high'], $candle['low'], $candle['close'], $candle['timestamp']))
             return false;
 
         $open = (float) $candle['open'];
@@ -82,10 +85,10 @@ class SMC_MarketData_Service
         $low = (float) $candle['low'];
         $close = (float) $candle['close'];
         $volume = isset($candle['volume']) ? (int) $candle['volume'] : 0;
-        $timestamp = $this->normalize_market_timestamp(
-            isset($candle['timestamp']) ? $candle['timestamp'] : null,
-            gmdate('Y-m-d H:i:s')
-        );
+        $timestamp = $this->normalize_market_timestamp($candle['timestamp'], null);
+        if ($timestamp === null) {
+            return false;
+        }
 
         return $this->wpdb->replace(
             $this->table_prefix . 'candles',

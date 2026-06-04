@@ -260,6 +260,17 @@ $storedCryptoTick = $wpdb->tables[$snapshotTable]['7|BTCUSD'] ?? null;
 assert_true(is_array($storedCryptoTick), 'store_tick_snapshot must persist the MT5 crypto snapshot row');
 assert_same('live', $storedCryptoTick['state'] ?? null, 'store_tick_snapshot must persist crypto LIVE freshness as a live snapshot state');
 
+assert_same(
+    false,
+    $service->store_tick_snapshot(7, 'EURUSD', array(
+        'bid' => 1.1010,
+        'ask' => 1.1012,
+        'spread' => 2,
+        'timestamp' => 'not-a-market-time',
+    )),
+    'store_tick_snapshot must reject malformed tick timestamps instead of falling back to server receipt time'
+);
+
 assert_true(
     $service->store_candle_m1(7, 'EURUSD', array(
         'timestamp' => '2026.05.16 08:15:00',
@@ -289,6 +300,31 @@ assert_true(
 $storedUtcCandle = $wpdb->tables[$candleTable]['7|USDJPY|1min|2026-05-16 08:16:00'] ?? null;
 assert_true(is_array($storedUtcCandle), 'store_candle_m1 must persist UTC-suffixed MT5 candle rows');
 assert_same('2026-05-16 08:16:00', $storedUtcCandle['candle_time'] ?? null, 'store_candle_m1 must normalize UTC-suffixed timestamps instead of falling back to receipt time');
+
+assert_same(
+    false,
+    $service->store_candle_m1(7, 'EURUSD', array(
+        'open' => 1.1005,
+        'high' => 1.1015,
+        'low' => 1.1001,
+        'close' => 1.1011,
+        'volume' => 12,
+    )),
+    'store_candle_m1 must reject missing candle timestamps instead of manufacturing a fresh candle time'
+);
+
+assert_same(
+    false,
+    $service->store_candle_m1(7, 'EURUSD', array(
+        'timestamp' => 'not-a-market-time',
+        'open' => 1.1005,
+        'high' => 1.1015,
+        'low' => 1.1001,
+        'close' => 1.1011,
+        'volume' => 12,
+    )),
+    'store_candle_m1 must reject malformed candle timestamps instead of falling back to server receipt time'
+);
 
 for ($i = 0; $i < 30; $i++) {
     $bucket = $i < 15 ? 0 : 15;
