@@ -1,0 +1,221 @@
+[
+    {
+        "symbol":  "EURUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "session_tf":  "Daily",
+        "authority_tf":  "Weekly",
+        "anchor_high":  1.16858,
+        "anchor_low":  1.15862,
+        "anchor_range":  0.0099599999999999689,
+        "compression_threshold":  0.002,
+        "debug_source":  "endpoint_anchor_debug",
+        "source":  "auth_f1",
+        "key":  202622,
+        "high":  1.16858,
+        "low":  1.15862,
+        "range":  0.0099599999999999689,
+        "candle_count":  480,
+        "first_candle":  "2026-05-25T00:14:59Z",
+        "last_candle":  "2026-05-31T23:59:59Z",
+        "components":  [
+
+                       ]
+    },
+    {
+        "symbol":  "EURUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "session_tf":  "Daily",
+        "authority_tf":  "Weekly",
+        "anchor_high":  1.164896,
+        "anchor_low":  1.160356,
+        "anchor_range":  0.0045399999999999885,
+        "compression_threshold":  0.002,
+        "debug_source":  "endpoint_anchor_debug",
+        "components":  [
+                           {
+                               "slot":  "F1",
+                               "key":  20260603,
+                               "high":  1.16333,
+                               "low":  1.15945,
+                               "range":  0.00388,
+                               "compression_pass":  true,
+                               "weight":  0.4,
+                               "candle_count":  96,
+                               "first_candle":  "2026-06-03T00:14:59Z",
+                               "last_candle":  "2026-06-03T23:59:59Z"
+                           },
+                           {
+                               "slot":  "F2",
+                               "key":  20260602,
+                               "high":  1.16556,
+                               "low":  1.16133,
+                               "range":  0.00423,
+                               "compression_pass":  true,
+                               "weight":  0.35,
+                               "candle_count":  96,
+                               "first_candle":  "2026-06-02T00:14:59Z",
+                               "last_candle":  "2026-06-02T23:59:59Z"
+                           },
+                           {
+                               "slot":  "F3",
+                               "key":  20260601,
+                               "high":  1.16647,
+                               "low":  1.16044,
+                               "range":  0.00603,
+                               "compression_pass":  true,
+                               "weight":  0.25,
+                               "candle_count":  96,
+                               "first_candle":  "2026-06-01T00:14:59Z",
+                               "last_candle":  "2026-06-01T23:59:59Z"
+                           }
+                       ]
+    },
+    {
+        "symbol":  "USDJPY",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "session_tf":  "Daily",
+        "authority_tf":  "Weekly",
+        "anchor_high":  159.653,
+        "anchor_low":  158.755,
+        "anchor_range":  0.89799999999999613,
+        "compression_threshold":  0.4,
+        "debug_source":  "endpoint_anchor_debug",
+        "source":  "auth_f1",
+        "key":  202622,
+        "high":  159.653,
+        "low":  158.755,
+        "range":  0.89799999999999613,
+        "candle_count":  480,
+        "first_candle":  "2026-05-25T00:14:59Z",
+        "last_candle":  "2026-05-31T23:59:59Z",
+        "components":  [
+
+                       ]
+    },
+    {
+        "symbol":  "USDJPY",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "session_tf":  "Daily",
+        "authority_tf":  "Weekly",
+        "anchor_high":  160.086,
+        "anchor_low":  159.37,
+        "anchor_range":  0.71600000000000819,
+        "compression_threshold":  0.4,
+        "debug_source":  "endpoint_anchor_debug",
+        "components":  [
+                           {
+                               "slot":  "F1",
+                               "key":  20260603,
+                               "high":  160.086,
+                               "low":  159.37,
+                               "range":  0.716,
+                               "compression_pass":  true,
+                               "weight":  1,
+                               "candle_count":  96,
+                               "first_candle":  "2026-06-03T00:14:59Z",
+                               "last_candle":  "2026-06-03T23:59:59Z"
+                           },
+                           {
+                               "slot":  "F2",
+                               "key":  20260602,
+                               "high":  159.995,
+                               "low":  159.637,
+                               "range":  0.358,
+                               "compression_pass":  false,
+                               "weight":  0,
+                               "candle_count":  96,
+                               "first_candle":  "2026-06-02T00:14:59Z",
+                               "last_candle":  "2026-06-02T23:59:59Z"
+                           },
+                           {
+                               "slot":  "F3",
+                               "key":  20260601,
+                               "high":  159.761,
+                               "low":  159.399,
+                               "range":  0.362,
+                               "compression_pass":  false,
+                               "weight":  0,
+                               "candle_count":  96,
+                               "first_candle":  "2026-06-01T00:14:59Z",
+                               "last_candle":  "2026-06-01T23:59:59Z"
+                           }
+                       ]
+    },
+    {
+        "symbol":  "XAUUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "session_tf":  "Daily",
+        "authority_tf":  "Weekly",
+        "anchor_high":  4595.32,
+        "anchor_low":  4366.33,
+        "anchor_range":  228.98999999999978,
+        "compression_threshold":  0.2,
+        "debug_source":  "endpoint_anchor_debug",
+        "source":  "auth_f1",
+        "key":  202622,
+        "high":  4595.32,
+        "low":  4366.33,
+        "range":  228.98999999999978,
+        "candle_count":  449,
+        "first_candle":  "2026-05-25T00:14:59Z",
+        "last_candle":  "2026-05-31T23:59:59Z",
+        "components":  [
+
+                       ]
+    },
+    {
+        "symbol":  "XAUUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "session_tf":  "Daily",
+        "authority_tf":  "Weekly",
+        "anchor_high":  4524.488,
+        "anchor_low":  4443.323,
+        "anchor_range":  81.164999999999964,
+        "compression_threshold":  0.2,
+        "debug_source":  "endpoint_anchor_debug",
+        "components":  [
+                           {
+                               "slot":  "F1",
+                               "key":  20260603,
+                               "high":  4496.67,
+                               "low":  4424.01,
+                               "range":  72.66,
+                               "compression_pass":  true,
+                               "weight":  0.4,
+                               "candle_count":  92,
+                               "first_candle":  "2026-06-03T00:14:59Z",
+                               "last_candle":  "2026-06-03T23:59:59Z"
+                           },
+                           {
+                               "slot":  "F2",
+                               "key":  20260602,
+                               "high":  4541.55,
+                               "low":  4462.19,
+                               "range":  79.36,
+                               "compression_pass":  true,
+                               "weight":  0.35,
+                               "candle_count":  92,
+                               "first_candle":  "2026-06-02T00:14:59Z",
+                               "last_candle":  "2026-06-02T23:59:59Z"
+                           },
+                           {
+                               "slot":  "F3",
+                               "key":  20260601,
+                               "high":  4545.11,
+                               "low":  4447.81,
+                               "range":  97.3,
+                               "compression_pass":  true,
+                               "weight":  0.25,
+                               "candle_count":  92,
+                               "first_candle":  "2026-06-01T00:14:59Z",
+                               "last_candle":  "2026-06-01T23:59:59Z"
+                           }
+                       ]
+    }
+]

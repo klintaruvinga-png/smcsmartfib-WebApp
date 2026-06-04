@@ -88,3 +88,9 @@ The validator confirms the live paired MT5 vs Pine corpus is not aligned. Large 
 - MT5: 96 rows (mt5-levels.json)
 - Pine: 96 rows (pine-levels.json)
 - Report: phase4-gate-2026-06-04_143044.json
+
+## Run: 2026-06-04_173401
+- Gate: **FAIL** (51.04%)
+- MT5: 96 rows (mt5-levels.json)
+- Pine: 96 rows (pine-levels.json)
+- Report: phase4-gate-2026-06-04_173401.json

@@ -564,7 +564,9 @@ function Format-AnchorDebugSummaryMarkdown($Gate, [string]$Mt5DebugFile, [string
 
         $mt5Components = if ($null -ne $mt5) { @($mt5.components) } else { @() }
         $pineComponents = if ($null -ne $pine) { @($pine.components) } else { @() }
-        if ($mt5Components.Count -eq 0 -and $pineComponents.Count -eq 0) {
+        $mt5ComponentCount = (@($mt5Components) | Measure-Object).Count
+        $pineComponentCount = (@($pineComponents) | Measure-Object).Count
+        if ($mt5ComponentCount -eq 0 -and $pineComponentCount -eq 0) {
             [void]$builder.AppendLine("_No component debug available for this group._")
             [void]$builder.AppendLine("")
             continue

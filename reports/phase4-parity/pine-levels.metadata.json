@@ -3,10 +3,10 @@
   "version": "v13.1.3",
   "source": "local-candles-pine-v13-compatible",
   "authority": "NOT a live TradingView/Pine export - locally computed Pine v13-compatible reference",
-  "generated_at": "2026-06-04T13:49:31.2927017+00:00",
+  "generated_at": "2026-06-04T17:34:01.1237375+00:00",
   "candle_dir": "C:\\Users\\LEONNA\\OneDrive\\All Final Softwares\\SMC SuperFib Dashboard\\smcsmartfib-WebApp\\data",
   "mt5_file": "C:\\Users\\LEONNA\\OneDrive\\All Final Softwares\\SMC SuperFib Dashboard\\smcsmartfib-WebApp\\reports\\phase4-parity\\mt5-levels.json",
-  "mt5_mtime": "2026-06-04T13:49:45.115Z",
+  "mt5_mtime": "2026-06-04T17:34:22.880Z",
   "source_timeframe": "M15",
   "helper_feed_ladder": {
     "Daily": "M15",
@@ -77,18 +77,18 @@
       "ltf_helper_tf": "M15",
       "htf_helper_tf": "H1",
       "compression_threshold": 0.4,
-      "anchor_high": 160.088,
-      "anchor_low": 159.37,
+      "anchor_high": 159.94085,
+      "anchor_low": 159.36595,
       "dbg": {
         "f1_key": 20260603,
         "f2_key": 20260602,
         "f3_key": 20260601,
         "f1v": true,
         "f2v": false,
-        "f3v": false,
-        "wf1": 1,
+        "f3v": true,
+        "wf1": 0.55,
         "wf2": 0,
-        "wf3": 0
+        "wf3": 0.45
       }
     },
     {
@@ -101,7 +101,7 @@
       "htf_helper_tf": "H1",
       "compression_threshold": 0.4,
       "anchor_high": 159.653,
-      "anchor_low": 158.755,
+      "anchor_low": 158.803,
       "dbg": {
         "anchor_key": 202622,
         "anchor": "auth_f1"
