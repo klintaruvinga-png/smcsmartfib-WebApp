@@ -480,9 +480,10 @@ public:
 
     // ---- HTF_AF anchor computation ----
     //
-    // Mirrors PHP: resolve_htf_authority_anchor()
-    // Groups candles by authority_tf; needs >3 completed sessions;
-    // anchor = the 3rd most recent completed session's raw extremes.
+    // Mirrors Pine v13.1.3 executable HTF Authority AF draw block and
+    // scripts/generate-pine-levels-v13.cjs computeHtfAnchorWithCompression().
+    // HTF_AF = auth_f1 = auth_s1 = the most recent completed authority session.
+    // Requires at least 1 completed authority session (sessionCount > 1).
     bool ComputeHTFAnchor(MqlRates& rates[], int count, int chart_tf_seconds,
                           string authority_tf, double compression,
                           double& out_high, double& out_low,
@@ -497,23 +498,22 @@ public:
             AddOrUpdateSession(key, rates[i].high, rates[i].low);
         }
 
-        // Need > 3 sessions (PHP: count($sessions) <= 3 → return invalid)
-        if (sessionCount <= 3)
+        // Pine: requires at least one completed authority session.
+        if (sessionCount <= 1)
             return false;
 
-        // completed = all except last
         int completedCount = sessionCount - 1;
-        if (completedCount < 3)
+        if (completedCount < 1)
             return false;
 
-        // recent_sessions[2] = 3rd most recent = index completedCount-3
-        int idx3 = completedCount - 3;
-        if (idx3 < 0)
+        // auth_f1 = most recent completed session = index completedCount-1
+        int idx1 = completedCount - 1;
+        if (idx1 < 0)
             return false;
 
-        dbg_anchor_key = sessionKeys[idx3];
-        out_high = sessionHighs[idx3];
-        out_low  = sessionLows[idx3];
+        dbg_anchor_key = sessionKeys[idx1];
+        out_high = sessionHighs[idx1];
+        out_low  = sessionLows[idx1];
 
         if ((out_high - out_low) < compression)
             return false;

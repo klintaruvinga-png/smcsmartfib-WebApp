@@ -628,19 +628,21 @@ class SMC_MarketData_Service
             $sessions[$session_key]['low'] = min($sessions[$session_key]['low'], (float) $candle['low']);
         }
 
-        if (count($sessions) <= 3) {
+        // Pine v13.1.3: HTF_AF = auth_f1 = most recent completed authority session.
+        // Requires at least 1 completed session (count > 1).
+        if (count($sessions) <= 1) {
             return $anchor;
         }
 
         $completed_sessions = array_slice(array_values($sessions), 0, -1);
         $recent_sessions = array_reverse($completed_sessions);
-        if (!isset($recent_sessions[2])) {
+        if (!isset($recent_sessions[0])) {
             return $anchor;
         }
 
         return array(
-            'high' => (float) $recent_sessions[2]['high'],
-            'low' => (float) $recent_sessions[2]['low'],
+            'high' => (float) $recent_sessions[0]['high'],
+            'low' => (float) $recent_sessions[0]['low'],
             'valid' => true,
         );
     }
