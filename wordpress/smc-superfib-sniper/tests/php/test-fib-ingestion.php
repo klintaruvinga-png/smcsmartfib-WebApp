@@ -66,12 +66,19 @@ if (!function_exists('wp_next_scheduled')) {
 if (!function_exists('wp_schedule_event')) {
     function wp_schedule_event($timestamp, $recurrence, $hook) {}
 }
+if (!function_exists('dbDelta')) {
+    function dbDelta($sql) { return array(); }
+}
 
 // ---- In-memory wpdb stub ----
 class FibIngestionTestWpdb {
     public $prefix   = 'wp_';
     public $last_error = '';
     private $store   = array(); // keyed by table+unique_key
+
+    public function get_charset_collate() {
+        return 'DEFAULT CHARSET=utf8mb4';
+    }
 
     public function replace($table, $data, $formats) {
         // Build a unique key from user_id, symbol, timeframe, family, ratio
@@ -93,13 +100,14 @@ class FibIngestionTestWpdb {
         preg_match('/symbol = \'([A-Z0-9]+)\'/', $sql, $sym_m);
         preg_match('/timeframe = \'([A-Z0-9]+)\'/', $sql, $tf_m);
         preg_match('/family = \'([A-Z0-9_]+)\'/', $sql, $fam_m);
+        preg_match('/FROM\s+([A-Za-z0-9_]+)/', $sql, $table_m);
 
         $user_id   = isset($uid_m[1]) ? (int) $uid_m[1] : null;
         $symbol    = isset($sym_m[1]) ? $sym_m[1] : null;
         $timeframe = isset($tf_m[1])  ? $tf_m[1]  : null;
         $family    = isset($fam_m[1]) ? $fam_m[1] : null;
 
-        $table = $this->prefix . 'smc_sf_fib_levels';
+        $table = isset($table_m[1]) ? $table_m[1] : $this->prefix . 'smc_sf_fib_levels';
         if (!isset($this->store[$table])) {
             return array();
         }
@@ -111,13 +119,22 @@ class FibIngestionTestWpdb {
             if ($timeframe !== null && $row['timeframe'] !== $timeframe)    continue;
             if ($family    !== null && $row['family']    !== $family)       continue;
 
-            $out[] = array(
-                'timeframe'     => $row['timeframe'],
-                'family'        => $row['family'],
-                'ratio'         => $row['ratio'],
-                'price'         => $row['price'],
-                'calculated_at' => $row['calculated_at'],
-            );
+            if ($table === $this->prefix . 'smc_sf_fib_anchor_debug') {
+                $out[] = array(
+                    'timeframe'     => $row['timeframe'],
+                    'family'        => $row['family'],
+                    'anchor_debug'  => $row['anchor_debug'],
+                    'calculated_at' => $row['calculated_at'],
+                );
+            } else {
+                $out[] = array(
+                    'timeframe'     => $row['timeframe'],
+                    'family'        => $row['family'],
+                    'ratio'         => $row['ratio'],
+                    'price'         => $row['price'],
+                    'calculated_at' => $row['calculated_at'],
+                );
+            }
         }
         return $out;
     }
@@ -234,6 +251,40 @@ $post_req = new FibTestWPRestRequest(array(
         array(
             'timeframe'      => 'M15',
             'chart_tf_seconds' => 900,
+            'anchor_debug'   => array(
+                'LTF_SF' => array(
+                    'session_tf' => 'Daily',
+                    'authority_tf' => 'Weekly',
+                    'anchor_high' => 1.12345,
+                    'anchor_low' => 1.10000,
+                    'anchor_range' => 0.02345,
+                    'compression_threshold' => 0.002,
+                    'components' => array(
+                        array(
+                            'slot' => 'F1',
+                            'key' => 20260603,
+                            'high' => 1.12345,
+                            'low' => 1.10000,
+                            'range' => 0.02345,
+                            'compression_pass' => true,
+                            'weight' => 1.0,
+                            'candle_count' => 95,
+                            'first_candle' => '2026-06-03T00:00:00Z',
+                            'last_candle' => '2026-06-03T23:45:00Z',
+                        ),
+                    ),
+                ),
+                'HTF_AF' => array(
+                    'source' => 'auth_f1',
+                    'key' => 202622,
+                    'high' => 1.15000,
+                    'low' => 1.08000,
+                    'range' => 0.07000,
+                    'candle_count' => 106,
+                    'first_candle' => '2026-05-25T00:00:00Z',
+                    'last_candle' => '2026-05-31T23:00:00Z',
+                ),
+            ),
             'ltf_sf'         => $ltf,
             'htf_af'         => $htf,
         ),
@@ -300,6 +351,10 @@ fib_ingest_assert(isset($get_result['fibs']['M15']['LTF_SF']), 'GET fibs M15 mus
 fib_ingest_assert(isset($get_result['fibs']['M15']['HTF_AF']), 'GET fibs M15 must include HTF_AF');
 fib_ingest_assert_eq(16, count($get_result['fibs']['M15']['LTF_SF']), 'GET M15 LTF_SF must have 16 levels');
 fib_ingest_assert_eq(16, count($get_result['fibs']['M15']['HTF_AF']), 'GET M15 HTF_AF must have 16 levels');
+fib_ingest_assert(isset($get_result['anchor_debug']['M15']['LTF_SF']['components'][0]), 'GET M15 LTF_SF must expose anchor debug components');
+fib_ingest_assert_eq(20260603, (int) $get_result['anchor_debug']['M15']['LTF_SF']['components'][0]['key'], 'GET M15 LTF_SF anchor debug key must round-trip');
+fib_ingest_assert_eq(95, (int) $get_result['anchor_debug']['M15']['LTF_SF']['components'][0]['candle_count'], 'GET M15 LTF_SF anchor debug candle count must round-trip');
+fib_ingest_assert_eq('auth_f1', $get_result['anchor_debug']['M15']['HTF_AF']['source'], 'GET M15 HTF_AF anchor debug source must round-trip');
 
 $get_multi_req = new FibTestWPRestRequest(array(), array('symbol' => 'XAUUSD'));
 $get_multi_result = $get_method->invoke($inst, $get_multi_req);

@@ -31,6 +31,7 @@ final class SMC_SuperFib_Sniper_REST {
     const ACTIVE_DAY_DEFINITION = 'CALENDAR_DAY_WITH_ANY_COMPLETED_ENGINE_RUN';
 
     private static $display_signals_table_ready = false;
+    private static $fib_anchor_debug_table_ready = false;
 
     private $ratios = array(-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300);
     private $fib_context_symbol = '';
@@ -448,6 +449,7 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         self::ensure_display_signals_table();
+        self::ensure_fib_anchor_debug_table();
         self::ensure_trade_telemetry_tables();
         self::ensure_soak_tables();
     }
@@ -516,6 +518,53 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         self::$display_signals_table_ready = true;
+        return true;
+    }
+
+    private static function get_fib_anchor_debug_table_sql(string $charset): string {
+        global $wpdb;
+
+        return "CREATE TABLE {$wpdb->prefix}smc_sf_fib_anchor_debug (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT UNSIGNED NOT NULL,
+            symbol VARCHAR(24) NOT NULL,
+            timeframe VARCHAR(16) NOT NULL,
+            family VARCHAR(16) NOT NULL,
+            anchor_debug LONGTEXT NOT NULL,
+            source VARCHAR(20) NOT NULL DEFAULT 'mt5',
+            calculated_at DATETIME NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY fib_anchor_lookup (user_id, symbol, timeframe, family),
+            KEY symbol_time (user_id, symbol, calculated_at)
+        ) $charset;";
+    }
+
+    public static function ensure_fib_anchor_debug_table() {
+        global $wpdb;
+
+        if (self::$fib_anchor_debug_table_ready) {
+            return true;
+        }
+
+        if (file_exists(ABSPATH . 'wp-admin/includes/upgrade.php')) {
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        }
+
+        if (!function_exists('dbDelta')) {
+            return false;
+        }
+
+        if (is_object($wpdb) && property_exists($wpdb, 'last_error')) {
+            $wpdb->last_error = '';
+        }
+
+        dbDelta(self::get_fib_anchor_debug_table_sql($wpdb->get_charset_collate()));
+
+        if (is_object($wpdb) && property_exists($wpdb, 'last_error') && $wpdb->last_error !== '') {
+            return false;
+        }
+
+        self::$fib_anchor_debug_table_ready = true;
         return true;
     }
 
@@ -791,6 +840,10 @@ final class SMC_SuperFib_Sniper_REST {
             UNIQUE KEY fib_lookup (user_id, symbol, timeframe, family, ratio),
             KEY symbol_time (user_id, symbol, calculated_at)
         ) $charset;";
+
+        // Phase 4: MT5 fib anchor-debug storage. Stored per family to avoid
+        // duplicating the same diagnostics on every ratio row.
+        $tables[] = self::get_fib_anchor_debug_table_sql($charset);
 
         // Phase 5: MT5 regime snapshots
         $tables[] = self::get_regime_snapshots_table_sql($charset);
@@ -2939,6 +2992,89 @@ final class SMC_SuperFib_Sniper_REST {
         ));
     }
 
+    private function sanitize_fib_anchor_debug_value($value, $depth = 0) {
+        if ($depth > 8) {
+            return null;
+        }
+
+        if (is_array($value)) {
+            $out = array();
+            foreach ($value as $key => $child) {
+                $clean_key = is_int($key) ? $key : preg_replace('/[^A-Za-z0-9_\-]/', '', (string) $key);
+                if ($clean_key === '') {
+                    continue;
+                }
+                $out[$clean_key] = $this->sanitize_fib_anchor_debug_value($child, $depth + 1);
+            }
+            return $out;
+        }
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return $value;
+        }
+
+        if (is_numeric($value)) {
+            $str = trim((string) $value);
+            return strpos($str, '.') !== false ? (float) $str : (int) $str;
+        }
+
+        return sanitize_text_field((string) $value);
+    }
+
+    private function get_fib_anchor_debug_for_family($tf_entry, $family) {
+        if (!is_array($tf_entry) || empty($tf_entry['anchor_debug']) || !is_array($tf_entry['anchor_debug'])) {
+            return null;
+        }
+
+        $debug = $tf_entry['anchor_debug'];
+        if (isset($debug[$family]) && is_array($debug[$family])) {
+            return $this->sanitize_fib_anchor_debug_value($debug[$family]);
+        }
+
+        // Backward compatibility for older EA payloads that sent a flat
+        // anchor_debug block with ltf_f1_key / htf_anchor_key fields.
+        if ($family === 'LTF_SF' && (isset($debug['ltf_f1_key']) || isset($debug['components']))) {
+            return $this->sanitize_fib_anchor_debug_value($debug);
+        }
+        if ($family === 'HTF_AF' && (isset($debug['htf_anchor_key']) || isset($debug['source']))) {
+            return $this->sanitize_fib_anchor_debug_value($debug);
+        }
+
+        return null;
+    }
+
+    private function store_fib_anchor_debug($user_id, $symbol, $timeframe, $family, $debug, $calculated_at) {
+        global $wpdb;
+
+        if (!is_array($debug) || empty($debug)) {
+            return true;
+        }
+
+        $json = wp_json_encode($debug);
+        if (!is_string($json) || $json === '') {
+            return false;
+        }
+
+        $table = $wpdb->prefix . 'smc_sf_fib_anchor_debug';
+        return $wpdb->replace(
+            $table,
+            array(
+                'user_id'       => (int) $user_id,
+                'symbol'        => $symbol,
+                'timeframe'     => $timeframe,
+                'family'        => $family,
+                'anchor_debug'  => $json,
+                'source'        => 'mt5',
+                'calculated_at' => $calculated_at,
+            ),
+            array('%d', '%s', '%s', '%s', '%s', '%s', '%s')
+        );
+    }
+
     // ---- Phase 4: POST /ea/fib-levels ----
     // Receives fib level payload from MT5 EA. Payload structure:
     // { user_id, symbol, levels: [ { timeframe, chart_tf_seconds, ltf_sf: [...], htf_af: [...] }, ... ] }
@@ -2974,6 +3110,7 @@ final class SMC_SuperFib_Sniper_REST {
         $inserted        = 0;
         $failed          = 0;
         $table           = $wpdb->prefix . 'smc_sf_fib_levels';
+        $debug_table_ready = self::ensure_fib_anchor_debug_table();
 
         foreach ($levels_payload as $tf_entry) {
             if (!is_array($tf_entry) || !isset($tf_entry['timeframe'])) {
@@ -2993,6 +3130,18 @@ final class SMC_SuperFib_Sniper_REST {
             foreach ($families_map as $family => $levels) {
                 if (!in_array($family, $valid_families, true)) {
                     continue;
+                }
+
+                $anchor_debug = $this->get_fib_anchor_debug_for_family($tf_entry, $family);
+                if ($debug_table_ready && is_array($anchor_debug) && !empty($anchor_debug)) {
+                    $debug_result = $this->store_fib_anchor_debug($user_id, $symbol, $timeframe, $family, $anchor_debug, $calculated_at);
+                    if ($debug_result === false) {
+                        $failed++;
+                        if (!empty($wpdb->last_error)) {
+                            error_log(sprintf('[SMC_SF] ea/fib-levels anchor debug upsert failed symbol=%s tf=%s family=%s err=%s',
+                                $symbol, $timeframe, $family, $wpdb->last_error));
+                        }
+                    }
                 }
 
                 foreach ($levels as $level) {
@@ -3061,6 +3210,8 @@ final class SMC_SuperFib_Sniper_REST {
         $timeframe = $request->get_param('timeframe');
         $family    = $request->get_param('family');
         $table     = $wpdb->prefix . 'smc_sf_fib_levels';
+        $debug_table = $wpdb->prefix . 'smc_sf_fib_anchor_debug';
+        $debug_table_ready = self::ensure_fib_anchor_debug_table();
 
         $where  = 'WHERE user_id = %d AND symbol = %s';
         $values = array($user_id, $symbol);
@@ -3077,6 +3228,11 @@ final class SMC_SuperFib_Sniper_REST {
 
         $sql  = $wpdb->prepare("SELECT timeframe, family, ratio, price, calculated_at FROM {$table} {$where} ORDER BY timeframe, family, ratio", ...$values);
         $rows = $wpdb->get_results($sql, ARRAY_A);
+        $debug_rows = array();
+        if ($debug_table_ready) {
+            $debug_sql = $wpdb->prepare("SELECT timeframe, family, anchor_debug, calculated_at FROM {$debug_table} {$where} ORDER BY timeframe, family", ...$values);
+            $debug_rows = $wpdb->get_results($debug_sql, ARRAY_A);
+        }
 
         // Group by timeframe → family → levels[]
         $result = array();
@@ -3098,10 +3254,25 @@ final class SMC_SuperFib_Sniper_REST {
             );
         }
 
+        $anchor_debug = array();
+        foreach ((array) $debug_rows as $row) {
+            $tf  = (string) $row['timeframe'];
+            $fam = (string) $row['family'];
+            $decoded = json_decode((string) $row['anchor_debug'], true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+            if (!isset($anchor_debug[$tf])) {
+                $anchor_debug[$tf] = array();
+            }
+            $anchor_debug[$tf][$fam] = $decoded;
+        }
+
         return $this->no_cache_response(array(
-            'ok'     => true,
-            'symbol' => $symbol,
-            'fibs'   => $result,
+            'ok'           => true,
+            'symbol'       => $symbol,
+            'fibs'         => $result,
+            'anchor_debug' => $anchor_debug,
         ));
     }
 
