@@ -400,6 +400,11 @@ function fib_test_make_rest_instance() {
     return $ref->newInstanceWithoutConstructor();
 }
 
+function fib_test_make_service_instance($class_name) {
+    $ref = new ReflectionClass($class_name);
+    return $ref->newInstanceWithoutConstructor();
+}
+
 function fib_test_set_private_property($instance, $property, $value) {
     $ref = new ReflectionProperty(get_class($instance), $property);
     $ref->setAccessible(true);

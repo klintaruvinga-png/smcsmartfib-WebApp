@@ -198,8 +198,13 @@ function normalizeCandle(raw) {
     return { timeMs, open, high, low, close };
 }
 
+function roundToNearestMinuteMs(timeMs) {
+    return Math.round(timeMs / 60000) * 60000;
+}
+
 function bucketStartMs(timeMs, tf) {
-    const d = new Date(timeMs);
+    const bucketInputMs = tf === 'M15' ? roundToNearestMinuteMs(timeMs) : timeMs;
+    const d = new Date(bucketInputMs);
     const y = d.getUTCFullYear();
     const m = d.getUTCMonth();
     const day = d.getUTCDate();

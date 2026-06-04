@@ -85,7 +85,7 @@ class SMC_MarketData_Service
         $low = (float) $candle['low'];
         $close = (float) $candle['close'];
         $volume = isset($candle['volume']) ? (int) $candle['volume'] : 0;
-        $timestamp = $this->normalize_market_timestamp($candle['timestamp'], null);
+        $timestamp = $this->normalize_market_timestamp($candle['timestamp'], null, true);
         if ($timestamp === null) {
             return false;
         }
@@ -659,7 +659,7 @@ class SMC_MarketData_Service
         return gmdate('Y-m-d\TH:i:s\Z', (int) $timestamp);
     }
 
-    private function normalize_market_timestamp($raw_time, $fallback = null)
+    private function normalize_market_timestamp($raw_time, $fallback = null, $round_to_minute = false)
     {
         $fallback_value = func_num_args() >= 2 ? $fallback : gmdate('Y-m-d H:i:s');
         if ($raw_time === null || $raw_time === '') {
@@ -683,7 +683,17 @@ class SMC_MarketData_Service
         }
 
         $ts = strtotime($value);
-        return $ts !== false ? gmdate('Y-m-d H:i:s', $ts) : $fallback_value;
+        if ($ts === false) {
+            return $fallback_value;
+        }
+        // Round to nearest minute only for candle bar-open timestamps
+        // (opt-in via $round_to_minute). Absorbs the ±1s broker jitter
+        // from the TimeCurrent()-TimeGMT() race in EA TimeToIso8601().
+        // Tick snapshot timestamps are NOT rounded to preserve second precision.
+        if ($round_to_minute) {
+            $ts = (int) (round($ts / 60) * 60);
+        }
+        return gmdate('Y-m-d H:i:s', $ts);
     }
 
     private function normalize_freshness($state)
