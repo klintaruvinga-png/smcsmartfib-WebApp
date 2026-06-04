@@ -68,3 +68,43 @@ assert_same(gmdate('Y-m-d H:i:58', $candle_ts), $m1_candle_time, 'M1 candle time
 assert_same(gmdate('Y-m-d H:i:00', (int) (round($candle_ts / 60) * 60)), $m15_candle_time, 'M15 candle time must round broker jitter to the nearest minute');
 
 echo "MT5 candle rounding checks passed\n";
+
+reset_ea_bridge_test_state();
+
+$stream_ts = (int) (floor((time() - 10) / 60) * 60);
+$candle_ts = $stream_ts - 2;
+
+$open_m15_payload = array(
+    'user_id' => 7,
+    'symbol' => 'EURUSD',
+    'timeframe' => 'M1',
+    'source' => 'MT5',
+    'quote_time' => gmdate('c', $stream_ts),
+    'bid' => 1.08521,
+    'ask' => 1.08534,
+    'spread' => 1.3,
+    'freshness' => 'LIVE',
+    'session' => 'London',
+    'candle_m15' => array(
+        'time' => gmdate('c', $candle_ts),
+        'open' => 1.08500,
+        'high' => 1.08550,
+        'low' => 1.08480,
+        'close' => 1.08520,
+        'volume' => 120,
+    ),
+);
+
+$response = dispatch_ea_request(
+    $plugin,
+    'permission_ea_market_stream',
+    'post_ea_market_stream',
+    $open_m15_payload,
+    ea_bridge_headers()
+);
+
+assert_true($response instanceof WP_REST_Response, 'EA market stream must accept a snapshot when rounded M15 is rejected');
+assert_same(0, (int) ($response->data['candles_inserted'] ?? 0), 'M15 candle must be rejected when rounding reaches quote_time');
+assert_same(array(), $wpdb->tables[$wpdb->prefix . 'smc_sf_candles'] ?? array(), 'Rejected rounded-open M15 candle must not persist');
+
+echo "MT5 rounded-open candle rejection checks passed\n";

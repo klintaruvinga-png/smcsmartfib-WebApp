@@ -4884,43 +4884,43 @@ final class SMC_SuperFib_Sniper_REST {
 
         // Parse timestamp to MySQL format. M15+ callers can round away
         // small broker/server-time jitter from closed bar-open timestamps.
-        $raw_ts = strtotime($candle['time']);
-        if ($round_to_minute && $raw_ts !== false) {
-            $raw_ts = (int) (round($raw_ts / 60) * 60);
+        $candle_ts = strtotime($candle['time']);
+        if ($candle_ts === false) {
+            return false;
         }
-        $candle_time = gmdate('Y-m-d H:i:s', $raw_ts);
-        if ($stream_timestamp && strtotime($candle['time']) >= strtotime($stream_timestamp)) {
-            error_log("CANDLE CHECK: candle_time={$candle['time']} | stream={$stream_timestamp}");
-            error_log("CANDLE REJECTED: {$symbol} | candle_time={$candle['time']} >= stream={$stream_timestamp}");
+        if ($round_to_minute) {
+            $candle_ts = (int) (round($candle_ts / 60) * 60);
+        }
+        $candle_time = gmdate('Y-m-d H:i:s', $candle_ts);
+        $stream_ts = $stream_timestamp ? strtotime($stream_timestamp) : false;
+        if ($stream_ts !== false && $candle_ts >= $stream_ts) {
+            error_log("CANDLE CHECK: candle_time={$candle_time} | stream={$stream_timestamp}");
+            error_log("CANDLE REJECTED: {$symbol} | candle_time={$candle_time} >= stream={$stream_timestamp}");
             $this->audit($user_id, 'ea.market_stream.open_or_future_candle_rejected', array(
                 'symbol' => $symbol,
                 'timeframe' => $timeframe,
-                'candle_time' => $candle['time'],
+                'candle_time' => $candle_time,
                 'stream_timestamp' => $stream_timestamp,
             ));
             return false;
         }
 
-        if ($stream_timestamp) {
-            $candle_ts = strtotime($candle['time']);
-            $stream_ts = strtotime($stream_timestamp);
-            if ($candle_ts !== false && $stream_ts !== false) {
-                $age_seconds = $stream_ts - $candle_ts;
-                // HARDENING: M1 candles are already 60s old by design (closed bar).
-                // Raise threshold to 180s (60s natural lag + 120s broker-jitter headroom).
-                // For M15 candles we pass a larger limit because a closed bar is naturally 15-30 minutes old.
-                // REGRESSION: Log via audit() not just error_log() so rejections are visible.
-                if ($age_seconds > $max_age_sec) {
-                    error_log("STALE REJECTED: {$symbol} | age={$age_seconds}s | candle={$candle['time']} | stream={$stream_timestamp}");
-                    $this->audit($user_id, 'ea.market_stream.stale_candle_rejected', array(
-                        'symbol' => $symbol,
-                        'timeframe' => $timeframe,
-                        'candle_time' => $candle['time'],
-                        'stream_timestamp' => $stream_timestamp,
-                        'age_seconds' => $age_seconds,
-                    ));
-                    return false;
-                }
+        if ($stream_ts !== false) {
+            $age_seconds = $stream_ts - $candle_ts;
+            // HARDENING: M1 candles are already 60s old by design (closed bar).
+            // Raise threshold to 180s (60s natural lag + 120s broker-jitter headroom).
+            // For M15 candles we pass a larger limit because a closed bar is naturally 15-30 minutes old.
+            // REGRESSION: Log via audit() not just error_log() so rejections are visible.
+            if ($age_seconds > $max_age_sec) {
+                error_log("STALE REJECTED: {$symbol} | age={$age_seconds}s | candle={$candle['time']} | stream={$stream_timestamp}");
+                $this->audit($user_id, 'ea.market_stream.stale_candle_rejected', array(
+                    'symbol' => $symbol,
+                    'timeframe' => $timeframe,
+                    'candle_time' => $candle_time,
+                    'stream_timestamp' => $stream_timestamp,
+                    'age_seconds' => $age_seconds,
+                ));
+                return false;
             }
         }
 
