@@ -2094,7 +2094,9 @@ final class SMC_SuperFib_Sniper_REST {
             $candle = $payload['candle_m1'];
             $timeframe = '1min';
             $candle_time = $this->normalize_market_timestamp(isset($candle['timestamp']) ? $candle['timestamp'] : null, $this->now_mysql());
-
+			$candle_time = $this->normalize_market_timestamp(isset($candle['timestamp']) ? $candle['timestamp'] : null, $this->now_mysql(),
+			true
+			);
             $wpdb->replace(
                 $this->table('candles'),
                 array(
