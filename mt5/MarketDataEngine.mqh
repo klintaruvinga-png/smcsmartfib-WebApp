@@ -43,6 +43,11 @@ private:
     // Cached constant headers — built once in Initialize(), reused every send.
     string   cachedHeaders;
 
+    // Cached broker UTC offset — set once per dispatch cycle via RefreshCachedBrokerOffset().
+    // Eliminates the TimeCurrent()-TimeGMT() race in TimeToIso8601() that produces
+    // ±1s candle timestamp jitter and flips midnight M15 bars to the wrong UTC session key.
+    datetime m_cachedBrokerOffset;
+
     // Base REST URL derived from webhookUrl (strips the route suffix).
     // Used by SendLicenseCheck, SendHeartbeat, SendAccountSync, SendSymbolSync.
     string   baseUrl;
@@ -84,6 +89,7 @@ public:
         signalCycleCounter  = 0;
         signalCycleInterval = 12;  // Phase 6: every ~120s
         ArrayInitialize(lastSentCandleM1, 0);
+        m_cachedBrokerOffset = 0;
     }
 
     ~MarketDataEngine()
@@ -97,6 +103,14 @@ public:
         delete regimeEngine;
         delete signalEngine;
         delete executionEngine;
+    }
+
+    // Compute and cache the broker UTC offset. Call once at startup and once
+    // per OnPeriodic() cycle so TimeToIso8601() always uses a stable offset
+    // without racing TimeCurrent()-TimeGMT() on the same timer tick.
+    void RefreshCachedBrokerOffset()
+    {
+        m_cachedBrokerOffset = TimeCurrent() - TimeGMT();
     }
 
     // url  = full webhook endpoint URL
@@ -138,6 +152,10 @@ public:
         if (StringLen(authHeader) > 0)
             cachedHeaders += authHeader + "\r\n";
 
+        // Seed the cached broker offset so TimeToIso8601() is safe from the
+        // first OnTick() call before OnPeriodic() has run.
+        RefreshCachedBrokerOffset();
+
         return true;
     }
 
@@ -158,6 +176,8 @@ public:
     void OnPeriodic()
     {
         Print("SMC_MarketDataEA: OnPeriodic fired");
+        // Refresh cached broker offset before any send path calls TimeToIso8601().
+        RefreshCachedBrokerOffset();
         datetime now = TimeCurrent();
         sessionManager.UpdateSession(now);
 
@@ -1093,10 +1113,11 @@ private:
     // then TimeGMT() returns 02:44:55 UTC, which is what gets sent.
     string TimeToIso8601(datetime t)
     {
-        // If t is in broker-local time (from TimeCurrent() or CopyRates()),
-        // convert it to UTC by applying the broker offset.
-        datetime brokerUtcOffset = TimeCurrent() - TimeGMT();
-        datetime utcTime = t - brokerUtcOffset;
+        // Use the per-cycle cached offset (set in RefreshCachedBrokerOffset) rather
+        // than recomputing TimeCurrent()-TimeGMT() inline. The inline form races on
+        // the same timer tick and can produce a ±1s offset, flipping midnight M15
+        // bars to 23:59:59 and assigning them to the wrong UTC session key.
+        datetime utcTime = t - m_cachedBrokerOffset;
         
         MqlDateTime dt;
         TimeToStruct(utcTime, dt);

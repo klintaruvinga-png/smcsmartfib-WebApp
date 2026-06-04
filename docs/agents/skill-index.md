@@ -125,7 +125,8 @@ Workflow:
 1. Summarize the work done.
 2. List files changed and why.
 3. Provide evidence commands and outputs.
-4. Note any risks or unaddressed issues.
+4. Confirm the session branch and PR URL for any file-changing session.
+5. Note any risks or unaddressed issues.
 
 Repo-specific example:
 - Handoff a parity patch with `phase4-gate` validation details.
@@ -133,6 +134,7 @@ Repo-specific example:
 Expected output:
 - Clear handoff notes.
 - Validation evidence.
+- Branch and PR link when files changed.
 - Recommended next steps.
 
 ## 8. prototype

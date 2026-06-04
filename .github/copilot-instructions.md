@@ -22,6 +22,7 @@ This file provides guidance for GitHub Copilot Agent in this repo.
 ## Branch and PR Guidance
 - Target a feature branch, not `main`, unless explicitly directed.
 - Commit only files related to the current task.
+- Every file-changing session must end with changes on a feature branch and a normal GitHub PR opened.
 - Respect repo guardrails in `AGENTS.md` for workflows, automation, and state files.
 
 ## Existing PR Guidance

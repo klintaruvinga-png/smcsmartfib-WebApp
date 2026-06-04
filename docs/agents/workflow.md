@@ -22,5 +22,11 @@ Validation rules
 - Prefer incremental validation: lint, docs checks, and targeted test commands.
 - For docs-only updates, document what was checked and why runtime validation may not apply.
 
+Branch and PR closeout
+- Any session that changes files must finish on a feature branch and open a normal GitHub PR.
+- Branch names must be descriptive and task-focused; avoid working directly on `main`.
+- The PR body must include the issue/objective, files changed, validation commands and results, and any remaining risks.
+- If the session was read-only or produced no file changes, the final handoff must explicitly state that no branch or PR was created.
+
 Routing note
 - Use `docs/agents/agent-routing.md` to decide whether to follow `.claude/skills/*` or `docs/agents/skill-index.md`.
