@@ -1,3 +1,5 @@
+import { useState, useMemo } from "react";
+import { ChevronDown, ChevronUp, ChevronsUpDown } from "lucide-react";
 import { useStableUserTrades, useSnapshot, usePollingUiState, useAccountTelemetry } from "@/hooks/useSniperData";
 import { SettingsQueryErrorState } from "@/components/sniper/SettingsQueryErrorState";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
@@ -5,6 +7,9 @@ import { WarningLine } from "@/components/sniper/Warnings";
 import { fmtPrice, fmtPct, fmtCurrency, relTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Position } from "@/types/sniper";
+
+type SortKey = "direction" | "entry" | "current" | "lots" | "pnl" | "time";
+type SortDir = "asc" | "desc";
 
 export function BookPage() {
   const { data: trades, isLoading, error } = useStableUserTrades();
@@ -86,103 +91,21 @@ export function BookPage() {
           const shorts = posList.filter((p) => p.direction === "SHORT");
           const totalLong = longs.reduce((s, p) => s + p.lots, 0);
           const totalShort = shorts.reduce((s, p) => s + p.lots, 0);
-          const netLots = totalLong - totalShort;
-          // Combined notional placeholder (backend will replace with true value)
-          const combinedValue = posList.reduce((s, p) => s + p.lots * p.current, 0);
           return (
-            <div key={symbol} className="rounded-lg border border-bd bg-bg1/60 overflow-hidden">
-              <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 border-b border-bd bg-bg2/30">
-                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                  <span className="font-mono text-sm font-semibold">{symbol}</span>
-                  <span className="text-[10px] font-mono text-mute">
-                    {posList.length} pos · {longs.length}L / {shorts.length}S
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <span
-                    className={cn("font-mono text-sm", groupPnl >= 0 ? "text-buy" : "text-sell")}
-                  >
-                    {fmtCurrency(groupPnl, accountTelemetry?.currency, true)}
-                  </span>
-                  <FreshnessBadge state={groupState} />
-                </div>
-              </div>
-
-              {/* Aggregate summary row */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-bd/60 border-b border-bd">
-                <SummaryCell label="Long lots" value={totalLong.toFixed(2)} tone="buy" />
-                <SummaryCell label="Short lots" value={totalShort.toFixed(2)} tone="sell" />
-                <SummaryCell
-                  label="Net lots"
-                  value={`${netLots >= 0 ? "+" : ""}${netLots.toFixed(2)}`}
-                  tone={netLots > 0 ? "buy" : netLots < 0 ? "sell" : "neutral"}
-                />
-                <SummaryCell
-                  label="Combined value"
-                  value={fmtCurrency(combinedValue, accountTelemetry?.currency)}
-                  tone="neutral"
-                />
-              </div>
-
-              {stale && (
-                <div className="px-4 py-2 border-b border-bd">
-                  <WarningLine level="warn">
-                    {symbol} backend snapshot is {relTime(snapPair?.updatedAt ?? "")}.
-                  </WarningLine>
-                </div>
-              )}
-
-              {/* Mobile-friendly horizontally scrollable position list */}
-              <div className="overflow-x-auto">
-                <div className="divide-y divide-bd min-w-[520px]">
-                  {posList.map((p) => (
-                    <div
-                      key={p.id}
-                      className="grid grid-cols-12 items-center gap-2 px-3 sm:px-4 py-2.5 text-xs"
-                    >
-                      <span
-                        className={cn(
-                          "col-span-2 sm:col-span-1 inline-flex items-center justify-center rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider font-mono w-fit",
-                          p.direction === "LONG"
-                            ? "border-buy/40 text-buy bg-buy/10"
-                            : "border-sell/40 text-sell bg-sell/10",
-                        )}
-                      >
-                        {p.direction}
-                      </span>
-                      <div className="col-span-3 sm:col-span-2 font-mono">
-                        <div className="text-[10px] text-mute">ENTRY</div>
-                        <div className="text-tx">{fmtPrice(p.entry, p.symbol)}</div>
-                      </div>
-                      <div className="col-span-3 sm:col-span-2 font-mono">
-                        <div className="text-[10px] text-mute">CURRENT</div>
-                        <div className="text-tx">{fmtPrice(p.current, p.symbol)}</div>
-                      </div>
-                      <div className="col-span-2 font-mono">
-                        <div className="text-[10px] text-mute">LOTS</div>
-                        <div className="text-dim">{p.lots.toFixed(2)}</div>
-                      </div>
-                      <div className="col-span-2 sm:col-span-3 text-right font-mono">
-                        <div className={cn(p.pnlUSC >= 0 ? "text-buy" : "text-sell")}>
-                          {fmtCurrency(p.pnlUSC, accountTelemetry?.currency, true)}
-                        </div>
-                        <div
-                          className={cn(
-                            "text-[10px]",
-                            p.pnlPct >= 0 ? "text-buy/70" : "text-sell/70",
-                          )}
-                        >
-                          {fmtPct(p.pnlPct)}
-                        </div>
-                      </div>
-                      <div className="hidden sm:block col-span-2 text-right text-[10px] font-mono text-mute">
-                        {relTime(p.openedAt)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <SymbolCard
+              key={symbol}
+              symbol={symbol}
+              posList={posList}
+              groupPnl={groupPnl}
+              groupState={groupState}
+              stale={stale}
+              snapPairUpdatedAt={snapPair?.updatedAt}
+              longsCount={longs.length}
+              shortsCount={shorts.length}
+              totalLong={totalLong}
+              totalShort={totalShort}
+              currency={accountTelemetry?.currency}
+            />
           );
         })}
       </div>
@@ -190,28 +113,188 @@ export function BookPage() {
   );
 }
 
-function SummaryCell({
+function SymbolCard({
+  symbol,
+  posList,
+  groupPnl,
+  groupState,
+  stale,
+  snapPairUpdatedAt,
+  longsCount,
+  shortsCount,
+  totalLong,
+  totalShort,
+  currency,
+}: {
+  symbol: string;
+  posList: Position[];
+  groupPnl: number;
+  groupState: string;
+  stale: boolean;
+  snapPairUpdatedAt?: string;
+  longsCount: number;
+  shortsCount: number;
+  totalLong: number;
+  totalShort: number;
+  currency?: string;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const [sortKey, setSortKey] = useState<SortKey>("time");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  const sortedPos = useMemo(() => {
+    const arr = [...posList];
+    arr.sort((a, b) => {
+      let av: number | string;
+      let bv: number | string;
+      switch (sortKey) {
+        case "direction": av = a.direction; bv = b.direction; break;
+        case "entry": av = a.entry; bv = b.entry; break;
+        case "current": av = a.current; bv = b.current; break;
+        case "lots": av = a.lots; bv = b.lots; break;
+        case "pnl": av = a.pnlUSC; bv = b.pnlUSC; break;
+        case "time": av = new Date(a.openedAt).getTime(); bv = new Date(b.openedAt).getTime(); break;
+      }
+      if (av < bv) return sortDir === "asc" ? -1 : 1;
+      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+    return arr;
+  }, [posList, sortKey, sortDir]);
+
+  return (
+    <div className="rounded-lg border border-bd bg-bg1/60 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className="w-full flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 border-b border-bd bg-bg2/30 text-left hover:bg-bg2/50 transition-colors"
+      >
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          {expanded ? (
+            <ChevronUp className="h-3.5 w-3.5 text-mute" />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5 text-mute" />
+          )}
+          <span className="font-mono text-sm font-semibold">{symbol}</span>
+          <span className="text-[10px] font-mono text-mute">
+            {posList.length} pos · {longsCount}L / {shortsCount}S
+          </span>
+          <span className="text-[10px] font-mono text-mute">·</span>
+          <span className="text-[10px] font-mono text-buy">Long {totalLong.toFixed(2)} Lots</span>
+          <span className="text-[10px] font-mono text-sell">Short {totalShort.toFixed(2)} Lots</span>
+        </div>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className={cn("font-mono text-sm", groupPnl >= 0 ? "text-buy" : "text-sell")}>
+            {fmtCurrency(groupPnl, currency, true)}
+          </span>
+          <FreshnessBadge state={groupState as never} />
+        </div>
+      </button>
+
+      {expanded && (
+        <>
+          {stale && (
+            <div className="px-4 py-2 border-b border-bd">
+              <WarningLine level="warn">
+                {symbol} backend snapshot is {relTime(snapPairUpdatedAt ?? "")}.
+              </WarningLine>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <div className="min-w-[560px]">
+              <div className="grid grid-cols-12 gap-2 px-3 sm:px-4 py-2 border-b border-bd bg-bg2/20 text-[10px] font-mono uppercase tracking-wider text-mute">
+                <SortHeader className="col-span-2 sm:col-span-1" label="Type" active={sortKey === "direction"} dir={sortDir} onClick={() => toggleSort("direction")} />
+                <SortHeader className="col-span-3 sm:col-span-2" label="Entry" active={sortKey === "entry"} dir={sortDir} onClick={() => toggleSort("entry")} />
+                <SortHeader className="col-span-3 sm:col-span-2" label="Current" active={sortKey === "current"} dir={sortDir} onClick={() => toggleSort("current")} />
+                <SortHeader className="col-span-2" label="Lots" active={sortKey === "lots"} dir={sortDir} onClick={() => toggleSort("lots")} />
+                <SortHeader className="col-span-2 sm:col-span-3 justify-end" label="P/L" active={sortKey === "pnl"} dir={sortDir} onClick={() => toggleSort("pnl")} />
+                <SortHeader className="hidden sm:flex col-span-2 justify-end" label="Time" active={sortKey === "time"} dir={sortDir} onClick={() => toggleSort("time")} />
+              </div>
+              <div className="divide-y divide-bd">
+                {sortedPos.map((p) => (
+                  <div
+                    key={p.id}
+                    className="grid grid-cols-12 items-center gap-2 px-3 sm:px-4 py-2.5 text-xs"
+                  >
+                    <span
+                      className={cn(
+                        "col-span-2 sm:col-span-1 inline-flex items-center justify-center rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider font-mono w-fit",
+                        p.direction === "LONG"
+                          ? "border-buy/40 text-buy bg-buy/10"
+                          : "border-sell/40 text-sell bg-sell/10",
+                      )}
+                    >
+                      {p.direction}
+                    </span>
+                    <div className="col-span-3 sm:col-span-2 font-mono text-tx">{fmtPrice(p.entry, p.symbol)}</div>
+                    <div className="col-span-3 sm:col-span-2 font-mono text-tx">{fmtPrice(p.current, p.symbol)}</div>
+                    <div className="col-span-2 font-mono text-dim">{p.lots.toFixed(2)}</div>
+                    <div className="col-span-2 sm:col-span-3 text-right font-mono">
+                      <div className={cn(p.pnlUSC >= 0 ? "text-buy" : "text-sell")}>
+                        {fmtCurrency(p.pnlUSC, currency, true)}
+                      </div>
+                      <div className={cn("text-[10px]", p.pnlPct >= 0 ? "text-buy/70" : "text-sell/70")}>
+                        {fmtPct(p.pnlPct)}
+                      </div>
+                    </div>
+                    <div className="hidden sm:block col-span-2 text-right text-[10px] font-mono text-mute">
+                      {relTime(p.openedAt)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function SortHeader({
   label,
-  value,
-  tone,
+  active,
+  dir,
+  onClick,
+  className,
 }: {
   label: string;
-  value: string;
-  tone: "buy" | "sell" | "neutral";
+  active: boolean;
+  dir: SortDir;
+  onClick: () => void;
+  className?: string;
 }) {
   return (
-    <div className="bg-bg1/50 px-3 py-2">
-      <div className="text-[10px] font-mono uppercase tracking-wider text-mute">{label}</div>
-      <div
-        className={cn(
-          "font-mono text-sm font-semibold tabular-nums",
-          tone === "buy" && "text-buy",
-          tone === "sell" && "text-sell",
-          tone === "neutral" && "text-tx",
-        )}
-      >
-        {value}
-      </div>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-1 hover:text-tx transition-colors",
+        active && "text-tx",
+        className,
+      )}
+    >
+      <span>{label}</span>
+      {active ? (
+        dir === "asc" ? (
+          <ChevronUp className="h-3 w-3" />
+        ) : (
+          <ChevronDown className="h-3 w-3" />
+        )
+      ) : (
+        <ChevronsUpDown className="h-3 w-3 opacity-50" />
+      )}
+    </button>
   );
 }
