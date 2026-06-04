@@ -2690,7 +2690,7 @@ final class SMC_SuperFib_Sniper_REST {
                     // HARDENING (BUG-001 2026-05-14): Same server-time fallback as M1 block.
                     // Uses $timestamp_raw which resolves quote_time|timestamp|null.
                     $m15_stream_ts = !empty($timestamp_raw) ? $timestamp_raw : gmdate('c');
-                    $result = $this->insert_mt5_candle($user_id, $symbol, '15min', $candle_m15, $m15_stream_ts, 1800);
+                    $result = $this->insert_mt5_candle($user_id, $symbol, '15min', $candle_m15, $m15_stream_ts, 1800, true);
                     if ($result) {
                         $inserted_candles++;
                     } else {
@@ -4879,11 +4879,16 @@ final class SMC_SuperFib_Sniper_REST {
      * Insert MT5 candle data
      * Regression guard: Atomic operation with proper source tagging
      */
-    private function insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $stream_timestamp = null, $max_age_sec = 180) {
+    private function insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $stream_timestamp = null, $max_age_sec = 180, $round_to_minute = false) {
         global $wpdb;
 
-        // Parse timestamp to MySQL format
-        $candle_time = gmdate('Y-m-d H:i:s', strtotime($candle['time']));
+        // Parse timestamp to MySQL format. M15+ callers can round away
+        // small broker/server-time jitter from closed bar-open timestamps.
+        $raw_ts = strtotime($candle['time']);
+        if ($round_to_minute && $raw_ts !== false) {
+            $raw_ts = (int) (round($raw_ts / 60) * 60);
+        }
+        $candle_time = gmdate('Y-m-d H:i:s', $raw_ts);
         if ($stream_timestamp && strtotime($candle['time']) >= strtotime($stream_timestamp)) {
             error_log("CANDLE CHECK: candle_time={$candle['time']} | stream={$stream_timestamp}");
             error_log("CANDLE REJECTED: {$symbol} | candle_time={$candle['time']} >= stream={$stream_timestamp}");
