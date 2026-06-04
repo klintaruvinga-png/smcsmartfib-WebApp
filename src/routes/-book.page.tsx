@@ -138,7 +138,7 @@ function SymbolCard({
   totalShort: number;
   currency?: string;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("time");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -192,6 +192,7 @@ function SymbolCard({
           <span className="text-[10px] font-mono text-mute">·</span>
           <span className="text-[10px] font-mono text-buy">Long {totalLong.toFixed(2)} Lots</span>
           <span className="text-[10px] font-mono text-sell">Short {totalShort.toFixed(2)} Lots</span>
+          <span className="text-[10px] font-mono text-tx">Net {(totalLong - totalShort).toFixed(2)} Lots</span>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           <span className={cn("font-mono text-sm", groupPnl >= 0 ? "text-buy" : "text-sell")}>
