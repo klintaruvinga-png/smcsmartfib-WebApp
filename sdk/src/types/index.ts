@@ -252,6 +252,7 @@ export interface TradePlan {
   tps: { tp1: number; tp2: number; tp3: number };
   rr: { tp1: number; tp2: number; tp3: number };
   lotSize: { e1: number; e2: number; e3: number };
+  minExecutableLot?: number;
   ladder?: {
     e1: { ratio: number; stopRatio: number; family: "LTF_SF" };
     e2: { ratio: number; stopRatio: number; family: "LTF_SF" };

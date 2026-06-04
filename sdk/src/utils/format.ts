@@ -37,8 +37,11 @@ export function fmtCurrency(value: number, currency?: string | null, signed = fa
   const sign = signed && value > 0 ? "+" : "";
   const cur = (currency ?? "").toUpperCase();
 
-  if (!cur || cur === "USD" || cur === "USC") {
+  if (!cur || cur === "USD") {
     return `${sign}$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  if (cur === "USC") {
+    return `${sign}USC ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
   if (cur === "EUR") {
     return `${sign}€${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -55,7 +58,7 @@ export function fmtCurrency(value: number, currency?: string | null, signed = fa
 
 /** Format a USC (US Cents / Dollars) amount. Backward-compat wrapper — prefer fmtCurrency. */
 export function fmtUSC(value: number, signed = false): string {
-  return fmtCurrency(value, "USD", signed);
+  return fmtCurrency(value, "USC", signed);
 }
 
 /** Format a ZAR (South African Rand) amount. */

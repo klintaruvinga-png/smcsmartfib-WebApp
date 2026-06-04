@@ -4,6 +4,8 @@ import { useAccountTelemetry } from "@/hooks/useSniperData";
 import { fmtCurrency } from "@/lib/format";
 import { FreshnessBadge } from "./FreshnessBadge";
 
+const USD_TO_ZAR_RATE = 18.5;
+
 export function WalletOverview() {
   const { data: account, isLoading, error } = useAccountTelemetry();
 
@@ -56,8 +58,6 @@ export function WalletOverview() {
 
   const cur = account.currency;
   const floating = account.floatingPl;
-  const onePctBalance = account.balance * 0.01;
-  const onePctEquity = account.equity * 0.01;
   const marginLevel = account.marginLevel > 0 ? account.marginLevel : 0;
   const marginStrength = marginLevel > 1000 ? "Strong" : marginLevel > 200 ? "Healthy" : "Tight";
 
@@ -79,27 +79,19 @@ export function WalletOverview() {
             label="EQUITY"
             value={fmtCurrency(account.equity, cur)}
             valueClass="text-buy"
-            sub={
-              <span className="text-mute">
-                1% = {onePctEquity.toFixed(2)} {cur}
-              </span>
-            }
+            sub={<span className="text-mute">{formatLocalZar(account.equity, cur)}</span>}
           />
           <Cell
             label="BALANCE"
             value={fmtCurrency(account.balance, cur)}
             valueClass="text-info"
-            sub={
-              <span className="text-mute">
-                1% = {onePctBalance.toFixed(2)} {cur}
-              </span>
-            }
+            sub={<span className="text-mute">{formatLocalZar(account.balance, cur)}</span>}
           />
           <Cell
             label="FLOATING P/L"
-            value={`${floating >= 0 ? "+" : ""}${floating.toFixed(2)}`}
+            value={fmtCurrency(floating, cur, true)}
             valueClass={floating >= 0 ? "text-buy" : "text-sell"}
-            sub={<span className="text-mute">{cur} open exposure</span>}
+            sub={<span className="text-mute">{formatLocalZar(floating, cur)}</span>}
           />
           <Cell
             label="MARGIN LEVEL"
@@ -111,6 +103,59 @@ export function WalletOverview() {
       </div>
     </section>
   );
+}
+
+function formatLocalZar(value: number, currency?: string | null): string {
+  const currencyInfo = parseAccountCurrency(currency);
+  const baseAmount = value / (currencyInfo.isCent ? 100 : 1);
+  const zar =
+    currencyInfo.base === "ZAR"
+      ? baseAmount
+      : currencyInfo.base === "USD"
+        ? baseAmount * USD_TO_ZAR_RATE
+        : null;
+
+  if (zar === null) {
+    return "Local ZAR --";
+  }
+
+  return `Local ZAR ${zar.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function parseAccountCurrency(currency?: string | null): { base: string; isCent: boolean } {
+  const raw = (currency ?? "").trim().toUpperCase();
+  let token = raw.replace(/[^A-Z]/g, "");
+  let isCent = false;
+
+  if (token === "USC") {
+    return { base: "USD", isCent: true };
+  }
+
+  for (const suffix of ["MICRO", "CENT"] as const) {
+    if (token.endsWith(suffix) && token.length > suffix.length) {
+      token = token.slice(0, -suffix.length);
+      isCent = true;
+      break;
+    }
+  }
+
+  if (!isCent && /(?:^|[.\s_-])[CM]$/.test(raw)) {
+    isCent = true;
+  }
+
+  if (!isCent && token.length > 3 && ["C", "M"].includes(token.at(-1) ?? "")) {
+    token = token.slice(0, -1);
+    isCent = true;
+  }
+
+  if (token === "EURO") {
+    token = "EUR";
+  }
+
+  return { base: token.slice(0, 3), isCent };
 }
 
 function Cell({

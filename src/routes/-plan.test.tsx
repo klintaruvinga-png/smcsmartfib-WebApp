@@ -276,6 +276,13 @@ describe("getMinExecutableStageLot", () => {
     ["EURUSD", 0.01],
     ["GBPJPY", 0.01],
     ["AUDUSD", 0.01],
+    ["EURGBP", 0.01],
+    ["GBPAUD", 0.01],
+    ["AUDCAD", 0.01],
+    ["CADJPY", 0.01],
+    ["CHFJPY", 0.01],
+    ["EURGBP.micro", 0.01],
+    ["EURGBP.cent", 0.01],
     [undefined, 0.01],
     ["XAUUSD", 0.1],
     ["XAUUSDm", 0.1],
@@ -298,6 +305,12 @@ describe("getMinExecutableStageLot", () => {
     ["SPX500", 0.1],
     ["GER40", 0.1],
     ["DAX40", 0.1],
+    ["USDZAR", 0.1],
+    ["USDZAR.pro", 0.1],
+    ["USDZAR.micro", 0.01],
+    ["USDZAR.cent", 0.01],
+    ["USDZAR.m", 0.01],
+    ["USDZAR.c", 0.01],
   ];
 
   it.each(cases)("resolves executable minimum for %s", (symbol, expected) => {
@@ -320,8 +333,17 @@ describe("isExecutableStageLotValue symbol-aware boundaries", () => {
     [0.01, "XAUUSDm", false],
     [0.01, "XAUUSD.a", false],
     [0.1, "NAS100.r", true],
+    [0.01, "USDZAR", false],
+    [0.099, "USDZAR", false],
+    [0.1, "USDZAR", true],
+    [0.01, "USDZAR.micro", true],
+    [0.01, "USDZAR.cent", true],
+    [0.01, "USDZAR.m", true],
+    [0.01, "USDZAR.c", true],
     [0.009, "EURUSD", false],
     [0.01, "EURUSD", true],
+    [0.009, "EURGBP.micro", false],
+    [0.01, "EURGBP.micro", true],
   ];
 
   it.each(cases)("classifies lot %s for %s as executable=%s", (lot, symbol, expected) => {
@@ -342,6 +364,28 @@ describe("isExecutableStageLotValue symbol-aware boundaries", () => {
       hasExecutableStageLots(
         buildPlan({
           symbol: "BTCUSD",
+          lotSize: { e1: 0.01, e2: 0.09, e3: 0 },
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("uses backend-published plan minimums when checking executable stage lots", () => {
+    expect(
+      hasExecutableStageLots(
+        buildPlan({
+          symbol: "EURUSD",
+          minExecutableLot: 0.1,
+          lotSize: { e1: 0.01, e2: 0.09, e3: 0.1 },
+        }),
+      ),
+    ).toBe(true);
+
+    expect(
+      hasExecutableStageLots(
+        buildPlan({
+          symbol: "EURUSD",
+          minExecutableLot: 0.1,
           lotSize: { e1: 0.01, e2: 0.09, e3: 0 },
         }),
       ),
@@ -518,14 +562,15 @@ describe("PlanPage ranking and execution guards", () => {
     expect(screen.queryByText("0.00 lot")).toBeNull();
     expect(screen.queryByText("0.01 lot")).toBeNull();
     expect(cardText).toContain("0.12 lot");
-    expect(cardText).toContain("Below 0.01 lot");
+    expect(cardText).toContain("0.009 lot");
+    expect(cardText).toContain("Below min 0.01");
     expect(
       screen.getByText(
-        /Backend plan contains stage lots below 0\.01\. The backend will skip those stages and queue any remaining executable legs\./,
+        /Some stages are below the 0\.01 minimum lot for GBPUSD\. The backend will skip those stages and queue any remaining executable legs\./,
       ),
     ).toBeTruthy();
     expect(
-      screen.queryByText(/No backend stage lots meet the 0\.01 execution minimum\./),
+      screen.queryByText(/No backend stage lots meet the 0\.01 minimum lot for GBPUSD\./),
     ).toBeNull();
     expect(
       (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
@@ -543,7 +588,7 @@ describe("PlanPage ranking and execution guards", () => {
     });
 
     expect(
-      screen.getByText(/No backend stage lots meet the 0\.01 execution minimum\./),
+      screen.getByText(/No backend stage lots meet the 0\.01 minimum lot for GBPUSD\./),
     ).toBeTruthy();
     expect(
       (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
@@ -563,9 +608,9 @@ describe("PlanPage ranking and execution guards", () => {
     });
 
     const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
-    expect(cardText).toContain("Below 0.10 lot");
+    expect(cardText).toContain("Below min 0.10");
     expect(
-      screen.getByText(/No backend stage lots meet the 0\.10 execution minimum\./),
+      screen.getByText(/No backend stage lots meet the 0\.10 minimum lot for BTCUSD\./),
     ).toBeTruthy();
     expect(
       (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,

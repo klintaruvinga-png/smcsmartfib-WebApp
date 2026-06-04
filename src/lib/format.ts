@@ -35,8 +35,11 @@ export function fmtCurrency(value: number, currency?: string | null, signed = fa
   const sign = signed && value > 0 ? "+" : "";
   const cur = (currency ?? "").toUpperCase();
 
-  if (!cur || cur === "USD" || cur === "USC") {
+  if (!cur || cur === "USD") {
     return `${sign}$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  if (cur === "USC") {
+    return `${sign}USC ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
   if (cur === "EUR") {
     return `${sign}€${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -54,7 +57,7 @@ export function fmtCurrency(value: number, currency?: string | null, signed = fa
 /** Thin backward-compat wrapper — callers that already know the account
  *  currency is USC/USD can continue using fmtUSC without change. */
 export function fmtUSC(value: number, signed = false): string {
-  return fmtCurrency(value, "USD", signed);
+  return fmtCurrency(value, "USC", signed);
 }
 
 export function fmtZAR(value: number): string {

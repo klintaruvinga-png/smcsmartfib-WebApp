@@ -22,17 +22,17 @@ describe("WalletOverview", () => {
     cleanup();
   });
 
-  it("renders backend account telemetry values read-only", () => {
+  it("renders USC telemetry in account currency with local-currency subtitles", () => {
     hookMocks.useAccountTelemetry.mockReturnValue({
       data: {
         accountId: "32206603",
         terminalId: "terminal-1",
-        balance: 12500,
-        equity: 12725,
+        balance: 5535.59,
+        equity: 9206.75,
         margin: 1500,
         freeMargin: 11225,
         marginLevel: 848.33,
-        floatingPl: 225,
+        floatingPl: 3671.16,
         currency: "USC",
         leverage: 500,
         eaVersion: "1.00",
@@ -47,9 +47,44 @@ describe("WalletOverview", () => {
     render(<WalletOverview />);
 
     expect(screen.getByText("Account")).toBeTruthy();
-    expect(screen.getByText("$12,725.00")).toBeTruthy();
-    expect(screen.getByText("$12,500.00")).toBeTruthy();
-    expect(screen.getByText("+225.00")).toBeTruthy();
+    expect(screen.getByText("USC 9,206.75")).toBeTruthy();
+    expect(screen.getByText("USC 5,535.59")).toBeTruthy();
+    expect(screen.getByText("+USC 3,671.16")).toBeTruthy();
+    expect(screen.getByText("Local ZAR 1,703.25")).toBeTruthy();
+    expect(screen.getByText("Local ZAR 1,024.08")).toBeTruthy();
+    expect(screen.queryByText("$9,206.75")).toBeNull();
+  });
+
+  it("renders ZAR cent account telemetry without applying USD conversion", () => {
+    hookMocks.useAccountTelemetry.mockReturnValue({
+      data: {
+        accountId: "32206604",
+        terminalId: "terminal-1",
+        balance: 5535.59,
+        equity: 9206.75,
+        margin: 1500,
+        freeMargin: 11225,
+        marginLevel: 848.33,
+        floatingPl: 3671.16,
+        currency: "ZAR.c",
+        leverage: 500,
+        eaVersion: "1.00",
+        lastSeenAt: "2026-05-20T10:15:00Z",
+        updatedAt: "2026-05-20T10:15:00Z",
+        state: "live",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    render(<WalletOverview />);
+
+    expect(screen.getByText("ZAR.C 9,206.75")).toBeTruthy();
+    expect(screen.getByText("ZAR.C 5,535.59")).toBeTruthy();
+    expect(screen.getByText("+ZAR.C 3,671.16")).toBeTruthy();
+    expect(screen.getByText("Local ZAR 92.07")).toBeTruthy();
+    expect(screen.getByText("Local ZAR 55.36")).toBeTruthy();
+    expect(screen.queryByText("Local ZAR 170,324.88")).toBeNull();
   });
 
   it("shows the degraded backend-owned state when telemetry is unavailable", () => {
