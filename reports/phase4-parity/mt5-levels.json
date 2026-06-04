@@ -116,336 +116,336 @@
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  -200,
-        "price":  1.174047
+        "price":  1.173976
     },
     {
         "symbol":  "EURUSD",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  -162.5,
-        "price":  1.172333
+        "price":  1.172273
     },
     {
         "symbol":  "EURUSD",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  -100,
-        "price":  1.169477
+        "price":  1.169436
     },
     {
         "symbol":  "EURUSD",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  -62.5,
-        "price":  1.167762
+        "price":  1.167733
     },
     {
         "symbol":  "EURUSD",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  -25,
-        "price":  1.166048
+        "price":  1.16603
     },
     {
         "symbol":  "EURUSD",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  0,
-        "price":  1.164905
+        "price":  1.164896
     },
     {
         "symbol":  "EURUSD",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  25,
-        "price":  1.163763
+        "price":  1.16376
     },
     {
         "symbol":  "EURUSD",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  50,
-        "price":  1.16262
+        "price":  1.162626
     },
     {
         "symbol":  "EURUSD",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  62.5,
-        "price":  1.162049
+        "price":  1.162058
     },
     {
         "symbol":  "EURUSD",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  75,
-        "price":  1.161477
+        "price":  1.16149
     },
     {
         "symbol":  "EURUSD",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  100,
-        "price":  1.160335
+        "price":  1.160356
     },
     {
         "symbol":  "EURUSD",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  125,
-        "price":  1.159192
+        "price":  1.15922
     },
     {
         "symbol":  "EURUSD",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  162.5,
-        "price":  1.157478
+        "price":  1.157518
     },
     {
         "symbol":  "EURUSD",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  200,
-        "price":  1.155763
+        "price":  1.155816
     },
     {
         "symbol":  "EURUSD",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  262.5,
-        "price":  1.152907
+        "price":  1.152978
     },
     {
         "symbol":  "EURUSD",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  300,
-        "price":  1.151193
+        "price":  1.151275
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "HTF_AF",
         "ratio":  -200,
-        "price":  161.442
+        "price":  161.449
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "HTF_AF",
         "ratio":  -162.5,
-        "price":  161.106375
+        "price":  161.11225
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "HTF_AF",
         "ratio":  -100,
-        "price":  160.547
+        "price":  160.551
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "HTF_AF",
         "ratio":  -62.5,
-        "price":  160.211375
+        "price":  160.21425
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "HTF_AF",
         "ratio":  -25,
-        "price":  159.87575
+        "price":  159.8775
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "HTF_AF",
         "ratio":  0,
-        "price":  159.652
+        "price":  159.653
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "HTF_AF",
         "ratio":  25,
-        "price":  159.42825
+        "price":  159.4285
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "HTF_AF",
         "ratio":  50,
-        "price":  159.2045
+        "price":  159.204
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "HTF_AF",
         "ratio":  62.5,
-        "price":  159.092625
+        "price":  159.09175
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "HTF_AF",
         "ratio":  75,
-        "price":  158.98075
+        "price":  158.9795
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "HTF_AF",
         "ratio":  100,
-        "price":  158.757
+        "price":  158.755
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "HTF_AF",
         "ratio":  125,
-        "price":  158.53325
+        "price":  158.5305
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "HTF_AF",
         "ratio":  162.5,
-        "price":  158.197625
+        "price":  158.19375
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "HTF_AF",
         "ratio":  200,
-        "price":  157.862
+        "price":  157.857
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "HTF_AF",
         "ratio":  262.5,
-        "price":  157.302625
+        "price":  157.29575
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "HTF_AF",
         "ratio":  300,
-        "price":  156.967
+        "price":  156.959
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  -200,
-        "price":  161.44
+        "price":  161.518
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  -162.5,
-        "price":  161.1865
+        "price":  161.2495
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  -100,
-        "price":  160.764
+        "price":  160.802
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  -62.5,
-        "price":  160.5105
+        "price":  160.5335
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  -25,
-        "price":  160.257
+        "price":  160.265
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  0,
-        "price":  160.088
+        "price":  160.086
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  25,
-        "price":  159.919
+        "price":  159.907
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  50,
-        "price":  159.75
+        "price":  159.728
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  62.5,
-        "price":  159.6655
+        "price":  159.6385
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  75,
-        "price":  159.581
+        "price":  159.549
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  100,
-        "price":  159.412
+        "price":  159.37
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  125,
-        "price":  159.243
+        "price":  159.191
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  162.5,
-        "price":  158.9895
+        "price":  158.9225
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  200,
-        "price":  158.736
+        "price":  158.654
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  262.5,
-        "price":  158.3135
+        "price":  158.2065
     },
     {
         "symbol":  "USDJPY",
         "timeframe":  "M15",
         "family":  "LTF_SF",
         "ratio":  300,
-        "price":  158.06
+        "price":  157.938
     },
     {
         "symbol":  "XAUUSD",
