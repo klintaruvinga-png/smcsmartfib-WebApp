@@ -1,0 +1,221 @@
+[
+    {
+        "symbol":  "EURUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "session_tf":  "Daily",
+        "authority_tf":  "Weekly",
+        "anchor_high":  1.16858,
+        "anchor_low":  1.15862,
+        "anchor_range":  0.0099599999999999689,
+        "compression_threshold":  0.002,
+        "debug_source":  "derived_from_levels",
+        "source":  "auth_f1",
+        "key":  null,
+        "high":  1.16858,
+        "low":  1.15862,
+        "range":  0.0099599999999999689,
+        "candle_count":  null,
+        "first_candle":  "",
+        "last_candle":  "",
+        "components":  [
+
+                       ]
+    },
+    {
+        "symbol":  "EURUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "session_tf":  "Daily",
+        "authority_tf":  "Weekly",
+        "anchor_high":  1.164896,
+        "anchor_low":  1.160356,
+        "anchor_range":  0.0045399999999999885,
+        "compression_threshold":  0.002,
+        "debug_source":  "derived_from_levels",
+        "components":  [
+                           {
+                               "slot":  "F1",
+                               "key":  null,
+                               "high":  null,
+                               "low":  null,
+                               "range":  null,
+                               "compression_pass":  null,
+                               "weight":  null,
+                               "candle_count":  null,
+                               "first_candle":  "",
+                               "last_candle":  ""
+                           },
+                           {
+                               "slot":  "F2",
+                               "key":  null,
+                               "high":  null,
+                               "low":  null,
+                               "range":  null,
+                               "compression_pass":  null,
+                               "weight":  null,
+                               "candle_count":  null,
+                               "first_candle":  "",
+                               "last_candle":  ""
+                           },
+                           {
+                               "slot":  "F3",
+                               "key":  null,
+                               "high":  null,
+                               "low":  null,
+                               "range":  null,
+                               "compression_pass":  null,
+                               "weight":  null,
+                               "candle_count":  null,
+                               "first_candle":  "",
+                               "last_candle":  ""
+                           }
+                       ]
+    },
+    {
+        "symbol":  "USDJPY",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "session_tf":  "Daily",
+        "authority_tf":  "Weekly",
+        "anchor_high":  159.653,
+        "anchor_low":  158.755,
+        "anchor_range":  0.89799999999999613,
+        "compression_threshold":  0.4,
+        "debug_source":  "derived_from_levels",
+        "source":  "auth_f1",
+        "key":  null,
+        "high":  159.653,
+        "low":  158.755,
+        "range":  0.89799999999999613,
+        "candle_count":  null,
+        "first_candle":  "",
+        "last_candle":  "",
+        "components":  [
+
+                       ]
+    },
+    {
+        "symbol":  "USDJPY",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "session_tf":  "Daily",
+        "authority_tf":  "Weekly",
+        "anchor_high":  160.086,
+        "anchor_low":  159.37,
+        "anchor_range":  0.71600000000000819,
+        "compression_threshold":  0.4,
+        "debug_source":  "derived_from_levels",
+        "components":  [
+                           {
+                               "slot":  "F1",
+                               "key":  null,
+                               "high":  null,
+                               "low":  null,
+                               "range":  null,
+                               "compression_pass":  null,
+                               "weight":  null,
+                               "candle_count":  null,
+                               "first_candle":  "",
+                               "last_candle":  ""
+                           },
+                           {
+                               "slot":  "F2",
+                               "key":  null,
+                               "high":  null,
+                               "low":  null,
+                               "range":  null,
+                               "compression_pass":  null,
+                               "weight":  null,
+                               "candle_count":  null,
+                               "first_candle":  "",
+                               "last_candle":  ""
+                           },
+                           {
+                               "slot":  "F3",
+                               "key":  null,
+                               "high":  null,
+                               "low":  null,
+                               "range":  null,
+                               "compression_pass":  null,
+                               "weight":  null,
+                               "candle_count":  null,
+                               "first_candle":  "",
+                               "last_candle":  ""
+                           }
+                       ]
+    },
+    {
+        "symbol":  "XAUUSD",
+        "timeframe":  "M15",
+        "family":  "HTF_AF",
+        "session_tf":  "Daily",
+        "authority_tf":  "Weekly",
+        "anchor_high":  4595.32,
+        "anchor_low":  4366.33,
+        "anchor_range":  228.98999999999978,
+        "compression_threshold":  0.2,
+        "debug_source":  "derived_from_levels",
+        "source":  "auth_f1",
+        "key":  null,
+        "high":  4595.32,
+        "low":  4366.33,
+        "range":  228.98999999999978,
+        "candle_count":  null,
+        "first_candle":  "",
+        "last_candle":  "",
+        "components":  [
+
+                       ]
+    },
+    {
+        "symbol":  "XAUUSD",
+        "timeframe":  "M15",
+        "family":  "LTF_SF",
+        "session_tf":  "Daily",
+        "authority_tf":  "Weekly",
+        "anchor_high":  4524.488,
+        "anchor_low":  4443.323,
+        "anchor_range":  81.164999999999964,
+        "compression_threshold":  0.2,
+        "debug_source":  "derived_from_levels",
+        "components":  [
+                           {
+                               "slot":  "F1",
+                               "key":  null,
+                               "high":  null,
+                               "low":  null,
+                               "range":  null,
+                               "compression_pass":  null,
+                               "weight":  null,
+                               "candle_count":  null,
+                               "first_candle":  "",
+                               "last_candle":  ""
+                           },
+                           {
+                               "slot":  "F2",
+                               "key":  null,
+                               "high":  null,
+                               "low":  null,
+                               "range":  null,
+                               "compression_pass":  null,
+                               "weight":  null,
+                               "candle_count":  null,
+                               "first_candle":  "",
+                               "last_candle":  ""
+                           },
+                           {
+                               "slot":  "F3",
+                               "key":  null,
+                               "high":  null,
+                               "low":  null,
+                               "range":  null,
+                               "compression_pass":  null,
+                               "weight":  null,
+                               "candle_count":  null,
+                               "first_candle":  "",
+                               "last_candle":  ""
+                           }
+                       ]
+    }
+]

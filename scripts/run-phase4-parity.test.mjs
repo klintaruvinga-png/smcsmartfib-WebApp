@@ -92,6 +92,26 @@ describe('run-phase4-parity.ps1 automation contract', () => {
     expect(source).toContain('--out');
   });
 
+  test('preserves anchor debug artifacts outside the validator level arrays', () => {
+    const source = readScript();
+
+    expect(source).toContain('$mt5AnchorDebugFile = Join-Path $reportsRoot "mt5-anchor-debug.json"');
+    expect(source).toContain('$pineAnchorDebugFile = Join-Path $reportsRoot "pine-anchor-debug.json"');
+    expect(source).toContain('ConvertTo-Mt5AnchorDebugRecords');
+    expect(source).toContain('Write-JsonFile $mt5AnchorDebugFile');
+    expect(source).toContain('Anchor debug artifacts');
+  });
+
+  test('adds anchor-debug comparison details to Markdown reports for critical groups', () => {
+    const source = readScript();
+
+    expect(source).toContain('Format-AnchorDebugSummaryMarkdown');
+    expect(source).toContain('## Anchor Debug Summary');
+    expect(source).toContain('Build-AnchorDebugIndex');
+    expect(source).toContain('Anchor High');
+    expect(source).toContain('Components');
+  });
+
   test('captures one canonical run timestamp and passes it to Node and PHP tools', () => {
     const source = readScript();
 

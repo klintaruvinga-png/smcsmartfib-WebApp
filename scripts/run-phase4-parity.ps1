@@ -308,6 +308,289 @@ function Get-RequiredM15CandleLimit([string[]]$OutputTimeframes) {
     return 2000
 }
 
+function Get-ObjectPropertyValue($Object, [string]$Name) {
+    if ($null -eq $Object) {
+        return $null
+    }
+    if ($Object -is [hashtable] -and $Object.ContainsKey($Name)) {
+        return $Object[$Name]
+    }
+    if ($Object.PSObject.Properties.Name -contains $Name) {
+        return $Object.$Name
+    }
+    return $null
+}
+
+function Get-SessionTfForTimeframe([string]$Timeframe) {
+    switch ($Timeframe.ToUpperInvariant()) {
+        "M15" { return "Daily" }
+        "H1"  { return "Weekly" }
+        "H4"  { return "Monthly" }
+        "D1"  { return "Quarterly" }
+        default { return $null }
+    }
+}
+
+function Get-AuthorityTfForSessionTf([string]$SessionTf) {
+    switch ($SessionTf) {
+        "Daily"     { return "Weekly" }
+        "Weekly"    { return "Monthly" }
+        "Monthly"   { return "Quarterly" }
+        "Quarterly" { return "Yearly" }
+        default     { return $null }
+    }
+}
+
+function Get-CompressionThreshold([string]$Symbol) {
+    $pipSize = 0.0001
+    if ($Symbol -match "JPY$" -or $Symbol -eq "XAUUSD" -or $Symbol -eq "XAGUSD") {
+        $pipSize = 0.01
+    }
+    $minPips = if ($Symbol -match "JPY$") { 40.0 } else { 20.0 }
+    return $pipSize * $minPips
+}
+
+function Get-LevelPrice($Levels, [double]$Ratio) {
+    foreach ($level in @($Levels)) {
+        if ([Math]::Abs(([double]$level.ratio) - $Ratio) -lt 0.0000001) {
+            return [double]$level.price
+        }
+    }
+    return $null
+}
+
+function New-EmptyAnchorComponent([string]$Slot, $Key, $Weight) {
+    return [PSCustomObject]@{
+        slot             = $Slot
+        key              = $Key
+        high             = $null
+        low              = $null
+        range            = $null
+        compression_pass = $null
+        weight           = $Weight
+        candle_count     = $null
+        first_candle     = ""
+        last_candle      = ""
+    }
+}
+
+function ConvertTo-AnchorComponents($Debug) {
+    $components = Get-ObjectPropertyValue $Debug "components"
+    if ($null -ne $components) {
+        return @($components)
+    }
+
+    return @(
+        (New-EmptyAnchorComponent "F1" (Get-ObjectPropertyValue $Debug "ltf_f1_key") $null),
+        (New-EmptyAnchorComponent "F2" (Get-ObjectPropertyValue $Debug "ltf_f2_key") $null),
+        (New-EmptyAnchorComponent "F3" (Get-ObjectPropertyValue $Debug "ltf_f3_key") $null)
+    )
+}
+
+function New-Mt5AnchorDebugRecord([string]$Symbol, [string]$Timeframe, [string]$Family, $Levels, $Debug) {
+    $anchorHigh = Get-LevelPrice $Levels 0
+    $anchorLow = Get-LevelPrice $Levels 100
+    if ($null -eq $anchorHigh -or $null -eq $anchorLow) {
+        return $null
+    }
+
+    $sessionTf = Get-ObjectPropertyValue $Debug "session_tf"
+    if ([string]::IsNullOrWhiteSpace([string]$sessionTf)) {
+        $sessionTf = Get-SessionTfForTimeframe $Timeframe
+    }
+    $authorityTf = Get-ObjectPropertyValue $Debug "authority_tf"
+    if ([string]::IsNullOrWhiteSpace([string]$authorityTf)) {
+        $authorityTf = Get-AuthorityTfForSessionTf $sessionTf
+    }
+
+    $threshold = Get-ObjectPropertyValue $Debug "compression_threshold"
+    if ($null -eq $threshold) {
+        $threshold = Get-CompressionThreshold $Symbol
+    }
+
+    $record = [ordered]@{
+        symbol                = $Symbol
+        timeframe             = $Timeframe
+        family                = $Family
+        session_tf            = $sessionTf
+        authority_tf          = $authorityTf
+        anchor_high           = $anchorHigh
+        anchor_low            = $anchorLow
+        anchor_range          = $anchorHigh - $anchorLow
+        compression_threshold = [double]$threshold
+        debug_source          = if ($null -ne $Debug) { "endpoint_anchor_debug" } else { "derived_from_levels" }
+    }
+
+    if ($Family -eq "LTF_SF") {
+        $record["components"] = @(ConvertTo-AnchorComponents $Debug)
+    } else {
+        $record["source"] = "auth_f1"
+        $record["key"] = Get-ObjectPropertyValue $Debug "htf_anchor_key"
+        $record["high"] = $anchorHigh
+        $record["low"] = $anchorLow
+        $record["range"] = $anchorHigh - $anchorLow
+        $record["candle_count"] = Get-ObjectPropertyValue $Debug "candle_count"
+        $record["first_candle"] = [string](Get-ObjectPropertyValue $Debug "first_candle")
+        $record["last_candle"] = [string](Get-ObjectPropertyValue $Debug "last_candle")
+        $record["components"] = @()
+    }
+
+    return [PSCustomObject]$record
+}
+
+function ConvertTo-Mt5AnchorDebugRecords([string]$Symbol, $Response) {
+    $records = New-Object System.Collections.Generic.List[object]
+    $debugRoot = Get-ObjectPropertyValue $Response "anchor_debug"
+
+    foreach ($tfProp in $Response.fibs.PSObject.Properties) {
+        $tf = $tfProp.Name
+        $tfDebug = Get-ObjectPropertyValue $debugRoot $tf
+        if ($null -eq $tfDebug) {
+            $tfDebug = $debugRoot
+        }
+        foreach ($familyProp in $tfProp.Value.PSObject.Properties) {
+            $family = $familyProp.Name
+            $familyDebug = Get-ObjectPropertyValue $tfDebug $family
+            if ($null -eq $familyDebug) {
+                $familyDebug = $tfDebug
+            }
+            $record = New-Mt5AnchorDebugRecord $Symbol $tf $family @($familyProp.Value) $familyDebug
+            if ($null -ne $record) {
+                $records.Add($record)
+            }
+        }
+    }
+
+    return $records.ToArray()
+}
+
+function ConvertTo-Mt5AnchorDebugRecordsFromLevelRows($Rows) {
+    $groups = @{}
+    foreach ($row in @($Rows)) {
+        $key = "$($row.symbol)|$($row.timeframe)|$($row.family)"
+        if (-not $groups.ContainsKey($key)) {
+            $groups[$key] = New-Object System.Collections.Generic.List[object]
+        }
+        $groups[$key].Add($row)
+    }
+
+    $records = New-Object System.Collections.Generic.List[object]
+    foreach ($key in $groups.Keys) {
+        $parts = $key -split "\|"
+        $record = New-Mt5AnchorDebugRecord $parts[0] $parts[1] $parts[2] @($groups[$key]) $null
+        if ($null -ne $record) {
+            $records.Add($record)
+        }
+    }
+    return $records.ToArray()
+}
+
+function Build-AnchorDebugIndex([string]$PathValue) {
+    $index = @{}
+    if (-not (Test-Path -LiteralPath $PathValue)) {
+        return $index
+    }
+
+    $rows = Get-Content -LiteralPath $PathValue -Raw | ConvertFrom-Json
+    foreach ($row in @($rows)) {
+        $key = "$($row.symbol)|$($row.timeframe)|$($row.family)"
+        $index[$key] = $row
+    }
+    return $index
+}
+
+function Format-AnchorNumber($Value) {
+    if ($null -eq $Value -or [string]::IsNullOrWhiteSpace([string]$Value)) {
+        return ""
+    }
+    return ("{0:0.########}" -f [double]$Value)
+}
+
+function Format-AnchorHighLow($Component) {
+    if ($null -eq $Component) {
+        return ""
+    }
+    $high = Format-AnchorNumber (Get-ObjectPropertyValue $Component "high")
+    $low = Format-AnchorNumber (Get-ObjectPropertyValue $Component "low")
+    if ($high -eq "" -and $low -eq "") {
+        return ""
+    }
+    return "$high / $low"
+}
+
+function Format-AnchorDebugSummaryMarkdown($Gate, [string]$Mt5DebugFile, [string]$PineDebugFile) {
+    $builder = New-Object System.Text.StringBuilder
+    [void]$builder.AppendLine("## Anchor Debug Summary")
+    [void]$builder.AppendLine("")
+
+    if ([int]$Gate.critical_mismatches_count -le 0) {
+        [void]$builder.AppendLine("_None_")
+        return $builder.ToString()
+    }
+
+    $mt5Index = Build-AnchorDebugIndex $Mt5DebugFile
+    $pineIndex = Build-AnchorDebugIndex $PineDebugFile
+    $seen = @{}
+
+    foreach ($mismatch in @($Gate.critical_mismatches)) {
+        $key = "$($mismatch.symbol)|$($mismatch.timeframe)|$($mismatch.family)"
+        if ($seen.ContainsKey($key)) {
+            continue
+        }
+        $seen[$key] = $true
+
+        $mt5 = if ($mt5Index.ContainsKey($key)) { $mt5Index[$key] } else { $null }
+        $pine = if ($pineIndex.ContainsKey($key)) { $pineIndex[$key] } else { $null }
+
+        [void]$builder.AppendLine("### Anchor Debug: $($mismatch.symbol) $($mismatch.timeframe) $($mismatch.family)")
+        [void]$builder.AppendLine("")
+        [void]$builder.AppendLine("| Source | Anchor High | Anchor Low | Range |")
+        [void]$builder.AppendLine("|---|---:|---:|---:|")
+        $mt5AnchorHigh = Get-ObjectPropertyValue $mt5 "anchor_high"
+        $mt5AnchorLow = Get-ObjectPropertyValue $mt5 "anchor_low"
+        $mt5AnchorRange = Get-ObjectPropertyValue $mt5 "anchor_range"
+        $pineAnchorHigh = Get-ObjectPropertyValue $pine "anchor_high"
+        $pineAnchorLow = Get-ObjectPropertyValue $pine "anchor_low"
+        $pineAnchorRange = Get-ObjectPropertyValue $pine "anchor_range"
+
+        [void]$builder.AppendLine("| MT5 | $(Format-AnchorNumber $mt5AnchorHigh) | $(Format-AnchorNumber $mt5AnchorLow) | $(Format-AnchorNumber $mt5AnchorRange) |")
+        [void]$builder.AppendLine("| Pine | $(Format-AnchorNumber $pineAnchorHigh) | $(Format-AnchorNumber $pineAnchorLow) | $(Format-AnchorNumber $pineAnchorRange) |")
+        if ($null -ne $mt5 -and $null -ne $pine) {
+            [void]$builder.AppendLine("| Delta | $(Format-AnchorNumber ([double]$pineAnchorHigh - [double]$mt5AnchorHigh)) | $(Format-AnchorNumber ([double]$pineAnchorLow - [double]$mt5AnchorLow)) | $(Format-AnchorNumber ([double]$pineAnchorRange - [double]$mt5AnchorRange)) |")
+        }
+        [void]$builder.AppendLine("")
+        [void]$builder.AppendLine("#### Components")
+        [void]$builder.AppendLine("")
+
+        $mt5Components = if ($null -ne $mt5) { @($mt5.components) } else { @() }
+        $pineComponents = if ($null -ne $pine) { @($pine.components) } else { @() }
+        if ($mt5Components.Count -eq 0 -and $pineComponents.Count -eq 0) {
+            [void]$builder.AppendLine("_No component debug available for this group._")
+            [void]$builder.AppendLine("")
+            continue
+        }
+
+        [void]$builder.AppendLine("| Slot | MT5 Key | Pine Key | MT5 High/Low | Pine High/Low | MT5 Count | Pine Count | Weight |")
+        [void]$builder.AppendLine("|---|---|---|---|---|---:|---:|---:|")
+        foreach ($slot in @("F1", "F2", "F3")) {
+            $mt5Component = $mt5Components | Where-Object { $_.slot -eq $slot } | Select-Object -First 1
+            $pineComponent = $pineComponents | Where-Object { $_.slot -eq $slot } | Select-Object -First 1
+            $weight = Get-ObjectPropertyValue $pineComponent "weight"
+            if ($null -eq $weight) {
+                $weight = Get-ObjectPropertyValue $mt5Component "weight"
+            }
+            $mt5Key = Get-ObjectPropertyValue $mt5Component "key"
+            $pineKey = Get-ObjectPropertyValue $pineComponent "key"
+            $mt5Count = Get-ObjectPropertyValue $mt5Component "candle_count"
+            $pineCount = Get-ObjectPropertyValue $pineComponent "candle_count"
+            [void]$builder.AppendLine("| $slot | $mt5Key | $pineKey | $(Format-AnchorHighLow $mt5Component) | $(Format-AnchorHighLow $pineComponent) | $mt5Count | $pineCount | $(Format-AnchorNumber $weight) |")
+        }
+        [void]$builder.AppendLine("")
+    }
+
+    return $builder.ToString()
+}
+
 Write-Step "Checking repo root"
 if (-not (Test-Path -LiteralPath "mt5/FibEngine.mqh")) {
     Write-Fail "Must be run from repo root (mt5/FibEngine.mqh not found)"
@@ -357,7 +640,7 @@ if ($Symbols.Count -gt 0) {
 } else {
     $symbols = $officialSymbols
 }
-$gateSymbols = if ($symbols.Count -gt 0) { $symbols } else { $officialSymbols }
+$gateSymbols = if ($Symbols.Count -gt 0) { $symbols } else { $officialSymbols }
 
 # -Timeframes overrides MT5 row filtering + Pine generator output.
 # Candle export stays M15-only; the generator derives Pine helper feeds from M15.
@@ -374,6 +657,8 @@ $candleExportLimit = [Math]::Max($CandleLimit, (Get-RequiredM15CandleLimit $time
 $mt5LevelsFile = Join-Path $reportsRoot "mt5-levels.json"
 $mt5ExpandedFile = Join-Path $reportsRoot "mt5-levels-expanded.json"
 $pineLevelsFile = Join-Path $reportsRoot "pine-levels.json"
+$mt5AnchorDebugFile = Join-Path $reportsRoot "mt5-anchor-debug.json"
+$pineAnchorDebugFile = Join-Path $reportsRoot "pine-anchor-debug.json"
 $mt5Rows = 0
 
 if (-not $DryRun) {
@@ -398,6 +683,7 @@ if (-not $DryRun) {
     $basic = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($pair))
     $headers = @{ Authorization = "Basic $basic" }
     $combined = New-Object System.Collections.Generic.List[object]
+    $mt5AnchorDebug = New-Object System.Collections.Generic.List[object]
 
     foreach ($sym in $symbols) {
         Write-Host "  Fetching $sym..."
@@ -413,6 +699,10 @@ if (-not $DryRun) {
 
         if (-not $response.fibs) {
             Write-Fail "No fibs in response for $sym"
+        }
+
+        foreach ($debugRecord in @(ConvertTo-Mt5AnchorDebugRecords $sym $response)) {
+            $mt5AnchorDebug.Add($debugRecord)
         }
 
         foreach ($tfProp in $response.fibs.PSObject.Properties) {
@@ -434,11 +724,14 @@ if (-not $DryRun) {
 
     $official = @($combined | Where-Object { ($gateSymbols -contains $_.symbol) -and ($timeframes -contains $_.timeframe) })
     Write-JsonFile $mt5LevelsFile ($official | Sort-Object symbol, timeframe, family, ratio)
+    $officialAnchorDebug = @($mt5AnchorDebug | Where-Object { ($gateSymbols -contains $_.symbol) -and ($timeframes -contains $_.timeframe) })
+    Write-JsonFile $mt5AnchorDebugFile ($officialAnchorDebug | Sort-Object symbol, timeframe, family)
 
     $mt5Rows = @($official).Count
     # Dynamic: symbols × timeframes × 2 families × 16 ratios. Respects -Symbols/-Timeframes overrides.
     $mt5ExpectedRows = $gateSymbols.Count * $timeframes.Count * 2 * 16
     Write-Ok "MT5 official: $mt5Rows rows -> $mt5LevelsFile (expected $mt5ExpectedRows)"
+    Write-Ok "MT5 anchor debug: $(@($officialAnchorDebug).Count) rows -> $mt5AnchorDebugFile"
     if ($mt5Rows -ne $mt5ExpectedRows) {
         Write-Fail "MT5 official row count $mt5Rows != $mt5ExpectedRows"
     }
@@ -485,6 +778,9 @@ if (-not $DryRun) {
     $existingMt5 = Get-Content -LiteralPath $mt5LevelsFile -Raw | ConvertFrom-Json
     $mt5Rows = @($existingMt5).Count
     Write-Ok "Using existing MT5 levels: $mt5LevelsFile ($mt5Rows rows)"
+    $dryRunAnchorDebug = ConvertTo-Mt5AnchorDebugRecordsFromLevelRows @($existingMt5)
+    Write-JsonFile $mt5AnchorDebugFile ($dryRunAnchorDebug | Sort-Object symbol, timeframe, family)
+    Write-Ok "MT5 anchor debug: $(@($dryRunAnchorDebug).Count) rows -> $mt5AnchorDebugFile"
 
     $referenceUtc = (Get-Item -LiteralPath $mt5LevelsFile).LastWriteTimeUtc
     Test-CandleFiles $candleRoot $gateSymbols $candleExportTimeframes $referenceUtc
@@ -505,10 +801,14 @@ Invoke-ExternalCommand "node" $nodeArgs "Pine generator failed"
 if (-not (Test-Path -LiteralPath $pineLevelsFile)) {
     Write-Fail "Pine generator did not produce output file: $pineLevelsFile"
 }
+if (-not (Test-Path -LiteralPath $pineAnchorDebugFile)) {
+    Write-Fail "Pine generator did not produce anchor debug file: $pineAnchorDebugFile"
+}
 
 $pineRows = @((Get-Content -LiteralPath $pineLevelsFile -Raw | ConvertFrom-Json)).Count
 $pineExpectedRows = $gateSymbols.Count * $timeframes.Count * 2 * 16
 Write-Ok "Pine levels: $pineRows rows -> $pineLevelsFile (expected $pineExpectedRows)"
+Write-Ok "Anchor debug artifacts: MT5=$(Split-Path $mt5AnchorDebugFile -Leaf) Pine=$(Split-Path $pineAnchorDebugFile -Leaf)"
 if ($pineRows -ne $pineExpectedRows) {
     Write-Fail "Pine row count $pineRows != $pineExpectedRows"
 }
@@ -550,6 +850,7 @@ if ([int]$gate.critical_mismatches_count -gt 0) {
         "- $($_.symbol) $($_.timeframe) $($_.family) ratio=$($_.ratio) mt5=$($_.mt5_price) pine=$($_.pine_price)"
     }) -join [Environment]::NewLine
 }
+$anchorDebugMarkdown = Format-AnchorDebugSummaryMarkdown $gate $mt5AnchorDebugFile $pineAnchorDebugFile
 
 $markdown = @"
 # Phase 4 Parity Gate - $timestamp
@@ -565,10 +866,14 @@ $markdown = @"
 | Pine rows | $pineRows |
 | MT5 file | $(Split-Path $mt5LevelsFile -Leaf) |
 | Pine file | $(Split-Path $pineLevelsFile -Leaf) |
+| MT5 anchor debug | $(Split-Path $mt5AnchorDebugFile -Leaf) |
+| Pine anchor debug | $(Split-Path $pineAnchorDebugFile -Leaf) |
 
 ## Critical mismatches
 
 $criticalLines
+
+$anchorDebugMarkdown
 "@
 $markdown | Set-Content -LiteralPath $mdFile -Encoding UTF8
 Write-Ok "Markdown report -> $mdFile"
