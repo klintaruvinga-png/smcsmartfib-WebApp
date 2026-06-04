@@ -64,3 +64,9 @@ The validator confirms the live paired MT5 vs Pine corpus is not aligned. Large 
 - Confirm the Pine reference capture timestamp matches the MT5 export snapshot
 - Re-run the validator after fixing the drift source
 
+
+## Run: 2026-06-04_112056
+- Gate: **FAIL** (13.54%)
+- MT5: 96 rows (mt5-levels.json)
+- Pine: 96 rows (pine-levels.json)
+- Report: phase4-gate-2026-06-04_112056.json

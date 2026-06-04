@@ -202,6 +202,12 @@ function Invoke-ExternalCommand([string]$Command, [string[]]$Arguments, [string]
     }
 }
 
+function Write-JsonFile([string]$PathValue, $Value) {
+    $json = $Value | ConvertTo-Json -Depth 20
+    $utf8 = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($PathValue, $json, $utf8)
+}
+
 function Get-CandleLastUtc([string]$PathValue) {
     try {
         $candles = Get-Content -LiteralPath $PathValue -Raw | ConvertFrom-Json
@@ -343,18 +349,22 @@ $defaultTimeframes = @("M15", "H1", "H4", "D1")
 
 # -Symbols overrides official/expanded. Use for broker-specific runs, e.g. when XAUUSD is unsupported.
 if ($Symbols.Count -gt 0) {
-    $symbols = $Symbols | ForEach-Object { $_.Trim().ToUpperInvariant() } | Where-Object { $_ -ne "" }
+    $symbols = ($Symbols -join ',') -split '[,;\s]+'
+    $symbols = $symbols | ForEach-Object { $_.Trim().ToUpperInvariant() } | Where-Object { $_ -ne "" }
+    $symbols = @($symbols)
 } elseif ($ExpandedAudit) {
     $symbols = $expandedSymbols
 } else {
     $symbols = $officialSymbols
 }
-$gateSymbols = if ($Symbols.Count -gt 0) { $symbols } else { $officialSymbols }
+$gateSymbols = if ($symbols.Count -gt 0) { $symbols } else { $officialSymbols }
 
 # -Timeframes overrides MT5 row filtering + Pine generator output.
 # Candle export stays M15-only; the generator derives Pine helper feeds from M15.
 if ($Timeframes.Count -gt 0) {
-    $timeframes = $Timeframes | ForEach-Object { $_.Trim().ToUpperInvariant() } | Where-Object { $_ -ne "" }
+    $timeframes = ($Timeframes -join ',') -split '[,;\s]+'
+    $timeframes = $timeframes | ForEach-Object { $_.Trim().ToUpperInvariant() } | Where-Object { $_ -ne "" }
+    $timeframes = @($timeframes)
 } else {
     $timeframes = $defaultTimeframes
 }
@@ -399,7 +409,7 @@ if (-not $DryRun) {
         }
 
         $rawFile = Join-Path $reportsRoot "mt5-${sym}-raw.json"
-        $response | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $rawFile -Encoding UTF8
+        Write-JsonFile $rawFile $response
 
         if (-not $response.fibs) {
             Write-Fail "No fibs in response for $sym"
@@ -423,10 +433,7 @@ if (-not $DryRun) {
     }
 
     $official = @($combined | Where-Object { ($gateSymbols -contains $_.symbol) -and ($timeframes -contains $_.timeframe) })
-    $official |
-        Sort-Object symbol, timeframe, family, ratio |
-        ConvertTo-Json -Depth 10 |
-        Set-Content -LiteralPath $mt5LevelsFile -Encoding UTF8
+    Write-JsonFile $mt5LevelsFile ($official | Sort-Object symbol, timeframe, family, ratio)
 
     $mt5Rows = @($official).Count
     # Dynamic: symbols × timeframes × 2 families × 16 ratios. Respects -Symbols/-Timeframes overrides.
@@ -438,10 +445,7 @@ if (-not $DryRun) {
 
     if ($ExpandedAudit) {
         $expanded = @($combined | Where-Object { $timeframes -contains $_.timeframe })
-        $expanded |
-            Sort-Object symbol, timeframe, family, ratio |
-            ConvertTo-Json -Depth 10 |
-            Set-Content -LiteralPath $mt5ExpandedFile -Encoding UTF8
+        Write-JsonFile $mt5ExpandedFile ($expanded | Sort-Object symbol, timeframe, family, ratio)
         Write-Ok "MT5 expanded: $($expanded.Count) rows -> $mt5ExpandedFile"
     }
 
@@ -463,8 +467,8 @@ if (-not $DryRun) {
             $candleParams["NoPrompt"] = $true
         }
         & $exporterScript @candleParams
-        if ($LASTEXITCODE -ne 0) {
-            Write-Fail "MT5 candle export failed (exit code $LASTEXITCODE)"
+        if (-not $?) {
+            Write-Fail "MT5 candle export failed"
         }
     } else {
         Write-Warn "Skipping MT5 candle export because -SkipCandleExport is active"

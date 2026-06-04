@@ -6,6 +6,13 @@ and the permanent guard installed to prevent recurrence. New entries are prepend
 
 ---
 
+## [2026-06-04] Phase 4 parity attempt blocked by stale M15 candle export
+
+- **Update:** `scripts/run-phase4-parity.ps1` completed MT5 fib export and candle export, but `generate-pine-levels-v13.cjs` failed because the exported M15 candles were stale relative to the MT5 export snapshot.
+- **Result:** No `phase4-gate-*.json` artifact was produced. The parity gate is blocked before validation.
+- **Root cause:** Candle export returned latest M15 candles ending at 2026-06-04T10:15:05Z while `mt5-levels.json` was written at 2026-06-04T10:42:19.623Z, exceeding the generator's 900s freshness window.
+- **Next action:** recapture synchronized fresh M15 candles aligned to the MT5 export snapshot and rerun the Phase 4 parity gate.
+
 ## [2026-06-03] Phase 4 live paired-export parity re-run completed; gate FAIL 40.89%
 
 - **Update:** Validator re-run completed with the same paired export corpus in `reports/phase4-parity`.

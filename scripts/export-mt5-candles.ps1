@@ -161,7 +161,8 @@ foreach ($symRaw in $Symbols) {
         }
 
         $file = Join-Path $candleRoot "${sym}_${tf}.json"
-        $candles | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $file -Encoding UTF8
+        $json = $candles | ConvertTo-Json -Depth 8
+        [System.IO.File]::WriteAllText($file, $json, (New-Object System.Text.UTF8Encoding $false))
 
         $summary.Add([PSCustomObject]@{
             Symbol = $sym

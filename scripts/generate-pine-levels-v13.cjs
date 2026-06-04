@@ -92,6 +92,13 @@ const STALE_MS = {
     D1:  1   * 86400 * 1000,
 };
 
+const TF_MS = {
+    M15: 15  * 60 * 1000,
+    H1:  1   * 3600 * 1000,
+    H4:  4   * 3600 * 1000,
+    D1:  1   * 86400 * 1000,
+};
+
 // ---- Session ladder v13.1.3 ----
 function toSessionTf(timeframe) {
     const map = { M15: 'Daily', H1: 'Weekly', H4: 'Monthly', D1: 'Quarterly' };
@@ -425,21 +432,27 @@ function checkStaleness(mt5Mtime) {
             console.error(`FAIL: no valid candles in ${path.join(CANDLE_DIR, `${sym}_${SOURCE_TIMEFRAME}.json`)}`);
             process.exit(1);
         }
-        const lastMs   = Math.max(...norm.map(c => c.timeMs));
-        const staleMs  = STALE_MS[SOURCE_TIMEFRAME];
-        const mt5Ms    = mt5Mtime.getTime();
-        // Guard: last source candle must be within one M15 period of mt5 mtime.
-        if (lastMs < mt5Ms - staleMs) {
-            const lastDate = new Date(lastMs).toISOString();
-            const mt5Date  = mt5Mtime.toISOString();
+        const lastOpenMs     = Math.max(...norm.map(c => c.timeMs));
+        const candleMs       = TF_MS[SOURCE_TIMEFRAME];
+        const lastCloseMs    = lastOpenMs + candleMs;
+        const staleMs        = STALE_MS[SOURCE_TIMEFRAME];
+        const mt5Ms          = mt5Mtime.getTime();
+        const ageFromCloseMs = mt5Ms - lastCloseMs;
+
+        // Guard: the latest closed source candle must be within the staleness window
+        // relative to the MT5 export timestamp.
+        if (ageFromCloseMs > staleMs) {
+            const lastOpenDate  = new Date(lastOpenMs).toISOString();
+            const lastCloseDate = new Date(lastCloseMs).toISOString();
+            const mt5Date       = mt5Mtime.toISOString();
             console.error(
                 `FAIL: stale candles in ${sym}_${SOURCE_TIMEFRAME}.json - ` +
-                `last candle ${lastDate}, mt5 export ${mt5Date}, ` +
-                `max allowed gap: ${staleMs / 1000}s`
+                `open=${lastOpenDate} close=${lastCloseDate} reference=${mt5Date} ` +
+                `age_from_close=${Math.round(ageFromCloseMs / 1000)}s max_age=${staleMs / 1000}s`
             );
             process.exit(1);
         }
-        console.log(`  [staleness OK] ${sym} ${SOURCE_TIMEFRAME}: last candle ${new Date(lastMs).toISOString()}`);
+        console.log(`  [staleness OK] ${sym} ${SOURCE_TIMEFRAME}: open=${new Date(lastOpenMs).toISOString()} close=${new Date(lastCloseMs).toISOString()}`);
     }
 }
 
