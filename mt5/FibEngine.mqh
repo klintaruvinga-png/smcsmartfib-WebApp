@@ -486,7 +486,7 @@ public:
         json += "\"anchor_range\":" + DoubleJson(anchor_high - anchor_low) + ",";
         json += "\"compression_threshold\":" + DoubleJson(compression) + ",";
         json += "\"source\":\"auth_f1\",";
-        json += "\"key\":" + (idx >= 0 ? IntegerToString(sessionKeys[idx]) : "null") + ",";
+        json += "\"htf_anchor_key\":" + (idx >= 0 ? IntegerToString(sessionKeys[idx]) : "null") + ",";
         json += "\"high\":" + DoubleJson(anchor_high) + ",";
         json += "\"low\":" + DoubleJson(anchor_low) + ",";
         json += "\"range\":" + DoubleJson(anchor_high - anchor_low) + ",";
