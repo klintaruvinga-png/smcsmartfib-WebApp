@@ -29,6 +29,13 @@ private:
     // Broker UTC offset cached per dispatch cycle
     datetime brokerUtcOffset;
 
+    // Lineage tracking: set before each CopyRates call in ComputeFibJson so both
+    // debug-JSON builders can report which broker period and bar count were used.
+    // The parity validator reads candle_lineage to classify LINEAGE_MISMATCH before
+    // comparing prices — distinguishing "direct_H4" from "derived_from_M15".
+    string m_sourcePeriod;      // e.g. "H4" (PERIOD_ prefix stripped)
+    int    m_sourceFeedBars;    // bars returned by CopyRates
+
     // Session store — parallel arrays acting as a keyed map (max 2048 sessions)
     enum { MAX_SESSIONS = 2048 };
     long   sessionKeys[2048];
@@ -47,6 +54,8 @@ public:
         for (int i = 0; i < 16; i++)
             ratios[i] = r[i];
         brokerUtcOffset = 0;
+        m_sourcePeriod   = "";
+        m_sourceFeedBars = 0;
         sessionCount    = 0;
         ArrayInitialize(sessionKeys,  0);
         ArrayInitialize(sessionHighs, 0.0);
@@ -223,6 +232,12 @@ public:
                   " tf=", tfName, " — skipping.");
             return "";
         }
+
+        // Record lineage so both anchor debug builders can tag this run.
+        // Strip the "PERIOD_" prefix so the report reads "direct_H4" not "direct_PERIOD_H4".
+        m_sourcePeriod   = EnumToString(mql_tf);
+        StringReplace(m_sourcePeriod, "PERIOD_", "");
+        m_sourceFeedBars = copied;
 
         // Compression threshold
         double compression = CompressionThreshold(symbol);
@@ -457,11 +472,20 @@ public:
                                    double anchor_high, double anchor_low,
                                    int f1, int f2, int f3,
                                    bool f1v, bool f2v, bool f3v,
-                                   double wf1, double wf2, double wf3)
+                                   double wf1, double wf2, double wf3,
+                                   string source_period = "",
+                                   int    source_feed_bars = 0)
     {
         string json = "{";
         json += "\"session_tf\":\"" + session_tf + "\",";
         json += "\"authority_tf\":\"" + authority_tf + "\",";
+        // candle_lineage identifies the bar source so the parity validator can
+        // classify LINEAGE_MISMATCH before comparing prices.
+        // Defensive: guard against empty source_period to avoid "direct_" in output.
+        string ltf_lineage = (source_period == "") ? "direct_unknown" : "direct_" + source_period;
+        json += "\"candle_lineage\":\"" + ltf_lineage + "\",";
+        json += "\"source_period\":\"" + source_period + "\",";
+        json += "\"source_feed_bars\":" + IntegerToString(source_feed_bars) + ",";
         json += "\"anchor_high\":" + DoubleJson(anchor_high) + ",";
         json += "\"anchor_low\":" + DoubleJson(anchor_low) + ",";
         json += "\"anchor_range\":" + DoubleJson(anchor_high - anchor_low) + ",";
@@ -476,11 +500,20 @@ public:
     }
 
     string BuildHTFAnchorDebugJson(string session_tf, string authority_tf, double compression, int idx,
-                                   double anchor_high, double anchor_low)
+                                   double anchor_high, double anchor_low,
+                                   string source_period = "",
+                                   int    source_feed_bars = 0)
     {
         string json = "{";
         json += "\"session_tf\":\"" + session_tf + "\",";
         json += "\"authority_tf\":\"" + authority_tf + "\",";
+        // candle_lineage identifies the bar source so the parity validator can
+        // classify LINEAGE_MISMATCH before comparing prices.
+        // Defensive: guard against empty source_period to avoid "direct_" in output.
+        string htf_lineage = (source_period == "") ? "direct_unknown" : "direct_" + source_period;
+        json += "\"candle_lineage\":\"" + htf_lineage + "\",";
+        json += "\"source_period\":\"" + source_period + "\",";
+        json += "\"source_feed_bars\":" + IntegerToString(source_feed_bars) + ",";
         json += "\"anchor_high\":" + DoubleJson(anchor_high) + ",";
         json += "\"anchor_low\":" + DoubleJson(anchor_low) + ",";
         json += "\"anchor_range\":" + DoubleJson(anchor_high - anchor_low) + ",";
@@ -590,7 +623,8 @@ public:
                                                   out_high, out_low,
                                                   f1, f2, f3,
                                                   f1v, f2v, f3v,
-                                                  wf1, wf2, wf3);
+                                                  wf1, wf2, wf3,
+                                                  m_sourcePeriod, m_sourceFeedBars);
 
         return true;
     }
@@ -638,7 +672,8 @@ public:
             return false;
 
         dbg_anchor_json = BuildHTFAnchorDebugJson(GetSessionTF(chart_tf_seconds), authority_tf, compression,
-                                                  idx1, out_high, out_low);
+                                                  idx1, out_high, out_low,
+                                                  m_sourcePeriod, m_sourceFeedBars);
 
         return true;
     }

@@ -447,13 +447,22 @@ function computeHtfAnchorWithCompression(candles, authorityTf, threshold) {
     };
 }
 
-function buildAnchorDebugRecord(symbol, timeframe, family, sessionTf, authorityTf, threshold, anchor) {
+// helperTf: the intermediate derived feed used for session grouping, e.g. 'H1' for H4 LTF_SF.
+// helperBars: candle count of that derived feed (not raw M15 count).
+// candle_lineage is always 'derived_from_M15' for this generator.
+function buildAnchorDebugRecord(symbol, timeframe, family, sessionTf, authorityTf, threshold, anchor,
+                                helperTf, helperBars) {
     const base = {
         symbol,
         timeframe,
         family,
         session_tf: sessionTf,
         authority_tf: authorityTf,
+        // candle_lineage identifies the bar source so the parity validator can
+        // classify LINEAGE_MISMATCH before comparing prices.
+        candle_lineage:   `derived_from_${SOURCE_TIMEFRAME}`,
+        source_period:    helperTf    != null ? helperTf    : SOURCE_TIMEFRAME,
+        source_feed_bars: helperBars  != null ? helperBars  : 0,
         anchor_high: anchor.high,
         anchor_low: anchor.low,
         anchor_range: anchor.high - anchor.low,
@@ -622,7 +631,14 @@ function main() {
                     anchor_low:  anchor.low,
                     dbg: anchor.dbg,
                 });
-                anchorDebugRows.push(buildAnchorDebugRecord(sym, tf, family, sessionTf, authorityTf, threshold, anchor));
+                // Pass helper-feed TF and bar count so the debug record reports
+                // which derived feed was used for session grouping.
+                const helperTf   = (family === 'LTF_SF') ? ltfHelperTf : htfHelperTf;
+                const helperFeed = helperFeeds[helperTf];
+                const helperBars = Array.isArray(helperFeed) ? helperFeed.length : 0;
+                anchorDebugRows.push(buildAnchorDebugRecord(
+                    sym, tf, family, sessionTf, authorityTf, threshold, anchor,
+                    helperTf, helperBars));
             }
         }
     }

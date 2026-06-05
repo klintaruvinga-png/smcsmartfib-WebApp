@@ -189,3 +189,47 @@ describe('export-mt5-candles.ps1 automation contract', () => {
     expect(source).toContain('[Math]::Min(100000, $Limit)');
   });
 });
+
+describe('Patch 1 — candle lineage columns in anchor debug Markdown report', () => {
+  test('Format-AnchorDebugSummaryMarkdown emits a Candle Lineage column header', () => {
+    const source = fs.readFileSync(
+      path.join(__dirname, 'run-phase4-parity.ps1'),
+      'utf8'
+    );
+    expect(source).toContain('Candle Lineage');
+  });
+
+  test('Format-AnchorDebugSummaryMarkdown reads candle_lineage from anchor debug objects', () => {
+    const source = fs.readFileSync(
+      path.join(__dirname, 'run-phase4-parity.ps1'),
+      'utf8'
+    );
+    expect(source).toContain('"candle_lineage"');
+  });
+
+  test('Format-AnchorDebugSummaryMarkdown reads source_feed_bars from anchor debug objects', () => {
+    const source = fs.readFileSync(
+      path.join(__dirname, 'run-phase4-parity.ps1'),
+      'utf8'
+    );
+    expect(source).toContain('"source_feed_bars"');
+  });
+
+  test('Format-AnchorDebugSummaryMarkdown appends LINEAGE_MISMATCH tag when lineage fields differ', () => {
+    const source = fs.readFileSync(
+      path.join(__dirname, 'run-phase4-parity.ps1'),
+      'utf8'
+    );
+    expect(source).toContain('LINEAGE_MISMATCH');
+    // Delta row must have an empty cell in the Lineage column (not a numeric delta).
+    expect(source).toContain('"| Delta | |');
+  });
+
+  test('Format-AnchorDebugSummaryMarkdown falls back to debug_source when candle_lineage is absent', () => {
+    const source = fs.readFileSync(
+      path.join(__dirname, 'run-phase4-parity.ps1'),
+      'utf8'
+    );
+    expect(source).toContain('debug_source');
+  });
+});
