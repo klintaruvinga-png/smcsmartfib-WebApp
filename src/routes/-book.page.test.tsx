@@ -37,7 +37,7 @@ describe("BookPage", () => {
       settingsLoadError: null,
       retrySettingsLoad: vi.fn(),
     });
-    hookMocks.useAccountTelemetry.mockReturnValue({ data: { currency: "USD" } });
+    hookMocks.useAccountTelemetry.mockReturnValue({ data: { currency: "USD", equity: 1000 } });
   });
 
   it("shows a degraded state when backend trade telemetry is unreachable", () => {
@@ -55,6 +55,12 @@ describe("BookPage", () => {
   });
 
   it("groups live positions by symbol regardless of direction", () => {
+    hookMocks.useSnapshot.mockReturnValue({
+      data: {
+        prices: [{ symbol: "EURUSD", state: "live", updatedAt: "2026-05-27T10:10:00Z" }],
+        regimes: [{ symbol: "EURUSD", bias: "BULL", chop: 0, updatedAt: "2026-05-27T10:10:00Z", state: "live" }],
+      },
+    });
     hookMocks.useStableUserTrades.mockReturnValue({
       data: {
         positions: [
@@ -93,8 +99,10 @@ describe("BookPage", () => {
 
     // Symbol appears once as group header (no longer split by direction)
     expect(screen.getAllByText("EURUSD")).toHaveLength(1);
-    expect(screen.getAllByText("LONG").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("SHORT").length).toBeGreaterThan(0);
+    expect(screen.getByText("Long 0.50")).toBeTruthy();
+    expect(screen.getByText("Short 0.50")).toBeTruthy();
+    expect(screen.getByText("BULL")).toBeTruthy();
+    expect(screen.getByText("+4.00%")).toBeTruthy();
   });
 
   it("keeps rendering carried-forward stale positions instead of flashing empty", () => {
