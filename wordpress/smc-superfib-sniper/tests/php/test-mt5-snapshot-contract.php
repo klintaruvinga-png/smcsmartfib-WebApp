@@ -1069,6 +1069,38 @@ assert_true(is_array($canonicalCandleRow), 'Canonical MT5 snapshot payload must 
 assert_same('27', $canonicalCandleRow['volume'] ?? null, 'Canonical MT5 snapshot payload must map tick_volume onto candle volume');
 assert_same('LIVE', $GLOBALS['test_transients']['smc_sf_freshness_7_NAS100'] ?? null, 'Canonical MT5 snapshot payload must persist freshness against the aliased symbol');
 
+$snapshotM15Rounding = $instance->post_snapshot(new WP_REST_Request(array(
+    'symbol' => 'EURUSD',
+    'normalized_symbol' => 'EURUSD',
+    'source' => 'MT5',
+    'timeframe' => 'M15',
+    'bid' => 1.08521,
+    'ask' => 1.08534,
+    'spread' => 1,
+    'quote_time' => '2026-05-03T08:30:30Z',
+    'candle' => array(
+        'time' => '2026-05-03T08:29:59Z',
+        'open' => 1.08500,
+        'high' => 1.08550,
+        'low' => 1.08480,
+        'close' => 1.08520,
+        'tick_volume' => 44,
+    ),
+    'freshness' => 'LIVE',
+    'session' => 'London',
+)));
+
+assert_true(is_array($snapshotM15Rounding) && !empty($snapshotM15Rounding['ok']), 'M15 MT5 snapshot payload should succeed');
+$snapshotM15CandleRow = null;
+foreach (($wpdb->tables[$wpdb->prefix . 'smc_sf_candles'] ?? array()) as $row) {
+    if (($row['symbol'] ?? null) === 'EURUSD' && ($row['timeframe'] ?? null) === '15min' && ($row['candle_time'] ?? null) === '2026-05-03 08:30:00') {
+        $snapshotM15CandleRow = $row;
+        break;
+    }
+}
+assert_true(is_array($snapshotM15CandleRow), 'M15 MT5 snapshot candle_time must round to the nearest minute on the stored 15min row');
+assert_same('44', $snapshotM15CandleRow['volume'] ?? null, 'M15 MT5 snapshot candle must map tick_volume onto volume');
+
 $wpdb->replace($snapshotTable, array(
     'user_id' => 7,
     'symbol' => 'USDJPY',
