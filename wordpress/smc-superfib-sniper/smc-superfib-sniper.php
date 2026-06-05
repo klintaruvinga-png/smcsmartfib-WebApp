@@ -3301,7 +3301,10 @@ final class SMC_SuperFib_Sniper_REST {
         if ($limit <= 0) {
             $limit = 600;
         }
-        $limit = max(1, min(2000, $limit));
+        // Cap raised to 60,000 to support phase-4 parity exports. H4 needs about
+        // 25,000 M15 bars to reach a completed Quarterly authority session, and
+        // D1 needs about 60,000. get_phase4_candles() enforces the same DB cap.
+        $limit = max(1, min(60000, $limit));
 
         $svc = new SMC_MarketData_Service();
         $candles = $svc->get_phase4_candles($user_id, $symbol, $timeframe, $limit);

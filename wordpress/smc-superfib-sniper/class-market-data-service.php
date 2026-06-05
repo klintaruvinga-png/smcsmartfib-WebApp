@@ -274,7 +274,7 @@ class SMC_MarketData_Service
     {
         $symbol = strtoupper(sanitize_text_field($symbol));
         $timeframe = strtoupper(sanitize_text_field($timeframe));
-        $count = max(1, min(2000, (int) $count));
+        $count = max(1, min(60000, (int) $count));
 
         $map = array(
             'M15' => array('db' => '15min', 'seconds' => 900),
