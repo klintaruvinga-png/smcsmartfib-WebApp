@@ -4,9 +4,10 @@ import { useStableUserTrades, useSnapshot, usePollingUiState, useAccountTelemetr
 import { SettingsQueryErrorState } from "@/components/sniper/SettingsQueryErrorState";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { WarningLine } from "@/components/sniper/Warnings";
+import { BiasBadge } from "@/components/sniper/Indicators";
 import { fmtPrice, fmtPct, fmtCurrency, relTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { Position } from "@/types/sniper";
+import type { Position, RegimeState } from "@/types/sniper";
 
 type PosSortKey = "direction" | "entry" | "current" | "lots" | "pnl" | "time";
 type SymSortKey = "symbol" | "positions" | "long" | "short" | "net" | "pnl";
@@ -14,7 +15,7 @@ type SortDir = "asc" | "desc";
 
 // Shared grid template: chevron | symbol | pos count | long | short | net | pnl | badge
 const HEADER_GRID =
-  "grid items-center gap-2 sm:gap-3 grid-cols-[16px_minmax(80px,1fr)_120px_110px_110px_110px_minmax(100px,1fr)_56px]";
+  "grid items-center gap-2 sm:gap-3 grid-cols-[16px_minmax(80px,1fr)_80px_120px_110px_110px_110px_100px_minmax(100px,1fr)_56px]";
 
 type SymbolSummary = {
   symbol: string;
@@ -28,6 +29,8 @@ type SymbolSummary = {
   totalLong: number;
   totalShort: number;
   netLots: number;
+  regimeBias?: RegimeState["bias"];
+  equityImpactPct: number | null;
 };
 
 export function BookPage() {
@@ -70,6 +73,11 @@ export function BookPage() {
       const shorts = posList.filter((p) => p.direction === "SHORT");
       const totalLong = longs.reduce((s, p) => s + p.lots, 0);
       const totalShort = shorts.reduce((s, p) => s + p.lots, 0);
+      const regime = snap?.regimes?.find((r) => r.symbol === symbol);
+      const equityImpactPct = accountTelemetry?.equity && accountTelemetry.equity > 0
+        ? (groupPnl / accountTelemetry.equity) * 100
+        : null;
+
       return {
         symbol,
         posList,
@@ -82,6 +90,8 @@ export function BookPage() {
         totalLong,
         totalShort,
         netLots: totalLong - totalShort,
+        regimeBias: regime?.bias,
+        equityImpactPct,
       };
     });
     list.sort((a, b) => {
@@ -100,7 +110,7 @@ export function BookPage() {
       return 0;
     });
     return list;
-  }, [positions, snap, symSortKey, symSortDir]);
+}, [positions, snap, symSortKey, symSortDir, accountTelemetry]);
 
   if (pendingSettingsLoad) {
     return <div className="text-mute text-sm">Loading active book...</div>;
@@ -165,10 +175,12 @@ export function BookPage() {
             >
               <span />
               <SymSortHeader label="Symbol" k="symbol" active={symSortKey === "symbol"} dir={symSortDir} onClick={() => toggleSymSort("symbol")} />
+              <span className="text-[10px] font-mono uppercase tracking-wider text-mute">Regime</span>
               <SymSortHeader label="Positions" k="positions" active={symSortKey === "positions"} dir={symSortDir} onClick={() => toggleSymSort("positions")} />
               <SymSortHeader label="Long" k="long" active={symSortKey === "long"} dir={symSortDir} onClick={() => toggleSymSort("long")} />
               <SymSortHeader label="Short" k="short" active={symSortKey === "short"} dir={symSortDir} onClick={() => toggleSymSort("short")} />
               <SymSortHeader label="Net" k="net" active={symSortKey === "net"} dir={symSortDir} onClick={() => toggleSymSort("net")} />
+              <span className="text-[10px] font-mono uppercase tracking-wider text-mute text-right">Equity %</span>
               <SymSortHeader label="P/L" k="pnl" active={symSortKey === "pnl"} dir={symSortDir} onClick={() => toggleSymSort("pnl")} className="justify-end" />
               <span />
             </div>
@@ -229,6 +241,8 @@ function SymbolCard({
   totalLong,
   totalShort,
   netLots,
+  regimeBias,
+  equityImpactPct,
   currency,
 }: SymbolSummary & { currency?: string }) {
   const [expanded, setExpanded] = useState(false);
@@ -282,6 +296,13 @@ function SymbolCard({
           <ChevronDown className="h-3.5 w-3.5 text-mute" />
         )}
         <span className="font-mono text-sm font-semibold truncate">{symbol}</span>
+        <span>
+          {regimeBias ? (
+            <BiasBadge bias={regimeBias} />
+          ) : (
+            <span className="text-[10px] font-mono text-mute">--</span>
+          )}
+        </span>
         <span className="text-[10px] font-mono text-mute tabular-nums">
           {posList.length} pos · {longsCount}L / {shortsCount}S
         </span>
@@ -289,6 +310,12 @@ function SymbolCard({
         <span className="text-[10px] font-mono text-sell tabular-nums">Short {totalShort.toFixed(2)}</span>
         <span className={cn("text-[10px] font-mono tabular-nums", netLots >= 0 ? "text-buy" : "text-sell")}>
           Net {netLots >= 0 ? "+" : ""}{netLots.toFixed(2)}
+        </span>
+        <span className={cn(
+          "text-[10px] font-mono tabular-nums text-right",
+          equityImpactPct !== null ? (equityImpactPct >= 0 ? "text-buy" : "text-sell") : "text-mute",
+        )}>
+          {equityImpactPct !== null ? fmtPct(equityImpactPct) : "--"}
         </span>
         <span className={cn("font-mono text-sm text-right tabular-nums", groupPnl >= 0 ? "text-buy" : "text-sell")}>
           {fmtCurrency(groupPnl, currency, true)}
