@@ -71,8 +71,8 @@
 .EXAMPLE
     # Copilot/Codex slash command trigger
     # Run scripts/run-phase4-parity.ps1 from repo root using env vars SMC_BACKEND,
-    # SMC_WP_USER, SMC_APP_PW. Do not modify source files. Stop if row counts are
-    # not 384/384 or if the validator fails.
+    # SMC_WP_USER, SMC_APP_PW. Do not modify source files. Stop if MT5 row counts
+    # are incomplete, Pine rows are below the partial-output floor, or the validator fails.
 #>
 
 [CmdletBinding()]
@@ -810,10 +810,18 @@ if (-not (Test-Path -LiteralPath $pineAnchorDebugFile)) {
 
 $pineRows = @((Get-Content -LiteralPath $pineLevelsFile -Raw | ConvertFrom-Json)).Count
 $pineExpectedRows = $gateSymbols.Count * $timeframes.Count * 2 * 16
-Write-Ok "Pine levels: $pineRows rows -> $pineLevelsFile (expected $pineExpectedRows)"
+$pineMinimumRows = $gateSymbols.Count * $timeframes.Count * 1 * 16
+$pineRequireHtf = [Environment]::GetEnvironmentVariable("PINE_REQUIRE_HTF") -eq "1"
+if ($pineRequireHtf) {
+    $pineMinimumRows = $pineExpectedRows
+}
+Write-Ok "Pine levels: $pineRows rows -> $pineLevelsFile (allowed $pineMinimumRows-$pineExpectedRows)"
 Write-Ok "Anchor debug artifacts: MT5=$(Split-Path $mt5AnchorDebugFile -Leaf) Pine=$(Split-Path $pineAnchorDebugFile -Leaf)"
-if ($pineRows -ne $pineExpectedRows) {
-    Write-Fail "Pine row count $pineRows != $pineExpectedRows"
+if ($pineRows -lt $pineMinimumRows -or $pineRows -gt $pineExpectedRows) {
+    Write-Fail "Pine row count $pineRows outside allowed range $pineMinimumRows-$pineExpectedRows"
+}
+if ($pineRows -lt $pineExpectedRows) {
+    Write-Warn "Pine partial output accepted: $pineRows/$pineExpectedRows rows. Missing HTF_AF rows will be reported by the validator."
 }
 
 if ($DryRun) {

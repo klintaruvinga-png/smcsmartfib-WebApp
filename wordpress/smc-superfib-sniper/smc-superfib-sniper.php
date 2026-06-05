@@ -3301,7 +3301,10 @@ final class SMC_SuperFib_Sniper_REST {
         if ($limit <= 0) {
             $limit = 600;
         }
-        $limit = max(1, min(2000, $limit));
+        // M15 is the only deep parity export source. Higher output timeframes
+        // keep the old cap because their M1 fallback multiplies by bucket size.
+        $max_limit = $timeframe === 'M15' ? 60000 : 2000;
+        $limit = max(1, min($max_limit, $limit));
 
         $svc = new SMC_MarketData_Service();
         $candles = $svc->get_phase4_candles($user_id, $symbol, $timeframe, $limit);

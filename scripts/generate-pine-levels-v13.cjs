@@ -581,16 +581,31 @@ function main() {
             const ltf = computeLtfAnchorWithCompression(ltfCandles, sessionTf, threshold);
             const htf = computeHtfAnchorWithCompression(htfCandles, authorityTf, threshold);
 
-            if (!ltf && !htf) {
-                console.error(`FAIL: no anchor computable for ${sym} ${tf}`);
+            // LTF_SF is required; without it the primary fib grid is unusable.
+            // HTF_AF is skippable when the DB lacks sufficient history (e.g. a newly
+            // deployed instance that hasn't yet accumulated a completed authority session).
+            // Export PINE_REQUIRE_HTF=1 to restore hard-fail for CI with full history.
+            const requireHtf = process.env.PINE_REQUIRE_HTF === '1';
+
+            if (!ltf) {
+                console.error(`FAIL: no LTF anchor computable for ${sym} ${tf}`);
                 process.exit(1);
+            }
+
+            if (!htf) {
+                if (requireHtf) {
+                    console.error(`FAIL: insufficient HTF_AF anchor history for ${sym} ${tf} - PINE_REQUIRE_HTF=1`);
+                    process.exit(1);
+                }
+                const authTf = toAuthorityTf(toSessionTf(tf));
+                console.warn(`WARN: skipping HTF_AF for ${sym} ${tf} - insufficient ${authTf} authority-session history`);
             }
 
             const anchors = { LTF_SF: ltf, HTF_AF: htf };
             for (const [family, anchor] of Object.entries(anchors)) {
                 if (!anchor) {
-                    console.error(`FAIL: insufficient completed anchor history for ${sym} ${tf} ${family}`);
-                    process.exit(1);
+                    // HTF_AF was already warned above; skip rows for this family.
+                    continue;
                 }
                 for (const ratio of RATIOS) {
                     const price = fibLevel(anchor.high, anchor.low, ratio);
@@ -614,10 +629,19 @@ function main() {
 
     // Row count guard: symbols × timeframes × 2 families × 16 ratios.
     // Computed dynamically so --symbols / --timeframes overrides are respected.
-    const EXPECTED_ROWS = SYMBOLS.length * TIMEFRAMES.length * 2 * RATIOS.length;
-    if (levels.length !== EXPECTED_ROWS) {
-        console.error(`FAIL: expected ${EXPECTED_ROWS} output rows, got ${levels.length}`);
+    // When PINE_REQUIRE_HTF is not set, HTF_AF rows may be absent due to insufficient
+    // authority-session history; compute the minimum acceptable count accordingly.
+    const requireHtfGlobal = process.env.PINE_REQUIRE_HTF === '1';
+    const EXPECTED_ROWS    = SYMBOLS.length * TIMEFRAMES.length * 2 * RATIOS.length;
+    const MIN_ROWS         = requireHtfGlobal
+        ? EXPECTED_ROWS
+        : SYMBOLS.length * TIMEFRAMES.length * 1 * RATIOS.length; // at least LTF_SF per cell
+    if (levels.length < MIN_ROWS || levels.length > EXPECTED_ROWS) {
+        console.error(`FAIL: expected ${MIN_ROWS}-${EXPECTED_ROWS} output rows, got ${levels.length}`);
         process.exit(1);
+    }
+    if (levels.length < EXPECTED_ROWS) {
+        console.warn(`WARN: partial output - ${levels.length}/${EXPECTED_ROWS} rows (some HTF_AF skipped due to insufficient history)`);
     }
 
     // Write outputs
