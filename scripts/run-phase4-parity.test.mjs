@@ -30,6 +30,13 @@ describe('run-phase4-parity.ps1 automation contract', () => {
     expect(source).toMatch(/\[switch\]\$NoPrompt/);
   });
 
+  test('requires WordPress auth before any dry-run or full-run mode can continue', () => {
+    const source = readScript();
+
+    expect(source.indexOf('Write-Step "Resolving auth"')).toBeLessThan(source.indexOf('if (-not $DryRun)'));
+    expect(source).toContain('Write-Fail "Auth env vars SMC_WP_USER / SMC_APP_PW not set and -NoPrompt is active"');
+  });
+
   test('documents backend candle export and checks candle files before generation', () => {
     const source = readScript();
 

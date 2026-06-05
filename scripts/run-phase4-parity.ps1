@@ -39,8 +39,9 @@
     Fails immediately if auth env vars are missing instead of showing Get-Credential.
 
 .PARAMETER DryRun
-    Runs preflight checks and the Pine generator only against existing candle and
-    MT5 level files, skipping MT5 export and skipping validator/report writes.
+    Requires WordPress auth, then runs preflight checks and the Pine generator only
+    against existing candle and MT5 level files, skipping MT5 export and skipping
+    validator/report writes.
 
 .PARAMETER SkipCandleExport
     Skips remote candle export and uses existing CandleDir files.
@@ -663,23 +664,23 @@ $mt5AnchorDebugFile = Join-Path $reportsRoot "mt5-anchor-debug.json"
 $pineAnchorDebugFile = Join-Path $reportsRoot "pine-anchor-debug.json"
 $mt5Rows = 0
 
-if (-not $DryRun) {
-    Write-Step "Resolving auth"
-    if ([string]::IsNullOrWhiteSpace($WpUser) -or [string]::IsNullOrWhiteSpace($AppPw)) {
-        if ($NoPrompt) {
-            Write-Fail "Auth env vars SMC_WP_USER / SMC_APP_PW not set and -NoPrompt is active"
-        }
-
-        Write-Warn "Auth env vars not set; showing secure Get-Credential prompt"
-        $credential = Get-Credential -Message "Enter WordPress username and application password"
-        if ($null -eq $credential) {
-            Write-Fail "Credential prompt cancelled"
-        }
-        $WpUser = $credential.UserName
-        $AppPw = $credential.GetNetworkCredential().Password
+Write-Step "Resolving auth"
+if ([string]::IsNullOrWhiteSpace($WpUser) -or [string]::IsNullOrWhiteSpace($AppPw)) {
+    if ($NoPrompt) {
+        Write-Fail "Auth env vars SMC_WP_USER / SMC_APP_PW not set and -NoPrompt is active"
     }
-    Write-Ok "Auth resolved for user: $WpUser"
 
+    Write-Warn "Auth env vars not set; showing secure Get-Credential prompt"
+    $credential = Get-Credential -Message "Enter WordPress username and application password"
+    if ($null -eq $credential) {
+        Write-Fail "Credential prompt cancelled"
+    }
+    $WpUser = $credential.UserName
+    $AppPw = $credential.GetNetworkCredential().Password
+}
+Write-Ok "Auth resolved for user: $WpUser"
+
+if (-not $DryRun) {
     Write-Step "Exporting MT5 fib levels (symbols: $($symbols -join ', '))"
     $pair = "${WpUser}:${AppPw}"
     $basic = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($pair))
