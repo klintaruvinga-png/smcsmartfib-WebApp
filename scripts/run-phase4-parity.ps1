@@ -419,6 +419,9 @@ function New-Mt5AnchorDebugRecord([string]$Symbol, [string]$Timeframe, [string]$
         anchor_low            = $anchorLow
         anchor_range          = $anchorHigh - $anchorLow
         compression_threshold = [double]$threshold
+        candle_lineage        = Get-ObjectPropertyValue $Debug "candle_lineage"
+        source_period         = Get-ObjectPropertyValue $Debug "source_period"
+        source_feed_bars      = Get-ObjectPropertyValue $Debug "source_feed_bars"
         debug_source          = if ($null -ne $Debug) { "endpoint_anchor_debug" } else { "derived_from_levels" }
     }
 

@@ -191,6 +191,16 @@ describe('export-mt5-candles.ps1 automation contract', () => {
 });
 
 describe('Patch 1 — candle lineage columns in anchor debug Markdown report', () => {
+  test('New-Mt5AnchorDebugRecord preserves MT5 lineage fields from endpoint debug', () => {
+    const source = fs.readFileSync(
+      path.join(__dirname, 'run-phase4-parity.ps1'),
+      'utf8'
+    );
+    expect(source).toContain('candle_lineage        = Get-ObjectPropertyValue $Debug "candle_lineage"');
+    expect(source).toContain('source_period         = Get-ObjectPropertyValue $Debug "source_period"');
+    expect(source).toContain('source_feed_bars      = Get-ObjectPropertyValue $Debug "source_feed_bars"');
+  });
+
   test('Format-AnchorDebugSummaryMarkdown emits a Candle Lineage column header', () => {
     const source = fs.readFileSync(
       path.join(__dirname, 'run-phase4-parity.ps1'),
