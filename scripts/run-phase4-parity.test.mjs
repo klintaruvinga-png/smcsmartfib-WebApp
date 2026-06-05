@@ -92,6 +92,17 @@ describe('run-phase4-parity.ps1 automation contract', () => {
     expect(source).toContain('--out');
   });
 
+  test('allows partial Pine output when HTF authority history is optional', () => {
+    const source = readScript();
+
+    expect(source).toContain('$pineExpectedRows = $gateSymbols.Count * $timeframes.Count * 2 * 16');
+    expect(source).toContain('$pineMinimumRows = $gateSymbols.Count * $timeframes.Count * 1 * 16');
+    expect(source).toContain('$pineRequireHtf = [Environment]::GetEnvironmentVariable("PINE_REQUIRE_HTF") -eq "1"');
+    expect(source).toContain('Pine levels: $pineRows rows -> $pineLevelsFile (allowed $pineMinimumRows-$pineExpectedRows)');
+    expect(source).toContain('Pine partial output accepted');
+    expect(source).not.toContain('if ($pineRows -ne $pineExpectedRows) {');
+  });
+
   test('preserves anchor debug artifacts outside the validator level arrays', () => {
     const source = readScript();
 
