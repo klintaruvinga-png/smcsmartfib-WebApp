@@ -2089,14 +2089,14 @@ final class SMC_SuperFib_Sniper_REST {
             }
         }
 
-        // Store M1 candle
+        // Store MT5 candle from /snapshot. M1 stays exact; bar-open frames round
+        // broker jitter to the nearest minute before writing candle_time.
         if (isset($payload['candle_m1'])) {
             $candle = $payload['candle_m1'];
-            $timeframe = '1min';
-            $candle_time = $this->normalize_market_timestamp(isset($candle['timestamp']) ? $candle['timestamp'] : null, $this->now_mysql());
-			$candle_time = $this->normalize_market_timestamp(isset($candle['timestamp']) ? $candle['timestamp'] : null, $this->now_mysql(),
-			true
-			);
+            $timeframe = $this->normalize_mt5_timeframe($payload['timeframe'] ?? 'M1');
+            $raw_candle_time = $candle['timestamp'] ?? ($candle['time'] ?? ($candle['candle_time'] ?? null));
+            $round_candle_time = $timeframe !== '1min';
+            $candle_time = $this->normalize_market_timestamp($raw_candle_time, $this->now_mysql(), $round_candle_time);
             $wpdb->replace(
                 $this->table('candles'),
                 array(
@@ -2175,8 +2175,13 @@ final class SMC_SuperFib_Sniper_REST {
             }
         }
 
-        if (isset($payload['candle_m1']) && is_array($payload['candle_m1']) && isset($payload['candle_m1']['time']) && !isset($payload['candle_m1']['timestamp'])) {
-            $payload['candle_m1']['timestamp'] = $payload['candle_m1']['time'];
+        if (isset($payload['candle_m1']) && is_array($payload['candle_m1'])) {
+            if (isset($payload['candle_m1']['tick_volume']) && !isset($payload['candle_m1']['volume'])) {
+                $payload['candle_m1']['volume'] = $payload['candle_m1']['tick_volume'];
+            }
+            if (isset($payload['candle_m1']['time']) && !isset($payload['candle_m1']['timestamp'])) {
+                $payload['candle_m1']['timestamp'] = $payload['candle_m1']['time'];
+            }
         }
 
         return $payload;
@@ -9441,7 +9446,7 @@ final class SMC_SuperFib_Sniper_REST {
         return (time() - $candle_ts) <= $threshold_sec;
     }
 
-    private function normalize_market_timestamp($raw_time, $fallback = null) {
+    private function normalize_market_timestamp($raw_time, $fallback = null, $round_to_minute = false) {
         $fallback_value = (func_num_args() >= 2) ? $fallback : $this->now_mysql();
         if ($raw_time === null || $raw_time === '') {
             return $fallback_value;
@@ -9453,6 +9458,9 @@ final class SMC_SuperFib_Sniper_REST {
             $epoch = (int) $value;
             if (strlen($value) === 13) {
                 $epoch = (int) floor($epoch / 1000);
+            }
+            if ($round_to_minute) {
+                $epoch = (int) (round($epoch / 60) * 60);
             }
             return gmdate('Y-m-d H:i:s', $epoch);
         }
@@ -9477,6 +9485,10 @@ final class SMC_SuperFib_Sniper_REST {
         if ($ts === false) {
             error_log("FAILED TO PARSE TIMESTAMP: raw={$raw_time} | value={$value}");
             return $fallback_value;
+        }
+
+        if ($round_to_minute) {
+            $ts = (int) (round($ts / 60) * 60);
         }
 
         return gmdate('Y-m-d H:i:s', $ts);
