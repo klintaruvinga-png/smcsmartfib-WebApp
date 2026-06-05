@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   extractUsablePlanFromCodexOutput,
+  buildCodexImplementationPrompt,
   buildCodexExecCommand,
   buildCodexVersionCommand,
   isActivePhaseUpdatePath,
+  selectOpenReadyPR,
 } from "./pipeline-watcher.js";
 
 describe("pipeline watcher state detection", () => {
@@ -59,5 +61,26 @@ describe("pipeline watcher Codex commands", () => {
     expect(command).toContain('"C:\\temp\\codex prompt.tmp.md"');
     expect(command.toLowerCase()).toContain("codex");
     expect(command.toLowerCase()).not.toContain("claude");
+  });
+
+  it("builds the implementation prompt with an explicit non-draft PR command", () => {
+    const prompt = buildCodexImplementationPrompt({
+      issue: "Patch the update runner",
+      promptText: "Base prompt",
+    });
+
+    expect(prompt).toContain("gh pr create --fill");
+    expect(prompt).toContain("Do not pass --draft");
+    expect(prompt).toContain("gh pr ready");
+  });
+
+  it("selects only open non-draft PRs as implementation-complete PRs", () => {
+    expect(selectOpenReadyPR([{ number: 101, isDraft: true }])).toBeNull();
+    expect(
+      selectOpenReadyPR([
+        { number: 101, isDraft: true },
+        { number: 102, isDraft: false },
+      ]),
+    ).toEqual({ number: 102, isDraft: false });
   });
 });

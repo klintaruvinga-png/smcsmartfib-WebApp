@@ -103,6 +103,23 @@ function buildCodexVersionCommand() {
   return buildCodexCommand(["--version"]);
 }
 
+function buildCodexImplementationPrompt({ issue, promptText }) {
+  const issueSlug = slugifyIssue(issue || "pipeline-issue");
+
+  return `${promptText ?? fs.readFileSync(CODEX_IMPLEMENT_PROMPT_FILE, "utf8")}
+
+## Runtime context
+- Current issue: ${issue}
+- Required branch: codex/${issueSlug}
+- Implementation summary target: reports/codex-implementation.md
+- PR closeout command: gh pr create --fill
+- Open a normal PR, not a draft PR.
+- Do not pass --draft to gh pr create.
+- If an existing PR for this branch is draft, run: gh pr ready
+- After PR creation, apply review fixes locally via the repository review process.
+`;
+}
+
 function isActivePhaseUpdatePath(filePath) {
   const resolvedPath = path.normalize(
     path.isAbsolute(filePath) ? filePath : path.resolve(REPO_ROOT, filePath),
@@ -231,13 +248,21 @@ function markIdle(reason) {
   log(`Pipeline reset to IDLE: ${reason}`);
 }
 
-// Returns { number } if an open (not yet merged) PR for the branch exists, else null.
+function selectOpenReadyPR(prs) {
+  if (!Array.isArray(prs)) {
+    return null;
+  }
+
+  return prs.find((pr) => Number.isFinite(Number(pr?.number)) && pr.isDraft === false) ?? null;
+}
+
+// Returns { number, isDraft } if an open, non-draft PR for the branch exists, else null.
 // Used to detect when Codex created a PR but the execSync wrapper timed out before
 // the watcher could record IMPLEMENTATION_COMPLETE.
 function checkOpenPR(issueSlug) {
   try {
     const raw = execSync(
-      `gh pr list --head "codex/${issueSlug}" --state open --json number --limit 1`,
+      `gh pr list --head "codex/${issueSlug}" --state open --json number,isDraft --limit 20`,
       {
         cwd: REPO_ROOT,
         encoding: "utf8",
@@ -248,7 +273,11 @@ function checkOpenPR(issueSlug) {
       },
     );
     const prs = JSON.parse(raw.trim() || "[]");
-    return prs.length ? prs[0] : null;
+    const readyPr = selectOpenReadyPR(prs);
+    if (!readyPr && prs.some((pr) => pr?.isDraft === true)) {
+      log(`Draft PR found for codex/${issueSlug}; waiting for a normal open PR`);
+    }
+    return readyPr;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log(`checkOpenPR error: ${msg}`);
@@ -878,7 +907,7 @@ function detectCodexStopReason(text) {
   return null;
 }
 
-function validateImplementationRun(previousImplementationMtime, previousOutputMtime) {
+function validateImplementationRun(previousImplementationMtime, previousOutputMtime, issueSlug) {
   const outputMtime = statMtime(CODEX_OUTPUT_FILE);
   if (outputMtime <= previousOutputMtime) {
     return {
@@ -923,6 +952,12 @@ function validateImplementationRun(previousImplementationMtime, previousOutputMt
       details: {
         implementation_excerpt: implementationText.slice(0, 4000),
       },
+    };
+  }
+
+  if (issueSlug && !checkOpenPR(issueSlug)) {
+    return {
+      reason: `Codex implementation finished without an open non-draft PR for codex/${issueSlug}`,
     };
   }
 
@@ -1210,15 +1245,7 @@ function runCodexImplementation(state) {
   }
 
   const issueSlug = slugifyIssue(state.issue || "pipeline-issue");
-  const prompt = `${fs.readFileSync(CODEX_IMPLEMENT_PROMPT_FILE, "utf8")}
-
-## Runtime context
-- Current issue: ${state.issue}
-- Required branch: codex/${issueSlug}
-- Implementation summary target: reports/codex-implementation.md
-- Open a normal PR, not a draft PR.
-- After PR creation, apply review fixes locally via the repository review process.
-`;
+  const prompt = buildCodexImplementationPrompt({ issue: state.issue });
   const previousImplementationMtime = statMtime(IMPLEMENTATION_FILE);
   const previousOutputMtime = statMtime(CODEX_OUTPUT_FILE);
 
@@ -1295,6 +1322,7 @@ function runCodexImplementation(state) {
     const validationFailure = validateImplementationRun(
       previousImplementationMtime,
       previousOutputMtime,
+      issueSlug,
     );
     if (validationFailure) {
       failImplementation(state, validationFailure.reason, validationFailure.details);
@@ -1765,7 +1793,12 @@ function evaluatePipeline() {
       return;
     }
 
-    log(`Pipeline cycle complete - PR open for codex/${issueSlug}, waiting for merge`);
+    if (!openPr) {
+      log(`Pipeline cycle complete - waiting for a normal open PR for codex/${issueSlug}`);
+      return;
+    }
+
+    log(`Pipeline cycle complete - PR #${openPr.number} open for codex/${issueSlug}, waiting for merge`);
     return;
   }
 
@@ -1875,9 +1908,11 @@ function startPipelineWatcher() {
 
 export {
   extractUsablePlanFromCodexOutput,
+  buildCodexImplementationPrompt,
   buildCodexExecCommand,
   buildCodexVersionCommand,
   isActivePhaseUpdatePath,
+  selectOpenReadyPR,
 };
 
 if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {

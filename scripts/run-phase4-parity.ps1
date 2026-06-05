@@ -419,6 +419,9 @@ function New-Mt5AnchorDebugRecord([string]$Symbol, [string]$Timeframe, [string]$
         anchor_low            = $anchorLow
         anchor_range          = $anchorHigh - $anchorLow
         compression_threshold = [double]$threshold
+        candle_lineage        = Get-ObjectPropertyValue $Debug "candle_lineage"
+        source_period         = Get-ObjectPropertyValue $Debug "source_period"
+        source_feed_bars      = Get-ObjectPropertyValue $Debug "source_feed_bars"
         debug_source          = if ($null -ne $Debug) { "endpoint_anchor_debug" } else { "derived_from_levels" }
     }
 
@@ -545,19 +548,35 @@ function Format-AnchorDebugSummaryMarkdown($Gate, [string]$Mt5DebugFile, [string
 
         [void]$builder.AppendLine("### Anchor Debug: $($mismatch.symbol) $($mismatch.timeframe) $($mismatch.family)")
         [void]$builder.AppendLine("")
-        [void]$builder.AppendLine("| Source | Anchor High | Anchor Low | Range |")
-        [void]$builder.AppendLine("|---|---:|---:|---:|")
+        [void]$builder.AppendLine("| Source | Candle Lineage | Anchor High | Anchor Low | Range |")
+        [void]$builder.AppendLine("|---|---|---:|---:|---:|")
         $mt5AnchorHigh = Get-ObjectPropertyValue $mt5 "anchor_high"
         $mt5AnchorLow = Get-ObjectPropertyValue $mt5 "anchor_low"
         $mt5AnchorRange = Get-ObjectPropertyValue $mt5 "anchor_range"
         $pineAnchorHigh = Get-ObjectPropertyValue $pine "anchor_high"
         $pineAnchorLow = Get-ObjectPropertyValue $pine "anchor_low"
         $pineAnchorRange = Get-ObjectPropertyValue $pine "anchor_range"
+        # candle_lineage and source_period are emitted by Patch 1 (lineage metadata).
+        # If absent (pre-patch artifacts) fall back to the legacy debug_source field.
+        $mt5Lineage  = [string](Get-ObjectPropertyValue $mt5  "candle_lineage")
+        $pinLineage  = [string](Get-ObjectPropertyValue $pine "candle_lineage")
+        $mt5Period   = [string](Get-ObjectPropertyValue $mt5  "source_period")
+        $pinePeriod  = [string](Get-ObjectPropertyValue $pine "source_period")
+        $mt5BarsStr  = [string](Get-ObjectPropertyValue $mt5  "source_feed_bars")
+        $pineBarsStr = [string](Get-ObjectPropertyValue $pine "source_feed_bars")
+        if ([string]::IsNullOrWhiteSpace($mt5Lineage))  { $mt5Lineage  = [string](Get-ObjectPropertyValue $mt5  "debug_source") }
+        if ([string]::IsNullOrWhiteSpace($pinLineage))  { $pinLineage  = [string](Get-ObjectPropertyValue $pine "debug_source") }
+        $mt5LineageStr  = if ($mt5Period  -and $mt5BarsStr)  { "$mt5Lineage ($mt5Period, $mt5BarsStr bars)" }  else { $mt5Lineage }
+        $pineLineageStr = if ($pinePeriod -and $pineBarsStr) { "$pinLineage ($pinePeriod, $pineBarsStr bars)" } else { $pinLineage }
+        $lineageMismatch = ($mt5Lineage -ne $pinLineage) -and
+                           -not [string]::IsNullOrWhiteSpace($mt5Lineage) -and
+                           -not [string]::IsNullOrWhiteSpace($pinLineage)
+        $lineageTag = if ($lineageMismatch) { " ⚠ LINEAGE_MISMATCH" } else { "" }
 
-        [void]$builder.AppendLine("| MT5 | $(Format-AnchorNumber $mt5AnchorHigh) | $(Format-AnchorNumber $mt5AnchorLow) | $(Format-AnchorNumber $mt5AnchorRange) |")
-        [void]$builder.AppendLine("| Pine | $(Format-AnchorNumber $pineAnchorHigh) | $(Format-AnchorNumber $pineAnchorLow) | $(Format-AnchorNumber $pineAnchorRange) |")
+        [void]$builder.AppendLine("| MT5 | $mt5LineageStr$lineageTag | $(Format-AnchorNumber $mt5AnchorHigh) | $(Format-AnchorNumber $mt5AnchorLow) | $(Format-AnchorNumber $mt5AnchorRange) |")
+        [void]$builder.AppendLine("| Pine | $pineLineageStr | $(Format-AnchorNumber $pineAnchorHigh) | $(Format-AnchorNumber $pineAnchorLow) | $(Format-AnchorNumber $pineAnchorRange) |")
         if ($null -ne $mt5 -and $null -ne $pine) {
-            [void]$builder.AppendLine("| Delta | $(Format-AnchorNumber ([double]$pineAnchorHigh - [double]$mt5AnchorHigh)) | $(Format-AnchorNumber ([double]$pineAnchorLow - [double]$mt5AnchorLow)) | $(Format-AnchorNumber ([double]$pineAnchorRange - [double]$mt5AnchorRange)) |")
+            [void]$builder.AppendLine("| Delta | | $(Format-AnchorNumber ([double]$pineAnchorHigh - [double]$mt5AnchorHigh)) | $(Format-AnchorNumber ([double]$pineAnchorLow - [double]$mt5AnchorLow)) | $(Format-AnchorNumber ([double]$pineAnchorRange - [double]$mt5AnchorRange)) |")
         }
         [void]$builder.AppendLine("")
         [void]$builder.AppendLine("#### Components")

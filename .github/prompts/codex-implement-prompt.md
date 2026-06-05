@@ -25,6 +25,8 @@ Read these files fully before touching code:
 - Never introduce frontend-only signal truth.
 - Do not alter Pine formulas unless the contract explicitly proves parity corruption and authorizes that change.
 - Open a normal PR, not a draft PR.
+- Use `gh pr create --fill` for PR creation. Do not pass `--draft`.
+- If a PR already exists for the branch and it is draft, run `gh pr ready` before finishing.
 
 ## Execution steps
 
@@ -44,7 +46,7 @@ if reports/codex-implementation.md is absent or incomplete.**
    - `.github/docs/BUG_SWEEP_REPORT_[YYYY-MM-DD]_[short-slug].md`
 8. Generate a parity audit when the contract requires parity re-validation:
    - `.github/migration/audits/phase-[X]-[engine]-parity-[YYYY-MM-DD].md`
-9. Commit the work (reports/codex-implementation.md must be included), push the branch, and open a normal PR.
+9. Commit the work (reports/codex-implementation.md must be included), push the branch, and open a normal PR with `gh pr create --fill`. Do not use `--draft`.
 
 ## Stop conditions
 
