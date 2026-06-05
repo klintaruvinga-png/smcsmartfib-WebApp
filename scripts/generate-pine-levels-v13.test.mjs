@@ -1,11 +1,44 @@
 import { describe, expect, test } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const generatorPath = path.join(repoRoot, 'scripts', 'generate-pine-levels-v13.cjs');
+
+function writeShortMonthlyHistoryFixture() {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'smc-pine-partial-htf-'));
+  const candleDir = path.join(tempRoot, 'data');
+  const reportsDir = path.join(tempRoot, 'reports');
+  fs.mkdirSync(candleDir, { recursive: true });
+  fs.mkdirSync(reportsDir, { recursive: true });
+
+  const candles = [];
+  const start = Date.UTC(2026, 4, 4, 0, 0, 0);
+  const end = Date.UTC(2026, 5, 5, 0, 0, 0);
+  let i = 0;
+  for (let timeMs = start; timeMs <= end; timeMs += 15 * 60 * 1000) {
+    const dayOffset = Math.floor(i / 96);
+    const base = 1.1 + dayOffset * 0.0002 + (i % 96) * 0.000002;
+    candles.push({
+      time: new Date(timeMs).toISOString(),
+      open: base,
+      high: base + 0.004,
+      low: base - 0.004,
+      close: base + 0.0001,
+    });
+    i++;
+  }
+
+  fs.writeFileSync(path.join(candleDir, 'EURUSD_M15.json'), JSON.stringify(candles));
+  const mt5File = path.join(reportsDir, 'mt5-levels.json');
+  fs.writeFileSync(mt5File, '[]');
+  const mt5Mtime = new Date(end + 60 * 1000);
+  fs.utimesSync(mt5File, mt5Mtime, mt5Mtime);
+
+  return { candleDir, reportsDir, mt5File };
+}
 
 describe('generate-pine-levels-v13.cjs output contract', () => {
   const readGenerator = () => fs.readFileSync(generatorPath, 'utf8');
@@ -186,5 +219,43 @@ describe('generate-pine-levels-v13.cjs output contract', () => {
     expect(bucketIso('2026-06-04T11:44:59Z')).toBe('2026-06-04T11:45:00.000Z');
     expect(bucketIso('2026-06-04T11:45:08Z')).toBe('2026-06-04T11:45:00.000Z');
     expect(bucketIso('2026-06-04T11:30:03Z')).toBe('2026-06-04T11:30:00.000Z');
+  });
+
+  test('skips HTF_AF rows by default when LTF_SF is computable but authority history is incomplete', () => {
+    const { candleDir, reportsDir, mt5File } = writeShortMonthlyHistoryFixture();
+
+    const result = spawnSync(process.execPath, [
+      generatorPath,
+      '--candle-dir', candleDir,
+      '--mt5-file', mt5File,
+      '--reports-dir', reportsDir,
+      '--run-ts', '2026-06-05T00:00:00.000Z',
+      '--symbols', 'EURUSD',
+      '--timeframes', 'H4',
+    ], { encoding: 'utf8' });
+
+    expect(result.status).toBe(0);
+    expect(`${result.stdout}${result.stderr}`).toContain('WARN: partial output');
+    const levels = JSON.parse(fs.readFileSync(path.join(reportsDir, 'pine-levels.json'), 'utf8'));
+    expect(levels).toHaveLength(16);
+    expect(new Set(levels.map((row) => row.family))).toEqual(new Set(['LTF_SF']));
+  });
+
+  test('keeps HTF_AF as a hard requirement when PINE_REQUIRE_HTF is enabled', () => {
+    const { candleDir, reportsDir, mt5File } = writeShortMonthlyHistoryFixture();
+
+    expect(() => execFileSync(process.execPath, [
+      generatorPath,
+      '--candle-dir', candleDir,
+      '--mt5-file', mt5File,
+      '--reports-dir', reportsDir,
+      '--run-ts', '2026-06-05T00:00:00.000Z',
+      '--symbols', 'EURUSD',
+      '--timeframes', 'H4',
+    ], {
+      encoding: 'utf8',
+      env: { ...process.env, PINE_REQUIRE_HTF: '1' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })).toThrow(/PINE_REQUIRE_HTF=1/);
   });
 });
