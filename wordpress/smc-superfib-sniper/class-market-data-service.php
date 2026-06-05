@@ -272,10 +272,6 @@ class SMC_MarketData_Service
      */
     public function get_phase4_candles($user_id, $symbol, $timeframe, $count = 600)
     {
-        $symbol = strtoupper(sanitize_text_field($symbol));
-        $timeframe = strtoupper(sanitize_text_field($timeframe));
-        $count = max(1, min(60000, (int) $count));
-
         $map = array(
             'M15' => array('db' => '15min', 'seconds' => 900),
             'H1' => array('db' => '1h', 'seconds' => 3600),
@@ -283,9 +279,13 @@ class SMC_MarketData_Service
             'D1' => array('db' => '1day', 'seconds' => 86400),
         );
 
+        $symbol = strtoupper(sanitize_text_field($symbol));
+        $timeframe = strtoupper(sanitize_text_field($timeframe));
         if (!isset($map[$timeframe])) {
             return array();
         }
+        $max_count = $timeframe === 'M15' ? 60000 : 2000;
+        $count = max(1, min($max_count, (int) $count));
 
         $direct = $this->get_mt5_candles_for_timeframe($user_id, $symbol, $map[$timeframe]['db'], $count);
         if (!empty($direct)) {

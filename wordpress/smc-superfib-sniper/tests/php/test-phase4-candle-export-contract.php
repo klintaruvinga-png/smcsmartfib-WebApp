@@ -40,6 +40,23 @@ function phase4_seed_m1_candle($user_id, $symbol, $time, $open, $high, $low, $cl
     ));
 }
 
+function phase4_seed_direct_candle($user_id, $symbol, $timeframe, $time, $open, $high, $low, $close, $volume = 1) {
+    global $wpdb;
+
+    $wpdb->insert(fib_test_table_name('candles'), array(
+        'user_id' => (int) $user_id,
+        'symbol' => $symbol,
+        'timeframe' => $timeframe,
+        'candle_time' => gmdate('Y-m-d H:i:s', strtotime($time . ' UTC')),
+        'open' => (float) $open,
+        'high' => (float) $high,
+        'low' => (float) $low,
+        'close' => (float) $close,
+        'volume' => (int) $volume,
+        'source' => 'mt5',
+    ));
+}
+
 function phase4_seed_m1_range($user_id, $symbol, $bucket_start, $minutes) {
     $start_ts = strtotime($bucket_start . ' UTC');
     for ($minute = 0; $minute < $minutes; $minute++) {
@@ -83,5 +100,47 @@ $candles = $service->get_phase4_candles(11, 'EURUSD', 'H1', 2);
 
 fib_test_assert_same(1, count($candles), 'M1 fallback must drop oldest buckets that do not have full minute coverage');
 fib_test_assert_same('2026-01-01T01:00:00Z', $candles[0]['time'], 'M1 fallback must only export fully covered H1 buckets');
+
+fib_test_reset_env(11);
+$start_ts = strtotime('2026-01-01 00:00:00 UTC');
+for ($i = 0; $i < 2001; $i++) {
+    phase4_seed_direct_candle(
+        11,
+        'EURUSD',
+        '1h',
+        gmdate('Y-m-d H:i:s', $start_ts + ($i * 3600)),
+        1.1,
+        1.2,
+        1.0,
+        1.15,
+        1
+    );
+}
+
+$service = new SMC_MarketData_Service();
+$candles = $service->get_phase4_candles(11, 'EURUSD', 'H1', 60000);
+
+fib_test_assert_same(2000, count($candles), 'H1 output candle requests must keep the old 2000 cap even when M15 allows 60000 for parity exports');
+
+fib_test_reset_env(11);
+$start_ts = strtotime('2026-01-01 00:00:00 UTC');
+for ($i = 0; $i < 2001; $i++) {
+    phase4_seed_direct_candle(
+        11,
+        'EURUSD',
+        '15min',
+        gmdate('Y-m-d H:i:s', $start_ts + ($i * 900)),
+        1.1,
+        1.2,
+        1.0,
+        1.15,
+        1
+    );
+}
+
+$service = new SMC_MarketData_Service();
+$candles = $service->get_phase4_candles(11, 'EURUSD', 'M15', 60000);
+
+fib_test_assert_same(2001, count($candles), 'M15 parity exports must keep the raised cap and return more than 2000 direct MT5 candles when available');
 
 fwrite(STDOUT, 'phase4 candle export route contract passed' . PHP_EOL);
