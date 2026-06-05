@@ -8,8 +8,27 @@ import { fmtPrice, fmtPct, fmtCurrency, relTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Position } from "@/types/sniper";
 
-type SortKey = "direction" | "entry" | "current" | "lots" | "pnl" | "time";
+type PosSortKey = "direction" | "entry" | "current" | "lots" | "pnl" | "time";
+type SymSortKey = "symbol" | "positions" | "long" | "short" | "net" | "pnl";
 type SortDir = "asc" | "desc";
+
+// Shared grid template: chevron | symbol | pos count | long | short | net | pnl | badge
+const HEADER_GRID =
+  "grid items-center gap-2 sm:gap-3 grid-cols-[16px_minmax(80px,1fr)_120px_110px_110px_110px_minmax(100px,1fr)_56px]";
+
+type SymbolSummary = {
+  symbol: string;
+  posList: Position[];
+  groupPnl: number;
+  groupState: string;
+  stale: boolean;
+  snapPairUpdatedAt?: string;
+  longsCount: number;
+  shortsCount: number;
+  totalLong: number;
+  totalShort: number;
+  netLots: number;
+};
 
 export function BookPage() {
   const { data: trades, isLoading, error } = useStableUserTrades();
@@ -23,6 +42,65 @@ export function BookPage() {
   } = usePollingUiState();
   const { data: accountTelemetry } = useAccountTelemetry();
   const positions = trades?.positions ?? [];
+
+  const [symSortKey, setSymSortKey] = useState<SymSortKey>("pnl");
+  const [symSortDir, setSymSortDir] = useState<SortDir>("desc");
+
+  const toggleSymSort = (key: SymSortKey) => {
+    if (symSortKey === key) {
+      setSymSortDir(symSortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSymSortKey(key);
+      setSymSortDir(key === "symbol" ? "asc" : "desc");
+    }
+  };
+
+  const summaries = useMemo<SymbolSummary[]>(() => {
+    const grouped = positions.reduce<Record<string, Position[]>>((acc, p) => {
+      (acc[p.symbol] ??= []).push(p);
+      return acc;
+    }, {});
+    const list = Object.entries(grouped).map(([symbol, posList]) => {
+      const snapPair = snap?.prices.find((p) => p.symbol === symbol);
+      const tradeStale = posList.some((p) => p.state === "stale");
+      const stale = tradeStale || snapPair?.state === "stale";
+      const groupState = tradeStale ? "stale" : (snapPair?.state ?? "unavailable");
+      const groupPnl = posList.reduce((s, p) => s + p.pnlUSC, 0);
+      const longs = posList.filter((p) => p.direction === "LONG");
+      const shorts = posList.filter((p) => p.direction === "SHORT");
+      const totalLong = longs.reduce((s, p) => s + p.lots, 0);
+      const totalShort = shorts.reduce((s, p) => s + p.lots, 0);
+      return {
+        symbol,
+        posList,
+        groupPnl,
+        groupState,
+        stale,
+        snapPairUpdatedAt: snapPair?.updatedAt,
+        longsCount: longs.length,
+        shortsCount: shorts.length,
+        totalLong,
+        totalShort,
+        netLots: totalLong - totalShort,
+      };
+    });
+    list.sort((a, b) => {
+      let av: number | string;
+      let bv: number | string;
+      switch (symSortKey) {
+        case "symbol": av = a.symbol; bv = b.symbol; break;
+        case "positions": av = a.posList.length; bv = b.posList.length; break;
+        case "long": av = a.totalLong; bv = b.totalLong; break;
+        case "short": av = a.totalShort; bv = b.totalShort; break;
+        case "net": av = a.netLots; bv = b.netLots; break;
+        case "pnl": av = a.groupPnl; bv = b.groupPnl; break;
+      }
+      if (av < bv) return symSortDir === "asc" ? -1 : 1;
+      if (av > bv) return symSortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+    return list;
+  }, [positions, snap, symSortKey, symSortDir]);
 
   if (pendingSettingsLoad) {
     return <div className="text-mute text-sm">Loading active book...</div>;
@@ -58,11 +136,6 @@ export function BookPage() {
     );
   }
 
-  const grouped = positions.reduce<Record<string, Position[]>>((acc, p) => {
-    (acc[p.symbol] ??= []).push(p);
-    return acc;
-  }, {});
-
   const totalPnl = positions.reduce((s, p) => s + p.pnlUSC, 0);
 
   return (
@@ -76,40 +149,71 @@ export function BookPage() {
         </div>
       </div>
 
-      {Object.keys(grouped).length === 0 && (
+      {summaries.length === 0 && (
         <div className="text-mute text-sm">No open positions.</div>
       )}
 
-      <div className="space-y-4">
-        {Object.entries(grouped).map(([symbol, posList]) => {
-          const snapPair = snap?.prices.find((p) => p.symbol === symbol);
-          const tradeStale = posList.some((p) => p.state === "stale");
-          const stale = tradeStale || snapPair?.state === "stale";
-          const groupState = tradeStale ? "stale" : (snapPair?.state ?? "unavailable");
-          const groupPnl = posList.reduce((s, p) => s + p.pnlUSC, 0);
-          const longs = posList.filter((p) => p.direction === "LONG");
-          const shorts = posList.filter((p) => p.direction === "SHORT");
-          const totalLong = longs.reduce((s, p) => s + p.lots, 0);
-          const totalShort = shorts.reduce((s, p) => s + p.lots, 0);
-          return (
-            <SymbolCard
-              key={symbol}
-              symbol={symbol}
-              posList={posList}
-              groupPnl={groupPnl}
-              groupState={groupState}
-              stale={stale}
-              snapPairUpdatedAt={snapPair?.updatedAt}
-              longsCount={longs.length}
-              shortsCount={shorts.length}
-              totalLong={totalLong}
-              totalShort={totalShort}
-              currency={accountTelemetry?.currency}
-            />
-          );
-        })}
-      </div>
+      {summaries.length > 0 && (
+        <div className="overflow-x-auto">
+          <div className="min-w-[760px] space-y-2">
+            {/* Symbol-level sort header */}
+            <div
+              className={cn(
+                HEADER_GRID,
+                "px-3 sm:px-4 py-2 rounded-md border border-bd bg-bg2/20 text-[10px] font-mono uppercase tracking-wider text-mute",
+              )}
+            >
+              <span />
+              <SymSortHeader label="Symbol" k="symbol" active={symSortKey === "symbol"} dir={symSortDir} onClick={() => toggleSymSort("symbol")} />
+              <SymSortHeader label="Positions" k="positions" active={symSortKey === "positions"} dir={symSortDir} onClick={() => toggleSymSort("positions")} />
+              <SymSortHeader label="Long" k="long" active={symSortKey === "long"} dir={symSortDir} onClick={() => toggleSymSort("long")} />
+              <SymSortHeader label="Short" k="short" active={symSortKey === "short"} dir={symSortDir} onClick={() => toggleSymSort("short")} />
+              <SymSortHeader label="Net" k="net" active={symSortKey === "net"} dir={symSortDir} onClick={() => toggleSymSort("net")} />
+              <SymSortHeader label="P/L" k="pnl" active={symSortKey === "pnl"} dir={symSortDir} onClick={() => toggleSymSort("pnl")} className="justify-end" />
+              <span />
+            </div>
+
+            {summaries.map((s) => (
+              <SymbolCard key={s.symbol} {...s} currency={accountTelemetry?.currency} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function SymSortHeader({
+  label,
+  active,
+  dir,
+  onClick,
+  className,
+}: {
+  label: string;
+  k: SymSortKey;
+  active: boolean;
+  dir: SortDir;
+  onClick: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-1 hover:text-tx transition-colors min-w-0",
+        active && "text-tx",
+        className,
+      )}
+    >
+      <span className="truncate">{label}</span>
+      {active ? (
+        dir === "asc" ? <ChevronUp className="h-3 w-3 shrink-0" /> : <ChevronDown className="h-3 w-3 shrink-0" />
+      ) : (
+        <ChevronsUpDown className="h-3 w-3 opacity-50 shrink-0" />
+      )}
+    </button>
   );
 }
 
@@ -124,25 +228,14 @@ function SymbolCard({
   shortsCount,
   totalLong,
   totalShort,
+  netLots,
   currency,
-}: {
-  symbol: string;
-  posList: Position[];
-  groupPnl: number;
-  groupState: string;
-  stale: boolean;
-  snapPairUpdatedAt?: string;
-  longsCount: number;
-  shortsCount: number;
-  totalLong: number;
-  totalShort: number;
-  currency?: string;
-}) {
+}: SymbolSummary & { currency?: string }) {
   const [expanded, setExpanded] = useState(false);
-  const [sortKey, setSortKey] = useState<SortKey>("time");
+  const [sortKey, setSortKey] = useState<PosSortKey>("time");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  const toggleSort = (key: SortKey) => {
+  const toggleSort = (key: PosSortKey) => {
     if (sortKey === key) {
       setSortDir(sortDir === "asc" ? "desc" : "asc");
     } else {
@@ -177,29 +270,32 @@ function SymbolCard({
         type="button"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
-        className="w-full flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 border-b border-bd bg-bg2/30 text-left hover:bg-bg2/50 transition-colors"
+        className={cn(
+          HEADER_GRID,
+          "w-full px-3 sm:px-4 py-2.5 bg-bg2/30 text-left hover:bg-bg2/50 transition-colors",
+          expanded && "border-b border-bd",
+        )}
       >
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-          {expanded ? (
-            <ChevronUp className="h-3.5 w-3.5 text-mute" />
-          ) : (
-            <ChevronDown className="h-3.5 w-3.5 text-mute" />
-          )}
-          <span className="font-mono text-sm font-semibold">{symbol}</span>
-          <span className="text-[10px] font-mono text-mute">
-            {posList.length} pos · {longsCount}L / {shortsCount}S
-          </span>
-          <span className="text-[10px] font-mono text-mute">·</span>
-          <span className="text-[10px] font-mono text-buy">Long {totalLong.toFixed(2)} Lots</span>
-          <span className="text-[10px] font-mono text-sell">Short {totalShort.toFixed(2)} Lots</span>
-          <span className="text-[10px] font-mono text-tx">Net {(totalLong - totalShort).toFixed(2)} Lots</span>
-        </div>
-        <div className="flex items-center gap-2 sm:gap-3">
-          <span className={cn("font-mono text-sm", groupPnl >= 0 ? "text-buy" : "text-sell")}>
-            {fmtCurrency(groupPnl, currency, true)}
-          </span>
+        {expanded ? (
+          <ChevronUp className="h-3.5 w-3.5 text-mute" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5 text-mute" />
+        )}
+        <span className="font-mono text-sm font-semibold truncate">{symbol}</span>
+        <span className="text-[10px] font-mono text-mute tabular-nums">
+          {posList.length} pos · {longsCount}L / {shortsCount}S
+        </span>
+        <span className="text-[10px] font-mono text-buy tabular-nums">Long {totalLong.toFixed(2)}</span>
+        <span className="text-[10px] font-mono text-sell tabular-nums">Short {totalShort.toFixed(2)}</span>
+        <span className={cn("text-[10px] font-mono tabular-nums", netLots >= 0 ? "text-buy" : "text-sell")}>
+          Net {netLots >= 0 ? "+" : ""}{netLots.toFixed(2)}
+        </span>
+        <span className={cn("font-mono text-sm text-right tabular-nums", groupPnl >= 0 ? "text-buy" : "text-sell")}>
+          {fmtCurrency(groupPnl, currency, true)}
+        </span>
+        <span className="flex justify-end">
           <FreshnessBadge state={groupState as never} />
-        </div>
+        </span>
       </button>
 
       {expanded && (
