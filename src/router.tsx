@@ -8,7 +8,8 @@ export const getRouter = () => {
     defaultOptions: {
       queries: {
         staleTime: 10_000,
-        refetchOnWindowFocus: false,
+        refetchOnWindowFocus: true,
+        refetchOnReconnect: true,
         retry: (failureCount, error) => {
           if (error instanceof AuthError) return false;
           return failureCount < 3;
