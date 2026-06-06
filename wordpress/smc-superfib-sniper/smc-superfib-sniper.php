@@ -77,14 +77,15 @@ final class SMC_SuperFib_Sniper_REST {
         // Without this, the browser's preflight check silently fails and blocks POST/DELETE.
         add_action('wp_loaded', function() {
             if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-                // Check if this is a request to our REST API
-                $request_uri = $_SERVER['REQUEST_URI'] ?? '';
-                if (strpos($request_uri, '/wp-json/sniper/v1/') !== false) {
+                // Check if this is a request to our REST API.
+                // Strip query string first so cache-buster params do not break path matching.
+                $request_uri  = $_SERVER['REQUEST_URI'] ?? '';
+                $request_path = (string) wp_parse_url($request_uri, PHP_URL_PATH);
+                if (strpos($request_path, '/wp-json/sniper/v1/') !== false) {
                     $allowed = self::get_allowed_origins();
-                    $origin  = $_SERVER['HTTP_ORIGIN'] ?? '';
+                    $origin  = isset($_SERVER['HTTP_ORIGIN']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
                     if ($origin && self::is_allowed_origin($origin, $allowed)) {
                         self::send_cors_headers_for_origin($origin);
-                        header('Access-Control-Max-Age: 86400');
                         header('Content-Length: 0');
                         http_response_code(204);
                         exit;
