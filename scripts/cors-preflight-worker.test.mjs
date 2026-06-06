@@ -34,6 +34,17 @@ describe("trader CORS preflight worker", () => {
     expect(response.headers.get("Vary")).toBe("Origin");
   });
 
+  it("allows WordPress-filtered origins configured through Worker vars", async () => {
+    const origin = "https://desk.example.com";
+    const response = await worker.fetch(makeRequest("OPTIONS", origin), {
+      SMC_SF_ALLOWED_ORIGINS: "https://desk.example.com, https://partner.example.com",
+    });
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(origin);
+    expect(response.headers.get("Access-Control-Allow-Credentials")).toBe("true");
+  });
+
   it("adds CORS headers to allowed actual sniper API responses", async () => {
     const origin = "http://localhost:5173";
     const fetchMock = vi.fn(async () => {
@@ -52,6 +63,20 @@ describe("trader CORS preflight worker", () => {
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe(origin);
     expect(response.headers.get("Access-Control-Allow-Credentials")).toBe("true");
     expect(response.headers.get("Vary")).toBe("Origin");
+  });
+
+  it("adds CORS headers to actual responses for Worker-configured origins", async () => {
+    const origin = "https://partner.example.com";
+    const fetchMock = vi.fn(async () => new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await worker.fetch(makeRequest("GET", origin), {
+      SMC_SF_ALLOWED_ORIGINS: "https://partner.example.com",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(origin);
+    expect(response.headers.get("Access-Control-Allow-Credentials")).toBe("true");
   });
 
   it("passes through non-sniper paths without CORS handling", async () => {

@@ -17,6 +17,11 @@
   "main": "./cors-preflight-worker.js",
   "compatibility_date": "2026-06-06",
   "workers_dev": false,
+  "vars": {
+    // Comma-separated extra origins that are also added through the WordPress
+    // smc_sf_allowed_origins filter. Example: "https://desk.example.com"
+    "SMC_SF_ALLOWED_ORIGINS": "",
+  },
   "routes": [
     {
       "pattern": "trader.stokvelsociety.co.za/wp-json/sniper/v1/*",

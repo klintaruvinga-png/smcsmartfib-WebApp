@@ -7,6 +7,9 @@
  * Route:
  *   trader.stokvelsociety.co.za/wp-json/sniper/v1/*
  *
+ * If smc_sf_allowed_origins is extended in WordPress, mirror those origins in
+ * the SMC_SF_ALLOWED_ORIGINS Worker var as a comma-separated list.
+ *
  * The origin server rejects OPTIONS before WordPress can run the PHP CORS
  * handler. This Worker handles preflight at the edge and also attaches CORS
  * headers to actual REST responses for browser enforcement.
@@ -45,10 +48,21 @@ function normalizeOrigin(origin) {
   return origin ? origin.replace(/\/+$/, "") : "";
 }
 
-function isAllowedOrigin(origin) {
+function getEnvAllowedOrigins(env) {
+  if (typeof env?.SMC_SF_ALLOWED_ORIGINS !== "string") {
+    return [];
+  }
+
+  return env.SMC_SF_ALLOWED_ORIGINS.split(/[\n,]+/)
+    .map((origin) => normalizeOrigin(origin.trim()))
+    .filter(Boolean);
+}
+
+function isAllowedOrigin(origin, env) {
   const normalized = normalizeOrigin(origin);
   if (!normalized) return false;
   if (ALLOWED_ORIGINS.has(normalized)) return true;
+  if (getEnvAllowedOrigins(env).includes(normalized)) return true;
 
   try {
     const { hostname, protocol } = new URL(normalized);
@@ -95,7 +109,7 @@ function addCorsHeaders(response, origin) {
 }
 
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin");
 
@@ -103,7 +117,7 @@ export default {
       return fetch(request);
     }
 
-    if (!isAllowedOrigin(origin)) {
+    if (!isAllowedOrigin(origin, env)) {
       if (request.method === "OPTIONS") {
         return new Response(null, {
           status: 403,
