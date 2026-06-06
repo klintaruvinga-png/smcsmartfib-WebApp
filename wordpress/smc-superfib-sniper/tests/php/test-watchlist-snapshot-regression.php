@@ -219,6 +219,7 @@ $freshSnapshot = array(
         array('symbol' => 'EURUSD'),
         array('symbol' => 'USDJPY'),
     ),
+    'todayOiImpacts' => array(),
     'meta' => array(
         'computedAt' => gmdate('c'),
     ),
@@ -229,6 +230,18 @@ assert_true(
     'matching symbols with a fresh timestamp must keep the snapshot current'
 );
 assert_true(
+    !$isCurrent->invoke($instance, array(
+        'prices' => array(
+            array('symbol' => 'EURUSD'),
+            array('symbol' => 'USDJPY'),
+        ),
+        'meta' => array(
+            'computedAt' => gmdate('c'),
+        ),
+    ), array('EURUSD', 'USDJPY'), 30, 60),
+    'snapshots missing today OI impacts must be recomputed before Active Book reads them'
+);
+assert_true(
     !$isCurrent->invoke($instance, $freshSnapshot, array('EURUSD'), 30, 60),
     'symbol-set mismatch must invalidate a fresh snapshot before timestamp freshness is considered'
 );
@@ -237,6 +250,7 @@ assert_true(
         'prices' => array(
             array('symbol' => 'EURUSD'),
         ),
+        'todayOiImpacts' => array(),
         'meta' => array(
             'computedAt' => gmdate('c'),
         ),
@@ -257,6 +271,7 @@ assert_true(
                 'updatedAt' => gmdate('c', time() - 15),
             ),
         ),
+        'todayOiImpacts' => array(),
         'meta' => array(
             'computedAt' => gmdate('c'),
         ),

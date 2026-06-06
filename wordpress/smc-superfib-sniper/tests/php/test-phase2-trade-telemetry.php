@@ -489,16 +489,19 @@ if (!function_exists('wp_unschedule_hook')) {
 }
 if (!function_exists('update_user_meta')) {
     function update_user_meta($user_id, $key, $value) {
+        $GLOBALS['test_user_meta'][(int) $user_id][$key] = $value;
         return true;
     }
 }
 if (!function_exists('get_user_meta')) {
     function get_user_meta($user_id, $key, $single = false) {
-        return $single ? null : array();
+        $value = $GLOBALS['test_user_meta'][(int) $user_id][$key] ?? null;
+        return $single ? $value : ($value === null ? array() : array($value));
     }
 }
 if (!function_exists('delete_user_meta')) {
     function delete_user_meta($user_id, $key) {
+        unset($GLOBALS['test_user_meta'][(int) $user_id][$key]);
         return true;
     }
 }
@@ -527,6 +530,7 @@ function phase2_reset_state() {
     $GLOBALS['test_is_logged_in'] = true;
     $GLOBALS['test_can_read'] = true;
     $GLOBALS['test_transients'] = array();
+    $GLOBALS['test_user_meta'] = array();
 }
 
 function phase2_assert_true($condition, $message) {
@@ -563,6 +567,12 @@ function phase2_invoke_static_private($class_name, $method_name) {
     $method = new ReflectionMethod($class_name, $method_name);
     $method->setAccessible(true);
     return $method->invoke(null);
+}
+
+function phase2_invoke_private($instance, $method_name, ...$args) {
+    $method = new ReflectionMethod(get_class($instance), $method_name);
+    $method->setAccessible(true);
+    return $method->invokeArgs($instance, $args);
 }
 
 function phase2_payload($overrides = array()) {
@@ -979,6 +989,108 @@ function test_progress_streak_unavailable_with_no_run_data() {
     echo "PASS streak unavailable with no run data\n";
 }
 
+function test_phase2_today_oi_impacts() {
+    echo "\nTesting snapshot today OI impacts\n";
+    echo "=================================\n\n";
+
+    phase2_reset_state();
+    $plugin = new SMC_SuperFib_Sniper_REST();
+    phase2_assert_true(phase2_invoke_static_private('SMC_SuperFib_Sniper_REST', 'ensure_trade_telemetry_tables') === true, 'Phase 2 tables must initialize for today OI impact test');
+
+    $payload = phase2_payload(array(
+        'positions' => array(
+            array(
+                'position_id' => 'older-eur',
+                'symbol' => 'EURUSD',
+                'normalized_symbol' => 'EURUSD',
+                'direction' => 'BUY',
+                'entry_price' => 1.08,
+                'current_price' => 1.083,
+                'sl' => 1.075,
+                'tp' => 1.09,
+                'volume' => 0.5,
+                'profit' => 150,
+                'swap' => 0,
+                'commission' => 0,
+                'magic' => 42,
+                'comment' => 'older position',
+                'opened_at' => gmdate('c', strtotime('-2 days')),
+                'state' => 'OPEN',
+            ),
+            array(
+                'position_id' => 'today-xau',
+                'symbol' => 'XAUUSD',
+                'normalized_symbol' => 'XAUUSD',
+                'direction' => 'BUY',
+                'entry_price' => 2300,
+                'current_price' => 2302,
+                'sl' => 2290,
+                'tp' => 2320,
+                'volume' => 0.1,
+                'profit' => 25,
+                'swap' => 0,
+                'commission' => 0,
+                'magic' => 42,
+                'comment' => 'today position',
+                'opened_at' => gmdate('c', time() - 1800),
+                'state' => 'OPEN',
+            ),
+        ),
+        'pending_orders' => array(),
+        'account_metrics' => array(
+            'balance' => 10000,
+            'equity' => 10125,
+            'margin' => 1000,
+            'free_margin' => 9125,
+            'margin_level' => 1012.5,
+            'floating_pl' => 175,
+            'currency' => 'USC',
+            'leverage' => 500,
+        ),
+    ));
+
+    $response = phase2_dispatch_market_stream($plugin, $payload);
+    phase2_assert_true($response instanceof WP_REST_Response, 'Phase 2 payload for today OI impacts must be accepted');
+
+    update_user_meta(7, 'smc_sf_today_oi_baselines', array(
+        'date' => gmdate('Y-m-d'),
+        'positions' => array(
+            '32206603|FB9A56D617EDDDFE29EE54EBEFFE96C1|older-eur' => array(
+                'symbol' => 'EURUSD',
+                'baselinePnlUSC' => 100,
+                'baselineQuality' => 'day_start',
+                'firstSeenAt' => gmdate('c', strtotime('-1 hour')),
+            ),
+        ),
+    ));
+
+    $impacts = phase2_invoke_private($plugin, 'build_today_oi_impacts', 7, array('EURUSD'));
+    phase2_assert_same(2, count($impacts), 'Today OI impacts must include every active position symbol, including non-watchlist active book symbols');
+
+    $by_symbol = array();
+    foreach ($impacts as $impact) {
+        $by_symbol[$impact['symbol']] = $impact;
+    }
+
+    phase2_assert_same(50.0, (float) ($by_symbol['EURUSD']['todayOiPnlImpactUSC'] ?? -1), 'Older EURUSD position must subtract stored day baseline from current P/L');
+    phase2_assert_same(0.49382716, (float) ($by_symbol['EURUSD']['todayOiEquityImpactPct'] ?? -1), 'EURUSD today OI equity percent must use account equity');
+    phase2_assert_same('day_start', $by_symbol['EURUSD']['todayBaselineQuality'] ?? null, 'Stored baseline must preserve day_start quality');
+    phase2_assert_same(25.0, (float) ($by_symbol['XAUUSD']['todayOiPnlImpactUSC'] ?? -1), 'Position opened today must use zero baseline');
+    phase2_assert_same('day_start', $by_symbol['XAUUSD']['todayBaselineQuality'] ?? null, 'Position opened today must be day_start quality');
+
+    $stale_snapshot = array(
+        'prices' => array(array('symbol' => 'EURUSD')),
+        'meta' => array('computedAt' => gmdate('c')),
+    );
+    phase2_assert_true(
+        !phase2_invoke_private($plugin, 'is_engine_snapshot_current', $stale_snapshot, array('EURUSD'), 30, 60),
+        'Cached snapshots missing todayOiImpacts must be recomputed'
+    );
+
+    echo "PASS snapshot today OI impacts\n";
+}
+
 test_phase2_trade_telemetry();
 test_progress_streak_live_state_with_consecutive_run_fixtures();
 test_progress_streak_unavailable_with_no_run_data();
+test_phase2_today_oi_impacts();
