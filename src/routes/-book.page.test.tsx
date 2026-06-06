@@ -59,6 +59,13 @@ describe("BookPage", () => {
       data: {
         prices: [{ symbol: "EURUSD", state: "live", updatedAt: "2026-05-27T10:10:00Z" }],
         regimes: [{ symbol: "EURUSD", bias: "BULL", chop: 0, updatedAt: "2026-05-27T10:10:00Z", state: "live" }],
+        todayOiImpacts: [
+          {
+            symbol: "EURUSD",
+            todayOiPnlImpactUSC: 12.5,
+            todayBaselineQuality: "day_start",
+          },
+        ],
       },
     });
     hookMocks.useStableUserTrades.mockReturnValue({
@@ -102,7 +109,51 @@ describe("BookPage", () => {
     expect(screen.getByText("Long 0.50")).toBeTruthy();
     expect(screen.getByText("Short 0.50")).toBeTruthy();
     expect(screen.getByText("BULL")).toBeTruthy();
-    expect(screen.getByText("+4.00%")).toBeTruthy();
+    expect(screen.getByText("OI Today %")).toBeTruthy();
+    expect(screen.getByText("+1.25%")).toBeTruthy();
+    expect(screen.queryByText("+4.00%")).toBeNull();
+  });
+
+  it("uses backend-provided today OI equity impact percentage when available", () => {
+    hookMocks.useSnapshot.mockReturnValue({
+      data: {
+        prices: [{ symbol: "XAUUSD", state: "live", updatedAt: "2026-05-27T10:10:00Z" }],
+        todayOiImpacts: [
+          {
+            symbol: "XAUUSD",
+            todayOiPnlImpactUSC: 50,
+            todayOiEquityImpactPct: -0.75,
+            todayBaselineQuality: "first_seen_today",
+          },
+        ],
+      },
+    });
+    hookMocks.useStableUserTrades.mockReturnValue({
+      data: {
+        positions: [
+          {
+            id: "1",
+            symbol: "XAUUSD",
+            direction: "LONG",
+            entry: 2300,
+            current: 2301,
+            lots: 0.1,
+            pnlUSC: 40,
+            pnlPct: 2,
+            openedAt: "2026-05-20T10:00:00Z",
+            state: "live",
+          },
+        ],
+        orders: [],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    render(<BookPage />);
+
+    expect(screen.getByText("-0.75%")).toBeTruthy();
+    expect(screen.queryByText("+4.00%")).toBeNull();
   });
 
   it("keeps rendering carried-forward stale positions instead of flashing empty", () => {

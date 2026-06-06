@@ -13,9 +13,18 @@ type PosSortKey = "direction" | "entry" | "current" | "lots" | "pnl" | "time";
 type SymSortKey = "symbol" | "positions" | "long" | "short" | "net" | "pnl";
 type SortDir = "asc" | "desc";
 
-// Shared grid template: chevron | symbol | pos count | long | short | net | pnl | badge
+// Shared grid template: chevron | symbol | regime | pos count | long | short | net | OI today % | pnl | badge
 const HEADER_GRID =
   "grid items-center gap-2 sm:gap-3 grid-cols-[16px_minmax(80px,1fr)_80px_120px_110px_110px_110px_100px_minmax(100px,1fr)_56px]";
+
+type TodayBaselineQuality = "day_start" | "first_seen_today" | "missing";
+
+type TodayOiImpactSource = {
+  symbol?: string;
+  todayOiPnlImpactUSC?: number | null;
+  todayOiEquityImpactPct?: number | null;
+  todayBaselineQuality?: TodayBaselineQuality | null;
+};
 
 type SymbolSummary = {
   symbol: string;
@@ -31,7 +40,73 @@ type SymbolSummary = {
   netLots: number;
   regimeBias?: RegimeState["bias"];
   equityImpactPct: number | null;
+  todayBaselineQuality: TodayBaselineQuality | null;
 };
+
+function getEquityImpactPct(
+  instrumentPnl: number | null | undefined,
+  accountEquity: number | null | undefined,
+) {
+  if (instrumentPnl === null || instrumentPnl === undefined) return null;
+  if (!accountEquity || accountEquity <= 0) return null;
+  return (instrumentPnl / accountEquity) * 100;
+}
+
+function finiteNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function getTodayOiImpactSource(snap: unknown, symbol: string): TodayOiImpactSource | null {
+  const maybeSnap = snap as { todayOiImpacts?: TodayOiImpactSource[] } | null | undefined;
+  return maybeSnap?.todayOiImpacts?.find((row) => row.symbol === symbol) ?? null;
+}
+
+function getTodayOiEquityImpactPct(
+  source: TodayOiImpactSource | null,
+  accountEquity: number | null | undefined,
+): number | null {
+  const providedPct = finiteNumber(source?.todayOiEquityImpactPct);
+  if (providedPct !== null) return providedPct;
+
+  const todayOiPnlImpactUSC = finiteNumber(source?.todayOiPnlImpactUSC);
+  return getEquityImpactPct(todayOiPnlImpactUSC, accountEquity);
+}
+
+function EquityImpactBadge({
+  value,
+  baselineQuality,
+}: {
+  value: number | null;
+  baselineQuality?: TodayBaselineQuality | null;
+}) {
+  if (value === null || !Number.isFinite(value)) {
+    return <span title="Today baseline unavailable" className="text-mute text-[10px] font-mono">--</span>;
+  }
+  if (value === 0) {
+    return (
+      <span title="Today's open exposure impact as % of total equity" className="text-mute text-[10px] font-mono tabular-nums">
+        0.00%
+      </span>
+    );
+  }
+  const isPositive = value > 0;
+  const title =
+    baselineQuality === "first_seen_today"
+      ? "Open exposure impact since first seen today as % of total equity"
+      : "Today's open exposure impact as % of total equity";
+
+  return (
+    <span
+      title={title}
+      className={cn(
+        "inline-flex items-center justify-end gap-0.5 font-mono text-[10px] font-semibold tabular-nums",
+        isPositive ? "text-buy" : "text-sell",
+      )}
+    >
+      {isPositive ? "+" : ""}{value.toFixed(2)}%
+    </span>
+  );
+}
 
 export function BookPage() {
   const { data: trades, isLoading, error } = useStableUserTrades();
@@ -74,9 +149,9 @@ export function BookPage() {
       const totalLong = longs.reduce((s, p) => s + p.lots, 0);
       const totalShort = shorts.reduce((s, p) => s + p.lots, 0);
       const regime = snap?.regimes?.find((r) => r.symbol === symbol);
-      const equityImpactPct = accountTelemetry?.equity && accountTelemetry.equity > 0
-        ? (groupPnl / accountTelemetry.equity) * 100
-        : null;
+      const todayOiImpact = getTodayOiImpactSource(snap, symbol);
+      const equityImpactPct = getTodayOiEquityImpactPct(todayOiImpact, accountTelemetry?.equity);
+      const todayBaselineQuality = todayOiImpact?.todayBaselineQuality ?? null;
 
       return {
         symbol,
@@ -92,6 +167,7 @@ export function BookPage() {
         netLots: totalLong - totalShort,
         regimeBias: regime?.bias,
         equityImpactPct,
+        todayBaselineQuality,
       };
     });
     list.sort((a, b) => {
@@ -180,7 +256,7 @@ export function BookPage() {
               <SymSortHeader label="Long" k="long" active={symSortKey === "long"} dir={symSortDir} onClick={() => toggleSymSort("long")} />
               <SymSortHeader label="Short" k="short" active={symSortKey === "short"} dir={symSortDir} onClick={() => toggleSymSort("short")} />
               <SymSortHeader label="Net" k="net" active={symSortKey === "net"} dir={symSortDir} onClick={() => toggleSymSort("net")} />
-              <span className="text-[10px] font-mono uppercase tracking-wider text-mute text-right">Equity %</span>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-mute text-right">OI Today %</span>
               <SymSortHeader label="P/L" k="pnl" active={symSortKey === "pnl"} dir={symSortDir} onClick={() => toggleSymSort("pnl")} className="justify-end" />
               <span />
             </div>
@@ -243,6 +319,7 @@ function SymbolCard({
   netLots,
   regimeBias,
   equityImpactPct,
+  todayBaselineQuality,
   currency,
 }: SymbolSummary & { currency?: string }) {
   const [expanded, setExpanded] = useState(false);
@@ -311,11 +388,8 @@ function SymbolCard({
         <span className={cn("text-[10px] font-mono tabular-nums", netLots >= 0 ? "text-buy" : "text-sell")}>
           Net {netLots >= 0 ? "+" : ""}{netLots.toFixed(2)}
         </span>
-        <span className={cn(
-          "text-[10px] font-mono tabular-nums text-right",
-          equityImpactPct !== null ? (equityImpactPct >= 0 ? "text-buy" : "text-sell") : "text-mute",
-        )}>
-          {equityImpactPct !== null ? fmtPct(equityImpactPct) : "--"}
+        <span className="text-right">
+          <EquityImpactBadge value={equityImpactPct} baselineQuality={todayBaselineQuality} />
         </span>
         <span className={cn("font-mono text-sm text-right tabular-nums", groupPnl >= 0 ? "text-buy" : "text-sell")}>
           {fmtCurrency(groupPnl, currency, true)}
