@@ -58,7 +58,22 @@ describe("BookPage", () => {
     hookMocks.useSnapshot.mockReturnValue({
       data: {
         prices: [{ symbol: "EURUSD", state: "live", updatedAt: "2026-05-27T10:10:00Z" }],
-        regimes: [{ symbol: "EURUSD", bias: "BULL", chop: 0, updatedAt: "2026-05-27T10:10:00Z", state: "live" }],
+        regimes: [
+          {
+            symbol: "EURUSD",
+            bias: "BULL",
+            chop: 0,
+            updatedAt: "2026-05-27T10:10:00Z",
+            state: "live",
+          },
+        ],
+        todayOiImpacts: [
+          {
+            symbol: "EURUSD",
+            todayOiPnlImpactUSC: 12.5,
+            todayBaselineQuality: "day_start",
+          },
+        ],
       },
     });
     hookMocks.useStableUserTrades.mockReturnValue({
@@ -97,12 +112,56 @@ describe("BookPage", () => {
 
     render(<BookPage />);
 
-    // Symbol appears once as group header (no longer split by direction)
-    expect(screen.getAllByText("EURUSD")).toHaveLength(1);
+    // Symbol is grouped once per responsive render path, no longer split by direction.
+    expect(screen.getAllByText("EURUSD")).toHaveLength(2);
     expect(screen.getByText("Long 0.50")).toBeTruthy();
     expect(screen.getByText("Short 0.50")).toBeTruthy();
-    expect(screen.getByText("BULL")).toBeTruthy();
-    expect(screen.getByText("+4.00%")).toBeTruthy();
+    expect(screen.getAllByText("BULL")).toHaveLength(2);
+    expect(screen.getAllByText("OI Today %").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("↑ 1.25%")).toHaveLength(2);
+    expect(screen.queryByText("+4.00%")).toBeNull();
+  });
+
+  it("uses backend-provided today OI equity impact percentage when available", () => {
+    hookMocks.useSnapshot.mockReturnValue({
+      data: {
+        prices: [{ symbol: "XAUUSD", state: "live", updatedAt: "2026-05-27T10:10:00Z" }],
+        todayOiImpacts: [
+          {
+            symbol: "XAUUSD",
+            todayOiPnlImpactUSC: 50,
+            todayOiEquityImpactPct: -0.75,
+            todayBaselineQuality: "first_seen_today",
+          },
+        ],
+      },
+    });
+    hookMocks.useStableUserTrades.mockReturnValue({
+      data: {
+        positions: [
+          {
+            id: "1",
+            symbol: "XAUUSD",
+            direction: "LONG",
+            entry: 2300,
+            current: 2301,
+            lots: 0.1,
+            pnlUSC: 40,
+            pnlPct: 2,
+            openedAt: "2026-05-20T10:00:00Z",
+            state: "live",
+          },
+        ],
+        orders: [],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    render(<BookPage />);
+
+    expect(screen.getAllByText("↓ 0.75%")).toHaveLength(2);
+    expect(screen.queryByText("+4.00%")).toBeNull();
   });
 
   it("keeps rendering carried-forward stale positions instead of flashing empty", () => {
@@ -136,6 +195,6 @@ describe("BookPage", () => {
     render(<BookPage />);
 
     expect(screen.queryByText("No open positions.")).toBeNull();
-    expect(screen.getByText("STALE")).toBeTruthy();
+    expect(screen.getAllByText("STALE").length).toBeGreaterThanOrEqual(1);
   });
 });
