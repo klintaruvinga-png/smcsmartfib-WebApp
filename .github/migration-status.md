@@ -9,6 +9,27 @@
 
 ---
 
+## Control Update - 2026-06-06
+
+Phase 4 remains the active migration blocker. Do not reopen Phase 0-3 gates, and do not advance Phase 5 until the live paired MT5-vs-Pine fib gate passes.
+
+Weekend control note: Phase 4 parity should not be rerun as a real gate during weekend market closure because the instruments in the test files will have stale M15 candles. Any parity failure during this window is expected and should not be treated as new fib/regime/signal evidence.
+
+Next valid Phase 4 action: wait until markets reopen and MT5 has fresh closed M15 candles for every test symbol, then recapture a synchronized MT5 fib export snapshot and matching M15 candle set in the same broker/feed window before rerunning `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/run-phase4-parity.ps1`.
+
+The latest evidence shows:
+
+- Initial 2026-06-02/03 live paired-export artifacts (`reports/phase4-gate.json`, `reports/phase4-parity/phase4-gate.json`) failed at `40.89%` parity with `227` critical mismatches.
+- Corrected 2026-06-03 evidence (`reports/phase4-parity/phase4-gate-2026-06-03-corrected.json`) failed at `0.26%` parity with `383` critical mismatches.
+- Committed 2026-06-04 gate artifacts exist under `reports/phase4-parity/phase4-gate-2026-06-04_*.json`; for example `_173401` failed at `51.04%` parity with `47` critical mismatches across `96` tuples.
+- A later 2026-06-04 stale-candle attempt was blocked before producing an additional gate artifact because Pine level generation rejected stale M15 candle exports before parity validation.
+- Weekend gate attempts are data-invalid until all Phase 4 symbols have fresh newly closed M15 candles after market reopen.
+- Final Phase 4 closeout still requires 99%+ paired-export parity, zero critical mismatches, weekend/sparse-data evidence, and operator export acceptance.
+
+Phase 4A is authorized only as parallel hardening and contract work. It must not change fib math, regime scoring, signal gates, or dashboard signal truth during the active Phase 4 soak unless explicitly marked read-only.
+
+---
+
 ## Phase Summary
 
 | Phase | Objective | Status | % Complete | Blocker | Target End |
@@ -18,6 +39,7 @@
 | 2 | Read-only trade telemetry | **COMPLETE** | 100% | None — gate passed 2026-05-22 | 2026-05-22 ✅ |
 | 3 | MT5 market data engine | **COMPLETE** | 100% | None — gate cleared; T0 admin baseline captured 2026-05-27 | 2026-05-25 ✅ |
 | 4 | Fib engine migration | **IN-PROGRESS** | 75% | Paired MT5/Pine exports + weekend/sparse-data evidence + final paired-input validator gate | 2026-08-15 |
+| 4A | Production hardening + domain contracts | **READY** | 0% | Parallel only; no fib/regime/signal scoring changes during Phase 4 soak | Parallel with Phase 4 |
 | 5 | Regime & chop engine | **CODE COMPLETE** | 70% | Phase 4 live gate + operator deployment | 2026-09-15 |
 | 5B | Fundamentals regime feed | **CODE COMPLETE** | 65% | Phase 5 parity gate | 2026-10-01 |
 | 6 | Signal engine dual-run | **CODE COMPLETE** | 60% | Phase 5B gate + fib→signal wiring sprint | 2026-10-15 |
@@ -251,7 +273,7 @@ Market-Stream Auth:
 - [x] **[MANUAL]** Historical runtime verification captured *(2026-05-27 — pre-correction evidence only; backend ingest confirmed `levels_written=96` before H4 was added)*
 - [x] **[MANUAL]** Redeploy the corrected H4 build and confirm backend ingest `levels_written=128` *(confirmed 2026-05-28; `XAUUSD` ingest logged at `15:14:35 UTC`)*
 - [ ] **[MANUAL]** Historical replay corpus (EURUSD + USDJPY + XAUUSD, 30-day, M15/H1/H4/D1)
-- [x] **[MANUAL]** Live parity validator run — MT5 output vs. Pine reference snapshots (first paired-export run executed 2026-06-02; gate FAIL 40.89%; final gate remains open)
+- [x] **[MANUAL]** Live parity validator run — MT5 output vs. Pine reference snapshots (initial 2026-06-02 artifact FAIL 40.89%; corrected 2026-06-03 artifact FAIL 0.26%; 2026-06-04 gate artifacts also FAIL; final gate remains open)
 - [ ] **[MANUAL]** Weekend gap + sparse data scenario validation
 
 ### Success Criteria
@@ -276,7 +298,7 @@ Market-Stream Auth:
 PHP Fixture Parity:        PASS (100%, 0.00000 delta max all 12 fixtures)
 Ingestion Contract Tests:  PASS (7/7; 128-row H4 contract enforced)
 Parity Validator Self-Test: PASS (synthetic no-input mode, 100%, 384/384 tuples)
-MT5 Live vs Pine Live:     PENDING (first paired-export run executed 2026-06-02; gate FAIL 40.89%; final gate remains open; weekend-gap and sparse-data evidence still required)
+MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; corrected 2026-06-03 artifact FAIL 0.26% with 383 critical mismatches; 2026-06-04 gate artifacts also FAIL, including _173401 at 51.04% with 47 critical mismatches; final gate remains open; weekend-gap and sparse-data evidence still required)
 ```
 
 ### Blockers
