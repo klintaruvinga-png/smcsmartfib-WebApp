@@ -19,8 +19,10 @@ Next valid Phase 4 action: wait until markets reopen and MT5 has fresh closed M1
 
 The latest evidence shows:
 
-- 2026-06-02/03 live paired-export validator runs failed at `40.89%` parity with `227` critical mismatches.
-- 2026-06-04 rerun did not produce a gate artifact because Pine level generation rejected stale M15 candle exports before parity validation.
+- Initial 2026-06-02/03 live paired-export artifacts (`reports/phase4-gate.json`, `reports/phase4-parity/phase4-gate.json`) failed at `40.89%` parity with `227` critical mismatches.
+- Corrected 2026-06-03 evidence (`reports/phase4-parity/phase4-gate-2026-06-03-corrected.json`) failed at `0.26%` parity with `383` critical mismatches.
+- Committed 2026-06-04 gate artifacts exist under `reports/phase4-parity/phase4-gate-2026-06-04_*.json`; for example `_173401` failed at `51.04%` parity with `47` critical mismatches across `96` tuples.
+- A later 2026-06-04 stale-candle attempt was blocked before producing an additional gate artifact because Pine level generation rejected stale M15 candle exports before parity validation.
 - Weekend gate attempts are data-invalid until all Phase 4 symbols have fresh newly closed M15 candles after market reopen.
 - Final Phase 4 closeout still requires 99%+ paired-export parity, zero critical mismatches, weekend/sparse-data evidence, and operator export acceptance.
 
@@ -271,7 +273,7 @@ Market-Stream Auth:
 - [x] **[MANUAL]** Historical runtime verification captured *(2026-05-27 — pre-correction evidence only; backend ingest confirmed `levels_written=96` before H4 was added)*
 - [x] **[MANUAL]** Redeploy the corrected H4 build and confirm backend ingest `levels_written=128` *(confirmed 2026-05-28; `XAUUSD` ingest logged at `15:14:35 UTC`)*
 - [ ] **[MANUAL]** Historical replay corpus (EURUSD + USDJPY + XAUUSD, 30-day, M15/H1/H4/D1)
-- [x] **[MANUAL]** Live parity validator run — MT5 output vs. Pine reference snapshots (first paired-export run executed 2026-06-02; gate FAIL 40.89%; final gate remains open)
+- [x] **[MANUAL]** Live parity validator run — MT5 output vs. Pine reference snapshots (initial 2026-06-02 artifact FAIL 40.89%; corrected 2026-06-03 artifact FAIL 0.26%; 2026-06-04 gate artifacts also FAIL; final gate remains open)
 - [ ] **[MANUAL]** Weekend gap + sparse data scenario validation
 
 ### Success Criteria
@@ -296,7 +298,7 @@ Market-Stream Auth:
 PHP Fixture Parity:        PASS (100%, 0.00000 delta max all 12 fixtures)
 Ingestion Contract Tests:  PASS (7/7; 128-row H4 contract enforced)
 Parity Validator Self-Test: PASS (synthetic no-input mode, 100%, 384/384 tuples)
-MT5 Live vs Pine Live:     PENDING (first paired-export run executed 2026-06-02; gate FAIL 40.89%; final gate remains open; weekend-gap and sparse-data evidence still required)
+MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; corrected 2026-06-03 artifact FAIL 0.26% with 383 critical mismatches; 2026-06-04 gate artifacts also FAIL, including _173401 at 51.04% with 47 critical mismatches; final gate remains open; weekend-gap and sparse-data evidence still required)
 ```
 
 ### Blockers

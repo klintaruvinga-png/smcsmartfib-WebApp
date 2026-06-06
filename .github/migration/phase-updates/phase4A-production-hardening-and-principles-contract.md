@@ -19,8 +19,10 @@ Next valid Phase 4 action: wait until markets reopen, confirm every Phase 4 test
 
 Evidence basis:
 
-- 2026-06-02/03 paired-export validator runs failed at `40.89%` parity with `227` critical mismatches.
-- 2026-06-04 rerun was blocked before validator output because M15 candle exports were stale relative to the MT5 export snapshot.
+- Initial 2026-06-02/03 paired-export artifacts (`reports/phase4-gate.json`, `reports/phase4-parity/phase4-gate.json`) failed at `40.89%` parity with `227` critical mismatches.
+- Corrected 2026-06-03 evidence (`reports/phase4-parity/phase4-gate-2026-06-03-corrected.json`) failed at `0.26%` parity with `383` critical mismatches.
+- Committed 2026-06-04 gate artifacts exist under `reports/phase4-parity/phase4-gate-2026-06-04_*.json`; for example `_173401` failed at `51.04%` parity with `47` critical mismatches across `96` tuples.
+- A later 2026-06-04 stale-candle attempt was blocked before producing an additional gate artifact because M15 candle exports were stale relative to the MT5 export snapshot.
 - Weekend gate reruns are invalid while stale weekend timestamps remain in candle files.
 - Phase 4 closeout still requires 99%+ paired-export parity, zero critical mismatches, weekend/sparse-data evidence, and operator export acceptance.
 

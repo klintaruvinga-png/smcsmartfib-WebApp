@@ -3,7 +3,7 @@
 **Created**: 2026-05-27  
 **Updated**: 2026-06-01  
 **Phase**: 4 - Fib Engine Migration  
-**Status**: Live soak active; H4 runtime verified; synthetic validator PASS recorded; first paired-export validator run executed 2026-06-02; gate FAIL 40.89%; final paired-export gate pending
+**Status**: Live soak active; H4 runtime verified; synthetic validator PASS recorded; paired-export gate still FAIL. Initial 2026-06-02 artifact is FAIL 40.89%; corrected 2026-06-03 artifact is FAIL 0.26%; committed 2026-06-04 gate artifacts also FAIL; separate stale-candle attempts are BLOCKED/data-invalid.
 **Primary tracker**: `.github/migration-status.md`
 **Companion log**: `.github/migration/phase-updates/phase4-live-soak-started-2026-05-27.md`  
 **Contract correction addendum**: `.github/migration/phase-updates/phase4-timeframe-contract-correction-2026-05-28.md`  
@@ -102,7 +102,9 @@ Do not treat the synthetic validator PASS as Phase 4 closeout evidence. The only
 | [ ] | **Recapture synchronized M15 candle exports** for EURUSD/USDJPY/XAUUSD aligned to the MT5 fib export snapshot | Operator | After freshness verification | Fresh `data/*_M15.json` files inside the Pine generator freshness window | Phase 4 rerun |
 | [ ] | **Export `mt5-levels.json`** for EURUSD/USDJPY/XAUUSD with all M15/H1/H4/D1 timeframes | Operator | Same broker/feed window as candle export | `mt5-levels.json` with 384 rows (24 groups) | Phase 5 gate |
 | [ ] | **Capture `pine-levels.json`** at same UTC snapshot as MT5 export | Operator | Same session as MT5 export | `pine-levels.json` with 384 rows | Phase 5 gate |
-| [x] | Run parity validator dry run on first matched snapshot set | Operator | 2026-06-02 | `reports/phase4-gate.json` (first paired-export run; FAIL 40.89%) | Phase 5 gate |
+| [x] | Preserve initial paired-export gate artifact | Operator | 2026-06-02 | `reports/phase4-gate.json` (FAIL 40.89%; 227 critical mismatches) | Phase 5 gate |
+| [x] | Preserve corrected paired-export gate artifact | Operator | 2026-06-03 | `reports/phase4-parity/phase4-gate-2026-06-03-corrected.json` (FAIL 0.26%; 383 critical mismatches) | Phase 5 gate |
+| [x] | Preserve committed 2026-06-04 gate artifacts | Operator | 2026-06-04 | `reports/phase4-parity/phase4-gate-2026-06-04_*.json`; `_173401` is FAIL 51.04% with 47 critical mismatches | Phase 5 gate |
 | [ ] | Rerun Phase 4 parity after market-reopen freshness checks pass | Operator | After fresh closed M15 verification | `reports/phase4-parity/phase4-gate-*.json` or stale-export BLOCKED report | Phase 4 gate closure |
 | [ ] | **Weekend gap scenario verification** (Test 1: Fri EOD -> Mon US open) | Operator | Next valid market-reopen window | Snapshots + notes; do not treat stale weekend candle failures as gate evidence | Phase 4 gate closure |
 | [ ] | **Sparse-data scenario verification** (Test 2: illiquid session simulation) | Operator | During next illiquid session | Snapshots + backend logs (see runbook for checklist) | Phase 4 gate closure |
