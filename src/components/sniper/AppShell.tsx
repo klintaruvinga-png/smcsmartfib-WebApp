@@ -31,7 +31,7 @@ import {
   TrendingUp,
   RefreshCw,
 } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useIsFetching } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { clearCredentials } from "@/lib/auth";
 import { APP_VERSION_LABEL } from "@/lib/version";
@@ -308,6 +308,8 @@ function Header() {
 export function AppShell() {
   useUserSettings();
   const isNavigating = useRouterState({ select: (state) => state.status === "pending" });
+  const fetchingCount = useIsFetching();
+  const showLoader = isNavigating || fetchingCount > 0;
 
   return (
     <div className="flex min-h-screen">
@@ -315,8 +317,8 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Header />
         <main className="relative flex-1 px-3 py-4 pb-20 md:pb-4 lg:px-6 lg:py-6 max-w-[1400px] w-full mx-auto">
-          {isNavigating && (
-            <div className="absolute inset-x-0 top-0 z-10 h-0.5 -mx-3 overflow-hidden bg-accent/20 lg:-mx-6">
+          {showLoader && (
+            <div className="absolute inset-x-0 top-0 z-10 h-0.5 overflow-hidden bg-accent/20 pointer-events-none">
               <div className="nav-progress-bar h-full w-1/3 bg-accent" />
             </div>
           )}

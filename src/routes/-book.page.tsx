@@ -403,7 +403,7 @@ function SymSortHeader({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex items-center gap-1 hover:text-tx transition-colors min-w-0",
+        "flex items-center gap-1 p-0 m-0 bg-transparent hover:text-tx transition-colors min-w-0",
         active && "text-tx",
         className,
       )}
@@ -500,7 +500,7 @@ function SymbolCard({
           Net {netLots >= 0 ? "+" : ""}
           {netLots.toFixed(2)}
         </span>
-        <span className="text-right">
+        <span className="flex justify-end">
           <EquityImpactBadge value={equityImpactPct} baselineQuality={todayBaselineQuality} />
         </span>
         <span
@@ -824,7 +824,7 @@ function SortHeader({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex items-center gap-1 hover:text-tx transition-colors",
+        "flex items-center gap-1 p-0 m-0 bg-transparent hover:text-tx transition-colors",
         active && "text-tx",
         className,
       )}
