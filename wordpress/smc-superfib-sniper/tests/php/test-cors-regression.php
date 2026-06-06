@@ -71,17 +71,37 @@ if (!$validateMethod->invoke(null)) {
 $headersMethod = $ref->getMethod('get_cors_allowed_headers');
 $headersMethod->setAccessible(true);
 $allowedHeaders = $headersMethod->invoke(null);
+
+// Regression guard: original headers must still be present.
 if (strpos($allowedHeaders, 'X-Sniper-Secret') === false) {
     $errors[] = 'CORS regression guard missing X-Sniper-Secret in allowed headers.';
 }
+// New required headers.
+if (strpos($allowedHeaders, 'X-Requested-With') === false) {
+    $errors[] = 'CORS missing X-Requested-With in allowed headers.';
+}
+if (strpos($allowedHeaders, 'X-SMC-Token') === false) {
+    $errors[] = 'CORS missing X-SMC-Token in allowed headers.';
+}
+if (strpos($allowedHeaders, 'X-SMC-Auth') === false) {
+    $errors[] = 'CORS missing X-SMC-Auth in allowed headers.';
+}
 
 $cases = [
+    // Existing allowed origins - must not regress.
     ['origin' => 'https://example.test', 'allowed' => true],
     ['origin' => 'https://smcsuperfibwebapp.klintaruvinga.workers.dev', 'allowed' => true],
     ['origin' => 'https://another-test.workers.dev', 'allowed' => false],
     ['origin' => 'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app', 'allowed' => true],
     ['origin' => 'https://smcsmartfib.lovable.app', 'allowed' => true],
     ['origin' => 'https://malicious.example.com', 'allowed' => false],
+    // New localhost/dev origins
+    ['origin' => 'http://localhost:5173', 'allowed' => true],
+    ['origin' => 'http://127.0.0.1:5173', 'allowed' => true],
+    ['origin' => 'http://localhost:5174', 'allowed' => true],
+    ['origin' => 'http://127.0.0.1:5174', 'allowed' => true],
+    // Must not allow arbitrary localhost ports
+    ['origin' => 'http://localhost:9999', 'allowed' => false],
 ];
 
 foreach ($cases as $case) {

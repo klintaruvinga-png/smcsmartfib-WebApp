@@ -37,35 +37,48 @@ final class SMC_SuperFib_Cors_Service {
             'https://smcsuperfibwebapp.klintaruvinga.workers.dev',
             'https://smcsmartfib.lovable.app',
             'https://id-preview--97eda4a2-efed-4b50-8b90-e9ac49043f57.lovable.app',
+            // Local dev origins - required for vite dev server (port 5173/5174)
+            'http://localhost:5173',
+            'http://127.0.0.1:5173',
+            'http://localhost:5174',
+            'http://127.0.0.1:5174',
         ));
     }
 
     public function get_allowed_headers() {
-        return 'Authorization, Content-Type, X-WP-Nonce, X-Sniper-Secret, X-EA-API-Key, X-API-KEY';
+        return 'Authorization, Content-Type, X-WP-Nonce, X-Requested-With, X-SMC-Token, X-SMC-Auth, X-Sniper-Secret, X-EA-API-Key, X-API-KEY';
     }
 
     public function send_headers_for_origin($origin) {
         header('Vary: Origin', false);
         header('Access-Control-Allow-Origin: ' . $origin);
-        header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
+        header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
         header('Access-Control-Allow-Headers: ' . $this->get_allowed_headers());
         header('Access-Control-Allow-Credentials: true');
         header('Access-Control-Max-Age: 86400');
     }
 
     public function handle_options_preflight_request() {
-        if (isset($_SERVER['REQUEST_METHOD']) && strtoupper($_SERVER['REQUEST_METHOD']) === 'OPTIONS') {
-            $request_uri = $_SERVER['REQUEST_URI'] ?? '';
-            if (strpos($request_uri, '/wp-json/sniper/v1/') !== false) {
-                $allowed = $this->get_allowed_origins();
-                $origin  = isset($_SERVER['HTTP_ORIGIN']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
-                if ($origin && $this->is_allowed_origin($origin, $allowed)) {
-                    $this->send_headers_for_origin($origin);
-                    header('Content-Length: 0');
-                    http_response_code(204);
-                    exit;
-                }
-            }
+        if (!isset($_SERVER['REQUEST_METHOD']) || strtoupper($_SERVER['REQUEST_METHOD']) !== 'OPTIONS') {
+            return;
+        }
+
+        // Match both with and without query string, and handle server configs
+        // that include the query string in REQUEST_URI.
+        $request_uri = isset($_SERVER['REQUEST_URI']) ? strtok($_SERVER['REQUEST_URI'], '?') : '';
+
+        if (strpos($request_uri, '/wp-json/sniper/v1/') === false) {
+            return;
+        }
+
+        $allowed = $this->get_allowed_origins();
+        $origin  = isset($_SERVER['HTTP_ORIGIN']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_ORIGIN'])) : '';
+
+        if ($origin && $this->is_allowed_origin($origin, $allowed)) {
+            $this->send_headers_for_origin($origin);
+            header('Content-Length: 0');
+            http_response_code(204);
+            exit;
         }
     }
 
