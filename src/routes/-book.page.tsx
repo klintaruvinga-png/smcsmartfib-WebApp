@@ -403,7 +403,7 @@ function SymSortHeader({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex items-center gap-1 hover:text-tx transition-colors min-w-0",
+        "flex items-center gap-1 p-0 m-0 bg-transparent hover:text-tx transition-colors min-w-0",
         active && "text-tx",
         className,
       )}
