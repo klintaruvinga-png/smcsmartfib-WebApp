@@ -1,0 +1,26 @@
+{
+  // Cloudflare Worker: CORS handler for trader.stokvelsociety.co.za.
+  //
+  // Deploy separately from the main React Worker at ../wrangler.jsonc.
+  //
+  // Deploy:
+  //   wrangler deploy --config cloudflare/wrangler-cors.jsonc
+  //
+  // Validate after deploy:
+  //   curl -si -X OPTIONS "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/user/settings?_=test" \
+  //     -H "Origin: https://smcsmartfib.lovable.app" \
+  //     -H "Access-Control-Request-Method: GET" \
+  //     -H "Access-Control-Request-Headers: Authorization, Content-Type, X-SMC-Token" \
+  //   | grep -Ei "HTTP/|access-control|vary"
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "smc-sniper-cors-preflight",
+  "main": "./cors-preflight-worker.js",
+  "compatibility_date": "2026-06-06",
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "trader.stokvelsociety.co.za/wp-json/sniper/v1/*",
+      "zone_name": "stokvelsociety.co.za",
+    },
+  ],
+}
