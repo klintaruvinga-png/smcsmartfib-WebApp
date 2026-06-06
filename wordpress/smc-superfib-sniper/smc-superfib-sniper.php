@@ -7957,6 +7957,119 @@ final class SMC_SuperFib_Sniper_REST {
         );
     }
 
+    private function build_today_oi_impacts(int $user_id, array $symbols): array {
+        $positions = $this->read_trade_positions($user_id);
+        if (empty($positions)) {
+            $this->save_today_oi_baselines($user_id, array(
+                'date' => gmdate('Y-m-d'),
+                'positions' => array(),
+            ));
+            return array();
+        }
+
+        $telemetry = $this->read_account_telemetry($user_id);
+        $equity = isset($telemetry['equity']) ? (float) $telemetry['equity'] : 0.0;
+        $today = gmdate('Y-m-d');
+        $today_start = strtotime($today . ' 00:00:00 UTC');
+        $stored = $this->read_today_oi_baselines($user_id);
+        $stored_positions = array();
+        if (
+            is_array($stored)
+            && ($stored['date'] ?? '') === $today
+            && is_array($stored['positions'] ?? null)
+        ) {
+            $stored_positions = $stored['positions'];
+        }
+
+        $next_positions = array();
+        $impacts_by_symbol = array();
+
+        foreach ($positions as $position) {
+            $symbol = (string) ($position['symbol'] ?? '');
+            if ($symbol === '') {
+                continue;
+            }
+
+            $position_id = (string) ($position['position_id'] ?? '');
+            if ($position_id === '') {
+                continue;
+            }
+
+            $account_id = (string) ($position['account_id'] ?? '');
+            $terminal_id = (string) ($position['terminal_id'] ?? '');
+            $baseline_key = implode('|', array($account_id, $terminal_id, $position_id));
+            $current_pnl = (float) ($position['profit'] ?? 0);
+            $opened_at_ts = strtotime((string) ($position['opened_at'] ?? ''));
+            $opened_today = $opened_at_ts !== false && $today_start !== false && $opened_at_ts >= $today_start;
+
+            $baseline_pnl = 0.0;
+            $baseline_quality = 'day_start';
+            if (!$opened_today) {
+                if (isset($stored_positions[$baseline_key]) && is_array($stored_positions[$baseline_key])) {
+                    $baseline_pnl = (float) ($stored_positions[$baseline_key]['baselinePnlUSC'] ?? 0);
+                    $baseline_quality = (string) ($stored_positions[$baseline_key]['baselineQuality'] ?? 'first_seen_today');
+                    if (!in_array($baseline_quality, array('day_start', 'first_seen_today'), true)) {
+                        $baseline_quality = 'first_seen_today';
+                    }
+                } else {
+                    $baseline_pnl = $current_pnl;
+                    $baseline_quality = 'first_seen_today';
+                }
+            }
+
+            $next_positions[$baseline_key] = array(
+                'symbol' => $symbol,
+                'baselinePnlUSC' => $baseline_pnl,
+                'baselineQuality' => $baseline_quality,
+                'firstSeenAt' => isset($stored_positions[$baseline_key]['firstSeenAt'])
+                    ? (string) $stored_positions[$baseline_key]['firstSeenAt']
+                    : gmdate('c'),
+            );
+
+            $impact = $current_pnl - $baseline_pnl;
+            if (!isset($impacts_by_symbol[$symbol])) {
+                $impacts_by_symbol[$symbol] = array(
+                    'symbol' => $symbol,
+                    'todayOiPnlImpactUSC' => 0.0,
+                    'todayOiEquityImpactPct' => null,
+                    'todayBaselineQuality' => $baseline_quality,
+                );
+            }
+
+            $impacts_by_symbol[$symbol]['todayOiPnlImpactUSC'] += $impact;
+            if ($impacts_by_symbol[$symbol]['todayBaselineQuality'] === 'day_start' && $baseline_quality !== 'day_start') {
+                $impacts_by_symbol[$symbol]['todayBaselineQuality'] = $baseline_quality;
+            }
+        }
+
+        $this->save_today_oi_baselines($user_id, array(
+            'date' => $today,
+            'positions' => $next_positions,
+        ));
+
+        $impacts = array_values(array_map(function ($row) use ($equity) {
+            $pnl = (float) ($row['todayOiPnlImpactUSC'] ?? 0);
+            $row['todayOiPnlImpactUSC'] = round($pnl, 8);
+            $row['todayOiEquityImpactPct'] = $equity > 0 ? round(($pnl / $equity) * 100, 8) : null;
+            return $row;
+        }, $impacts_by_symbol));
+
+        usort($impacts, function ($left, $right) {
+            return strcmp((string) ($left['symbol'] ?? ''), (string) ($right['symbol'] ?? ''));
+        });
+
+        return $impacts;
+    }
+
+    private function read_today_oi_baselines(int $user_id): array {
+        $stored = get_user_meta($user_id, 'smc_sf_today_oi_baselines', true);
+        return is_array($stored) ? $stored : array();
+    }
+
+    private function save_today_oi_baselines(int $user_id, array $baselines): void {
+        update_user_meta($user_id, 'smc_sf_today_oi_baselines', $baselines);
+    }
+
     private function read_progress_equity_pulse(int $user_id): array {
         $telemetry = $this->read_account_telemetry($user_id);
         $account_blob = $this->get_account_blob($user_id);
@@ -8335,6 +8448,7 @@ final class SMC_SuperFib_Sniper_REST {
         $prices = $this->refresh_prices($user_id, $symbols);
         $engine = $this->run_engine_for_symbols($user_id, $symbols, $prices, $force);
         $prices = $this->apply_closed_session_price_states($prices, $engine['diagnostics'] ?? array());
+        $today_oi_impacts = $this->build_today_oi_impacts((int) $user_id, $symbols);
         $snapshot = array(
             'prices' => $prices,
             'regimes' => $engine['regimes'],
@@ -8343,6 +8457,7 @@ final class SMC_SuperFib_Sniper_REST {
             'candidateSignals' => is_array($engine['candidateSignals'] ?? null) ? $engine['candidateSignals'] : array(),
             'plans' => $engine['plans'],
             'diagnostics' => $engine['diagnostics'] ?? array(),
+            'todayOiImpacts' => $today_oi_impacts,
             'meta' => array(
                 'computedAt' => gmdate('c'),
                 'watchlist' => $symbols,
@@ -8387,6 +8502,9 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function is_engine_snapshot_current($snapshot, $expected_symbols, $refresh_interval_sec, $stale_threshold_sec = null) {
         if (!is_array($snapshot) || empty($snapshot['prices']) || empty($snapshot['meta']['computedAt'])) {
+            return false;
+        }
+        if (!array_key_exists('todayOiImpacts', $snapshot) || !is_array($snapshot['todayOiImpacts'])) {
             return false;
         }
 
