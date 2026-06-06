@@ -37,3 +37,5 @@ VITE_SNIPER_MOCK_MODE=false
 ```
 
 If the frontend is served from a separate origin, add that origin through the `smc_sf_allowed_origins` filter so WordPress can return credentialed CORS headers.
+
+When the Cloudflare CORS Worker in `cloudflare/wrangler-cors.jsonc` is deployed for `/wp-json/sniper/v1/*`, mirror any `smc_sf_allowed_origins` additions in the Worker `SMC_SF_ALLOWED_ORIGINS` variable. The Worker handles browser preflight before WordPress, so filtered origins must be present at the edge too.
