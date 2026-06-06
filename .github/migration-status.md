@@ -13,10 +13,15 @@
 
 Phase 4 remains the active migration blocker. Do not reopen Phase 0-3 gates, and do not advance Phase 5 until the live paired MT5-vs-Pine fib gate passes.
 
-Immediate next step: recapture synchronized fresh M15 candles aligned to the MT5 fib export snapshot, then rerun `scripts/run-phase4-parity.ps1`. The latest evidence shows:
+Weekend control note: Phase 4 parity should not be rerun as a real gate during weekend market closure because the instruments in the test files will have stale M15 candles. Any parity failure during this window is expected and should not be treated as new fib/regime/signal evidence.
+
+Next valid Phase 4 action: wait until markets reopen and MT5 has fresh closed M15 candles for every test symbol, then recapture a synchronized MT5 fib export snapshot and matching M15 candle set in the same broker/feed window before rerunning `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/run-phase4-parity.ps1`.
+
+The latest evidence shows:
 
 - 2026-06-02/03 live paired-export validator runs failed at `40.89%` parity with `227` critical mismatches.
 - 2026-06-04 rerun did not produce a gate artifact because Pine level generation rejected stale M15 candle exports before parity validation.
+- Weekend gate attempts are data-invalid until all Phase 4 symbols have fresh newly closed M15 candles after market reopen.
 - Final Phase 4 closeout still requires 99%+ paired-export parity, zero critical mismatches, weekend/sparse-data evidence, and operator export acceptance.
 
 Phase 4A is authorized only as parallel hardening and contract work. It must not change fib math, regime scoring, signal gates, or dashboard signal truth during the active Phase 4 soak unless explicitly marked read-only.

@@ -13,12 +13,15 @@ Phase 4A must not be used to reopen Phase 0-3 gates or bypass the Phase 4 closeo
 
 ## Current Phase 4 Blocker
 
-Immediate next step: recapture synchronized fresh M15 candles aligned to the MT5 fib export snapshot, then rerun `scripts/run-phase4-parity.ps1`.
+Weekend control note: do not rerun Phase 4 parity as a real gate during weekend market closure. The expected stale M15 candle state makes weekend failures data-invalid, not new fib/regime/signal evidence.
+
+Next valid Phase 4 action: wait until markets reopen, confirm every Phase 4 test symbol has a newly closed M15 candle, then recapture the synchronized MT5 fib export snapshot and matching M15 candle set before rerunning `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/run-phase4-parity.ps1`.
 
 Evidence basis:
 
 - 2026-06-02/03 paired-export validator runs failed at `40.89%` parity with `227` critical mismatches.
 - 2026-06-04 rerun was blocked before validator output because M15 candle exports were stale relative to the MT5 export snapshot.
+- Weekend gate reruns are invalid while stale weekend timestamps remain in candle files.
 - Phase 4 closeout still requires 99%+ paired-export parity, zero critical mismatches, weekend/sparse-data evidence, and operator export acceptance.
 
 ## Lane 1 - Hardening
@@ -85,7 +88,7 @@ Allowed exception:
 
 ## Immediate Next Repo Step
 
-Keep Phase 4 focused on synchronized live paired-export evidence. The next implementation PR should target the M15 export freshness blocker or the associated runbook/diagnostic path, not SMT/AMD/weekly-profile scoring.
+Pause Phase 4 parity reruns until market reopen. The next implementation PR can safely target docs cleanup, capture procedure hardening, stale-candle guard planning, artifact naming conventions, or Phase 4A non-behavior hardening. Do not use weekend parity evidence to fix fib, regime, or signal behavior.
 
 ## Regression Checks
 
