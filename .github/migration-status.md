@@ -9,6 +9,20 @@
 
 ---
 
+## Control Update - 2026-06-06
+
+Phase 4 remains the active migration blocker. Do not reopen Phase 0-3 gates, and do not advance Phase 5 until the live paired MT5-vs-Pine fib gate passes.
+
+Immediate next step: recapture synchronized fresh M15 candles aligned to the MT5 fib export snapshot, then rerun `scripts/run-phase4-parity.ps1`. The latest evidence shows:
+
+- 2026-06-02/03 live paired-export validator runs failed at `40.89%` parity with `227` critical mismatches.
+- 2026-06-04 rerun did not produce a gate artifact because Pine level generation rejected stale M15 candle exports before parity validation.
+- Final Phase 4 closeout still requires 99%+ paired-export parity, zero critical mismatches, weekend/sparse-data evidence, and operator export acceptance.
+
+Phase 4A is authorized only as parallel hardening and contract work. It must not change fib math, regime scoring, signal gates, or dashboard signal truth during the active Phase 4 soak unless explicitly marked read-only.
+
+---
+
 ## Phase Summary
 
 | Phase | Objective | Status | % Complete | Blocker | Target End |
@@ -18,6 +32,7 @@
 | 2 | Read-only trade telemetry | **COMPLETE** | 100% | None — gate passed 2026-05-22 | 2026-05-22 ✅ |
 | 3 | MT5 market data engine | **COMPLETE** | 100% | None — gate cleared; T0 admin baseline captured 2026-05-27 | 2026-05-25 ✅ |
 | 4 | Fib engine migration | **IN-PROGRESS** | 75% | Paired MT5/Pine exports + weekend/sparse-data evidence + final paired-input validator gate | 2026-08-15 |
+| 4A | Production hardening + domain contracts | **READY** | 0% | Parallel only; no fib/regime/signal scoring changes during Phase 4 soak | Parallel with Phase 4 |
 | 5 | Regime & chop engine | **CODE COMPLETE** | 70% | Phase 4 live gate + operator deployment | 2026-09-15 |
 | 5B | Fundamentals regime feed | **CODE COMPLETE** | 65% | Phase 5 parity gate | 2026-10-01 |
 | 6 | Signal engine dual-run | **CODE COMPLETE** | 60% | Phase 5B gate + fib→signal wiring sprint | 2026-10-15 |

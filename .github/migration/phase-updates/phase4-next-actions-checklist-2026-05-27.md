@@ -73,13 +73,28 @@ php scripts/signal-parity-validator.php --mt5-file mt5-signals.json --pine-file 
 
 ---
 
+## Immediate Next Step - 2026-06-06
+
+The active blocker is no longer export-path discovery. It is synchronized live evidence capture.
+
+1. Recapture fresh M15 candles for `EURUSD`, `USDJPY`, and `XAUUSD` at a timestamp aligned to the MT5 fib export snapshot.
+2. Confirm the newest exported M15 candle is inside the Pine generator freshness window for the same run.
+3. Rerun `scripts/run-phase4-parity.ps1`.
+4. Preserve both outcomes:
+   - stale-export BLOCKED artifacts if freshness still fails;
+   - paired-export FAIL/PASS artifacts if the validator runs.
+
+Do not treat the synthetic validator PASS as Phase 4 closeout evidence. The only closeout evidence that can unlock Phase 5 is a paired MT5/Pine live export gate with 99%+ parity, zero critical mismatches, weekend/sparse-data evidence, and operator acceptance.
+
 ## Active Next Actions (Phase 4 Operational)
 
 | Status | Task | Owner | Target | Evidence to capture | Blocker for |
 |--------|------|-------|--------|---------------------|-------------|
-| [ ] | **Export `mt5-levels.json`** for EURUSD/USDJPY/XAUUSD with all M15/H1/H4/D1 timeframes | Operator | By 2026-06-05 | `mt5-levels.json` with 384 rows (24 groups) | Phase 5 gate |
+| [ ] | **Recapture fresh synchronized M15 candle exports** for EURUSD/USDJPY/XAUUSD aligned to the MT5 fib export snapshot | Operator | Immediate | Fresh `data/*_M15.json` files inside the Pine generator freshness window | Phase 4 rerun |
+| [ ] | **Export `mt5-levels.json`** for EURUSD/USDJPY/XAUUSD with all M15/H1/H4/D1 timeframes | Operator | Immediate | `mt5-levels.json` with 384 rows (24 groups) | Phase 5 gate |
 | [ ] | **Capture `pine-levels.json`** at same UTC snapshot as MT5 export | Operator | Same session as MT5 export | `pine-levels.json` with 384 rows | Phase 5 gate |
 | [x] | Run parity validator dry run on first matched snapshot set | Operator | 2026-06-02 | `reports/phase4-gate.json` (first paired-export run; FAIL 40.89%) | Phase 5 gate |
+| [ ] | Rerun Phase 4 parity after fresh M15 recapture | Operator | Immediate | `reports/phase4-parity/phase4-gate-*.json` or stale-export BLOCKED report | Phase 4 gate closure |
 | [ ] | **Weekend gap scenario verification** (Test 1: Fri EOD → Mon US open) | Operator | 2026-06-01/06-03 (this weekend) | Snapshots + notes (see runbook for checklist) | Phase 4 gate closure |
 | [ ] | **Sparse-data scenario verification** (Test 2: illiquid session simulation) | Operator | During next illiquid session | Snapshots + backend logs (see runbook for checklist) | Phase 4 gate closure |
 | [ ] | Weekly soak checkpoint snapshot #1 | Operator | 2026-06-03 09:00:02 SAST | Admin export + notes | Monitoring |
@@ -89,6 +104,28 @@ php scripts/signal-parity-validator.php --mt5-file mt5-signals.json --pine-file 
 | [ ] | Export final `mt5-levels.json` for gate review | Operator | 2026-06-26 | Final `mt5-levels.json` (384 rows, 24 groups) | Gate closure |
 | [ ] | Capture final `pine-levels.json` for gate review | Operator | 2026-06-26 | Final `pine-levels.json` (384 rows, same UTC) | Gate closure |
 | [ ] | Run final parity gate | Operator | 2026-06-26 | `reports/phase4-gate.json` | Gate closure |
+
+---
+
+## Parallel Phase 4A Lane
+
+Phase 4A may run during the 30-day Phase 4 soak, but only for changes that do not alter trading output.
+
+Allowed during soak:
+
+- Repo safety, CI, licensing, docs, and workflow hygiene.
+- Auth/CORS/security hardening when staged independently from signal behavior.
+- Observability and parity diagnostics that make Phase 4 evidence easier to capture.
+- Domain-principle contracts and fixtures for SMT, AMD, ERL/IRL, Silver Bullet, and weekly profiles.
+
+Blocked during soak unless explicitly approved as read-only:
+
+- Fib math changes.
+- Regime scoring changes.
+- Signal gate changes.
+- Dashboard changes that invent or override backend signal truth.
+
+Tracker: `.github/migration/phase-updates/phase4A-production-hardening-and-principles-contract.md`
 
 ---
 
