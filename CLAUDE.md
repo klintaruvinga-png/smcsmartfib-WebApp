@@ -2,10 +2,20 @@
 
 This repository supports interchangeable use of Claude Code, Codex, and GitHub Copilot Agent.
 
+## Installation: Cloudflare Skills and MCP Servers
+
+Before working with Workers tasks, install Cloudflare integration:
+```bash
+claude plugin marketplace add cloudflare/skills
+claude plugin install cloudflare@cloudflare
+```
+Then run `/reload-plugins` in Claude Code.
+
 ## Read Before Acting
 1. Start with `AGENTS.md`.
 2. Then review `docs/agents/skill-index.md` and `CONTEXT.md`.
 3. If the task is workflow or state-related, also read `docs/agents/workflow.md`.
+4. For Workers tasks, consult the Cloudflare documentation available via MCP servers.
 
 ## How Claude Should Work Here
 - Treat `.claude/skills/*` as supplemental guidance, not the only source.
@@ -58,6 +68,20 @@ be asked.
   the user explicitly directs otherwise.
 - Document agent assistance in the PR body if the change was generated or
   guided by an AI workflow.
+
+## Cloudflare Workers Workflows
+
+When working with Workers:
+1. Use Cloudflare skills and MCP servers for documentation, testing, and deployment
+2. Always validate locally: `wrangler dev`
+3. Test all bindings (KV, Durable Objects, service bindings) before submission
+4. Include exact `wrangler publish` output in PR for production deployments
+5. For diagnostics, use the `/cloudflare-observability` MCP for logs and analytics
+
+### Workers-Specific Tasks
+- Use `workers-deployment` skill for build, test, deploy workflows
+- Use `workers-diagnostics` skill for performance issues, logging, and troubleshooting
+- Always verify `wrangler.jsonc` configuration is correct before deployment
 
 ## PR Review Fix Stage (Local Claude Code)
 

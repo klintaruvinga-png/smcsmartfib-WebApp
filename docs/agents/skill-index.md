@@ -277,3 +277,53 @@ Expected output:
 - Safe/unsafe cleanup list.
 - Exact commands run.
 - Resume recommendation.
+
+## 15. workers-deployment
+When to use:
+- Deploying or updating Cloudflare Workers code.
+- Testing Workers locally before production.
+- Configuring bindings (KV, Durable Objects, service bindings).
+- Validating environment variables and secrets.
+
+Workflow:
+1. Review `wrangler.jsonc` for build and deployment config.
+2. Run `wrangler dev` to test locally and validate bindings.
+3. Test all environment variables and KV access in dev mode.
+4. Confirm no errors in `npm run build` output.
+5. Deploy with `wrangler publish` and validate production endpoint.
+6. Include deployment command output and validation results in PR.
+
+Expected output:
+- Local validation results from `wrangler dev`.
+- Build output confirming no errors.
+- Exact `wrangler publish` output showing deployment success.
+- Production endpoint validation or health check result.
+- Any new or modified bindings documented.
+
+Repo-specific example:
+- Deploy updated API endpoint or cache invalidation logic to Cloudflare Workers.
+
+## 16. workers-diagnostics
+When to use:
+- Workers are experiencing performance issues or errors in production.
+- Investigating Workers logs or analytics.
+- Debugging binding access or environment variable issues.
+- Analyzing request latency or error rates.
+
+Workflow:
+1. Use Cloudflare MCP observability server to fetch recent logs.
+2. Review error patterns and failure rates.
+3. Check Workers analytics for performance metrics.
+4. Inspect binding access logs (KV, Durable Objects).
+5. Correlate issues with recent deployments or config changes.
+6. Propose fixes or diagnostic next steps.
+
+Expected output:
+- Log entries showing error patterns or timestamps.
+- Analytics summary (error rate, latency, request count).
+- Identified root cause or suspect component.
+- Recommended fix or escalation path.
+- Commands run and exact results.
+
+Repo-specific example:
+- Diagnose high error rate on market data endpoint and identify missing KV binding.

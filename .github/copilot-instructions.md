@@ -7,6 +7,7 @@ This file provides guidance for GitHub Copilot Agent in this repo.
 - Use `docs/agents/skill-index.md` as the shared skill guide.
 - Translate Claude skill wording into normal implementation behavior.
 - Do not rely on Claude-specific slash commands or skill syntax.
+- For Workers tasks, use the Cloudflare MCP servers configured in `.vscode/mcp.json`.
 
 ## Skill Use
 - When a request maps to a skill, choose the corresponding workflow from `docs/agents/skill-index.md`.
@@ -34,6 +35,29 @@ This file provides guidance for GitHub Copilot Agent in this repo.
 ## When Not to Create a PR
 - Never create a PR from `main` or `master` directly.
 - Do not create a PR if the task was only reading or analyzing files with no changes made.
+
+## Cloudflare Workers Support
+
+### MCP Server Setup for GitHub Copilot
+Cloudflare MCP servers are configured in `.vscode/mcp.json`:
+```json
+"mcpServers": {
+  "cloudflare": { "url": "https://mcp.cloudflare.com/mcp" },
+  "cloudflare-docs": { "url": "https://docs.mcp.cloudflare.com/mcp" },
+  "cloudflare-bindings": { "url": "https://bindings.mcp.cloudflare.com/mcp" },
+  "cloudflare-builds": { "url": "https://builds.mcp.cloudflare.com/mcp" },
+  "cloudflare-observability": { "url": "https://observability.mcp.cloudflare.com/mcp" }
+}
+```
+OAuth triggers automatically on first Cloudflare tool use.
+
+### Workers Workflows
+When working with Cloudflare Workers:
+1. Always validate changes locally with `wrangler dev`
+2. Test bindings and environment configuration before deployment
+3. Review `wrangler.jsonc` for deployment targets and build configuration
+4. Include Workers deployment commands and results in PR body
+5. For production deployment, use the `workers-deployment` skill workflow
 
 # Workflow Governance Rules
 

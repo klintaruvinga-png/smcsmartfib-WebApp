@@ -6,6 +6,8 @@ This repo supports interchangeable use of three agent environments:
 - Codex
 - GitHub Copilot Agent
 
+This repo uses **Cloudflare Workers** for serverless deployment and integrates Cloudflare MCP servers for AI-assisted Workers development.
+
 `AGENTS.md` is the primary cross-agent operating model for this repository. It defines the shared project context, workflow rules, skill guidance, guardrails, and evidence expectations.
 
 ## Read First
@@ -19,6 +21,7 @@ This repo supports interchangeable use of three agent environments:
 - Codex and GitHub Copilot must use `docs/agents/skill-index.md` as the cross-agent version of the same skill workflows.
 - Skills describe workflow patterns, not slash-command syntax.
 - Do not assume agent-specific commands work across all systems.
+- All agents have access to Cloudflare Workers MCP servers for Workers development and deployment tasks.
 
 ## Skill Selection Rules
 - Use `diagnose` for broad problem discovery, bug sweep, and assessing what layers are involved.
@@ -39,8 +42,20 @@ This repository also defines SMC-specific workflow wrappers:
 - `ea-backend-bridge`
 - `dashboard-plan-cards`
 - `workflow-runner`
+- `workers-deployment` (Cloudflare Workers build, test, and deploy)
+- `workers-diagnostics` (Workers performance, logs, and troubleshooting)
 
 These wrappers are documented in `docs/agents/skill-index.md` and implemented as `.claude/skills/*` for Claude-specific use.
+
+## Cloudflare Workers Integration
+All agents have Cloudflare MCP servers configured for Workers development:
+- **cloudflare**: Main Cloudflare API and Workers deployment
+- **cloudflare-docs**: Public Workers documentation
+- **cloudflare-bindings**: Workers KV, Durable Objects, and service bindings
+- **cloudflare-builds**: Workers build and deployment pipeline
+- **cloudflare-observability**: Workers logs, analytics, and monitoring
+
+See agent-specific sections below for MCP server setup.
 
 ## General Workflow Rules
 - Preserve local workflow state files such as `.smc-workflow-state.json` and `reports/` artifacts.
@@ -51,6 +66,9 @@ These wrappers are documented in `docs/agents/skill-index.md` and implemented as
 - Do not remove lockfiles without an explicit repo-specific reason.
 - Avoid broad formatting-only diffs during logic fixes.
 - Before automation or workflow changes, inspect `.github/workflows/`, package scripts, and workflow state/report files.
+- Do not modify `wrangler.jsonc` without understanding Workers configuration impact.
+- Always test Workers changes locally with `wrangler dev` before pushing.
+- Workers deployment must include validation of bindings, KV access, and environment variables.
 
 ## Testing and Evidence Rules
 - Do not claim tests passed unless you actually ran the command and cited the output.
