@@ -31,7 +31,7 @@ import {
   TrendingUp,
   RefreshCw,
 } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useIsFetching } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { clearCredentials } from "@/lib/auth";
 import { APP_VERSION_LABEL } from "@/lib/version";
