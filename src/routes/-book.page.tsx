@@ -824,7 +824,7 @@ function SortHeader({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex items-center gap-1 hover:text-tx transition-colors",
+        "flex items-center gap-1 p-0 m-0 bg-transparent hover:text-tx transition-colors",
         active && "text-tx",
         className,
       )}
