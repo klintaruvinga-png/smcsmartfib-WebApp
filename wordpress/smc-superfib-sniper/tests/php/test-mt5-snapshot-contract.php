@@ -1010,6 +1010,24 @@ $snapshotRow = $wpdb->tables[$snapshotTable]['7|EURUSD'] ?? null;
 assert_same('live', $snapshotRow['state'], 'Tick-only MT5 update must default to live when freshness is omitted');
 assert_same('2026-05-03 08:16:30', $snapshotRow['updated_at'], 'Tick-only MT5 update must persist the new quote timestamp');
 
+$staleTickWithFreshness = $instance->post_snapshot(new WP_REST_Request(array(
+    'symbol' => 'AUDUSD',
+    'normalized_symbol' => 'AUDUSD',
+    'tick' => array(
+        'bid' => 0.6625,
+        'ask' => 0.6627,
+        'spread' => 2,
+        'timestamp' => '2026-05-03T08:17:00Z',
+    ),
+    'freshness' => 'STALE',
+    'session' => 'London',
+)));
+
+assert_true(is_array($staleTickWithFreshness) && !empty($staleTickWithFreshness['ok']), 'Tick plus STALE freshness should succeed');
+$snapshotRow = $wpdb->tables[$snapshotTable]['7|AUDUSD'] ?? null;
+assert_same('stale', $snapshotRow['state'], 'Tick plus STALE freshness must not persist a fake live snapshot state');
+assert_same('2026-05-03 08:17:00', $snapshotRow['updated_at'], 'Tick plus STALE freshness must preserve the authoritative quote timestamp');
+
 $snapshotCountBeforeInvalidSource = count($wpdb->tables[$snapshotTable] ?? array());
 $invalidSource = $instance->post_snapshot(new WP_REST_Request(array(
     'symbol' => 'GBPUSD',
