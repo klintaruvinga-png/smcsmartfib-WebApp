@@ -500,7 +500,7 @@ function SymbolCard({
           Net {netLots >= 0 ? "+" : ""}
           {netLots.toFixed(2)}
         </span>
-        <span className="text-right">
+        <span className="flex justify-end">
           <EquityImpactBadge value={equityImpactPct} baselineQuality={todayBaselineQuality} />
         </span>
         <span
