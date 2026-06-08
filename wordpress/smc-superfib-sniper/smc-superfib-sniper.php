@@ -5174,7 +5174,7 @@ final class SMC_SuperFib_Sniper_REST {
         $buckets = array();
         $now = time();
 
-        foreach ($m15_rows as $row) {
+        foreach (array_reverse($m15_rows) as $row) {
             $ts = strtotime($row['candle_open_time'] . ' UTC');
             if ($ts === false) {
                 continue;
