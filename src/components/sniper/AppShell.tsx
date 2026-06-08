@@ -308,8 +308,7 @@ function Header() {
 export function AppShell() {
   useUserSettings();
   const isNavigating = useRouterState({ select: (state) => state.status === "pending" });
-  const fetchingCount = useIsFetching();
-  const showLoader = isNavigating || fetchingCount > 0;
+  const showLoader = isNavigating;
 
   return (
     <div className="flex min-h-screen">
