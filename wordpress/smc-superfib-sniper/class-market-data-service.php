@@ -725,7 +725,7 @@ class SMC_MarketData_Service
         ksort($sessions);
         // Exclude latest (currently-forming) session.
         $completed = array_values($sessions);
-        if (count($completed) > 1) {
+        if (count($completed) > 0) {
             array_pop($completed);
         }
 
@@ -765,7 +765,7 @@ class SMC_MarketData_Service
         // Take the 3 most recent completed sessions (F1 = most recent).
         $recent = array_slice(array_reverse($completed), 0, 3);
 
-        $f = array();
+        $f = array('F1' => null, 'F2' => null, 'F3' => null);
         foreach ($recent as $idx => $sess) {
             $label = 'F' . ($idx + 1);
             $passes = ($sess['high'] - $sess['low']) >= $threshold;
