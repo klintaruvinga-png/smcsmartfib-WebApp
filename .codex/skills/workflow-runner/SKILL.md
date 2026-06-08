@@ -1,3 +1,8 @@
+---
+name: workflow-runner
+description: Use when pipeline runner state, automation tasks, Codex workflow state, stale locks, or PR review fixes need local workflow handling.
+---
+
 # workflow-runner
 
 Use when:

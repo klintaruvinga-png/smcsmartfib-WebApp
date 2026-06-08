@@ -1,3 +1,8 @@
+---
+name: grill-with-docs
+description: Use for deep investigation with repository documentation, reports, architecture notes, or documented-intent comparisons.
+---
+
 # grill-with-docs
 
 Use when:

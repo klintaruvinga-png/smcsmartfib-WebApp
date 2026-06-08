@@ -1,3 +1,8 @@
+---
+name: handoff
+description: Use when delivering final implementation notes, validation evidence, exact commands, branch details, and PR handoff.
+---
+
 # handoff
 
 Use when:

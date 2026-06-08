@@ -1,3 +1,8 @@
+---
+name: to-issues
+description: Use when converting findings into tracked issues or tasks without immediate implementation.
+---
+
 # to-issues
 
 Use when:

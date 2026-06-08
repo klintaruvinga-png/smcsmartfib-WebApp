@@ -1,3 +1,8 @@
+---
+name: zoom-out
+description: Use for high-level planning, scope alignment, and dependency mapping across Pine, MT5 EA, backend, and dashboard.
+---
+
 # zoom-out
 
 Use when:

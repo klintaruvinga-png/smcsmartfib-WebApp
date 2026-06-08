@@ -1,3 +1,8 @@
+---
+name: diagnose
+description: Use for broad root-cause discovery when behavior spans Pine, MT5 EA, backend, or dashboard layers.
+---
+
 # diagnose
 
 Use when:

@@ -1,3 +1,8 @@
+---
+name: improve-codebase-architecture
+description: Use when improving structural design, cross-cutting architecture, reliability, parity, or data-contract boundaries.
+---
+
 # improve-codebase-architecture
 
 Use when:

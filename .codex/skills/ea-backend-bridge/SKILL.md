@@ -1,3 +1,8 @@
+---
+name: ea-backend-bridge
+description: Use when EA/backend bridge behavior, heartbeat, market-stream, account-sync, symbol-sync, license-check, or snapshot state needs comparison.
+---
+
 # ea-backend-bridge
 
 Use when:

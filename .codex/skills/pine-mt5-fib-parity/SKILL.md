@@ -1,3 +1,8 @@
+---
+name: pine-mt5-fib-parity
+description: Use when fib parity, Pine versus EA/backend mismatches, phase4-gate failures, anchors, AF/SF, HTF/LTF, chop block, or draw methods are under review.
+---
+
 # pine-mt5-fib-parity
 
 Use when:

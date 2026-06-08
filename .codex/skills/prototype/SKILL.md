@@ -1,3 +1,8 @@
+---
+name: prototype
+description: Use when exploring alternative designs, architecture changes, or small proof-of-concept work before full implementation.
+---
+
 # prototype
 
 Use when:

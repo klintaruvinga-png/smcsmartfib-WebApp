@@ -1,3 +1,8 @@
+---
+name: to-prd
+description: Use when finalizing a completed change for production delivery with validation, documentation, and PR readiness.
+---
+
 # to-prd
 
 Use when:

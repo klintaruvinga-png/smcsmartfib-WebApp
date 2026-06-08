@@ -1,3 +1,8 @@
+---
+name: dashboard-plan-cards
+description: Use when plan cards, RR display, currency display, lot warnings, or dashboard plan-card data contracts need review.
+---
+
 # dashboard-plan-cards
 
 Use when:

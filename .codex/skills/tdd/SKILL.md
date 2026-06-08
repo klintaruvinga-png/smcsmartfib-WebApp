@@ -1,3 +1,8 @@
+---
+name: tdd
+description: Use when adding or updating tests alongside code changes to protect parity, data contracts, or UI behavior.
+---
+
 # tdd
 
 Use when:

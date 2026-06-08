@@ -1,3 +1,8 @@
+---
+name: triage
+description: Use when classifying incoming requests, finding missing context, assigning readiness, or deciding the next workflow.
+---
+
 # triage
 
 Use when:
