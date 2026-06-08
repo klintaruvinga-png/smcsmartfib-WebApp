@@ -94,3 +94,10 @@ The validator confirms the live paired MT5 vs Pine corpus is not aligned. Large 
 - MT5: 96 rows (mt5-levels.json)
 - Pine: 96 rows (pine-levels.json)
 - Report: phase4-gate-2026-06-04_173401.json
+
+## Run: 2026-06-08_preflight
+- Gate: **BLOCKED**
+- Command attempted: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-phase4-parity.ps1 -DryRun -NoPrompt`
+- Blocking checks: PHP CLI missing from PATH; `SMC_WP_USER` / `SMC_APP_PW` missing; `node_modules` not installed.
+- Latest available gate remains **FAIL** at 51.04% from `reports/phase4-parity/phase4-gate-2026-06-04_173401.md`.
+- Report: `reports/phase4-parity/phase4-gate-report-2026-06-08.md`
