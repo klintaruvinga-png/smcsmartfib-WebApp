@@ -3217,6 +3217,24 @@ final class SMC_SuperFib_Sniper_REST {
             return new WP_Error('missing_symbol', 'symbol query parameter is required', array('status' => 400));
         }
 
+        $mode = sanitize_text_field((string) ($request->get_param('mode') ?? ''));
+
+        if ($mode === 'pine_compatible') {
+            $svc    = new SMC_MarketData_Service();
+            $result = $svc->get_pine_compatible_fib_levels(
+                $user_id,
+                $symbol,
+                $request->get_param('timeframe'),
+                $request->get_param('family')
+            );
+
+            if (is_wp_error($result)) {
+                return $result;
+            }
+
+            return $this->no_cache_response($result);
+        }
+
         $timeframe = $request->get_param('timeframe');
         $family    = $request->get_param('family');
         $table     = $wpdb->prefix . 'smc_sf_fib_levels';

@@ -60,9 +60,15 @@
     e.g. -Timeframes M15
 
 .EXAMPLE
-    # Full run using env vars
+    # Full run using env vars (diagnostic lane - EA direct output)
     $env:SMC_WP_USER = "admin"; $env:SMC_APP_PW = "xxxx xxxx"
     .\scripts\run-phase4-parity.ps1
+
+.EXAMPLE
+    # Official Phase 4 parity gate - backend derives all TFs from MT5 M15 candles
+    # to match Pine v13 reference. Use this for gate-blocking comparison.
+    $env:SMC_WP_USER = "admin"; $env:SMC_APP_PW = "xxxx xxxx"
+    .\scripts\run-phase4-parity.ps1 -BackendMode pine_compatible -NoPrompt
 
 .EXAMPLE
     # Dry run using existing candles
@@ -88,7 +94,14 @@ param(
     [switch]$ExpandedAudit,
     [switch]$NoPrompt,
     [switch]$DryRun,
-    [switch]$SkipCandleExport
+    [switch]$SkipCandleExport,
+
+    # Controls which backend lane is used when fetching fib levels.
+    # "pine_compatible" is the official parity gate (backend derives all TFs from MT5 M15 candles,
+    # mirroring generate-pine-levels-v13.cjs). "direct" returns stored EA output for diagnostics.
+    # Default is "direct" for backward compatibility.
+    [ValidateSet("direct", "pine_compatible")]
+    [string]$BackendMode = "direct"
 )
 
 Set-StrictMode -Version Latest
@@ -709,7 +722,7 @@ if (-not $DryRun) {
 
     foreach ($sym in $symbols) {
         Write-Host "  Fetching $sym..."
-        $url = "$Backend/wp-json/sniper/v1/market-data/fib-levels?symbol=$sym"
+        $url = "$Backend/wp-json/sniper/v1/market-data/fib-levels?symbol=$sym&mode=$BackendMode"
         try {
             $response = Invoke-RestMethod -Uri $url -Headers $headers -Method GET -ErrorAction Stop
         } catch {

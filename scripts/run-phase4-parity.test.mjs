@@ -242,4 +242,29 @@ describe('Patch 1 — candle lineage columns in anchor debug Markdown report', (
     );
     expect(source).toContain('debug_source');
   });
+
+  test('-BackendMode pine_compatible appends mode=pine_compatible to fib-levels URL', () => {
+    const source = readScript();
+
+    expect(source).toMatch(/\[ValidateSet\("direct",\s*"pine_compatible"\)/);
+    expect(source).toMatch(/\[string\]\$BackendMode\s*=\s*"direct"/);
+    expect(source).toContain('&mode=$BackendMode');
+  });
+
+  test('default BackendMode is direct for backward compatibility', () => {
+    const source = readScript();
+
+    // Default must remain "direct" so existing callers are unaffected.
+    expect(source).toMatch(/\$BackendMode\s*=\s*"direct"/);
+  });
+
+  test('official Phase 4 gate documents -BackendMode pine_compatible', () => {
+    const source = readScript();
+
+    // Help block or comments must mention the official gate command.
+    expect(source).toContain('-BackendMode pine_compatible');
+    // And the example should use -NoPrompt so CI/CD can run it unattended.
+    expect(source).toMatch(/-BackendMode\s+pine_compatible.*-NoPrompt|-NoPrompt.*-BackendMode\s+pine_compatible/s);
+  });
+
 });
