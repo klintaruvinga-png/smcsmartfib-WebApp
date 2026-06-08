@@ -222,6 +222,69 @@ if (!class_exists('TestWpdb')) {
             return null;
         }
 
+        public function query($sql) {
+            $this->queries[] = array('type' => 'query', 'sql' => $sql);
+            return 1;
+        }
+
+        public function get_row($query, $output = ARRAY_A) {
+            $results = $this->get_results($query, $output);
+            return $results ? reset($results) : null;
+        }
+
+        public function get_results($query, $output = ARRAY_A) {
+            if (!preg_match('/SELECT .* FROM ([^ ]+) WHERE (.+)$/', $query, $matches)) {
+                return array();
+            }
+
+            $table = $matches[1];
+            $conditions = $matches[2];
+            $rows = array_values($this->tables[$table] ?? array());
+
+            if (preg_match("/feed_key = '([^']+)'/", $conditions, $match)) {
+                $feed_key = $match[1];
+                $rows = array_values(array_filter($rows, function ($row) use ($feed_key) {
+                    return isset($row['feed_key']) && $row['feed_key'] === $feed_key;
+                }));
+            }
+            if (preg_match("/normalized_symbol = '([^']+)'/", $conditions, $match)) {
+                $normalized_symbol = $match[1];
+                $rows = array_values(array_filter($rows, function ($row) use ($normalized_symbol) {
+                    return isset($row['normalized_symbol']) && $row['normalized_symbol'] === $normalized_symbol;
+                }));
+            }
+            if (preg_match("/timeframe = '([^']+)'/", $conditions, $match)) {
+                $timeframe = $match[1];
+                $rows = array_values(array_filter($rows, function ($row) use ($timeframe) {
+                    return isset($row['timeframe']) && $row['timeframe'] === $timeframe;
+                }));
+            }
+            if (preg_match("/candle_open_time = '([^']+)'/", $conditions, $match)) {
+                $candle_open_time = $match[1];
+                $rows = array_values(array_filter($rows, function ($row) use ($candle_open_time) {
+                    return isset($row['candle_open_time']) && $row['candle_open_time'] === $candle_open_time;
+                }));
+            }
+            if (preg_match("/symbol = '([^']+)'/", $conditions, $match)) {
+                $symbol = $match[1];
+                $rows = array_values(array_filter($rows, function ($row) use ($symbol) {
+                    return isset($row['symbol']) && $row['symbol'] === $symbol;
+                }));
+            }
+
+            if (preg_match('/ORDER BY ([^\s]+) DESC/', $conditions, $match)) {
+                $order_col = $match[1];
+                usort($rows, function ($a, $b) use ($order_col) {
+                    return strcmp($b[$order_col] ?? '', $a[$order_col] ?? '');
+                });
+            }
+            if (preg_match('/LIMIT (\d+)/', $conditions, $match)) {
+                $limit = (int) $match[1];
+                $rows = array_slice($rows, 0, $limit);
+            }
+            return $rows;
+        }
+
         public function insert($table, $data, $formats = array()) {
             $this->queries[] = array('type' => 'insert', 'table' => $table, 'data' => $data);
             if (!isset($this->tables[$table])) {
@@ -236,6 +299,10 @@ if (!class_exists('TestWpdb')) {
                 return $data['user_id'] . '_' . $data['symbol'];
             } elseif ($table === 'wp_smc_sf_candles') {
                 return $data['user_id'] . '_' . $data['symbol'] . '_' . $data['timeframe'] . '_' . $data['candle_time'];
+            } elseif ($table === 'wp_smc_sf_market_quotes_latest') {
+                return ($data['feed_key'] ?? '') . '_' . ($data['normalized_symbol'] ?? '');
+            } elseif ($table === 'wp_smc_sf_market_candles') {
+                return ($data['feed_key'] ?? '') . '_' . ($data['normalized_symbol'] ?? '') . '_' . ($data['timeframe'] ?? '') . '_' . ($data['candle_open_time'] ?? '');
             }
             return md5(serialize($data));
         }
