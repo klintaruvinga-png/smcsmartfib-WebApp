@@ -72,10 +72,55 @@ function Test-CandleShape([object]$Candle, [string]$Label) {
     }
 
     foreach ($field in @("open", "high", "low", "close")) {
+        $text = [string]$Candle.$field
+        if ([string]::IsNullOrWhiteSpace($text)) {
+            Write-Fail "$Label has invalid numeric $field value: <empty>"
+        }
+
         $number = 0.0
-        if (-not [double]::TryParse([string]$Candle.$field, [ref]$number)) {
+        $styles = [System.Globalization.NumberStyles]::Float
+        $culture = [System.Globalization.CultureInfo]::InvariantCulture
+        if (-not [double]::TryParse($text, $styles, $culture, [ref]$number)) {
             Write-Fail "$Label has invalid numeric $field value: $($Candle.$field)"
         }
+        if ([double]::IsNaN($number) -or [double]::IsInfinity($number)) {
+            Write-Fail "$Label has invalid numeric $field value: $($Candle.$field)"
+        }
+    }
+}
+
+function ConvertTo-NormalizedCandle([object]$Candle, [string]$Label) {
+    $styles = [System.Globalization.NumberStyles]::Float
+    $culture = [System.Globalization.CultureInfo]::InvariantCulture
+    $open = 0.0
+    $high = 0.0
+    $low = 0.0
+    $close = 0.0
+    $volume = 0.0
+
+    if (-not [double]::TryParse([string]$Candle.open, $styles, $culture, [ref]$open)) {
+        Write-Fail "$Label has invalid numeric open value: $($Candle.open)"
+    }
+    if (-not [double]::TryParse([string]$Candle.high, $styles, $culture, [ref]$high)) {
+        Write-Fail "$Label has invalid numeric high value: $($Candle.high)"
+    }
+    if (-not [double]::TryParse([string]$Candle.low, $styles, $culture, [ref]$low)) {
+        Write-Fail "$Label has invalid numeric low value: $($Candle.low)"
+    }
+    if (-not [double]::TryParse([string]$Candle.close, $styles, $culture, [ref]$close)) {
+        Write-Fail "$Label has invalid numeric close value: $($Candle.close)"
+    }
+    if ($Candle.PSObject.Properties.Name -contains "volume") {
+        [void][double]::TryParse([string]$Candle.volume, $styles, $culture, [ref]$volume)
+    }
+
+    [PSCustomObject]@{
+        time = [string]$Candle.time
+        open = $open
+        high = $high
+        low = $low
+        close = $close
+        volume = $volume
     }
 }
 
@@ -160,8 +205,12 @@ foreach ($symRaw in $Symbols) {
             Write-Fail ("Stale MT5 candles for {0}: latest={1:o} age_sec={2:N0} max_age_sec={3}" -f $label, $latest, $ageSeconds, $maxAgeSeconds)
         }
 
+        $normalized = foreach ($candle in $candles) {
+            ConvertTo-NormalizedCandle $candle $label
+        }
+
         $file = Join-Path $candleRoot "${sym}_${tf}.json"
-        $json = $candles | ConvertTo-Json -Depth 8
+        $json = @($normalized) | ConvertTo-Json -Depth 8
         [System.IO.File]::WriteAllText($file, $json, (New-Object System.Text.UTF8Encoding $false))
 
         $summary.Add([PSCustomObject]@{
