@@ -60,9 +60,15 @@
     e.g. -Timeframes M15
 
 .EXAMPLE
-    # Full run using env vars
+    # Full run using env vars (diagnostic lane - EA direct output)
     $env:SMC_WP_USER = "admin"; $env:SMC_APP_PW = "xxxx xxxx"
     .\scripts\run-phase4-parity.ps1
+
+.EXAMPLE
+    # Official Phase 4 parity gate - backend derives all TFs from MT5 M15 candles
+    # to match Pine v13 reference. Use this for gate-blocking comparison.
+    $env:SMC_WP_USER = "admin"; $env:SMC_APP_PW = "xxxx xxxx"
+    .\scripts\run-phase4-parity.ps1 -BackendMode pine_compatible -NoPrompt
 
 .EXAMPLE
     # Dry run using existing candles
@@ -88,7 +94,14 @@ param(
     [switch]$ExpandedAudit,
     [switch]$NoPrompt,
     [switch]$DryRun,
-    [switch]$SkipCandleExport
+    [switch]$SkipCandleExport,
+
+    # Controls which backend lane is used when fetching fib levels.
+    # "pine_compatible" is the official parity gate (backend derives all TFs from MT5 M15 candles,
+    # mirroring generate-pine-levels-v13.cjs). "direct" returns stored EA output for diagnostics.
+    # Default is "direct" for backward compatibility.
+    [ValidateSet("direct", "pine_compatible")]
+    [string]$BackendMode = "direct"
 )
 
 Set-StrictMode -Version Latest
@@ -709,7 +722,7 @@ if (-not $DryRun) {
 
     foreach ($sym in $symbols) {
         Write-Host "  Fetching $sym..."
-        $url = "$Backend/wp-json/sniper/v1/market-data/fib-levels?symbol=$sym"
+        $url = "$Backend/wp-json/sniper/v1/market-data/fib-levels?symbol=$sym&mode=$BackendMode"
         try {
             $response = Invoke-RestMethod -Uri $url -Headers $headers -Method GET -ErrorAction Stop
         } catch {
@@ -752,10 +765,18 @@ if (-not $DryRun) {
     $mt5Rows = @($official).Count
     # Dynamic: symbols × timeframes × 2 families × 16 ratios. Respects -Symbols/-Timeframes overrides.
     $mt5ExpectedRows = $gateSymbols.Count * $timeframes.Count * 2 * 16
-    Write-Ok "MT5 official: $mt5Rows rows -> $mt5LevelsFile (expected $mt5ExpectedRows)"
+    # pine_compatible mode: D1/HTF_AF may be absent when there is insufficient completed
+    # authority-session history (matches generate-pine-levels-v13.cjs partial-output behaviour
+    # and the PHP coverage assertion that D1/HTF_AF can be omitted). Allow the same floor
+    # that the Pine generator uses: symbols × timeframes × 1 family × 16 ratios.
+    $mt5MinimumRows = if ($BackendMode -eq 'pine_compatible') { $gateSymbols.Count * $timeframes.Count * 1 * 16 } else { $mt5ExpectedRows }
+    Write-Ok "MT5 official: $mt5Rows rows -> $mt5LevelsFile (allowed $mt5MinimumRows-$mt5ExpectedRows)"
     Write-Ok "MT5 anchor debug: $(@($officialAnchorDebug).Count) rows -> $mt5AnchorDebugFile"
-    if ($mt5Rows -ne $mt5ExpectedRows) {
-        Write-Fail "MT5 official row count $mt5Rows != $mt5ExpectedRows"
+    if ($mt5Rows -lt $mt5MinimumRows -or $mt5Rows -gt $mt5ExpectedRows) {
+        Write-Fail "MT5 official row count $mt5Rows outside allowed range $mt5MinimumRows-$mt5ExpectedRows"
+    }
+    if ($mt5Rows -lt $mt5ExpectedRows) {
+        Write-Warn "MT5 partial output accepted ($BackendMode): $mt5Rows/$mt5ExpectedRows rows. Missing HTF_AF rows will be reported by the validator."
     }
 
     if ($ExpandedAudit) {

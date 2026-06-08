@@ -402,8 +402,509 @@ class SMC_MarketData_Service
     }
 
     /**
+     * Compute Pine-compatible fib levels from stored MT5 M15 candles only.
+     *
+     * All higher-timeframe helper feeds (H1, H4, D1) are derived from M15
+     * aggregation, exactly mirroring generate-pine-levels-v13.cjs.
+     * Every anchor_debug record emits candle_lineage = "derived_from_M15".
+     *
+     * This is the parity comparison lane. Default endpoint behavior (direct
+     * stored EA output) is unchanged.
+     *
+     * @param int         $user_id
+     * @param string      $symbol
+     * @param string|null $timeframe  Optional TF filter (e.g. 'M15','H1','H4','D1').
+     * @param string|null $family     Optional family filter (LTF_SF | HTF_AF).
+     * @return array|WP_Error
+     */
+    public function get_pine_compatible_fib_levels($user_id, $symbol, $timeframe = null, $family = null)
+    {
+        $symbol    = strtoupper(sanitize_text_field((string) $symbol));
+        $timeframe = $timeframe !== null ? strtoupper(sanitize_text_field((string) $timeframe)) : null;
+        $family    = $family    !== null ? strtoupper(sanitize_text_field((string) $family))    : null;
+
+        if ($symbol === '') {
+            return new WP_Error('missing_symbol', 'symbol is required', array('status' => 400));
+        }
+
+        // ---- Load MT5 M15 candles only ----------------------------------------
+        $m15_rows = $this->wpdb->get_results(
+            $this->wpdb->prepare(
+                "SELECT candle_time, open, high, low, close, volume
+                   FROM {$this->table_prefix}candles
+                  WHERE user_id = %d AND symbol = %s AND timeframe = %s AND source = %s
+                  ORDER BY candle_time DESC
+                  LIMIT 60000",
+                $user_id,
+                $symbol,
+                '15min',
+                'mt5'
+            ),
+            ARRAY_A
+        );
+        $m15_rows = array_reverse((array) $m15_rows);
+
+        if (empty($m15_rows)) {
+            return new WP_Error(
+                'no_m15_candles',
+                "No MT5 M15 candles found for {$symbol}. Run candle export first.",
+                array('status' => 404)
+            );
+        }
+
+        // Normalize raw DB rows to { time (epoch int), open, high, low, close }
+        $raw_m15 = array_values(array_filter(array_map(
+            array($this, 'pine_normalize_candle'),
+            $m15_rows
+        )));
+
+        if (empty($raw_m15)) {
+            return new WP_Error('invalid_m15_candles', "M15 candles for {$symbol} could not be normalized.", array('status' => 500));
+        }
+
+        // ---- Build helper feeds from M15 (mirrors buildHelperFeeds in .cjs) ------
+        $feeds = array(
+            'M15' => $raw_m15,
+            'H1'  => $this->pine_aggregate_candles($raw_m15, 3600),
+            'H4'  => $this->pine_aggregate_candles($raw_m15, 14400),
+            'D1'  => $this->pine_aggregate_candles($raw_m15, 86400),
+        );
+
+        // ---- Session / authority / helper ladder (Pine v13.1.3) ------------------
+        // chart TF  -> session_tf -> authority_tf -> helper_tf (for HTF_AF)
+        //   M15       Daily          Weekly           H1
+        //   H1        Weekly         Monthly          D1
+        //   H4        Monthly        Quarterly        D1
+        //   D1        Quarterly      Yearly           D1
+        $ltf_helper_map = array(
+            'M15' => 'M15',
+            'H1'  => 'H1',
+            'H4'  => 'D1',
+            'D1'  => 'D1',
+        );
+        $htf_helper_map = array(
+            'M15' => 'H1',
+            'H1'  => 'D1',
+            'H4'  => 'D1',
+            'D1'  => 'D1',
+        );
+        $session_tf_map = array(
+            'M15' => 'Daily',
+            'H1'  => 'Weekly',
+            'H4'  => 'Monthly',
+            'D1'  => 'Quarterly',
+        );
+        $authority_tf_map = array(
+            'Daily'     => 'Weekly',
+            'Weekly'    => 'Monthly',
+            'Monthly'   => 'Quarterly',
+            'Quarterly' => 'Yearly',
+        );
+
+        $chart_tfs = array('M15', 'H1', 'H4', 'D1');
+        if ($timeframe !== null && in_array($timeframe, $chart_tfs, true)) {
+            $chart_tfs = array($timeframe);
+        }
+
+        $ratios = array(-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300);
+        $source = 'pine_compatible';
+
+        $fibs         = array();
+        $anchor_debug = array();
+
+        $threshold = $this->pine_compression_threshold($symbol);
+
+        foreach ($chart_tfs as $tf) {
+            $session_tf    = $session_tf_map[$tf];
+            $authority_tf  = $authority_tf_map[$session_tf];
+            $ltf_helper    = $ltf_helper_map[$tf];
+            $htf_helper    = $htf_helper_map[$tf];
+
+            $ltf_feed = isset($feeds[$ltf_helper]) ? $feeds[$ltf_helper] : array();
+            $htf_feed = isset($feeds[$htf_helper]) ? $feeds[$htf_helper] : array();
+
+            // ---- LTF_SF anchor ---------------------------------------------------
+            $ltf_levels = array();
+            $ltf_debug  = null;
+
+            if (!empty($ltf_feed) && ($family === null || $family === 'LTF_SF')) {
+                $ltf_result = $this->pine_compute_ltf_sf(
+                    $ltf_feed, $session_tf, $threshold, $symbol, $tf, $ltf_helper
+                );
+                if ($ltf_result !== null) {
+                    foreach ($ratios as $ratio) {
+                        $ltf_levels[] = array(
+                            'family'         => 'LTF_SF',
+                            'ratio'          => $ratio,
+                            'price'          => round($ltf_result['high'] - (($ratio / 100.0) * ($ltf_result['high'] - $ltf_result['low'])), 8),
+                            'calculated_at'  => gmdate('c'),
+                        );
+                    }
+                    $ltf_debug = $ltf_result['debug'];
+                }
+            }
+
+            // ---- HTF_AF anchor ---------------------------------------------------
+            $htf_levels = array();
+            $htf_debug  = null;
+
+            if (!empty($htf_feed) && ($family === null || $family === 'HTF_AF')) {
+                $htf_result = $this->pine_compute_htf_af(
+                    $htf_feed, $authority_tf, $threshold, $symbol, $tf, $htf_helper, $session_tf
+                );
+                if ($htf_result !== null) {
+                    foreach ($ratios as $ratio) {
+                        $htf_levels[] = array(
+                            'family'         => 'HTF_AF',
+                            'ratio'          => $ratio,
+                            'price'          => round($htf_result['high'] - (($ratio / 100.0) * ($htf_result['high'] - $htf_result['low'])), 8),
+                            'calculated_at'  => gmdate('c'),
+                        );
+                    }
+                    $htf_debug = $htf_result['debug'];
+                }
+            }
+
+            $fibs[$tf] = array();
+            if (!empty($ltf_levels)) {
+                $fibs[$tf]['LTF_SF'] = $ltf_levels;
+            }
+            if (!empty($htf_levels)) {
+                $fibs[$tf]['HTF_AF'] = $htf_levels;
+            }
+
+            $anchor_debug[$tf] = array();
+            if ($ltf_debug !== null) {
+                $anchor_debug[$tf]['LTF_SF'] = $ltf_debug;
+            }
+            if ($htf_debug !== null) {
+                $anchor_debug[$tf]['HTF_AF'] = $htf_debug;
+            }
+        }
+
+        return array(
+            'ok'           => true,
+            'symbol'       => $symbol,
+            'source'       => $source,
+            'fibs'         => $fibs,
+            'anchor_debug' => $anchor_debug,
+        );
+    }
+
+    // ---- Pine-compatible helper methods (private) --------------------------------
+
+    /**
+     * Normalize a raw DB candle row to { time (epoch seconds), open, high, low, close }.
+     * Returns null for invalid rows.
+     */
+    private function pine_normalize_candle($row)
+    {
+        if (empty($row['candle_time'])) {
+            return null;
+        }
+        $ts = strtotime((string) $row['candle_time'] . ' UTC');
+        if ($ts === false || $ts <= 0) {
+            return null;
+        }
+        // Round to nearest minute to absorb +/- 1s broker jitter (mirrors round_to_minute in normalize_market_timestamp).
+        $ts = (int) (round($ts / 60) * 60);
+        $high = (float) ($row['high'] ?? 0);
+        $low  = (float) ($row['low']  ?? 0);
+        if ($high <= 0 || $low <= 0) {
+            return null;
+        }
+        return array(
+            'time'  => $ts,
+            'open'  => (float) ($row['open']  ?? 0),
+            'high'  => $high,
+            'low'   => $low,
+            'close' => (float) ($row['close'] ?? 0),
+        );
+    }
+
+    /**
+     * Aggregate a normalized candle array into larger buckets.
+     * Mirrors aggregateCandles() + bucketStartMs() in generate-pine-levels-v13.cjs.
+     *
+     * @param array $candles   Normalized candles sorted ASC by time (epoch seconds).
+     * @param int   $bucket_s  Bucket size in seconds (3600, 14400, 86400).
+     * @return array
+     */
+    private function pine_aggregate_candles(array $candles, $bucket_s)
+    {
+        $buckets = array();
+
+        foreach ($candles as $c) {
+            $ts         = (int) $c['time'];
+            // Round M15 open times to nearest 15-min boundary first (mirrors bucketStartMs for M15 source)
+            // then snap to the requested bucket. For M15 source, ts is already on 15-min boundaries after normalization.
+            $bucket_ts  = (int) (floor($ts / $bucket_s) * $bucket_s);
+
+            if (!isset($buckets[$bucket_ts])) {
+                $buckets[$bucket_ts] = array(
+                    'time'  => $bucket_ts,
+                    'open'  => $c['open'],
+                    'high'  => $c['high'],
+                    'low'   => $c['low'],
+                    'close' => $c['close'],
+                );
+                continue;
+            }
+
+            $buckets[$bucket_ts]['high']  = max($buckets[$bucket_ts]['high'],  $c['high']);
+            $buckets[$bucket_ts]['low']   = min($buckets[$bucket_ts]['low'],   $c['low']);
+            $buckets[$bucket_ts]['close'] = $c['close'];
+        }
+
+        ksort($buckets);
+        $all = array_values($buckets);
+
+        return $all;
+    }
+
+    /**
+     * Build completed sessions from a helper feed for a given session_tf.
+     * Returns array of sessions sorted ASC by session key, excluding the latest open session.
+     */
+    private function pine_build_sessions(array $feed, $session_tf)
+    {
+        $sessions = array();
+
+        foreach ($feed as $c) {
+            $ts      = (int) $c['time'];
+            $year    = (int) gmdate('Y', $ts);
+            $month   = (int) gmdate('n', $ts);
+            $day     = (int) gmdate('j', $ts);
+            $quarter = (int) floor(($month - 1) / 3) + 1;
+
+            // ISO week (Thursday-pivot) - mirrors gmdate('o','W') and PHP isoWeekYear.
+            $iso_week      = (int) gmdate('W', $ts);
+            $iso_week_year = (int) gmdate('o', $ts);
+
+            switch ($session_tf) {
+                case 'Daily':
+                    $key = $year * 10000 + $month * 100 + $day;
+                    break;
+                case 'Weekly':
+                    $key = $iso_week_year * 100 + $iso_week;
+                    break;
+                case 'Monthly':
+                    $key = $year * 100 + $month;
+                    break;
+                case 'Quarterly':
+                    $key = $year * 10 + $quarter;
+                    break;
+                case 'Yearly':
+                    $key = $year;
+                    break;
+                default:
+                    continue 2;
+            }
+
+            if (!isset($sessions[$key])) {
+                $sessions[$key] = array(
+                    'key'          => $key,
+                    'high'         => $c['high'],
+                    'low'          => $c['low'],
+                    'open'         => $c['open'],
+                    'close'        => $c['close'],
+                    'candle_count' => 1,
+                    'start_ts'     => $ts,
+                    'end_ts'       => $ts,
+                );
+                continue;
+            }
+
+            $sessions[$key]['high']         = max($sessions[$key]['high'], $c['high']);
+            $sessions[$key]['low']          = min($sessions[$key]['low'],  $c['low']);
+            $sessions[$key]['close']        = $c['close'];
+            $sessions[$key]['end_ts']       = $ts;
+            $sessions[$key]['candle_count'] += 1;
+        }
+
+        ksort($sessions);
+        // Exclude latest (currently-forming) session.
+        $completed = array_values($sessions);
+        if (count($completed) > 0) {
+            array_pop($completed);
+        }
+
+        return $completed;
+    }
+
+    /**
+     * Compression threshold - mirrors compressionThreshold() in .cjs and fib_compression_threshold() in plugin.
+     * pip_size is hardcoded per symbol class (not from broker SYMBOL_POINT) to match EA regression fix.
+     */
+    private function pine_compression_threshold($symbol)
+    {
+        $sym = strtoupper((string) $symbol);
+        if (substr($sym, -3) === 'JPY' || $sym === 'XAUUSD' || $sym === 'XAGUSD') {
+            $pip_size = 0.01;
+        } else {
+            $pip_size = 0.0001;
+        }
+        $min_pips = (substr($sym, -3) === 'JPY') ? 40.0 : 20.0;
+        return $min_pips * $pip_size;
+    }
+
+    /**
+     * Compute LTF_SF anchor from a helper feed using F1/F2/F3 composite weighting.
+     * Mirrors computeLtfAnchorWithCompression() in generate-pine-levels-v13.cjs.
+     *
+     * Returns null when no valid anchor can be computed.
+     * Returns array { high, low, debug }.
+     */
+    private function pine_compute_ltf_sf(array $feed, $session_tf, $threshold, $symbol, $chart_tf, $helper_tf)
+    {
+        $completed = $this->pine_build_sessions($feed, $session_tf);
+        if (empty($completed)) {
+            return null;
+        }
+
+        // Take the 3 most recent completed sessions (F1 = most recent).
+        $recent = array_slice(array_reverse($completed), 0, 3);
+
+        $f = array('F1' => null, 'F2' => null, 'F3' => null);
+        foreach ($recent as $idx => $sess) {
+            $label = 'F' . ($idx + 1);
+            $passes = ($sess['high'] - $sess['low']) >= $threshold;
+            $f[$label] = $passes ? $sess : null;
+        }
+
+        // Weight assignment - mirrors Pine v13.1.3 and existing superfib_composite_anchor.
+        $valid_count = count(array_filter($f));
+        if ($valid_count < 1) {
+            return null;
+        }
+
+        $weights = array('F1' => 0.0, 'F2' => 0.0, 'F3' => 0.0);
+        if ($valid_count === 3) {
+            $weights = array('F1' => 0.40, 'F2' => 0.35, 'F3' => 0.25);
+        } elseif ($valid_count === 2) {
+            if ($f['F1'] !== null) {
+                $weights['F1'] = 0.55;
+                $weights[$f['F2'] !== null ? 'F2' : 'F3'] = 0.45;
+            } else {
+                $weights['F2'] = 0.55;
+                $weights['F3'] = 0.45;
+            }
+        } else {
+            foreach (array('F1', 'F2', 'F3') as $k) {
+                if ($f[$k] !== null) {
+                    $weights[$k] = 1.0;
+                    break;
+                }
+            }
+        }
+
+        $sum_high = 0.0;
+        $sum_low  = 0.0;
+        $wt       = 0.0;
+        foreach ($weights as $k => $w) {
+            if ($w <= 0.0 || $f[$k] === null) {
+                continue;
+            }
+            $sum_high += $f[$k]['high'] * $w;
+            $sum_low  += $f[$k]['low']  * $w;
+            $wt       += $w;
+        }
+
+        if ($wt <= 0.0) {
+            return null;
+        }
+
+        $anchor_high = $sum_high / $wt;
+        $anchor_low  = $sum_low  / $wt;
+
+        if (($anchor_high - $anchor_low) < $threshold) {
+            return null;
+        }
+
+        $components = array();
+        foreach (array('F1', 'F2', 'F3') as $k) {
+            $sess = $f[$k];
+            $passes = $sess !== null && ($sess['high'] - $sess['low']) >= $threshold;
+            $components[] = array(
+                'slot'             => $k,
+                'high'             => $sess ? $sess['high'] : null,
+                'low'              => $sess ? $sess['low']  : null,
+                'range'            => $sess ? ($sess['high'] - $sess['low']) : null,
+                'compression_pass' => $passes,
+                'weight'           => $weights[$k],
+                'candle_count'     => $sess ? $sess['candle_count'] : 0,
+            );
+        }
+
+        return array(
+            'high'  => $anchor_high,
+            'low'   => $anchor_low,
+            'debug' => array(
+                'symbol'               => $symbol,
+                'timeframe'            => $chart_tf,
+                'family'               => 'LTF_SF',
+                'session_tf'           => $session_tf,
+                'authority_tf'         => null,
+                'candle_lineage'       => 'derived_from_M15',
+                'source_period'        => $helper_tf,
+                'source_feed_bars'     => count($feed),
+                'anchor_high'          => $anchor_high,
+                'anchor_low'           => $anchor_low,
+                'anchor_range'         => $anchor_high - $anchor_low,
+                'compression_threshold'=> $threshold,
+                'components'           => $components,
+            ),
+        );
+    }
+
+    /**
+     * Compute HTF_AF anchor (auth_f1 = most recent completed authority session).
+     * Mirrors computeHtfAnchorWithCompression() in generate-pine-levels-v13.cjs.
+     *
+     * Returns null when no valid anchor can be computed.
+     * Returns array { high, low, debug }.
+     */
+    private function pine_compute_htf_af(array $feed, $authority_tf, $threshold, $symbol, $chart_tf, $helper_tf, $session_tf)
+    {
+        $completed = $this->pine_build_sessions($feed, $authority_tf);
+        if (empty($completed)) {
+            return null;
+        }
+
+        // auth_f1 = most recent completed authority session.
+        $auth_f1 = end($completed);
+
+        if (($auth_f1['high'] - $auth_f1['low']) < $threshold) {
+            return null;
+        }
+
+        return array(
+            'high'  => $auth_f1['high'],
+            'low'   => $auth_f1['low'],
+            'debug' => array(
+                'symbol'               => $symbol,
+                'timeframe'            => $chart_tf,
+                'family'               => 'HTF_AF',
+                'session_tf'           => $session_tf,
+                'authority_tf'         => $authority_tf,
+                'candle_lineage'       => 'derived_from_M15',
+                'source_period'        => $helper_tf,
+                'source_feed_bars'     => count($feed),
+                'anchor_high'          => $auth_f1['high'],
+                'anchor_low'           => $auth_f1['low'],
+                'anchor_range'         => $auth_f1['high'] - $auth_f1['low'],
+                'compression_threshold'=> $threshold,
+                'anchor_key'           => $auth_f1['key'],
+                'anchor'               => 'auth_f1',
+                'candle_count'         => $auth_f1['candle_count'],
+                'components'           => array(),
+            ),
+        );
+    }
+
+    /**
      * Check if MT5 data is available (has received ticks)
-     * 
+     *
      * @param int $user_id
      * @param string $symbol
      * @return bool
