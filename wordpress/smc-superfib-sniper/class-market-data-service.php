@@ -433,7 +433,7 @@ class SMC_MarketData_Service
                 "SELECT candle_time, open, high, low, close, volume
                    FROM {$this->table_prefix}candles
                   WHERE user_id = %d AND symbol = %s AND timeframe = %s AND source = %s
-                  ORDER BY candle_time ASC
+                  ORDER BY candle_time DESC
                   LIMIT 60000",
                 $user_id,
                 $symbol,
@@ -442,6 +442,7 @@ class SMC_MarketData_Service
             ),
             ARRAY_A
         );
+        $m15_rows = array_reverse((array) $m15_rows);
 
         if (empty($m15_rows)) {
             return new WP_Error(
@@ -624,7 +625,6 @@ class SMC_MarketData_Service
     /**
      * Aggregate a normalized candle array into larger buckets.
      * Mirrors aggregateCandles() + bucketStartMs() in generate-pine-levels-v13.cjs.
-     * Excludes the currently-forming (latest) bucket.
      *
      * @param array $candles   Normalized candles sorted ASC by time (epoch seconds).
      * @param int   $bucket_s  Bucket size in seconds (3600, 14400, 86400).
@@ -658,11 +658,6 @@ class SMC_MarketData_Service
 
         ksort($buckets);
         $all = array_values($buckets);
-
-        // Exclude currently-forming bucket (last one) - mirrors barstate.islast exclusion.
-        if (count($all) > 1) {
-            array_pop($all);
-        }
 
         return $all;
     }

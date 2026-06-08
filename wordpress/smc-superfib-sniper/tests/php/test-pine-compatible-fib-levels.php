@@ -6,8 +6,9 @@
  *   - H1/H4/D1 outputs are derived from M15 only (no direct timeframe rows needed)
  *   - Every anchor_debug record carries candle_lineage = "derived_from_M15"
  *   - source_period follows the Pine v13.1.3 helper ladder
- *   - Default endpoint behavior (stored direct) is unchanged
+ *   - Latest M15 window is fetched DESC and restored to ASC before calculation
  *   - Compression threshold matches Pine/EA constants per symbol class
+ *   - Aggregate helper feeds keep the latest bucket; only session building drops latest session
  */
 
 require_once __DIR__ . '/fib-test-helpers.php';
@@ -23,6 +24,7 @@ $ratios = array(-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 1
 function pine_test_make_mock_wpdb(array $m15_rows, $prefix = 'wp_') {
     $mock = new class($m15_rows, $prefix) {
         public $prefix;
+        public $last_sql = '';
         private $rows;
         public function __construct($rows, $pfx) {
             $this->rows   = $rows;
@@ -36,8 +38,12 @@ function pine_test_make_mock_wpdb(array $m15_rows, $prefix = 'wp_') {
             }, $sql);
         }
         public function get_results($sql, $mode = null) {
+            $this->last_sql = $sql;
             // Only serve M15 rows when the timeframe filter matches '15min'.
             if (strpos($sql, "'15min'") !== false || strpos($sql, '15min') !== false) {
+                if (preg_match('/ORDER BY candle_time DESC/i', $sql)) {
+                    return array_reverse($this->rows);
+                }
                 return $this->rows;
             }
             return array();
@@ -88,6 +94,7 @@ function pine_test_make_service_with_mock(array $m15_rows) {
 
     $mock_wpdb = pine_test_make_mock_wpdb($m15_rows, 'wp_');
     $wpdb = $mock_wpdb;
+    $GLOBALS['pine_test_last_wpdb'] = $mock_wpdb;
 
     $svc = new SMC_MarketData_Service();
     $ref = new ReflectionClass($svc);
@@ -125,8 +132,13 @@ function pine_assert($cond, $msg) {
     }
 }
 
+function pine_assert_close($actual, $expected, $msg, $epsilon = 1e-8) {
+    pine_assert(abs((float) $actual - (float) $expected) <= $epsilon, $msg . " (got {$actual}, expected {$expected})");
+}
+
 $m15_rows = pine_test_make_dense_m15_rows('EURUSD');
 $svc      = pine_test_make_service_with_mock($m15_rows);
+$ref      = new ReflectionClass($svc);
 
 echo "\n[test-pine-compatible-fib-levels] Running...\n";
 
@@ -139,43 +151,66 @@ pine_assert(isset($result['source']) && $result['source'] === 'pine_compatible',
 pine_assert(isset($result['fibs']), 'fibs key present');
 pine_assert(isset($result['anchor_debug']), 'anchor_debug key present');
 
-// ---- Test 2: All four chart TFs exist in output (no direct rows required) -----
-echo "\nTest 2: All chart timeframes derived from M15\n";
+// ---- Test 2: Latest M15 window is fetched and restored to ascending order -----
+echo "\nTest 2: Latest M15 window query and normalization order\n";
+pine_assert(
+    isset($GLOBALS['pine_test_last_wpdb']->last_sql)
+        && preg_match('/ORDER BY candle_time DESC\s+LIMIT 60000/i', $GLOBALS['pine_test_last_wpdb']->last_sql),
+    'M15 SQL fetches latest 60000 rows using DESC LIMIT'
+);
+pine_assert(
+    isset($result['anchor_debug']['M15']['LTF_SF']['components'][0]['slot'])
+        && $result['anchor_debug']['M15']['LTF_SF']['components'][0]['slot'] === 'F1',
+    'DESC query rows are reversed before session calculation'
+);
+
+// ---- Test 3: All four chart TFs exist in output (no direct rows required) -----
+echo "\nTest 3: All chart timeframes derived from M15\n";
 foreach (array('M15', 'H1', 'H4', 'D1') as $tf) {
     pine_assert(isset($result['fibs'][$tf]), "$tf fibs present (derived from M15, no direct rows)");
 }
 
-// ---- Test 3: 16 ratios per family where levels exist --------------------------
-echo "\nTest 3: 16 levels per family\n";
+// ---- Test 4: Expected family/timeframe tuples and row counts -------------------
+echo "\nTest 4: Expected family/timeframe tuples and row counts\n";
 global $ratios;
-foreach (array('M15', 'H1', 'H4', 'D1') as $tf) {
-    if (!empty($result['fibs'][$tf]['LTF_SF'])) {
-        pine_assert(count($result['fibs'][$tf]['LTF_SF']) === 16, "$tf LTF_SF has 16 levels");
+$expected_tuples = array(
+    'M15' => array('LTF_SF', 'HTF_AF'),
+    'H1'  => array('LTF_SF', 'HTF_AF'),
+    'H4'  => array('LTF_SF', 'HTF_AF'),
+    'D1'  => array('LTF_SF'),
+);
+$expected_level_rows = 0;
+$actual_level_rows = 0;
+foreach ($expected_tuples as $tf => $families) {
+    foreach ($families as $fam) {
+        pine_assert(isset($result['fibs'][$tf][$fam]), "$tf/$fam levels present");
+        pine_assert(count($result['fibs'][$tf][$fam]) === count($ratios), "$tf/$fam has 16 levels");
+        $expected_level_rows += count($ratios);
+        $actual_level_rows += isset($result['fibs'][$tf][$fam]) ? count($result['fibs'][$tf][$fam]) : 0;
     }
-    if (!empty($result['fibs'][$tf]['HTF_AF'])) {
-        pine_assert(count($result['fibs'][$tf]['HTF_AF']) === 16, "$tf HTF_AF has 16 levels");
+}
+pine_assert(!isset($result['fibs']['D1']['HTF_AF']), 'D1/HTF_AF absent because fixture has no completed prior year');
+pine_assert($expected_level_rows === 112, 'Fixture scope expects 112 level rows (7 tuples * 16 ratios)');
+pine_assert($actual_level_rows === 112, 'Fixture scope returns 112 level rows (7 tuples * 16 ratios)');
+
+// ---- Test 5: candle_lineage = derived_from_M15 in every expected debug record -
+echo "\nTest 5: candle_lineage = derived_from_M15 in all expected anchor_debug records\n";
+foreach ($expected_tuples as $tf => $families) {
+    foreach ($families as $fam) {
+        pine_assert(isset($result['anchor_debug'][$tf][$fam]), "$tf/$fam anchor_debug present");
+        $dbg = $result['anchor_debug'][$tf][$fam];
+        pine_assert(
+            isset($dbg['candle_lineage']) && $dbg['candle_lineage'] === 'derived_from_M15',
+            "$tf/$fam candle_lineage=derived_from_M15"
+        );
     }
 }
 
-// ---- Test 4: candle_lineage = derived_from_M15 in every debug record ----------
-echo "\nTest 4: candle_lineage = derived_from_M15 in all anchor_debug records\n";
-foreach (array('M15', 'H1', 'H4', 'D1') as $tf) {
-    foreach (array('LTF_SF', 'HTF_AF') as $fam) {
-        if (!empty($result['anchor_debug'][$tf][$fam])) {
-            $dbg = $result['anchor_debug'][$tf][$fam];
-            pine_assert(
-                isset($dbg['candle_lineage']) && $dbg['candle_lineage'] === 'derived_from_M15',
-                "$tf/$fam candle_lineage=derived_from_M15"
-            );
-        }
-    }
-}
-
-// ---- Test 5: source_period follows helper ladder ------------------------------
+// ---- Test 6: source_period follows helper ladder ------------------------------
 // Pine v13.1.3 helper ladder:
 //   M15 LTF_SF -> M15,  H1 LTF_SF -> H1,  H4 LTF_SF -> D1,  D1 LTF_SF -> D1
 //   M15 HTF_AF -> H1,   H1 HTF_AF -> D1,  H4 HTF_AF -> D1,  D1 HTF_AF -> D1
-echo "\nTest 5: source_period follows Pine v13.1.3 helper ladder\n";
+echo "\nTest 6: source_period follows Pine v13.1.3 helper ladder\n";
 $expected_source_period = array(
     'M15' => array('LTF_SF' => 'M15', 'HTF_AF' => 'H1'),
     'H1'  => array('LTF_SF' => 'H1',  'HTF_AF' => 'D1'),
@@ -184,34 +219,60 @@ $expected_source_period = array(
 );
 foreach ($expected_source_period as $tf => $families) {
     foreach ($families as $fam => $expected_sp) {
-        if (!empty($result['anchor_debug'][$tf][$fam])) {
-            $dbg = $result['anchor_debug'][$tf][$fam];
-            pine_assert(
-                isset($dbg['source_period']) && $dbg['source_period'] === $expected_sp,
-                "$tf/$fam source_period=$expected_sp (got " . ($dbg['source_period'] ?? 'null') . ")"
-            );
+        if (!in_array($fam, $expected_tuples[$tf], true)) {
+            continue;
         }
+        $dbg = $result['anchor_debug'][$tf][$fam];
+        pine_assert(
+            isset($dbg['source_period']) && $dbg['source_period'] === $expected_sp,
+            "$tf/$fam source_period=$expected_sp (got " . ($dbg['source_period'] ?? 'null') . ")"
+        );
     }
 }
 
-// ---- Test 6: anchor_debug contains required fields ----------------------------
-echo "\nTest 6: Required anchor_debug fields present\n";
+// ---- Test 7: Anchor values match deterministic Pine-compatible fixture --------
+echo "\nTest 7: Expected deterministic anchor values\n";
+foreach ($expected_tuples as $tf => $families) {
+    foreach ($families as $fam) {
+        $dbg = $result['anchor_debug'][$tf][$fam];
+        pine_assert_close($dbg['anchor_high'], 1.1995, "$tf/$fam anchor_high");
+        pine_assert_close($dbg['anchor_low'], 1.0995, "$tf/$fam anchor_low");
+    }
+}
+pine_assert((int) $result['anchor_debug']['H4']['LTF_SF']['source_feed_bars'] === 90, 'H4/LTF_SF D1 helper keeps all 90 aggregate buckets');
+pine_assert((int) $result['anchor_debug']['H4']['HTF_AF']['source_feed_bars'] === 90, 'H4/HTF_AF D1 helper keeps all 90 aggregate buckets');
+
+// ---- Test 8: Aggregate keeps latest bucket; session builder drops session only -
+echo "\nTest 8: Aggregate/session drop parity\n";
+$agg_method = $ref->getMethod('pine_aggregate_candles');
+$agg_method->setAccessible(true);
+$session_method = $ref->getMethod('pine_build_sessions');
+$session_method->setAccessible(true);
+$month_edge_feed = array(
+    array('time' => strtotime('2025-01-31 00:00:00 UTC'), 'open' => 1.1, 'high' => 1.2, 'low' => 1.0, 'close' => 1.15),
+    array('time' => strtotime('2025-02-01 00:00:00 UTC'), 'open' => 1.2, 'high' => 1.3, 'low' => 1.1, 'close' => 1.25),
+    array('time' => strtotime('2025-03-01 00:00:00 UTC'), 'open' => 1.3, 'high' => 1.4, 'low' => 1.2, 'close' => 1.35),
+);
+$aggregated_days = $agg_method->invoke($svc, $month_edge_feed, 86400);
+$completed_months = $session_method->invoke($svc, $aggregated_days, 'Monthly');
+pine_assert(count($aggregated_days) === 3, 'D1 aggregation retains latest bucket');
+pine_assert(count($completed_months) === 2, 'Monthly session builder alone drops latest session');
+
+// ---- Test 9: anchor_debug contains required fields ----------------------------
+echo "\nTest 9: Required anchor_debug fields present\n";
 $required_fields = array('symbol', 'timeframe', 'family', 'candle_lineage', 'source_period',
     'source_feed_bars', 'anchor_high', 'anchor_low', 'anchor_range', 'compression_threshold');
-foreach (array('M15', 'H1') as $tf) {
-    foreach (array('LTF_SF', 'HTF_AF') as $fam) {
-        if (!empty($result['anchor_debug'][$tf][$fam])) {
-            $dbg = $result['anchor_debug'][$tf][$fam];
-            foreach ($required_fields as $field) {
-                pine_assert(isset($dbg[$field]), "$tf/$fam anchor_debug.$field present");
-            }
+foreach ($expected_tuples as $tf => $families) {
+    foreach ($families as $fam) {
+        $dbg = $result['anchor_debug'][$tf][$fam];
+        foreach ($required_fields as $field) {
+            pine_assert(isset($dbg[$field]), "$tf/$fam anchor_debug.$field present");
         }
     }
 }
 
-// ---- Test 7: Compression threshold correct per symbol class -------------------
-echo "\nTest 7: Compression threshold per symbol class\n";
-$ref = new ReflectionClass($svc);
+// ---- Test 10: Compression threshold correct per symbol class ------------------
+echo "\nTest 10: Compression threshold per symbol class\n";
 $thresh_method = $ref->getMethod('pine_compression_threshold');
 $thresh_method->setAccessible(true);
 
@@ -223,16 +284,16 @@ pine_assert(abs($thresh_eur - 0.0020) < 1e-8, 'EURUSD threshold=0.0020 (20 pips 
 pine_assert(abs($thresh_jpy - 0.40)   < 1e-8, 'USDJPY threshold=0.40 (40 pips * 0.01)');
 pine_assert(abs($thresh_xau - 0.20)   < 1e-8, 'XAUUSD threshold=0.20 (20 pips * 0.01)');
 
-// ---- Test 8: Timeframe filter ------------------------------------------------
-echo "\nTest 8: Timeframe filter\n";
+// ---- Test 11: Timeframe filter -----------------------------------------------
+echo "\nTest 11: Timeframe filter\n";
 $filtered = $svc->get_pine_compatible_fib_levels(1, 'EURUSD', 'H1');
 pine_assert(!($filtered instanceof WP_Error), 'Filtered result is not WP_Error');
 pine_assert(isset($filtered['fibs']['H1']), 'H1 fibs present when filtered to H1');
 pine_assert(!isset($filtered['fibs']['M15']), 'M15 fibs absent when filtered to H1');
 pine_assert(!isset($filtered['fibs']['H4']),  'H4 fibs absent when filtered to H1');
 
-// ---- Test 9: Missing M15 candles returns WP_Error ----------------------------
-echo "\nTest 9: WP_Error on missing M15 candles\n";
+// ---- Test 12: Missing M15 candles returns WP_Error ---------------------------
+echo "\nTest 12: WP_Error on missing M15 candles\n";
 $empty_svc = pine_test_make_service_with_mock(array());
 $err = $empty_svc->get_pine_compatible_fib_levels(1, 'EURUSD');
 pine_assert($err instanceof WP_Error, 'Empty M15 returns WP_Error');
