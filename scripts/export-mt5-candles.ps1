@@ -110,7 +110,9 @@ function ConvertTo-NormalizedCandle([object]$Candle, [string]$Label) {
     if (-not [double]::TryParse([string]$Candle.close, $styles, $culture, [ref]$close)) {
         Write-Fail "$Label has invalid numeric close value: $($Candle.close)"
     }
-    [void][double]::TryParse([string]$Candle.volume, $styles, $culture, [ref]$volume)
+    if ($Candle.PSObject.Properties.Name -contains "volume") {
+        [void][double]::TryParse([string]$Candle.volume, $styles, $culture, [ref]$volume)
+    }
 
     [PSCustomObject]@{
         time = [string]$Candle.time
