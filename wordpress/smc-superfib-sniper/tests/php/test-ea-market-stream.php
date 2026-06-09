@@ -192,6 +192,15 @@ if (!function_exists('update_user_meta')) {
     }
 }
 
+if (!function_exists('delete_user_meta')) {
+    function delete_user_meta($user_id, $key) {
+        if (isset($GLOBALS['test_user_meta'][$user_id][$key])) {
+            unset($GLOBALS['test_user_meta'][$user_id][$key]);
+        }
+        return true;
+    }
+}
+
 if (!function_exists('rest_ensure_response')) {
     function rest_ensure_response($data) {
         return new WP_REST_Response($data);
@@ -311,7 +320,12 @@ if (!class_exists('TestWpdb')) {
                 if (preg_match($pattern, $conditions, $match)) {
                     $value = $match[1];
                     $rows = array_values(array_filter($rows, function ($row) use ($field, $value) {
-                        return isset($row[$field]) && $row[$field] === $value;
+                        // Skip filtering if the field doesn't exist in the row
+                        // (e.g., market_candles has 'normalized_symbol' not 'symbol')
+                        if (!isset($row[$field])) {
+                            return true;  // Keep rows that don't have this field
+                        }
+                        return $row[$field] === $value;
                     }));
                 }
             }
@@ -935,6 +949,9 @@ function test_ea_market_stream() {
         'ask' => 1.08534,
         'spread' => 1.3,
         'freshness' => 'LIVE',
+        'broker_server' => 'ICMARKETS',
+        'broker' => 'MT5',
+        'session' => 'London',
         'candle_m15' => array(
             'time' => $candle_ts_15,
             'open' => 1.0850, 'high' => 1.0855, 'low' => 1.0848, 'close' => 1.0852,
@@ -944,6 +961,9 @@ function test_ea_market_stream() {
     dispatch_ea_market_stream($plugin, $shared_candle_payload_a);
     $count_before = count($wpdb->tables[$candle_table_key] ?? array());
     dispatch_ea_market_stream($plugin, $shared_candle_payload_a); // retry from same source
+    if (getenv('TEST_DEBUG')) {
+        error_log('[TEST DEBUG] wp_smc_sf_market_candles after retries: ' . wp_json_encode(array_values($wpdb->tables[$candle_table_key] ?? array())));
+    }
     $rows_after = array_values($wpdb->tables[$candle_table_key] ?? array());
     $source_count_after_retry = null;
     foreach ($rows_after as $r) {
@@ -971,16 +991,25 @@ function test_ea_market_stream() {
         'ask' => 1.08534,
         'spread' => 1.3,
         'freshness' => 'LIVE',
+        'broker_server' => 'ICMARKETS',
+        'broker' => 'MT5',
+        'session' => 'London',
         'candle_m15' => array(
             'time' => $candle_ts_16,
             'open' => 1.0850, 'high' => 1.0855, 'low' => 1.0848, 'close' => 1.0852,
         ),
     );
     dispatch_ea_market_stream($plugin, $shared_p_src1); // user_id=7
+    if (defined('WP_SMC_SF_DEBUG') && WP_SMC_SF_DEBUG) {
+        error_log('[TEST DEBUG T16-A] wp_smc_sf_market_candles after first dispatch: ' . wp_json_encode(array_values($wpdb->tables[$candle_table_key] ?? array())));
+    }
     $shared_p_src2 = $shared_p_src1;
     $shared_p_src2['user_id'] = 8; // different user = distinct source hash
     $GLOBALS['test_current_user_id'] = 8;
     dispatch_ea_market_stream($plugin, $shared_p_src2);
+    if (defined('WP_SMC_SF_DEBUG') && WP_SMC_SF_DEBUG) {
+        error_log('[TEST DEBUG T16-B] wp_smc_sf_market_candles after second dispatch: ' . wp_json_encode(array_values($wpdb->tables[$candle_table_key] ?? array())));
+    }
     $GLOBALS['test_current_user_id'] = 7;
     $confidence_16 = null;
     $source_count_16 = null;
@@ -1010,6 +1039,9 @@ function test_ea_market_stream() {
         'ask' => 1.08534,
         'spread' => 1.3,
         'freshness' => 'LIVE',
+        'broker_server' => 'ICMARKETS',
+        'broker' => 'MT5',
+        'session' => 'London',
         'candle_m15' => array(
             'time' => $candle_ts_17,
             'open' => 1.0850, 'high' => 1.0855, 'low' => 1.0848, 'close' => 1.0852,
@@ -1018,8 +1050,8 @@ function test_ea_market_stream() {
     dispatch_ea_market_stream($plugin, $shared_p17_src1);
     $shared_p17_src2 = $shared_p17_src1;
     $shared_p17_src2['user_id'] = 9;
-    $shared_p17_src2['candle_m15']['open'] = 1.0860; // conflicting OHLC
-    $shared_p17_src2['candle_m15']['close'] = 1.0865;
+    $shared_p17_src2['candle_m15']['open'] = 1.0851; // conflicting OHLC but valid
+    $shared_p17_src2['candle_m15']['close'] = 1.0854; // low <= min(open,close) and max(open,close) <= high
     $GLOBALS['test_current_user_id'] = 9;
     dispatch_ea_market_stream($plugin, $shared_p17_src2);
     $GLOBALS['test_current_user_id'] = 7;
@@ -1140,6 +1172,146 @@ function test_ea_market_stream() {
         abs($result_20[0]['open'] - 1.1000) < 0.000001 && abs($result_20[0]['high'] - 1.1040) < 0.000001 && abs($result_20[0]['low'] - 1.0990) < 0.000001 && abs($result_20[0]['close'] - 1.1035) < 0.000001,
         'H1 candle OHLC should aggregate M15 rows correctly'
     );
+
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // Tests 21–25: shared quote read-through in get_cached_price()
+    // ────────────────────────────────────────────────────────────────────────────
+
+    $quotes_table_key = 'wp_smc_sf_market_quotes_latest';
+    $ref_get_cached = new ReflectionMethod($plugin, 'get_cached_price');
+    $ref_get_cached->setAccessible(true);
+    $ref_shared_quote = new ReflectionMethod($plugin, 'fetch_shared_market_quote');
+    $ref_shared_quote->setAccessible(true);
+
+    echo "Test 21: get_cached_price() returns shared quote when feed_key exists and quote is fresh\n";
+    $wpdb->tables[$quotes_table_key] = array();
+    // Seed a fresh shared quote row — feed_key has no trailing pipe (no session segment)
+    $wpdb->replace($quotes_table_key, array(
+        'id'                    => null,
+        'feed_key'              => 'ICMARKETS_SV',
+        'symbol'                => 'EURUSD',
+        'normalized_symbol'     => 'EURUSD',
+        'bid'                   => 1.08521,
+        'ask'                   => 1.08534,
+        'mid'                   => 1.085275,
+        'source_count'          => 2,
+        'last_source_user_hash' => 'abc',
+        'updated_at'            => gmdate('Y-m-d H:i:s', time() - 10),  // 10s old — fresh
+    ));
+    // Store the feed_key in user meta so resolve_user_shared_feed_key() finds it
+    update_user_meta(7, 'smc_sf_shared_feed_key_' . md5('EURUSD'), 'ICMARKETS_SV');
+    $result_21 = $ref_get_cached->invoke($plugin, 7, 'EURUSD', 300);
+    assert_test(
+        isset($result_21['source']) && $result_21['source'] === 'mt5',
+        'Test 21: get_cached_price() should return MT5-compatible shared quote when feed_key exists and quote is fresh'
+    );
+    assert_test(
+        isset($result_21['sourceDetail']) && $result_21['sourceDetail'] === 'shared_market_quote',
+        'Test 21: shared quote sourceDetail should be shared_market_quote (provenance)'
+    );
+    assert_test(
+        isset($result_21['source_count']) && (int) $result_21['source_count'] === 2,
+        'Test 21: shared quote source_count should be 2 (two distinct EA sources)'
+    );
+    assert_test(
+        array_key_exists('changePct1d', $result_21) && $result_21['changePct1d'] === null,
+        'Test 21: shared quote changePct1d should be null (not fake 0.0) until daily-change is implemented'
+    );
+
+    echo "\n";
+
+    echo "Test 22: Stale shared quote (> stale_threshold_sec) falls back to per-user snapshot\n";
+    $wpdb->tables[$quotes_table_key] = array();
+    $wpdb->replace($quotes_table_key, array(
+        'id'                    => null,
+        'feed_key'              => 'ICMARKETS_SV',
+        'symbol'                => 'EURUSD',
+        'normalized_symbol'     => 'EURUSD',
+        'bid'                   => 1.09000,
+        'ask'                   => 1.09015,
+        'mid'                   => 1.090075,
+        'source_count'          => 1,
+        'last_source_user_hash' => 'abc',
+        'updated_at'            => gmdate('Y-m-d H:i:s', time() - 400),  // 400s > 300s threshold
+    ));
+    update_user_meta(7, 'smc_sf_shared_feed_key_' . md5('EURUSD'), 'ICMARKETS_SV');
+    // Ensure per-user snapshot row exists for fallback
+    $wpdb->replace('wp_smc_sf_snapshots', array(
+        'user_id' => 7, 'symbol' => 'EURUSD', 'bid' => 1.08521, 'ask' => 1.08534,
+        'mid' => 1.085275, 'spread' => 1, 'change_pct_1d' => 0.0,
+        'source' => 'mt5', 'state' => 'live',
+        'updated_at' => gmdate('Y-m-d H:i:s', time() - 5),
+    ));
+    $result_22 = $ref_get_cached->invoke($plugin, 7, 'EURUSD', 300);
+    assert_test(
+        isset($result_22['source']) && $result_22['source'] === 'mt5',
+        'Test 22: shared quote older than stale_threshold_sec must fall back to per-user mt5 snapshot'
+    );
+
+    echo "\n";
+
+    echo "Test 23: Missing feed_key falls back to per-user snapshot\n";
+    // Remove the stored feed_key for this symbol
+    delete_user_meta(7, 'smc_sf_shared_feed_key_' . md5('EURUSD'));
+    $wpdb->tables[$quotes_table_key] = array();
+    // Per-user snapshot still present from Test 22 setup
+    $result_23 = $ref_get_cached->invoke($plugin, 7, 'EURUSD', 300);
+    assert_test(
+        isset($result_23['source']) && $result_23['source'] === 'mt5',
+        'Test 23: missing feed_key must fall back to per-user mt5 snapshot'
+    );
+    // Restore feed_key for subsequent tests
+    update_user_meta(7, 'smc_sf_shared_feed_key_' . md5('EURUSD'), 'ICMARKETS_SV');
+
+    echo "\n";
+
+    echo "Test 24: fetch_shared_market_quote() ignores rows with a different feed_key\n";
+    $wpdb->tables[$quotes_table_key] = array();
+    $wpdb->replace($quotes_table_key, array(
+        'id'                    => null,
+        'feed_key'              => 'OTHER_BROKER',   // different feed_key — no pipe
+        'symbol'                => 'EURUSD',
+        'normalized_symbol'     => 'EURUSD',
+        'bid'                   => 1.09500,
+        'ask'                   => 1.09515,
+        'mid'                   => 1.095075,
+        'source_count'          => 1,
+        'last_source_user_hash' => 'xyz',
+        'updated_at'            => gmdate('Y-m-d H:i:s', time() - 5),
+    ));
+    // user meta still maps to 'ICMARKETS_SV' — different from row in table
+    $result_24 = $ref_shared_quote->invoke($plugin, 7, 'EURUSD', 300);
+    assert_test(
+        $result_24 === null,
+        'Test 24: fetch_shared_market_quote() must return null when stored feed_key does not match any table row'
+    );
+
+    echo "\n";
+
+    echo "Test 25: Empty broker_server does not write shared quote rows\n";
+    $wpdb->tables[$quotes_table_key] = array();
+    $no_broker_payload = array(
+        'user_id'   => 7,
+        'symbol'    => 'GBPUSD',
+        'timestamp' => gmdate('c', time() - 5),
+        'bid'       => 1.27000,
+        'ask'       => 1.27015,
+        'spread'    => 1.5,
+        'freshness' => 'LIVE',
+        // broker_server intentionally absent — normalize_market_feed_key() returns ''
+    );
+    dispatch_ea_market_stream($plugin, $no_broker_payload);
+    $rows_25 = array_filter(
+        array_values($wpdb->tables[$quotes_table_key] ?? array()),
+        function ($r) { return ($r['normalized_symbol'] ?? '') === 'GBPUSD'; }
+    );
+    assert_test(
+        count($rows_25) === 0,
+        'Test 25: empty broker_server must not write any shared quote row'
+    );
+
+    echo "\n";
 
     echo "\nTest completed.\n";
 }
