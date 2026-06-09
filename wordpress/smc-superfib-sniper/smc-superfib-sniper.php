@@ -38,10 +38,13 @@ final class SMC_SuperFib_Sniper_REST {
     private $fib_context_timeframe = '';
     private $fib_context_tf_seconds = 0;
 
+    private const SMC_SF_SHARED_MARKET_SCHEMA_VERSION = '2026_06_08_01';
+
     public static function boot() {
         $instance = new self();
         add_action('rest_api_init', array($instance, 'register_routes'));
         add_action('init', array(__CLASS__, 'ensure_display_signals_table'), 1);
+        add_action('init', array($instance, 'ensure_shared_market_tables'), 5);
         
         // Send CORS headers on all REST responses (success, error, auth failure, etc)
         add_filter('rest_post_dispatch', function($response, $server, $request) {
@@ -253,53 +256,11 @@ final class SMC_SuperFib_Sniper_REST {
             PRIMARY KEY  (user_id, symbol)
         ) $charset;";
 
-        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_market_quotes_latest (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            feed_key VARCHAR(120) NOT NULL,
-            symbol VARCHAR(40) NOT NULL,
-            normalized_symbol VARCHAR(40) NOT NULL,
-            bid DECIMAL(20,8) NULL,
-            ask DECIMAL(20,8) NULL,
-            mid DECIMAL(20,8) NULL,
-            source_count INT UNSIGNED NOT NULL DEFAULT 1,
-            last_source_user_hash VARCHAR(80) NULL,
-            updated_at DATETIME NOT NULL,
-            PRIMARY KEY  (id),
-            UNIQUE KEY uq_quote_feed_symbol (feed_key, normalized_symbol),
-            KEY idx_updated_at (updated_at)
-        ) $charset;";
+        foreach (self::shared_market_table_sql($charset) as $sql) {
+            $tables[] = $sql;
+        }
 
-        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_market_candles (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            feed_key VARCHAR(120) NOT NULL,
-            normalized_symbol VARCHAR(40) NOT NULL,
-            timeframe VARCHAR(10) NOT NULL,
-            candle_open_time DATETIME NOT NULL,
-            open DECIMAL(20,8) NOT NULL,
-            high DECIMAL(20,8) NOT NULL,
-            low DECIMAL(20,8) NOT NULL,
-            close DECIMAL(20,8) NOT NULL,
-            volume DECIMAL(20,4) NULL,
-            source_count INT UNSIGNED NOT NULL DEFAULT 1,
-            first_seen_at DATETIME NOT NULL,
-            last_seen_at DATETIME NOT NULL,
-            confidence ENUM('single','confirmed','disputed') NOT NULL DEFAULT 'single',
-            PRIMARY KEY  (id),
-            UNIQUE KEY uq_candle (
-                feed_key,
-                normalized_symbol,
-                timeframe,
-                candle_open_time
-            ),
-            KEY idx_symbol_tf_time (
-                normalized_symbol,
-                timeframe,
-                candle_open_time
-            ),
-            KEY idx_last_seen_at (last_seen_at)
-        ) $charset;";
-
-        $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_engine_runs (
+                $tables[] = "CREATE TABLE {$wpdb->prefix}smc_sf_engine_runs (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             user_id BIGINT UNSIGNED NOT NULL,
             status VARCHAR(32) NOT NULL,
@@ -1073,6 +1034,108 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         return true;
+    }
+
+    /**
+     * SQL fragments for the shared cross-user market data tables.
+     * Called by both activate() and ensure_shared_market_tables().
+     */
+    private static function shared_market_table_sql(string $charset = ''): array {
+        global $wpdb;
+
+        if ($charset === '') {
+            $charset = $wpdb->get_charset_collate();
+        }
+
+        return array(
+            "CREATE TABLE {$wpdb->prefix}smc_sf_market_quotes_latest (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            feed_key VARCHAR(120) NOT NULL,
+            symbol VARCHAR(40) NOT NULL,
+            normalized_symbol VARCHAR(40) NOT NULL,
+            bid DECIMAL(20,8) NULL,
+            ask DECIMAL(20,8) NULL,
+            mid DECIMAL(20,8) NULL,
+            source_count INT UNSIGNED NOT NULL DEFAULT 1,
+            last_source_user_hash VARCHAR(80) NULL,
+            updated_at DATETIME NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY uq_quote_feed_symbol (feed_key, normalized_symbol),
+            KEY idx_updated_at (updated_at)
+        ) $charset;",
+            "CREATE TABLE {$wpdb->prefix}smc_sf_market_candles (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            feed_key VARCHAR(120) NOT NULL,
+            normalized_symbol VARCHAR(40) NOT NULL,
+            timeframe VARCHAR(10) NOT NULL,
+            candle_open_time DATETIME NOT NULL,
+            open DECIMAL(20,8) NOT NULL,
+            high DECIMAL(20,8) NOT NULL,
+            low DECIMAL(20,8) NOT NULL,
+            close DECIMAL(20,8) NOT NULL,
+            volume DECIMAL(20,4) NULL,
+            source_count INT UNSIGNED NOT NULL DEFAULT 1,
+            source_hashes LONGTEXT NULL,
+            first_seen_at DATETIME NOT NULL,
+            last_seen_at DATETIME NOT NULL,
+            confidence ENUM('single','confirmed','disputed') NOT NULL DEFAULT 'single',
+            PRIMARY KEY  (id),
+            UNIQUE KEY uq_candle (
+                feed_key,
+                normalized_symbol,
+                timeframe,
+                candle_open_time
+            ),
+            KEY idx_symbol_tf_time (
+                normalized_symbol,
+                timeframe,
+                candle_open_time
+            ),
+            KEY idx_last_seen_at (last_seen_at)
+        ) $charset;",
+        );
+    }
+
+    /**
+     * Ensure shared cross-user market data tables exist after plugin updates.
+     *
+     * Activation creates these tables, but normal plugin updates may not trigger
+     * activation hooks, so this method safely runs a versioned dbDelta check.
+     */
+    public function ensure_shared_market_tables(): void {
+        global $wpdb;
+
+        $quotes_table  = $this->table('market_quotes_latest');
+        $candles_table = $this->table('market_candles');
+
+        $version = get_option('smc_sf_shared_market_schema_version', '');
+        if (
+            $version === self::SMC_SF_SHARED_MARKET_SCHEMA_VERSION
+            && $this->table_exists($quotes_table)
+            && $this->table_exists($candles_table)
+        ) {
+            return;
+        }
+
+        if (file_exists(ABSPATH . 'wp-admin/includes/upgrade.php')) {
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        }
+
+        if (!function_exists('dbDelta')) {
+            return;
+        }
+
+        foreach (self::shared_market_table_sql() as $sql) {
+            dbDelta($sql);
+        }
+
+        update_option('smc_sf_shared_market_schema_version', self::SMC_SF_SHARED_MARKET_SCHEMA_VERSION, false);
+    }
+
+    private function table_exists(string $table): bool {
+        global $wpdb;
+
+        return $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table)) === $table;
     }
 
     public function register_routes() {
@@ -2373,7 +2436,7 @@ final class SMC_SuperFib_Sniper_REST {
                 return array('field' => $key, 'message' => $key . ' is required for Phase 3 payloads.');
             }
 
-            foreach (array('time', 'open', 'high', 'low', 'close', 'volume') as $field) {
+            foreach (array('time', 'open', 'high', 'low', 'close') as $field) {
                 if (!array_key_exists($field, $payload[$key]) || $payload[$key][$field] === '' || $payload[$key][$field] === null) {
                     return array('field' => $key . '.' . $field, 'message' => $label . ' candle field ' . $field . ' is required.');
                 }
@@ -2584,6 +2647,7 @@ final class SMC_SuperFib_Sniper_REST {
         $broker = $this->sanitize_ea_text($payload['broker'] ?? '', 96);
         $broker_server = $this->sanitize_ea_text($payload['broker_server'] ?? '', 128);
         $shared_feed_key = $this->normalize_market_feed_key($broker_server, $broker, $phase3_session);
+        $this->persist_user_shared_feed_key($user_id, $symbol, $shared_feed_key);
 
         if ($this->is_phase3_market_stream_payload($payload)) {
             $phase3_validation_error = $this->validate_phase3_market_stream_payload($payload);
@@ -2759,7 +2823,7 @@ final class SMC_SuperFib_Sniper_REST {
                                 '15min',
                                 $candle,
                                 $m1_stream_ts,
-                                $user_id
+                                $this->market_source_user_hash($user_id, $broker_server, $broker)
                             );
                         }
                     } else {
@@ -2819,7 +2883,7 @@ final class SMC_SuperFib_Sniper_REST {
                             '15min',
                             $candle_m15,
                             $m15_stream_ts,
-                            $user_id
+                            $this->market_source_user_hash($user_id, $broker_server, $broker)
                         );
                     } else {
                         error_log("MT5 M15 CANDLE INSERT FAILED: {$symbol} | timeframe=15min | time={$candle_m15['time']} | stream_timestamp={$m15_stream_ts}");
@@ -5011,6 +5075,7 @@ final class SMC_SuperFib_Sniper_REST {
         $broker_server = strtoupper(trim((string) $broker_server));
         $broker = strtoupper(trim((string) $broker));
         $session = strtoupper(trim((string) $session));
+        $parts = array();
 
         $broker_server = preg_replace('/[^A-Z0-9_\-\+]/', '', $broker_server);
         $broker = preg_replace('/[^A-Z0-9_\-\+]/', '', $broker);
@@ -5064,7 +5129,7 @@ final class SMC_SuperFib_Sniper_REST {
         return $wpdb->replace($table, $data, array('%d', '%s', '%s', '%s', '%f', '%f', '%f', '%d', '%s', '%s')) !== false;
     }
 
-    private function upsert_shared_market_candle($feed_key, $normalized_symbol, $timeframe, $candle, $stream_timestamp = null, $user_id = 0) {
+    private function upsert_shared_market_candle($feed_key, $normalized_symbol, $timeframe, $candle, $stream_timestamp = null, $source_hash = '') {
         global $wpdb;
 
         $candle_ts = strtotime($candle['time']);
@@ -5075,7 +5140,7 @@ final class SMC_SuperFib_Sniper_REST {
         $candle_open_time = gmdate('Y-m-d H:i:s', $candle_ts);
         $table = $this->table('market_candles');
         $existing = $wpdb->get_row($wpdb->prepare(
-            "SELECT id, source_count, confidence, first_seen_at, open, high, low, close FROM {$table} WHERE feed_key = %s AND normalized_symbol = %s AND timeframe = %s AND candle_open_time = %s LIMIT 1",
+            "SELECT id, source_count, source_hashes, confidence, first_seen_at, open, high, low, close FROM {$table} WHERE feed_key = %s AND normalized_symbol = %s AND timeframe = %s AND candle_open_time = %s LIMIT 1",
             $feed_key,
             $normalized_symbol,
             $timeframe,
@@ -5084,46 +5149,79 @@ final class SMC_SuperFib_Sniper_REST {
 
         $volume = isset($candle['volume']) ? (string) round((float) $candle['volume'], 4) : null;
         $now = $this->now_mysql();
-        $same_ohlc = false;
         $source_count = 1;
         $confidence = 'single';
         $first_seen_at = $now;
+        $source_hashes_arr = array();
 
         if ($existing) {
-            $source_count = (int) ($existing['source_count'] ?? 1) + 1;
-            $same_ohlc = abs((float) ($existing['open'] ?? 0) - (float) $candle['open']) < 0.0000001
-                && abs((float) ($existing['high'] ?? 0) - (float) $candle['high']) < 0.0000001
-                && abs((float) ($existing['low'] ?? 0) - (float) $candle['low']) < 0.0000001
-                && abs((float) ($existing['close'] ?? 0) - (float) $candle['close']) < 0.0000001;
-            $confidence = (string) ($existing['confidence'] ?? 'single');
-            if (!$same_ohlc && $confidence !== 'disputed') {
-                $confidence = 'disputed';
+            // Decode existing source hashes.
+            $decoded = json_decode((string) ($existing['source_hashes'] ?? ''), true);
+            $source_hashes_arr = is_array($decoded) ? $decoded : array();
+
+            $is_new_source = $source_hash !== '' && !in_array($source_hash, $source_hashes_arr, true);
+            if ($is_new_source) {
+                $source_hashes_arr[] = $source_hash;
             }
+
+            $source_count = max(1, count($source_hashes_arr));
             $first_seen_at = $existing['first_seen_at'] ?? $now;
+            $confidence    = (string) ($existing['confidence'] ?? 'single');
+
+            if ($is_new_source) {
+                $same_ohlc = abs((float) ($existing['open'] ?? 0) - (float) $candle['open']) < 0.0000001
+                    && abs((float) ($existing['high'] ?? 0) - (float) $candle['high']) < 0.0000001
+                    && abs((float) ($existing['low'] ?? 0) - (float) $candle['low']) < 0.0000001
+                    && abs((float) ($existing['close'] ?? 0) - (float) $candle['close']) < 0.0000001;
+
+                if ($same_ohlc && $confidence === 'single') {
+                    $confidence = 'confirmed';
+                } elseif (!$same_ohlc && $confidence !== 'disputed') {
+                    $confidence = 'disputed';
+                }
+            }
+            // Same-source retry: do not change confidence or overwrite canonical OHLC.
+        } else {
+            // New candle: seed source hash list.
+            if ($source_hash !== '') {
+                $source_hashes_arr[] = $source_hash;
+            }
         }
 
+        // Do not overwrite canonical OHLC when disputed — keep the first accepted values.
+        $write_ohlc = !$existing || $confidence !== 'disputed';
+        $open  = $write_ohlc ? (float) $candle['open']  : (float) ($existing['open']  ?? $candle['open']);
+        $high  = $write_ohlc ? (float) $candle['high']  : (float) ($existing['high']  ?? $candle['high']);
+        $low   = $write_ohlc ? (float) $candle['low']   : (float) ($existing['low']   ?? $candle['low']);
+        $close = $write_ohlc ? (float) $candle['close'] : (float) ($existing['close'] ?? $candle['close']);
+
         $data = array(
-            'id' => $existing ? (int) $existing['id'] : null,
-            'feed_key' => $feed_key,
-            'normalized_symbol' => $normalized_symbol,
-            'timeframe' => $timeframe,
+            'id'               => $existing ? (int) $existing['id'] : null,
+            'feed_key'         => $feed_key,
+            'normalized_symbol'=> $normalized_symbol,
+            'timeframe'        => $timeframe,
             'candle_open_time' => $candle_open_time,
-            'open' => (float) $candle['open'], 
-            'high' => (float) $candle['high'], 
-            'low' => (float) $candle['low'], 
-            'close' => (float) $candle['close'], 
-            'volume' => $volume,
-            'source_count' => $source_count,
-            'first_seen_at' => $first_seen_at,
-            'last_seen_at' => $now,
-            'confidence' => $confidence,
+            'open'             => $open,
+            'high'             => $high,
+            'low'              => $low,
+            'close'            => $close,
+            'volume'           => $volume,
+            'source_count'     => $source_count,
+            'source_hashes'    => json_encode($source_hashes_arr),
+            'first_seen_at'    => $first_seen_at,
+            'last_seen_at'     => $now,
+            'confidence'       => $confidence,
         );
 
-        return $wpdb->replace($table, $data, array('%d', '%s', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%s', '%d', '%s', '%s', '%s')) !== false;
+        return $wpdb->replace($table, $data, array('%d', '%s', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%s', '%d', '%s', '%s', '%s', '%s')) !== false;
     }
 
-    private function fetch_shared_market_candles($symbol, $timeframe, $outputsize) {
+    private function fetch_shared_market_candles($feed_key, $symbol, $timeframe, $outputsize) {
         global $wpdb;
+
+        if ($feed_key === '') {
+            return array();
+        }
 
         $normalized_symbol = $this->map_symbol_aliases($symbol);
         if ($timeframe === '1min') {
@@ -5132,7 +5230,8 @@ final class SMC_SuperFib_Sniper_REST {
 
         if ($timeframe === '15min') {
             $rows = $wpdb->get_results($wpdb->prepare(
-                "SELECT candle_open_time, open, high, low, close FROM {$this->table('market_candles')} WHERE normalized_symbol = %s AND timeframe = %s ORDER BY candle_open_time DESC LIMIT %d",
+                "SELECT candle_open_time, open, high, low, close FROM {$this->table('market_candles')} WHERE feed_key = %s AND normalized_symbol = %s AND timeframe = %s AND confidence <> 'disputed' ORDER BY candle_open_time DESC LIMIT %d",
+                $feed_key,
                 $normalized_symbol,
                 $timeframe,
                 $outputsize
@@ -5140,29 +5239,74 @@ final class SMC_SuperFib_Sniper_REST {
             if (empty($rows)) {
                 return array();
             }
+            $newest_ts = strtotime(($rows[0]['candle_open_time'] ?? '') . ' UTC');
+            if ($newest_ts === false || (time() - $newest_ts) > $this->shared_market_freshness_ttl($timeframe)) {
+                return array();
+            }
             $rows = array_reverse($rows);
             return array_map(function ($row) {
                 return array(
-                    'time' => $this->to_iso($row['candle_open_time']),
-                    'open' => (float) $row['open'], 
-                    'high' => (float) $row['high'], 
-                    'low' => (float) $row['low'], 
-                    'close' => (float) $row['close'], 
+                    'time'  => $this->to_iso($row['candle_open_time']),
+                    'open'  => (float) $row['open'],
+                    'high'  => (float) $row['high'],
+                    'low'   => (float) $row['low'],
+                    'close' => (float) $row['close'],
                 );
             }, $rows);
         }
 
         if (in_array($timeframe, array('1h', '4h'), true)) {
             $m15_rows = $wpdb->get_results($wpdb->prepare(
-                "SELECT candle_open_time, open, high, low, close FROM {$this->table('market_candles')} WHERE normalized_symbol = %s AND timeframe = %s ORDER BY candle_open_time DESC LIMIT %d",
+                "SELECT candle_open_time, open, high, low, close FROM {$this->table('market_candles')} WHERE feed_key = %s AND normalized_symbol = %s AND timeframe = %s AND confidence <> 'disputed' ORDER BY candle_open_time DESC LIMIT %d",
+                $feed_key,
                 $normalized_symbol,
                 '15min',
                 max($outputsize * ($timeframe === '4h' ? 16 : 4), 40)
             ), ARRAY_A);
+            if (empty($m15_rows)) {
+                return array();
+            }
+            $newest_m15_ts = strtotime(($m15_rows[0]['candle_open_time'] ?? '') . ' UTC');
+            if ($newest_m15_ts === false || (time() - $newest_m15_ts) > $this->shared_market_freshness_ttl('15min')) {
+                return array();
+            }
             return $this->derive_higher_timeframe_from_m15($m15_rows, $timeframe, $outputsize);
         }
 
         return array();
+    }
+
+    private function shared_feed_key_meta_key(string $symbol): string {
+        return 'smc_sf_shared_feed_key_' . md5($this->map_symbol_aliases($symbol));
+    }
+
+    private function persist_user_shared_feed_key(int $user_id, string $symbol, string $feed_key): void {
+        if ($user_id <= 0 || $feed_key === '') {
+            return;
+        }
+
+        update_user_meta($user_id, $this->shared_feed_key_meta_key($symbol), $feed_key);
+    }
+
+    private function resolve_user_shared_feed_key(int $user_id, string $symbol): string {
+        if ($user_id <= 0) {
+            return '';
+        }
+
+        return (string) get_user_meta($user_id, $this->shared_feed_key_meta_key($symbol), true);
+    }
+
+    private function shared_market_freshness_ttl(string $timeframe): int {
+        if ($timeframe === '15min') {
+            return 45 * MINUTE_IN_SECONDS;
+        }
+        if ($timeframe === '1h') {
+            return 2 * HOUR_IN_SECONDS;
+        }
+        if ($timeframe === '4h') {
+            return 6 * HOUR_IN_SECONDS;
+        }
+        return HOUR_IN_SECONDS;
     }
 
     private function derive_higher_timeframe_from_m15(array $m15_rows, $timeframe, $outputsize) {
@@ -7402,7 +7546,8 @@ final class SMC_SuperFib_Sniper_REST {
             ));
         }
 
-        $shared_candles = $this->fetch_shared_market_candles($symbol, $timeframe, $outputsize);
+        $shared_feed_key = $this->resolve_user_shared_feed_key($user_id, $symbol);
+        $shared_candles = $this->fetch_shared_market_candles($shared_feed_key, $symbol, $timeframe, $outputsize);
         if (!empty($shared_candles)) {
             return $shared_candles;
         }
