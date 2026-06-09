@@ -66,11 +66,24 @@ function HeaderTickerItem({ price, pollMs }: { price: PairPrice; pollMs: number 
     motionKey: midMotionKey,
     motionImpulse: midMotionImpulse,
   } = useStreamingTicks(price.mid, pollMs, flashHoldMs);
-  const { value: animatedChange } = useAnimatedNumber(price.changePct1d, 100);
   const motionStyle = tickMotionStyle(`${price.symbol}:header-mid`, HEADER_TICK_MOTION, {
     motionKey: midMotionKey,
     motionImpulse: midMotionImpulse,
   });
+
+  // Derive a live % change that tracks the animated mid, instead of relying on
+  // the backend's snapshot-cadence changePct1d (which is rounded to 2dp and
+  // appears stuck between polls). Reference open is inferred from
+  // mid + changePct1d, so livePct collapses to changePct1d when mid is stable.
+  const displayMid = animatedMid ?? price.mid;
+  const reference =
+    Number.isFinite(price.mid) && price.mid > 0 && Number.isFinite(price.changePct1d)
+      ? price.mid / (1 + price.changePct1d / 100)
+      : price.mid;
+  const livePct =
+    Number.isFinite(reference) && reference > 0 && Number.isFinite(displayMid)
+      ? ((displayMid - reference) / reference) * 100
+      : price.changePct1d;
 
   return (
     <div
@@ -96,15 +109,15 @@ function HeaderTickerItem({ price, pollMs }: { price: PairPrice; pollMs: number 
           midDir === "down" && "tick-flash-down-fast",
         )}
       >
-        {fmtPrice(animatedMid ?? price.mid, price.symbol)}
+        {fmtPrice(displayMid, price.symbol)}
       </span>
       <span
         className={cn(
           "rounded px-1 -mx-1 tabular-nums price-smooth",
-          price.changePct1d >= 0 ? "text-buy" : "text-sell",
+          livePct >= 0 ? "text-buy" : "text-sell",
         )}
       >
-        {fmtPct(animatedChange ?? price.changePct1d)}
+        {fmtPct(livePct)}
       </span>
     </div>
   );
