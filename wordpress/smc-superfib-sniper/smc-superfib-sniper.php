@@ -2832,7 +2832,7 @@ final class SMC_SuperFib_Sniper_REST {
                     $result = $this->insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $m1_stream_ts);
                     if ($result) {
                         $inserted_candles = 1;
-                        if ($timeframe === '15min') {
+                        if ($timeframe === '15min' && $shared_feed_key !== '') {
                             $this->upsert_shared_market_candle(
                                 $shared_feed_key,
                                 $symbol,
@@ -2881,7 +2881,7 @@ final class SMC_SuperFib_Sniper_REST {
                     // contribute provenance and confidence state without overwriting canonical OHLC.
                     $candle_ts = strtotime($candle_m15['time']);
                     $existing_shared_row = false;
-                    if ($candle_ts !== false) {
+                    if ($shared_feed_key !== '' && $candle_ts !== false) {
                         $table = $this->table('market_candles');
                         $existing_shared_row = (bool) $wpdb->get_var($wpdb->prepare(
                             "SELECT 1 FROM {$table} WHERE feed_key = %s AND normalized_symbol = %s AND timeframe = %s AND candle_open_time = %s LIMIT 1",
@@ -2890,18 +2890,6 @@ final class SMC_SuperFib_Sniper_REST {
                             '15min',
                             gmdate('Y-m-d H:i:s', $candle_ts)
                         ));
-
-                        if (!$existing_shared_row && is_object($wpdb) && property_exists($wpdb, 'tables') && isset($wpdb->tables[$table])) {
-                            foreach ($wpdb->tables[$table] as $row) {
-                                if ((string) ($row['feed_key'] ?? '') === (string) $shared_feed_key
-                                    && (string) ($row['normalized_symbol'] ?? '') === (string) $symbol
-                                    && (string) ($row['timeframe'] ?? '') === '15min'
-                                    && (string) ($row['candle_open_time'] ?? '') === gmdate('Y-m-d H:i:s', $candle_ts)) {
-                                    $existing_shared_row = true;
-                                    break;
-                                }
-                            }
-                        }
                     }
 
                     if ($existing_shared_row) {
@@ -2932,14 +2920,16 @@ final class SMC_SuperFib_Sniper_REST {
                     $result = $this->insert_mt5_candle($user_id, $symbol, '15min', $candle_m15, $m15_stream_ts, 1800, true);
                     if ($result) {
                         $inserted_candles++;
-                        $this->upsert_shared_market_candle(
-                            $shared_feed_key,
-                            $symbol,
-                            '15min',
-                            $candle_m15,
-                            $m15_stream_ts,
-                            $this->market_source_user_hash($user_id, $broker_server, $broker)
-                        );
+                        if ($shared_feed_key !== '') {
+                            $this->upsert_shared_market_candle(
+                                $shared_feed_key,
+                                $symbol,
+                                '15min',
+                                $candle_m15,
+                                $m15_stream_ts,
+                                $this->market_source_user_hash($user_id, $broker_server, $broker)
+                            );
+                        }
                     } else {
                         error_log("MT5 M15 CANDLE INSERT FAILED: {$symbol} | timeframe=15min | time={$candle_m15['time']} | stream_timestamp={$m15_stream_ts}");
                     }
@@ -5203,19 +5193,6 @@ final class SMC_SuperFib_Sniper_REST {
             $candle_open_time
         ), ARRAY_A);
 
-        // Test harness fallback: TestWpdb's SQL parsing can miss empty-string feed_key matches.
-        if (!$existing && is_object($wpdb) && property_exists($wpdb, 'tables') && isset($wpdb->tables[$table])) {
-            foreach ($wpdb->tables[$table] as $r) {
-                if ((string)($r['feed_key'] ?? '') === (string)$feed_key
-                    && (string)($r['normalized_symbol'] ?? '') === (string)$normalized_symbol
-                    && (string)($r['timeframe'] ?? '') === (string)$timeframe
-                    && (string)($r['candle_open_time'] ?? '') === (string)$candle_open_time) {
-                    $existing = $r;
-                            break;
-                }
-            }
-        }
-
         $volume = isset($candle['volume']) ? (string) round((float) $candle['volume'], 4) : null;
         $now = $this->now_mysql();
         $source_count = 1;
@@ -5339,25 +5316,7 @@ final class SMC_SuperFib_Sniper_REST {
                 '15min',
                 max($outputsize * ($timeframe === '4h' ? 16 : 4), 40)
             );
-                // Test harness fallback: TestWpdb's get_results parsing is brittle with
-            // certain SQL formatting. When running under the TestWpdb mock, filter
-            // the in-memory table directly to simulate the expected result set.
-            if (is_object($wpdb) && get_class($wpdb) === 'TestWpdb') {
-                $table = $this->table('market_candles');
-                $all = array_values($wpdb->tables[$table] ?? array());
-                $filtered = array_values(array_filter($all, function ($r) use ($feed_key, $normalized_symbol) {
-                    return (isset($r['feed_key']) && $r['feed_key'] === $feed_key)
-                        && (isset($r['normalized_symbol']) && $r['normalized_symbol'] === $normalized_symbol)
-                        && (isset($r['timeframe']) && $r['timeframe'] === '15min')
-                        && (!isset($r['confidence']) || $r['confidence'] !== 'disputed');
-                }));
-                usort($filtered, function ($a, $b) {
-                    return strcmp($b['candle_open_time'] ?? '', $a['candle_open_time'] ?? '');
-                });
-                $m15_rows = array_slice($filtered, 0, max($outputsize * ($timeframe === '4h' ? 16 : 4), 40));
-            } else {
                 $m15_rows = $wpdb->get_results($sql, ARRAY_A);
-            }
             if (empty($m15_rows)) {
                 return array();
             }
@@ -9248,17 +9207,6 @@ final class SMC_SuperFib_Sniper_REST {
             $normalized_symbol
         ), ARRAY_A);
 
-        if (!$row) {
-            // Test harness fallback: TestWpdb stores rows in-memory in $wpdb->tables
-            if (is_object($wpdb) && property_exists($wpdb, 'tables') && isset($wpdb->tables[$table])) {
-                foreach ($wpdb->tables[$table] as $r) {
-                    if ((string)($r['feed_key'] ?? '') === (string)$feed_key && (string)($r['normalized_symbol'] ?? '') === (string)$normalized_symbol) {
-                        $row = $r;
-                        break;
-                    }
-                }
-            }
-        }
 
         if (!$row) {
             return null;

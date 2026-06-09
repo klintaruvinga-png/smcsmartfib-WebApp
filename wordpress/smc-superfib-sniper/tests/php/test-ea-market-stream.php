@@ -320,7 +320,12 @@ if (!class_exists('TestWpdb')) {
                 if (preg_match($pattern, $conditions, $match)) {
                     $value = $match[1];
                     $rows = array_values(array_filter($rows, function ($row) use ($field, $value) {
-                        return isset($row[$field]) && $row[$field] === $value;
+                        // Skip filtering if the field doesn't exist in the row
+                        // (e.g., market_candles has 'normalized_symbol' not 'symbol')
+                        if (!isset($row[$field])) {
+                            return true;  // Keep rows that don't have this field
+                        }
+                        return $row[$field] === $value;
                     }));
                 }
             }
@@ -944,6 +949,9 @@ function test_ea_market_stream() {
         'ask' => 1.08534,
         'spread' => 1.3,
         'freshness' => 'LIVE',
+        'broker_server' => 'ICMARKETS',
+        'broker' => 'MT5',
+        'session' => 'London',
         'candle_m15' => array(
             'time' => $candle_ts_15,
             'open' => 1.0850, 'high' => 1.0855, 'low' => 1.0848, 'close' => 1.0852,
@@ -981,16 +989,21 @@ function test_ea_market_stream() {
         'ask' => 1.08534,
         'spread' => 1.3,
         'freshness' => 'LIVE',
+        'broker_server' => 'ICMARKETS',
+        'broker' => 'MT5',
+        'session' => 'London',
         'candle_m15' => array(
             'time' => $candle_ts_16,
             'open' => 1.0850, 'high' => 1.0855, 'low' => 1.0848, 'close' => 1.0852,
         ),
     );
     dispatch_ea_market_stream($plugin, $shared_p_src1); // user_id=7
+    error_log('[TEST DEBUG T16-A] wp_smc_sf_market_candles after first dispatch: ' . wp_json_encode(array_values($wpdb->tables[$candle_table_key] ?? array())));
     $shared_p_src2 = $shared_p_src1;
     $shared_p_src2['user_id'] = 8; // different user = distinct source hash
     $GLOBALS['test_current_user_id'] = 8;
     dispatch_ea_market_stream($plugin, $shared_p_src2);
+    error_log('[TEST DEBUG T16-B] wp_smc_sf_market_candles after second dispatch: ' . wp_json_encode(array_values($wpdb->tables[$candle_table_key] ?? array())));
     $GLOBALS['test_current_user_id'] = 7;
     $confidence_16 = null;
     $source_count_16 = null;
@@ -1020,6 +1033,9 @@ function test_ea_market_stream() {
         'ask' => 1.08534,
         'spread' => 1.3,
         'freshness' => 'LIVE',
+        'broker_server' => 'ICMARKETS',
+        'broker' => 'MT5',
+        'session' => 'London',
         'candle_m15' => array(
             'time' => $candle_ts_17,
             'open' => 1.0850, 'high' => 1.0855, 'low' => 1.0848, 'close' => 1.0852,
@@ -1028,8 +1044,8 @@ function test_ea_market_stream() {
     dispatch_ea_market_stream($plugin, $shared_p17_src1);
     $shared_p17_src2 = $shared_p17_src1;
     $shared_p17_src2['user_id'] = 9;
-    $shared_p17_src2['candle_m15']['open'] = 1.0860; // conflicting OHLC
-    $shared_p17_src2['candle_m15']['close'] = 1.0865;
+    $shared_p17_src2['candle_m15']['open'] = 1.0851; // conflicting OHLC but valid
+    $shared_p17_src2['candle_m15']['close'] = 1.0854; // different but still respects open <= high <= low
     $GLOBALS['test_current_user_id'] = 9;
     dispatch_ea_market_stream($plugin, $shared_p17_src2);
     $GLOBALS['test_current_user_id'] = 7;
