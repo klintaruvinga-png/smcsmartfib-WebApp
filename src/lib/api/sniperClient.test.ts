@@ -377,7 +377,16 @@ describe("unified snapshot client contract", () => {
 
   it("getUnifiedSnapshot calls /snapshot/unified with a cache-bust token", async () => {
     const payload = {
-      prices: [{ symbol: "EURUSD", bid: 1.1, ask: 1.10012, mid: 1.10006, changePct1d: 0, state: "live" }],
+      prices: [
+        {
+          symbol: "EURUSD",
+          bid: 1.1,
+          ask: 1.10012,
+          mid: 1.10006,
+          changePct1d: 0,
+          state: "live",
+        },
+      ],
       regimes: [],
       gates: [],
       diagnostics: [],
