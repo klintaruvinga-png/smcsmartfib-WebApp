@@ -4,6 +4,7 @@ define('ABSPATH', __DIR__ . '/');
 define('ARRAY_A', 'ARRAY_A');
 
 $GLOBALS['test_registered_routes'] = array();
+$GLOBALS['test_options'] = array();
 $GLOBALS['test_transients'] = array();
 $GLOBALS['test_user_meta'] = array();
 $GLOBALS['test_current_user_id'] = 1;
@@ -94,6 +95,14 @@ if (!defined('SMC_SF_EA_API_KEY')) {
     define('SMC_SF_EA_API_KEY', 'test-key');
 }
 
+if (!defined('MINUTE_IN_SECONDS')) {
+    define('MINUTE_IN_SECONDS', 60);
+}
+
+if (!defined('HOUR_IN_SECONDS')) {
+    define('HOUR_IN_SECONDS', 3600);
+}
+
 if (!function_exists('get_userdata')) {
     function get_userdata($user_id) {
         return $user_id > 0 ? (object) array('ID' => $user_id) : false;
@@ -147,6 +156,39 @@ if (!function_exists('delete_transient')) {
 if (!function_exists('sanitize_key')) {
     function sanitize_key($key) {
         return strtolower(preg_replace('/[^a-zA-Z0-9_\\-]/', '', (string) $key));
+    }
+}
+
+if (!function_exists('get_option')) {
+    function get_option($key, $default = false) {
+        return $GLOBALS['test_options'][$key] ?? $default;
+    }
+}
+
+if (!function_exists('update_option')) {
+    function update_option($key, $value, $autoload = true) {
+        $GLOBALS['test_options'][$key] = $value;
+        return true;
+    }
+}
+
+if (!function_exists('get_user_meta')) {
+    function get_user_meta($user_id, $key, $single = false) {
+        if (!isset($GLOBALS['test_user_meta'][$user_id])) {
+            return $single ? '' : array();
+        }
+        $value = $GLOBALS['test_user_meta'][$user_id][$key] ?? '';
+        return $single ? $value : array($value);
+    }
+}
+
+if (!function_exists('update_user_meta')) {
+    function update_user_meta($user_id, $key, $value) {
+        if (!isset($GLOBALS['test_user_meta'][$user_id])) {
+            $GLOBALS['test_user_meta'][$user_id] = array();
+        }
+        $GLOBALS['test_user_meta'][$user_id][$key] = $value;
+        return true;
     }
 }
 
@@ -222,6 +264,69 @@ if (!class_exists('TestWpdb')) {
             return null;
         }
 
+        public function query($sql) {
+            $this->queries[] = array('type' => 'query', 'sql' => $sql);
+            return 1;
+        }
+
+        public function get_row($query, $output = ARRAY_A) {
+            $results = $this->get_results($query, $output);
+            return $results ? reset($results) : null;
+        }
+
+        public function get_results($query, $output = ARRAY_A) {
+            if (!preg_match('/SELECT .* FROM ([^ ]+) WHERE (.+)$/', $query, $matches)) {
+                return array();
+            }
+
+            $table = $matches[1];
+            $conditions = $matches[2];
+            $rows = array_values($this->tables[$table] ?? array());
+
+            $rows = $this->apply_where_filters($rows, $conditions);
+
+            if (preg_match('/ORDER BY ([^\s]+) DESC/', $conditions, $match)) {
+                $order_col = $match[1];
+                usort($rows, function ($a, $b) use ($order_col) {
+                    return strcmp($b[$order_col] ?? '', $a[$order_col] ?? '');
+                });
+            }
+            if (preg_match('/LIMIT (\d+)/', $conditions, $match)) {
+                $limit = (int) $match[1];
+                $rows = array_slice($rows, 0, $limit);
+            }
+            return $rows;
+        }
+
+        private function apply_where_filters(array $rows, $conditions) {
+            $patterns = array(
+                'feed_key' => "/feed_key = '([^']+)'/",
+                'normalized_symbol' => "/normalized_symbol = '([^']+)'/",
+                'timeframe' => "/timeframe = '([^']+)'/",
+                'candle_open_time' => "/candle_open_time = '([^']+)'/",
+                'symbol' => "/symbol = '([^']+)'/",
+            );
+
+            foreach ($patterns as $field => $pattern) {
+                if (preg_match($pattern, $conditions, $match)) {
+                    $value = $match[1];
+                    $rows = array_values(array_filter($rows, function ($row) use ($field, $value) {
+                        return isset($row[$field]) && $row[$field] === $value;
+                    }));
+                }
+            }
+
+            // Handle non-equality confidence filter: confidence <> 'disputed' or confidence != 'disputed'
+            if (preg_match("/confidence\s*(?:<>|!=)\s*'([^']+)'/", $conditions, $match)) {
+                $excluded_value = $match[1];
+                $rows = array_values(array_filter($rows, function ($row) use ($excluded_value) {
+                    return !isset($row['confidence']) || $row['confidence'] !== $excluded_value;
+                }));
+            }
+
+            return $rows;
+        }
+
         public function insert($table, $data, $formats = array()) {
             $this->queries[] = array('type' => 'insert', 'table' => $table, 'data' => $data);
             if (!isset($this->tables[$table])) {
@@ -236,6 +341,10 @@ if (!class_exists('TestWpdb')) {
                 return $data['user_id'] . '_' . $data['symbol'];
             } elseif ($table === 'wp_smc_sf_candles') {
                 return $data['user_id'] . '_' . $data['symbol'] . '_' . $data['timeframe'] . '_' . $data['candle_time'];
+            } elseif ($table === 'wp_smc_sf_market_quotes_latest') {
+                return ($data['feed_key'] ?? '') . '_' . ($data['normalized_symbol'] ?? '');
+            } elseif ($table === 'wp_smc_sf_market_candles') {
+                return ($data['feed_key'] ?? '') . '_' . ($data['normalized_symbol'] ?? '') . '_' . ($data['timeframe'] ?? '') . '_' . ($data['candle_open_time'] ?? '');
             }
             return md5(serialize($data));
         }
@@ -281,6 +390,13 @@ function dispatch_ea_market_stream($plugin, $payload, $headers = array()) {
         return $permission;
     }
     return $plugin->post_ea_market_stream($request);
+}
+
+function assert_test($condition, $message) {
+    if (!$condition) {
+        throw new RuntimeException($message);
+    }
+    echo "✓ SUCCESS: {$message}\n";
 }
 
 // Test the EA market stream endpoint
@@ -800,8 +916,234 @@ function test_ea_market_stream() {
         var_dump($stale_qt_response);
     }
 
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // Tests 15–19: shared candle source/confidence + feed_key scoping
+    // ────────────────────────────────────────────────────────────────────────────
+
+    echo "Test 15: Same source retry does not increment source_count\n";
+    $candle_table_key = 'wp_smc_sf_market_candles';
+    // Clear shared candle table for isolation
+    $wpdb->tables[$candle_table_key] = array();
+    $candle_ts_15 = gmdate('c', time() - 90);
+    $shared_candle_payload_a = array(
+        'user_id' => 7,
+        'symbol' => 'EURUSD',
+        'timeframe' => 'M15',
+        'timestamp' => gmdate('c', time() - 5),
+        'bid' => 1.08521,
+        'ask' => 1.08534,
+        'spread' => 1.3,
+        'freshness' => 'LIVE',
+        'candle_m15' => array(
+            'time' => $candle_ts_15,
+            'open' => 1.0850, 'high' => 1.0855, 'low' => 1.0848, 'close' => 1.0852,
+            'volume' => 100,
+        ),
+    );
+    dispatch_ea_market_stream($plugin, $shared_candle_payload_a);
+    $count_before = count($wpdb->tables[$candle_table_key] ?? array());
+    dispatch_ea_market_stream($plugin, $shared_candle_payload_a); // retry from same source
+    $rows_after = array_values($wpdb->tables[$candle_table_key] ?? array());
+    $source_count_after_retry = null;
+    foreach ($rows_after as $r) {
+        if (($r['timeframe'] ?? '') === '15min') {
+            $source_count_after_retry = (int) ($r['source_count'] ?? 0);
+        }
+    }
+    if ($source_count_after_retry === 1) {
+        echo "✓ SUCCESS: Same-source retry did not increment source_count (still 1)\n";
+    } else {
+        echo "✗ FAILED: source_count after same-source retry = " . var_export($source_count_after_retry, true) . " (expected 1)\n";
+    }
+
+    echo "\n";
+
+    echo "Test 16: Second distinct source with same OHLC promotes confidence to 'confirmed'\n";
+    $wpdb->tables[$candle_table_key] = array();
+    $candle_ts_16 = gmdate('c', time() - 110);
+    $shared_p_src1 = array(
+        'user_id' => 7,
+        'symbol' => 'EURUSD',
+        'timeframe' => 'M15',
+        'timestamp' => gmdate('c', time() - 5),
+        'bid' => 1.08521,
+        'ask' => 1.08534,
+        'spread' => 1.3,
+        'freshness' => 'LIVE',
+        'candle_m15' => array(
+            'time' => $candle_ts_16,
+            'open' => 1.0850, 'high' => 1.0855, 'low' => 1.0848, 'close' => 1.0852,
+        ),
+    );
+    dispatch_ea_market_stream($plugin, $shared_p_src1); // user_id=7
+    $shared_p_src2 = $shared_p_src1;
+    $shared_p_src2['user_id'] = 8; // different user = distinct source hash
+    $GLOBALS['test_current_user_id'] = 8;
+    dispatch_ea_market_stream($plugin, $shared_p_src2);
+    $GLOBALS['test_current_user_id'] = 7;
+    $confidence_16 = null;
+    $source_count_16 = null;
+    foreach (array_values($wpdb->tables[$candle_table_key] ?? array()) as $r) {
+        if (($r['timeframe'] ?? '') === '15min') {
+            $confidence_16 = $r['confidence'] ?? null;
+            $source_count_16 = (int) ($r['source_count'] ?? 0);
+        }
+    }
+    if ($confidence_16 === 'confirmed' && $source_count_16 === 2) {
+        echo "✓ SUCCESS: Second distinct source with same OHLC: confidence=confirmed, source_count=2\n";
+    } else {
+        echo "✗ FAILED: confidence=" . var_export($confidence_16, true) . " source_count=" . var_export($source_count_16, true) . " (expected confirmed/2)\n";
+    }
+
+    echo "\n";
+
+    echo "Test 17: Second distinct source with different OHLC sets confidence='disputed', canonical OHLC unchanged\n";
+    $wpdb->tables[$candle_table_key] = array();
+    $candle_ts_17 = gmdate('c', time() - 130);
+    $shared_p17_src1 = array(
+        'user_id' => 7,
+        'symbol' => 'EURUSD',
+        'timeframe' => 'M15',
+        'timestamp' => gmdate('c', time() - 5),
+        'bid' => 1.08521,
+        'ask' => 1.08534,
+        'spread' => 1.3,
+        'freshness' => 'LIVE',
+        'candle_m15' => array(
+            'time' => $candle_ts_17,
+            'open' => 1.0850, 'high' => 1.0855, 'low' => 1.0848, 'close' => 1.0852,
+        ),
+    );
+    dispatch_ea_market_stream($plugin, $shared_p17_src1);
+    $shared_p17_src2 = $shared_p17_src1;
+    $shared_p17_src2['user_id'] = 9;
+    $shared_p17_src2['candle_m15']['open'] = 1.0860; // conflicting OHLC
+    $shared_p17_src2['candle_m15']['close'] = 1.0865;
+    $GLOBALS['test_current_user_id'] = 9;
+    dispatch_ea_market_stream($plugin, $shared_p17_src2);
+    $GLOBALS['test_current_user_id'] = 7;
+    $confidence_17 = null;
+    $open_17 = null;
+    foreach (array_values($wpdb->tables[$candle_table_key] ?? array()) as $r) {
+        if (($r['timeframe'] ?? '') === '15min') {
+            $confidence_17 = $r['confidence'] ?? null;
+            $open_17 = (float) ($r['open'] ?? 0);
+        }
+    }
+    if ($confidence_17 === 'disputed' && abs($open_17 - 1.0850) < 0.0001) {
+        echo "✓ SUCCESS: Conflicting OHLC: confidence=disputed, canonical open preserved (1.0850)\n";
+    } else {
+        echo "✗ FAILED: confidence=" . var_export($confidence_17, true) . " open=" . var_export($open_17, true) . " (expected disputed, open=1.0850)\n";
+    }
+
+    echo "\n";
+
+    echo "Test 18: fetch_shared_market_candles ignores rows from a different feed_key\n";
+    // Seed a row under a different feed_key
+    $wpdb->tables[$candle_table_key] = array();
+    $foreign_candle = array(
+        'id' => null,
+        'feed_key' => 'FOREIGN_BROKER|LONDON',
+        'normalized_symbol' => 'EURUSD',
+        'timeframe' => '15min',
+        'candle_open_time' => gmdate('Y-m-d H:i:s', time() - 900),
+        'open' => 1.0800, 'high' => 1.0810, 'low' => 1.0795, 'close' => 1.0805,
+        'volume' => '50.0000',
+        'source_count' => 1,
+        'source_hashes' => '["abc"]',
+        'first_seen_at' => gmdate('Y-m-d H:i:s'),
+        'last_seen_at' => gmdate('Y-m-d H:i:s'),
+        'confidence' => 'single',
+    );
+    $wpdb->replace($candle_table_key, $foreign_candle);
+    // resolve_user_shared_feed_key reads market_quotes_latest — clear it so it returns ''
+    $wpdb->tables['wp_smc_sf_market_quotes_latest'] = array();
+    // Directly test the method via reflection with a different feed_key to verify filtering
+    $ref = new ReflectionMethod($plugin, 'fetch_shared_market_candles');
+    $ref->setAccessible(true);
+    $result_18 = $ref->invoke($plugin, 'LOCAL_BROKER|LONDON', 'EURUSD', '15min', 50);
+    if (empty($result_18)) {
+        echo "✓ SUCCESS: Different feed_key returns no shared candles (foreign rows ignored)\n";
+    } else {
+        echo "✗ FAILED: Got " . count($result_18) . " candle(s) with different feed_key (expected 0)\n";
+    }
+
+    echo "\n";
+
+    echo "Test 19: Stale shared candles trigger fallback (return empty)\n";
+    $wpdb->tables[$candle_table_key] = array();
+    $stale_candle = array(
+        'id' => null,
+        'feed_key' => 'STALEBROKER',
+        'normalized_symbol' => 'EURUSD',
+        'timeframe' => '15min',
+        'candle_open_time' => gmdate('Y-m-d H:i:s', time() - 7200), // 2 hours old > 45-min TTL
+        'open' => 1.0800, 'high' => 1.0810, 'low' => 1.0795, 'close' => 1.0805,
+        'volume' => '50.0000',
+        'source_count' => 1,
+        'source_hashes' => '["abc"]',
+        'first_seen_at' => gmdate('Y-m-d H:i:s', time() - 7200),
+        'last_seen_at' => gmdate('Y-m-d H:i:s', time() - 7200),
+        'confidence' => 'single',
+    );
+    $wpdb->replace($candle_table_key, $stale_candle);
+    $ref19 = new ReflectionMethod($plugin, 'fetch_shared_market_candles');
+    $ref19->setAccessible(true);
+    $result_19 = $ref19->invoke($plugin, 'STALEBROKER', 'EURUSD', '15min', 50);
+    if (empty($result_19)) {
+        echo "✓ SUCCESS: Stale shared candles return empty (fallback triggered)\n";
+    } else {
+        echo "✗ FAILED: Stale candles not rejected; got " . count($result_19) . " row(s)\n";
+    }
+
+    echo "\n";
+
+    echo "Test 20: M15 canonical rows derive correct H1/H4 OHLC in order\n";
+    $wpdb->tables[$candle_table_key] = array();
+    $base_time = time() - 3600;
+    $m15_rows = array(
+        array('time' => gmdate('c', $base_time + 0 * 900), 'open' => 1.1000, 'high' => 1.1010, 'low' => 1.0990, 'close' => 1.1005),
+        array('time' => gmdate('c', $base_time + 1 * 900), 'open' => 1.1005, 'high' => 1.1020, 'low' => 1.1000, 'close' => 1.1015),
+        array('time' => gmdate('c', $base_time + 2 * 900), 'open' => 1.1015, 'high' => 1.1030, 'low' => 1.1010, 'close' => 1.1025),
+        array('time' => gmdate('c', $base_time + 3 * 900), 'open' => 1.1025, 'high' => 1.1040, 'low' => 1.1020, 'close' => 1.1035),
+    );
+
+    foreach ($m15_rows as $row) {
+        $wpdb->replace($candle_table_key, array(
+            'id' => null,
+            'feed_key' => 'H1H4_TEST_FEED',
+            'normalized_symbol' => 'EURUSD',
+            'timeframe' => '15min',
+            'candle_open_time' => gmdate('Y-m-d H:i:s', strtotime($row['time'])),
+            'open' => $row['open'],
+            'high' => $row['high'],
+            'low' => $row['low'],
+            'close' => $row['close'],
+            'volume' => '100.0000',
+            'source_count' => 1,
+            'source_hashes' => '[]',
+            'first_seen_at' => gmdate('Y-m-d H:i:s', strtotime($row['time'])),
+            'last_seen_at' => gmdate('Y-m-d H:i:s', strtotime($row['time'])),
+            'confidence' => 'confirmed',
+        ));
+    }
+
+    $ref20 = new ReflectionMethod($plugin, 'fetch_shared_market_candles');
+    $ref20->setAccessible(true);
+    $result_20 = $ref20->invoke($plugin, 'H1H4_TEST_FEED', 'EURUSD', '1h', 1);
+    assert_test(
+        count($result_20) === 1 && isset($result_20[0]['open'], $result_20[0]['high'], $result_20[0]['low'], $result_20[0]['close']),
+        'H1 derived candle should be returned from M15 source rows'
+    );
+    assert_test(
+        abs($result_20[0]['open'] - 1.1000) < 0.000001 && abs($result_20[0]['high'] - 1.1040) < 0.000001 && abs($result_20[0]['low'] - 1.0990) < 0.000001 && abs($result_20[0]['close'] - 1.1035) < 0.000001,
+        'H1 candle OHLC should aggregate M15 rows correctly'
+    );
+
     echo "\nTest completed.\n";
 }
+
 
 // Run the test
 test_ea_market_stream();

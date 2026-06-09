@@ -1,4 +1,4 @@
-export { fmtPrice, fmtPct, fmtUSC, fmtZAR, relTime, pipDecimals, tickSize } from "./format.js";
+export { fmtPrice, fmtPct, fmtCurrency, fmtUSC, fmtZAR, relTime, pipDecimals, tickSize } from "./format.js";
 
 export {
   isLive,
