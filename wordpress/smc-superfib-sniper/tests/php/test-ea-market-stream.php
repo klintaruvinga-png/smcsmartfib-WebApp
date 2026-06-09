@@ -1000,12 +1000,16 @@ function test_ea_market_stream() {
         ),
     );
     dispatch_ea_market_stream($plugin, $shared_p_src1); // user_id=7
-    error_log('[TEST DEBUG T16-A] wp_smc_sf_market_candles after first dispatch: ' . wp_json_encode(array_values($wpdb->tables[$candle_table_key] ?? array())));
+    if (defined('WP_SMC_SF_DEBUG') && WP_SMC_SF_DEBUG) {
+        error_log('[TEST DEBUG T16-A] wp_smc_sf_market_candles after first dispatch: ' . wp_json_encode(array_values($wpdb->tables[$candle_table_key] ?? array())));
+    }
     $shared_p_src2 = $shared_p_src1;
     $shared_p_src2['user_id'] = 8; // different user = distinct source hash
     $GLOBALS['test_current_user_id'] = 8;
     dispatch_ea_market_stream($plugin, $shared_p_src2);
-    error_log('[TEST DEBUG T16-B] wp_smc_sf_market_candles after second dispatch: ' . wp_json_encode(array_values($wpdb->tables[$candle_table_key] ?? array())));
+    if (defined('WP_SMC_SF_DEBUG') && WP_SMC_SF_DEBUG) {
+        error_log('[TEST DEBUG T16-B] wp_smc_sf_market_candles after second dispatch: ' . wp_json_encode(array_values($wpdb->tables[$candle_table_key] ?? array())));
+    }
     $GLOBALS['test_current_user_id'] = 7;
     $confidence_16 = null;
     $source_count_16 = null;
@@ -1047,7 +1051,7 @@ function test_ea_market_stream() {
     $shared_p17_src2 = $shared_p17_src1;
     $shared_p17_src2['user_id'] = 9;
     $shared_p17_src2['candle_m15']['open'] = 1.0851; // conflicting OHLC but valid
-    $shared_p17_src2['candle_m15']['close'] = 1.0854; // different but still respects open <= high <= low
+    $shared_p17_src2['candle_m15']['close'] = 1.0854; // low <= min(open,close) and max(open,close) <= high
     $GLOBALS['test_current_user_id'] = 9;
     dispatch_ea_market_stream($plugin, $shared_p17_src2);
     $GLOBALS['test_current_user_id'] = 7;
