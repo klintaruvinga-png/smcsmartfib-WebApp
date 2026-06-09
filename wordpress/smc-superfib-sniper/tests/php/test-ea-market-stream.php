@@ -284,7 +284,13 @@ if (!class_exists('TestWpdb')) {
         }
 
         public function get_results($query, $output = ARRAY_A) {
-            if (!preg_match('/SELECT .* FROM ([^ ]+) WHERE (.+)$/', $query, $matches)) {
+            // Normalise whitespace so multiline SQL (e.g. fetch_shared_market_quote) is
+            // parsed correctly. Without this, the regex fails on queries whose SELECT,
+            // FROM, and WHERE clauses span multiple lines, making get_row() return null
+            // and causing Test 21 to fall back to the per-user snapshot instead of the
+            // seeded shared quote row.
+            $query = preg_replace('/\s+/', ' ', trim($query));
+            if (!preg_match('/SELECT .* FROM ([^ ]+) WHERE (.+)$/s', $query, $matches)) {
                 return array();
             }
 
@@ -1201,6 +1207,14 @@ function test_ea_market_stream() {
     ));
     // Store the feed_key in user meta so resolve_user_shared_feed_key() finds it
     update_user_meta(7, 'smc_sf_shared_feed_key_' . md5('EURUSD'), 'ICMARKETS_SV');
+    // Setup assertion: confirm fetch_shared_market_quote() itself resolves the seeded row
+    // before exercising the full get_cached_price() read-through path.
+    // If this fails, the mock query/filter layer is not returning the seeded shared quote row.
+    $direct_21 = $ref_shared_quote->invoke($plugin, 7, 'EURUSD', 300);
+    assert_test(
+        isset($direct_21['sourceDetail']) && $direct_21['sourceDetail'] === 'shared_market_quote',
+        'Test 21 setup: fetch_shared_market_quote() should find the seeded shared quote row'
+    );
     $result_21 = $ref_get_cached->invoke($plugin, 7, 'EURUSD', 300);
     assert_test(
         isset($result_21['source']) && $result_21['source'] === 'mt5',
