@@ -430,7 +430,7 @@ function normalizeSnapshot(snapshot: {
 
 // Public / shared
 export const apiClient = {
-  async getSnapshot(mock = MOCK_MODE) {
+  async getUnifiedSnapshot(mock = MOCK_MODE) {
     if (mock) {
       const wl = new Set(mockSettings.watchlist);
       return {
@@ -445,8 +445,12 @@ export const apiClient = {
       regimes: RegimeState[];
       gates: GateState[];
       diagnostics: SymbolDiagnostic[];
-    }>("/snapshot", { cacheBust: true });
+    }>("/snapshot/unified", { cacheBust: true });
     return normalizeSnapshot(snapshot);
+  },
+  /** Compatibility alias — delegates to getUnifiedSnapshot. */
+  async getSnapshot(mock = MOCK_MODE) {
+    return this.getUnifiedSnapshot(mock);
   },
   async getChartSnapshot(
     symbol: Symbol,

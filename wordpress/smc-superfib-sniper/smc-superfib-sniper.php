@@ -18,6 +18,7 @@ require_once __DIR__ . '/class-plugin-utils.php';
 require_once __DIR__ . '/class-settings-service.php';
 require_once __DIR__ . '/class-watchlist-service.php';
 require_once __DIR__ . '/class-route-registrar.php';
+require_once __DIR__ . '/class-signal-aggregator.php';
 
 final class SMC_SuperFib_Sniper_REST {
     const VERSION = '13.1.0';
@@ -2107,6 +2108,70 @@ final class SMC_SuperFib_Sniper_REST {
         $user_id = get_current_user_id();
         $snapshot = $this->ensure_engine_snapshot($user_id);
         return $this->no_cache_response($snapshot);
+    }
+
+    /**
+     * GET /snapshot/unified
+     *
+     * Returns the engine snapshot with prices deduped to one entry per canonical
+     * symbol. Uses SMC_SF_Signal_Aggregator for pure dedupe logic so the main
+     * class stays free of freshness-ranking details.
+     *
+     * The route registrar wires callbacks against the plugin instance ($this), so
+     * this method must live on SMC_SuperFib_Sniper_REST — not on the aggregator.
+     */
+    public function get_unified_snapshot() {
+        $user_id  = get_current_user_id();
+        $snapshot = $this->ensure_engine_snapshot( $user_id );
+
+        if ( is_wp_error( $snapshot ) ) {
+            return $snapshot;
+        }
+
+        if ( ! is_array( $snapshot ) ) {
+            return $this->no_cache_response( array(
+                'prices'      => array(),
+                'regimes'     => array(),
+                'gates'       => array(),
+                'diagnostics' => array(),
+                'meta'        => array(
+                    'source'  => 'backend-unified',
+                    'deduped' => false,
+                    'error'   => 'snapshot_not_array',
+                ),
+            ) );
+        }
+
+        $aggregator = new SMC_SF_Signal_Aggregator();
+
+        $raw_prices    = is_array( $snapshot['prices'] ?? null ) ? $snapshot['prices'] : array();
+        $deduped_prices = $aggregator->dedupe_by_canonical_symbol(
+            $raw_prices,
+            array( $this, 'normalize_canonical_symbol' )
+        );
+
+        $snapshot['prices'] = $deduped_prices;
+        $snapshot['meta']   = array_merge(
+            is_array( $snapshot['meta'] ?? null ) ? $snapshot['meta'] : array(),
+            array(
+                'source'      => 'backend-unified',
+                'deduped'     => true,
+                'sourceCount' => count( $deduped_prices ),
+            )
+        );
+
+        return $this->no_cache_response( $snapshot );
+    }
+
+    /**
+     * Public proxy so SMC_SF_Signal_Aggregator can call the private alias map
+     * without needing a reference to the plugin instance internals.
+     *
+     * @param  string $symbol Raw broker symbol string.
+     * @return string         Canonical symbol (e.g. "USDCHF.c" → "USDCHF").
+     */
+    public function normalize_canonical_symbol( string $symbol ): string {
+        return $this->map_symbol_aliases( $symbol );
     }
 
     // MT5 webhook — process and store market data from MT5 EA

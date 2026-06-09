@@ -364,3 +364,72 @@ describe("ladders client contract", () => {
     );
   });
 });
+
+describe("unified snapshot client contract", () => {
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("getUnifiedSnapshot calls /snapshot/unified with a cache-bust token", async () => {
+    const payload = {
+      prices: [{ symbol: "EURUSD", bid: 1.1, ask: 1.10012, mid: 1.10006, changePct1d: 0, state: "live" }],
+      regimes: [],
+      gates: [],
+      diagnostics: [],
+    };
+
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await apiClient.getUnifiedSnapshot(false);
+
+    expect(result.prices).toHaveLength(1);
+    expect(result.prices[0].symbol).toBe("EURUSD");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/sniper\/v1\/snapshot\/unified\?_=\d+$/),
+      expect.objectContaining({
+        method: "GET",
+        cache: "no-store",
+      }),
+    );
+  });
+
+  it("getSnapshot is a compatibility alias that calls /snapshot/unified", async () => {
+    const payload = {
+      prices: [],
+      regimes: [],
+      gates: [],
+      diagnostics: [],
+    };
+
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiClient.getSnapshot(false);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/sniper\/v1\/snapshot\/unified\?_=\d+$/),
+      expect.anything(),
+    );
+  });
+});
