@@ -953,6 +953,7 @@ function test_ea_market_stream() {
     dispatch_ea_market_stream($plugin, $shared_candle_payload_a);
     $count_before = count($wpdb->tables[$candle_table_key] ?? array());
     dispatch_ea_market_stream($plugin, $shared_candle_payload_a); // retry from same source
+    error_log('[TEST DEBUG] wp_smc_sf_market_candles after retries: ' . wp_json_encode(array_values($wpdb->tables[$candle_table_key] ?? array())));
     $rows_after = array_values($wpdb->tables[$candle_table_key] ?? array());
     $source_count_after_retry = null;
     foreach ($rows_after as $r) {
