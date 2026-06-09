@@ -32,6 +32,13 @@ $filtered = array_filter($rows, function ($row) use ($conditions) {
             }
         }
     }
+    // Handle non-equality confidence filter: confidence <> 'disputed' or confidence != 'disputed'
+    if (preg_match("/confidence\s*(?:<>|!=)\s*'([^']+)'/", $conditions, $match)) {
+        $excluded_value = $match[1];
+        if (isset($row['confidence']) && $row['confidence'] === $excluded_value) {
+            return false;
+        }
+    }
     return true;
 });
 $rows = array_values($filtered);

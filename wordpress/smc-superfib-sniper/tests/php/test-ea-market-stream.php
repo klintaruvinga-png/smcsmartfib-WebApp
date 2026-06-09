@@ -316,6 +316,14 @@ if (!class_exists('TestWpdb')) {
                 }
             }
 
+            // Handle non-equality confidence filter: confidence <> 'disputed' or confidence != 'disputed'
+            if (preg_match("/confidence\s*(?:<>|!=)\s*'([^']+)'/", $conditions, $match)) {
+                $excluded_value = $match[1];
+                $rows = array_values(array_filter($rows, function ($row) use ($excluded_value) {
+                    return !isset($row['confidence']) || $row['confidence'] !== $excluded_value;
+                }));
+            }
+
             return $rows;
         }
 
@@ -1051,14 +1059,14 @@ function test_ea_market_stream() {
     $wpdb->replace($candle_table_key, $foreign_candle);
     // resolve_user_shared_feed_key reads market_quotes_latest — clear it so it returns ''
     $wpdb->tables['wp_smc_sf_market_quotes_latest'] = array();
-    // Directly test the method via reflection
+    // Directly test the method via reflection with a different feed_key to verify filtering
     $ref = new ReflectionMethod($plugin, 'fetch_shared_market_candles');
     $ref->setAccessible(true);
-    $result_18 = $ref->invoke($plugin, '', 'EURUSD', '15min', 50);
+    $result_18 = $ref->invoke($plugin, 'LOCAL_BROKER|LONDON', 'EURUSD', '15min', 50);
     if (empty($result_18)) {
-        echo "✓ SUCCESS: Empty feed_key returns no shared candles (foreign rows ignored)\n";
+        echo "✓ SUCCESS: Different feed_key returns no shared candles (foreign rows ignored)\n";
     } else {
-        echo "✗ FAILED: Got " . count($result_18) . " candle(s) when feed_key='' (expected 0)\n";
+        echo "✗ FAILED: Got " . count($result_18) . " candle(s) with different feed_key (expected 0)\n";
     }
 
     echo "\n";

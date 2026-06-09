@@ -1050,7 +1050,7 @@ final class SMC_SuperFib_Sniper_REST {
         return array(
             "CREATE TABLE {$wpdb->prefix}smc_sf_market_quotes_latest (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            feed_key VARCHAR(120) NOT NULL,
+            feed_key VARCHAR(191) NOT NULL,
             symbol VARCHAR(40) NOT NULL,
             normalized_symbol VARCHAR(40) NOT NULL,
             bid DECIMAL(20,8) NULL,
@@ -1065,7 +1065,7 @@ final class SMC_SuperFib_Sniper_REST {
         ) $charset;",
             "CREATE TABLE {$wpdb->prefix}smc_sf_market_candles (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            feed_key VARCHAR(120) NOT NULL,
+            feed_key VARCHAR(191) NOT NULL,
             normalized_symbol VARCHAR(40) NOT NULL,
             timeframe VARCHAR(10) NOT NULL,
             candle_open_time DATETIME NOT NULL,
@@ -1125,11 +1125,21 @@ final class SMC_SuperFib_Sniper_REST {
             return;
         }
 
+        $has_error = false;
         foreach (self::shared_market_table_sql() as $sql) {
-            dbDelta($sql);
+            $result = dbDelta($sql);
+            if (!empty($wpdb->last_error)) {
+                error_log(sprintf(
+                    '[SMC_SF] shared_market_tables dbDelta error: %s',
+                    $wpdb->last_error
+                ));
+                $has_error = true;
+            }
         }
 
-        update_option('smc_sf_shared_market_schema_version', self::SMC_SF_SHARED_MARKET_SCHEMA_VERSION, false);
+        if (!$has_error) {
+            update_option('smc_sf_shared_market_schema_version', self::SMC_SF_SHARED_MARKET_SCHEMA_VERSION, false);
+        }
     }
 
     private function table_exists(string $table): bool {
@@ -2647,7 +2657,6 @@ final class SMC_SuperFib_Sniper_REST {
         $broker = $this->sanitize_ea_text($payload['broker'] ?? '', 96);
         $broker_server = $this->sanitize_ea_text($payload['broker_server'] ?? '', 128);
         $shared_feed_key = $this->normalize_market_feed_key($broker_server, $broker, $phase3_session);
-        $this->persist_user_shared_feed_key($user_id, $symbol, $shared_feed_key);
 
         if ($this->is_phase3_market_stream_payload($payload)) {
             $phase3_validation_error = $this->validate_phase3_market_stream_payload($payload);
@@ -2736,6 +2745,9 @@ final class SMC_SuperFib_Sniper_REST {
                 error_log("MT5 DRIFT WARNING: {$symbol} | payload_age={$age_seconds}s | snapshot will write, candle gated separately");
             }
         }
+
+        // Persist the shared feed key only after Phase 3 validation and timestamp checks pass
+        $this->persist_user_shared_feed_key($user_id, $symbol, $shared_feed_key);
 
         $inserted_snapshots = 0;
         $inserted_candles = 0;
