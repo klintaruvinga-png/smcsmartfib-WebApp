@@ -10,7 +10,7 @@ import {
   useCanonicalWatchlist,
   alignWatchlistItems,
 } from "@/hooks/useSniperData";
-import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
+
 import { useStreamingTicks } from "@/hooks/useStreamingTicks";
 import { fmtPrice, fmtPct } from "@/lib/format";
 import { tickMotionHoldMs, tickMotionStyle, type TickMotionOptions } from "@/lib/tickMotion";
