@@ -1125,6 +1125,7 @@ final class SMC_SuperFib_Sniper_REST {
             return;
         }
 
+        $this->reset_wpdb_error();
         $has_error = false;
         foreach (self::shared_market_table_sql() as $sql) {
             $result = dbDelta($sql);
