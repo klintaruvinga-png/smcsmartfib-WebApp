@@ -9080,7 +9080,95 @@ final class SMC_SuperFib_Sniper_REST {
         return $wpdb->get_row($wpdb->prepare($query, $params), ARRAY_A);
     }
 
+    /**
+     * Fetch the most recent shared market quote for a symbol via the feed_key index.
+     *
+     * Returns null when:
+     *  - the user has no stored feed_key for this symbol (broker_server was absent),
+     *  - the shared table has no row for this feed_key + symbol,
+     *  - the shared quote is older than $max_age_sec.
+     *
+     * $max_age_sec is supplied by get_cached_price() from the caller's own staleness
+     * threshold so PHP_INT_MAX callers (e.g. is_mt5_authoritative()) are not capped
+     * to a hard 90-second limit here.
+     *
+     * Callers must NOT call get_cached_price() from within this helper —
+     * this helper is called BY get_cached_price() to avoid a recursive loop.
+     *
+     * @param int      $user_id
+     * @param string   $symbol      Normalised symbol (e.g. 'EURUSD')
+     * @param int|null $max_age_sec Max acceptable age in seconds; null = no age check
+     * @return array|null  Keys: symbol, bid, ask, mid, changePct1d, source,
+     *                           updatedAt, state, age_sec, feed_key, source_count
+     */
+    private function fetch_shared_market_quote(int $user_id, string $symbol, ?int $max_age_sec = 90): ?array {
+        global $wpdb;
+
+        $feed_key = $this->resolve_user_shared_feed_key($user_id, $symbol);
+        if ($feed_key === '') {
+            return null;
+        }
+
+        $normalized_symbol = $this->map_symbol_aliases($symbol);
+        $table = $this->table('market_quotes_latest');
+
+        $row = $wpdb->get_row($wpdb->prepare(
+            "SELECT bid, ask, mid, updated_at, source_count
+               FROM {$table}
+              WHERE feed_key = %s
+                AND normalized_symbol = %s
+              LIMIT 1",
+            $feed_key,
+            $normalized_symbol
+        ), ARRAY_A);
+
+        if (!$row) {
+            return null;
+        }
+
+        $updated_at_iso = $this->to_iso($row['updated_at'] ?? '');
+        $age_sec = $updated_at_iso ? $this->iso_age_sec($updated_at_iso) : PHP_INT_MAX;
+
+        if ($max_age_sec !== null && $age_sec > $max_age_sec) {
+            return null;
+        }
+
+        $bid = isset($row['bid']) ? (float) $row['bid'] : 0.0;
+        $ask = isset($row['ask']) ? (float) $row['ask'] : 0.0;
+
+        return array(
+            'symbol'       => $symbol,
+            'bid'          => $bid,
+            'ask'          => $ask,
+            'mid'          => isset($row['mid']) ? (float) $row['mid'] : (($bid + $ask) / 2),
+            // changePct1d: null until a shared daily-change calculation is implemented.
+            // Do not fake 0.0 — callers that need this field fall back to per-user snapshot.
+            'changePct1d'  => null,
+            'source'       => 'shared_market_quote',
+            'updatedAt'    => $updated_at_iso,
+            'state'        => 'live',
+            'age_sec'      => (int) $age_sec,
+            'feed_key'     => $feed_key,
+            'source_count' => isset($row['source_count']) ? (int) $row['source_count'] : 1,
+        );
+    }
+
     private function get_cached_price($user_id, $symbol, $stale_threshold_sec = null) {
+        // Shared-quote read-through: prefer the broker-aggregated quote when fresh.
+        // The resolved threshold is passed directly so PHP_INT_MAX callers (e.g.
+        // is_mt5_authoritative()) are not artificially capped by a hard 90-second
+        // cutoff inside fetch_shared_market_quote().
+        // Falls through on null return or invalid bid. Shared quote changePct1d remains
+        // null until shared daily-change calculation is implemented.
+        $threshold = $stale_threshold_sec !== null
+            ? $stale_threshold_sec
+            : $this->get_settings($user_id)['staleThresholdSec'];
+
+        $shared_quote = $this->fetch_shared_market_quote((int) $user_id, (string) $symbol, (int) $threshold);
+        if ($shared_quote !== null && isset($shared_quote['bid']) && $shared_quote['bid'] > 0) {
+            return $shared_quote;
+        }
+
         $row = $this->get_snapshot_row($user_id, $symbol, 'mt5');
         if (!$row) {
             return null;
@@ -9088,9 +9176,6 @@ final class SMC_SuperFib_Sniper_REST {
 
         // HARDENING: Use iso_age_sec() to avoid PHP 8 strtotime issues.
         // Regression guard: Preserve existing logic; extract to variable for clarity.
-        $threshold = $stale_threshold_sec !== null
-            ? $stale_threshold_sec
-            : $this->get_settings($user_id)['staleThresholdSec'];
         $updated_at_iso = $this->to_iso($row['updated_at']);
         $age_sec = $this->iso_age_sec($updated_at_iso);
         $price_state = $age_sec > $threshold
