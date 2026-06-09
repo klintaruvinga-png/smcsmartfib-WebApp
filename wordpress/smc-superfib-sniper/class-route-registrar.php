@@ -38,6 +38,7 @@ final class SMC_SuperFib_Route_Registrar {
             array('path' => '/session', 'methods' => WP_REST_Server::READABLE, 'callback' => 'get_session', 'permission' => 'public'),
             array('path' => '/snapshot', 'methods' => WP_REST_Server::READABLE, 'callback' => 'get_snapshot'),
             array('path' => '/snapshot', 'methods' => WP_REST_Server::CREATABLE, 'callback' => 'post_snapshot'),
+            array('path' => '/snapshot/unified', 'methods' => WP_REST_Server::READABLE, 'callback' => 'get_unified_snapshot'),
             array('path' => '/charts', 'methods' => WP_REST_Server::READABLE, 'callback' => 'get_chart_snapshot'),
             array('path' => '/regimes', 'methods' => WP_REST_Server::READABLE, 'callback' => 'get_regimes'),
             array('path' => '/regime', 'methods' => WP_REST_Server::CREATABLE, 'callback' => 'post_regime'),
