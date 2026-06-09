@@ -5420,8 +5420,13 @@ final class SMC_SuperFib_Sniper_REST {
             return $k <= $last_completed_start && (!empty($buckets[$k]['count']) && $buckets[$k]['count'] >= $expected_count);
         }));
         if (!empty($eligible_keys)) {
-            $key = end($eligible_keys);
-            return array($buckets[$key]);
+            // Return up to $outputsize most-recent buckets
+            $selected_keys = array_slice($eligible_keys, -$outputsize);
+            $result = array();
+            foreach ($selected_keys as $k) {
+                $result[] = $buckets[$k];
+            }
+            return $result;
         }
 
         // No single bucket has enough M15 rows — try merging recent contiguous
