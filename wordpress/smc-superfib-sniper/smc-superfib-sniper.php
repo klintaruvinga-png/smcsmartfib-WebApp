@@ -2777,16 +2777,19 @@ final class SMC_SuperFib_Sniper_REST {
             $inserted_snapshots = 1;
             delete_transient('smc_sf_qt_' . $user_id . '_' . md5($symbol));
             delete_transient($this->rl_transient_key($user_id, $symbol));
-            $this->upsert_shared_market_quote(
-                $shared_feed_key,
-                $symbol,
-                $symbol,
-                $bid,
-                $ask,
-                ($bid + $ask) / 2,
-                $snapshot_updated_at,
-                $this->market_source_user_hash($user_id, $broker_server, $broker)
-            );
+            // Guard: Only upsert to shared market storage if feed_key is non-empty
+            if ($shared_feed_key !== '') {
+                $this->upsert_shared_market_quote(
+                    $shared_feed_key,
+                    $symbol,
+                    $symbol,
+                    $bid,
+                    $ask,
+                    ($bid + $ask) / 2,
+                    $snapshot_updated_at,
+                    $this->market_source_user_hash($user_id, $broker_server, $broker)
+                );
+            }
         }
 
         // Insert candle if provided (closed candle only, dedupe via UNIQUE candle key).
@@ -2829,14 +2832,17 @@ final class SMC_SuperFib_Sniper_REST {
                     if ($result) {
                         $inserted_candles = 1;
                         if ($timeframe === '15min') {
-                            $this->upsert_shared_market_candle(
-                                $shared_feed_key,
-                                $symbol,
-                                '15min',
-                                $candle,
-                                $m1_stream_ts,
-                                $this->market_source_user_hash($user_id, $broker_server, $broker)
-                            );
+                            // Guard: Only upsert to shared market storage if feed_key is non-empty
+                            if ($shared_feed_key !== '') {
+                                $this->upsert_shared_market_candle(
+                                    $shared_feed_key,
+                                    $symbol,
+                                    '15min',
+                                    $candle,
+                                    $m1_stream_ts,
+                                    $this->market_source_user_hash($user_id, $broker_server, $broker)
+                                );
+                            }
                         }
                     } else {
                         error_log("MT5 CANDLE INSERT FAILED: {$symbol} | tf={$timeframe} | time={$candle['time']} | stream_timestamp={$m1_stream_ts}");
@@ -2889,14 +2895,17 @@ final class SMC_SuperFib_Sniper_REST {
                     $result = $this->insert_mt5_candle($user_id, $symbol, '15min', $candle_m15, $m15_stream_ts, 1800, true);
                     if ($result) {
                         $inserted_candles++;
-                        $this->upsert_shared_market_candle(
-                            $shared_feed_key,
-                            $symbol,
-                            '15min',
-                            $candle_m15,
-                            $m15_stream_ts,
-                            $this->market_source_user_hash($user_id, $broker_server, $broker)
-                        );
+                        // Guard: Only upsert to shared market storage if feed_key is non-empty
+                        if ($shared_feed_key !== '') {
+                            $this->upsert_shared_market_candle(
+                                $shared_feed_key,
+                                $symbol,
+                                '15min',
+                                $candle_m15,
+                                $m15_stream_ts,
+                                $this->market_source_user_hash($user_id, $broker_server, $broker)
+                            );
+                        }
                     } else {
                         error_log("MT5 M15 CANDLE INSERT FAILED: {$symbol} | timeframe=15min | time={$candle_m15['time']} | stream_timestamp={$m15_stream_ts}");
                     }
@@ -5084,21 +5093,22 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function normalize_market_feed_key($broker_server, $broker = '', $session = '') {
+        // REQUIREMENT: broker_server is mandatory for shared-market storage.
+        // If broker_server is empty, return empty feed_key so shared quote/candle upserts are skipped.
+        // This prevents unrelated brokers from sharing mixed candle data when broker_server is missing.
         $broker_server = strtoupper(trim((string) $broker_server));
-        $broker = strtoupper(trim((string) $broker));
+        if ($broker_server === '') {
+            return '';
+        }
+
         $session = strtoupper(trim((string) $session));
         $parts = array();
 
         $broker_server = preg_replace('/[^A-Z0-9_\-\+]/', '', $broker_server);
-        $broker = preg_replace('/[^A-Z0-9_\-\+]/', '', $broker);
         $session = preg_replace('/[^A-Z0-9_\-\+]/', '', $session);
 
         if ($broker_server !== '') {
             $parts[] = $broker_server;
-        } elseif ($broker !== '') {
-            $parts[] = $broker;
-        } else {
-            $parts[] = 'UNKNOWN';
         }
 
         if ($session !== '') {
