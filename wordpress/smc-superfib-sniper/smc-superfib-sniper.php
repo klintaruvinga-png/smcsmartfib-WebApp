@@ -9144,7 +9144,10 @@ final class SMC_SuperFib_Sniper_REST {
             // changePct1d: null until a shared daily-change calculation is implemented.
             // Do not fake 0.0 — callers that need this field fall back to per-user snapshot.
             'changePct1d'  => null,
-            'source'       => 'shared_market_quote',
+            // Keep `source` MT5-compatible so downstream MT5-authority logic remains
+            // unchanged; provide provenance in `sourceDetail`.
+            'source'       => 'mt5',
+            'sourceDetail' => 'shared_market_quote',
             'updatedAt'    => $updated_at_iso,
             'state'        => 'live',
             'age_sec'      => (int) $age_sec,

@@ -1180,8 +1180,12 @@ function test_ea_market_stream() {
     update_user_meta(7, 'smc_sf_shared_feed_key_' . md5('EURUSD'), 'ICMARKETS_SV');
     $result_21 = $ref_get_cached->invoke($plugin, 7, 'EURUSD', 300);
     assert_test(
-        isset($result_21['source']) && $result_21['source'] === 'shared_market_quote',
-        'Test 21: get_cached_price() should return shared_market_quote when feed_key exists and quote is fresh'
+        isset($result_21['source']) && $result_21['source'] === 'mt5',
+        'Test 21: get_cached_price() should return MT5-compatible shared quote when feed_key exists and quote is fresh'
+    );
+    assert_test(
+        isset($result_21['sourceDetail']) && $result_21['sourceDetail'] === 'shared_market_quote',
+        'Test 21: shared quote sourceDetail should be shared_market_quote (provenance)'
     );
     assert_test(
         isset($result_21['source_count']) && (int) $result_21['source_count'] === 2,
