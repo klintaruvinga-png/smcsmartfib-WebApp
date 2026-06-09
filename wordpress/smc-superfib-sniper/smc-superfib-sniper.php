@@ -5346,7 +5346,9 @@ final class SMC_SuperFib_Sniper_REST {
             return array();
         }
 
-        return array_slice(array_reverse($buckets), 0, $outputsize);
+        $recent_buckets = array_slice($buckets, -$outputsize, $outputsize, true);
+        ksort($recent_buckets);
+        return array_values($recent_buckets);
     }
 
     private function mt5_change_pct_1d($user_id, $symbol, $current_bid) {
