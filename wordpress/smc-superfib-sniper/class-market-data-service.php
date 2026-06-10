@@ -739,12 +739,15 @@ class SMC_MarketData_Service
     private function pine_compression_threshold($symbol)
     {
         $sym = strtoupper((string) $symbol);
-        if (substr($sym, -3) === 'JPY' || $sym === 'XAUUSD' || $sym === 'XAGUSD') {
+        $is_jpy = str_contains($sym, 'JPY');
+        $is_gold_silver = str_contains($sym, 'XAU') || str_contains($sym, 'XAG') || str_contains($sym, 'GOLD') || str_contains($sym, 'SILVER');
+
+        if ($is_jpy || $is_gold_silver) {
             $pip_size = 0.01;
         } else {
             $pip_size = 0.0001;
         }
-        $min_pips = (substr($sym, -3) === 'JPY') ? 40.0 : 20.0;
+        $min_pips = $is_jpy ? 40.0 : 20.0;
         return $min_pips * $pip_size;
     }
 
