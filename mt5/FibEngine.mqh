@@ -720,7 +720,7 @@ public:
     double CompressionThreshold(string symbol)
     {
         string sym = symbol;
-        StringUpper(sym);
+        StringToUpper(sym);
         double pip_size = PipSizeForSymbol(sym);
         bool isJPY = (StringFind(sym, "JPY") >= 0);
         double min_pips = isJPY ? 40.0 : 20.0;
@@ -732,7 +732,7 @@ public:
     double PipSizeForSymbol(string symbol)
     {
         string sym = symbol;
-        StringUpper(sym);
+        StringToUpper(sym);
 
         // JPY pairs — 0.01
         if (StringFind(sym, "JPY") >= 0)

@@ -16,18 +16,18 @@ describe("MT5 regime dispatch parity guard", () => {
 
     // Verify RegimeEngine computes HTF bias (EMA-based D1 classification)
     expect(regimeEngine).toContain("bool ComputeRegimeState(string symbol, RegimeSnapshotOut& out)");
-    expect(regimeEngine).toContain("ComputeEMA(symbol, PERIOD_D1, 20");
-    expect(regimeEngine).toContain('string htfBias = "BULL"');
-    expect(regimeEngine).toContain('string htfBias = "BEAR"');
-    expect(regimeEngine).toContain('string htfBias = "TRANSITIONAL"');
+    expect(regimeEngine).toContain("ComputeEMA(d1Close, d1Bars, EMA_PERIOD)");
+    expect(regimeEngine).toContain('htfBias = "BULL"');
+    expect(regimeEngine).toContain('htfBias = "BEAR"');
+    expect(regimeEngine).toContain('htfBias = "TRANSITIONAL"');
     expect(regimeEngine).toContain("1.0005"); // Bull threshold multiplier
     expect(regimeEngine).toContain("0.9995"); // Bear threshold multiplier
 
-    // Verify RegimeEngine computes LTF regime (efficiency ratio-based H1 classification)
-    expect(regimeEngine).toContain("ComputeEfficiencyRatio(symbol, PERIOD_H1, 14");
-    expect(regimeEngine).toContain('string ltfRegime = "TRENDING"');
-    expect(regimeEngine).toContain('string ltfRegime = "RANGING"');
-    expect(regimeEngine).toContain('string ltfRegime = "CHOP"');
+    // Verify RegimeEngine computes LTF regime (chop score-based H1 classification)
+    expect(regimeEngine).toContain("ComputeChopScore(h1Rates, h1Bars, ATR_PERIOD)");
+    expect(regimeEngine).toContain('ltfRegime = "TRENDING"');
+    expect(regimeEngine).toContain('ltfRegime = "RANGING"');
+    expect(regimeEngine).toContain('ltfRegime = "CHOP"');
     expect(regimeEngine).toContain("0.35"); // Trending threshold (chop score)
     expect(regimeEngine).toContain("0.65"); // Chop threshold (chop score)
 
