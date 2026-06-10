@@ -719,9 +719,10 @@ public:
     // (e.g. USDJPY H1/M15 LTF_SF always returned empty).
     double CompressionThreshold(string symbol)
     {
-        double pip_size = PipSizeForSymbol(symbol);
-        bool isJPY = (StringLen(symbol) >= 6 &&
-                      StringSubstr(symbol, 3, 3) == "JPY");
+        string sym = symbol;
+        StringUpper(sym);
+        double pip_size = PipSizeForSymbol(sym);
+        bool isJPY = (StringFind(sym, "JPY") >= 0);
         double min_pips = isJPY ? 40.0 : 20.0;
         return min_pips * pip_size;
     }
@@ -730,13 +731,16 @@ public:
     // Fallback: 0.0001 (standard 5dp forex).
     double PipSizeForSymbol(string symbol)
     {
+        string sym = symbol;
+        StringUpper(sym);
+
         // JPY pairs — 0.01
-        if (symbol == "USDJPY" || symbol == "AUDJPY" || symbol == "EURJPY" ||
-            symbol == "GBPJPY" || symbol == "NZDJPY" || symbol == "CADJPY")
+        if (StringFind(sym, "JPY") >= 0)
             return 0.01;
 
         // Metals — 0.01
-        if (symbol == "XAUUSD" || symbol == "XAGUSD")
+        if (StringFind(sym, "XAU") >= 0 || StringFind(sym, "XAG") >= 0 || 
+            StringFind(sym, "GOLD") >= 0 || StringFind(sym, "SILVER") >= 0)
             return 0.01;
 
         // Standard 5dp forex — 0.0001

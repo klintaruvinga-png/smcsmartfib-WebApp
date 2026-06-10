@@ -20,7 +20,8 @@
     "validate:impl": "node scripts/validate-implementation.mjs",
     "parity": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-phase4-parity.ps1",
     "parity:dry": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-phase4-parity.ps1 -DryRun",
-    "parity:expanded": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-phase4-parity.ps1 -ExpandedAudit"
+    "parity:expanded": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-phase4-parity.ps1 -ExpandedAudit",
+    "bug-scan": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/bug-scan.ps1"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",

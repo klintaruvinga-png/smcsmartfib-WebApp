@@ -4623,7 +4623,7 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         $signal_id  = sanitize_text_field((string) ($payload['signal_id']  ?? ''));
-        $symbol     = preg_replace('/[^A-Z0-9]/', '', strtoupper(sanitize_text_field((string) ($payload['symbol'] ?? ''))));
+        $symbol = preg_replace('/[^A-Z0-9.]/', '', strtoupper(sanitize_text_field((string) ($payload['symbol'] ?? ''))));
         $direction  = strtoupper(sanitize_text_field((string) ($payload['direction'] ?? '')));
         $order_type = strtoupper(sanitize_text_field((string) ($payload['order_type'] ?? 'MARKET')));
         $lots       = isset($payload['lots']) && is_numeric($payload['lots']) ? (float) $payload['lots'] : 0.0;
