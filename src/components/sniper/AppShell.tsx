@@ -1,5 +1,5 @@
 import { Link, Outlet, useRouterState, useRouter } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   useSnapshot,
   useLiveSignals,
@@ -57,8 +57,35 @@ const HEADER_TICK_MOTION: TickMotionOptions = {
   dotDelayMaxMs: 90,
 };
 
+interface HeaderPctReference {
+  symbol: PairPrice["symbol"];
+  dayKey: string | null;
+  reference: number;
+}
+
+function priceDayKey(updatedAt: string | null | undefined) {
+  if (!updatedAt) return null;
+  const time = Date.parse(updatedAt);
+  return Number.isFinite(time) ? new Date(time).toISOString().slice(0, 10) : null;
+}
+
+function inferReferenceOpen(price: PairPrice) {
+  const denominator = 1 + price.changePct1d / 100;
+  if (
+    Number.isFinite(price.mid) &&
+    price.mid > 0 &&
+    Number.isFinite(price.changePct1d) &&
+    Number.isFinite(denominator) &&
+    Math.abs(denominator) > Number.EPSILON
+  ) {
+    return price.mid / denominator;
+  }
+  return Number.isFinite(price.mid) && price.mid > 0 ? price.mid : undefined;
+}
+
 function HeaderTickerItem({ price, pollMs }: { price: PairPrice; pollMs: number }) {
   const flashHoldMs = tickMotionHoldMs(HEADER_TICK_MOTION);
+  const referenceOpenRef = useRef<HeaderPctReference | null>(null);
   const {
     value: animatedMid,
     direction: midDir,
@@ -73,13 +100,27 @@ function HeaderTickerItem({ price, pollMs }: { price: PairPrice; pollMs: number 
 
   // Derive a live % change that tracks the animated mid, instead of relying on
   // the backend's snapshot-cadence changePct1d (which is rounded to 2dp and
-  // appears stuck between polls). Reference open is inferred from
-  // mid + changePct1d, so livePct collapses to changePct1d when mid is stable.
+  // appears stuck between polls). Keep the inferred open stable across polls so
+  // livePct does not collapse/reset whenever a new backend snapshot arrives.
   const displayMid = animatedMid ?? price.mid;
-  const reference =
-    Number.isFinite(price.mid) && price.mid > 0 && Number.isFinite(price.changePct1d)
-      ? price.mid / (1 + price.changePct1d / 100)
-      : price.mid;
+  const dayKey = priceDayKey(price.updatedAt);
+  const inferredReference = inferReferenceOpen(price);
+  const referenceNeedsReset =
+    referenceOpenRef.current === null ||
+    referenceOpenRef.current.symbol !== price.symbol ||
+    referenceOpenRef.current.dayKey !== dayKey ||
+    !Number.isFinite(referenceOpenRef.current.reference) ||
+    referenceOpenRef.current.reference <= 0;
+
+  if (referenceNeedsReset && inferredReference !== undefined) {
+    referenceOpenRef.current = {
+      symbol: price.symbol,
+      dayKey,
+      reference: inferredReference,
+    };
+  }
+
+  const reference = referenceOpenRef.current?.reference ?? inferredReference ?? price.mid;
   const livePct =
     Number.isFinite(reference) && reference > 0 && Number.isFinite(displayMid)
       ? ((displayMid - reference) / reference) * 100
