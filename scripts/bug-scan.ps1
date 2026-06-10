@@ -25,10 +25,10 @@ $fragilePatterns = @(
 )
 
 foreach ($pattern in $fragilePatterns) {
-    $matches = Get-ChildItem -Recurse -Include *.php, *.mqh, *.ts, *.tsx -Exclude "bug-scan.ps1" | Select-String -Pattern $pattern
-    if ($matches) {
+    $patternMatches = Get-ChildItem -Recurse -Include *.php, *.mqh, *.ts, *.tsx -Exclude "bug-scan.ps1" | Select-String -Pattern $pattern
+    if ($patternMatches) {
         Write-Host "FAIL: Found fragile pattern: $pattern" -ForegroundColor Red
-        $matches | ForEach-Object { Write-Host "  $($_.FileName):$($_.LineNumber)" }
+        $patternMatches | ForEach-Object { Write-Host "  $($_.FileName):$($_.LineNumber)" }
         $failed = $true
     } else {
         Write-Host "PASS: Pattern not found: $pattern" -ForegroundColor Green
