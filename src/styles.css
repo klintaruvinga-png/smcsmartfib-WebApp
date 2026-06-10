@@ -229,6 +229,8 @@
 
   .ticker-track {
     animation: ticker 60s linear infinite;
+    will-change: transform;
+    transform: translate3d(0, 0, 0);
   }
 
   .nav-progress-bar {
@@ -327,10 +329,10 @@
 
   @keyframes ticker {
     from {
-      transform: translateX(0);
+      transform: translate3d(0, 0, 0);
     }
     to {
-      transform: translateX(-50%);
+      transform: translate3d(-50%, 0, 0);
     }
   }
 

@@ -140,10 +140,10 @@ function HeaderTickerItem({ price, pollMs }: { price: PairPrice; pollMs: number 
           midDir === "down" && "header-tick-dot-down",
         )}
       />
-      <span className="text-mute">{price.symbol}</span>
+      <span className="text-mute inline-block w-[7ch]">{price.symbol}</span>
       <span
         className={cn(
-          "text-tx rounded px-1 -mx-1 tabular-nums price-smooth",
+          "text-tx inline-block w-[10ch] text-right rounded px-1 -mx-1 tabular-nums price-smooth",
           heldMidDir === "up" && "tick-hold-up",
           heldMidDir === "down" && "tick-hold-down",
           midDir === "up" && "tick-flash-up-fast",
@@ -154,7 +154,7 @@ function HeaderTickerItem({ price, pollMs }: { price: PairPrice; pollMs: number 
       </span>
       <span
         className={cn(
-          "rounded px-1 -mx-1 tabular-nums price-smooth",
+          "inline-block w-[8ch] text-right rounded px-1 -mx-1 tabular-nums price-smooth",
           livePct >= 0 ? "text-buy" : "text-sell",
         )}
       >
