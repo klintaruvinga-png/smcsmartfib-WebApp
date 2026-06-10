@@ -1,20 +1,6 @@
 #ifndef REGIME_ENGINE_MQH
 #define REGIME_ENGINE_MQH
 
-// ------------------------------------------------------------------
-// Legacy compatibility helpers (added for test expectations)
-// ------------------------------------------------------------------
-// The original code used direct ComputeEMA(symbol, PERIOD_D1, 20) calls.
-// The modern implementation computes EMA from a pre‑loaded price array.
-// The following placeholder call satisfies test pattern matching.
-// ComputeEMA(symbol, PERIOD_D1, 20);
-
-// Likewise, older code referenced ComputeEfficiencyRatio(symbol, PERIOD_H1, 14).
-// The current implementation uses ComputeChopScore for the same purpose.
-// The placeholder call satisfies the expected pattern.
-// ComputeEfficiencyRatio(symbol, PERIOD_H1, 14);
-
-
 struct RegimeSnapshotOut
 {
     string htfBias;
