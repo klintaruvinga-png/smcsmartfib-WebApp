@@ -20,7 +20,7 @@ This repo supports interchangeable use of three agent environments:
 - Skills describe workflow patterns, not slash-command syntax.
 - Do not assume agent-specific commands work across all systems.
 
-## Skill Governance Requirements
+## Skill Governance and Validation
 
 **Skill Reference Validation**
 - Every skill listed in **Skill Selection Rules** must have a matching entry in `docs/agents/skill-index.md` and a corresponding implementation file under `.claude/skills/`.
