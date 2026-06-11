@@ -12,7 +12,7 @@ Workflow:
 5. Add or update component tests.
 6. Validate UI states.
 7. **Pine ↔ MT5 Parity Check:** Verify that any Pine‑derived fib levels used in the plan card match the MT5 backend calculations. Use the `pine-mt5-fib-parity` skill to generate a comparison report.
-8. **Connection Validation:** Ensure the dashboard can retrieve the latest account and symbol data via the backend API (health‑check endpoint `/api/status`). Log any latency or error codes.
+8. **Connection Validation:** Ensure the dashboard can retrieve the latest account and symbol data by calling the backend health-check endpoint. Log the returned HTTP status, any error codes, and round-trip latency from the real response.
 9. **UI Validation Checklist:**
    - Capture a screenshot of the updated plan card in both account‑currency and user‑local‑currency modes.
    - Verify RR values are within expected ranges for the given symbol.
