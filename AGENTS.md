@@ -20,13 +20,13 @@ This repo supports interchangeable use of three agent environments:
 - Skills describe workflow patterns, not slash-command syntax.
 - Do not assume agent-specific commands work across all systems.
 
-## Skill Selection Rules
+## Skill Governance Requirements
 
 **Skill Reference Validation**
 - Every skill listed in **Skill Selection Rules** must have a matching entry in `docs/agents/skill-index.md` and a corresponding implementation file under `.claude/skills/`.
-- Each skill definition must include **validation steps** that demonstrate how the skill’s outcome will be verified (e.g., lint, tests, parity checks, UI screenshots).
-- Before any code change, run the skill’s validation commands and capture their output in `reports/`.
-- If a skill lacks a validation step, add a **“Demo / Validation Example**” section to its `SKILL.md` (see examples in other skill files).
+- Each skill definition must include **validation steps** that demonstrate how the skill's outcome will be verified (e.g., lint, tests, parity checks, UI screenshots).
+- Before any code change, run the skill's validation commands and capture their output in `reports/`.
+- If a skill lacks a validation step, add a **"Demo / Validation Example"** section to its `SKILL.md` (see examples in other skill files).
 
 - Agents should **cross‑check** that the skill name, description, and workflow match between `AGENTS.md`, `docs/agents/skill-index.md`, and `.claude/skills/`.
 - Any drift should be corrected immediately to keep the cross‑agent model consistent.
