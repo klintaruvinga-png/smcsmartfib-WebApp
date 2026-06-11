@@ -21,6 +21,17 @@ This repo supports interchangeable use of three agent environments:
 - Do not assume agent-specific commands work across all systems.
 
 ## Skill Selection Rules
+
+**Skill Reference Validation**
+- Every skill listed in **Skill Selection Rules** must have a matching entry in `docs/agents/skill-index.md` and a corresponding implementation file under `.claude/skills/`.
+- Each skill definition must include **validation steps** that demonstrate how the skill’s outcome will be verified (e.g., lint, tests, parity checks, UI screenshots).
+- Before any code change, run the skill’s validation commands and capture their output in `reports/`.
+- If a skill lacks a validation step, add a **“Demo / Validation Example**” section to its `SKILL.md` (see examples in other skill files).
+
+- Agents should **cross‑check** that the skill name, description, and workflow match between `AGENTS.md`, `docs/agents/skill-index.md`, and `.claude/skills/`.
+- Any drift should be corrected immediately to keep the cross‑agent model consistent.
+
+## Skill Selection Rules
 - Use `diagnose` for broad problem discovery, bug sweep, and assessing what layers are involved.
 - Use `grill-with-docs` when the issue requires deep investigation using repo docs, existing reports, or architecture notes.
 - Use `tdd` for intentional code/test cycles and when adding or improving automated coverage.
