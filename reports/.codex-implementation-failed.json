@@ -1,0 +1,7 @@
+{
+  "failed_at": "2026-06-15T14:09:22.447Z",
+  "issue": "SMC Intake - Test the local automation loop",
+  "plan_hash": "0fefd8821586bd7fa67176303ab384694d0cea2852de16ba79d4d0a5dad19272",
+  "reason": "Codex CLI invocation failed: Command failed: \"codex.cmd\" exec --json --dangerously-bypass-approvals-and-sandbox -C \"C:\\Users\\Kudzie\\OneDrive\\All Final Softwares\\SMC SuperFib Dashboard\\smcsmartfib-WebApp\" -o \"C:\\Users\\Kudzie\\OneDrive\\All Final Softwares\\SMC SuperFib Dashboard\\smcsmartfib-WebApp\\reports\\codex-last-message.txt\" - < \"C:\\Users\\Kudzie\\OneDrive\\All Final Softwares\\SMC SuperFib Dashboard\\smcsmartfib-WebApp\\reports\\codex-prompt.tmp.md\"",
+  "codex_output_excerpt": ""
+}
