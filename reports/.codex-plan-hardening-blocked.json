@@ -1,0 +1,13 @@
+{
+  "blocked_at": "2026-06-15T13:54:00.696Z",
+  "reason": "Command failed: \"codex.cmd\" exec --json --dangerously-bypass-approvals-and-sandbox -C \"C:\\Users\\Kudzie\\OneDrive\\All Final Softwares\\SMC SuperFib Dashboard\\smcsmartfib-WebApp\" -o \"C:\\Users\\Kudzie\\OneDrive\\All Final Softwares\\SMC SuperFib Dashboard\\smcsmartfib-WebApp\\reports\\codex-last-message.txt\" - < \"C:\\Users\\Kudzie\\OneDrive\\All Final Softwares\\SMC SuperFib Dashboard\\smcsmartfib-WebApp\\reports\\codex-plan-prompt.tmp.md\"",
+  "issue": "SMC Intake - Test the local automation loop",
+  "research_hash": "ddbe506766dc527dfaa42feec43a93b1b08ff0af025f53b85e7e7b2ee346532f",
+  "retry_count": 3,
+  "permanent": true,
+  "resolution": [
+    "All automatic retries exhausted. Manual intervention required.",
+    "Option A: run Codex plan hardening manually by writing reports/codex-plan.md.",
+    "Option B: fix the Codex CLI installation or PATH and delete this file."
+  ]
+}
