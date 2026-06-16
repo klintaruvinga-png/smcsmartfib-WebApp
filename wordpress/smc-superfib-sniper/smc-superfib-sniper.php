@@ -9299,6 +9299,9 @@ final class SMC_SuperFib_Sniper_REST {
         $bid = isset($row['bid']) ? (float) $row['bid'] : 0.0;
         $ask = isset($row['ask']) ? (float) $row['ask'] : 0.0;
 
+        // Determine state based on freshness vs threshold.
+        $state = ($age_sec > $max_age_sec) ? 'stale' : 'live';
+
         return array(
             'symbol'       => $symbol,
             'bid'          => $bid,
@@ -9312,7 +9315,7 @@ final class SMC_SuperFib_Sniper_REST {
             'source'       => 'mt5',
             'sourceDetail' => 'shared_market_quote',
             'updatedAt'    => $updated_at_iso,
-            'state'        => 'live',
+            'state'        => $state,
             'age_sec'      => (int) $age_sec,
             'feed_key'     => $feed_key,
             'source_count' => isset($row['source_count']) ? (int) $row['source_count'] : 1,
@@ -9704,10 +9707,11 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
 
-    private function is_mt5_authoritative($user_id, $symbol) {
+    private function is_mt5_authoritative($user_id, $symbol, $stale_threshold_sec = 60) {
         if (!$symbol) return false;
-        $cached_price = $this->get_cached_price($user_id, $symbol, PHP_INT_MAX);
-        if ($cached_price && ($cached_price['source'] ?? '') === 'mt5') {
+        $cached_price = $this->get_cached_price($user_id, $symbol, $stale_threshold_sec);
+        // MT5 is authoritative only when source is mt5 AND state is live (fresh).
+        if ($cached_price && ($cached_price['source'] ?? '') === 'mt5' && ($cached_price['state'] ?? '') === 'live') {
             return true;
         }
 
@@ -10586,7 +10590,8 @@ final class SMC_SuperFib_Sniper_REST {
         $response = rest_ensure_response($payload);
 
         if ($response instanceof WP_REST_Response && method_exists($response, 'header')) {
-            $response->header('Cache-Control', 'no-store, no-cache, must-revalidate');
+            $response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+            $response->header('Expires', '0');
             $response->header('Pragma', 'no-cache');
         }
 
