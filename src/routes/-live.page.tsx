@@ -332,6 +332,15 @@ function PriceCard({
         </span>
       </div>
 
+      {price.sourceDetail === "shared_market_quote" && (
+        <div className="text-[10px] font-mono text-mute">
+          Shared market quote
+          {price.source_count !== undefined
+            ? ` · ${price.source_count} source${price.source_count === 1 ? "" : "s"}`
+            : ""}
+        </div>
+      )}
+
       <div className="border-t border-bd pt-3 space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-mono uppercase tracking-wider text-mute">Regime</span>

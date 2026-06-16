@@ -405,6 +405,10 @@ function normalizeSnapshot(snapshot: {
         price.age_sec === undefined
           ? undefined
           : toFiniteNumber(price.age_sec, Number(price.age_sec)),
+      sourceDetail: typeof price.sourceDetail === 'string' ? price.sourceDetail : undefined,
+      feed_key: typeof price.feed_key === 'string' ? price.feed_key : undefined,
+      source_count:
+        price.source_count === undefined ? undefined : toFiniteNumber(price.source_count, Number(price.source_count)),
     })),
     regimes: (snapshot.regimes ?? []).map((regime) => ({
       ...regime,

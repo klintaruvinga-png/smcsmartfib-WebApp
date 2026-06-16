@@ -149,6 +149,9 @@ export interface PairPrice {
   state: FreshnessState;
   source: PriceSource;
   age_sec?: number;
+  sourceDetail?: string;
+  feed_key?: string;
+  source_count?: number;
 }
 
 export interface ChartCandle {

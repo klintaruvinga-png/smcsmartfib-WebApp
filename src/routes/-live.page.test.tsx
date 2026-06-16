@@ -2,6 +2,21 @@
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { PairPrice } from "@/types/sniper";
+
+function buildPrice(overrides: Partial<PairPrice>): PairPrice {
+  return {
+    symbol: "EURUSD",
+    bid: 1.1,
+    ask: 1.10012,
+    mid: 1.10006,
+    changePct1d: 0,
+    updatedAt: new Date().toISOString(),
+    state: "live",
+    source: "mt5",
+    ...overrides,
+  };
+}
 
 const hookMocks = vi.hoisted(() => ({
   useSnapshot: vi.fn(),
@@ -121,5 +136,43 @@ describe("LivePage backend gating", () => {
     expect(
       screen.queryByText("Configure a backend URL in Account before loading live radar."),
     ).toBeNull();
+  });
+
+  it("renders shared market provenance metadata on live radar cards", () => {
+    const price = buildPrice({
+      sourceDetail: "shared_market_quote",
+      source_count: 2,
+    });
+
+    hookMocks.usePollingUiState.mockReturnValue({
+      backendReady: true,
+      pendingSettingsLoad: false,
+      missingBackendUrl: false,
+      settingsLoadFailed: false,
+      settingsLoadError: null,
+      pollMs: 2_000,
+      retrySettingsLoad: vi.fn(),
+    });
+
+    hookMocks.useSnapshot.mockReturnValue({
+      data: {
+        prices: [price],
+        regimes: [],
+        gates: [],
+        diagnostics: [],
+      },
+      isLoading: false,
+    });
+    hookMocks.useCanonicalWatchlist.mockReturnValue({
+      watchlist: ["EURUSD"],
+    });
+    hookMocks.alignWatchlistItems.mockReturnValue([
+      { symbol: "EURUSD", item: price },
+    ]);
+
+    render(<LivePage />);
+
+    expect(screen.getByText("Shared market quote")).toBeTruthy();
+    expect(screen.getByText("· 2 sources")).toBeTruthy();
   });
 });
