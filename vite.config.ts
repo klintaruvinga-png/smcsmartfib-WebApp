@@ -7,6 +7,10 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
+  define: {
+    __BUILD_ID__: JSON.stringify(process.env.VITE_BUILD_ID ?? 'dev'),
+    __SCHEMA_VERSION__: JSON.stringify(process.env.VITE_SCHEMA_VERSION ?? '1'),
+  },
   test: {
     include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.{js,mjs,ts}"],
     exclude: ["node_modules/**", "wordpress/_archive/**"],
