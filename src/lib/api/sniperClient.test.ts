@@ -416,6 +416,80 @@ describe("unified snapshot client contract", () => {
     );
   });
 
+  it("preserves shared market provenance metadata in normalized snapshot prices", async () => {
+    const payload = {
+      prices: [
+        {
+          symbol: "EURUSD",
+          bid: 1.1,
+          ask: 1.10012,
+          mid: 1.10006,
+          changePct1d: 0,
+          state: "live",
+          source: "mt5",
+          sourceDetail: "shared_market_quote",
+          feed_key: "ICMARKETS_SV",
+          source_count: 2,
+        },
+      ],
+      regimes: [],
+      gates: [],
+      diagnostics: [],
+    };
+
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await apiClient.getUnifiedSnapshot(false);
+
+    expect(result.prices[0]).toMatchObject({
+      sourceDetail: "shared_market_quote",
+      feed_key: "ICMARKETS_SV",
+      source_count: 2,
+    });
+  });
+
+  it("preserves null source_count as undefined instead of coercing to 0", async () => {
+    const payload = {
+      prices: [
+        {
+          symbol: "EURUSD",
+          bid: 1.1,
+          ask: 1.10012,
+          mid: 1.10006,
+          changePct1d: 0,
+          state: "live",
+          source: "mt5",
+          source_count: null,
+        },
+      ],
+      regimes: [],
+      gates: [],
+      diagnostics: [],
+    };
+
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await apiClient.getUnifiedSnapshot(false);
+
+    expect(result.prices[0].source_count).toBeUndefined();
+  });
+
   it("getSnapshot is a compatibility alias that calls /snapshot/unified", async () => {
     const payload = {
       prices: [],

@@ -4,6 +4,7 @@ import {
   useLadders,
   useSnapshot,
   usePollingUiState,
+  useUserSettings,
   normalizeSymbolForWatchlistComparison,
 } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
@@ -111,6 +112,27 @@ export function PlanPage() {
     ({ signal }) => signal.computedBy === "frontend" && !signal.backendConfirmed,
   ).length;
   const firstWatchlistCandidate = rankedWatchlistCandidates[0];
+
+  const { data: settings } = useUserSettings();
+  const staleThreshold = settings?.staleThresholdSec ?? 60;
+
+  const getFreshnessState = () => {
+    if (divergentCount > 0) return "pending-sync";
+    if (!snapshot) return "unavailable";
+
+    const hasNonLivePrice = snapshot.prices.some((p) => p.state !== "live");
+    if (hasNonLivePrice) return "pending-sync";
+
+    // Check the most recent price update timestamp
+    const mostRecentPrice = snapshot.prices.reduce((latest, p) => {
+      const pTime = new Date(p.updatedAt).getTime();
+      return pTime > latest ? pTime : latest;
+    }, 0);
+    const ageSec = mostRecentPrice > 0 ? (Date.now() - mostRecentPrice) / 1000 : Infinity;
+    if (ageSec > staleThreshold) return "pending-sync";
+
+    return "live";
+  };
 
   if (settingsLoadFailed) {
     return (
@@ -292,7 +314,7 @@ export function PlanPage() {
               {size === 10 ? "all" : size}
             </button>
           ))}
-          <FreshnessBadge state={divergentCount > 0 ? "pending-sync" : "live"} />
+          <FreshnessBadge state={getFreshnessState()} />
         </div>
       </div>
 
