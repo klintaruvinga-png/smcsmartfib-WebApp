@@ -6676,6 +6676,13 @@ final class SMC_SuperFib_Sniper_REST {
         if ($replaced_by !== null) {
             $data['replaced_by'] = $replaced_by;
         }
+        if ($state === 'STALE_HELD') {
+            $engine = !empty($row['engine_json']) ? json_decode($row['engine_json'], true) : array();
+            if (is_array($engine)) {
+                $engine['engineBlocker'] = $reason;
+                $data['engine_json'] = json_encode($engine);
+            }
+        }
         $wpdb->update($this->table('display_signals'), $data, array('id' => (string) ($row['id'] ?? ''), 'user_id' => $user_id));
         $this->audit($user_id, 'display_signal.lifecycle_transition', array(
             'id' => (string) ($row['id'] ?? ''),
@@ -7728,7 +7735,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         $shared_feed_key = $this->resolve_user_shared_feed_key($user_id, $symbol);
         $shared_candles = $this->fetch_shared_market_candles($shared_feed_key, $symbol, $timeframe, $outputsize);
-        if (!empty($shared_candles)) {
+        if (!empty($shared_candles) && count($shared_candles) >= 30) {
             return $shared_candles;
         }
 

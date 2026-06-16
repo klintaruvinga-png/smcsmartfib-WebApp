@@ -1,59 +1,58 @@
-# Gemini Implementation Plan: SMC Intake - Test the local automation loop
+# Gemini Implementation Plan: PR #395 Frontend Cleanup & Compatibility Patch
 
 ### 1. Issue validation
 
-- **Confirmed**: The pipeline is currently stalled in the `PLANNING` state because the background watcher fails to execute `codex.cmd` (missing from PATH).
-- **Confirmed**: Stale blocking artifacts like `.claude-hardening-blocked.json` from previous failed attempts are preventing clean retries for new issues.
-- **Confirmed**: There is a significant testing gap: no end-to-end integration test exists to verify the full research-plan-implement-merge cycle.
+- **Confirmed**: Backend provenance metadata (`sourceDetail`, `feed_key`, `source_count`) was being exposed in the `Live Radar` UI.
+- **Confirmed**: Users should see a stable, unified frontend without broker-specific or source-specific labels.
+- **Confirmed**: Compatibility with the SDK and other internal tools must be maintained by keeping the fields in the types.
 
 ### 2. Implementation contract
 
-#### File: `scripts/pipeline-watcher.js`
-- **Change**: Implement a robust `checkHealth()` function that verifies the availability of `codex` and `gh` CLIs, as well as writability of the `reports/` and `reports/archive/` directories.
-- **Change**: Update `startPipelineWatcher()` and `evaluatePipeline()` to call `checkHealth()` before attempting AI-driven transitions.
-- **Change**: Introduce an internal "Mock Mode" (triggered by `PROCESS_ENV.PIPELINE_MOCK === 'true'`) that bypasses live CLI calls and synthesizes successful/failed artifacts for testing purposes.
-- **Guard rails**: Do not modify the core state machine transitions in `.smc-workflow-state.json`.
-- **Acceptance criterion**: The watcher should log a clear error and enter a "BLOCKED" state (with a notification) if a required dependency is missing, rather than crashing or silent looping.
+#### File: `src/types/sniper.ts` & `sdk/src/types/index.ts`
+- **Change (Option B)**: Keep `sourceDetail`, `feed_key`, and `source_count` in the `PairPrice` interface for compatibility.
+- **Change**: Mark these fields with "BACKEND INTERNAL" comments to indicate they are not for UI rendering.
 
-#### File: `scripts/pipeline-watcher.test.mjs`
-- **Change**: Add an integration test suite that utilizes "Mock Mode" to exercise the full state machine from `IDLE` through `IMPLEMENTATION_COMPLETE`.
-- **Acceptance criterion**: `npm run test:focused` must include and pass these integration steps.
+#### File: `src/routes/-live.page.tsx`
+- **Change**: Remove the rendering logic that displayed "Shared market quote" and "N sources".
+
+#### File: `src/lib/api/sniperClient.ts` & `sdk/src/client/SniperClient.ts`
+- **Change**: Ensure normalization logic preserves these fields for internal use while marking them as internal.
+
+#### File: `src/routes/-live.page.test.tsx`
+- **Change**: Add a regression test to ensure that backend/internal provenance metadata is NOT rendered on public live radar cards.
 
 ### 3. Patch sequence
 
-1. **Dependency Hardening**: Add health checks to `scripts/pipeline-watcher.js`.
-2. **Mock Support**: Add `PIPELINE_MOCK` support to `scripts/pipeline-watcher.js` for CLI bypass.
-3. **Integration Test**: Implement the full-cycle integration test in `scripts/pipeline-watcher.test.mjs`.
-4. **Cleanup**: Ensure the watcher correctly clears stale `.claude-hardening-blocked.json` or `.codex-plan-hardening-blocked.json` when a new issue is detected (already partially implemented, will verify/harden).
+1. **Type Hardening**: Update types with internal markers (Option B).
+2. **UI Cleanup**: Remove provenance rendering from `LivePage`.
+3. **API Normalization**: Ensure client-side normalization preserves fields but respects internal status.
+4. **Regression Testing**: Add/Update tests to assert non-rendering of metadata.
 
 ### 4. Regression guards
 
-- Existing unit tests in `scripts/pipeline-watcher.test.mjs` must remain green.
-- The `reports/archive` logic must be verified to ensure no data is overwritten or lost during state transitions.
-- Parity with `workflow-state.js` CLI must be maintained.
+- Verify that `npm run build` still passes (no breaking type changes).
+- Ensure `source_count` and other fields are still available in the `PairPrice` object for potential (future) non-UI logic.
+- Run grep scans to confirm no matches in user-facing render paths.
 
 ### 5. Non-goals
 
-- Implementing a replacement for the `codex` CLI itself.
-- Changing the authoritative nature of the local pipeline runner.
-- Modifying MT5 or Pine codebases.
+- Implementing full backend NY-normalized authority (this is a follow-up).
+- Changing any backend logic in this PR.
+- Removing fields from the SDK (transparency for power users/SDK consumers is preserved).
 
 ### 6. Risk assessment
 
-- **Risk**: Mock mode might not perfectly reflect live CLI behavior, leading to false confidence in the integration test.
-- **Mitigation**: Keep mock logic as close as possible to the shell command output observed in logs.
-- **Risk**: Automated deletion of blocking artifacts might clear a legitimate "permanent" block.
-- **Mitigation**: Only auto-clear if the issue slug or research hash has changed.
+- **Risk**: Removing fields from types might break other consumers.
+- **Mitigation**: Chose Option B (keep fields, mark internal) to ensure maximum compatibility.
 
 ### 7. Test requirements
 
-- **New Test**: `scripts/pipeline-watcher.test.mjs` -> "Integration: Full Cycle"
-- **Manual Check**: Run `npm run pipeline:reset` and verify the watcher transitions to `IDLE` and archives current artifacts.
+- **New Test**: `src/routes/-live.page.test.tsx` -> "does not render backend/internal provenance metadata on public live radar cards"
+- **Grep Scan**: Confirm no rendering of `Shared market quote` or `sources` in `src/routes` and `src/components`.
 
 ### 8. Implementation handoff
 
-- **Branch naming**: `gemini/test-automation-loop`
+- **Branch naming**: `fix/price-feed-stability` (current)
 - **Commit grouping**: 
-  - `feat(pipeline): add health checks and mock mode support`
-  - `test(pipeline): add full-cycle integration test`
-- **Post-implementation state**: `READY_FOR_IMPLEMENTATION` with `editing_locked: false`.
+  - `fix(ui): remove backend provenance metadata from live radar`
+  - `chore(types): mark metadata fields as internal for compatibility`
