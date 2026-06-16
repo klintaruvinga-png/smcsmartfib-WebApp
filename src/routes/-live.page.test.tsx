@@ -138,9 +138,10 @@ describe("LivePage backend gating", () => {
     ).toBeNull();
   });
 
-  it("renders shared market provenance metadata on live radar cards", () => {
+  it("does not render backend/internal provenance metadata on public live radar cards", () => {
     const price = buildPrice({
       sourceDetail: "shared_market_quote",
+      feed_key: "ICMARKETS_SV",
       source_count: 2,
     });
 
@@ -172,7 +173,8 @@ describe("LivePage backend gating", () => {
 
     render(<LivePage />);
 
-    expect(screen.getByText("Shared market quote")).toBeTruthy();
-    expect(screen.getByText("· 2 sources")).toBeTruthy();
+    expect(screen.queryByText("Shared market quote")).toBeNull();
+    expect(screen.queryByText(/sources?/i)).toBeNull();
+    expect(screen.queryByText("ICMARKETS_SV")).toBeNull();
   });
 });

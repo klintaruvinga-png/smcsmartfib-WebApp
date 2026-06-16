@@ -159,6 +159,8 @@ export interface PairPrice {
   state: FreshnessState;
   source: PriceSource;
   age_sec?: number;
+  // BACKEND INTERNAL: compatibility-only metadata for raw API clients.
+  // Do not render or derive UI state from these fields.
   sourceDetail?: string;
   feed_key?: string;
   source_count?: number;

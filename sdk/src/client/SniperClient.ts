@@ -187,6 +187,7 @@ function normalizeSnapshot(raw: {
       mid: toFinite(p.mid),
       changePct1d: toFinite(p.changePct1d),
       age_sec: p.age_sec === undefined ? undefined : toFinite(p.age_sec),
+      // BACKEND INTERNAL: preserve aggregation metadata for compatibility; do not render or use for UI logic.
       sourceDetail: typeof p.sourceDetail === 'string' ? p.sourceDetail : undefined,
       feed_key: typeof p.feed_key === 'string' ? p.feed_key : undefined,
       source_count: p.source_count === undefined ? undefined : toFinite(p.source_count),

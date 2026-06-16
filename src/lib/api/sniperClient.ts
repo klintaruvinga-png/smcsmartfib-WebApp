@@ -405,6 +405,7 @@ function normalizeSnapshot(snapshot: {
         price.age_sec === undefined
           ? undefined
           : toFiniteNumber(price.age_sec, Number(price.age_sec)),
+      // BACKEND INTERNAL: preserve aggregation metadata for compatibility; do not render or use for UI logic.
       sourceDetail: typeof price.sourceDetail === 'string' ? price.sourceDetail : undefined,
       feed_key: typeof price.feed_key === 'string' ? price.feed_key : undefined,
       source_count:
