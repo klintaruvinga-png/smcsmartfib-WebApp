@@ -2,23 +2,29 @@
 
 ### 1. Issue validation
 
+
 - **Confirmed**: Backend provenance metadata (`sourceDetail`, `feed_key`, `source_count`) was being exposed in the `Live Radar` UI.
 - **Confirmed**: Users should see a stable, unified frontend without broker-specific or source-specific labels.
 - **Confirmed**: Compatibility with the SDK and other internal tools must be maintained by keeping the fields in the types.
 
 ### 2. Implementation contract
 
+
 #### File: `src/types/sniper.ts` & `sdk/src/types/index.ts`
+
 - **Change (Option B)**: Keep `sourceDetail`, `feed_key`, and `source_count` in the `PairPrice` interface for compatibility.
 - **Change**: Mark these fields with "BACKEND INTERNAL" comments to indicate they are not for UI rendering.
 
 #### File: `src/routes/-live.page.tsx`
+
 - **Change**: Remove the rendering logic that displayed "Shared market quote" and "N sources".
 
 #### File: `src/lib/api/sniperClient.ts` & `sdk/src/client/SniperClient.ts`
+
 - **Change**: Ensure normalization logic preserves these fields for internal use while marking them as internal.
 
 #### File: `src/routes/-live.page.test.tsx`
+
 - **Change**: Add a regression test to ensure that backend/internal provenance metadata is NOT rendered on public live radar cards.
 
 ### 3. Patch sequence

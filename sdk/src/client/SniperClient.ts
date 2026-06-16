@@ -190,7 +190,10 @@ function normalizeSnapshot(raw: {
       // BACKEND INTERNAL: preserve aggregation metadata for compatibility; do not render or use for UI logic.
       sourceDetail: typeof p.sourceDetail === 'string' ? p.sourceDetail : undefined,
       feed_key: typeof p.feed_key === 'string' ? p.feed_key : undefined,
-      source_count: p.source_count === undefined ? undefined : toFinite(p.source_count),
+      source_count: p.source_count === undefined ? undefined : (() => {
+        const converted = Number(p.source_count);
+        return Number.isFinite(converted) ? converted : undefined;
+      })(),
     })),
     regimes: (raw.regimes ?? []).map((r) => ({
       ...r,

@@ -123,8 +123,12 @@ export function PlanPage() {
     const hasNonLivePrice = snapshot.prices.some((p) => p.state !== "live");
     if (hasNonLivePrice) return "pending-sync";
 
-    const updatedAt = new Date(snapshot.updatedAt).getTime();
-    const ageSec = (Date.now() - updatedAt) / 1000;
+    // Check the most recent price update timestamp
+    const mostRecentPrice = snapshot.prices.reduce((latest, p) => {
+      const pTime = new Date(p.updatedAt).getTime();
+      return pTime > latest ? pTime : latest;
+    }, 0);
+    const ageSec = mostRecentPrice > 0 ? (Date.now() - mostRecentPrice) / 1000 : Infinity;
     if (ageSec > staleThreshold) return "pending-sync";
 
     return "live";
