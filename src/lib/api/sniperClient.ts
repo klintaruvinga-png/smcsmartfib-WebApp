@@ -408,7 +408,12 @@ function normalizeSnapshot(snapshot: {
       sourceDetail: typeof price.sourceDetail === 'string' ? price.sourceDetail : undefined,
       feed_key: typeof price.feed_key === 'string' ? price.feed_key : undefined,
       source_count:
-        price.source_count === undefined ? undefined : toFiniteNumber(price.source_count, Number(price.source_count)),
+        price.source_count === undefined
+          ? undefined
+          : (() => {
+              const converted = Number(price.source_count);
+              return Number.isFinite(converted) ? converted : undefined;
+            })(),
     })),
     regimes: (snapshot.regimes ?? []).map((regime) => ({
       ...regime,

@@ -173,6 +173,6 @@ describe("LivePage backend gating", () => {
     render(<LivePage />);
 
     expect(screen.getByText("Shared market quote")).toBeTruthy();
-    expect(screen.getByText("· 2 sources")).toBeTruthy();
+    expect(screen.getByText(/· 2 sources/)).toBeTruthy();
   });
 });
