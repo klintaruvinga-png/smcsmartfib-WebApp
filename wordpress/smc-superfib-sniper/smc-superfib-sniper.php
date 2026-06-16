@@ -6677,10 +6677,10 @@ final class SMC_SuperFib_Sniper_REST {
             $data['replaced_by'] = $replaced_by;
         }
         if ($state === 'STALE_HELD') {
-            $engine = !empty($row['engine_json']) ? json_decode($row['engine_json'], true) : array();
+            $engine = !empty($row['engine']) ? json_decode($row['engine'], true) : array();
             if (is_array($engine)) {
                 $engine['engineBlocker'] = $reason;
-                $data['engine_json'] = json_encode($engine);
+                $data['engine'] = json_encode($engine);
             }
         }
         $wpdb->update($this->table('display_signals'), $data, array('id' => (string) ($row['id'] ?? ''), 'user_id' => $user_id));
