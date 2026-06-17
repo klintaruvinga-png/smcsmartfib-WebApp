@@ -1,3 +1,4 @@
+import type { PairPrice } from "@/types/sniper";
 import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { UseQueryOptions } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
@@ -112,7 +113,7 @@ export function useSnapshot() {
     structuralSharing: false,
     placeholderData: (previousData) => {
       // If previous data has any non-live prices, don't use placeholder (force fresh fetch)
-      if (previousData?.prices?.some((p: any) => p.state !== 'live')) {
+      if (previousData?.prices?.some((p: PairPrice) => p.state !== 'live')) {
         return undefined;
       }
       return keepPreviousData(previousData);

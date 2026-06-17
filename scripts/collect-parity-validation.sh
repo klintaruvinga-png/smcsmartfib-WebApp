@@ -26,7 +26,7 @@ get_auth_token() {
     local pass=$2
     local response
     
-    response=$(curl -s -X POST \
+    response=$(curl -s --max-time "${PARITY_CURL_TIMEOUT:-20}" -X POST \
         "${BACKEND_URL}/auth/login" \
         -H "Content-Type: application/json" \
         -d "{\"username\":\"$user\",\"password\":\"$pass\"}" \
@@ -40,7 +40,13 @@ get_auth_token() {
         return 1
     fi
     
-    echo "$body" | jq -r '.token // .access_token // empty'
+    local token
+    token=$(echo "$body" | jq -r '.token // .access_token // empty')
+    if [ -z "$token" ]; then
+        echo "ERROR: Auth response for user $user did not include a token" >&2
+        return 1
+    fi
+    echo "$token"
 }
 
 ##
@@ -50,7 +56,7 @@ get_snapshot() {
     local token=$1
     local user=$2
     
-    curl -s -H "Authorization: Bearer $token" \
+    curl -s --max-time "${PARITY_CURL_TIMEOUT:-20}" -H "Authorization: Bearer $token" \
         "${BACKEND_URL}/sniper/v1/snapshot/unified?cacheBust=true" \
         | jq --arg user "$user" '{
             user: $user,
@@ -67,8 +73,8 @@ compare_parity() {
     local prices_b=$2
     
     # Extract feed_keys and state per symbol; diff should be empty if canonical
-    local by_symbol_a=$(echo "$prices_a" | jq -s 'map({symbol, feed_key, state}) | sort_by(.symbol)')
-    local by_symbol_b=$(echo "$prices_b" | jq -s 'map({symbol, feed_key, state}) | sort_by(.symbol)')
+    local by_symbol_a=$(echo "$prices_a" | jq 'map({symbol, feed_key, state}) | sort_by(.symbol)')
+    local by_symbol_b=$(echo "$prices_b" | jq 'map({symbol, feed_key, state}) | sort_by(.symbol)')
     
     if [ "$by_symbol_a" == "$by_symbol_b" ]; then
         echo "PARITY_OK"
