@@ -32,8 +32,10 @@ get_auth_token() {
         -d "{\"username\":\"$user\",\"password\":\"$pass\"}" \
         -w "\n%{http_code}")
     
-    local http_code=$(echo "$response" | tail -n1)
-    local body=$(echo "$response" | head -n-1)
+    local http_code
+    local body
+    http_code=$(echo "$response" | tail -n1)
+    body=$(echo "$response" | head -n-1)
     
     if [ "$http_code" != "200" ]; then
         echo "ERROR: Auth failed for user $user (HTTP $http_code)" >&2
@@ -73,8 +75,10 @@ compare_parity() {
     local prices_b=$2
     
     # Extract feed_keys and state per symbol; diff should be empty if canonical
-    local by_symbol_a=$(echo "$prices_a" | jq 'map({symbol, feed_key, state}) | sort_by(.symbol)')
-    local by_symbol_b=$(echo "$prices_b" | jq 'map({symbol, feed_key, state}) | sort_by(.symbol)')
+    local by_symbol_a
+    local by_symbol_b
+    by_symbol_a=$(echo "$prices_a" | jq 'map({symbol, feed_key, state}) | sort_by(.symbol)')
+    by_symbol_b=$(echo "$prices_b" | jq 'map({symbol, feed_key, state}) | sort_by(.symbol)')
     
     if [ "$by_symbol_a" == "$by_symbol_b" ]; then
         echo "PARITY_OK"
@@ -99,13 +103,16 @@ main() {
     for i in $(seq 1 "$ITERATIONS"); do
         echo "[VALIDATION] Poll $i/$ITERATIONS" >&2
         
-        local snap_a=$(get_snapshot "$token_a" "$USER_A")
-        local snap_b=$(get_snapshot "$token_b" "$USER_B")
-        
-        local prices_a=$(echo "$snap_a" | jq '.prices')
-        local prices_b=$(echo "$snap_b" | jq '.prices')
-        
-        local parity=$(compare_parity "$prices_a" "$prices_b")
+        local snap_a
+        local snap_b
+        local prices_a
+        local prices_b
+        local parity
+        snap_a=$(get_snapshot "$token_a" "$USER_A")
+        snap_b=$(get_snapshot "$token_b" "$USER_B")
+        prices_a=$(echo "$snap_a" | jq '.prices')
+        prices_b=$(echo "$snap_b" | jq '.prices')
+        parity=$(compare_parity "$prices_a" "$prices_b")
         parity_results+=("$parity")
         
         snapshots+=("{\"poll\":$i,\"userA\":$snap_a,\"userB\":$snap_b,\"parity\":\"$parity\"}")
