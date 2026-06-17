@@ -25,6 +25,7 @@ export function FreshnessBadge({
   const s = STYLES[state] ?? STYLES["stale"];
   return (
     <span
+      data-testid="freshness-badge"
       className={cn(
         "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider font-mono",
         s.cls,
