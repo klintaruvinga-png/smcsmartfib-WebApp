@@ -19,6 +19,7 @@ require_once __DIR__ . '/class-settings-service.php';
 require_once __DIR__ . '/class-watchlist-service.php';
 require_once __DIR__ . '/class-route-registrar.php';
 require_once __DIR__ . '/class-signal-aggregator.php';
+require_once __DIR__ . '/class-canonical-market-resolver.php';
 
 final class SMC_SuperFib_Sniper_REST {
     const VERSION = '13.1.0';
@@ -2529,7 +2530,7 @@ final class SMC_SuperFib_Sniper_REST {
         $svc = new SMC_MarketData_Service();
 
         if ($symbol) {
-            return rest_ensure_response($svc->get_authority_state($user_id, $symbol));
+            return $this->no_cache_response($svc->get_authority_state($user_id, $symbol));
         }
 
         $watched = $this->get_settings($user_id)['watchlist'];
@@ -2542,7 +2543,7 @@ final class SMC_SuperFib_Sniper_REST {
         foreach ($watched as $sym) {
             $result[$sym] = $svc->get_authority_state($user_id, $sym);
         }
-        return rest_ensure_response($result);
+        return $this->no_cache_response($result);
     }
 
     public function get_authority_diagnostics(WP_REST_Request $request) {
@@ -5665,7 +5666,7 @@ final class SMC_SuperFib_Sniper_REST {
     public function get_regimes() {
         $user_id = get_current_user_id();
         $snapshot = $this->ensure_engine_snapshot($user_id);
-        return rest_ensure_response($snapshot['regimes'] ?? array());
+        return $this->no_cache_response($snapshot['regimes'] ?? array());
     }
 
     // Pine webhook stub — intentionally audit-only until Pine alert integration is implemented.
@@ -7733,8 +7734,14 @@ final class SMC_SuperFib_Sniper_REST {
             ));
         }
 
-        $shared_feed_key = $this->resolve_user_shared_feed_key($user_id, $symbol);
-        $shared_candles = $this->fetch_shared_market_candles($shared_feed_key, $symbol, $timeframe, $outputsize);
+        // CANONICAL RESOLVER: Use freshest feed_key for candles too
+        $resolver = new CanonicalMarketResolver();
+        $user_feed_key = $this->resolve_user_shared_feed_key($user_id, $symbol);
+        $normalized_symbol = $this->map_symbol_aliases($symbol);
+        $stale_threshold_sec = (int) ($this->get_settings($user_id)['staleThresholdSec'] ?? 60);
+        $resolved = $resolver->resolve_canonical_feed_key($normalized_symbol, $user_feed_key, $stale_threshold_sec);
+        $shared_feed_key = $resolved ? $resolved['feed_key'] : $user_feed_key;
+        $shared_candles = $this->fetch_shared_market_candles($shared_feed_key, $normalized_symbol, $timeframe, $outputsize);
         if (!empty($shared_candles) && count($shared_candles) >= 30) {
             return $shared_candles;
         }
@@ -9266,10 +9273,16 @@ final class SMC_SuperFib_Sniper_REST {
     private function fetch_shared_market_quote(int $user_id, string $symbol, ?int $max_age_sec = 90): ?array {
         global $wpdb;
 
-        $feed_key = $this->resolve_user_shared_feed_key($user_id, $symbol);
-        if ($feed_key === '') {
+        // CANONICAL RESOLVER: Select freshest feed_key across all users for this symbol
+        $resolver = new CanonicalMarketResolver();
+        $user_feed_key = $this->resolve_user_shared_feed_key($user_id, $symbol);
+        $resolved = $resolver->resolve_canonical_feed_key($symbol, $user_feed_key, $max_age_sec ?? 90);
+        
+        if (!$resolved) {
             return null;
         }
+        $feed_key = $resolved['feed_key'];
+        $rotation_reason = $resolved['rotation_reason'];
 
         $normalized_symbol = $this->map_symbol_aliases($symbol);
         $table = $this->table('market_quotes_latest');
@@ -9292,12 +9305,11 @@ final class SMC_SuperFib_Sniper_REST {
         $updated_at_iso = $this->to_iso($row['updated_at'] ?? '');
         $age_sec = $updated_at_iso ? $this->iso_age_sec($updated_at_iso) : PHP_INT_MAX;
 
-        if ($max_age_sec !== null && $age_sec > $max_age_sec) {
-            return null;
-        }
-
         $bid = isset($row['bid']) ? (float) $row['bid'] : 0.0;
         $ask = isset($row['ask']) ? (float) $row['ask'] : 0.0;
+
+        // Determine state based on freshness vs threshold.
+        $state = ($max_age_sec !== null && $age_sec > $max_age_sec) ? 'stale' : 'live';
 
         return array(
             'symbol'       => $symbol,
@@ -9312,7 +9324,7 @@ final class SMC_SuperFib_Sniper_REST {
             'source'       => 'mt5',
             'sourceDetail' => 'shared_market_quote',
             'updatedAt'    => $updated_at_iso,
-            'state'        => 'live',
+            'state'        => $state,
             'age_sec'      => (int) $age_sec,
             'feed_key'     => $feed_key,
             'source_count' => isset($row['source_count']) ? (int) $row['source_count'] : 1,
@@ -9704,15 +9716,15 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
 
-    private function is_mt5_authoritative($user_id, $symbol) {
+    private function is_mt5_authoritative($user_id, $symbol, $stale_threshold_sec = 60) {
         if (!$symbol) return false;
-        $cached_price = $this->get_cached_price($user_id, $symbol, PHP_INT_MAX);
-        if ($cached_price && ($cached_price['source'] ?? '') === 'mt5') {
+        $cached_price = $this->get_cached_price($user_id, $symbol, $stale_threshold_sec);
+        // MT5 is authoritative only when source is mt5 AND state is live (fresh).
+        if ($cached_price && ($cached_price['source'] ?? '') === 'mt5' && ($cached_price['state'] ?? '') === 'live') {
             return true;
         }
 
-        $svc = new SMC_MarketData_Service();
-        return $svc->has_mt5_data($user_id, $symbol);
+        return false;
     }
 
     // ── Rate-limit transient helpers ─────────────────────────────────────────
@@ -10586,7 +10598,8 @@ final class SMC_SuperFib_Sniper_REST {
         $response = rest_ensure_response($payload);
 
         if ($response instanceof WP_REST_Response && method_exists($response, 'header')) {
-            $response->header('Cache-Control', 'no-store, no-cache, must-revalidate');
+            $response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+            $response->header('Expires', '0');
             $response->header('Pragma', 'no-cache');
         }
 
