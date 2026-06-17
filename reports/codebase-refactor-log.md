@@ -47,8 +47,14 @@
 - `node .\node_modules\prettier\bin\prettier.cjs --check reports/codebase-refactor-log.md reports/architecture-review-clean-hexagonal-plan-2026-06-17.md`
   - result: passed after formatting the report artifacts with Prettier
 
-### Pending publication steps
+### Publication outcome
 
-1. Commit assessment artifacts.
-2. Push branch to remote.
-3. Open review PR.
+- Local commit:
+  - `99672a4` - `docs: add architecture refactor review`
+- Remote branch:
+  - `arch/codebase-refactor-review`
+- Pull request:
+  - `#399` - `Architecture review and phased refactor plan`
+- Labels applied:
+  - `codex`
+  - `codex-automation`
