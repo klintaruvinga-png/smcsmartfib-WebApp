@@ -88,6 +88,52 @@ Allowed exception:
 
 - Read-only labels, fixtures, or diagnostics that do not alter persisted signal truth or operator gating.
 
+## Phase 4A Refactor Work Packages
+
+These work packages are authorized only as planning and governance artifacts during the active Phase 4 soak.
+
+### 4A-01 Source-of-Truth Matrix
+
+- Objective: document the authoritative owner, parity reference, allowed projections, divergence points, blocked changes, and future consolidation phase for signal, plan, regime, license, and dashboard truth.
+- Output artifact: `reports/source-of-truth-matrix-2026-06-17.md`
+- Mode: docs-only / read-only
+- Runtime change rule: no fib, regime, signal, dashboard-truth, API, or licensing behavior changes may be bundled with this artifact.
+
+### 4A-02 Route-to-Use-Case Map
+
+- Objective: map the current REST and EA route families to their implicit owners, target application-service owners, truth domains touched, and future migration activation phase.
+- Output artifact: `reports/route-to-use-case-map-2026-06-17.md`
+- Mode: docs-only / read-only
+- Runtime change rule: route documentation may not alter any current route contract, permission path, or phase gate.
+
+### 4A-03 Projection and Cache Inventory
+
+- Objective: inventory the current snapshot, projection, and cache surfaces that can drift from domain truth and assign their future consolidation phase.
+- Output artifact: `reports/projection-and-contract-inventory-2026-06-17.md`
+- Mode: docs-only / read-only
+- Runtime change rule: no projection lifecycle, cache invalidation, or persistence semantics may change in this work package.
+
+### 4A-04 Shared Contract Duplication Inventory
+
+- Objective: document duplicated type and normalization ownership between backend payloads, frontend types, SDK types, and MT5 payload surfaces.
+- Output artifact: `reports/projection-and-contract-inventory-2026-06-17.md`
+- Mode: docs-only / read-only
+- Runtime change rule: the inventory may not change payload shapes, generated contracts, or SDK/frontend compatibility.
+
+### 4A-05 Authority Governance Checklist
+
+- Objective: define what each future migration phase may and may not change as authority consolidates across regime, signal, plan, license, and dashboard read models.
+- Output artifact: `reports/source-of-truth-matrix-2026-06-17.md` and `reports/codebase-refactor-log.md`
+- Mode: docs-only / read-only
+- Runtime change rule: governance notes may not be used to bypass the active Phase 4 gate or reopen closed phases.
+
+Acceptance criteria for these work packages:
+
+- The artifacts clarify ownership, sequencing, and future consolidation targets only.
+- No current phase gate is loosened, bypassed, or reinterpreted.
+- No current runtime truth source is changed.
+- Phase 5 remains gated on Phase 4, and later phases remain gated exactly as defined by the migration board.
+
 ## Immediate Next Repo Step
 
 Pause Phase 4 parity reruns until market reopen. The next implementation PR can safely target docs cleanup, capture procedure hardening, stale-candle guard planning, artifact naming conventions, or Phase 4A non-behavior hardening. Do not use weekend parity evidence to fix fib, regime, or signal behavior.
