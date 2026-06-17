@@ -158,42 +158,42 @@ WordPress table schema, user meta snapshot cache, display board persistence, and
 
 ### High
 
-5. Frontend application layer embedded inside hooks and route files
+1. Frontend application layer embedded inside hooks and route files
 
 - Evidence: `src/hooks/useSniperData.ts`, `src/routes/-plan.page.tsx`, `src/routes/admin.tsx`
 - Impact: testing and reuse costs are high
 
-6. MT5 and backend both own overlapping behavioral logic
+2. MT5 and backend both own overlapping behavioral logic
 
 - Evidence: fib, regime, and signal candidate computation paths
 - Impact: parity work requires comparing two implementations instead of validating one canonical model plus one publisher
 
-7. User-meta engine snapshot cache is implicit infrastructure with domain significance
+3. User-meta engine snapshot cache is implicit infrastructure with domain significance
 
 - Evidence: `smc_sf_engine_snapshot`
 - Impact: caching bugs become business-truth bugs
 
-8. Display signal board persistence is a separate truth layer
+4. Display signal board persistence is a separate truth layer
 
 - Evidence: `smc_sf_display_signals`
 - Impact: lifecycle and promotion rules can diverge from raw engine outputs
 
 ### Medium
 
-9. Admin workflow is effectively a mini-product embedded in one route file
+1. Admin workflow is effectively a mini-product embedded in one route file
 
 - Impact: hard to extend or test safely
 
-10. Scripts and reports encode architectural knowledge outside code
+2. Scripts and reports encode architectural knowledge outside code
 
 - Impact: critical invariants live in docs rather than enforceable modules
 
-11. SDK lags domain richness in some areas
+3. SDK lags domain richness in some areas
 
 - Example: frontend `FreshnessState` includes `closed_session`, SDK does not
 - Impact: external consumers can receive an incomplete contract model
 
-12. Test concentration does not match runtime concentration
+4. Test concentration does not match runtime concentration
 
 - Example: one backend contract test file is ~2.8k lines
 - Impact: verification exists, but maintainability is degrading
@@ -341,32 +341,32 @@ Required architectural change:
 
 1. API normalization logic
 
-- `src/lib/api/sniperClient.ts`
-- `sdk/src/client/SniperClient.ts`
+1. `src/lib/api/sniperClient.ts`
+2. `sdk/src/client/SniperClient.ts`
 
-2. Type definitions
+1. Type definitions
 
-- `src/types/sniper.ts`
-- `sdk/src/types/index.ts`
+1. `src/types/sniper.ts`
+2. `sdk/src/types/index.ts`
 
-3. Watchlist normalization / symbol canonicalization
+1. Watchlist normalization / symbol canonicalization
 
-- frontend hook utilities
-- backend watchlist service
-- MT5 symbol normalizer
+1. frontend hook utilities
+2. backend watchlist service
+3. MT5 symbol normalizer
 
-4. Freshness and state vocabulary
+1. Freshness and state vocabulary
 
-- MT5 freshness engine
-- backend health/snapshot interpretation
-- frontend badge and rendering behavior
-- SDK type surface
+1. MT5 freshness engine
+2. backend health/snapshot interpretation
+3. frontend badge and rendering behavior
+4. SDK type surface
 
-5. Plan executability rules
+1. Plan executability rules
 
-- backend lot sizing and plan state
-- frontend `-plan.utils.ts`
-- `PlanCard.tsx`
+1. backend lot sizing and plan state
+2. frontend `-plan.utils.ts`
+3. `PlanCard.tsx`
 
 ## 8. Scalability Risks
 
@@ -749,19 +749,19 @@ Add and reorganize tests around contracts rather than file boundaries.
 
 - likely outcome: prettier layout, same hidden truth drift
 
-2. Contract cleanup before characterization tests
+1. Contract cleanup before characterization tests
 
 - likely outcome: accidental API or UI behavior changes
 
-3. Frontend cleanup before backend authority extraction
+1. Frontend cleanup before backend authority extraction
 
 - likely outcome: more client-side policy and more truth drift
 
-4. MT5/backend parity work continuing with duplicated business logic
+1. MT5/backend parity work continuing with duplicated business logic
 
 - likely outcome: each parity fix becomes a two-implementation patch
 
-5. SDK continuing as a parallel contract owner
+1. SDK continuing as a parallel contract owner
 
 - likely outcome: external and internal clients slowly diverge
 
