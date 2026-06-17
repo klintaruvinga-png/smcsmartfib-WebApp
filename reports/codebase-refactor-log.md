@@ -44,7 +44,7 @@
 
 - `git diff --check`
   - result: passed with no diff hygiene errors
-- `node .\node_modules\prettier\bin\prettier.cjs --check reports/codebase-refactor-log.md reports/architecture-review-clean-hexagonal-plan-2026-06-17.md`
+- `npx prettier --check reports/codebase-refactor-log.md reports/architecture-review-clean-hexagonal-plan-2026-06-17.md`
   - result: passed after formatting the report artifacts with Prettier
 
 ### Publication outcome
