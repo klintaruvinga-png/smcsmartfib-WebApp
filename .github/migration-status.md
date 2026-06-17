@@ -37,7 +37,7 @@ Phase 4 remains the active migration blocker. The architecture review in `report
 The following controls apply immediately:
 
 - Phases 0-3 remain closed and receive no new refactor tasks.
-- Plugin-refactor Phases 1-7 remain closed and receive no new tasks.
+- Plugin-refactor work for Phases 1-4 is closed; Phases 5-9 refactor ownership is defined in the table below and gated on their respective migration phase prerequisites.
 - Phase 4A is the only authorized parallel refactor lane during the active Phase 4 soak.
 - No refactor task may imply that Phase 5 can start before Phase 4 closes, that Phase 6 can start before Phase 5B closes, or that Phase 7 can start before Phase 6 parity clears.
 
@@ -137,7 +137,7 @@ Live planning artifacts for this alignment:
 
 ### Parity Status
 
-```
+```text
 Pine <-> Backend Signal: [PASS on audited paths]
 Backend -> Dashboard: [PASS on audited admin/dashboard surfaces]
 Freshness Logic: [PASS - NAS100/US30/XAUUSD all live during active session]
@@ -200,7 +200,7 @@ Watchlist Authority: [PASS - 100% parity]
 
 ### Live Validation Evidence
 
-```
+```text
 Heartbeat Confirmed:
 - EA logs: [Heartbeat] Dispatch | user_id=1 | account_id=32206603 | [Heartbeat] OK. (2026-05-18 ~00:31, 01:47 UTC)
 - PHP logs: SMC SuperFIB EA heartbeat received: user_id=1 account_id=32206603 terminal_id=FB9A56D617EDDDFE29EE54EBEFFE96C1 connected=1 (2026-05-17 22:51, 23:18, 23:37 UTC)
@@ -315,9 +315,9 @@ Market-Stream Auth:
 
 ### Deliverables
 
-- [x] `mt5/FibEngine.mqh` — LTF*SF (recency-weighted) + HTF_AF (raw-extreme) fib levels, all 16 ratios, M15/H1/H4/D1 *(corrected 2026-05-28)\_
+- [x] `mt5/FibEngine.mqh` — LTF*SF (recency-weighted) + HTF_AF (raw-extreme) fib levels, all 16 ratios, M15/H1/H4/D1 *(corrected 2026-05-28)_
 - [x] `FibEngine` integrated into `MarketDataEngine.mqh` — dispatches `/ea/fib-levels` every ~60s _(2026-05-25)_
-- [x] `wp_smc_sf_fib_levels` DB table — UNIQUE upsert on (user*id, symbol, timeframe, family, ratio) *(2026-05-25)\_
+- [x] `wp_smc_sf_fib_levels` DB table — UNIQUE upsert on (user*id, symbol, timeframe, family, ratio) *(2026-05-25)_
 - [x] `POST /ea/fib-levels` + ingestion handler — validates against canonical 16-ratio whitelist and accepts H4 _(corrected 2026-05-28)_
 - [x] `GET /market-data/fib-levels` — grouped response for dashboard consumption _(2026-05-25)_
 - [x] `scripts/parity-validator.php` — machine-readable JSON gate report; synthetic self-test 100% PASS on `384/384` when run without paired inputs _(corrected 2026-05-28)_
@@ -352,7 +352,7 @@ Market-Stream Auth:
 
 ### Parity Status
 
-```
+```text
 PHP Fixture Parity:        PASS (100%, 0.00000 delta max all 12 fixtures)
 Ingestion Contract Tests:  PASS (7/7; 128-row H4 contract enforced)
 Parity Validator Self-Test: PASS (synthetic no-input mode, 100%, 384/384 tuples)
@@ -386,7 +386,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 
 - [x] **`mt5/RegimeEngine.mqh`** — EMA-20 D1 HTF bias, efficiency-ratio chop score, ATR-14 H1 _(2026-05-25)_
 - [x] **`MarketDataEngine.mqh` integration** — `SendRegimeToBackend()` every ~60s _(2026-05-25)_
-- [x] **`wp_smc_sf_regime_snapshots` DB table** — UNIQUE upsert on (user*id, symbol) *(2026-05-25)\_
+- [x] **`wp_smc_sf_regime_snapshots` DB table** — UNIQUE upsert on (user*id, symbol) *(2026-05-25)_
 - [x] **`POST /ea/regime-snapshot`** — batch ingestion, EA bridge auth _(2026-05-25)_
 - [x] **`GET /market-data/regime`** — grouped response for dashboard _(2026-05-25)_
 - [ ] **[MANUAL]** 48h+ regime accumulation on live MT5 terminal
@@ -408,7 +408,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 
 ### Parity Status
 
-```
+```text
 MT5 htf_bias vs Pine bias:    PENDING (Phase 4 gate must clear first)
 MT5 ltf_regime vs Pine regime: PENDING
 MT5 chop_score delta:         PENDING (target: ≤ 0.15)
@@ -513,7 +513,7 @@ All sources below are **free tier** — no paid subscriptions required for Phase
 
 ### Parity Status
 
-```
+```text
 Fundamental bias accuracy vs. known events: [PENDING]
 Signal conviction weighting regression: [PENDING]
 Regime engine parity post-overlay: [PENDING]
@@ -541,9 +541,9 @@ Regime engine parity post-overlay: [PENDING]
 - [x] **`mt5/ExecutionEngine.mqh`** — Phase 7 scaffold, `phase6Cleared=false` hard gate _(2026-05-25)_
 - [x] **`wp_smc_sf_mt5_signal_candidates` DB table** _(2026-05-25)_
 - [x] **`POST /ea/signal-candidates`** — batch ingestion with drift classification _(2026-05-25)_
-- [x] **`GET /market-data/signal-drift`** — parity report with gate*status *(2026-05-25)\_
-- [x] **`classify_signal_drift()`** — MT5 vs Pine: EXACT/DRIFT/MISMATCH/NO*PINE *(2026-05-25)\_
-- [x] **`is_phase6_gate_cleared()`** — ≥50 comparables AND parity*pct ≥ 95% *(2026-05-25)\_
+- [x] **`GET /market-data/signal-drift`** — parity report with gate*status *(2026-05-25)_
+- [x] **`classify_signal_drift()`** — MT5 vs Pine: EXACT/DRIFT/MISMATCH/NO*PINE *(2026-05-25)_
+- [x] **`is_phase6_gate_cleared()`** — ≥50 comparables AND parity*pct ≥ 95% *(2026-05-25)_
 - [ ] **[ACTIVATION SPRINT]** Fib→Signal SharedStateCache wiring (fibCount currently=0)
 - [ ] **[MANUAL]** 200+ comparable candidates across 2+ weeks
 - [ ] **[MANUAL]** Parity ≥ 95% confirmed in drift report
@@ -556,7 +556,7 @@ Regime engine parity post-overlay: [PENDING]
 
 ### Parity Status
 
-```
+```text
 MT5 Entry vs Pine Entry: PENDING (needs Phase 5B live + fib wiring sprint)
 SL/TP Parity: PENDING
 Confluence Detection: PENDING
@@ -637,7 +637,7 @@ Phase 7 GATE: BLOCKED (hard gate in is_phase6_gate_cleared)
 - [x] **`wp_smc_sf_license_tiers` DB table** — Basic/Pro/Elite/Institutional _(2026-05-25)_
 - [x] **`GET /user/license`** — returns current tier; defaults to Basic _(2026-05-25)_
 - [x] **`POST /admin/license/set-tier`** — admin assigns tier + expiry _(2026-05-25)_
-- [x] Tier config: max*symbols, max_ea_sessions, execution_enabled, api_access_enabled *(2026-05-25)\_
+- [x] Tier config: max*symbols, max_ea_sessions, execution_enabled, api_access_enabled *(2026-05-25)_
 - [ ] Anti-piracy: max_ea_sessions enforcement in heartbeat
 - [ ] License-check integration (tier limits in `/ea/license-check` response)
 - [ ] Subscription/payment integration (Stripe or WooCommerce)

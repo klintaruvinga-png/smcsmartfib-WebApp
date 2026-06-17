@@ -90,7 +90,7 @@
 
 - `git diff --check`
   - result: passed with no diff hygiene errors
-- `npx prettier --check reports/codebase-refactor-log.md reports/architecture-review-clean-hexagonal-plan-2026-06-17.md`
+- `npx prettier --check reports/codebase-refactor-log.md reports/architecture-review-clean-hexagonal-plan-2026-06-17.md reports/source-of-truth-matrix-2026-06-17.md reports/route-to-use-case-map-2026-06-17.md reports/projection-and-contract-inventory-2026-06-17.md`
   - result: passed after formatting the report artifacts with Prettier
 
 ### Publication outcome
