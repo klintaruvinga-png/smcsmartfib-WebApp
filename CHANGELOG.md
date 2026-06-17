@@ -1,3 +1,5 @@
+# Changelog
+
 ## 2026-06-17 — Canonical Feed Stabilization Hardening (v13.1.1-canonical-feed-hardening)
 
 - Wired `CanonicalMarketResolver` into quote and candle fetchers to ensure cross-user canonical feed selection.

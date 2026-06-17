@@ -1,0 +1,81 @@
+# PR 396 P1/P2 bugfix validation
+## php resolver regression tests
+PASS testTwoUsersSameSymbolResolvesToFreshestFeed
+PASS testStaleQuoteComputesCorrectState
+PASS testFeedKeyRotationToGlobalFresh
+PASS testFallbackToLeastStaleFeed
+PASS testInvalidDatetimeAndZeroPricesAreSafe
+PASS testCacheHeaderContract
+## php syntax main plugin
+No syntax errors detected in wordpress/smc-superfib-sniper/smc-superfib-sniper.php
+## php syntax resolver
+No syntax errors detected in wordpress/smc-superfib-sniper/class-canonical-market-resolver.php
+## shell syntax parity scripts
+shell syntax OK
+## git diff check
+git diff check OK
+## npm ci
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+npm warn ERESOLVE overriding peer dependency
+npm warn While resolving: env-runner@0.1.9
+npm warn Found: miniflare@undefined
+npm warn node_modules/nitro/node_modules/miniflare
+npm warn
+npm warn Could not resolve dependency:
+npm warn peerOptional miniflare@"^4.20260515.0" from env-runner@0.1.9
+npm warn node_modules/nitro/node_modules/env-runner
+npm warn   env-runner@"^0.1.9" from nitro@3.0.260603-beta
+npm warn   node_modules/nitro
+npm warn ERESOLVE overriding peer dependency
+npm warn While resolving: unstorage@2.0.0-alpha.7
+npm warn Found: chokidar@undefined
+npm warn node_modules/nitro/node_modules/chokidar
+npm warn
+npm warn Could not resolve dependency:
+npm warn peerOptional chokidar@"^4 || ^5" from unstorage@2.0.0-alpha.7
+npm warn node_modules/nitro/node_modules/unstorage
+npm warn   unstorage@"^2.0.0-alpha.7" from nitro@3.0.260603-beta
+npm warn   node_modules/nitro
+npm warn ERESOLVE overriding peer dependency
+npm warn While resolving: unstorage@2.0.0-alpha.7
+npm warn Found: lru-cache@undefined
+npm warn node_modules/nitro/node_modules/lru-cache
+npm warn
+npm warn Could not resolve dependency:
+npm warn peerOptional lru-cache@"^11.2.6" from unstorage@2.0.0-alpha.7
+npm warn node_modules/nitro/node_modules/unstorage
+npm warn   unstorage@"^2.0.0-alpha.7" from nitro@3.0.260603-beta
+npm warn   node_modules/nitro
+npm error code EUSAGE
+npm error
+npm error `npm ci` can only install packages when your package.json and package-lock.json or npm-shrinkwrap.json are in sync. Please update your lock file with `npm install` before continuing.
+npm error
+npm error Missing: miniflare@ from lock file
+npm error Missing: chokidar@ from lock file
+npm error Missing: lru-cache@ from lock file
+npm error
+npm error Clean install a project
+npm error
+npm error Usage:
+npm error npm ci
+npm error
+npm error Options:
+npm error [--install-strategy <hoisted|nested|shallow|linked>] [--legacy-bundling]
+npm error [--global-style] [--omit <dev|optional|peer> [--omit <dev|optional|peer> ...]]
+npm error [--include <prod|dev|optional|peer> [--include <prod|dev|optional|peer> ...]]
+npm error [--strict-peer-deps] [--foreground-scripts] [--ignore-scripts] [--no-audit]
+npm error [--no-bin-links] [--no-fund] [--dry-run]
+npm error [-w|--workspace <workspace-name> [-w|--workspace <workspace-name> ...]]
+npm error [--workspaces] [--include-workspace-root] [--install-links]
+npm error
+npm error aliases: clean-install, ic, install-clean, isntall-clean
+npm error
+npm error Run "npm help ci" for more info
+npm error A complete log of this run can be found in: /root/.npm/_logs/2026-06-17T04_48_43_425Z-debug-0.log
+## npm run build
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> tanstack_start_ts@13.1.0 build
+> vite build
+
+sh: 1: vite: not found

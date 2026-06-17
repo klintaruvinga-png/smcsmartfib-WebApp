@@ -46,7 +46,7 @@ class CanonicalMarketResolver {
         $best_age = PHP_INT_MAX;
         foreach ($rows as $r) {
             $age = $this->iso_age_sec($this->to_iso($r['updated_at']));
-            if ($age < $best_age) {
+            if ($best === null || $age < $best_age) {
                 $best_age = $age;
                 $best = $r;
             }
@@ -95,7 +95,7 @@ class CanonicalMarketResolver {
             return null;
         }
         $updated_at_iso = $this->to_iso($row['updated_at'] ?? '');
-        $age_sec = $updated_at_iso ? $this->iso_age_sec($updated_at_iso) : PHP_INT_MAX;
+        $age_sec = $this->is_valid_datetime($updated_at_iso) ? $this->iso_age_sec($updated_at_iso) : PHP_INT_MAX;
         // Compute state based on age.
         $state = ($age_sec <= $stale_threshold_sec) ? 'live' : 'stale';
         $bid = isset($row['bid']) ? (float) $row['bid'] : 0.0;
@@ -104,7 +104,7 @@ class CanonicalMarketResolver {
             'symbol'       => $normalized_symbol,
             'bid'          => $bid,
             'ask'          => $ask,
-            'mid'          => isset($row['mid']) ? (float) $row['mid'] : (($bid + $ask) / 2),
+            'mid'          => isset($row['mid']) ? (float) $row['mid'] : $this->calculate_mid($bid, $ask),
             'changePct1d'  => null,
             'source'       => 'mt5',
             'sourceDetail' => 'canonical_resolver',
@@ -114,6 +114,23 @@ class CanonicalMarketResolver {
             'feed_key'     => $feed_key,
             'source_count' => isset($row['source_count']) ? (int) $row['source_count'] : 1,
         ];
+    }
+
+    private function is_valid_datetime(string $datetime): bool {
+        return $datetime !== '' && strtotime($datetime) !== false;
+    }
+
+    private function calculate_mid(float $bid, float $ask): ?float {
+        if ($bid <= 0.0 && $ask <= 0.0) {
+            return null;
+        }
+        if ($bid <= 0.0) {
+            return $ask;
+        }
+        if ($ask <= 0.0) {
+            return $bid;
+        }
+        return ($bid + $ask) / 2;
     }
 
     // Helper proxies – expected to exist on the main plugin class. We delegate to the global plugin instance.
@@ -130,13 +147,21 @@ class CanonicalMarketResolver {
         if (function_exists('smc_sf_to_iso')) {
             return smc_sf_to_iso($datetime);
         }
-        return gmdate('c', strtotime($datetime));
+        $timestamp = strtotime($datetime);
+        if ($timestamp === false) {
+            return '';
+        }
+        return gmdate('c', $timestamp);
     }
     private function iso_age_sec(string $iso): int {
         if (function_exists('smc_sf_iso_age_sec')) {
             return smc_sf_iso_age_sec($iso);
         }
-        return max(0, time() - strtotime($iso));
+        $timestamp = strtotime($iso);
+        if ($timestamp === false) {
+            return PHP_INT_MAX;
+        }
+        return max(0, time() - $timestamp);
     }
 }
 ?>

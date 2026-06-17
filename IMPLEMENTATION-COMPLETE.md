@@ -46,19 +46,22 @@
 ## 🧪 Verification Strategy
 
 ### Phase 1: Unit Tests
+
 ```bash
-npm test                # TypeScript
-npm run test:php        # PHP
+npm run test:focused    # TypeScript
+php wordpress/smc-superfib-sniper/tests/php/test-canonical-market-resolver.php  # PHP
 npm run build           # Build (catches type errors)
 ```
 
 ### Phase 2: Cache Header Smoke Test
+
 ```bash
 curl -I https://trader.stokvelsociety.co.za/wp-json/sniper/v1/regimes
 # Must include: Cache-Control: no-store, no-cache, must-revalidate, max-age=0
 ```
 
 ### Phase 3: Two-User Parity (Requires live backend + test users)
+
 ```bash
 # Pre-patch baseline
 export PARITY_USER_A=user_parity_a

@@ -19,6 +19,7 @@ require_once __DIR__ . '/class-settings-service.php';
 require_once __DIR__ . '/class-watchlist-service.php';
 require_once __DIR__ . '/class-route-registrar.php';
 require_once __DIR__ . '/class-signal-aggregator.php';
+require_once __DIR__ . '/class-canonical-market-resolver.php';
 
 final class SMC_SuperFib_Sniper_REST {
     const VERSION = '13.1.0';
@@ -7736,9 +7737,11 @@ final class SMC_SuperFib_Sniper_REST {
         // CANONICAL RESOLVER: Use freshest feed_key for candles too
         $resolver = new CanonicalMarketResolver();
         $user_feed_key = $this->resolve_user_shared_feed_key($user_id, $symbol);
-        $resolved = $resolver->resolve_canonical_feed_key($symbol, $user_feed_key, $max_age_sec ?? 90);
+        $normalized_symbol = $this->map_symbol_aliases($symbol);
+        $stale_threshold_sec = (int) ($this->get_settings($user_id)['staleThresholdSec'] ?? 60);
+        $resolved = $resolver->resolve_canonical_feed_key($normalized_symbol, $user_feed_key, $stale_threshold_sec);
         $shared_feed_key = $resolved ? $resolved['feed_key'] : $user_feed_key;
-        $shared_candles = $this->fetch_shared_market_candles($shared_feed_key, $symbol, $timeframe, $outputsize);
+        $shared_candles = $this->fetch_shared_market_candles($shared_feed_key, $normalized_symbol, $timeframe, $outputsize);
         if (!empty($shared_candles) && count($shared_candles) >= 30) {
             return $shared_candles;
         }
@@ -9302,15 +9305,11 @@ final class SMC_SuperFib_Sniper_REST {
         $updated_at_iso = $this->to_iso($row['updated_at'] ?? '');
         $age_sec = $updated_at_iso ? $this->iso_age_sec($updated_at_iso) : PHP_INT_MAX;
 
-        if ($max_age_sec !== null && $age_sec > $max_age_sec) {
-            return null;
-        }
-
         $bid = isset($row['bid']) ? (float) $row['bid'] : 0.0;
         $ask = isset($row['ask']) ? (float) $row['ask'] : 0.0;
 
         // Determine state based on freshness vs threshold.
-        $state = ($age_sec > $max_age_sec) ? 'stale' : 'live';
+        $state = ($max_age_sec !== null && $age_sec > $max_age_sec) ? 'stale' : 'live';
 
         return array(
             'symbol'       => $symbol,
@@ -9725,8 +9724,7 @@ final class SMC_SuperFib_Sniper_REST {
             return true;
         }
 
-        $svc = new SMC_MarketData_Service();
-        return $svc->has_mt5_data($user_id, $symbol);
+        return false;
     }
 
     // ── Rate-limit transient helpers ─────────────────────────────────────────

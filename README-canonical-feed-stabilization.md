@@ -182,7 +182,7 @@ scripts/collect-parity-validation.sh > reports/post-patch.json
 
 ## CI Integration
 
-The CI workflow (`..github/workflows/ci.yml`) now includes:
+The CI workflow (`.github/workflows/ci-canonical-feed.yml`) now includes:
 
 ```yaml
 - name: Canonical Feed — Parity Baseline
@@ -190,8 +190,8 @@ The CI workflow (`..github/workflows/ci.yml`) now includes:
 
 - name: Run Tests & Deploy
   run: |
-    npm run test:php
-    npm test
+    php wordpress/smc-superfib-sniper/tests/php/test-canonical-market-resolver.php
+    npm run test:focused
     npm run build
     npm run deploy
 
@@ -208,7 +208,7 @@ The CI workflow (`..github/workflows/ci.yml`) now includes:
       || echo "PARITY CONVERGENCE FAILED" && exit 1
 ```
 
-**Pipeline guarantee**: No PR can be merged unless parity validation passes.
+**Pipeline guarantee**: When backend parity secrets are configured, parity validation is a hard gate and failures exit non-zero; when secrets are absent, the workflow records an empty report and skips live-backend checks.
 
 ---
 
