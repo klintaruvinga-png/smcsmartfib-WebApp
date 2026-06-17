@@ -2529,7 +2529,7 @@ final class SMC_SuperFib_Sniper_REST {
         $svc = new SMC_MarketData_Service();
 
         if ($symbol) {
-            return rest_ensure_response($svc->get_authority_state($user_id, $symbol));
+            return $this->no_cache_response($svc->get_authority_state($user_id, $symbol));
         }
 
         $watched = $this->get_settings($user_id)['watchlist'];
@@ -2542,7 +2542,7 @@ final class SMC_SuperFib_Sniper_REST {
         foreach ($watched as $sym) {
             $result[$sym] = $svc->get_authority_state($user_id, $sym);
         }
-        return rest_ensure_response($result);
+        return $this->no_cache_response($result);
     }
 
     public function get_authority_diagnostics(WP_REST_Request $request) {
@@ -5665,7 +5665,7 @@ final class SMC_SuperFib_Sniper_REST {
     public function get_regimes() {
         $user_id = get_current_user_id();
         $snapshot = $this->ensure_engine_snapshot($user_id);
-        return rest_ensure_response($snapshot['regimes'] ?? array());
+        return $this->no_cache_response($snapshot['regimes'] ?? array());
     }
 
     // Pine webhook stub — intentionally audit-only until Pine alert integration is implemented.
@@ -7733,7 +7733,11 @@ final class SMC_SuperFib_Sniper_REST {
             ));
         }
 
-        $shared_feed_key = $this->resolve_user_shared_feed_key($user_id, $symbol);
+        // CANONICAL RESOLVER: Use freshest feed_key for candles too
+        $resolver = new CanonicalMarketResolver();
+        $user_feed_key = $this->resolve_user_shared_feed_key($user_id, $symbol);
+        $resolved = $resolver->resolve_canonical_feed_key($symbol, $user_feed_key, $max_age_sec ?? 90);
+        $shared_feed_key = $resolved ? $resolved['feed_key'] : $user_feed_key;
         $shared_candles = $this->fetch_shared_market_candles($shared_feed_key, $symbol, $timeframe, $outputsize);
         if (!empty($shared_candles) && count($shared_candles) >= 30) {
             return $shared_candles;
@@ -9266,10 +9270,16 @@ final class SMC_SuperFib_Sniper_REST {
     private function fetch_shared_market_quote(int $user_id, string $symbol, ?int $max_age_sec = 90): ?array {
         global $wpdb;
 
-        $feed_key = $this->resolve_user_shared_feed_key($user_id, $symbol);
-        if ($feed_key === '') {
+        // CANONICAL RESOLVER: Select freshest feed_key across all users for this symbol
+        $resolver = new CanonicalMarketResolver();
+        $user_feed_key = $this->resolve_user_shared_feed_key($user_id, $symbol);
+        $resolved = $resolver->resolve_canonical_feed_key($symbol, $user_feed_key, $max_age_sec ?? 90);
+        
+        if (!$resolved) {
             return null;
         }
+        $feed_key = $resolved['feed_key'];
+        $rotation_reason = $resolved['rotation_reason'];
 
         $normalized_symbol = $this->map_symbol_aliases($symbol);
         $table = $this->table('market_quotes_latest');

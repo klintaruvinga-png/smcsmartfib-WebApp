@@ -101,13 +101,22 @@ export function useSnapshot() {
   // Prevents orphaned queries and race conditions during initialization.
   const enabled = backendReady && pollMs !== null;
   useLivePollingDiagnostics("SNAPSHOT_POLL", backendReady, pendingSettingsLoad, pollMs);
+  
+  // CANONICAL FEED: Conditional placeholder guard — disable when any price is stale.
+  // When backend signals state !== 'live', force a fresh fetch instead of showing stale via placeholder.
   return useQuery({
     queryKey: ["snapshot"],
     queryFn: () => apiClient.getSnapshot(),
     enabled,
     staleTime: 0,
     structuralSharing: false,
-    placeholderData: keepPreviousData,
+    placeholderData: (previousData) => {
+      // If previous data has any non-live prices, don't use placeholder (force fresh fetch)
+      if (previousData?.prices?.some((p: any) => p.state !== 'live')) {
+        return undefined;
+      }
+      return keepPreviousData(previousData);
+    },
     refetchOnWindowFocus: false,
     refetchInterval: enabled && pollMs !== null ? pollMs : false,
   });
