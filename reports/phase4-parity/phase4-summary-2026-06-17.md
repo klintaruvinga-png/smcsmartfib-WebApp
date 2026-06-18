@@ -2,7 +2,7 @@
 
 **Run timestamp:** 2026‑06‑17 20:22:54 UTC
 
-**Overall gate result:** **FAIL** – parity = **15.63 %** (target ≥ 75 %).
+**Overall gate result:** **FAIL** – parity = **9.38 %** (target ≥ 75 %).
 
 ## Findings
 
