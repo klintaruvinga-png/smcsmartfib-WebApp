@@ -790,3 +790,26 @@ The correct migration path is not a large rewrite. It is a staged authority-cons
 - then reduce MT5/backend duplication
 
 If this sequence is followed, the platform can move toward Clean Architecture / Hexagonal Architecture with low operational risk and without changing business behavior, API contracts, signal logic, or licensing logic.
+
+## 18. Migration Alignment Addendum
+
+The migration board in `.github/migration-status.md` controls start/stop authority for implementation. This architecture review defines the target structure and authority model, but it does not override phase gates, phase ownership, or operator closeout requirements already defined by the migration system.
+
+Migration-owned sequencing for the architecture-review phases:
+
+- Architecture review `Phase 0. Baseline and safety net` and `Phase 1. Contract consolidation` become Phase `4A` preparation work in the current migration system.
+- Architecture review `Phase 2. Backend extraction by bounded context` is split across migration Phases `5`, `6`, `7`, and `9` so authority is consolidated under the active owning domain instead of through one cross-cutting rewrite.
+- Architecture review `Phase 3. Backend projection isolation` is tied primarily to migration Phase `6`, where signal truth, board projections, and candidate separation become active runtime concerns.
+- Architecture review `Phase 4. Frontend application-layer extraction` is deferred until backend truth services exist, beginning only after migration Phase `7` has established backend-owned plan and execution state.
+- Architecture review `Phase 5. MT5 transport/domain split` is deferred until after migration Phase `6`, so MT5 structure changes do not overlap with unresolved fib/regime/signal parity gates.
+- Architecture review `Phase 6. Monolith shrink pass` is deferred until post-authority stabilization, after the later migration phases have proven the extracted services and truth boundaries in production-like conditions.
+
+Practical alignment for current implementation:
+
+- Phase `4A` is the immediate execution lane for docs-only and read-only refactor governance artifacts.
+- Phase `5` owns regime-truth consolidation.
+- Phase `5B` owns macro-overlay contract ownership.
+- Phase `6` owns signal-truth and projection isolation.
+- Phase `7` owns trade-plan truth consolidation.
+- Phase `8` owns approval-workflow separation.
+- Phase `9` owns license-truth consolidation.
