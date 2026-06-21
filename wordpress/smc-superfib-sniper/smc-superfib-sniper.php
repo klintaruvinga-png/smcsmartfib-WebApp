@@ -73,9 +73,18 @@ final class SMC_SuperFib_Sniper_REST {
         }, 0);
 
         // Regression guard: Validate CORS configuration consistency on every boot.
-        // Non-fatal: logs a warning but never blocks plugin load.
+        // Non-fatal: logs a warning but never blocks plugin load. Throttle the
+        // warning so repeated requests don't fill logs when configuration is
+        // known to be inconsistent during maintenance or deploys.
         if (!self::validate_cors_origins_consistency()) {
-            error_log('SMC SuperFIB: CORS configuration inconsistency detected. Check allowed origins for protocol prefix or duplicate entries.');
+            $log_key = 'smc_sf_cors_inconsistency_log_v1';
+            if (!function_exists('get_transient') || !get_transient($log_key)) {
+                error_log('SMC SuperFIB: CORS configuration inconsistency detected. Check allowed origins for protocol prefix or duplicate entries.');
+                if (function_exists('set_transient')) {
+                    // Cache for 1 hour to avoid log spam during repeated requests.
+                    set_transient($log_key, 1, HOUR_IN_SECONDS ?? 3600);
+                }
+            }
         }
 
         // Respond to CORS preflight (OPTIONS) requests before WordPress processes them.
@@ -2997,7 +3006,13 @@ final class SMC_SuperFib_Sniper_REST {
                             );
                         }
                     } else {
-                        error_log("MT5 M15 CANDLE INSERT FAILED: {$symbol} | timeframe=15min | time={$candle_m15['time']} | stream_timestamp={$m15_stream_ts}");
+                        $insert_fail_key = 'smc_sf_mt5_m15_insert_failed_' . md5($symbol);
+                        if (!function_exists('get_transient') || !get_transient($insert_fail_key)) {
+                            error_log("MT5 M15 CANDLE INSERT FAILED: {$symbol} | timeframe=15min | time={$candle_m15['time']} | stream_timestamp={$m15_stream_ts}");
+                            if (function_exists('set_transient')) {
+                                set_transient($insert_fail_key, 1, 300);
+                            }
+                        }
                     }
                 }
             } else {
@@ -5570,8 +5585,14 @@ final class SMC_SuperFib_Sniper_REST {
         $candle_time = gmdate('Y-m-d H:i:s', $candle_ts);
         $stream_ts = $stream_timestamp ? strtotime($stream_timestamp) : false;
         if ($stream_ts !== false && $candle_ts >= $stream_ts) {
-            error_log("CANDLE CHECK: candle_time={$candle_time} | stream={$stream_timestamp}");
-            error_log("CANDLE REJECTED: {$symbol} | candle_time={$candle_time} >= stream={$stream_timestamp}");
+            $check_key = 'smc_sf_candle_reject_' . md5($symbol . '|' . $timeframe . '|' . $candle_time);
+            if (!function_exists('get_transient') || !get_transient($check_key)) {
+                error_log("CANDLE CHECK: candle_time={$candle_time} | stream={$stream_timestamp}");
+                error_log("CANDLE REJECTED: {$symbol} | candle_time={$candle_time} >= stream={$stream_timestamp}");
+                if (function_exists('set_transient')) {
+                    set_transient($check_key, 1, 300);
+                }
+            }
             $this->audit($user_id, 'ea.market_stream.open_or_future_candle_rejected', array(
                 'symbol' => $symbol,
                 'timeframe' => $timeframe,
@@ -5588,7 +5609,13 @@ final class SMC_SuperFib_Sniper_REST {
             // For M15 candles we pass a larger limit because a closed bar is naturally 15-30 minutes old.
             // REGRESSION: Log via audit() not just error_log() so rejections are visible.
             if ($age_seconds > $max_age_sec) {
-                error_log("STALE REJECTED: {$symbol} | age={$age_seconds}s | candle={$candle['time']} | stream={$stream_timestamp}");
+                $stale_key = 'smc_sf_stale_rejected_' . md5($symbol . '|' . $timeframe);
+                if (!function_exists('get_transient') || !get_transient($stale_key)) {
+                    error_log("STALE REJECTED: {$symbol} | age={$age_seconds}s | candle={$candle['time']} | stream={$stream_timestamp}");
+                    if (function_exists('set_transient')) {
+                        set_transient($stale_key, 1, 300);
+                    }
+                }
                 $this->audit($user_id, 'ea.market_stream.stale_candle_rejected', array(
                     'symbol' => $symbol,
                     'timeframe' => $timeframe,
@@ -5619,6 +5646,31 @@ final class SMC_SuperFib_Sniper_REST {
         );
 
         return $result !== false;
+    }
+
+    /**
+     * Wrapper for $wpdb->replace that retries on MySQL deadlock errors.
+     * Returns the replace result or false after exhausting attempts.
+     */
+    private function safe_replace($table, $data, $format = null, $max_attempts = 3) {
+        global $wpdb;
+        $attempt = 0;
+        while (true) {
+            $attempt++;
+            $res = $wpdb->replace($table, $data, $format);
+            if ($res !== false) {
+                return $res;
+            }
+            $err = isset($wpdb->last_error) ? $wpdb->last_error : '';
+            if ($attempt >= $max_attempts) {
+                return false;
+            }
+            if ($err !== '' && (stripos($err, 'deadlock') !== false || stripos($err, 'Deadlock found when trying to get lock') !== false)) {
+                usleep(50000 * $attempt);
+                continue;
+            }
+            return false;
+        }
     }
 
     /**
@@ -5675,7 +5727,7 @@ final class SMC_SuperFib_Sniper_REST {
         return rest_ensure_response(array('ok' => true));
     }
 
-    public function get_live_signals(WP_REST_Request $request = null) {
+    public function get_live_signals(?WP_REST_Request $request = null) {
         $user_id = get_current_user_id();
         $snapshot_was_computed = false;
         $snapshot = $this->ensure_engine_snapshot($user_id, false, $snapshot_was_computed);
@@ -8285,7 +8337,7 @@ final class SMC_SuperFib_Sniper_REST {
             $orders[] = $record;
         }
 
-        $account_saved = $wpdb->replace(
+        $account_saved = $this->safe_replace(
             $this->table('account_telemetry'),
             $account_metrics,
             array('%d', '%s', '%s', '%f', '%f', '%f', '%f', '%f', '%f', '%s', '%d', '%s', '%s', '%s', '%s')
@@ -8296,7 +8348,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         $positions_upserted = 0;
         foreach ($positions as $record) {
-            $saved = $wpdb->replace(
+            $saved = $this->safe_replace(
                 $this->table('trade_positions'),
                 $record,
                 array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
@@ -8309,7 +8361,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         $orders_upserted = 0;
         foreach ($orders as $record) {
-            $saved = $wpdb->replace(
+            $saved = $this->safe_replace(
                 $this->table('trade_orders'),
                 $record,
                 array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
