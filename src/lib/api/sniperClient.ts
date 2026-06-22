@@ -57,8 +57,13 @@ import {
   mockUserProgress,
 } from "@/mocks/sniperData";
 
-const DEFAULT_BACKEND_URL =
-  import.meta.env.VITE_SNIPER_BACKEND_URL ?? "https://trader.stokvelsociety.co.za/wp-json";
+const DEFAULT_BACKEND_URL = (() => {
+  const buildVal = import.meta.env.VITE_SNIPER_BACKEND_URL;
+  if (typeof window !== "undefined") {
+    return buildVal ?? `${window.location.origin}/wp-json`;
+  }
+  return buildVal ?? "https://trader.stokvelsociety.co.za/wp-json";
+})();
 
 // Default to LIVE backend. Only use mock data when explicitly opted in via
 // VITE_SNIPER_MOCK_MODE=true. Previously this defaulted to mock in dev, which
