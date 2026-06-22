@@ -3,5 +3,5 @@
   "name": "smcsuperfibwebapp",
   "compatibility_date": "2026-06-22",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "@tanstack/react-start/server-entry"
+  "main": "dist/server/server.js"
 }
