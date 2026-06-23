@@ -1,0 +1,120 @@
+# Frontend load fix evidence - 2026-06-23
+
+## Failure observed
+
+Production HTML loaded from:
+
+`https://smcsuperfibwebapp.klintaruvinga.workers.dev/`
+
+but static assets under `/assets/*` returned 404, including:
+
+- `/assets/styles-B_y_4r30.css`
+- `/assets/index-ByjDYHRf.js`
+
+This meant the Worker was serving HTML that referenced Vite/TanStack client assets, but Wrangler was not deploying `dist/client` as static assets.
+
+## Fix
+
+Updated `wrangler.jsonc` to bind the generated client asset directory:
+
+```json
+"assets": {
+  "directory": "./dist/client"
+}
+```
+
+## Build
+
+Command:
+
+```powershell
+npm run build
+```
+
+Result:
+
+- Exit code: 0
+- Client build produced `dist/client/assets/styles-B_y_4r30.css`
+- Client build produced `dist/client/assets/index--lXHrtnD.js`
+- SSR build produced `dist/server/server.js`
+
+Notable non-fatal warning:
+
+- Vite reported one client chunk larger than 500 kB.
+
+## Deploy
+
+Command:
+
+```powershell
+node ./node_modules/wrangler/bin/wrangler.js deploy
+```
+
+Result:
+
+- Exit code: 0
+- Wrangler read 17 files from `dist/client`
+- Wrangler uploaded 16 new or modified static assets
+- Deployed Worker URL: `https://smcsuperfibwebapp.klintaruvinga.workers.dev`
+- Version ID: `7240b68e-954d-4d00-8496-fd6e9ae806a2`
+
+Wrangler emitted side-effect tree-shaking warnings for dependency imports in SSR chunks. These were warnings, not deploy failures.
+
+## Production asset verification
+
+Command:
+
+```powershell
+$urls = @(
+  'https://smcsuperfibwebapp.klintaruvinga.workers.dev/',
+  'https://smcsuperfibwebapp.klintaruvinga.workers.dev/assets/styles-B_y_4r30.css',
+  'https://smcsuperfibwebapp.klintaruvinga.workers.dev/assets/index--lXHrtnD.js',
+  'https://smcsuperfibwebapp.klintaruvinga.workers.dev/assets/charts-BfYCEiin.js'
+)
+foreach ($url in $urls) {
+  $r = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 30
+  "$url $($r.StatusCode) $($r.Content.Length) $($r.Headers['content-type'])"
+}
+```
+
+Result:
+
+- `/` returned 200, `text/html; charset=utf-8`
+- `/assets/styles-B_y_4r30.css` returned 200, `text/css`
+- `/assets/index--lXHrtnD.js` returned 200, `text/javascript`
+- `/assets/charts-BfYCEiin.js` returned 200, `text/javascript`
+
+## Production route verification
+
+Command checked:
+
+- `/`
+- `/account`
+- `/admin`
+- `/analytics`
+- `/book`
+- `/charts`
+- `/live`
+- `/login`
+- `/orders`
+- `/plan`
+- `/progress`
+- `/signals`
+
+Result:
+
+All routes returned HTTP 200 from `https://smcsuperfibwebapp.klintaruvinga.workers.dev`.
+
+## Root HTML asset verification
+
+Command parsed the deployed root HTML for `src` and `href` values under `/assets/*`, then requested each unique asset.
+
+Result:
+
+- `/assets/index-DyoNWte3.js` returned 200
+- `/assets/index--lXHrtnD.js` returned 200
+- `/assets/styles-B_y_4r30.css` returned 200
+
+## Browser verification note
+
+The Codex in-app browser plugin was attempted for a hydration/console check, but the `iab` browser was unavailable in this session. The production HTTP checks cover the reported failure mode directly: the missing CSS/JS assets now return 200 and all app routes return 200.
