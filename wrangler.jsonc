@@ -3,6 +3,5 @@
   "name": "smcsmartfib",
   "compatibility_date": "2026-06-22",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "dist/server/server.js",
-  "pages_build_output_dir": "dist"
+  "main": "dist/server/server.js"
 }
