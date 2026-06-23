@@ -218,7 +218,7 @@ function Invoke-ExternalCommand([string]$Command, [string[]]$Arguments, [string]
 
 function Write-JsonFile([string]$PathValue, $Value) {
     $json = $Value | ConvertTo-Json -Depth 20
-    $utf8 = New-Object System.Text.UTF8Encoding $false
+    $utf8 = New-Object System.Text.UTF8Encoding -ArgumentList $false
     [System.IO.File]::WriteAllText($PathValue, $json, $utf8)
 }
 
@@ -471,7 +471,7 @@ function ConvertTo-Mt5AnchorDebugRecords([string]$Symbol, $Response) {
             if ($null -eq $familyDebug) {
                 $familyDebug = $tfDebug
             }
-            $record = New-Mt5AnchorDebugRecord $Symbol $tf $family @($familyProp.Value) $familyDebug
+            $record = New-Mt5AnchorDebugRecord -Symbol $Symbol -Timeframe $tf -Family $family -Levels @($familyProp.Value) -Debug $familyDebug
             if ($null -ne $record) {
                 $records.Add($record)
             }
@@ -486,15 +486,16 @@ function ConvertTo-Mt5AnchorDebugRecordsFromLevelRows($Rows) {
     foreach ($row in @($Rows)) {
         $key = "$($row.symbol)|$($row.timeframe)|$($row.family)"
         if (-not $groups.ContainsKey($key)) {
-            $groups[$key] = New-Object System.Collections.Generic.List[object]
+            $groups[$key] = @()
         }
-        $groups[$key].Add($row)
+        $groups[$key] = @($groups[$key]) + $row
     }
 
     $records = New-Object System.Collections.Generic.List[object]
     foreach ($key in $groups.Keys) {
         $parts = $key -split "\|"
-        $record = New-Mt5AnchorDebugRecord $parts[0] $parts[1] $parts[2] @($groups[$key]) $null
+        $levelRows = @($groups[$key])
+        $record = New-Mt5AnchorDebugRecord -Symbol $parts[0] -Timeframe $parts[1] -Family $parts[2] -Levels $levelRows -Debug $null
         if ($null -ne $record) {
             $records.Add($record)
         }
