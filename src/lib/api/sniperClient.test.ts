@@ -490,6 +490,37 @@ describe("unified snapshot client contract", () => {
     expect(result.prices[0].source_count).toBeUndefined();
   });
 
+  it("preserves backend-owned top-level snapshot fields through normalization", async () => {
+    const payload = {
+      prices: [],
+      regimes: [],
+      gates: [],
+      diagnostics: [],
+      todayOiImpacts: [
+        {
+          symbol: "EURUSD",
+          todayOiPnlImpactUSC: 42.5,
+          todayOiEquityImpactPct: 0.12,
+          todayBaselineQuality: "day_start",
+        },
+      ],
+    };
+
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await apiClient.getUnifiedSnapshot(false);
+
+    expect(result.todayOiImpacts).toEqual(payload.todayOiImpacts);
+  });
+
   it("getSnapshot is a compatibility alias that calls /snapshot/unified", async () => {
     const payload = {
       prices: [],

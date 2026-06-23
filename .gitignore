@@ -1,5 +1,6 @@
 # Local, private Claude Code CLI config (do not commit)
 docs/claude-code-cli-config.md
+.codex/config.toml
 # Logs
 logs
 *.log

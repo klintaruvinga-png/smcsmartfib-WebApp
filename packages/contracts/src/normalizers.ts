@@ -189,12 +189,14 @@ export function normalizeLiveSignalsResponse(
 }
 
 export function normalizeSnapshot(snapshot: {
-  prices: PairPrice[];
-  regimes: RegimeState[];
-  gates: GateState[];
-  diagnostics: SymbolDiagnostic[];
+  prices?: PairPrice[];
+  regimes?: RegimeState[];
+  gates?: GateState[];
+  diagnostics?: SymbolDiagnostic[];
+  [key: string]: unknown;
 }): MarketSnapshot {
   return {
+    ...snapshot,
     prices: (snapshot.prices ?? []).map((price) => ({
       ...price,
       bid: toFiniteNumber(price.bid),
