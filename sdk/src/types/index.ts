@@ -1,1 +1,1 @@
-export * from "../../../packages/contracts/src/index";
+export * from "./contracts";

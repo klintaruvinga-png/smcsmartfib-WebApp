@@ -294,14 +294,16 @@ export const apiClient = {
   ): Promise<LiveSignalsResponse> {
     if (mock) {
       const wl = new Set(mockSettings.watchlist);
-      const signals =
+      const allSignals =
         scope === "global"
-          ? mockSignals.slice(0, boardSize ?? 3)
-          : mockSignals.filter((s) => wl.has(s.symbol)).slice(0, boardSize ?? 3);
+          ? mockSignals
+          : mockSignals.filter((s) => wl.has(s.symbol));
+      const totalActive = allSignals.length;
+      const signals = allSignals.slice(0, boardSize ?? 3);
       return {
         signals,
         polledAt: new Date().toISOString(),
-        meta: { boardSize: boardSize ?? 3, totalActive: signals.length },
+        meta: { boardSize: boardSize ?? 3, totalActive },
       };
     }
     const params = new URLSearchParams();

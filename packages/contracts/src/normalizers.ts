@@ -82,7 +82,7 @@ export function toFiniteNumber(value: unknown, fallback = 0): number {
     const parsed = Number(value);
     if (Number.isFinite(parsed)) return parsed;
   }
-  return fallback;
+  return typeof fallback === "number" && Number.isFinite(fallback) ? fallback : 0;
 }
 
 export function normalizeAccountTelemetry(response: RawAccountTelemetryResponse): AccountTelemetry {
@@ -96,7 +96,7 @@ export function normalizeAccountTelemetry(response: RawAccountTelemetryResponse)
     marginLevel: toFiniteNumber(response.margin_level),
     floatingPl: toFiniteNumber(response.floating_pl),
     currency: response.currency ?? "",
-    leverage: toFiniteNumber(response.leverage, Number(response.leverage)),
+    leverage: toFiniteNumber(response.leverage),
     eaVersion: response.ea_version ?? "",
     lastSeenAt: response.last_seen_at ?? null,
     updatedAt: response.updated_at ?? null,
@@ -204,7 +204,7 @@ export function normalizeSnapshot(snapshot: {
       age_sec:
         price.age_sec === undefined
           ? undefined
-          : toFiniteNumber(price.age_sec, Number(price.age_sec)),
+          : toFiniteNumber(price.age_sec),
       sourceDetail: typeof price.sourceDetail === "string" ? price.sourceDetail : undefined,
       feed_key: typeof price.feed_key === "string" ? price.feed_key : undefined,
       source_count:
@@ -222,15 +222,15 @@ export function normalizeSnapshot(snapshot: {
       sfPosition:
         regime.sfPosition === null || regime.sfPosition === undefined
           ? null
-          : toFiniteNumber(regime.sfPosition, Number(regime.sfPosition)),
+          : toFiniteNumber(regime.sfPosition),
       afPosition:
         regime.afPosition === null || regime.afPosition === undefined
           ? null
-          : toFiniteNumber(regime.afPosition, Number(regime.afPosition)),
+          : toFiniteNumber(regime.afPosition),
       nearestFib:
         regime.nearestFib === null || regime.nearestFib === undefined
           ? null
-          : toFiniteNumber(regime.nearestFib, Number(regime.nearestFib)),
+          : toFiniteNumber(regime.nearestFib),
     })),
     gates: snapshot.gates ?? [],
     diagnostics: snapshot.diagnostics ?? [],

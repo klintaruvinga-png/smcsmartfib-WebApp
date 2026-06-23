@@ -6,7 +6,7 @@ import {
   normalizeSnapshot,
   normalizeTelemetryOrders,
   normalizeTelemetryPositions,
-} from "../../../packages/contracts/src/normalizers";
+} from "../normalizers/index.js";
 import type {
   AccountState,
   AccountTelemetry,
@@ -34,7 +34,7 @@ import type {
   RawAccountTelemetryResponse,
   RawOrderResponse,
   RawPositionResponse,
-} from "../../../packages/contracts/src/normalizers";
+} from "../normalizers/index.js";
 
 export interface SniperClientConfig {
   baseUrl: string;
@@ -155,7 +155,7 @@ export class SniperClient {
   }
 
   async getSnapshot(): Promise<MarketSnapshot> {
-    const raw = await this.request<MarketSnapshot>("/snapshot", { cacheBust: true });
+    const raw = await this.request<unknown>("/snapshot", { cacheBust: true });
     return normalizeSnapshot(raw);
   }
 

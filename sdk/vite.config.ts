@@ -14,6 +14,7 @@ export default defineConfig({
         "utils/index": resolve(__dirname, "src/utils/index.ts"),
         "constants/index": resolve(__dirname, "src/constants/index.ts"),
         "mocks/index": resolve(__dirname, "src/mocks/index.ts"),
+        "normalizers/index": resolve(__dirname, "src/normalizers/index.ts"),
       },
       formats: ["es", "cjs"],
     },
