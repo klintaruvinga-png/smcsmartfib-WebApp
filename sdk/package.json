@@ -41,6 +41,11 @@
       "types": "./dist/auth/index.d.ts",
       "import": "./dist/auth/index.js",
       "require": "./dist/auth/index.cjs"
+    },
+    "./normalizers": {
+      "types": "./dist/normalizers/index.d.ts",
+      "import": "./dist/normalizers/index.js",
+      "require": "./dist/normalizers/index.cjs"
     }
   },
   "files": [

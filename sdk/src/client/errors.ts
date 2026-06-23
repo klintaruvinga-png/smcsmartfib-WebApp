@@ -26,6 +26,7 @@ export class ApiError extends Error {
 export class NetworkError extends Error {
   readonly code = "NETWORK_ERROR" as const;
   readonly path: string;
+  cause?: Error;
 
   constructor(path: string, cause?: Error) {
     super(`Network error on ${path}${cause ? `: ${cause.message}` : ""}`);

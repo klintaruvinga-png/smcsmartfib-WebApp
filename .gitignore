@@ -61,4 +61,8 @@ reports/.manual-session
 src/routeTree.gen.ts
 src/routeTree.gen.ts
 *.ts
+!packages/
+!packages/contracts/
+!packages/contracts/src/
+!packages/contracts/src/*.ts
 .claude/
