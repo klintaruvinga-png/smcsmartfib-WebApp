@@ -6,7 +6,12 @@ vi.mock("@/lib/auth", () => ({
   getWordPressNonce: vi.fn(() => "test-nonce"),
 }));
 
-import { apiClient, fetchSoakReport, resolveDefaultBackendUrl, setBackendUrl } from "./sniperClient";
+import {
+  apiClient,
+  fetchSoakReport,
+  resolveDefaultBackendUrl,
+  setBackendUrl,
+} from "./sniperClient";
 
 describe("default backend URL resolution", () => {
   it("uses the configured build-time backend URL when present", () => {
@@ -29,8 +34,8 @@ describe("default backend URL resolution", () => {
   });
 
   it("keeps same-origin REST calls when served from the WordPress backend host", () => {
-    expect(resolveDefaultBackendUrl(undefined, "https://trader.stokvelsociety.co.za")).toBe(
-      "https://trader.stokvelsociety.co.za/wp-json",
+    expect(resolveDefaultBackendUrl(undefined, "http://trader.stokvelsociety.co.za:8080")).toBe(
+      "http://trader.stokvelsociety.co.za:8080/wp-json",
     );
   });
 });
