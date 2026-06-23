@@ -1,0 +1,33 @@
+
+[parity] Checking repo root
+  OK   Repo root confirmed
+
+[parity] Checking dependencies
+  OK   node found
+  OK   php found
+
+[parity] Resolving auth
+  WARN Auth env vars not set; showing secure Get-Credential prompt
+  OK   Auth resolved for user: admin
+
+[parity] DryRun mode - skipping MT5 export
+  OK   Using existing MT5 levels: C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\reports\phase4-parity\mt5-levels.json (96 rows)
+  OK   MT5 anchor debug: 6 rows -> C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\reports\phase4-parity\mt5-anchor-debug.json
+
+[parity] Checking candle files
+  WARN The staleness guard in the Pine generator will hard-fail stale files before the validator runs.
+  WARN Possibly stale candle file: C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\data\EURUSD_M15.json last=2026-06-04T13:29:58.0000000Z reference=2026-06-18T07:27:29.0623145Z max_gap=900s
+  WARN Possibly stale candle file: C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\data\USDJPY_M15.json last=2026-06-04T13:29:59.0000000Z reference=2026-06-18T07:27:29.0623145Z max_gap=900s
+  WARN Possibly stale candle file: C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\data\XAUUSD_M15.json last=2026-06-04T13:30:00.0000000Z reference=2026-06-18T07:27:29.0623145Z max_gap=900s
+
+[parity] Generating Pine v13-compatible reference levels
+[generate-pine-levels-v13] Starting...
+  candle-dir : C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\data
+  reports-dir: C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\reports\phase4-parity
+  mt5-file   : C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\reports\phase4-parity\mt5-levels.json
+  mt5 mtime  : 2026-06-18T07:27:29.062Z
+[generate-pine-levels-v13] Checking candle staleness...
+
+FAIL: stale candles in EURUSD_M15.json - open=2026-06-04T13:29:58.000Z close=2026-06-04T13:44:58.000Z reference=2026-06-18T07:27:29.062Z age_from_close=1186951s max_age=900s
+
+  FAIL Pine generator failed (exit code 1)

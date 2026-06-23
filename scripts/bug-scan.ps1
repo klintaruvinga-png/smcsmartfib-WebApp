@@ -18,6 +18,21 @@ if ($LASTEXITCODE -ne 0) {
 
 # 2. Check for known fragile patterns
 Write-Host "[2/3] Checking for fragile code patterns..."
+$scanRoots = @(
+    "src",
+    "scripts",
+    "mt5",
+    "wordpress",
+    "packages",
+    "sdk",
+    "cloudflare"
+) | Where-Object { Test-Path -LiteralPath $_ }
+$scanExtensions = @(".php", ".mqh", ".ts", ".tsx")
+$scanFiles = Get-ChildItem -Path $scanRoots -Recurse -File -ErrorAction SilentlyContinue |
+    Where-Object {
+        $scanExtensions -contains $_.Extension.ToLowerInvariant() -and
+        $_.FullName -notmatch '\\(node_modules|dist|reports|data|\.git|\.tanstack|\.wrangler)\\'
+    }
 $fragilePatterns = @(
     'substr\(\$sym, -3\) === ''JPY''',
     'symbol == "XAUUSD"',
@@ -25,7 +40,7 @@ $fragilePatterns = @(
 )
 
 foreach ($pattern in $fragilePatterns) {
-    $patternMatches = Get-ChildItem -Recurse -Include *.php, *.mqh, *.ts, *.tsx -Exclude "bug-scan.ps1" | Select-String -Pattern $pattern
+    $patternMatches = $scanFiles | Select-String -Pattern $pattern
     if ($patternMatches) {
         Write-Host "FAIL: Found fragile pattern: $pattern" -ForegroundColor Red
         $patternMatches | ForEach-Object { Write-Host "  $($_.FileName):$($_.LineNumber)" }
@@ -37,7 +52,7 @@ foreach ($pattern in $fragilePatterns) {
 
 # 3. Check for stale data
 Write-Host "[3/3] Checking data freshness..."
-node scripts/generate-pine-levels-v13.cjs --dry-run
+node scripts/generate-pine-levels-v13.cjs
 if ($LASTEXITCODE -ne 0) {
     Write-Host "FAIL: Data freshness check failed with exit code $LASTEXITCODE" -ForegroundColor Red
     $failed = $true

@@ -1,0 +1,83 @@
+
+> tanstack_start_ts@13.1.0 bug-scan
+> powershell -NoProfile -ExecutionPolicy Bypass -File scripts/bug-scan.ps1
+
+Starting SMC SuperFIB Daily Bug Scan...
+[1/3] Running Parity Gate...
+
+> tanstack_start_ts@13.1.0 parity:dry
+> powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-phase4-parity.ps1 -DryRun
+
+
+[parity] Checking repo root
+  OK   Repo root confirmed
+
+[parity] Checking dependencies
+  OK   node found
+  OK   php found
+
+[parity] Resolving auth
+  WARN Auth env vars not set; showing secure Get-Credential prompt
+  OK   Auth resolved for user: admin
+
+[parity] DryRun mode - skipping MT5 export
+  OK   Using existing MT5 levels: C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\reports\phase4-parity\mt5-levels.json (96 rows)
+  OK   MT5 anchor debug: 6 rows -> C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\reports\phase4-parity\mt5-anchor-debug.json
+
+[parity] Checking candle files
+  WARN The staleness guard in the Pine generator will hard-fail stale files before the validator runs.
+  WARN Possibly stale candle file: C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\data\EURUSD_M15.json last=2026-06-04T13:29:58.0000000Z reference=2026-06-18T07:27:29.0623145Z max_gap=900s
+  WARN Possibly stale candle file: C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\data\USDJPY_M15.json last=2026-06-04T13:29:59.0000000Z reference=2026-06-18T07:27:29.0623145Z max_gap=900s
+  WARN Possibly stale candle file: C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\data\XAUUSD_M15.json last=2026-06-04T13:30:00.0000000Z reference=2026-06-18T07:27:29.0623145Z max_gap=900s
+
+[parity] Generating Pine v13-compatible reference levels
+[generate-pine-levels-v13] Starting...
+  candle-dir : C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\data
+  reports-dir: C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\reports\phase4-parity
+  mt5-file   : C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\reports\phase4-parity\mt5-levels.json
+  mt5 mtime  : 2026-06-18T07:27:29.062Z
+[generate-pine-levels-v13] Checking candle staleness...
+
+FAIL: stale candles in EURUSD_M15.json - open=2026-06-04T13:29:58.000Z close=2026-06-04T13:44:58.000Z reference=2026-06-18T07:27:29.062Z age_from_close=1186951s max_age=900s
+
+  FAIL Pine generator failed (exit code 1)
+FAIL: Parity Gate failed with exit code 1
+[2/3] Checking for fragile code patterns...
+PASS: Pattern not found: substr\(\$sym, -3\) === 'JPY'
+PASS: Pattern not found: symbol == "XAUUSD"
+FAIL: Found fragile pattern: preg_replace\('/\[\^A-Z0-9\]/', '
+  smc-superfib-sniper.php:2682
+  smc-superfib-sniper.php:3416
+  smc-superfib-sniper.php:3524
+  smc-superfib-sniper.php:3619
+  smc-superfib-sniper.php:3695
+  smc-superfib-sniper.php:3753
+  smc-superfib-sniper.php:4083
+  smc-superfib-sniper.php:6266
+  smc-superfib-sniper.php:6355
+  smc-superfib-sniper.php:6442
+  smc-superfib-sniper.php:6456
+  smc-superfib-sniper.php:6476
+  smc-superfib-sniper.php:6527
+  smc-superfib-sniper.php:6546
+  smc-superfib-sniper.php:6612
+  smc-superfib-sniper.php:6672
+  smc-superfib-sniper.php:6761
+  smc-superfib-sniper.php:7565
+[3/3] Checking data freshness...
+[generate-pine-levels-v13] Starting...
+  candle-dir : C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\data
+  reports-dir: C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\reports\phase4-parity
+  mt5-file   : C:\Users\Kudzie\OneDrive\SS - Apps & Software\SMC SuperFib Dashboard\smcsmartfib-WebApp\reports\phase4-parity\mt5-levels.json
+  mt5 mtime  : 2026-06-18T07:27:29.062Z
+[generate-pine-levels-v13] Checking candle staleness...
+node.exe : FAIL: stale candles in EURUSD_M15.json - open=2026-06-04T13:29:58.000Z close=2026-06-04T13:44:58.000Z 
+reference=2026-06-18T07:27:29.062Z age_from_close=1186951s max_age=900s
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (FAIL: stale can...1s max_age=900s:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+FAIL: Data freshness check failed with exit code 1
+Bug scan FAILED.

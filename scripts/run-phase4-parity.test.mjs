@@ -7,9 +7,9 @@ const scriptPath = path.join(repoRoot, 'scripts', 'run-phase4-parity.ps1');
 const candleExporterPath = path.join(repoRoot, 'scripts', 'export-mt5-candles.ps1');
 const packageJsonPath = path.join(repoRoot, 'package.json');
 
-describe('run-phase4-parity.ps1 automation contract', () => {
-  const readScript = () => fs.readFileSync(scriptPath, 'utf8');
+const readScript = () => fs.readFileSync(scriptPath, 'utf8');
 
+describe('run-phase4-parity.ps1 automation contract', () => {
   test('exists and remains compatible with Windows PowerShell 5.1 syntax', () => {
     expect(fs.existsSync(scriptPath)).toBe(true);
     const source = readScript();
