@@ -1,5 +1,51 @@
 # Codebase Refactor Log
 
+## 2026-06-23 - Run 3
+
+- Automation: `Codebase Refactor`
+- Branch: `arch/contract-consolidation-2026-06-23`
+- Scope for this run:
+  - implement the first runtime-safe architecture slice from the prior review
+  - remove frontend/SDK contract duplication without changing behavior
+  - keep signal, plan, regime, license, and dashboard authorities unchanged
+
+### Architectural work completed
+
+- Added shared repo-level contracts in:
+  - `packages/contracts/src/index.ts`
+  - `packages/contracts/src/normalizers.ts`
+- Replaced duplicated type ownership with re-exports in:
+  - `src/types/sniper.ts`
+  - `sdk/src/types/index.ts`
+- Replaced duplicated TypeScript response normalization in:
+  - `src/lib/api/sniperClient.ts`
+  - `sdk/src/client/SniperClient.ts`
+- Aligned SDK support files to the consolidated contract surface:
+  - `sdk/src/mocks/fixtures.ts`
+  - `sdk/src/utils/freshness.ts`
+  - `sdk/src/client/errors.ts`
+
+### Governance decision for this run
+
+- This run executes only Phase 1 style contract consolidation from the existing architecture plan.
+- No backend truth-domain extraction was started early.
+- No route contract, business logic, signal policy, plan policy, regime scoring, or licensing logic changed.
+
+### Validation status
+
+- `node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json`
+  - result: passed
+- `node sdk/node_modules/typescript/bin/tsc --noEmit -p sdk/tsconfig.json`
+  - result: passed
+- `node node_modules/eslint/bin/eslint.js --config eslint.config.js <touched-files>`
+  - result: passed
+- `node node_modules/vite/bin/vite.js build`
+  - result: passed
+
+### Artifact created
+
+- `reports/contract-consolidation-2026-06-23.md`
+
 ## 2026-06-17 - Run 2
 
 - Automation: `Codebase Refactor`

@@ -26,7 +26,7 @@ export function isPendingSync(state: FreshnessState): boolean {
 
 /** True if the data is usable for decision-making (live or stale but not absent). */
 export function isUsable(state: FreshnessState): boolean {
-  return state === "live" || state === "stale" || state === "mock";
+  return state === "live" || state === "stale" || state === "closed_session" || state === "mock";
 }
 
 /** Human-readable label for a freshness state. */
@@ -38,6 +38,7 @@ export function freshnessLabel(state: FreshnessState): string {
     blocked: "Blocked",
     offline: "Offline",
     "pending-sync": "Syncing",
+    closed_session: "Closed Session",
     mock: "Mock",
   };
   return labels[state] ?? state;
@@ -57,6 +58,8 @@ export function freshnessColor(
     case "unavailable":
     case "offline":
       return "red";
+    case "closed_session":
+      return "gray";
     case "mock":
       return "blue";
     default:
@@ -83,6 +86,7 @@ export function blockerLabel(blocker: EngineBlocker): string {
     QUOTE_UNAVAILABLE: "Quote unavailable",
     PRICE_STALE: "Price stale",
     PRICE_NOT_MT5_FRESH: "MT5 price not fresh",
+    CLOSED_SESSION: "Closed session",
     CANDLES_MISSING: "Candles missing",
     CANDLES_STALE: "Candles stale",
     INSUFFICIENT_CANDLE_HISTORY: "Insufficient candle history",
