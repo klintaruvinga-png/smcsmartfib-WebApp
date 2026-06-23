@@ -524,6 +524,7 @@ export interface MarketSnapshot {
   regimes: RegimeState[];
   gates: GateState[];
   diagnostics: SymbolDiagnostic[];
+  [key: string]: unknown;
 }
 
 export interface SessionInfo {
