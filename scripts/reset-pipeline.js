@@ -1,21 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { readWorkflowState, writeWorkflowState } from "./workflow-state.js";
+import { resolvePipelineContext } from "./pipeline-config.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const REPO_ROOT = path.join(__dirname, "..");
-const STATE_FILE = path.join(REPO_ROOT, ".smc-workflow-state.json");
-const REPORTS_DIR = path.join(REPO_ROOT, "reports");
-const ARCHIVE_DIR = path.join(REPORTS_DIR, "archive");
-const PIPELINE_RESET_FILE = path.join(REPORTS_DIR, ".pipeline-reset-requested");
-const RESEARCH_FILE = path.join(REPORTS_DIR, "copilot-research.md");
-const PLAN_FILE = path.join(REPORTS_DIR, "codex-plan.md");
-const PLAN_METADATA_FILE = path.join(REPORTS_DIR, "codex-plan.meta.json");
-const IMPLEMENTATION_FILE = path.join(REPORTS_DIR, "codex-implementation.md");
-const IMPLEMENTATION_METADATA_FILE = path.join(REPORTS_DIR, "codex-implementation.meta.json");
+const PIPELINE_CONTEXT = resolvePipelineContext();
+const STATE_FILE = PIPELINE_CONTEXT.paths.stateFile;
+const REPORTS_DIR = PIPELINE_CONTEXT.paths.reportsDir;
+const ARCHIVE_DIR = PIPELINE_CONTEXT.paths.archiveDir;
+const PIPELINE_RESET_FILE = PIPELINE_CONTEXT.paths.resetFile;
+const RESEARCH_FILE = PIPELINE_CONTEXT.paths.researchFile;
+const PLAN_FILE = PIPELINE_CONTEXT.paths.planFile;
+const PLAN_METADATA_FILE = PIPELINE_CONTEXT.paths.planMetadataFile;
+const IMPLEMENTATION_FILE = PIPELINE_CONTEXT.paths.implementationFile;
+const IMPLEMENTATION_METADATA_FILE = PIPELINE_CONTEXT.paths.implementationMetadataFile;
 
 function buildArchiveTimestamp() {
   return new Date().toISOString().replace(/[:.]/g, "-");
@@ -70,10 +67,10 @@ function archiveArtifactsForManualReset(state) {
   const dest = path.join(ARCHIVE_DIR, `manual-reset-${buildArchiveTimestamp()}`);
   const artifacts = [
     ...(isCurrentCycleResearchArtifact(state) ? [[RESEARCH_FILE, "copilot-research.md"]] : []),
-    [PLAN_FILE, "codex-plan.md"],
-    [PLAN_METADATA_FILE, "codex-plan.meta.json"],
-    [IMPLEMENTATION_FILE, "codex-implementation.md"],
-    [IMPLEMENTATION_METADATA_FILE, "codex-implementation.meta.json"],
+    [PLAN_FILE, "claude-plan.md"],
+    [PLAN_METADATA_FILE, "claude-plan.meta.json"],
+    [IMPLEMENTATION_FILE, "claude-implementation.md"],
+    [IMPLEMENTATION_METADATA_FILE, "claude-implementation.meta.json"],
   ];
 
   let archivedAny = false;
