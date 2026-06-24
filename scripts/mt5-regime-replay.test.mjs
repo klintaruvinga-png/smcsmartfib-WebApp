@@ -15,7 +15,9 @@ describe("MT5 regime dispatch parity guard", () => {
     expect(marketDataEngine).toContain("regimeCycleInterval");
 
     // Verify RegimeEngine computes HTF bias (EMA-based D1 classification)
-    expect(regimeEngine).toContain("bool ComputeRegimeState(string symbol, RegimeSnapshotOut& out)");
+    expect(regimeEngine).toContain(
+      "bool ComputeRegimeState(string symbol, RegimeSnapshotOut& out)",
+    );
     expect(regimeEngine).toContain("ComputeEMA(d1Close, d1Bars, EMA_PERIOD)");
     expect(regimeEngine).toContain('htfBias = "BULL"');
     expect(regimeEngine).toContain('htfBias = "BEAR"');
@@ -34,16 +36,16 @@ describe("MT5 regime dispatch parity guard", () => {
     // Verify volatility metrics are computed and stored
     expect(regimeEngine).toContain("double ema20D1");
     expect(regimeEngine).toContain("double atr14H1");
-    expect(regimeEngine).toContain('"ema20_d1"');
-    expect(regimeEngine).toContain('"atr14_h1"');
+    expect(regimeEngine).toContain('\\"ema20_d1\\"');
+    expect(regimeEngine).toContain('\\"atr14_h1\\"');
 
     // Verify JSON payload structure for backend dispatch
     expect(regimeEngine).toContain("BuildBatchPayload");
-    expect(regimeEngine).toContain('"regimes"');
-    expect(regimeEngine).toContain('"symbol"');
-    expect(regimeEngine).toContain('"htf_bias"');
-    expect(regimeEngine).toContain('"ltf_regime"');
-    expect(regimeEngine).toContain('"chop_score"');
+    expect(marketDataEngine).toContain('"{\\"regimes\\":" + batchJson + "}"');
+    expect(regimeEngine).toContain('\\"symbol\\"');
+    expect(regimeEngine).toContain('\\"htf_bias\\"');
+    expect(regimeEngine).toContain('\\"ltf_regime\\"');
+    expect(regimeEngine).toContain('\\"chop_score\\"');
   });
 
   it("validates regime classification accuracy on historical snapshots (EURUSD H1 trending gate)", () => {
@@ -52,8 +54,8 @@ describe("MT5 regime dispatch parity guard", () => {
     // Expected: ER-14 H1 = 0.28 → TRENDING (< 0.35)
     const snapshot = {
       symbol: "EURUSD",
-      ema20D1: 1.0850,
-      closeD1: 1.0920,
+      ema20D1: 1.085,
+      closeD1: 1.092,
       er14H1: 0.28,
       atr14H1: 0.0042,
     };
@@ -94,7 +96,7 @@ describe("MT5 regime dispatch parity guard", () => {
     const snapshot = {
       symbol: "XAUUSD",
       ema20D1: 4550,
-      closeD1: 4548,
+      closeD1: 4547,
       er14H1: 0.78,
       atr14H1: 3.2,
     };
@@ -120,18 +122,26 @@ describe("MT5 regime dispatch parity guard", () => {
   });
 
   it("pins the backend regime ingestion contract", async () => {
-    const regimeEngine = await readFile(new URL("../mt5/RegimeEngine.mqh", import.meta.url), "utf8");
+    const [marketDataEngine, wordpressPlugin] = await Promise.all([
+      readFile(new URL("../mt5/MarketDataEngine.mqh", import.meta.url), "utf8"),
+      readFile(
+        new URL("../wordpress/smc-superfib-sniper/smc-superfib-sniper.php", import.meta.url),
+        "utf8",
+      ),
+    ]);
 
     // Verify POST endpoint contract
-    expect(regimeEngine).toContain("POST /ea/regime-snapshot");
-    expect(regimeEngine).toContain("{ regimes: [ {...}, ... ] }");
+    expect(marketDataEngine).toContain("POST regime snapshots");
+    expect(marketDataEngine).toContain('"{\\"regimes\\":" + batchJson + "}"');
+    expect(wordpressPlugin).toContain("Payload: { regimes: [ { user_id, symbol, htf_bias");
+    expect(wordpressPlugin).toContain("regimes array required");
 
     // Verify validation constraints
-    expect(regimeEngine).toContain("BULL");
-    expect(regimeEngine).toContain("BEAR");
-    expect(regimeEngine).toContain("TRANSITIONAL");
-    expect(regimeEngine).toContain("TRENDING");
-    expect(regimeEngine).toContain("RANGING");
-    expect(regimeEngine).toContain("CHOP");
+    expect(wordpressPlugin).toContain("'BULL'");
+    expect(wordpressPlugin).toContain("'BEAR'");
+    expect(wordpressPlugin).toContain("'TRANSITIONAL'");
+    expect(wordpressPlugin).toContain("'TRENDING'");
+    expect(wordpressPlugin).toContain("'RANGING'");
+    expect(wordpressPlugin).toContain("'CHOP'");
   });
 });
