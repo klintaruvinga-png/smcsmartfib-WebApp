@@ -73,7 +73,8 @@ These wrappers are documented in `docs/agents/skill-index.md` and implemented as
 - Prefer feature branches over `main`.
 - Keep branch names descriptive and task-focused.
 - Commit only files related to the task.
-- Every session that changes files must end on a feature branch with a normal GitHub PR opened.
+- Every session that changes files must end on a feature branch with a normal GitHub PR opened and ready for review.
+- Do not open draft PRs. If a PR is accidentally opened as draft, immediately mark it ready for review before handoff.
 - If a session is read-only or produces no file changes, explicitly state that no branch or PR was created.
 - When a PR is opened, include exact validation commands and results.
 - If the repo has a local pipeline watcher or `reports/` state, preserve it and do not modify without cause.
