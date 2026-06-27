@@ -15,19 +15,23 @@ describe("MT5 signal dispatch parity guard", () => {
     expect(marketDataEngine).toContain("regimeEngine.ComputeRegimeState(symbols[i], regimeState)");
     expect(marketDataEngine).toContain("if (!IsLive(symbols[i]))");
     expect(marketDataEngine.indexOf("if (!IsLive(symbols[i]))")).toBeLessThan(
-      marketDataEngine.indexOf("fibEngine.BuildSignalFibLevels(symbols[i], fibLevels)")
+      marketDataEngine.indexOf("fibEngine.BuildSignalFibLevels(symbols[i], fibLevels)"),
     );
     expect(marketDataEngine).not.toContain('string htfBias    = "TRANSITIONAL";');
     expect(marketDataEngine).not.toContain('string ltfRegime  = "RANGING";');
     expect(marketDataEngine).not.toContain("int fibCount = 0;");
     expect(fibEngine).toContain(
-      "int BuildSignalFibLevelsForTF(string symbol, ENUM_TIMEFRAMES mqlTf,"
+      "int BuildSignalFibLevelsForTF(string symbol, ENUM_TIMEFRAMES mqlTf,",
     );
-    expect(fibEngine).toContain("int BuildSignalFibLevels(string symbol, FibLevelOut& outLevels[])");
-    expect(fibEngine).toContain('ENUM_TIMEFRAMES mqlTfs[3] = {PERIOD_M15, PERIOD_H1, PERIOD_H4};');
-    expect(fibEngine).toContain('int chartTfSeconds[3] = {900, 3600, 14400};');
+    expect(fibEngine).toContain(
+      "int BuildSignalFibLevels(string symbol, FibLevelOut& outLevels[])",
+    );
+    expect(fibEngine).toContain("ENUM_TIMEFRAMES mqlTfs[3] = {PERIOD_M15, PERIOD_H1, PERIOD_H4};");
+    expect(fibEngine).toContain("int chartTfSeconds[3] = {900, 3600, 14400};");
     expect(fibEngine).toContain('string tfNames[3] = {"M15", "H1", "H4"};');
-    expect(regimeEngine).toContain("bool ComputeRegimeState(string symbol, RegimeSnapshotOut& out)");
+    expect(regimeEngine).toContain(
+      "bool ComputeRegimeState(string symbol, RegimeSnapshotOut& out)",
+    );
     expect(regimeEngine).toContain("double htfBiasHigh;");
     expect(regimeEngine).toContain("double htfBiasLow;");
     expect(regimeEngine).toContain('\\"htf_bias_high\\"');
@@ -60,7 +64,9 @@ describe("MT5 signal dispatch parity guard", () => {
       expectedSignalStatus: "SKIP_OR_WATCH", // Should not generate ARMED/READY on gap open
     };
 
-    const isExcessiveGap = Math.abs((gapScenario.mondayOpen - gapScenario.fridayClose) * 10000) > gapScenario.maxAllowedGap;
+    const isExcessiveGap =
+      Math.abs((gapScenario.mondayOpen - gapScenario.fridayClose) * 10000) >
+      gapScenario.maxAllowedGap;
     expect(isExcessiveGap).toBe(true);
     expect(gapScenario.gapPips).toBeGreaterThan(gapScenario.maxAllowedGap);
   });
@@ -78,7 +84,8 @@ describe("MT5 signal dispatch parity guard", () => {
       statusAfterFlip: "WATCH",
     };
 
-    const isTrendingDowngrade = regimeFlipScenario.fridayER < 0.35 && regimeFlipScenario.mondayER > 0.65;
+    const isTrendingDowngrade =
+      regimeFlipScenario.fridayER < 0.35 && regimeFlipScenario.mondayER > 0.65;
     expect(isTrendingDowngrade).toBe(true);
   });
 
@@ -97,13 +104,18 @@ describe("MT5 signal dispatch parity guard", () => {
       transitionalGate: 0.72, // ER threshold for CHOP
     };
 
-    const chopToTrending = transitionScenario.t1ER > transitionScenario.transitionalGate && transitionScenario.t2ER < 0.35;
+    const chopToTrending =
+      transitionScenario.t1ER > transitionScenario.transitionalGate &&
+      transitionScenario.t2ER < 0.35;
     expect(chopToTrending).toBe(true);
     expect(transitionScenario.t2Status).toBe("READY");
   });
 
   it("pins signal engine dispatch cycle throttling (120s default, no performance regression)", async () => {
-    const marketDataEngine = await readFile(new URL("../mt5/MarketDataEngine.mqh", import.meta.url), "utf8");
+    const marketDataEngine = await readFile(
+      new URL("../mt5/MarketDataEngine.mqh", import.meta.url),
+      "utf8",
+    );
 
     // Verify signal cycle throttling
     expect(marketDataEngine).toContain("signalCycleCounter");

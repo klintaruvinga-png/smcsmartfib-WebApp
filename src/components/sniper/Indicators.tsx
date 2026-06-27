@@ -15,13 +15,7 @@ export function ChopMeter({ value }: { value: number }) {
 }
 
 /** Shows where price sits inside an anchor range (0 = premium, 100 = discount, 50 = equilibrium). */
-export function AnchorPositionMeter({
-  label,
-  pct,
-}: {
-  label: "SF" | "AF";
-  pct: number | null;
-}) {
+export function AnchorPositionMeter({ label, pct }: { label: "SF" | "AF"; pct: number | null }) {
   if (pct === null) return null;
   const clamped = Math.min(100, Math.max(0, pct));
   const inEq = clamped >= 37.5 && clamped <= 62.5;
@@ -30,10 +24,7 @@ export function AnchorPositionMeter({
     <div className="flex items-center gap-2">
       <span className="font-mono text-[10px] text-mute w-5">{label}</span>
       <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-bg3">
-        <div
-          className="absolute top-0 h-full bg-warn/20"
-          style={{ left: "37.5%", width: "25%" }}
-        />
+        <div className="absolute top-0 h-full bg-warn/20" style={{ left: "37.5%", width: "25%" }} />
         <div
           className={cn("absolute top-0 h-2 w-0.5 rounded-full -mt-px", color)}
           style={{ left: `${clamped}%`, transform: "translateX(-50%)" }}
@@ -45,11 +36,7 @@ export function AnchorPositionMeter({
 }
 
 /** Badge showing anchor chop state: "SF+AF" (blocked) | "SF" | "AF" (caution) | "none" (clear). */
-export function AnchorChopBadge({
-  source,
-}: {
-  source: "SF+AF" | "SF" | "AF" | "none" | null;
-}) {
+export function AnchorChopBadge({ source }: { source: "SF+AF" | "SF" | "AF" | "none" | null }) {
   if (!source || source === "none") {
     return (
       <span className="inline-flex items-center rounded border border-buy/40 bg-buy/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-buy">

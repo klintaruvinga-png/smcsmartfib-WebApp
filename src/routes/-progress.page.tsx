@@ -1,4 +1,9 @@
-import { useUserAccount, useUserProgress, useUserRiskProfile, useAccountTelemetry } from "@/hooks/useSniperData";
+import {
+  useUserAccount,
+  useUserProgress,
+  useUserRiskProfile,
+  useAccountTelemetry,
+} from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { fmtCurrency, fmtPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -56,7 +61,9 @@ export function ProgressPage() {
             <div className="text-[11px] font-mono uppercase tracking-wider text-mute">Equity</div>
             <FreshnessBadge state={account.state} />
           </div>
-          <div className="font-mono text-2xl font-semibold mt-2">{fmtCurrency(account.equityUSC, accountTelemetry?.currency)}</div>
+          <div className="font-mono text-2xl font-semibold mt-2">
+            {fmtCurrency(account.equityUSC, accountTelemetry?.currency)}
+          </div>
           <div
             className={cn(
               "text-xs font-mono mt-0.5",

@@ -315,9 +315,7 @@ export const apiClient = {
     if (mock) {
       const wl = new Set(mockSettings.watchlist);
       const allSignals =
-        scope === "global"
-          ? mockSignals
-          : mockSignals.filter((s) => wl.has(s.symbol));
+        scope === "global" ? mockSignals : mockSignals.filter((s) => wl.has(s.symbol));
       const totalActive = allSignals.length;
       const signals = allSignals.slice(0, boardSize ?? 3);
       return {

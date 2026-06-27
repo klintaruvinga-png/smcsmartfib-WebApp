@@ -44,11 +44,15 @@ function printUsage() {
 
 function runNodeScript(scriptName, extraArgs = []) {
   const scriptPath = path.join(__dirname, scriptName);
-  const result = spawnSync(process.execPath, [scriptPath, "--repo", context.repoRoot, ...extraArgs], {
-    cwd: context.repoRoot,
-    stdio: "inherit",
-    windowsHide: true,
-  });
+  const result = spawnSync(
+    process.execPath,
+    [scriptPath, "--repo", context.repoRoot, ...extraArgs],
+    {
+      cwd: context.repoRoot,
+      stdio: "inherit",
+      windowsHide: true,
+    },
+  );
   process.exitCode = result.status ?? 1;
 }
 
@@ -75,7 +79,9 @@ function isRunning(pid) {
 
 function readStateSummary() {
   try {
-    const state = JSON.parse(fs.readFileSync(context.paths.stateFile, "utf8").replace(/^\uFEFF/, ""));
+    const state = JSON.parse(
+      fs.readFileSync(context.paths.stateFile, "utf8").replace(/^\uFEFF/, ""),
+    );
     return `${state.state ?? "UNKNOWN"}${state.issue ? ` (${state.issue})` : ""}`;
   } catch {
     return "missing";
@@ -109,7 +115,9 @@ function initConfig() {
 function printStatus() {
   const pid = readPid();
   console.log(`Repo: ${context.repoRoot}`);
-  console.log(`Config: ${fs.existsSync(path.join(context.repoRoot, ".agent-pipeline", "config.json")) ? ".agent-pipeline/config.json" : "defaults"}`);
+  console.log(
+    `Config: ${fs.existsSync(path.join(context.repoRoot, ".agent-pipeline", "config.json")) ? ".agent-pipeline/config.json" : "defaults"}`,
+  );
   console.log(`State: ${readStateSummary()}`);
   console.log(`Runner PID: ${pid ?? "none"}`);
   console.log(`Runner active: ${isRunning(pid) ? "yes" : "no"}`);
@@ -117,14 +125,13 @@ function printStatus() {
 }
 
 function checkRequiredFiles() {
-  const required = [
-    context.paths.planPromptFile,
-    context.paths.implementationPromptFile,
-  ];
+  const required = [context.paths.planPromptFile, context.paths.implementationPromptFile];
   const missing = required.filter((filePath) => !fs.existsSync(filePath));
 
   console.log(`Repo: ${context.repoRoot}`);
-  console.log(`Config: ${fs.existsSync(path.join(context.repoRoot, ".agent-pipeline", "config.json")) ? ".agent-pipeline/config.json" : "defaults"}`);
+  console.log(
+    `Config: ${fs.existsSync(path.join(context.repoRoot, ".agent-pipeline", "config.json")) ? ".agent-pipeline/config.json" : "defaults"}`,
+  );
 
   if (missing.length) {
     console.log("Missing:");

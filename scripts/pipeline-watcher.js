@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync, execSync } from "node:child_process";
+import { execFileSync, execSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { readWorkflowState } from "./workflow-state.js";
@@ -45,8 +45,7 @@ const LOCK_STALE_MS = 30 * 60 * 1000;
 
 // The exact watcher-generated failure reason string for a missing implementation report.
 // Used to distinguish "report missing but PR exists" (recoverable) from other failures.
-const REASON_NO_IMPL_REPORT =
-  "Claude implementation finished without reports/claude-implementation.md";
+const REASON_NO_IMPL_REPORT = `Claude implementation finished without ${path.relative(REPO_ROOT, IMPLEMENTATION_FILE)}`;
 
 // Patterns that indicate Claude intentionally stopped before creating a branch or PR
 // (contract/reality conflict). When all of these match the last Claude output the pipeline
@@ -63,8 +62,8 @@ const MAX_HARDENING_RETRIES = 3;
 const HARDENING_RETRY_INTERVAL_MS = 5 * 60 * 1000; // 5 min
 
 // Centralize the Claude executable name so the watcher health check and runtime
-// invocations cannot drift. The implementation/report flows still use shell
-// commands because they rely on stdin redirection from a temp prompt file.
+// invocations cannot drift. Uses spawnSync with argument arrays to avoid
+// shell injection vulnerabilities from paths containing shell metacharacters.
 function getClaudeBinary() {
   if (typeof CONFIG.claudeBinary === "string" && CONFIG.claudeBinary.trim()) {
     return CONFIG.claudeBinary;
@@ -72,27 +71,21 @@ function getClaudeBinary() {
   return process.platform === "win32" ? "claude.cmd" : "claude";
 }
 
-function buildClaudeCommand(args) {
-  return [`"${getClaudeBinary()}"`, ...args].join(" ");
-}
-
-function buildClaudeExecCommand(promptFile) {
-  return buildClaudeCommand([
+function buildClaudeExecArgs(promptFile) {
+  return [
     "exec",
     "--json",
     "--dangerously-bypass-approvals-and-sandbox",
     "-C",
-    `"${REPO_ROOT}"`,
+    REPO_ROOT,
     "-o",
-    `"${CLAUDE_OUTPUT_FILE}"`,
-    "-",
-    "<",
-    `"${promptFile}"`,
-  ]);
+    CLAUDE_OUTPUT_FILE,
+    promptFile,
+  ];
 }
 
-function buildClaudeVersionCommand() {
-  return buildClaudeCommand(["--version"]);
+function buildClaudeVersionArgs() {
+  return ["--version"];
 }
 
 function buildClaudeImplementationPrompt({ issue, promptText }) {
@@ -1130,19 +1123,21 @@ function runClaudePlanHardening(state) {
     const currentRetryCount = readHardeningRetryCount();
     const nextRetryCount = currentRetryCount + 1;
 
-    const promptFile = path.join(REPO_ROOT, "reports", "claude-plan-prompt.tmp.md");
+    const promptFile = path.join(REPORTS_DIR, "claude-plan-prompt.tmp.md");
     fs.writeFileSync(promptFile, prompt, "utf8");
 
     try {
-      const cmd = buildClaudeExecCommand(promptFile);
-
-      execSync(cmd, {
+      const result = spawnSync(getClaudeBinary(), buildClaudeExecArgs(promptFile), {
         cwd: REPO_ROOT,
-        shell: true,
         windowsHide: true,
         timeout: PLAN_TIMEOUT_MS,
         stdio: ["ignore", "inherit", "inherit"],
+        shell: process.platform === "win32",
       });
+
+      if (result.error || (result.status !== null && result.status !== 0)) {
+        throw result.error || new Error(`Claude exited with status ${result.status}`);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       writeHardeningBlockedState(state, message, nextRetryCount);
@@ -1258,31 +1253,35 @@ function runClaudeImplementation(state) {
     // Write the prompt to a temp file so we can feed it via stdin redirect
     // without relying on execFileSync's `input` option, which triggers EINVAL
     // on Windows when stdout/stderr are not inheritable (detached background process).
-    const promptFile = path.join(REPO_ROOT, "reports", "claude-prompt.tmp.md");
+    const promptFile = path.join(REPORTS_DIR, "claude-prompt.tmp.md");
     fs.writeFileSync(promptFile, prompt, "utf8");
 
     try {
-      // execSync with shell:true lets Windows resolve claude.cmd and handle
-      // the stdin redirect operator (<) without needing inheritable file descriptors.
+      // spawnSync with argument array avoids shell injection vulnerabilities.
       // --json disables the interactive TUI so claude can run in a detached
       // background process (no console attached). Without it, claude crashes
       // immediately with STATUS_CONTROL_C_EXIT (0xC000013A) on Windows.
       // --dangerously-bypass-approvals-and-sandbox already disables the sandbox,
       // so --sandbox workspace-write is redundant and removed to avoid conflict.
-      const cmd = buildClaudeExecCommand(promptFile);
-
-      execSync(cmd, {
+      // shell: true only on Windows to resolve claude.cmd via PATH.
+      const result = spawnSync(getClaudeBinary(), buildClaudeExecArgs(promptFile), {
         cwd: REPO_ROOT,
-        shell: true,
         windowsHide: true,
         timeout: CLAUDE_TIMEOUT_MS,
-        // stdin: "ignore" -- the shell handles stdin via the < redirect in cmd.
         // stdout/stderr: "inherit" -- Claude output streams directly to the
         // watcher's inherited log file descriptors (set by start-pipeline-runner.js
         // to logFd). This avoids buffering all output in memory, which would
         // hit Node's default execSync maxBuffer limit on verbose Claude runs.
         stdio: ["ignore", "inherit", "inherit"],
+        shell: process.platform === "win32",
       });
+
+      if (result.error) {
+        throw result.error;
+      }
+      if (result.status !== null && result.status !== 0) {
+        throw new Error(`Claude exited with status ${result.status}`);
+      }
     } catch (error) {
       const outputText =
         statMtime(CLAUDE_OUTPUT_FILE) > previousOutputMtime && fs.existsSync(CLAUDE_OUTPUT_FILE)
@@ -1298,16 +1297,25 @@ function runClaudeImplementation(state) {
       // Before recording failure, check whether Claude already created an open PR.
       // When execSync hits the timeout (ETIMEDOUT), Claude may have finished all
       // work -- branch, commit, push, PR -- but the wrapper expired before the
-      // watcher could validate. Treat an existing open PR as success so the
-      // pipeline advances to IMPLEMENTATION_COMPLETE rather than going dead-end.
+      // watcher could validate. Treat an existing open PR as success only if the
+      // implementation report exists and is valid, so the pipeline advances to
+      // IMPLEMENTATION_COMPLETE rather than going dead-end.
       const openPr = checkOpenPR(issueSlug);
       if (openPr) {
+        if (
+          fs.existsSync(IMPLEMENTATION_FILE) &&
+          isUsableImplementation(readTextFile(IMPLEMENTATION_FILE).trim())
+        ) {
+          log(
+            `Claude timed out but open PR #${openPr.number} exists for ${buildAgentBranchName(issueSlug)} with valid implementation report - treating as IMPLEMENTATION_COMPLETE`,
+          );
+          writeImplementationMetadata(state);
+          markImplementationComplete(state);
+          return;
+        }
         log(
-          `Claude execSync timed out but open PR #${openPr.number} exists for ${buildAgentBranchName(issueSlug)} - treating as IMPLEMENTATION_COMPLETE`,
+          `Claude timed out and open PR #${openPr.number} exists but implementation report is missing or invalid - keeping recovery path active`,
         );
-        writeImplementationMetadata(state);
-        markImplementationComplete(state);
-        return;
       }
 
       failImplementation(state, reason, {
@@ -1378,22 +1386,27 @@ function runReportRecovery(state, issueSlug, prNumber) {
       `Current issue: ${state.issue}`,
     ].join("\n");
 
-    const promptFile = path.join(REPO_ROOT, "reports", "claude-report-recovery.tmp.md");
+    const promptFile = path.join(REPORTS_DIR, "claude-report-recovery.tmp.md");
     fs.writeFileSync(promptFile, prompt, "utf8");
 
     const previousImplementationMtime = statMtime(IMPLEMENTATION_FILE);
     const previousOutputMtime = statMtime(CLAUDE_OUTPUT_FILE);
 
     try {
-      const cmd = buildClaudeExecCommand(promptFile);
-
-      execSync(cmd, {
+      const result = spawnSync(getClaudeBinary(), buildClaudeExecArgs(promptFile), {
         cwd: REPO_ROOT,
-        shell: true,
         windowsHide: true,
         timeout: 300000, // 5 min -- short task, just the report
         stdio: ["ignore", "inherit", "inherit"],
+        shell: process.platform === "win32",
       });
+
+      if (result.error) {
+        throw result.error;
+      }
+      if (result.status !== null && result.status !== 0) {
+        throw new Error(`Claude exited with status ${result.status}`);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log(`Report recovery Claude session failed: ${message}`);
@@ -1769,9 +1782,7 @@ function evaluatePipeline() {
     const branchName = buildAgentBranchName(issueSlug);
     const merged = checkMergedPR(issueSlug, state.plan_hardened_at);
     if (merged) {
-      log(
-        `PR #${merged.number} for ${branchName} merged at ${merged.mergedAt} - closing cycle`,
-      );
+      log(`PR #${merged.number} for ${branchName} merged at ${merged.mergedAt} - closing cycle`);
       archiveCycleArtifacts(issueSlug);
       clearImplementationFailedState();
       markIdle(`PR #${merged.number} merged for: ${state.issue}`);
@@ -1886,14 +1897,19 @@ function pollPipeline() {
 
 function checkClaudeAvailability() {
   try {
-    const output = execSync(buildClaudeVersionCommand(), {
+    const result = spawnSync(getClaudeBinary(), buildClaudeVersionArgs(), {
       cwd: REPO_ROOT,
-      shell: true,
       windowsHide: true,
-      stdio: ["ignore", "pipe", "pipe"],
       timeout: 10000,
       encoding: "utf8",
-    }).trim();
+      shell: process.platform === "win32",
+    });
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    const output = (result.stdout || "").trim();
     log(`Claude CLI health check passed (${output || getClaudeBinary()})`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -1914,8 +1930,8 @@ function startPipelineWatcher() {
 export {
   extractUsablePlanFromClaudeOutput,
   buildClaudeImplementationPrompt,
-  buildClaudeExecCommand,
-  buildClaudeVersionCommand,
+  buildClaudeExecArgs,
+  buildClaudeVersionArgs,
   isActivePhaseUpdatePath,
   selectOpenReadyPR,
 };

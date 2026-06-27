@@ -66,11 +66,13 @@ function isCurrentCycleResearchArtifact(state) {
 function archiveArtifactsForManualReset(state) {
   const dest = path.join(ARCHIVE_DIR, `manual-reset-${buildArchiveTimestamp()}`);
   const artifacts = [
-    ...(isCurrentCycleResearchArtifact(state) ? [[RESEARCH_FILE, "copilot-research.md"]] : []),
-    [PLAN_FILE, "claude-plan.md"],
-    [PLAN_METADATA_FILE, "claude-plan.meta.json"],
-    [IMPLEMENTATION_FILE, "claude-implementation.md"],
-    [IMPLEMENTATION_METADATA_FILE, "claude-implementation.meta.json"],
+    ...(isCurrentCycleResearchArtifact(state)
+      ? [[RESEARCH_FILE, path.basename(RESEARCH_FILE)]]
+      : []),
+    [PLAN_FILE, path.basename(PLAN_FILE)],
+    [PLAN_METADATA_FILE, path.basename(PLAN_METADATA_FILE)],
+    [IMPLEMENTATION_FILE, path.basename(IMPLEMENTATION_FILE)],
+    [IMPLEMENTATION_METADATA_FILE, path.basename(IMPLEMENTATION_METADATA_FILE)],
   ];
 
   let archivedAny = false;

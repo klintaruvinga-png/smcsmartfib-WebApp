@@ -9,6 +9,8 @@ npm run agent-pipeline -- init --repo /path/to/repo
 npm run agent-pipeline -- check --repo /path/to/repo
 npm run agent-pipeline -- status --repo /path/to/repo
 npm run agent-pipeline -- start --repo /path/to/repo
+npm run agent-pipeline -- watch --repo /path/to/repo
+npm run agent-pipeline -- reset --repo /path/to/repo
 ```
 
 If `--repo` is omitted, the current working directory is used. `AGENT_PIPELINE_REPO`

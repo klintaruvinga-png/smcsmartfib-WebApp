@@ -3,11 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import {
-  loadPipelineConfig,
-  resolvePipelineContext,
-  resolveRepoRoot,
-} from "./pipeline-config.js";
+import { loadPipelineConfig, resolvePipelineContext, resolveRepoRoot } from "./pipeline-config.js";
 
 const tempDirs = [];
 

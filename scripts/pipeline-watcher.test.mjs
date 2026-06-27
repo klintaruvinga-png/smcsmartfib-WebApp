@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   extractUsablePlanFromClaudeOutput,
   buildClaudeImplementationPrompt,
-  buildClaudeExecCommand,
-  buildClaudeVersionCommand,
+  buildClaudeExecArgs,
+  buildClaudeVersionArgs,
   isActivePhaseUpdatePath,
   selectOpenReadyPR,
 } from "./pipeline-watcher.js";
@@ -44,23 +44,19 @@ describe("pipeline watcher state detection", () => {
 });
 
 describe("pipeline watcher Claude commands", () => {
-  it("builds a Claude health-check command without Codex references", () => {
-    const command = buildClaudeVersionCommand();
+  it("builds Claude health-check args without Codex references", () => {
+    const args = buildClaudeVersionArgs();
 
-    expect(command).toContain("--version");
-    expect(command.toLowerCase()).toContain("claude");
-    expect(command.toLowerCase()).not.toContain("codex");
+    expect(args).toContain("--version");
   });
 
-  it("builds the Claude exec command with the watcher contract", () => {
-    const command = buildClaudeExecCommand("C:\\temp\\claude prompt.tmp.md");
+  it("builds the Claude exec args with the watcher contract", () => {
+    const args = buildClaudeExecArgs("/tmp/prompt.md");
 
-    expect(command).toContain("exec");
-    expect(command).toContain("--json");
-    expect(command).toContain("--dangerously-bypass-approvals-and-sandbox");
-    expect(command).toContain('"C:\\temp\\claude prompt.tmp.md"');
-    expect(command.toLowerCase()).toContain("claude");
-    expect(command.toLowerCase()).not.toContain("codex");
+    expect(args).toContain("exec");
+    expect(args).toContain("--json");
+    expect(args).toContain("--dangerously-bypass-approvals-and-sandbox");
+    expect(args).toContain("/tmp/prompt.md");
   });
 
   it("builds the implementation prompt with an explicit non-draft PR command", () => {

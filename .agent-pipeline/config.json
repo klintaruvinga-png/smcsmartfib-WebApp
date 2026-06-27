@@ -13,6 +13,5 @@
   "lastMessageArtifact": "reports/claude-last-message.txt",
   "resetArtifact": "reports/.pipeline-reset-requested",
   "planHardeningBlockedArtifact": "reports/.claude-plan-hardening-blocked.json",
-  "branchPrefix": "claude",
-  "claudeBinary": "claude"
+  "branchPrefix": "claude"
 }

@@ -72,10 +72,7 @@ export function resolvePipelineContext(args = process.argv.slice(2), env = proce
       planFile: resolveFromRepo(repoRoot, config.planArtifact),
       planMetadataFile: resolveFromRepo(repoRoot, config.planMetadataArtifact),
       implementationFile: resolveFromRepo(repoRoot, config.implementationArtifact),
-      implementationMetadataFile: resolveFromRepo(
-        repoRoot,
-        config.implementationMetadataArtifact,
-      ),
+      implementationMetadataFile: resolveFromRepo(repoRoot, config.implementationMetadataArtifact),
       implementationFailedFile: resolveFromRepo(repoRoot, config.implementationFailedArtifact),
       planPromptFile: resolveFromRepo(repoRoot, config.planPrompt),
       implementationPromptFile: resolveFromRepo(repoRoot, config.implementPrompt),
