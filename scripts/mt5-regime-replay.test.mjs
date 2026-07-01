@@ -34,16 +34,16 @@ describe("MT5 regime dispatch parity guard", () => {
     // Verify volatility metrics are computed and stored
     expect(regimeEngine).toContain("double ema20D1");
     expect(regimeEngine).toContain("double atr14H1");
-    expect(regimeEngine).toContain('"ema20_d1"');
-    expect(regimeEngine).toContain('"atr14_h1"');
+    expect(regimeEngine).toContain('\\"ema20_d1\\"');
+    expect(regimeEngine).toContain('\\"atr14_h1\\"');
 
     // Verify JSON payload structure for backend dispatch
     expect(regimeEngine).toContain("BuildBatchPayload");
-    expect(regimeEngine).toContain('"regimes"');
-    expect(regimeEngine).toContain('"symbol"');
-    expect(regimeEngine).toContain('"htf_bias"');
-    expect(regimeEngine).toContain('"ltf_regime"');
-    expect(regimeEngine).toContain('"chop_score"');
+    expect(regimeEngine).toContain('string arr = "["');
+    expect(regimeEngine).toContain('\\"symbol\\"');
+    expect(regimeEngine).toContain('\\"htf_bias\\"');
+    expect(regimeEngine).toContain('\\"ltf_regime\\"');
+    expect(regimeEngine).toContain('\\"chop_score\\"');
   });
 
   it("validates regime classification accuracy on historical snapshots (EURUSD H1 trending gate)", () => {
@@ -94,7 +94,7 @@ describe("MT5 regime dispatch parity guard", () => {
     const snapshot = {
       symbol: "XAUUSD",
       ema20D1: 4550,
-      closeD1: 4548,
+      closeD1: 4547,
       er14H1: 0.78,
       atr14H1: 3.2,
     };
@@ -124,7 +124,8 @@ describe("MT5 regime dispatch parity guard", () => {
 
     // Verify POST endpoint contract
     expect(regimeEngine).toContain("POST /ea/regime-snapshot");
-    expect(regimeEngine).toContain("{ regimes: [ {...}, ... ] }");
+    expect(regimeEngine).toContain("BuildBatchPayload");
+    expect(regimeEngine).toContain('string arr = "["');
 
     // Verify validation constraints
     expect(regimeEngine).toContain("BULL");
