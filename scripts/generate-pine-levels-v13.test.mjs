@@ -221,6 +221,18 @@ describe('generate-pine-levels-v13.cjs output contract', () => {
     expect(bucketIso('2026-06-04T11:30:03Z')).toBe('2026-06-04T11:30:00.000Z');
   });
 
+  test('uses the same compression guard constants as Pine/PHP/MT5', () => {
+    const source = readGenerator();
+    const helperStart = source.indexOf('function pipSizeForSymbol');
+    const helperEnd = source.indexOf('// Per-session compression check');
+    const helperSource = source.slice(helperStart, helperEnd);
+    const compressionThreshold = Function(`${helperSource}; return compressionThreshold;`)();
+
+    expect(compressionThreshold('EURUSD')).toBeCloseTo(0.002, 10);
+    expect(compressionThreshold('USDJPY')).toBeCloseTo(0.4, 10);
+    expect(compressionThreshold('XAUUSD')).toBeCloseTo(0.2, 10);
+  });
+
   test('skips HTF_AF rows by default when LTF_SF is computable but authority history is incomplete', () => {
     const { candleDir, reportsDir, mt5File } = writeShortMonthlyHistoryFixture();
 

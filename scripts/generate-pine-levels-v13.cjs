@@ -308,7 +308,7 @@ function pipSizeForSymbol(symbol) {
 }
 
 function compressionThreshold(symbol) {
-    const minPips = /JPY$/.test(symbol) ? 50.0 : 30.0;
+    const minPips = /JPY$/.test(symbol) ? 40.0 : 20.0;
     return minPips * pipSizeForSymbol(symbol);
 }
 
