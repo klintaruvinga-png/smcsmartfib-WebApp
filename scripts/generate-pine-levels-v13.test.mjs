@@ -1,11 +1,14 @@
 import { describe, expect, test } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const generatorPath = path.join(repoRoot, 'scripts', 'generate-pine-levels-v13.cjs');
+const requireCjs = createRequire(import.meta.url);
+const { compressionThreshold, pipSizeForSymbol } = requireCjs(generatorPath);
 
 function writeShortMonthlyHistoryFixture() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'smc-pine-partial-htf-'));
@@ -222,12 +225,9 @@ describe('generate-pine-levels-v13.cjs output contract', () => {
   });
 
   test('uses the same compression guard constants as Pine/PHP/MT5', () => {
-    const source = readGenerator();
-    const helperStart = source.indexOf('function pipSizeForSymbol');
-    const helperEnd = source.indexOf('// Per-session compression check');
-    const helperSource = source.slice(helperStart, helperEnd);
-    const compressionThreshold = Function(`${helperSource}; return compressionThreshold;`)();
-
+    expect(pipSizeForSymbol('EURUSD')).toBeCloseTo(0.0001, 10);
+    expect(pipSizeForSymbol('USDJPY')).toBeCloseTo(0.01, 10);
+    expect(pipSizeForSymbol('XAUUSD')).toBeCloseTo(0.01, 10);
     expect(compressionThreshold('EURUSD')).toBeCloseTo(0.002, 10);
     expect(compressionThreshold('USDJPY')).toBeCloseTo(0.4, 10);
     expect(compressionThreshold('XAUUSD')).toBeCloseTo(0.2, 10);

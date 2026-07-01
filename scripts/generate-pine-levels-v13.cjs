@@ -688,4 +688,11 @@ function main() {
     console.log('[generate-pine-levels-v13] Done.');
 }
 
-main();
+if (require.main === module) {
+    main();
+}
+
+module.exports = {
+    compressionThreshold,
+    pipSizeForSymbol,
+};

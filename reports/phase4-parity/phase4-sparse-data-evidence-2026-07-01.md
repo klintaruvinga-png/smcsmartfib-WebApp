@@ -86,8 +86,7 @@ Fresh M15 export is required before the Phase 4 gate can prove completion.
 `scripts/generate-pine-levels-v13.cjs` had a compression threshold drift from
 the Pine compression guard / PHP / MT5 parity lane. The generator now uses:
 
-- EURUSD and XAUUSD class: 20 pips
-- JPY class: 40 pips
+- Non-JPY symbols: 20 pips, including XAUUSD/XAGUSD with metal pip size 0.01
+- JPY symbols: 40 pips
 
 Regression coverage was added in `scripts/generate-pine-levels-v13.test.mjs`.
-
