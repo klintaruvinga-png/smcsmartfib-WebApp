@@ -123,6 +123,15 @@ describe('run-phase4-parity.ps1 automation contract', () => {
     expect(source).toContain('Anchor debug artifacts');
   });
 
+  test('iterates JSON object fields instead of PowerShell array metadata when flattening backend fibs', () => {
+    const source = readScript();
+
+    expect(source).toContain('function Get-JsonObjectProperties($Value)');
+    expect(source).toContain('Where-Object { $_.MemberType -eq "NoteProperty" }');
+    expect(source).toContain('foreach ($tfProp in @(Get-JsonObjectProperties $response.fibs))');
+    expect(source).toContain('foreach ($familyProp in @(Get-JsonObjectProperties $tfProp.Value))');
+  });
+
   test('adds anchor-debug comparison details to Markdown reports for critical groups', () => {
     const source = readScript();
 

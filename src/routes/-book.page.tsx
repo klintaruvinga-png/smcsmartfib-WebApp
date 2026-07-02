@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import type { Position, RegimeState } from "@/types/sniper";
 
 type PosSortKey = "direction" | "entry" | "current" | "lots" | "pnl" | "time";
-type SymSortKey = "symbol" | "positions" | "long" | "short" | "net" | "pnl";
+type SymSortKey = "symbol" | "positions" | "long" | "short" | "net" | "pnl" | "oi";
 type SortDir = "asc" | "desc";
 
 // Shared grid template: chevron | symbol+regime | pos count | long | short | net | OI today % | pnl | badge
@@ -112,7 +112,7 @@ function EquityImpactBadge({
     <span
       title={title}
       className={cn(
-        "inline-flex items-center justify-end gap-0.5 font-mono text-[10px] font-semibold tabular-nums",
+        "inline-flex items-center justify-start gap-0.5 font-mono text-[10px] font-semibold tabular-nums",
         isPositive ? "text-buy" : "text-sell",
       )}
     >
@@ -245,6 +245,10 @@ export function BookPage() {
           av = a.netLots;
           bv = b.netLots;
           break;
+        case "oi":
+          av = finiteNumber(a.equityImpactPct) ?? -Infinity;
+          bv = finiteNumber(b.equityImpactPct) ?? -Infinity;
+          break;
         case "pnl":
           av = a.groupPnl;
           bv = b.groupPnl;
@@ -352,16 +356,19 @@ export function BookPage() {
                 dir={symSortDir}
                 onClick={() => toggleSymSort("net")}
               />
-              <span className="text-[10px] font-mono uppercase tracking-wider text-mute text-right">
-                OI Today %
-              </span>
+              <SymSortHeader
+                label="OI Today %"
+                k="oi"
+                active={symSortKey === "oi"}
+                dir={symSortDir}
+                onClick={() => toggleSymSort("oi")}
+              />
               <SymSortHeader
                 label="P/L"
                 k="pnl"
                 active={symSortKey === "pnl"}
                 dir={symSortDir}
                 onClick={() => toggleSymSort("pnl")}
-                className="justify-end"
               />
               <span />
             </div>
@@ -500,12 +507,12 @@ function SymbolCard({
           Net {netLots >= 0 ? "+" : ""}
           {netLots.toFixed(2)}
         </span>
-        <span className="flex justify-end">
+        <span className="text-[10px] font-mono tabular-nums">
           <EquityImpactBadge value={equityImpactPct} baselineQuality={todayBaselineQuality} />
         </span>
         <span
           className={cn(
-            "font-mono text-sm text-right tabular-nums",
+            "font-mono text-sm tabular-nums",
             groupPnl >= 0 ? "text-buy" : "text-sell",
           )}
         >
@@ -558,7 +565,7 @@ function SymbolCard({
                   onClick={() => toggleSort("lots")}
                 />
                 <SortHeader
-                  className="col-span-2 sm:col-span-3 justify-end"
+                  className="col-span-2 sm:col-span-3"
                   label="P/L"
                   active={sortKey === "pnl"}
                   dir={sortDir}
@@ -595,7 +602,7 @@ function SymbolCard({
                       {fmtPrice(p.current, p.symbol)}
                     </div>
                     <div className="col-span-2 font-mono text-dim">{p.lots.toFixed(2)}</div>
-                    <div className="col-span-2 sm:col-span-3 text-right font-mono">
+                    <div className="col-span-2 sm:col-span-3 font-mono">
                       <div className={cn(p.pnlUSC >= 0 ? "text-buy" : "text-sell")}>
                         {fmtCurrency(p.pnlUSC, currency, true)}
                       </div>
@@ -681,7 +688,7 @@ function MobileSymbolCard({
               {posList.length} pos · {longsCount}L / {shortsCount}S
             </div>
           </div>
-          <div className="shrink-0 text-right">
+          <div className="shrink-0 text-left">
             <div
               className={cn(
                 "font-mono text-sm tabular-nums",

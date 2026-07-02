@@ -606,8 +606,9 @@ class SMC_MarketData_Service
         if ($ts === false || $ts <= 0) {
             return null;
         }
-        // Round to nearest minute to absorb +/- 1s broker jitter (mirrors round_to_minute in normalize_market_timestamp).
-        $ts = (int) (round($ts / 60) * 60);
+        // Floor to the preceding 15-min boundary to keep jittered M15 bars in the
+        // same canonical bucket as the broker-aligned feed instead of nudging them forward.
+        $ts = (int) (floor($ts / (15 * 60)) * (15 * 60));
         $high = (float) ($row['high'] ?? 0);
         $low  = (float) ($row['low']  ?? 0);
         if ($high <= 0 || $low <= 0) {

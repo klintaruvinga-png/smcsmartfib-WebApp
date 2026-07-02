@@ -200,12 +200,14 @@ function normalizeCandle(raw) {
     return { timeMs, open, high, low, close };
 }
 
-function roundToNearestMinuteMs(timeMs) {
-    return Math.round(timeMs / 60000) * 60000;
+function floorToQuarterHourMs(timeMs) {
+    const minuteMs = 60 * 1000;
+    const quarterHourMs = 15 * minuteMs;
+    return Math.floor(timeMs / quarterHourMs) * quarterHourMs;
 }
 
 function bucketStartMs(timeMs, tf) {
-    const bucketInputMs = tf === 'M15' ? roundToNearestMinuteMs(timeMs) : timeMs;
+    const bucketInputMs = tf === 'M15' ? floorToQuarterHourMs(timeMs) : timeMs;
     const d = new Date(bucketInputMs);
     const y = d.getUTCFullYear();
     const m = d.getUTCMonth();
@@ -516,6 +518,11 @@ function loadSourceCandles(symbol) {
 
 // ---- Staleness guard ----
 function checkStaleness(mt5Mtime) {
+    if (process.env.PINE_SKIP_STALENESS === '1') {
+        console.warn('[generate-pine-levels-v13] PINE_SKIP_STALENESS=1 set; skipping staleness guard');
+        return;
+    }
+
     // mt5Mtime = Date object of mt5-levels.json last modification
     for (const sym of SYMBOLS) {
         const candles = loadSourceCandles(sym);
