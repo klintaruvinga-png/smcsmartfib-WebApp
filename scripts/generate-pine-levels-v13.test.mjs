@@ -437,8 +437,9 @@ describe("Patch 1 — candle lineage metadata in pine-anchor-debug.json", () => 
     const ltf = debug.find((r) => r.family === "LTF_SF");
     expect(ltf).toBeDefined();
     // M15 LTF_SF sessions use Daily grouping → helper feed is M15 itself.
-    // source_period must NOT be the raw 'M15' label when using an intermediate feed.
-    // The key assertion: it must be a string and not empty, proving the field is wired.
+    // For this test case, the helper feed happens to also be M15, so source_period
+    // will equal "M15". The test verifies that source_period is populated and wired
+    // through correctly, not that it differs from the M15 label.
     expect(ltf.source_period.length).toBeGreaterThan(0);
     // candle_lineage must always say derived_from_M15 regardless of helper feed.
     expect(ltf.candle_lineage).toBe("derived_from_M15");

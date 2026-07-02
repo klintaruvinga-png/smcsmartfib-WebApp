@@ -316,7 +316,7 @@ function buildCompletedSessions(candles, sessionTf) {
 }
 
 // ---- Compression threshold - matches EA CompressionThreshold() / PHP fib_compression_threshold() ----
-// EA: pip_size * min_pips (JPY=40, else=20)
+// EA: pip_size * min_pips (JPY pairs=50.0 pips, non-JPY pairs=30.0 pips)
 // Regression note: pip_size is hardcoded, not derived from broker SYMBOL_POINT, to match
 // the EA regression fix that guards against brokers reporting SYMBOL_POINT=0.001 for JPY.
 function pipSizeForSymbol(symbol) {
@@ -615,6 +615,9 @@ function main() {
   const metaRows = [];
   const anchorDebugRows = [];
 
+  // Read PINE_REQUIRE_HTF env flag once at function scope
+  const requireHtfGlobal = process.env.PINE_REQUIRE_HTF === "1";
+
   for (const sym of SYMBOLS) {
     const sourceCandles = loadSourceCandles(sym);
     const helperFeeds = buildHelperFeeds(sourceCandles);
@@ -635,7 +638,6 @@ function main() {
       // HTF_AF is skippable when the DB lacks sufficient history (e.g. a newly
       // deployed instance that hasn't yet accumulated a completed authority session).
       // Export PINE_REQUIRE_HTF=1 to restore hard-fail for CI with full history.
-      const requireHtf = process.env.PINE_REQUIRE_HTF === "1";
 
       if (!ltf) {
         console.error(`FAIL: no LTF anchor computable for ${sym} ${tf}`);
@@ -643,7 +645,7 @@ function main() {
       }
 
       if (!htf) {
-        if (requireHtf) {
+        if (requireHtfGlobal) {
           console.error(
             `FAIL: insufficient HTF_AF anchor history for ${sym} ${tf} - PINE_REQUIRE_HTF=1`,
           );
@@ -704,7 +706,6 @@ function main() {
   // Computed dynamically so --symbols / --timeframes overrides are respected.
   // When PINE_REQUIRE_HTF is not set, HTF_AF rows may be absent due to insufficient
   // authority-session history; compute the minimum acceptable count accordingly.
-  const requireHtfGlobal = process.env.PINE_REQUIRE_HTF === "1";
   const EXPECTED_ROWS = SYMBOLS.length * TIMEFRAMES.length * 2 * RATIOS.length;
   const MIN_ROWS = requireHtfGlobal
     ? EXPECTED_ROWS

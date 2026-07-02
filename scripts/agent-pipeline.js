@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -53,7 +54,15 @@ function runNodeScript(scriptName, extraArgs = []) {
       windowsHide: true,
     },
   );
-  process.exitCode = result.status ?? 1;
+  if (result.status !== null) {
+    process.exitCode = result.status;
+  } else if (result.signal) {
+    // Process terminated by signal: map to exit code 128 + signal number (Unix convention)
+    const signalNumber = os.constants.signals[result.signal] || 1;
+    process.exitCode = 128 + signalNumber;
+  } else {
+    process.exitCode = 1;
+  }
 }
 
 function readPid() {

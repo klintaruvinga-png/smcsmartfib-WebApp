@@ -71,7 +71,7 @@ function getClaudeBinary() {
   return process.platform === "win32" ? "claude.cmd" : "claude";
 }
 
-function buildClaudeExecArgs(promptFile) {
+function buildClaudeExecArgs() {
   return [
     "exec",
     "--json",
@@ -80,7 +80,6 @@ function buildClaudeExecArgs(promptFile) {
     REPO_ROOT,
     "-o",
     CLAUDE_OUTPUT_FILE,
-    promptFile,
   ];
 }
 
@@ -1127,11 +1126,13 @@ function runClaudePlanHardening(state) {
     fs.writeFileSync(promptFile, prompt, "utf8");
 
     try {
-      const result = spawnSync(getClaudeBinary(), buildClaudeExecArgs(promptFile), {
+      const result = spawnSync(getClaudeBinary(), buildClaudeExecArgs(), {
         cwd: REPO_ROOT,
         windowsHide: true,
         timeout: PLAN_TIMEOUT_MS,
-        stdio: ["ignore", "inherit", "inherit"],
+        input: prompt,
+        encoding: "utf8",
+        stdio: ["pipe", "inherit", "inherit"],
         shell: process.platform === "win32",
       });
 
@@ -1251,8 +1252,7 @@ function runClaudeImplementation(state) {
     log("READY_FOR_IMPLEMENTATION detected - running Claude implementation");
     clearImplementationRunArtifacts();
     // Write the prompt to a temp file so we can feed it via stdin redirect
-    // without relying on execFileSync's `input` option, which triggers EINVAL
-    // on Windows when stdout/stderr are not inheritable (detached background process).
+    // Write prompt to temp file for debugging, then pass content via stdin.
     const promptFile = path.join(REPORTS_DIR, "claude-prompt.tmp.md");
     fs.writeFileSync(promptFile, prompt, "utf8");
 
@@ -1264,15 +1264,17 @@ function runClaudeImplementation(state) {
       // --dangerously-bypass-approvals-and-sandbox already disables the sandbox,
       // so --sandbox workspace-write is redundant and removed to avoid conflict.
       // shell: true only on Windows to resolve claude.cmd via PATH.
-      const result = spawnSync(getClaudeBinary(), buildClaudeExecArgs(promptFile), {
+      const result = spawnSync(getClaudeBinary(), buildClaudeExecArgs(), {
         cwd: REPO_ROOT,
         windowsHide: true,
         timeout: CLAUDE_TIMEOUT_MS,
+        input: prompt,
+        encoding: "utf8",
         // stdout/stderr: "inherit" -- Claude output streams directly to the
         // watcher's inherited log file descriptors (set by start-pipeline-runner.js
         // to logFd). This avoids buffering all output in memory, which would
         // hit Node's default execSync maxBuffer limit on verbose Claude runs.
-        stdio: ["ignore", "inherit", "inherit"],
+        stdio: ["pipe", "inherit", "inherit"],
         shell: process.platform === "win32",
       });
 
@@ -1393,11 +1395,13 @@ function runReportRecovery(state, issueSlug, prNumber) {
     const previousOutputMtime = statMtime(CLAUDE_OUTPUT_FILE);
 
     try {
-      const result = spawnSync(getClaudeBinary(), buildClaudeExecArgs(promptFile), {
+      const result = spawnSync(getClaudeBinary(), buildClaudeExecArgs(), {
         cwd: REPO_ROOT,
         windowsHide: true,
         timeout: 300000, // 5 min -- short task, just the report
-        stdio: ["ignore", "inherit", "inherit"],
+        input: prompt,
+        encoding: "utf8",
+        stdio: ["pipe", "inherit", "inherit"],
         shell: process.platform === "win32",
       });
 
@@ -1907,6 +1911,14 @@ function checkClaudeAvailability() {
 
     if (result.error) {
       throw result.error;
+    }
+
+    // Fail if process exited with non-zero status or was terminated by signal
+    if (result.status !== 0 || result.signal) {
+      const statusMsg = result.signal
+        ? `terminated by signal ${result.signal}`
+        : `exited with status ${result.status}`;
+      throw new Error(`Claude CLI ${statusMsg}`);
     }
 
     const output = (result.stdout || "").trim();
