@@ -64,7 +64,9 @@ export function AnalyticsPage() {
                 Equity (30d)
               </div>
               <div className="font-mono text-2xl font-semibold mt-1">
-                {telemetryUnavailable ? "Unavailable" : fmtCurrency(equityValue, accountTelemetry?.currency)}
+                {telemetryUnavailable
+                  ? "Unavailable"
+                  : fmtCurrency(equityValue, accountTelemetry?.currency)}
               </div>
             </div>
             <FreshnessBadge state={accountFreshness} />
@@ -127,7 +129,11 @@ export function AnalyticsPage() {
         />
         <Stat
           label="Floating P/L"
-          value={telemetryUnavailable ? "Unavailable" : fmtCurrency(floatingPnl, accountTelemetry?.currency, true)}
+          value={
+            telemetryUnavailable
+              ? "Unavailable"
+              : fmtCurrency(floatingPnl, accountTelemetry?.currency, true)
+          }
           sub={
             telemetryUnavailable
               ? "Waiting for backend trade telemetry"

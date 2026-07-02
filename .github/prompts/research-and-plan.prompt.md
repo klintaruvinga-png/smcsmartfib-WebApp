@@ -52,7 +52,7 @@ Overwrite if the file already exists.
 
 ---
 
-## STEP 3 - HAND OFF TO CODEX PLAN HARDENING
+## STEP 3 - HAND OFF TO CLAUDE PLAN HARDENING
 
 After saving `reports/copilot-research.md`, run this exact command from the repository root:
 
@@ -60,7 +60,7 @@ After saving `reports/copilot-research.md`, run this exact command from the repo
 node scripts/workflow-state.js planning-start --issue "[normalized SMC_ISSUE value]"
 ```
 
-Do not write `reports/codex-plan.md`.
+Do not write `reports/claude-plan.md`.
 Do not implement code.
 Do not stage or commit any files.
 
@@ -83,6 +83,7 @@ reports/copilot-research.md - saved
 Copilot intake complete
 Local pipeline runner started or already active
 Local pipeline runner now owns:
-1. Codex plan hardening -> reports/codex-plan.md
-2. Codex implementation -> branch + normal PR
+1. Claude plan hardening -> reports/claude-plan.md
+2. Claude implementation hardening -> reports/claude-implementation.md + branch + normal PR
+3. Codex verification -> focused watcher checks and report evidence
 ```
