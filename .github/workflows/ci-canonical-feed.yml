@@ -23,7 +23,7 @@ jobs:
     strategy:
       matrix:
         php-version: ['8.2']
-        node-version: ['18']
+        node-version: ['22']
     
     steps:
       - name: Checkout code
@@ -123,6 +123,7 @@ jobs:
       
       - name: Comment PR with test results
         if: github.event_name == 'pull_request'
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |

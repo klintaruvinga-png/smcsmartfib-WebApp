@@ -94,7 +94,7 @@ describe("MT5 signal dispatch parity guard", () => {
       t2Regime: "TRENDING",
       t2ER: 0.28,
       t2Status: "READY", // Should upgrade if HTF bias matches direction
-      transitionalGate: 0.72, // ER threshold for CHOP
+      transitionalGate: 0.65, // ER threshold for CHOP
     };
 
     const chopToTrending = transitionScenario.t1ER > transitionScenario.transitionalGate && transitionScenario.t2ER < 0.35;

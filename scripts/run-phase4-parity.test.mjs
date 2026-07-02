@@ -20,6 +20,7 @@ describe('run-phase4-parity.ps1 automation contract', () => {
 
   test('guards repo/dependencies/auth and supports non-interactive failure', () => {
     const source = readScript();
+    const candleExporter = fs.readFileSync(candleExporterPath, 'utf8');
 
     expect(source).toContain('mt5/FibEngine.mqh');
     expect(source).toMatch(/Get-Command\s+\$cmd/);
@@ -28,6 +29,8 @@ describe('run-phase4-parity.ps1 automation contract', () => {
     expect(source).toContain('SMC_APP_PW');
     expect(source).toContain('Get-Credential');
     expect(source).toMatch(/\[switch\]\$NoPrompt/);
+    expect(source).toContain('foreach ($target in @("Process", "User", "Machine"))');
+    expect(candleExporter).toContain('foreach ($target in @("Process", "User", "Machine"))');
   });
 
   test('requires WordPress auth before any dry-run or full-run mode can continue', () => {
@@ -118,6 +121,15 @@ describe('run-phase4-parity.ps1 automation contract', () => {
     expect(source).toContain('ConvertTo-Mt5AnchorDebugRecords');
     expect(source).toContain('Write-JsonFile $mt5AnchorDebugFile');
     expect(source).toContain('Anchor debug artifacts');
+  });
+
+  test('iterates JSON object fields instead of PowerShell array metadata when flattening backend fibs', () => {
+    const source = readScript();
+
+    expect(source).toContain('function Get-JsonObjectProperties($Value)');
+    expect(source).toContain('Where-Object { $_.MemberType -eq "NoteProperty" }');
+    expect(source).toContain('foreach ($tfProp in @(Get-JsonObjectProperties $response.fibs))');
+    expect(source).toContain('foreach ($familyProp in @(Get-JsonObjectProperties $tfProp.Value))');
   });
 
   test('adds anchor-debug comparison details to Markdown reports for critical groups', () => {

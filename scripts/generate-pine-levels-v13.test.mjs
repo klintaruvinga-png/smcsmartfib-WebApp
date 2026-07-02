@@ -1,11 +1,14 @@
 import { describe, expect, test } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const generatorPath = path.join(repoRoot, 'scripts', 'generate-pine-levels-v13.cjs');
+const requireCjs = createRequire(import.meta.url);
+const { compressionThreshold, pipSizeForSymbol } = requireCjs(generatorPath);
 
 function writeShortMonthlyHistoryFixture() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'smc-pine-partial-htf-'));
@@ -204,10 +207,10 @@ describe('generate-pine-levels-v13.cjs output contract', () => {
     }));
   });
 
-  test('rounds jittered M15 source times before assigning aggregation buckets', () => {
+  test('floors jittered M15 source times to the preceding quarter-hour boundary before bucketing', () => {
     const source = readGenerator();
-    const helperStart = source.includes('function roundToNearestMinuteMs')
-      ? source.indexOf('function roundToNearestMinuteMs')
+    const helperStart = source.includes('function floorToQuarterHourMs')
+      ? source.indexOf('function floorToQuarterHourMs')
       : source.indexOf('function bucketStartMs');
     const helperEnd = source.indexOf('function aggregateCandles');
     const helperSource = source.slice(helperStart, helperEnd);
@@ -215,10 +218,64 @@ describe('generate-pine-levels-v13.cjs output contract', () => {
 
     const bucketIso = (iso) => new Date(bucketStartMs(Date.parse(iso), 'M15')).toISOString();
 
-    expect(bucketIso('2026-06-04T11:44:58Z')).toBe('2026-06-04T11:45:00.000Z');
-    expect(bucketIso('2026-06-04T11:44:59Z')).toBe('2026-06-04T11:45:00.000Z');
+    expect(bucketIso('2026-06-04T11:44:58Z')).toBe('2026-06-04T11:30:00.000Z');
+    expect(bucketIso('2026-06-04T11:44:59Z')).toBe('2026-06-04T11:30:00.000Z');
     expect(bucketIso('2026-06-04T11:45:08Z')).toBe('2026-06-04T11:45:00.000Z');
     expect(bucketIso('2026-06-04T11:30:03Z')).toBe('2026-06-04T11:30:00.000Z');
+  });
+
+  test('uses the same compression guard constants as Pine/PHP/MT5', () => {
+    expect(pipSizeForSymbol('EURUSD')).toBeCloseTo(0.0001, 10);
+    expect(pipSizeForSymbol('USDJPY')).toBeCloseTo(0.01, 10);
+    expect(pipSizeForSymbol('XAUUSD')).toBeCloseTo(0.01, 10);
+    expect(compressionThreshold('EURUSD')).toBeCloseTo(0.002, 10);
+    expect(compressionThreshold('USDJPY')).toBeCloseTo(0.4, 10);
+    expect(compressionThreshold('XAUUSD')).toBeCloseTo(0.2, 10);
+  });
+
+  test('allows local parity replays to bypass the staleness guard when explicitly requested', () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'smc-pine-staleness-'));
+    const candleDir = path.join(tempRoot, 'data');
+    const reportsDir = path.join(tempRoot, 'reports');
+    fs.mkdirSync(candleDir, { recursive: true });
+    fs.mkdirSync(reportsDir, { recursive: true });
+
+    const candles = [];
+    const start = Date.UTC(2026, 4, 4, 0, 0, 0);
+    const end = Date.UTC(2026, 5, 5, 0, 0, 0);
+    for (let timeMs = start; timeMs <= end; timeMs += 15 * 60 * 1000) {
+      const base = 1.1 + (timeMs / 1000) * 0.000000001;
+      candles.push({
+        time: new Date(timeMs).toISOString(),
+        open: base,
+        high: base + 0.001,
+        low: base - 0.001,
+        close: base + 0.0001,
+      });
+    }
+
+    fs.writeFileSync(path.join(candleDir, 'EURUSD_M15.json'), JSON.stringify(candles));
+    const mt5File = path.join(reportsDir, 'mt5-levels.json');
+    fs.writeFileSync(mt5File, '[]');
+    const mt5Mtime = new Date('2026-06-20T00:00:00.000Z');
+    fs.utimesSync(mt5File, mt5Mtime, mt5Mtime);
+
+    const result = spawnSync(process.execPath, [
+      generatorPath,
+      '--candle-dir', candleDir,
+      '--mt5-file', mt5File,
+      '--reports-dir', reportsDir,
+      '--run-ts', '2026-06-20T00:00:00.000Z',
+      '--symbols', 'EURUSD',
+      '--timeframes', 'M15',
+    ], {
+      encoding: 'utf8',
+      env: { ...process.env, PINE_SKIP_STALENESS: '1' },
+    });
+
+    expect(result.status).toBe(0);
+    expect(`${result.stdout}${result.stderr}`).toContain('skipping staleness guard');
+    expect(fs.existsSync(path.join(reportsDir, 'pine-levels.json'))).toBe(true);
   });
 
   test('skips HTF_AF rows by default when LTF_SF is computable but authority history is incomplete', () => {

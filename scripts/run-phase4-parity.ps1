@@ -130,9 +130,11 @@ function Resolve-ConfigValue([string]$Value, [string]$EnvName, [string]$Fallback
         return $Value
     }
 
-    $envValue = [Environment]::GetEnvironmentVariable($EnvName)
-    if (-not [string]::IsNullOrWhiteSpace($envValue)) {
-        return $envValue
+    foreach ($target in @("Process", "User", "Machine")) {
+        $envValue = [Environment]::GetEnvironmentVariable($EnvName, $target)
+        if (-not [string]::IsNullOrWhiteSpace($envValue)) {
+            return $envValue
+        }
     }
 
     return $Fallback
@@ -373,6 +375,14 @@ function Get-LevelPrice($Levels, [double]$Ratio) {
     return $null
 }
 
+function Get-JsonObjectProperties($Value) {
+    if ($null -eq $Value) {
+        return @()
+    }
+
+    return @($Value.PSObject.Properties | Where-Object { $_.MemberType -eq "NoteProperty" })
+}
+
 function New-EmptyAnchorComponent([string]$Slot, $Key, $Weight) {
     return [PSCustomObject]@{
         slot             = $Slot
@@ -459,13 +469,13 @@ function ConvertTo-Mt5AnchorDebugRecords([string]$Symbol, $Response) {
     $records = New-Object System.Collections.Generic.List[object]
     $debugRoot = Get-ObjectPropertyValue $Response "anchor_debug"
 
-    foreach ($tfProp in $Response.fibs.PSObject.Properties) {
+    foreach ($tfProp in @(Get-JsonObjectProperties $Response.fibs)) {
         $tf = $tfProp.Name
         $tfDebug = Get-ObjectPropertyValue $debugRoot $tf
         if ($null -eq $tfDebug) {
             $tfDebug = $debugRoot
         }
-        foreach ($familyProp in $tfProp.Value.PSObject.Properties) {
+        foreach ($familyProp in @(Get-JsonObjectProperties $tfProp.Value)) {
             $family = $familyProp.Name
             $familyDebug = Get-ObjectPropertyValue $tfDebug $family
             if ($null -eq $familyDebug) {
@@ -741,9 +751,9 @@ if (-not $DryRun) {
             $mt5AnchorDebug.Add($debugRecord)
         }
 
-        foreach ($tfProp in $response.fibs.PSObject.Properties) {
+        foreach ($tfProp in @(Get-JsonObjectProperties $response.fibs)) {
             $tf = $tfProp.Name
-            foreach ($familyProp in $tfProp.Value.PSObject.Properties) {
+            foreach ($familyProp in @(Get-JsonObjectProperties $tfProp.Value)) {
                 $family = $familyProp.Name
                 foreach ($level in @($familyProp.Value)) {
                     $combined.Add([PSCustomObject]@{
