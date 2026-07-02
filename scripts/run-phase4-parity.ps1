@@ -130,9 +130,11 @@ function Resolve-ConfigValue([string]$Value, [string]$EnvName, [string]$Fallback
         return $Value
     }
 
-    $envValue = [Environment]::GetEnvironmentVariable($EnvName)
-    if (-not [string]::IsNullOrWhiteSpace($envValue)) {
-        return $envValue
+    foreach ($target in @("Process", "User", "Machine")) {
+        $envValue = [Environment]::GetEnvironmentVariable($EnvName, $target)
+        if (-not [string]::IsNullOrWhiteSpace($envValue)) {
+            return $envValue
+        }
     }
 
     return $Fallback

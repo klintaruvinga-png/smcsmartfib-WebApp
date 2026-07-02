@@ -20,6 +20,7 @@ describe('run-phase4-parity.ps1 automation contract', () => {
 
   test('guards repo/dependencies/auth and supports non-interactive failure', () => {
     const source = readScript();
+    const candleExporter = fs.readFileSync(candleExporterPath, 'utf8');
 
     expect(source).toContain('mt5/FibEngine.mqh');
     expect(source).toMatch(/Get-Command\s+\$cmd/);
@@ -28,6 +29,8 @@ describe('run-phase4-parity.ps1 automation contract', () => {
     expect(source).toContain('SMC_APP_PW');
     expect(source).toContain('Get-Credential');
     expect(source).toMatch(/\[switch\]\$NoPrompt/);
+    expect(source).toContain('foreach ($target in @("Process", "User", "Machine"))');
+    expect(candleExporter).toContain('foreach ($target in @("Process", "User", "Machine"))');
   });
 
   test('requires WordPress auth before any dry-run or full-run mode can continue', () => {
