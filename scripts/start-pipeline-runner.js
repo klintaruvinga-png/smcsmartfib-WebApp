@@ -2,13 +2,16 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { resolvePipelineContext } from "./pipeline-config.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const REPO_ROOT = path.join(__dirname, "..");
-const REPORTS_DIR = path.join(REPO_ROOT, "reports");
-const PID_FILE = path.join(REPORTS_DIR, ".pipeline-runner.pid");
-const LOG_FILE = path.join(REPORTS_DIR, "pipeline-runner.log");
+
+const PIPELINE_CONTEXT = resolvePipelineContext();
+const REPO_ROOT = PIPELINE_CONTEXT.repoRoot;
+const REPORTS_DIR = PIPELINE_CONTEXT.paths.reportsDir;
+const PID_FILE = PIPELINE_CONTEXT.paths.runnerPidFile;
+const LOG_FILE = PIPELINE_CONTEXT.paths.runnerLogFile;
 const WATCHER_FILE = path.join(__dirname, "pipeline-watcher.js");
 
 function ensureReportsDir() {
@@ -56,7 +59,7 @@ function main() {
   }
 
   const logFd = fs.openSync(LOG_FILE, "a");
-  const child = spawn(process.execPath, [WATCHER_FILE], {
+  const child = spawn(process.execPath, [WATCHER_FILE, "--repo", REPO_ROOT], {
     cwd: REPO_ROOT,
     detached: true,
     windowsHide: true,

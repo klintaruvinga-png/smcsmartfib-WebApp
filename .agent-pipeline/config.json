@@ -1,0 +1,17 @@
+{
+  "profile": "copilot-claude-codex",
+  "reportsDir": "reports",
+  "stateFile": ".smc-workflow-state.json",
+  "researchArtifact": "reports/copilot-research.md",
+  "planArtifact": "reports/claude-plan.md",
+  "planMetadataArtifact": "reports/claude-plan.meta.json",
+  "implementationArtifact": "reports/claude-implementation.md",
+  "implementationMetadataArtifact": "reports/claude-implementation.meta.json",
+  "implementationFailedArtifact": "reports/.claude-implementation-failed.json",
+  "planPrompt": ".github/prompts/claude-plan-prompt.md",
+  "implementPrompt": ".github/prompts/claude-implement-prompt.md",
+  "lastMessageArtifact": "reports/claude-last-message.txt",
+  "resetArtifact": "reports/.pipeline-reset-requested",
+  "planHardeningBlockedArtifact": "reports/.claude-plan-hardening-blocked.json",
+  "branchPrefix": "claude"
+}

@@ -203,10 +203,7 @@ export function normalizeSnapshot(snapshot: {
       ask: toFiniteNumber(price.ask),
       mid: toFiniteNumber(price.mid),
       changePct1d: toFiniteNumber(price.changePct1d),
-      age_sec:
-        price.age_sec === undefined
-          ? undefined
-          : toFiniteNumber(price.age_sec),
+      age_sec: price.age_sec === undefined ? undefined : toFiniteNumber(price.age_sec),
       sourceDetail: typeof price.sourceDetail === "string" ? price.sourceDetail : undefined,
       feed_key: typeof price.feed_key === "string" ? price.feed_key : undefined,
       source_count:

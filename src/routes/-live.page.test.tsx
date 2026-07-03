@@ -167,9 +167,7 @@ describe("LivePage backend gating", () => {
     hookMocks.useCanonicalWatchlist.mockReturnValue({
       watchlist: ["EURUSD"],
     });
-    hookMocks.alignWatchlistItems.mockReturnValue([
-      { symbol: "EURUSD", item: price },
-    ]);
+    hookMocks.alignWatchlistItems.mockReturnValue([{ symbol: "EURUSD", item: price }]);
 
     render(<LivePage />);
 

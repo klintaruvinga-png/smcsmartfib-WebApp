@@ -1,66 +1,54 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync, execSync } from "node:child_process";
+import { execFileSync, execSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { readWorkflowState } from "./workflow-state.js";
+import { resolvePipelineContext } from "./pipeline-config.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const REPO_ROOT = path.join(__dirname, "..");
-const RESEARCH_FILE = path.join(REPO_ROOT, "reports", "copilot-research.md");
-const PLAN_FILE = path.join(REPO_ROOT, "reports", "codex-plan.md");
-const PLAN_METADATA_FILE = path.join(REPO_ROOT, "reports", "codex-plan.meta.json");
-const IMPLEMENTATION_FILE = path.join(REPO_ROOT, "reports", "codex-implementation.md");
-const IMPLEMENTATION_METADATA_FILE = path.join(
-  REPO_ROOT,
-  "reports",
-  "codex-implementation.meta.json",
-);
-const IMPLEMENTATION_FAILED_FILE = path.join(
-  REPO_ROOT,
-  "reports",
-  ".codex-implementation-failed.json",
-);
-const STATE_FILE = path.join(REPO_ROOT, ".smc-workflow-state.json");
-// Write-only JSON lock — status field ("running"|"done") determines liveness.
+const PIPELINE_CONTEXT = resolvePipelineContext();
+const REPO_ROOT = PIPELINE_CONTEXT.repoRoot;
+const CONFIG = PIPELINE_CONTEXT.config;
+const {
+  reportsDir: REPORTS_DIR,
+  researchFile: RESEARCH_FILE,
+  planFile: PLAN_FILE,
+  planMetadataFile: PLAN_METADATA_FILE,
+  implementationFile: IMPLEMENTATION_FILE,
+  implementationMetadataFile: IMPLEMENTATION_METADATA_FILE,
+  implementationFailedFile: IMPLEMENTATION_FAILED_FILE,
+  stateFile: STATE_FILE,
+  lockFile: LOCK_FILE,
+  archiveDir: ARCHIVE_DIR,
+  planPromptFile: PLAN_PROMPT_FILE,
+  implementationPromptFile: CLAUDE_IMPLEMENT_PROMPT_FILE,
+  lastMessageFile: CLAUDE_OUTPUT_FILE,
+  resetFile: PIPELINE_RESET_FILE,
+  planHardeningBlockedFile: PLAN_HARDENING_BLOCKED_FILE,
+} = PIPELINE_CONTEXT.paths;
+// Write-only JSON lock -- status field ("running"|"done") determines liveness.
 // The file is NEVER deleted; it is overwritten on acquire and on release.
 // This avoids EPERM failures from OneDrive holding a sync lock on the file.
-const LOCK_FILE = path.join(REPO_ROOT, "reports", ".pipeline-lock.json");
-const ARCHIVE_DIR = path.join(REPO_ROOT, "reports", "archive");
-const PLAN_PROMPT_FILE = path.join(REPO_ROOT, ".github", "prompts", "codex-plan-prompt.md");
-const CODEX_IMPLEMENT_PROMPT_FILE = path.join(
-  REPO_ROOT,
-  ".github",
-  "prompts",
-  "codex-implement-prompt.md",
-);
-const CODEX_OUTPUT_FILE = path.join(REPO_ROOT, "reports", "codex-last-message.txt");
 // Written by `npm run pipeline:reset` (or `node scripts/reset-pipeline.js`).
 // The watcher detects this sentinel on its next poll, archives any current cycle
 // artifacts, deletes the sentinel, and resets state to IDLE. This is the safe
 // programmatic escape from IMPLEMENTATION_FAILED without direct state file edits.
-const PIPELINE_RESET_FILE = path.join(REPO_ROOT, "reports", ".pipeline-reset-requested");
-// Written when Codex plan hardening fails so the watcher stops retrying until
+// Written when Claude plan hardening fails so the watcher stops retrying until
 // the research/issue changes or the file is manually deleted.
-const PLAN_HARDENING_BLOCKED_FILE = path.join(
-  REPO_ROOT,
-  "reports",
-  ".codex-plan-hardening-blocked.json",
-);
 const POLL_INTERVAL_MS = 5000;
-const PLAN_TIMEOUT_MS = 900000; // 15 min — larger research reports need more time
-const CODEX_TIMEOUT_MS = 1800000; // 30 min — complex implementations regularly exceed 15 min
+const PLAN_TIMEOUT_MS = 900000; // 15 min -- larger research reports need more time
+const CLAUDE_TIMEOUT_MS = 1800000; // 30 min -- complex implementations regularly exceed 15 min
 const LOCK_STALE_MS = 30 * 60 * 1000;
 
 // The exact watcher-generated failure reason string for a missing implementation report.
 // Used to distinguish "report missing but PR exists" (recoverable) from other failures.
-const REASON_NO_IMPL_REPORT =
-  "Codex implementation finished without reports/codex-implementation.md";
+const REASON_NO_IMPL_REPORT = `Claude implementation finished without ${path.relative(REPO_ROOT, IMPLEMENTATION_FILE)}`;
 
-// Patterns that indicate Codex intentionally stopped before creating a branch or PR
-// (contract/reality conflict). When all of these match the last Codex output the pipeline
+// Patterns that indicate Claude intentionally stopped before creating a branch or PR
+// (contract/reality conflict). When all of these match the last Claude output the pipeline
 // synthesises the implementation report locally instead of waiting for human intervention.
 const STOP_BEFORE_PATCH_PATTERNS = [
   /no\s+(?:patch|files?)\s+(?:(?:was|were)\s+)?(?:applied|changed)/i,
@@ -73,45 +61,42 @@ const STOP_BEFORE_PATCH_PATTERNS = [
 const MAX_HARDENING_RETRIES = 3;
 const HARDENING_RETRY_INTERVAL_MS = 5 * 60 * 1000; // 5 min
 
-// Centralize the Codex executable name so the watcher health check and runtime
-// invocations cannot drift. The implementation/report flows still use shell
-// commands because they rely on stdin redirection from a temp prompt file.
-function getCodexBinary() {
-  return process.platform === "win32" ? "codex.cmd" : "codex";
+// Centralize the Claude executable name so the watcher health check and runtime
+// invocations cannot drift. Uses spawnSync with argument arrays to avoid
+// shell injection vulnerabilities from paths containing shell metacharacters.
+function getClaudeBinary() {
+  if (typeof CONFIG.claudeBinary === "string" && CONFIG.claudeBinary.trim()) {
+    return CONFIG.claudeBinary;
+  }
+  return process.platform === "win32" ? "claude.cmd" : "claude";
 }
 
-function buildCodexCommand(args) {
-  return [`"${getCodexBinary()}"`, ...args].join(" ");
-}
-
-function buildCodexExecCommand(promptFile) {
-  return buildCodexCommand([
+function buildClaudeExecArgs() {
+  return [
     "exec",
     "--json",
     "--dangerously-bypass-approvals-and-sandbox",
     "-C",
-    `"${REPO_ROOT}"`,
+    REPO_ROOT,
     "-o",
-    `"${CODEX_OUTPUT_FILE}"`,
-    "-",
-    "<",
-    `"${promptFile}"`,
-  ]);
+    CLAUDE_OUTPUT_FILE,
+  ];
 }
 
-function buildCodexVersionCommand() {
-  return buildCodexCommand(["--version"]);
+function buildClaudeVersionArgs() {
+  return ["--version"];
 }
 
-function buildCodexImplementationPrompt({ issue, promptText }) {
+function buildClaudeImplementationPrompt({ issue, promptText }) {
   const issueSlug = slugifyIssue(issue || "pipeline-issue");
+  const branchName = buildAgentBranchName(issueSlug);
 
-  return `${promptText ?? fs.readFileSync(CODEX_IMPLEMENT_PROMPT_FILE, "utf8")}
+  return `${promptText ?? fs.readFileSync(CLAUDE_IMPLEMENT_PROMPT_FILE, "utf8")}
 
 ## Runtime context
 - Current issue: ${issue}
-- Required branch: codex/${issueSlug}
-- Implementation summary target: reports/codex-implementation.md
+- Required branch: ${branchName}
+- Implementation summary target: reports/claude-implementation.md
 - PR closeout command: gh pr create --fill
 - Open a normal PR, not a draft PR.
 - Do not pass --draft to gh pr create.
@@ -195,7 +180,7 @@ function readTextFile(filePath) {
 function readJson(filePath) {
   // PowerShell's Set-Content -Encoding UTF8 writes a UTF-8 BOM on Windows.
   // Strip it before parsing so the watcher never fails on Copilot-written files.
-  const raw = fs.readFileSync(filePath, "utf8").replace(/^﻿/, "");
+  const raw = fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
   return JSON.parse(raw);
 }
 
@@ -257,12 +242,13 @@ function selectOpenReadyPR(prs) {
 }
 
 // Returns { number, isDraft } if an open, non-draft PR for the branch exists, else null.
-// Used to detect when Codex created a PR but the execSync wrapper timed out before
+// Used to detect when Claude created a PR but the execSync wrapper timed out before
 // the watcher could record IMPLEMENTATION_COMPLETE.
 function checkOpenPR(issueSlug) {
+  const branchName = buildAgentBranchName(issueSlug);
   try {
     const raw = execSync(
-      `gh pr list --head "codex/${issueSlug}" --state open --json number,isDraft --limit 20`,
+      `gh pr list --head "${branchName}" --state open --json number,isDraft --limit 20`,
       {
         cwd: REPO_ROOT,
         encoding: "utf8",
@@ -275,7 +261,7 @@ function checkOpenPR(issueSlug) {
     const prs = JSON.parse(raw.trim() || "[]");
     const readyPr = selectOpenReadyPR(prs);
     if (!readyPr && prs.some((pr) => pr?.isDraft === true)) {
-      log(`Draft PR found for codex/${issueSlug}; waiting for a normal open PR`);
+      log(`Draft PR found for ${branchName}; waiting for a normal open PR`);
     }
     return readyPr;
   } catch (err) {
@@ -287,9 +273,10 @@ function checkOpenPR(issueSlug) {
 
 // Returns { number, mergedAt } if a merged PR for the current cycle exists, else null.
 function checkMergedPR(issueSlug, cycleStartedAt) {
+  const branchName = buildAgentBranchName(issueSlug);
   try {
     const raw = execSync(
-      `gh pr list --head "codex/${issueSlug}" --state merged --json number,mergedAt --limit 20`,
+      `gh pr list --head "${branchName}" --state merged --json number,mergedAt --limit 20`,
       {
         cwd: REPO_ROOT,
         encoding: "utf8",
@@ -429,8 +416,8 @@ function archiveStaleCycleArtifacts(state) {
     (!fs.existsSync(PLAN_FILE) && fs.existsSync(PLAN_METADATA_FILE) && planIssue !== currentIssue)
   ) {
     archiveStaleArtifactGroup(planIssue, currentIssue, [
-      [PLAN_FILE, "codex-plan.md"],
-      [PLAN_METADATA_FILE, "codex-plan.meta.json"],
+      [PLAN_FILE, "claude-plan.md"],
+      [PLAN_METADATA_FILE, "claude-plan.meta.json"],
     ]);
   }
 
@@ -447,8 +434,8 @@ function archiveStaleCycleArtifacts(state) {
       implementationIssue !== currentIssue)
   ) {
     archiveStaleArtifactGroup(implementationIssue, currentIssue, [
-      [IMPLEMENTATION_FILE, "codex-implementation.md"],
-      [IMPLEMENTATION_METADATA_FILE, "codex-implementation.meta.json"],
+      [IMPLEMENTATION_FILE, "claude-implementation.md"],
+      [IMPLEMENTATION_METADATA_FILE, "claude-implementation.meta.json"],
     ]);
   }
 }
@@ -457,10 +444,10 @@ function archiveArtifactsForManualReset(state) {
   const dest = path.join(ARCHIVE_DIR, `manual-reset-${buildArchiveTimestamp()}`);
   const artifacts = [
     ...(shouldArchiveResearchOnManualReset(state) ? [[RESEARCH_FILE, "copilot-research.md"]] : []),
-    [PLAN_FILE, "codex-plan.md"],
-    [PLAN_METADATA_FILE, "codex-plan.meta.json"],
-    [IMPLEMENTATION_FILE, "codex-implementation.md"],
-    [IMPLEMENTATION_METADATA_FILE, "codex-implementation.meta.json"],
+    [PLAN_FILE, "claude-plan.md"],
+    [PLAN_METADATA_FILE, "claude-plan.meta.json"],
+    [IMPLEMENTATION_FILE, "claude-implementation.md"],
+    [IMPLEMENTATION_METADATA_FILE, "claude-implementation.meta.json"],
   ];
 
   return archiveArtifactsToDirectory(artifacts, dest, "Manual reset archive warning", (name) => {
@@ -478,11 +465,11 @@ function archiveCycleArtifacts(issueSlug, options = {}) {
 
   const artifacts = [
     ...(includeResearch ? [[RESEARCH_FILE, "copilot-research.md"]] : []),
-    [PLAN_FILE, "codex-plan.md"],
-    [PLAN_METADATA_FILE, "codex-plan.meta.json"],
-    [IMPLEMENTATION_FILE, "codex-implementation.md"],
-    [IMPLEMENTATION_METADATA_FILE, "codex-implementation.meta.json"],
-    [CODEX_OUTPUT_FILE, "codex-last-message.txt"],
+    [PLAN_FILE, "claude-plan.md"],
+    [PLAN_METADATA_FILE, "claude-plan.meta.json"],
+    [IMPLEMENTATION_FILE, "claude-implementation.md"],
+    [IMPLEMENTATION_METADATA_FILE, "claude-implementation.meta.json"],
+    [CLAUDE_OUTPUT_FILE, "claude-last-message.txt"],
   ];
 
   for (const [src, name] of artifacts) {
@@ -525,7 +512,7 @@ function isUsablePlan(text) {
   return requiredSections.every((section) => text.includes(section));
 }
 
-function extractUsablePlanFromCodexOutput(outputText) {
+function extractUsablePlanFromClaudeOutput(outputText) {
   const planText = outputText.trim();
   return isUsablePlan(planText) ? planText : null;
 }
@@ -553,7 +540,7 @@ function isUsableImplementation(text) {
 }
 
 // Returns true when the implementation report's "Exact files changed" section
-// contains only "None" — indicating Codex stopped before making any code changes.
+// contains only "None" -- indicating Claude stopped before making any code changes.
 function isNoCodeChangeReport() {
   if (!fs.existsSync(IMPLEMENTATION_FILE)) return false;
   try {
@@ -565,14 +552,14 @@ function isNoCodeChangeReport() {
   }
 }
 
-// Returns true only when every file changed on codex/<slug> relative to main is
+// Returns true only when every file changed on the configured agent branch relative to main is
 // under the reports/ directory. This is an objective git-state guard used before
 // the no-PR auto-reset so that real implementation work is never silently discarded
 // based solely on the (model-authored, potentially stale) implementation report.
-// Tries the local branch first, then the remote-tracking ref. Returns false — i.e.
-// refuses cleanup — whenever the branch cannot be resolved or the diff command fails.
+// Tries the local branch first, then the remote-tracking ref. Returns false -- i.e.
+// refuses cleanup -- whenever the branch cannot be resolved or the diff command fails.
 function isReportOnlyBranch(issueSlug) {
-  const branchName = `codex/${issueSlug}`;
+  const branchName = buildAgentBranchName(issueSlug);
   const candidates = [branchName, `origin/${branchName}`];
 
   for (const ref of candidates) {
@@ -587,7 +574,7 @@ function isReportOnlyBranch(issueSlug) {
         stdio: ["ignore", "pipe", "pipe"],
       });
     } catch {
-      continue; // ref not found or git error — try next candidate
+      continue; // ref not found or git error -- try next candidate
     }
 
     const changedFiles = output.trim().split(/\r?\n/).filter(Boolean);
@@ -596,16 +583,16 @@ function isReportOnlyBranch(issueSlug) {
     const nonReportFiles = changedFiles.filter((f) => !f.startsWith("reports/"));
     if (nonReportFiles.length > 0) {
       log(
-        `isReportOnlyBranch: ${ref} has non-report changes (${nonReportFiles.slice(0, 5).join(", ")}) — skipping auto-reset`,
+        `isReportOnlyBranch: ${ref} has non-report changes (${nonReportFiles.slice(0, 5).join(", ")}) -- skipping auto-reset`,
       );
       return false;
     }
     return true; // every changed file is under reports/
   }
 
-  // Neither local nor remote branch resolved — refuse cleanup to be safe.
+  // Neither local nor remote branch resolved -- refuse cleanup to be safe.
   log(
-    `isReportOnlyBranch: branch ${branchName} not found locally or on remote — skipping auto-reset`,
+    `isReportOnlyBranch: branch ${branchName} not found locally or on remote -- skipping auto-reset`,
   );
   return false;
 }
@@ -656,13 +643,13 @@ function writeHardeningBlockedState(state, reason, retryCount = 0) {
     resolution: permanent
       ? [
           "All automatic retries exhausted. Manual intervention required.",
-          "Option A: run Codex plan hardening manually by writing reports/codex-plan.md.",
-          "Option B: fix the Codex CLI installation or PATH and delete this file.",
+          "Option A: run Claude plan hardening manually by writing reports/claude-plan.md.",
+          "Option B: fix the Claude CLI installation or PATH and delete this file.",
         ]
       : [
           `Retry ${retryCount}/${MAX_HARDENING_RETRIES} scheduled at ${nextRetryAt}.`,
-          "Option A (automatic): the pipeline will retry automatically — no action needed.",
-          "Option B (fix now): ensure 'codex' CLI is installed and available on PATH.",
+          "Option A (automatic): the pipeline will retry automatically -- no action needed.",
+          "Option B (fix now): ensure 'claude' CLI is installed and available on PATH.",
           "  then delete this file to skip the wait.",
         ],
   });
@@ -696,7 +683,7 @@ function isHardeningBlockedForCurrentState(state) {
     return false;
   }
 
-  // Permanent block (all retries exhausted) — stay blocked until manual fix.
+  // Permanent block (all retries exhausted) -- stay blocked until manual fix.
   if (blocked.permanent) {
     return true;
   }
@@ -705,16 +692,16 @@ function isHardeningBlockedForCurrentState(state) {
   if (blocked.next_retry_at) {
     const due = Date.parse(blocked.next_retry_at);
     if (Number.isFinite(due) && Date.now() >= due) {
-      return false; // retry window reached — allow the run
+      return false; // retry window reached -- allow the run
     }
     const secsRemaining = Math.max(0, Math.round((due - Date.now()) / 1000));
     log(
-      `Codex plan hardening retry in ${secsRemaining}s (attempt ${(blocked.retry_count ?? 0) + 1}/${MAX_HARDENING_RETRIES})`,
+      `Claude plan hardening retry in ${secsRemaining}s (attempt ${(blocked.retry_count ?? 0) + 1}/${MAX_HARDENING_RETRIES})`,
     );
     return true;
   }
 
-  // Legacy block file with no retry metadata — treat as blocked.
+  // Legacy block file with no retry metadata -- treat as blocked.
   return true;
 }
 
@@ -728,7 +715,7 @@ function readHardeningRetryCount() {
 }
 
 function sendHardeningFailureNotification(state, reason) {
-  const title = `[pipeline-watcher] Codex plan hardening permanently blocked`;
+  const title = `[pipeline-watcher] Claude plan hardening permanently blocked`;
   const body = [
     `All ${MAX_HARDENING_RETRIES} automatic retries for the plan-hardening step have failed.`,
     "",
@@ -736,9 +723,9 @@ function sendHardeningFailureNotification(state, reason) {
     `**Last failure reason:** ${reason}`,
     "",
     "**To unblock:**",
-    "1. Fix the Codex CLI: install or configure codex on PATH.",
-    "2. Delete `reports/.codex-plan-hardening-blocked.json` — the pipeline restarts automatically.",
-    "   OR write `reports/codex-plan.md`; the watcher will advance state automatically when the artifact is valid.",
+    "1. Fix the Claude CLI: install or configure claude on PATH.",
+    "2. Delete `reports/.claude-plan-hardening-blocked.json` -- the pipeline restarts automatically.",
+    "   OR write `reports/claude-plan.md`; the watcher will advance state automatically when the artifact is valid.",
   ].join("\n");
 
   try {
@@ -755,9 +742,9 @@ function sendHardeningFailureNotification(state, reason) {
     );
     log("Hardening failure notification: GitHub issue created successfully");
   } catch (err) {
-    // Notification failure must not crash the watcher — log and continue.
+    // Notification failure must not crash the watcher -- log and continue.
     const msg = err instanceof Error ? err.message : String(err);
-    log(`Hardening failure notification: GitHub issue creation failed (${msg}) — check manually`);
+    log(`Hardening failure notification: GitHub issue creation failed (${msg}) -- check manually`);
   }
 }
 
@@ -813,29 +800,29 @@ function clearImplementationRunArtifacts() {
   // Each run must prove it produced fresh artifacts for the current issue.
   removeFileIfExists(IMPLEMENTATION_FILE);
   removeFileIfExists(IMPLEMENTATION_METADATA_FILE);
-  removeFileIfExists(CODEX_OUTPUT_FILE);
+  removeFileIfExists(CLAUDE_OUTPUT_FILE);
 }
 
-function recoverPlanArtifactFromCodexOutput(state) {
-  if (!fs.existsSync(RESEARCH_FILE) || !fs.existsSync(CODEX_OUTPUT_FILE)) {
+function recoverPlanArtifactFromClaudeOutput(state) {
+  if (!fs.existsSync(RESEARCH_FILE) || !fs.existsSync(CLAUDE_OUTPUT_FILE)) {
     return false;
   }
 
   // Only trust captured plan output that is at least as new as the current
   // research artifact; this avoids rehydrating a stale plan from a prior cycle.
-  if (statMtime(CODEX_OUTPUT_FILE) < statMtime(RESEARCH_FILE)) {
+  if (statMtime(CLAUDE_OUTPUT_FILE) < statMtime(RESEARCH_FILE)) {
     return false;
   }
 
   try {
-    const recoveredPlan = extractUsablePlanFromCodexOutput(readTextFile(CODEX_OUTPUT_FILE));
+    const recoveredPlan = extractUsablePlanFromClaudeOutput(readTextFile(CLAUDE_OUTPUT_FILE));
     if (!recoveredPlan) {
       return false;
     }
 
     persistPlanArtifact(recoveredPlan);
     writePlanMetadata(state);
-    log("Recovered reports/codex-plan.md from reports/codex-last-message.txt");
+    log("Recovered reports/claude-plan.md from reports/claude-last-message.txt");
     return true;
   } catch {
     return false;
@@ -847,7 +834,7 @@ function hasUsablePlanArtifactForState(state) {
     return false;
   }
 
-  if (!fs.existsSync(PLAN_FILE) && !recoverPlanArtifactFromCodexOutput(state)) {
+  if (!fs.existsSync(PLAN_FILE) && !recoverPlanArtifactFromClaudeOutput(state)) {
     return false;
   }
 
@@ -871,7 +858,7 @@ function hasUsablePlanArtifactForState(state) {
   }
 }
 
-function summarizeCodexStopReason(text) {
+function summarizeClaudeStopReason(text) {
   const lines = text
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -887,68 +874,68 @@ function summarizeCodexStopReason(text) {
     return line.replace(/\*\*/g, "");
   }
 
-  return "Codex stopped without applying the patch";
+  return "Claude stopped without applying the patch";
 }
 
-function detectCodexStopReason(text) {
+function detectClaudeStopReason(text) {
   const normalized = text.trim();
   if (!normalized) {
-    return "Codex exited without writing a final status message";
+    return "Claude exited without writing a final status message";
   }
 
   if (/^\*\*Stopped\*\*$/im.test(normalized) || /^Stopped$/im.test(normalized)) {
-    return summarizeCodexStopReason(normalized);
+    return summarizeClaudeStopReason(normalized);
   }
 
   if (/did not patch, switch branches, commit, or open a PR/i.test(normalized)) {
-    return "Codex stopped before patching, branching, committing, or opening a PR";
+    return "Claude stopped before patching, branching, committing, or opening a PR";
   }
 
   return null;
 }
 
 function validateImplementationRun(previousImplementationMtime, previousOutputMtime, issueSlug) {
-  const outputMtime = statMtime(CODEX_OUTPUT_FILE);
+  const outputMtime = statMtime(CLAUDE_OUTPUT_FILE);
   if (outputMtime <= previousOutputMtime) {
     return {
-      reason: "Codex run finished without refreshing reports/codex-last-message.txt",
+      reason: "Claude run finished without refreshing reports/claude-last-message.txt",
     };
   }
 
-  const outputText = readTextFile(CODEX_OUTPUT_FILE).trim();
-  const stopReason = detectCodexStopReason(outputText);
+  const outputText = readTextFile(CLAUDE_OUTPUT_FILE).trim();
+  const stopReason = detectClaudeStopReason(outputText);
   if (stopReason) {
     return {
       reason: stopReason,
       details: {
-        codex_output_excerpt: outputText.slice(0, 4000),
+        claude_output_excerpt: outputText.slice(0, 4000),
       },
     };
   }
 
   if (!fs.existsSync(IMPLEMENTATION_FILE)) {
     return {
-      reason: "Codex implementation finished without reports/codex-implementation.md",
+      reason: "Claude implementation finished without reports/claude-implementation.md",
     };
   }
 
   const implementationMtime = statMtime(IMPLEMENTATION_FILE);
   if (implementationMtime <= previousImplementationMtime) {
     return {
-      reason: "Codex run finished without updating reports/codex-implementation.md",
+      reason: "Claude run finished without updating reports/claude-implementation.md",
     };
   }
 
   const implementationText = readTextFile(IMPLEMENTATION_FILE).trim();
   if (!implementationText) {
     return {
-      reason: "Codex implementation wrote an empty reports/codex-implementation.md",
+      reason: "Claude implementation wrote an empty reports/claude-implementation.md",
     };
   }
 
   if (!isUsableImplementation(implementationText)) {
     return {
-      reason: "Codex implementation wrote an invalid reports/codex-implementation.md",
+      reason: "Claude implementation wrote an invalid reports/claude-implementation.md",
       details: {
         implementation_excerpt: implementationText.slice(0, 4000),
       },
@@ -957,7 +944,7 @@ function validateImplementationRun(previousImplementationMtime, previousOutputMt
 
   if (issueSlug && !checkOpenPR(issueSlug)) {
     return {
-      reason: `Codex implementation finished without an open non-draft PR for codex/${issueSlug}`,
+      reason: `Claude implementation finished without an open non-draft PR for ${buildAgentBranchName(issueSlug)}`,
     };
   }
 
@@ -967,7 +954,7 @@ function validateImplementationRun(previousImplementationMtime, previousOutputMt
 function failImplementation(state, reason, details = {}) {
   writeImplementationFailedState(state, reason, details);
   markImplementationFailed(state, reason);
-  log("Codex implementation failed - state IMPLEMENTATION_FAILED");
+  log("Claude implementation failed - state IMPLEMENTATION_FAILED");
   log(`  Reason: ${reason}`);
 }
 
@@ -998,6 +985,14 @@ function slugifyIssue(issue) {
     .slice(0, 48);
 }
 
+function buildAgentBranchName(issueSlug) {
+  const prefix =
+    typeof CONFIG.branchPrefix === "string" && CONFIG.branchPrefix.trim()
+      ? CONFIG.branchPrefix.trim().replace(/^\/+|\/+$/g, "")
+      : "claude";
+  return `${prefix}/${issueSlug}`;
+}
+
 function canSignalPid(pid) {
   try {
     process.kill(pid, 0);
@@ -1007,7 +1002,7 @@ function canSignalPid(pid) {
   }
 }
 
-// ── Write-only lock primitives ────────────────────────────────────────────────
+// ---- Write-only lock primitives ------------------------------------------------------------------------------------------------
 // The lock file is never deleted. Acquiring writes status:"running"; releasing
 // overwrites with status:"done". A lock is considered active only when:
 //   status === "running"  AND  owner process is alive  AND  not expired.
@@ -1084,9 +1079,9 @@ function withPipelineLock(label, fn) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ----------------------------------------------------------------------------------------------------------------------------------------------------------
 
-function runCodexPlanHardening(state) {
+function runClaudePlanHardening(state) {
   if (!fs.existsSync(RESEARCH_FILE)) {
     log("State is PLANNING but reports/copilot-research.md is missing");
     return;
@@ -1094,13 +1089,13 @@ function runCodexPlanHardening(state) {
 
   if (isHardeningBlockedForCurrentState(state)) {
     log(
-      "Codex plan hardening blocked - see reports/.codex-plan-hardening-blocked.json for resolution steps",
+      "Claude plan hardening blocked - see reports/.claude-plan-hardening-blocked.json for resolution steps",
     );
     return;
   }
 
-  withPipelineLock("codex-plan-hardening", () => {
-    log("PLANNING detected - running Codex plan hardening");
+  withPipelineLock("claude-plan-hardening", () => {
+    log("PLANNING detected - running Claude plan hardening");
 
     const prompt = [
       "Produce a hardened implementation contract. Follow all instructions in the TEMPLATE section exactly. Return only the plan markdown; no preamble and no prose outside the numbered sections.",
@@ -1113,11 +1108,11 @@ function runCodexPlanHardening(state) {
       "",
       `Issue: ${state.issue}`,
       "Input artifact: reports/copilot-research.md",
-      "Output artifact: reports/codex-plan.md",
-      "Write the exact artifact file reports/codex-plan.md.",
+      "Output artifact: reports/claude-plan.md",
+      "Write the exact artifact file reports/claude-plan.md.",
       "Do not attempt to edit any other files.",
       "Do not implement code.",
-      "Stop after writing reports/codex-plan.md.",
+      "Stop after writing reports/claude-plan.md.",
       "",
       "# RESEARCH REPORT",
       "",
@@ -1127,30 +1122,34 @@ function runCodexPlanHardening(state) {
     const currentRetryCount = readHardeningRetryCount();
     const nextRetryCount = currentRetryCount + 1;
 
-    const promptFile = path.join(REPO_ROOT, "reports", "codex-plan-prompt.tmp.md");
+    const promptFile = path.join(REPORTS_DIR, "claude-plan-prompt.tmp.md");
     fs.writeFileSync(promptFile, prompt, "utf8");
 
     try {
-      const cmd = buildCodexExecCommand(promptFile);
-
-      execSync(cmd, {
+      const result = spawnSync(getClaudeBinary(), buildClaudeExecArgs(), {
         cwd: REPO_ROOT,
-        shell: true,
         windowsHide: true,
         timeout: PLAN_TIMEOUT_MS,
-        stdio: ["ignore", "inherit", "inherit"],
+        input: prompt,
+        encoding: "utf8",
+        stdio: ["pipe", "inherit", "inherit"],
+        shell: process.platform === "win32",
       });
+
+      if (result.error || (result.status !== null && result.status !== 0)) {
+        throw result.error || new Error(`Claude exited with status ${result.status}`);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       writeHardeningBlockedState(state, message, nextRetryCount);
       if (nextRetryCount >= MAX_HARDENING_RETRIES) {
         log(
-          `Codex plan hardening failed after ${MAX_HARDENING_RETRIES} attempts - permanent block. Sending notification.`,
+          `Claude plan hardening failed after ${MAX_HARDENING_RETRIES} attempts - permanent block. Sending notification.`,
         );
         sendHardeningFailureNotification(state, message);
       } else {
         log(
-          `Codex plan hardening failed (attempt ${nextRetryCount}/${MAX_HARDENING_RETRIES}) - retry in 5 min. See reports/.codex-plan-hardening-blocked.json`,
+          `Claude plan hardening failed (attempt ${nextRetryCount}/${MAX_HARDENING_RETRIES}) - retry in 5 min. See reports/.claude-plan-hardening-blocked.json`,
         );
       }
       throw err;
@@ -1161,43 +1160,43 @@ function runCodexPlanHardening(state) {
     if (!fs.existsSync(PLAN_FILE)) {
       writeHardeningBlockedState(
         state,
-        "Codex failed to produce reports/codex-plan.md",
+        "Claude failed to produce reports/claude-plan.md",
         nextRetryCount,
       );
       if (nextRetryCount >= MAX_HARDENING_RETRIES) {
-        sendHardeningFailureNotification(state, "Codex failed to produce reports/codex-plan.md");
+        sendHardeningFailureNotification(state, "Claude failed to produce reports/claude-plan.md");
       }
-      throw new Error("Codex plan hardening failed to write reports/codex-plan.md");
+      throw new Error("Claude plan hardening failed to write reports/claude-plan.md");
     }
 
     const planText = readTextFile(PLAN_FILE).trim();
     if (!planText) {
-      writeHardeningBlockedState(state, "Codex wrote an empty plan", nextRetryCount);
+      writeHardeningBlockedState(state, "Claude wrote an empty plan", nextRetryCount);
       if (nextRetryCount >= MAX_HARDENING_RETRIES) {
-        sendHardeningFailureNotification(state, "Codex wrote an empty plan");
+        sendHardeningFailureNotification(state, "Claude wrote an empty plan");
       }
-      throw new Error("Codex plan hardening returned an empty plan");
+      throw new Error("Claude plan hardening returned an empty plan");
     }
 
     if (!isUsablePlan(planText)) {
       writeHardeningBlockedState(
         state,
-        "Codex returned a plan missing required plan sections",
+        "Claude returned a plan missing required plan sections",
         nextRetryCount,
       );
       if (nextRetryCount >= MAX_HARDENING_RETRIES) {
         sendHardeningFailureNotification(
           state,
-          "Codex returned a plan missing required plan sections",
+          "Claude returned a plan missing required plan sections",
         );
       }
-      throw new Error("Codex plan hardening returned invalid plan output");
+      throw new Error("Claude plan hardening returned invalid plan output");
     }
 
     clearHardeningBlockedState();
     writePlanMetadata(state);
-    markReadyForImplementation(state, "codex");
-    log("Codex plan hardening complete - state READY_FOR_IMPLEMENTATION");
+    markReadyForImplementation(state, "claude");
+    log("Claude plan hardening complete - state READY_FOR_IMPLEMENTATION");
   });
 }
 
@@ -1205,7 +1204,7 @@ function isImplementationAlreadyDone(state) {
   if (!fs.existsSync(IMPLEMENTATION_FILE)) {
     return false;
   }
-  // If the implementation file is newer than when the plan was hardened, Codex already
+  // If the implementation file is newer than when the plan was hardened, Claude already
   // completed this cycle. Protect against re-runs on every watcher restart.
   const implMtime = statMtime(IMPLEMENTATION_FILE);
   const hardened = Date.parse(state.plan_hardened_at ?? "");
@@ -1217,7 +1216,7 @@ function isImplementationAlreadyDone(state) {
   if (!metadata) {
     // Backward compatibility: older/in-flight cycles may have a valid implementation
     // artifact without metadata. Fall back to mtime-only behavior to avoid duplicate
-    // Codex runs and duplicate PR creation on watcher restart.
+    // Claude runs and duplicate PR creation on watcher restart.
     return true;
   }
 
@@ -1232,83 +1231,97 @@ function isImplementationAlreadyDone(state) {
   }
 }
 
-function runCodexImplementation(state) {
+function runClaudeImplementation(state) {
   if (!fs.existsSync(RESEARCH_FILE) || !fs.existsSync(PLAN_FILE)) {
     log("READY_FOR_IMPLEMENTATION requires both research and plan artifacts");
     return;
   }
 
   if (isImplementationAlreadyDone(state)) {
-    log("Codex implementation already complete for this cycle - marking IMPLEMENTATION_COMPLETE");
+    log("Claude implementation already complete for this cycle - marking IMPLEMENTATION_COMPLETE");
     markImplementationComplete(state);
     return;
   }
 
   const issueSlug = slugifyIssue(state.issue || "pipeline-issue");
-  const prompt = buildCodexImplementationPrompt({ issue: state.issue });
+  const prompt = buildClaudeImplementationPrompt({ issue: state.issue });
   const previousImplementationMtime = statMtime(IMPLEMENTATION_FILE);
-  const previousOutputMtime = statMtime(CODEX_OUTPUT_FILE);
+  const previousOutputMtime = statMtime(CLAUDE_OUTPUT_FILE);
 
-  withPipelineLock("codex-implementation", () => {
-    log("READY_FOR_IMPLEMENTATION detected - running Codex implementation");
+  withPipelineLock("claude-implementation", () => {
+    log("READY_FOR_IMPLEMENTATION detected - running Claude implementation");
     clearImplementationRunArtifacts();
     // Write the prompt to a temp file so we can feed it via stdin redirect
-    // without relying on execFileSync's `input` option, which triggers EINVAL
-    // on Windows when stdout/stderr are not inheritable (detached background process).
-    const promptFile = path.join(REPO_ROOT, "reports", "codex-prompt.tmp.md");
+    // Write prompt to temp file for debugging, then pass content via stdin.
+    const promptFile = path.join(REPORTS_DIR, "claude-prompt.tmp.md");
     fs.writeFileSync(promptFile, prompt, "utf8");
 
     try {
-      // execSync with shell:true lets Windows resolve codex.cmd and handle
-      // the stdin redirect operator (<) without needing inheritable file descriptors.
-      // --json disables the interactive TUI so codex can run in a detached
-      // background process (no console attached). Without it, codex crashes
+      // spawnSync with argument array avoids shell injection vulnerabilities.
+      // --json disables the interactive TUI so claude can run in a detached
+      // background process (no console attached). Without it, claude crashes
       // immediately with STATUS_CONTROL_C_EXIT (0xC000013A) on Windows.
       // --dangerously-bypass-approvals-and-sandbox already disables the sandbox,
       // so --sandbox workspace-write is redundant and removed to avoid conflict.
-      const cmd = buildCodexExecCommand(promptFile);
-
-      execSync(cmd, {
+      // shell: true only on Windows to resolve claude.cmd via PATH.
+      const result = spawnSync(getClaudeBinary(), buildClaudeExecArgs(), {
         cwd: REPO_ROOT,
-        shell: true,
         windowsHide: true,
-        timeout: CODEX_TIMEOUT_MS,
-        // stdin: "ignore" — the shell handles stdin via the < redirect in cmd.
-        // stdout/stderr: "inherit" — Codex output streams directly to the
+        timeout: CLAUDE_TIMEOUT_MS,
+        input: prompt,
+        encoding: "utf8",
+        // stdout/stderr: "inherit" -- Claude output streams directly to the
         // watcher's inherited log file descriptors (set by start-pipeline-runner.js
         // to logFd). This avoids buffering all output in memory, which would
-        // hit Node's default execSync maxBuffer limit on verbose Codex runs.
-        stdio: ["ignore", "inherit", "inherit"],
+        // hit Node's default execSync maxBuffer limit on verbose Claude runs.
+        stdio: ["pipe", "inherit", "inherit"],
+        shell: process.platform === "win32",
       });
+
+      if (result.error) {
+        throw result.error;
+      }
+      if (result.status !== null && result.status !== 0) {
+        throw new Error(`Claude exited with status ${result.status}`);
+      }
     } catch (error) {
       const outputText =
-        statMtime(CODEX_OUTPUT_FILE) > previousOutputMtime && fs.existsSync(CODEX_OUTPUT_FILE)
-          ? readTextFile(CODEX_OUTPUT_FILE).trim()
+        statMtime(CLAUDE_OUTPUT_FILE) > previousOutputMtime && fs.existsSync(CLAUDE_OUTPUT_FILE)
+          ? readTextFile(CLAUDE_OUTPUT_FILE).trim()
           : "";
-      const stopReason = outputText ? detectCodexStopReason(outputText) : null;
+      const stopReason = outputText ? detectClaudeStopReason(outputText) : null;
       const reason =
         stopReason ??
         (error instanceof Error
-          ? `Codex CLI invocation failed: ${error.message}`
-          : `Codex CLI invocation failed: ${String(error)}`);
+          ? `Claude CLI invocation failed: ${error.message}`
+          : `Claude CLI invocation failed: ${String(error)}`);
 
-      // Before recording failure, check whether Codex already created an open PR.
-      // When execSync hits the timeout (ETIMEDOUT), Codex may have finished all
-      // work — branch, commit, push, PR — but the wrapper expired before the
-      // watcher could validate. Treat an existing open PR as success so the
-      // pipeline advances to IMPLEMENTATION_COMPLETE rather than going dead-end.
+      // Before recording failure, check whether Claude already created an open PR.
+      // When execSync hits the timeout (ETIMEDOUT), Claude may have finished all
+      // work -- branch, commit, push, PR -- but the wrapper expired before the
+      // watcher could validate. Treat an existing open PR as success only if the
+      // implementation report exists and is valid, so the pipeline advances to
+      // IMPLEMENTATION_COMPLETE rather than going dead-end.
       const openPr = checkOpenPR(issueSlug);
       if (openPr) {
+        if (
+          fs.existsSync(IMPLEMENTATION_FILE) &&
+          isUsableImplementation(readTextFile(IMPLEMENTATION_FILE).trim())
+        ) {
+          log(
+            `Claude timed out but open PR #${openPr.number} exists for ${buildAgentBranchName(issueSlug)} with valid implementation report - treating as IMPLEMENTATION_COMPLETE`,
+          );
+          writeImplementationMetadata(state);
+          markImplementationComplete(state);
+          return;
+        }
         log(
-          `Codex execSync timed out but open PR #${openPr.number} exists for codex/${issueSlug} - treating as IMPLEMENTATION_COMPLETE`,
+          `Claude timed out and open PR #${openPr.number} exists but implementation report is missing or invalid - keeping recovery path active`,
         );
-        writeImplementationMetadata(state);
-        markImplementationComplete(state);
-        return;
       }
 
       failImplementation(state, reason, {
-        codex_output_excerpt: outputText.slice(0, 4000),
+        claude_output_excerpt: outputText.slice(0, 4000),
       });
       return;
     } finally {
@@ -1332,33 +1345,33 @@ function runCodexImplementation(state) {
     writeImplementationMetadata(state);
 
     markImplementationComplete(state);
-    log("Codex implementation run complete - state IMPLEMENTATION_COMPLETE");
+    log("Claude implementation run complete - state IMPLEMENTATION_COMPLETE");
   });
 }
 
-// Recovery path: Codex created a branch + PR but exited before writing the report.
-// Runs a targeted Codex session on the existing branch to write only the report,
+// Recovery path: Claude created a branch + PR but exited before writing the report.
+// Runs a targeted Claude session on the existing branch to write only the report,
 // then commits and pushes it so the watcher can advance to IMPLEMENTATION_COMPLETE.
 // Called from evaluatePipeline() when state is IMPLEMENTATION_FAILED with the
 // specific REASON_NO_IMPL_REPORT reason and an open PR is confirmed.
 function runReportRecovery(state, issueSlug, prNumber) {
   withPipelineLock("report-recovery", () => {
+    const branchName = buildAgentBranchName(issueSlug);
     log(
-      `Report-only recovery: PR #${prNumber} exists for codex/${issueSlug} but implementation report is missing`,
+      `Report-only recovery: PR #${prNumber} exists for ${branchName} but implementation report is missing`,
     );
 
-    // Build a short, focused prompt — avoids the context exhaustion that caused the original failure.
-    const branchName = `codex/${issueSlug}`;
+    // Build a short, focused prompt -- avoids the context exhaustion that caused the original failure.
     const prompt = [
-      "You are recovering from a Codex pipeline failure. The code changes are already committed",
+      "You are recovering from a Claude pipeline failure. The code changes are already committed",
       `on branch '${branchName}' and PR #${prNumber} is open. The only missing artifact is`,
-      "'reports/codex-implementation.md'.",
+      "'reports/claude-implementation.md'.",
       "",
       "Your ONLY task:",
       `1. Run: git checkout ${branchName}`,
       "2. Read the git diff on this branch: git diff main...HEAD -- (look at changed files)",
-      "3. Read reports/codex-plan.md to understand the issue and contract",
-      "4. Write reports/codex-implementation.md with ALL seven required sections:",
+      "3. Read reports/claude-plan.md to understand the issue and contract",
+      "4. Write reports/claude-implementation.md with ALL seven required sections:",
       "   - Issue summary",
       "   - Root cause implemented",
       "   - Exact files changed",
@@ -1366,35 +1379,42 @@ function runReportRecovery(state, issueSlug, prNumber) {
       "   - Reports generated",
       "   - Remaining risks",
       "   - Any contract ambiguities resolved during implementation",
-      "5. Stage and commit the report: git add reports/codex-implementation.md && git commit -m 'docs: add missing implementation report'",
+      "5. Stage and commit the report: git add reports/claude-implementation.md && git commit -m 'docs: add missing implementation report'",
       "6. Push: git push",
       "",
       "Do NOT re-implement any code. Do NOT create a new PR. Do NOT modify any files except",
-      "reports/codex-implementation.md.",
+      "reports/claude-implementation.md.",
       "",
       `Current issue: ${state.issue}`,
     ].join("\n");
 
-    const promptFile = path.join(REPO_ROOT, "reports", "codex-report-recovery.tmp.md");
+    const promptFile = path.join(REPORTS_DIR, "claude-report-recovery.tmp.md");
     fs.writeFileSync(promptFile, prompt, "utf8");
 
     const previousImplementationMtime = statMtime(IMPLEMENTATION_FILE);
-    const previousOutputMtime = statMtime(CODEX_OUTPUT_FILE);
+    const previousOutputMtime = statMtime(CLAUDE_OUTPUT_FILE);
 
     try {
-      const cmd = buildCodexExecCommand(promptFile);
-
-      execSync(cmd, {
+      const result = spawnSync(getClaudeBinary(), buildClaudeExecArgs(), {
         cwd: REPO_ROOT,
-        shell: true,
         windowsHide: true,
-        timeout: 300000, // 5 min — short task, just the report
-        stdio: ["ignore", "inherit", "inherit"],
+        timeout: 300000, // 5 min -- short task, just the report
+        input: prompt,
+        encoding: "utf8",
+        stdio: ["pipe", "inherit", "inherit"],
+        shell: process.platform === "win32",
       });
+
+      if (result.error) {
+        throw result.error;
+      }
+      if (result.status !== null && result.status !== 0) {
+        throw new Error(`Claude exited with status ${result.status}`);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      log(`Report recovery Codex session failed: ${message}`);
-      // Do not flip to IMPLEMENTATION_FAILED again — the PR still exists and
+      log(`Report recovery Claude session failed: ${message}`);
+      // Do not flip to IMPLEMENTATION_FAILED again -- the PR still exists and
       // the failure is logged. The watcher will retry on the next cycle.
       return;
     } finally {
@@ -1412,7 +1432,7 @@ function runReportRecovery(state, issueSlug, prNumber) {
     );
     if (validationFailure) {
       log(`Report recovery completed but validation still fails: ${validationFailure.reason}`);
-      log("Manual intervention required: write reports/codex-implementation.md by hand.");
+      log("Manual intervention required: write reports/claude-implementation.md by hand.");
       return;
     }
 
@@ -1423,8 +1443,8 @@ function runReportRecovery(state, issueSlug, prNumber) {
   });
 }
 
-// Returns true when the Codex last-message text indicates an intentional stop-before-patch.
-// Originally required all three patterns, but when Codex creates a branch solely to commit
+// Returns true when the Claude last-message text indicates an intentional stop-before-patch.
+// Originally required all three patterns, but when Claude creates a branch solely to commit
 // a stop report (no code changed), the "no branch was created" pattern never fires.
 // Two-pattern match (no-files-changed + no-PR-opened) is sufficient to identify a stop.
 function detectStopBeforePatch(text) {
@@ -1433,18 +1453,18 @@ function detectStopBeforePatch(text) {
   return STOP_BEFORE_PATCH_PATTERNS[0].test(text) && STOP_BEFORE_PATCH_PATTERNS[2].test(text);
 }
 
-// Recovery for the case where Codex stopped (contract/reality conflict) before creating
-// a branch, PR, or implementation report. Synthesises codex-implementation.md directly
-// from the Codex stop message — no AI invocation required — then archives the cycle
+// Recovery for the case where Claude stopped (contract/reality conflict) before creating
+// a branch, PR, or implementation report. Synthesises claude-implementation.md directly
+// from the Claude stop message -- no AI invocation required -- then archives the cycle
 // and resets the pipeline to IDLE so the human can revise the plan and re-queue.
 function synthesizeStopReport(state, issueSlug) {
   withPipelineLock("stop-report-synthesis", () => {
-    const stopMessage = fs.existsSync(CODEX_OUTPUT_FILE)
-      ? readTextFile(CODEX_OUTPUT_FILE).trim()
+    const stopMessage = fs.existsSync(CLAUDE_OUTPUT_FILE)
+      ? readTextFile(CLAUDE_OUTPUT_FILE).trim()
       : "";
 
     log(
-      "Stop-report synthesis: Codex stopped before implementation — synthesising report, archiving cycle",
+      "Stop-report synthesis: Claude stopped before implementation -- synthesising report, archiving cycle",
     );
 
     const stopExcerpt = stopMessage.slice(0, 2000);
@@ -1457,49 +1477,49 @@ function synthesizeStopReport(state, issueSlug) {
       ``,
       `## Issue summary`,
       ``,
-      `${state.issue ?? "Unknown issue"} — Codex stopped before implementation due to a`,
+      `${state.issue ?? "Unknown issue"} -- Claude stopped before implementation due to a`,
       `contract/reality conflict. No code was changed.`,
       ``,
       `## Root cause implemented`,
       ``,
-      `Not implemented. Codex identified a conflict between the implementation contract and`,
+      `Not implemented. Claude identified a conflict between the implementation contract and`,
       `the current repository state and stopped before making any code changes.`,
       `See "Remaining risks" for the specific conflict.`,
       ``,
       `## Exact files changed`,
       ``,
-      `None — Codex stopped before code changes. No branch was created, no commit was made,`,
+      `None -- Claude stopped before code changes. No branch was created, no commit was made,`,
       `and no PR was opened.`,
       ``,
       `## Tests run`,
       ``,
-      `None — stopped before code changes.`,
+      `None -- stopped before code changes.`,
       ``,
       `## Reports generated`,
       ``,
-      `None — stopped before code changes. This stop report was synthesised by the pipeline`,
+      `None -- stopped before code changes. This stop report was synthesised by the pipeline`,
       `watcher to unblock the next planning cycle.`,
       ``,
       `## Remaining risks`,
       ``,
-      `The implementation contract could not be applied as written. Codex stop message:`,
+      `The implementation contract could not be applied as written. Claude stop message:`,
       ``,
       `\`\`\``,
-      stopExcerpt || "(Codex output not available)",
+      stopExcerpt || "(Claude output not available)",
       `\`\`\``,
       ``,
       `The plan must be revised before the next implementation attempt to address this conflict.`,
       ``,
       `## Any contract ambiguities resolved during implementation`,
       ``,
-      `The contract was not ambiguous — it conflicted with the repository's actual execution`,
+      `The contract was not ambiguous -- it conflicted with the repository's actual execution`,
       `path. No ambiguities were resolved because implementation was halted. The conflict`,
       `should be addressed in the next planning cycle by revising the contract.`,
     ].join("\n");
 
     // Write the implementation report so it is preserved in the cycle archive.
     fs.writeFileSync(IMPLEMENTATION_FILE, `${implContent}\n`, "utf8");
-    log("Stop-report synthesis: wrote reports/codex-implementation.md");
+    log("Stop-report synthesis: wrote reports/claude-implementation.md");
 
     archiveCycleArtifacts(issueSlug);
     clearImplementationFailedState();
@@ -1509,12 +1529,12 @@ function synthesizeStopReport(state, issueSlug) {
       .replace(/\r?\n+/g, " ")
       .trim();
     markIdle(
-      `Codex stopped (contract conflict) for: ${state.issue}. Stop reason: ${stopSummary}. ` +
+      `Claude stopped (contract conflict) for: ${state.issue}. Stop reason: ${stopSummary}. ` +
         `Revise the plan and re-queue a new /research-and-plan issue.`,
     );
 
     log(
-      "Stop-report synthesis complete — pipeline reset to IDLE. Revise the contract before re-queuing.",
+      "Stop-report synthesis complete -- pipeline reset to IDLE. Revise the contract before re-queuing.",
     );
   });
 }
@@ -1522,7 +1542,7 @@ function synthesizeStopReport(state, issueSlug) {
 // Deletes the remote and local stop-report branch so the next run for the same
 // issue slug can create a fresh branch without collision.
 function cleanupStopBranch(issueSlug) {
-  const branchName = `codex/${issueSlug}`;
+  const branchName = buildAgentBranchName(issueSlug);
   try {
     execSync(`git push origin --delete "${branchName}"`, {
       cwd: REPO_ROOT,
@@ -1534,7 +1554,7 @@ function cleanupStopBranch(issueSlug) {
     });
     log(`Deleted remote stop-report branch ${branchName}`);
   } catch {
-    // Branch may not exist remotely — ignore
+    // Branch may not exist remotely -- ignore
   }
   try {
     const currentBranch = execSync("git rev-parse --abbrev-ref HEAD", {
@@ -1564,22 +1584,22 @@ function cleanupStopBranch(issueSlug) {
     });
     log(`Deleted local stop-report branch ${branchName}`);
   } catch {
-    // Branch may not exist locally — ignore
+    // Branch may not exist locally -- ignore
   }
 }
 
 // Detects when Copilot has written a new research file while the pipeline is already
 // past the planning phase (READY_FOR_IMPLEMENTATION / IMPLEMENTATION_COMPLETE /
 // IMPLEMENTATION_FAILED). A changed research hash compared to what plan metadata
-// recorded means a new issue cycle started — the old cycle should be treated as
+// recorded means a new issue cycle started -- the old cycle should be treated as
 // complete. Archives old artifacts and resets state to RESEARCHING so the fresh
 // research flows cleanly through plan hardening and implementation.
 //
 // NOT triggered for IDLE, RESEARCHING, or PLANNING states:
-//   IDLE        — the pipeline is already waiting for a new cycle.
-//   RESEARCHING — a new research write is expected and normal.
-//   PLANNING    — hasUsablePlanArtifactForState() already detects hash mismatches
-//                 and re-runs Codex plan hardening automatically.
+//   IDLE        -- the pipeline is already waiting for a new cycle.
+//   RESEARCHING -- a new research write is expected and normal.
+//   PLANNING    -- hasUsablePlanArtifactForState() already detects hash mismatches
+//                 and re-runs Claude plan hardening automatically.
 function checkForResearchCycleChange(state) {
   if (!state || !fs.existsSync(RESEARCH_FILE)) {
     return false;
@@ -1606,7 +1626,7 @@ function checkForResearchCycleChange(state) {
   }
 
   log(
-    `New research cycle detected for issue "${state.issue}": research hash changed — archiving old cycle and restarting from RESEARCHING`,
+    `New research cycle detected for issue "${state.issue}": research hash changed -- archiving old cycle and restarting from RESEARCHING`,
   );
   const issueSlug = slugifyIssue(state.issue || "pipeline-issue");
   archiveCycleArtifacts(issueSlug, { includeResearch: false });
@@ -1627,7 +1647,7 @@ function checkForResearchCycleChange(state) {
 }
 
 function evaluatePipeline() {
-  // Check for a manual reset request first — this takes priority over all other
+  // Check for a manual reset request first -- this takes priority over all other
   // state handling so that a stuck IMPLEMENTATION_FAILED cycle can always be cleared.
   if (fs.existsSync(PIPELINE_RESET_FILE)) {
     removeFileIfExists(PIPELINE_RESET_FILE);
@@ -1651,8 +1671,8 @@ function evaluatePipeline() {
   }
 
   // RESEARCHING is set by Copilot while it writes the research artifact. The watcher
-  // has no role during that window — but once copilot-research.md exists and is non-empty
-  // it must advance the state to PLANNING so Codex plan hardening can run. Without this
+  // has no role during that window -- but once copilot-research.md exists and is non-empty
+  // it must advance the state to PLANNING so Claude plan hardening can run. Without this
   // handler the pipeline stalls silently: the watcher falls through all branches,
   // logs nothing, and never triggers hardening. (Bug surfaced 2026-05-23.)
   if (state.state === "RESEARCHING") {
@@ -1724,7 +1744,7 @@ function evaluatePipeline() {
     }
 
     if (!hasUsablePlanArtifactForState(state)) {
-      runCodexPlanHardening(state);
+      runClaudePlanHardening(state);
       return;
     }
 
@@ -1739,20 +1759,20 @@ function evaluatePipeline() {
       return;
     }
 
-    runCodexImplementation(state);
+    runClaudeImplementation(state);
     return;
   }
 
   if (state.state === "IDLE") {
     // If a fresh research file appeared after we idled, log a hint. The pipeline cannot
-    // auto-advance without a known issue title — that requires the state file to be
+    // auto-advance without a known issue title -- that requires the state file to be
     // updated externally (by Copilot or the user) with state RESEARCHING and the new issue.
     if (fs.existsSync(RESEARCH_FILE)) {
       const idledAt = Date.parse(state.idled_at ?? "");
       const researchMtime = statMtime(RESEARCH_FILE);
       if (!Number.isFinite(idledAt) || researchMtime > idledAt) {
         log(
-          "IDLE — fresh research file detected (newer than last idle timestamp); waiting for workflow state to advance to RESEARCHING",
+          "IDLE -- fresh research file detected (newer than last idle timestamp); waiting for workflow state to advance to RESEARCHING",
         );
         return;
       }
@@ -1763,11 +1783,10 @@ function evaluatePipeline() {
 
   if (state.state === "IMPLEMENTATION_COMPLETE") {
     const issueSlug = slugifyIssue(state.issue || "pipeline-issue");
+    const branchName = buildAgentBranchName(issueSlug);
     const merged = checkMergedPR(issueSlug, state.plan_hardened_at);
     if (merged) {
-      log(
-        `PR #${merged.number} for codex/${issueSlug} merged at ${merged.mergedAt} - closing cycle`,
-      );
+      log(`PR #${merged.number} for ${branchName} merged at ${merged.mergedAt} - closing cycle`);
       archiveCycleArtifacts(issueSlug);
       clearImplementationFailedState();
       markIdle(`PR #${merged.number} merged for: ${state.issue}`);
@@ -1775,40 +1794,41 @@ function evaluatePipeline() {
     }
 
     // If there is no open PR and both the implementation report and the actual git
-    // diff confirm no code was changed, Codex stopped before patching (contract conflict).
+    // diff confirm no code was changed, Claude stopped before patching (contract conflict).
     // Auto-reset so the pipeline does not stall waiting for a PR merge that will never
-    // arrive. isReportOnlyBranch() is the authoritative guard — isNoCodeChangeReport()
+    // arrive. isReportOnlyBranch() is the authoritative guard -- isNoCodeChangeReport()
     // is a fast pre-filter that avoids the git invocation in the common (PR exists) path.
     const openPr = checkOpenPR(issueSlug);
     if (!openPr && isNoCodeChangeReport() && isReportOnlyBranch(issueSlug)) {
       log(
-        `No open or merged PR for codex/${issueSlug}, implementation report and git diff both confirm no code changes — archiving stop-report cycle and resetting`,
+        `No open or merged PR for ${branchName}, implementation report and git diff both confirm no code changes -- archiving stop-report cycle and resetting`,
       );
       archiveCycleArtifacts(issueSlug);
       cleanupStopBranch(issueSlug);
       clearImplementationFailedState();
       markIdle(
-        `Codex stopped (no code changes) for: ${state.issue} — revise the plan and re-queue`,
+        `Claude stopped (no code changes) for: ${state.issue} -- revise the plan and re-queue`,
       );
       return;
     }
 
     if (!openPr) {
-      log(`Pipeline cycle complete - waiting for a normal open PR for codex/${issueSlug}`);
+      log(`Pipeline cycle complete - waiting for a normal open PR for ${branchName}`);
       return;
     }
 
-    log(`Pipeline cycle complete - PR #${openPr.number} open for codex/${issueSlug}, waiting for merge`);
+    log(`Pipeline cycle complete - PR #${openPr.number} open for ${branchName}, waiting for merge`);
     return;
   }
 
   if (state.state === "IMPLEMENTATION_FAILED") {
     const issueSlug = slugifyIssue(state.issue || "pipeline-issue");
+    const branchName = buildAgentBranchName(issueSlug);
 
     // Allow a manually merged PR to close the loop even after a recorded failure.
     const merged = checkMergedPR(issueSlug, state.plan_hardened_at);
     if (merged) {
-      log(`PR #${merged.number} for codex/${issueSlug} merged despite failure - closing cycle`);
+      log(`PR #${merged.number} for ${branchName} merged despite failure - closing cycle`);
       archiveCycleArtifacts(issueSlug);
       clearImplementationFailedState();
       markIdle(`PR #${merged.number} merged for: ${state.issue}`);
@@ -1817,7 +1837,7 @@ function evaluatePipeline() {
 
     const openPr = checkOpenPR(issueSlug);
     if (openPr) {
-      // Special case: Codex wrote the code + PR but skipped the implementation report.
+      // Special case: Claude wrote the code + PR but skipped the implementation report.
       // Advancing directly to IMPLEMENTATION_COMPLETE would bypass the report requirement.
       // Instead, run a short targeted recovery session to write the report onto the branch.
       if (state.implementation_failure_reason === REASON_NO_IMPL_REPORT) {
@@ -1829,27 +1849,27 @@ function evaluatePipeline() {
       }
 
       // For any other failure reason (e.g. timeout after all work completed), an open PR
-      // means Codex finished before the execSync wrapper expired — safe to advance.
+      // means Claude finished before the execSync wrapper expired -- safe to advance.
       log(
-        `Open PR #${openPr.number} found for codex/${issueSlug} despite recorded failure - advancing to IMPLEMENTATION_COMPLETE`,
+        `Open PR #${openPr.number} found for ${branchName} despite recorded failure - advancing to IMPLEMENTATION_COMPLETE`,
       );
       clearImplementationFailedState();
       markImplementationComplete(state);
       return;
     }
 
-    // No open PR and no merged PR. Check whether Codex intentionally stopped before
+    // No open PR and no merged PR. Check whether Claude intentionally stopped before
     // creating a branch (contract/reality conflict). If all three stop-before-patch
-    // markers are present in the last Codex output, synthesise the implementation
+    // markers are present in the last Claude output, synthesise the implementation
     // report locally and reset the pipeline to IDLE so the human can revise the plan.
     // This prevents the pipeline from stalling indefinitely on a legitimate stop.
     if (state.implementation_failure_reason === REASON_NO_IMPL_REPORT) {
-      const lastMessage = fs.existsSync(CODEX_OUTPUT_FILE)
-        ? readTextFile(CODEX_OUTPUT_FILE).trim()
+      const lastMessage = fs.existsSync(CLAUDE_OUTPUT_FILE)
+        ? readTextFile(CLAUDE_OUTPUT_FILE).trim()
         : "";
       if (detectStopBeforePatch(lastMessage)) {
         log(
-          "Codex stopped before creating a branch or PR — running stop-report synthesis to unblock pipeline",
+          "Claude stopped before creating a branch or PR -- running stop-report synthesis to unblock pipeline",
         );
         synthesizeStopReport(state, issueSlug);
         return;
@@ -1879,38 +1899,51 @@ function pollPipeline() {
   }
 }
 
-function checkCodexAvailability() {
+function checkClaudeAvailability() {
   try {
-    const output = execSync(buildCodexVersionCommand(), {
+    const result = spawnSync(getClaudeBinary(), buildClaudeVersionArgs(), {
       cwd: REPO_ROOT,
-      shell: true,
       windowsHide: true,
-      stdio: ["ignore", "pipe", "pipe"],
       timeout: 10000,
       encoding: "utf8",
-    }).trim();
-    log(`Codex CLI health check passed (${output || getCodexBinary()})`);
+      shell: process.platform === "win32",
+    });
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    // Fail if process exited with non-zero status or was terminated by signal
+    if (result.status !== 0 || result.signal) {
+      const statusMsg = result.signal
+        ? `terminated by signal ${result.signal}`
+        : `exited with status ${result.status}`;
+      throw new Error(`Claude CLI ${statusMsg}`);
+    }
+
+    const output = (result.stdout || "").trim();
+    log(`Claude CLI health check passed (${output || getClaudeBinary()})`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log(
-      `WARNING: Codex CLI health check failed - plan hardening will be blocked on PLANNING state`,
+      `WARNING: Claude CLI health check failed - plan hardening will be blocked on PLANNING state`,
     );
     log(`  Reason: ${message}`);
-    log(`  Fix: ensure 'codex' CLI is installed and available on PATH`);
+    log(`  Fix: ensure 'claude' CLI is installed and available on PATH`);
   }
 }
 
 function startPipelineWatcher() {
   log("Pipeline watcher started");
-  checkCodexAvailability();
+  checkClaudeAvailability();
   setInterval(pollPipeline, POLL_INTERVAL_MS);
 }
 
 export {
-  extractUsablePlanFromCodexOutput,
-  buildCodexImplementationPrompt,
-  buildCodexExecCommand,
-  buildCodexVersionCommand,
+  extractUsablePlanFromClaudeOutput,
+  buildClaudeImplementationPrompt,
+  buildClaudeExecArgs,
+  buildClaudeVersionArgs,
   isActivePhaseUpdatePath,
   selectOpenReadyPR,
 };
@@ -1924,7 +1957,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
       try {
         currentState = readJson(STATE_FILE);
       } catch {
-        // Corrupt state file — allow the reset so the user can recover.
+        // Corrupt state file -- allow the reset so the user can recover.
       }
       if (currentState?.editing_locked === true) {
         console.error(
@@ -1937,7 +1970,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
         process.exit(1);
       }
     }
-    // Write the reset sentinel and exit immediately — the running watcher will
+    // Write the reset sentinel and exit immediately -- the running watcher will
     // pick it up on the next poll cycle (within 5 seconds).
     ensureReportsDir();
     fs.writeFileSync(

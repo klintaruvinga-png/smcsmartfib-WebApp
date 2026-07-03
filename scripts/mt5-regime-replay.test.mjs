@@ -15,7 +15,9 @@ describe("MT5 regime dispatch parity guard", () => {
     expect(marketDataEngine).toContain("regimeCycleInterval");
 
     // Verify RegimeEngine computes HTF bias (EMA-based D1 classification)
-    expect(regimeEngine).toContain("bool ComputeRegimeState(string symbol, RegimeSnapshotOut& out)");
+    expect(regimeEngine).toContain(
+      "bool ComputeRegimeState(string symbol, RegimeSnapshotOut& out)",
+    );
     expect(regimeEngine).toContain("ComputeEMA(d1Close, d1Bars, EMA_PERIOD)");
     expect(regimeEngine).toContain('htfBias = "BULL"');
     expect(regimeEngine).toContain('htfBias = "BEAR"');
@@ -39,7 +41,7 @@ describe("MT5 regime dispatch parity guard", () => {
 
     // Verify JSON payload structure for backend dispatch
     expect(regimeEngine).toContain("BuildBatchPayload");
-    expect(regimeEngine).toContain('string arr = "["');
+    expect(marketDataEngine).toContain('"{\\"regimes\\":" + batchJson + "}"');
     expect(regimeEngine).toContain('\\"symbol\\"');
     expect(regimeEngine).toContain('\\"htf_bias\\"');
     expect(regimeEngine).toContain('\\"ltf_regime\\"');
@@ -52,8 +54,8 @@ describe("MT5 regime dispatch parity guard", () => {
     // Expected: ER-14 H1 = 0.28 → TRENDING (< 0.35)
     const snapshot = {
       symbol: "EURUSD",
-      ema20D1: 1.0850,
-      closeD1: 1.0920,
+      ema20D1: 1.085,
+      closeD1: 1.092,
       er14H1: 0.28,
       atr14H1: 0.0042,
     };
@@ -120,19 +122,37 @@ describe("MT5 regime dispatch parity guard", () => {
   });
 
   it("pins the backend regime ingestion contract", async () => {
-    const regimeEngine = await readFile(new URL("../mt5/RegimeEngine.mqh", import.meta.url), "utf8");
+    const [marketDataEngine, wordpressPlugin, routeRegistrar] = await Promise.all([
+      readFile(new URL("../mt5/MarketDataEngine.mqh", import.meta.url), "utf8"),
+      readFile(
+        new URL("../wordpress/smc-superfib-sniper/smc-superfib-sniper.php", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../wordpress/smc-superfib-sniper/class-route-registrar.php", import.meta.url),
+        "utf8",
+      ),
+    ]);
 
-    // Verify POST endpoint contract
-    expect(regimeEngine).toContain("POST /ea/regime-snapshot");
-    expect(regimeEngine).toContain("BuildBatchPayload");
-    expect(regimeEngine).toContain('string arr = "["');
+    // Verify POST endpoint contract: MT5 builds the real URL
+    expect(marketDataEngine).toContain('baseUrl + "/ea/regime-snapshot"');
+    expect(marketDataEngine).toContain('"{\\\"regimes\\\":" + batchJson + "}"');
 
-    // Verify validation constraints
-    expect(regimeEngine).toContain("BULL");
-    expect(regimeEngine).toContain("BEAR");
-    expect(regimeEngine).toContain("TRANSITIONAL");
-    expect(regimeEngine).toContain("TRENDING");
-    expect(regimeEngine).toContain("RANGING");
-    expect(regimeEngine).toContain("CHOP");
+    // Verify route registration wires the correct path, method, and callback
+    expect(routeRegistrar).toContain("array('path' => '/ea/regime-snapshot', 'methods' => WP_REST_Server::CREATABLE, 'callback' => 'post_ea_regime_snapshot', 'permission' => 'ea_bridge')");
+
+    // Verify handler function exists
+    expect(wordpressPlugin).toContain("public function post_ea_regime_snapshot(WP_REST_Request $request)");
+
+    // Verify payload validation gate: regimes array is required
+    expect(wordpressPlugin).toContain("if (!is_array($payload) || !isset($payload['regimes']) || !is_array($payload['regimes']))");
+    expect(wordpressPlugin).toContain("new WP_Error('invalid_payload', 'regimes array required'");
+
+    // Verify validation constraints: actual array declarations
+    expect(wordpressPlugin).toContain("$valid_bias    = array('BULL', 'BEAR', 'TRANSITIONAL')");
+    expect(wordpressPlugin).toContain("$valid_regimes = array('TRENDING', 'RANGING', 'CHOP')");
+
+    // Verify validation gate: actual in_array check
+    expect(wordpressPlugin).toContain("!in_array($htf_bias, $valid_bias, true) || !in_array($ltf_regime, $valid_regimes, true)");
   });
 });

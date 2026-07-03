@@ -102,7 +102,7 @@ export function useSnapshot() {
   // Prevents orphaned queries and race conditions during initialization.
   const enabled = backendReady && pollMs !== null;
   useLivePollingDiagnostics("SNAPSHOT_POLL", backendReady, pendingSettingsLoad, pollMs);
-  
+
   // CANONICAL FEED: Conditional placeholder guard — disable when any price is stale.
   // When backend signals state !== 'live', force a fresh fetch instead of showing stale via placeholder.
   return useQuery({
@@ -113,7 +113,7 @@ export function useSnapshot() {
     structuralSharing: false,
     placeholderData: (previousData) => {
       // If previous data has any non-live prices, don't use placeholder (force fresh fetch)
-      if (previousData?.prices?.some((p: PairPrice) => p.state !== 'live')) {
+      if (previousData?.prices?.some((p: PairPrice) => p.state !== "live")) {
         return undefined;
       }
       return keepPreviousData(previousData);
@@ -123,12 +123,12 @@ export function useSnapshot() {
   });
 }
 
-export function useDisplaySignals(boardSize: 3 | 5 | 10 = 3, scope?: 'watchlist' | 'global') {
+export function useDisplaySignals(boardSize: 3 | 5 | 10 = 3, scope?: "watchlist" | "global") {
   const { backendReady, pollMs } = usePollingQueryState();
   // CRITICAL: Only enable query when backend is ready AND pollMs is valid (not null).
   const enabled = backendReady && pollMs !== null;
   return useQuery({
-    queryKey: ["live-signals", boardSize, scope ?? 'watchlist'],
+    queryKey: ["live-signals", boardSize, scope ?? "watchlist"],
     queryFn: () => apiClient.getDisplaySignals(false, boardSize, scope),
     enabled,
     staleTime: 0,
