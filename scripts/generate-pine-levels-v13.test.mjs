@@ -3,9 +3,12 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createRequire } from "node:module";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const generatorPath = path.join(repoRoot, "scripts", "generate-pine-levels-v13.cjs");
+const require = createRequire(import.meta.url);
+const { bucketStartMs } = require(generatorPath);
 
 function writeShortMonthlyHistoryFixture() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "smc-pine-partial-htf-"));
@@ -239,14 +242,6 @@ describe("generate-pine-levels-v13.cjs output contract", () => {
   });
 
   test("rounds jittered M15 source times before assigning aggregation buckets", () => {
-    const source = readGenerator();
-    const helperStart = source.includes("function roundToNearestMinuteMs")
-      ? source.indexOf("function roundToNearestMinuteMs")
-      : source.indexOf("function bucketStartMs");
-    const helperEnd = source.indexOf("function aggregateCandles");
-    const helperSource = source.slice(helperStart, helperEnd);
-    const bucketStartMs = Function(`${helperSource}; return bucketStartMs;`)();
-
     const bucketIso = (iso) => new Date(bucketStartMs(Date.parse(iso), "M15")).toISOString();
 
     expect(bucketIso("2026-06-04T11:44:58Z")).toBe("2026-06-04T11:45:00.000Z");

@@ -4,8 +4,8 @@
   "source": "local-candles-pine-v13-compatible",
   "authority": "NOT a live TradingView/Pine export - locally computed Pine v13-compatible reference",
   "generated_at": "2026-07-02T00:00:00.000Z",
-  "candle_dir": "C:\\Users\\Kudzie\\OneDrive\\SS - Apps & Software\\SMC SuperFib Dashboard\\smcsmartfib-WebApp\\data",
-  "mt5_file": "C:\\Users\\Kudzie\\OneDrive\\SS - Apps & Software\\SMC SuperFib Dashboard\\smcsmartfib-WebApp\\reports\\phase4-parity\\mt5-levels.json",
+  "candle_dir": "data",
+  "mt5_file": "reports/phase4-parity/mt5-levels.json",
   "mt5_mtime": "2026-07-02T06:07:27.673Z",
   "source_timeframe": "M15",
   "helper_feed_ladder": {

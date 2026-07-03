@@ -14,7 +14,7 @@ Enable traders to monitor positions, execute trades, and analyze market data—a
 smart, sleek, clean
 
 ## Anti‑references
-Avoid overly colorful or cluttered interfaces; aim for a simple green‑white‑red light theme with a complementary dark theme.
+Avoid overly colorful or cluttered interfaces. The design system uses a dark-mode baseline with gold accents (see DESIGN.md) rather than a light theme.
 
 ## Design Principles
 - **Clarity** – information is clear and easy to understand.
