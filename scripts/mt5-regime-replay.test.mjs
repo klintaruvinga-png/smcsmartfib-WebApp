@@ -122,26 +122,37 @@ describe("MT5 regime dispatch parity guard", () => {
   });
 
   it("pins the backend regime ingestion contract", async () => {
-    const [marketDataEngine, wordpressPlugin] = await Promise.all([
+    const [marketDataEngine, wordpressPlugin, routeRegistrar] = await Promise.all([
       readFile(new URL("../mt5/MarketDataEngine.mqh", import.meta.url), "utf8"),
       readFile(
         new URL("../wordpress/smc-superfib-sniper/smc-superfib-sniper.php", import.meta.url),
         "utf8",
       ),
+      readFile(
+        new URL("../wordpress/smc-superfib-sniper/class-route-registrar.php", import.meta.url),
+        "utf8",
+      ),
     ]);
 
-    // Verify POST endpoint contract
-    expect(marketDataEngine).toContain("POST regime snapshots");
-    expect(marketDataEngine).toContain('"{\\"regimes\\":" + batchJson + "}"');
-    expect(wordpressPlugin).toContain("Payload: { regimes: [ { user_id, symbol, htf_bias");
-    expect(wordpressPlugin).toContain("regimes array required");
+    // Verify POST endpoint contract: MT5 builds the real URL
+    expect(marketDataEngine).toContain('baseUrl + "/ea/regime-snapshot"');
+    expect(marketDataEngine).toContain('"{\\\"regimes\\\":" + batchJson + "}"');
 
-    // Verify validation constraints
-    expect(wordpressPlugin).toContain("'BULL'");
-    expect(wordpressPlugin).toContain("'BEAR'");
-    expect(wordpressPlugin).toContain("'TRANSITIONAL'");
-    expect(wordpressPlugin).toContain("'TRENDING'");
-    expect(wordpressPlugin).toContain("'RANGING'");
-    expect(wordpressPlugin).toContain("'CHOP'");
+    // Verify route registration wires the correct path, method, and callback
+    expect(routeRegistrar).toContain("array('path' => '/ea/regime-snapshot', 'methods' => WP_REST_Server::CREATABLE, 'callback' => 'post_ea_regime_snapshot', 'permission' => 'ea_bridge')");
+
+    // Verify handler function exists
+    expect(wordpressPlugin).toContain("public function post_ea_regime_snapshot(WP_REST_Request $request)");
+
+    // Verify payload validation gate: regimes array is required
+    expect(wordpressPlugin).toContain("if (!is_array($payload) || !isset($payload['regimes']) || !is_array($payload['regimes']))");
+    expect(wordpressPlugin).toContain("new WP_Error('invalid_payload', 'regimes array required'");
+
+    // Verify validation constraints: actual array declarations
+    expect(wordpressPlugin).toContain("$valid_bias    = array('BULL', 'BEAR', 'TRANSITIONAL')");
+    expect(wordpressPlugin).toContain("$valid_regimes = array('TRENDING', 'RANGING', 'CHOP')");
+
+    // Verify validation gate: actual in_array check
+    expect(wordpressPlugin).toContain("!in_array($htf_bias, $valid_bias, true) || !in_array($ltf_regime, $valid_regimes, true)");
   });
 });
