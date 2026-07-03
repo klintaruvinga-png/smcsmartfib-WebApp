@@ -10442,7 +10442,7 @@ final class SMC_SuperFib_Sniper_REST {
         }
 
         if ($round_to_minute) {
-            $ts = (int) (round($ts / 60) * 60);
+            $ts = (int) (floor($ts / (15 * 60)) * (15 * 60));
         }
 
         return gmdate('Y-m-d H:i:s', $ts);

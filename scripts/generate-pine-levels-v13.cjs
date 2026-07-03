@@ -319,6 +319,10 @@ function buildCompletedSessions(candles, sessionTf) {
 // EA: pip_size * min_pips (JPY pairs=50.0 pips, non-JPY pairs=30.0 pips)
 // Regression note: pip_size is hardcoded, not derived from broker SYMBOL_POINT, to match
 // the EA regression fix that guards against brokers reporting SYMBOL_POINT=0.001 for JPY.
+//
+// KNOWN ISSUE: XAUUSD LTF_SF parity shows systematically larger drift (0.2-2.5) vs other symbols (0.004-0.006).
+// This is NOT a compression threshold issue, but rather a separate anchor/window/session alignment problem
+// specific to XAUUSD that requires dedicated follow-up investigation. See phase4-gate-local.json lines 120-259.
 function pipSizeForSymbol(symbol) {
   if (/JPY$/.test(symbol)) return 0.01;
   if (symbol === "XAUUSD" || symbol === "XAGUSD") return 0.01;
@@ -732,8 +736,8 @@ function main() {
     authority:
       "NOT a live TradingView/Pine export - locally computed Pine v13-compatible reference",
     generated_at: RUN_TS,
-    candle_dir: CANDLE_DIR,
-    mt5_file: MT5_FILE,
+    candle_dir: path.relative(REPO_ROOT, CANDLE_DIR).replace(/\\/g, "/"),
+    mt5_file: path.relative(REPO_ROOT, MT5_FILE).replace(/\\/g, "/"),
     mt5_mtime: mt5Mtime.toISOString(),
     source_timeframe: SOURCE_TIMEFRAME,
     helper_feed_ladder: {
@@ -760,4 +764,12 @@ function main() {
   console.log("[generate-pine-levels-v13] Done.");
 }
 
-main();
+if (require.main === module) {
+    main();
+}
+
+module.exports = {
+    compressionThreshold,
+    pipSizeForSymbol,
+    bucketStartMs,
+};

@@ -1,928 +1,686 @@
 {
     "ok":  true,
     "symbol":  "EURUSD",
+    "source":  "pine_compatible",
     "fibs":  {
-                 "D1":  {
-                            "HTF_AF":  [
-                                           {
-                                               "ratio":  -200,
-                                               "price":  1.54013,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  -162.5,
-                                               "price":  1.474831,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  -100,
-                                               "price":  1.366,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  -62.5,
-                                               "price":  1.300701,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  -25,
-                                               "price":  1.235402,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  0,
-                                               "price":  1.19187,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  25,
-                                               "price":  1.148338,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  50,
-                                               "price":  1.104805,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  62.5,
-                                               "price":  1.083039,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  75,
-                                               "price":  1.061273,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  100,
-                                               "price":  1.01774,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  125,
-                                               "price":  0.974208,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  162.5,
-                                               "price":  0.908909,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  200,
-                                               "price":  0.84361,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  262.5,
-                                               "price":  0.734779,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  300,
-                                               "price":  0.66948,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           }
-                                       ],
-                            "LTF_SF":  [
-                                           {
-                                               "ratio":  -200,
-                                               "price":  1.298313,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  -162.5,
-                                               "price":  1.278852,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  -100,
-                                               "price":  1.246417,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  -62.5,
-                                               "price":  1.226955,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  -25,
-                                               "price":  1.207494,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  0,
-                                               "price":  1.19452,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  25,
-                                               "price":  1.181546,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  50,
-                                               "price":  1.168572,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  62.5,
-                                               "price":  1.162085,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  75,
-                                               "price":  1.155598,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  100,
-                                               "price":  1.142624,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  125,
-                                               "price":  1.129649,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  162.5,
-                                               "price":  1.110188,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  200,
-                                               "price":  1.090727,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  262.5,
-                                               "price":  1.058292,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  300,
-                                               "price":  1.03883,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           }
-                                       ]
-                        },
+                 "M15":  {
+                             "LTF_SF":  [
+                                            {
+                                                "family":  "LTF_SF",
+                                                "ratio":  -200,
+                                                "price":  1.149976,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "LTF_SF",
+                                                "ratio":  -162.5,
+                                                "price":  1.14798719,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "LTF_SF",
+                                                "ratio":  -100,
+                                                "price":  1.1446725,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "LTF_SF",
+                                                "ratio":  -62.5,
+                                                "price":  1.14268369,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "LTF_SF",
+                                                "ratio":  -25,
+                                                "price":  1.14069488,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "LTF_SF",
+                                                "ratio":  0,
+                                                "price":  1.139369,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "LTF_SF",
+                                                "ratio":  25,
+                                                "price":  1.13804313,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "LTF_SF",
+                                                "ratio":  50,
+                                                "price":  1.13671725,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "LTF_SF",
+                                                "ratio":  62.5,
+                                                "price":  1.13605431,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "LTF_SF",
+                                                "ratio":  75,
+                                                "price":  1.13539138,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "LTF_SF",
+                                                "ratio":  100,
+                                                "price":  1.1340655,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "LTF_SF",
+                                                "ratio":  125,
+                                                "price":  1.13273963,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "LTF_SF",
+                                                "ratio":  162.5,
+                                                "price":  1.13075081,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "LTF_SF",
+                                                "ratio":  200,
+                                                "price":  1.128762,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "LTF_SF",
+                                                "ratio":  262.5,
+                                                "price":  1.12544731,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "LTF_SF",
+                                                "ratio":  300,
+                                                "price":  1.1234585,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            }
+                                        ],
+                             "HTF_AF":  [
+                                            {
+                                                "family":  "HTF_AF",
+                                                "ratio":  -200,
+                                                "price":  1.20243,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "HTF_AF",
+                                                "ratio":  -162.5,
+                                                "price":  1.19485875,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "HTF_AF",
+                                                "ratio":  -100,
+                                                "price":  1.18224,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "HTF_AF",
+                                                "ratio":  -62.5,
+                                                "price":  1.17466875,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "HTF_AF",
+                                                "ratio":  -25,
+                                                "price":  1.1670975,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "HTF_AF",
+                                                "ratio":  0,
+                                                "price":  1.16205,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "HTF_AF",
+                                                "ratio":  25,
+                                                "price":  1.1570025,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "HTF_AF",
+                                                "ratio":  50,
+                                                "price":  1.151955,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "HTF_AF",
+                                                "ratio":  62.5,
+                                                "price":  1.14943125,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "HTF_AF",
+                                                "ratio":  75,
+                                                "price":  1.1469075,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "HTF_AF",
+                                                "ratio":  100,
+                                                "price":  1.14186,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "HTF_AF",
+                                                "ratio":  125,
+                                                "price":  1.1368125,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "HTF_AF",
+                                                "ratio":  162.5,
+                                                "price":  1.12924125,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "HTF_AF",
+                                                "ratio":  200,
+                                                "price":  1.12167,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "HTF_AF",
+                                                "ratio":  262.5,
+                                                "price":  1.10905125,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            },
+                                            {
+                                                "family":  "HTF_AF",
+                                                "ratio":  300,
+                                                "price":  1.10148,
+                                                "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                            }
+                                        ]
+                         },
                  "H1":  {
-                            "HTF_AF":  [
-                                           {
-                                               "ratio":  -200,
-                                               "price":  1.22376,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  -162.5,
-                                               "price":  1.215491,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  -100,
-                                               "price":  1.20171,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  -62.5,
-                                               "price":  1.193441,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  -25,
-                                               "price":  1.185172,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  0,
-                                               "price":  1.17966,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  25,
-                                               "price":  1.174147,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  50,
-                                               "price":  1.168635,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  62.5,
-                                               "price":  1.165879,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  75,
-                                               "price":  1.163123,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  100,
-                                               "price":  1.15761,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  125,
-                                               "price":  1.152097,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  162.5,
-                                               "price":  1.143829,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  200,
-                                               "price":  1.13556,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  262.5,
-                                               "price":  1.121779,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  300,
-                                               "price":  1.11351,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           }
-                                       ],
                             "LTF_SF":  [
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  -200,
-                                               "price":  1.193164,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.1906475,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  -162.5,
-                                               "price":  1.18887,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.18521375,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  -100,
-                                               "price":  1.181715,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.1761575,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  -62.5,
-                                               "price":  1.177421,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.17072375,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  -25,
-                                               "price":  1.173128,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.16529,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  0,
-                                               "price":  1.170265,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.1616675,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  25,
-                                               "price":  1.167403,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.158045,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  50,
-                                               "price":  1.164541,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.1544225,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  62.5,
-                                               "price":  1.16311,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.15261125,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  75,
-                                               "price":  1.161679,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.1508,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  100,
-                                               "price":  1.158816,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.1471775,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  125,
-                                               "price":  1.155954,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.143555,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  162.5,
-                                               "price":  1.151661,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.13812125,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  200,
-                                               "price":  1.147368,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.1326875,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  262.5,
-                                               "price":  1.140212,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.12363125,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  300,
-                                               "price":  1.135919,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.1181975,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                           }
+                                       ],
+                            "HTF_AF":  [
+                                           {
+                                               "family":  "HTF_AF",
+                                               "ratio":  -200,
+                                               "price":  1.36911,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                           },
+                                           {
+                                               "family":  "HTF_AF",
+                                               "ratio":  -162.5,
+                                               "price":  1.33349625,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                           },
+                                           {
+                                               "family":  "HTF_AF",
+                                               "ratio":  -100,
+                                               "price":  1.27414,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                           },
+                                           {
+                                               "family":  "HTF_AF",
+                                               "ratio":  -62.5,
+                                               "price":  1.23852625,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                           },
+                                           {
+                                               "family":  "HTF_AF",
+                                               "ratio":  -25,
+                                               "price":  1.2029125,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                           },
+                                           {
+                                               "family":  "HTF_AF",
+                                               "ratio":  0,
+                                               "price":  1.17917,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                           },
+                                           {
+                                               "family":  "HTF_AF",
+                                               "ratio":  25,
+                                               "price":  1.1554275,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                           },
+                                           {
+                                               "family":  "HTF_AF",
+                                               "ratio":  50,
+                                               "price":  1.131685,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                           },
+                                           {
+                                               "family":  "HTF_AF",
+                                               "ratio":  62.5,
+                                               "price":  1.11981375,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                           },
+                                           {
+                                               "family":  "HTF_AF",
+                                               "ratio":  75,
+                                               "price":  1.1079425,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                           },
+                                           {
+                                               "family":  "HTF_AF",
+                                               "ratio":  100,
+                                               "price":  1.0842,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                           },
+                                           {
+                                               "family":  "HTF_AF",
+                                               "ratio":  125,
+                                               "price":  1.0604575,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                           },
+                                           {
+                                               "family":  "HTF_AF",
+                                               "ratio":  162.5,
+                                               "price":  1.02484375,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                           },
+                                           {
+                                               "family":  "HTF_AF",
+                                               "ratio":  200,
+                                               "price":  0.98923,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                           },
+                                           {
+                                               "family":  "HTF_AF",
+                                               "ratio":  262.5,
+                                               "price":  0.92987375,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
+                                           },
+                                           {
+                                               "family":  "HTF_AF",
+                                               "ratio":  300,
+                                               "price":  0.89426,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            }
                                        ]
                         },
                  "H4":  {
-                            "HTF_AF":  [
-                                           {
-                                               "ratio":  -200,
-                                               "price":  1.34243,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  -162.5,
-                                               "price":  1.31726,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  -100,
-                                               "price":  1.27531,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  -62.5,
-                                               "price":  1.25014,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  -25,
-                                               "price":  1.22497,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  0,
-                                               "price":  1.20819,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  25,
-                                               "price":  1.19141,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  50,
-                                               "price":  1.17463,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  62.5,
-                                               "price":  1.16624,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  75,
-                                               "price":  1.15785,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  100,
-                                               "price":  1.14107,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  125,
-                                               "price":  1.12429,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  162.5,
-                                               "price":  1.09912,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  200,
-                                               "price":  1.07395,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  262.5,
-                                               "price":  1.032,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           },
-                                           {
-                                               "ratio":  300,
-                                               "price":  1.00683,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                           }
-                                       ],
                             "LTF_SF":  [
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  -200,
-                                               "price":  1.242614,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.36911,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  -162.5,
-                                               "price":  1.231151,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.33349625,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  -100,
-                                               "price":  1.212046,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.27414,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  -62.5,
-                                               "price":  1.200583,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.23852625,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  -25,
-                                               "price":  1.18912,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.2029125,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  0,
-                                               "price":  1.181477,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.17917,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  25,
-                                               "price":  1.173836,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.1554275,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  50,
-                                               "price":  1.166194,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.131685,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  62.5,
-                                               "price":  1.162373,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.11981375,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  75,
-                                               "price":  1.158551,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.1079425,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  100,
-                                               "price":  1.15091,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.0842,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  125,
-                                               "price":  1.143268,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.0604575,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  162.5,
-                                               "price":  1.131805,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  1.02484375,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  200,
-                                               "price":  1.120342,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  0.98923,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  262.5,
-                                               "price":  1.101236,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  0.92987375,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            },
                                            {
+                                               "family":  "LTF_SF",
                                                "ratio":  300,
-                                               "price":  1.089773,
-                                               "calculated_at":  "2026-06-04T17:31:52+00:00"
+                                               "price":  0.89426,
+                                               "calculated_at":  "2026-07-02T07:03:13+00:00"
                                            }
                                        ]
                         },
-                 "M15":  {
-                             "HTF_AF":  [
-                                            {
-                                                "ratio":  -200,
-                                                "price":  1.1885,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  -162.5,
-                                                "price":  1.184765,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  -100,
-                                                "price":  1.17854,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  -62.5,
-                                                "price":  1.174805,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  -25,
-                                                "price":  1.17107,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  0,
-                                                "price":  1.16858,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  25,
-                                                "price":  1.16609,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  50,
-                                                "price":  1.1636,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  62.5,
-                                                "price":  1.162355,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  75,
-                                                "price":  1.16111,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  100,
-                                                "price":  1.15862,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  125,
-                                                "price":  1.15613,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  162.5,
-                                                "price":  1.152395,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  200,
-                                                "price":  1.14866,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  262.5,
-                                                "price":  1.142435,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  300,
-                                                "price":  1.1387,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            }
-                                        ],
-                             "LTF_SF":  [
-                                            {
-                                                "ratio":  -200,
-                                                "price":  1.173976,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  -162.5,
-                                                "price":  1.172273,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  -100,
-                                                "price":  1.169436,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  -62.5,
-                                                "price":  1.167733,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  -25,
-                                                "price":  1.16603,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  0,
-                                                "price":  1.164896,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  25,
-                                                "price":  1.16376,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  50,
-                                                "price":  1.162626,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  62.5,
-                                                "price":  1.162058,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  75,
-                                                "price":  1.16149,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  100,
-                                                "price":  1.160356,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  125,
-                                                "price":  1.15922,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  162.5,
-                                                "price":  1.157518,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  200,
-                                                "price":  1.155816,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  262.5,
-                                                "price":  1.152978,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            },
-                                            {
-                                                "ratio":  300,
-                                                "price":  1.151275,
-                                                "calculated_at":  "2026-06-04T17:31:52+00:00"
-                                            }
-                                        ]
-                         }
+                 "D1":  [
+
+                        ]
              },
     "anchor_debug":  {
-                         "D1":  {
-                                    "HTF_AF":  {
-                                                   "session_tf":  "Quarterly",
-                                                   "authority_tf":  "Yearly",
-                                                   "anchor_high":  1.19187,
-                                                   "anchor_low":  1.01774,
-                                                   "anchor_range":  0.17413,
-                                                   "compression_threshold":  0.002,
-                                                   "source":  "auth_f1",
-                                                   "htf_anchor_key":  2025,
-                                                   "high":  1.19187,
-                                                   "low":  1.01774,
-                                                   "range":  0.17413,
-                                                   "candle_count":  313,
-                                                   "first_candle":  "2025-01-01T23:59:59Z",
-                                                   "last_candle":  "2025-12-31T23:59:59Z"
-                                               },
-                                    "LTF_SF":  {
-                                                   "session_tf":  "Quarterly",
-                                                   "authority_tf":  "Yearly",
-                                                   "anchor_high":  1.19452,
-                                                   "anchor_low":  1.1426235,
-                                                   "anchor_range":  0.0518965,
-                                                   "compression_threshold":  0.002,
-                                                   "components":  [
-                                                                      {
-                                                                          "slot":  "F1",
-                                                                          "key":  20261,
-                                                                          "high":  1.20819,
-                                                                          "low":  1.14107,
-                                                                          "range":  0.06712,
-                                                                          "compression_pass":  true,
-                                                                          "weight":  0.4,
-                                                                          "candle_count":  77,
-                                                                          "first_candle":  "2026-01-01T23:59:59Z",
-                                                                          "last_candle":  "2026-03-31T23:59:59Z"
-                                                                      },
-                                                                      {
-                                                                          "slot":  "F2",
-                                                                          "key":  20254,
-                                                                          "high":  1.18079,
-                                                                          "low":  1.14688,
-                                                                          "range":  0.03391,
-                                                                          "compression_pass":  true,
-                                                                          "weight":  0.35,
-                                                                          "candle_count":  79,
-                                                                          "first_candle":  "2025-10-01T23:59:59Z",
-                                                                          "last_candle":  "2025-12-31T23:59:59Z"
-                                                                      },
-                                                                      {
-                                                                          "slot":  "F3",
-                                                                          "key":  20253,
-                                                                          "high":  1.19187,
-                                                                          "low":  1.13915,
-                                                                          "range":  0.05272,
-                                                                          "compression_pass":  true,
-                                                                          "weight":  0.25,
-                                                                          "candle_count":  79,
-                                                                          "first_candle":  "2025-07-01T23:59:59Z",
-                                                                          "last_candle":  "2025-09-30T23:59:59Z"
-                                                                      }
-                                                                  ]
-                                               }
-                                },
-                         "H1":  {
-                                    "HTF_AF":  {
-                                                   "session_tf":  "Weekly",
-                                                   "authority_tf":  "Monthly",
-                                                   "anchor_high":  1.17966,
-                                                   "anchor_low":  1.15761,
-                                                   "anchor_range":  0.02205,
-                                                   "compression_threshold":  0.002,
-                                                   "source":  "auth_f1",
-                                                   "htf_anchor_key":  202605,
-                                                   "high":  1.17966,
-                                                   "low":  1.15761,
-                                                   "range":  0.02205,
-                                                   "candle_count":  504,
-                                                   "first_candle":  "2026-05-01T00:59:59Z",
-                                                   "last_candle":  "2026-05-31T23:59:59Z"
-                                               },
-                                    "LTF_SF":  {
-                                                   "session_tf":  "Weekly",
-                                                   "authority_tf":  "Monthly",
-                                                   "anchor_high":  1.1702655,
-                                                   "anchor_low":  1.1588165,
-                                                   "anchor_range":  0.011449,
-                                                   "compression_threshold":  0.002,
-                                                   "components":  [
-                                                                      {
-                                                                          "slot":  "F1",
-                                                                          "key":  202622,
-                                                                          "high":  1.16858,
-                                                                          "low":  1.15862,
-                                                                          "range":  0.00996,
-                                                                          "compression_pass":  true,
-                                                                          "weight":  0.4,
-                                                                          "candle_count":  120,
-                                                                          "first_candle":  "2026-05-25T00:59:59Z",
-                                                                          "last_candle":  "2026-05-31T23:59:59Z"
-                                                                      },
-                                                                      {
-                                                                          "slot":  "F2",
-                                                                          "key":  202621,
-                                                                          "high":  1.16611,
-                                                                          "low":  1.15761,
-                                                                          "range":  0.0085,
-                                                                          "compression_pass":  true,
-                                                                          "weight":  0.35,
-                                                                          "candle_count":  120,
-                                                                          "first_candle":  "2026-05-18T00:59:59Z",
-                                                                          "last_candle":  "2026-05-24T23:59:59Z"
-                                                                      },
-                                                                      {
-                                                                          "slot":  "F3",
-                                                                          "key":  202620,
-                                                                          "high":  1.17878,
-                                                                          "low":  1.16082,
-                                                                          "range":  0.01796,
-                                                                          "compression_pass":  true,
-                                                                          "weight":  0.25,
-                                                                          "candle_count":  120,
-                                                                          "first_candle":  "2026-05-11T00:59:59Z",
-                                                                          "last_candle":  "2026-05-17T23:59:59Z"
-                                                                      }
-                                                                  ]
-                                               }
-                                },
-                         "H4":  {
-                                    "HTF_AF":  {
-                                                   "session_tf":  "Monthly",
-                                                   "authority_tf":  "Quarterly",
-                                                   "anchor_high":  1.20819,
-                                                   "anchor_low":  1.14107,
-                                                   "anchor_range":  0.06712,
-                                                   "compression_threshold":  0.002,
-                                                   "source":  "auth_f1",
-                                                   "htf_anchor_key":  20261,
-                                                   "high":  1.20819,
-                                                   "low":  1.14107,
-                                                   "range":  0.06712,
-                                                   "candle_count":  393,
-                                                   "first_candle":  "2026-01-01T19:59:59Z",
-                                                   "last_candle":  "2026-03-31T23:59:59Z"
-                                               },
-                                    "LTF_SF":  {
-                                                   "session_tf":  "Monthly",
-                                                   "authority_tf":  "Quarterly",
-                                                   "anchor_high":  1.1814775,
-                                                   "anchor_low":  1.1509095,
-                                                   "anchor_range":  0.030568,
-                                                   "compression_threshold":  0.002,
-                                                   "components":  [
-                                                                      {
-                                                                          "slot":  "F1",
-                                                                          "key":  202605,
-                                                                          "high":  1.17966,
-                                                                          "low":  1.15761,
-                                                                          "range":  0.02205,
-                                                                          "compression_pass":  true,
-                                                                          "weight":  0.4,
-                                                                          "candle_count":  131,
-                                                                          "first_candle":  "2026-05-01T03:59:59Z",
-                                                                          "last_candle":  "2026-05-31T23:59:59Z"
-                                                                      },
-                                                                      {
-                                                                          "slot":  "F2",
-                                                                          "key":  202604,
-                                                                          "high":  1.18491,
-                                                                          "low":  1.15028,
-                                                                          "range":  0.03463,
-                                                                          "compression_pass":  true,
-                                                                          "weight":  0.35,
-                                                                          "candle_count":  136,
-                                                                          "first_candle":  "2026-04-01T03:59:59Z",
-                                                                          "last_candle":  "2026-04-30T23:59:59Z"
-                                                                      },
-                                                                      {
-                                                                          "slot":  "F3",
-                                                                          "key":  202603,
-                                                                          "high":  1.17958,
-                                                                          "low":  1.14107,
-                                                                          "range":  0.03851,
-                                                                          "compression_pass":  true,
-                                                                          "weight":  0.25,
-                                                                          "candle_count":  138,
-                                                                          "first_candle":  "2026-03-01T19:59:59Z",
-                                                                          "last_candle":  "2026-03-31T23:59:59Z"
-                                                                      }
-                                                                  ]
-                                               }
-                                },
                          "M15":  {
-                                     "HTF_AF":  {
-                                                    "session_tf":  "Daily",
-                                                    "authority_tf":  "Weekly",
-                                                    "anchor_high":  1.16858,
-                                                    "anchor_low":  1.15862,
-                                                    "anchor_range":  0.00996,
-                                                    "compression_threshold":  0.002,
-                                                    "source":  "auth_f1",
-                                                    "htf_anchor_key":  202622,
-                                                    "high":  1.16858,
-                                                    "low":  1.15862,
-                                                    "range":  0.00996,
-                                                    "candle_count":  480,
-                                                    "first_candle":  "2026-05-25T00:14:59Z",
-                                                    "last_candle":  "2026-05-31T23:59:59Z"
-                                                },
                                      "LTF_SF":  {
+                                                    "symbol":  "EURUSD",
+                                                    "timeframe":  "M15",
+                                                    "family":  "LTF_SF",
                                                     "session_tf":  "Daily",
-                                                    "authority_tf":  "Weekly",
-                                                    "anchor_high":  1.1648955,
-                                                    "anchor_low":  1.1603555,
-                                                    "anchor_range":  0.00454,
+                                                    "authority_tf":  null,
+                                                    "candle_lineage":  "derived_from_M15",
+                                                    "source_period":  "M15",
+                                                    "source_feed_bars":  2291,
+                                                    "anchor_high":  1.139369,
+                                                    "anchor_low":  1.1340655000000002,
+                                                    "anchor_range":  0.0053034999999999055,
                                                     "compression_threshold":  0.002,
                                                     "components":  [
                                                                        {
                                                                            "slot":  "F1",
-                                                                           "key":  20260603,
-                                                                           "high":  1.16333,
-                                                                           "low":  1.15945,
-                                                                           "range":  0.00388,
+                                                                           "high":  1.1388,
+                                                                           "low":  1.13332,
+                                                                           "range":  0.005479999999999929,
                                                                            "compression_pass":  true,
                                                                            "weight":  0.4,
-                                                                           "candle_count":  96,
-                                                                           "first_candle":  "2026-06-03T00:14:59Z",
-                                                                           "last_candle":  "2026-06-03T23:59:59Z"
+                                                                           "candle_count":  83
                                                                        },
                                                                        {
                                                                            "slot":  "F2",
-                                                                           "key":  20260602,
-                                                                           "high":  1.16556,
-                                                                           "low":  1.16133,
-                                                                           "range":  0.00423,
+                                                                           "high":  1.13679,
+                                                                           "low":  1.13245,
+                                                                           "range":  0.0043400000000000105,
                                                                            "compression_pass":  true,
                                                                            "weight":  0.35,
-                                                                           "candle_count":  96,
-                                                                           "first_candle":  "2026-06-02T00:14:59Z",
-                                                                           "last_candle":  "2026-06-02T23:59:59Z"
+                                                                           "candle_count":  49
                                                                        },
                                                                        {
                                                                            "slot":  "F3",
-                                                                           "key":  20260601,
-                                                                           "high":  1.16647,
-                                                                           "low":  1.16044,
-                                                                           "range":  0.00603,
+                                                                           "high":  1.14389,
+                                                                           "low":  1.13752,
+                                                                           "range":  0.006369999999999987,
                                                                            "compression_pass":  true,
                                                                            "weight":  0.25,
-                                                                           "candle_count":  96,
-                                                                           "first_candle":  "2026-06-01T00:14:59Z",
-                                                                           "last_candle":  "2026-06-01T23:59:59Z"
+                                                                           "candle_count":  99
                                                                        }
                                                                    ]
+                                                },
+                                     "HTF_AF":  {
+                                                    "symbol":  "EURUSD",
+                                                    "timeframe":  "M15",
+                                                    "family":  "HTF_AF",
+                                                    "session_tf":  "Daily",
+                                                    "authority_tf":  "Weekly",
+                                                    "candle_lineage":  "derived_from_M15",
+                                                    "source_period":  "H1",
+                                                    "source_feed_bars":  632,
+                                                    "anchor_high":  1.16205,
+                                                    "anchor_low":  1.14186,
+                                                    "anchor_range":  0.02018999999999993,
+                                                    "compression_threshold":  0.002,
+                                                    "anchor_key":  202625,
+                                                    "anchor":  "auth_f1",
+                                                    "candle_count":  99,
+                                                    "components":  [
+
+                                                                   ]
                                                 }
-                                 }
+                                 },
+                         "H1":  {
+                                    "LTF_SF":  {
+                                                   "symbol":  "EURUSD",
+                                                   "timeframe":  "H1",
+                                                   "family":  "LTF_SF",
+                                                   "session_tf":  "Weekly",
+                                                   "authority_tf":  null,
+                                                   "candle_lineage":  "derived_from_M15",
+                                                   "source_period":  "H1",
+                                                   "source_feed_bars":  632,
+                                                   "anchor_high":  1.1616675,
+                                                   "anchor_low":  1.1471775000000002,
+                                                   "anchor_range":  0.014489999999999892,
+                                                   "compression_threshold":  0.002,
+                                                   "components":  [
+                                                                      {
+                                                                          "slot":  "F1",
+                                                                          "high":  1.16205,
+                                                                          "low":  1.14186,
+                                                                          "range":  0.02018999999999993,
+                                                                          "compression_pass":  true,
+                                                                          "weight":  0.4,
+                                                                          "candle_count":  99
+                                                                      },
+                                                                      {
+                                                                          "slot":  "F2",
+                                                                          "high":  1.1578,
+                                                                          "low":  1.14996,
+                                                                          "range":  0.007839999999999847,
+                                                                          "compression_pass":  true,
+                                                                          "weight":  0.35,
+                                                                          "candle_count":  87
+                                                                      },
+                                                                      {
+                                                                          "slot":  "F3",
+                                                                          "high":  1.16647,
+                                                                          "low":  1.15179,
+                                                                          "range":  0.014679999999999804,
+                                                                          "compression_pass":  true,
+                                                                          "weight":  0.25,
+                                                                          "candle_count":  105
+                                                                      }
+                                                                  ]
+                                               },
+                                    "HTF_AF":  {
+                                                   "symbol":  "EURUSD",
+                                                   "timeframe":  "H1",
+                                                   "family":  "HTF_AF",
+                                                   "session_tf":  "Weekly",
+                                                   "authority_tf":  "Monthly",
+                                                   "candle_lineage":  "derived_from_M15",
+                                                   "source_period":  "D1",
+                                                   "source_feed_bars":  42,
+                                                   "anchor_high":  1.17917,
+                                                   "anchor_low":  1.0842,
+                                                   "anchor_range":  0.09497,
+                                                   "compression_threshold":  0.002,
+                                                   "anchor_key":  202605,
+                                                   "anchor":  "auth_f1",
+                                                   "candle_count":  20,
+                                                   "components":  [
+
+                                                                  ]
+                                               }
+                                },
+                         "H4":  {
+                                    "LTF_SF":  {
+                                                   "symbol":  "EURUSD",
+                                                   "timeframe":  "H4",
+                                                   "family":  "LTF_SF",
+                                                   "session_tf":  "Monthly",
+                                                   "authority_tf":  null,
+                                                   "candle_lineage":  "derived_from_M15",
+                                                   "source_period":  "D1",
+                                                   "source_feed_bars":  42,
+                                                   "anchor_high":  1.17917,
+                                                   "anchor_low":  1.0842,
+                                                   "anchor_range":  0.09497,
+                                                   "compression_threshold":  0.002,
+                                                   "components":  [
+                                                                      {
+                                                                          "slot":  "F1",
+                                                                          "high":  1.17917,
+                                                                          "low":  1.0842,
+                                                                          "range":  0.09497,
+                                                                          "compression_pass":  true,
+                                                                          "weight":  1,
+                                                                          "candle_count":  20
+                                                                      },
+                                                                      {
+                                                                          "slot":  "F2",
+                                                                          "high":  null,
+                                                                          "low":  null,
+                                                                          "range":  null,
+                                                                          "compression_pass":  false,
+                                                                          "weight":  0,
+                                                                          "candle_count":  0
+                                                                      },
+                                                                      {
+                                                                          "slot":  "F3",
+                                                                          "high":  null,
+                                                                          "low":  null,
+                                                                          "range":  null,
+                                                                          "compression_pass":  false,
+                                                                          "weight":  0,
+                                                                          "candle_count":  0
+                                                                      }
+                                                                  ]
+                                               }
+                                },
+                         "D1":  [
+
+                                ]
                      }
 }
