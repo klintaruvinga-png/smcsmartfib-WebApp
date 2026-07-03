@@ -36,16 +36,16 @@ describe("MT5 regime dispatch parity guard", () => {
     // Verify volatility metrics are computed and stored
     expect(regimeEngine).toContain("double ema20D1");
     expect(regimeEngine).toContain("double atr14H1");
-    expect(regimeEngine).toContain('"ema20_d1"');
-    expect(regimeEngine).toContain('"atr14_h1"');
+    expect(regimeEngine).toContain('\\"ema20_d1\\"');
+    expect(regimeEngine).toContain('\\"atr14_h1\\"');
 
     // Verify JSON payload structure for backend dispatch
     expect(regimeEngine).toContain("BuildBatchPayload");
-    expect(regimeEngine).toContain('"regimes"');
-    expect(regimeEngine).toContain('"symbol"');
-    expect(regimeEngine).toContain('"htf_bias"');
-    expect(regimeEngine).toContain('"ltf_regime"');
-    expect(regimeEngine).toContain('"chop_score"');
+    expect(marketDataEngine).toContain('"{\\"regimes\\":" + batchJson + "}"');
+    expect(regimeEngine).toContain('\\"symbol\\"');
+    expect(regimeEngine).toContain('\\"htf_bias\\"');
+    expect(regimeEngine).toContain('\\"ltf_regime\\"');
+    expect(regimeEngine).toContain('\\"chop_score\\"');
   });
 
   it("validates regime classification accuracy on historical snapshots (EURUSD H1 trending gate)", () => {
@@ -96,7 +96,7 @@ describe("MT5 regime dispatch parity guard", () => {
     const snapshot = {
       symbol: "XAUUSD",
       ema20D1: 4550,
-      closeD1: 4548,
+      closeD1: 4547,
       er14H1: 0.78,
       atr14H1: 3.2,
     };
@@ -122,21 +122,37 @@ describe("MT5 regime dispatch parity guard", () => {
   });
 
   it("pins the backend regime ingestion contract", async () => {
-    const regimeEngine = await readFile(
-      new URL("../mt5/RegimeEngine.mqh", import.meta.url),
-      "utf8",
-    );
+    const [marketDataEngine, wordpressPlugin, routeRegistrar] = await Promise.all([
+      readFile(new URL("../mt5/MarketDataEngine.mqh", import.meta.url), "utf8"),
+      readFile(
+        new URL("../wordpress/smc-superfib-sniper/smc-superfib-sniper.php", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../wordpress/smc-superfib-sniper/class-route-registrar.php", import.meta.url),
+        "utf8",
+      ),
+    ]);
 
-    // Verify POST endpoint contract
-    expect(regimeEngine).toContain("POST /ea/regime-snapshot");
-    expect(regimeEngine).toContain("{ regimes: [ {...}, ... ] }");
+    // Verify POST endpoint contract: MT5 builds the real URL
+    expect(marketDataEngine).toContain('baseUrl + "/ea/regime-snapshot"');
+    expect(marketDataEngine).toContain('"{\\\"regimes\\\":" + batchJson + "}"');
 
-    // Verify validation constraints
-    expect(regimeEngine).toContain("BULL");
-    expect(regimeEngine).toContain("BEAR");
-    expect(regimeEngine).toContain("TRANSITIONAL");
-    expect(regimeEngine).toContain("TRENDING");
-    expect(regimeEngine).toContain("RANGING");
-    expect(regimeEngine).toContain("CHOP");
+    // Verify route registration wires the correct path, method, and callback
+    expect(routeRegistrar).toContain("array('path' => '/ea/regime-snapshot', 'methods' => WP_REST_Server::CREATABLE, 'callback' => 'post_ea_regime_snapshot', 'permission' => 'ea_bridge')");
+
+    // Verify handler function exists
+    expect(wordpressPlugin).toContain("public function post_ea_regime_snapshot(WP_REST_Request $request)");
+
+    // Verify payload validation gate: regimes array is required
+    expect(wordpressPlugin).toContain("if (!is_array($payload) || !isset($payload['regimes']) || !is_array($payload['regimes']))");
+    expect(wordpressPlugin).toContain("new WP_Error('invalid_payload', 'regimes array required'");
+
+    // Verify validation constraints: actual array declarations
+    expect(wordpressPlugin).toContain("$valid_bias    = array('BULL', 'BEAR', 'TRANSITIONAL')");
+    expect(wordpressPlugin).toContain("$valid_regimes = array('TRENDING', 'RANGING', 'CHOP')");
+
+    // Verify validation gate: actual in_array check
+    expect(wordpressPlugin).toContain("!in_array($htf_bias, $valid_bias, true) || !in_array($ltf_regime, $valid_regimes, true)");
   });
 });

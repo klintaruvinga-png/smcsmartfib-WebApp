@@ -23,7 +23,8 @@ Validation rules
 - For docs-only updates, document what was checked and why runtime validation may not apply.
 
 Branch and PR closeout
-- Any session that changes files must finish on a feature branch and open a normal GitHub PR.
+- Any session that changes files must finish on a feature branch and open a normal GitHub PR that is ready for review.
+- Draft PRs are not acceptable for session closeout. If a PR is accidentally opened as draft, mark it ready for review before handoff.
 - Branch names must be descriptive and task-focused; avoid working directly on `main`.
 - The PR body must include the issue/objective, files changed, validation commands and results, and any remaining risks.
 - If the session was read-only or produced no file changes, the final handoff must explicitly state that no branch or PR was created.
