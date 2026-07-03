@@ -14,7 +14,8 @@ Invokes the **global research‑and‑plan** automation that:
 The command does **not** perform the research step itself – that is handled by Copilot. It simply validates the research artifact, runs plan hardening, and drives the implementation.
 
 ## Usage
-```
+
+```text
 /research-and-plan
 ```
 

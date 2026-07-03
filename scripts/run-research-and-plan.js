@@ -1,4 +1,4 @@
-//!/usr/bin/env node
+#!/usr/bin/env node
 /**
  * Global entry point for the /research-and-plan slash command.
  * It forwards to the existing pipeline-watcher implementation, using the
