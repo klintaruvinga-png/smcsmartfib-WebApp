@@ -206,7 +206,12 @@ export const mockRegimes: RegimeState[] = [
 export const mockGates: GateState[] = [
   { symbol: "GBPUSD", allow: "BOTH", state: "mock" },
   { symbol: "AUDUSD", allow: "SELL", state: "mock" },
-  { symbol: "EURUSD", allow: "BLOCKED", reason: "SF+AF dual equilibrium — anchor chop zone", state: "blocked" },
+  {
+    symbol: "EURUSD",
+    allow: "BLOCKED",
+    reason: "SF+AF dual equilibrium — anchor chop zone",
+    state: "blocked",
+  },
   { symbol: "NZDUSD", allow: "SELL", state: "stale" },
   { symbol: "USDJPY", allow: "BUY", state: "mock" },
   { symbol: "AUDJPY", allow: "BUY", state: "mock" },

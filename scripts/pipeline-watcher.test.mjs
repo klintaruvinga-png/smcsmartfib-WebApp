@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  extractUsablePlanFromCodexOutput,
-  buildCodexImplementationPrompt,
-  buildCodexExecCommand,
-  buildCodexVersionCommand,
+  extractUsablePlanFromClaudeOutput,
+  buildClaudeImplementationPrompt,
+  buildClaudeExecArgs,
+  buildClaudeVersionArgs,
   isActivePhaseUpdatePath,
   selectOpenReadyPR,
 } from "./pipeline-watcher.js";
@@ -23,7 +23,7 @@ describe("pipeline watcher state detection", () => {
     ).toBe(false);
   });
 
-  it("extracts a valid plan from captured Codex output", () => {
+  it("extracts a valid plan from captured Claude output", () => {
     const output = `
 1. Issue validation
 2. Implementation contract
@@ -35,36 +35,32 @@ describe("pipeline watcher state detection", () => {
 8. Implementation handoff
 `;
 
-    expect(extractUsablePlanFromCodexOutput(output)).toContain("1. Issue validation");
+    expect(extractUsablePlanFromClaudeOutput(output)).toContain("1. Issue validation");
   });
 
-  it("rejects captured Codex output that is not a usable plan", () => {
-    expect(extractUsablePlanFromCodexOutput("Stopped\nNo patch was applied")).toBeNull();
+  it("rejects captured Claude output that is not a usable plan", () => {
+    expect(extractUsablePlanFromClaudeOutput("Stopped\nNo patch was applied")).toBeNull();
   });
 });
 
-describe("pipeline watcher Codex commands", () => {
-  it("builds a Codex health-check command without Claude references", () => {
-    const command = buildCodexVersionCommand();
+describe("pipeline watcher Claude commands", () => {
+  it("builds Claude health-check args without Codex references", () => {
+    const args = buildClaudeVersionArgs();
 
-    expect(command).toContain("--version");
-    expect(command.toLowerCase()).toContain("codex");
-    expect(command.toLowerCase()).not.toContain("claude");
+    expect(args).toContain("--version");
   });
 
-  it("builds the Codex exec command with the watcher contract", () => {
-    const command = buildCodexExecCommand("C:\\temp\\codex prompt.tmp.md");
+  it("builds the Claude exec args with the watcher contract", () => {
+    const args = buildClaudeExecArgs("/tmp/prompt.md");
 
-    expect(command).toContain("exec");
-    expect(command).toContain("--json");
-    expect(command).toContain("--dangerously-bypass-approvals-and-sandbox");
-    expect(command).toContain('"C:\\temp\\codex prompt.tmp.md"');
-    expect(command.toLowerCase()).toContain("codex");
-    expect(command.toLowerCase()).not.toContain("claude");
+    expect(args).toContain("exec");
+    expect(args).toContain("--json");
+    expect(args).toContain("--dangerously-bypass-approvals-and-sandbox");
+    expect(args).toContain("/tmp/prompt.md");
   });
 
   it("builds the implementation prompt with an explicit non-draft PR command", () => {
-    const prompt = buildCodexImplementationPrompt({
+    const prompt = buildClaudeImplementationPrompt({
       issue: "Patch the update runner",
       promptText: "Base prompt",
     });

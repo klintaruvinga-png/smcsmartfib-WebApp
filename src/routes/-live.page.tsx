@@ -9,7 +9,12 @@ import {
 import { useStreamingTicks } from "@/hooks/useStreamingTicks";
 import { useTickFlash } from "@/hooks/useTickFlash";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
-import { BiasBadge, GateBadge, AnchorChopBadge, AnchorPositionMeter } from "@/components/sniper/Indicators";
+import {
+  BiasBadge,
+  GateBadge,
+  AnchorChopBadge,
+  AnchorPositionMeter,
+} from "@/components/sniper/Indicators";
 import { SettingsQueryErrorState } from "@/components/sniper/SettingsQueryErrorState";
 import { WarningLine } from "@/components/sniper/Warnings";
 import { fmtPrice, fmtPct, relTime } from "@/lib/format";
@@ -344,13 +349,17 @@ function PriceCard({
         {regime && (
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-mute">Anchor</span>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-mute">
+                Anchor
+              </span>
               <AnchorChopBadge source={regime.anchorChop ?? "none"} />
             </div>
             <AnchorPositionMeter label="SF" pct={regime.sfPosition ?? null} />
             <AnchorPositionMeter label="AF" pct={regime.afPosition ?? null} />
             <div className="flex items-center justify-between pt-0.5">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-mute">Nearest Fib</span>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-mute">
+                Nearest Fib
+              </span>
               <span
                 style={chopTickStyle}
                 className={cn(
