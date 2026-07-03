@@ -2679,7 +2679,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         $symbol = sanitize_text_field(strtoupper($payload['symbol']));
         if (!empty($payload['normalized_symbol'])) {
-            $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper(sanitize_text_field($payload['normalized_symbol'])));
+            $symbol = $this->normalize_symbol_token(sanitize_text_field($payload['normalized_symbol']));
         }
         // Remap broker-specific stripped names to canonical SMC SuperFib symbols.
         // Needed because multi-word broker names (e.g. "Wall Street 30") lose their
@@ -3413,7 +3413,7 @@ final class SMC_SuperFib_Sniper_REST {
             return new WP_Error('missing_fields', 'symbol and levels are required', array('status' => 400));
         }
 
-        $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper(sanitize_text_field($payload['symbol'])));
+        $symbol = $this->normalize_symbol_token(sanitize_text_field($payload['symbol']));
         if ($symbol === '') {
             return new WP_Error('invalid_symbol', 'symbol must be a non-empty alphanumeric string', array('status' => 400));
         }
@@ -3521,7 +3521,7 @@ final class SMC_SuperFib_Sniper_REST {
         global $wpdb;
 
         $user_id = get_current_user_id();
-        $symbol  = preg_replace('/[^A-Z0-9]/', '', strtoupper(sanitize_text_field((string) $request->get_param('symbol'))));
+        $symbol  = $this->normalize_symbol_token(sanitize_text_field((string) $request->get_param('symbol')));
 
         if ($symbol === '') {
             return new WP_Error('missing_symbol', 'symbol query parameter is required', array('status' => 400));
@@ -3616,7 +3616,7 @@ final class SMC_SuperFib_Sniper_REST {
 
     public function get_market_data_candles(WP_REST_Request $request) {
         $user_id = get_current_user_id();
-        $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper(sanitize_text_field((string) $request->get_param('symbol'))));
+        $symbol = $this->normalize_symbol_token(sanitize_text_field((string) $request->get_param('symbol')));
 
         if ($symbol === '') {
             return new WP_Error('missing_symbol', 'symbol query parameter is required', array('status' => 400));
@@ -3692,7 +3692,7 @@ final class SMC_SuperFib_Sniper_REST {
                 continue;
             }
 
-            $symbol     = preg_replace('/[^A-Z0-9]/', '', strtoupper(sanitize_text_field($entry['symbol'])));
+            $symbol     = $this->normalize_symbol_token(sanitize_text_field($entry['symbol']));
             $htf_bias   = sanitize_text_field(strtoupper((string) ($entry['htf_bias'] ?? 'TRANSITIONAL')));
             $ltf_regime = sanitize_text_field(strtoupper((string) ($entry['ltf_regime'] ?? 'RANGING')));
             $chop_score = max(0.0, min(1.0, (float) ($entry['chop_score'] ?? 0.5)));
@@ -3750,7 +3750,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         $user_id = get_current_user_id();
         $symbol  = sanitize_text_field((string) ($request->get_param('symbol') ?? ''));
-        $symbol  = preg_replace('/[^A-Z0-9]/', '', strtoupper($symbol));
+        $symbol  = $this->normalize_symbol_token($symbol);
 
         $table  = $wpdb->prefix . 'smc_sf_regime_snapshots';
         $where  = 'WHERE user_id = %d';
@@ -4080,7 +4080,7 @@ final class SMC_SuperFib_Sniper_REST {
 
             $id        = sanitize_text_field((string) $cand['id']);
             $stored_id = substr($id, 0, 64);
-            $symbol    = preg_replace('/[^A-Z0-9]/', '', strtoupper(sanitize_text_field((string) $cand['symbol'])));
+            $symbol    = $this->normalize_symbol_token(sanitize_text_field((string) $cand['symbol']));
             $direction = strtoupper(sanitize_text_field((string) ($cand['direction'] ?? 'LONG')));
             $status    = strtoupper(sanitize_text_field((string) ($cand['status']    ?? 'WATCH')));
             $verdict   = strtoupper(sanitize_text_field((string) ($cand['verdict']   ?? 'C')));
@@ -6263,7 +6263,7 @@ final class SMC_SuperFib_Sniper_REST {
 
         $active_rows = $this->read_display_signal_rows($user_id, array_keys($watchlist_lookup), true);
         foreach ($active_rows as $row) {
-            $row_symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($row['symbol'] ?? '')));
+            $row_symbol = $this->normalize_symbol_token((string) ($row['symbol'] ?? ''));
             if ($row_symbol === '' || !isset($watchlist_lookup[$row_symbol])) {
                 $this->transition_display_signal($user_id, $row, 'INVALIDATED', 'watchlist_removed', null, $now);
                 continue;
@@ -6352,7 +6352,7 @@ final class SMC_SuperFib_Sniper_REST {
             if (!is_array($signal) || !$this->is_display_signal_eligible($signal, $watchlist_lookup)) {
                 continue;
             }
-            $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($signal['symbol'] ?? '')));
+            $symbol = $this->normalize_symbol_token((string) ($signal['symbol'] ?? ''));
             if ($symbol === '' || isset($blocked_symbols[$symbol])) {
                 continue;
             }
@@ -6439,7 +6439,7 @@ final class SMC_SuperFib_Sniper_REST {
     private function normalize_symbol_lookup(array $symbols): array {
         $lookup = array();
         foreach ($symbols as $symbol) {
-            $normalized = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $symbol));
+            $normalized = $this->normalize_symbol_token((string) $symbol);
             if ($normalized !== '') {
                 $lookup[$normalized] = true;
             }
@@ -6453,7 +6453,7 @@ final class SMC_SuperFib_Sniper_REST {
             if (!is_array($diagnostic) || empty($diagnostic['symbol'])) {
                 continue;
             }
-            $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $diagnostic['symbol']));
+            $symbol = $this->normalize_symbol_token((string) $diagnostic['symbol']);
             if ($symbol === '' || !isset($watchlist_lookup[$symbol])) {
                 continue;
             }
@@ -6473,7 +6473,7 @@ final class SMC_SuperFib_Sniper_REST {
 
     private function hydrate_display_signal_candidate(int $user_id, array $signal): ?array {
         global $wpdb;
-        $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($signal['symbol'] ?? '')));
+        $symbol = $this->normalize_symbol_token((string) ($signal['symbol'] ?? ''));
         $direction = strtoupper((string) ($signal['direction'] ?? ''));
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM {$this->table('mt5_signal_candidates')} WHERE user_id = %d",
@@ -6524,7 +6524,7 @@ final class SMC_SuperFib_Sniper_REST {
         $anchor = (string) ($engine['anchorSessionId'] ?? ($engine['anchorSession'] ?? $fallback_anchor));
         $family_parts = array(
             $user_id,
-            preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($candidate['symbol'] ?? ''))),
+            $this->normalize_symbol_token((string) ($candidate['symbol'] ?? '')),
             strtoupper((string) ($candidate['direction'] ?? '')),
             (string) ($candidate['fib_family'] ?? 'backend'),
             is_numeric($candidate['fib_ratio'] ?? null) ? number_format((float) $candidate['fib_ratio'], 4, '.', '') : 'na',
@@ -6543,7 +6543,7 @@ final class SMC_SuperFib_Sniper_REST {
         $anchor = (string) ($engine['anchorSessionId'] ?? ($engine['anchorSession'] ?? date('Ymd', strtotime((string) ($candidate['created_at'] ?? $this->now_mysql())))));
         $parts = array(
             $user_id,
-            preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($candidate['symbol'] ?? ''))),
+            $this->normalize_symbol_token((string) ($candidate['symbol'] ?? '')),
             strtoupper((string) ($candidate['direction'] ?? '')),
             (string) (($candidate['fib_family'] ?? '') ?: ($engine['firstReactionFamily'] ?? 'backend')),
             is_numeric($candidate['fib_ratio'] ?? null) ? number_format((float) $candidate['fib_ratio'], 4, '.', '') : 'na',
@@ -6609,7 +6609,7 @@ final class SMC_SuperFib_Sniper_REST {
         }
         $out = array();
         foreach ((array) $rows as $row) {
-            $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($row['symbol'] ?? '')));
+            $symbol = $this->normalize_symbol_token((string) ($row['symbol'] ?? ''));
             if (!empty($lookup) && !isset($lookup[$symbol])) {
                 continue;
             }
@@ -6669,7 +6669,7 @@ final class SMC_SuperFib_Sniper_REST {
         $row = array(
             'id' => $id,
             'user_id' => $user_id,
-            'symbol' => preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($candidate['symbol'] ?? ''))),
+            'symbol' => $this->normalize_symbol_token((string) ($candidate['symbol'] ?? '')),
             'direction' => strtoupper((string) ($candidate['direction'] ?? '')),
             'lifecycle_state' => 'DISPLAY_ACTIVE',
             'status' => strtoupper((string) ($candidate['status'] ?? '')),
@@ -6758,7 +6758,7 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function is_display_signal_eligible(array $signal, array $watchlist_lookup): bool {
-        $symbol = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) ($signal['symbol'] ?? '')));
+        $symbol = $this->normalize_symbol_token((string) ($signal['symbol'] ?? ''));
         if ($symbol === '' || !isset($watchlist_lookup[$symbol])) {
             return false;
         }
@@ -7413,15 +7413,35 @@ final class SMC_SuperFib_Sniper_REST {
     }
 
     private function get_sl_from_sweep($direction, $sweep_up, $sweep_down, $swing_hi, $swing_lo, $symbol = null) {
-        // 5-pip buffer beyond swing extreme; scale by instrument pip_size so JPY/metal/index
-        // pairs don't get a USD-pair-sized buffer that is effectively 0 pips.
-        $spec   = $symbol ? $this->get_instrument_spec($symbol) : null;
-        $buffer = $spec ? ((float) $spec['pip_size'] * 5) : 0.0005;
+        $spec = $symbol ? $this->get_instrument_spec($symbol) : null;
+        $pip = is_array($spec) && isset($spec['pip_size']) && (float) $spec['pip_size'] > 0
+            ? (float) $spec['pip_size']
+            : 0.0001;
+        $buffer_pips = 5.0;
+        $floor_pips = $this->get_stop_floor_pips($symbol);
+        $buffer = $pip * max($buffer_pips, $floor_pips);
+
         if ($direction === 'LONG') {
             return round($swing_lo - $buffer, 8);
-        } else {
-            return round($swing_hi + $buffer, 8);
         }
+        return round($swing_hi + $buffer, 8);
+    }
+
+    private function get_stop_floor_pips($symbol = null) {
+        $spec = $symbol ? $this->get_instrument_spec($symbol) : null;
+        if (is_array($spec) && isset($spec['min_stop_pips']) && (float) $spec['min_stop_pips'] > 0) {
+            return (float) $spec['min_stop_pips'];
+        }
+
+        $type = is_array($spec) ? (string) ($spec['type'] ?? '') : '';
+        if ($type === 'metal' || $type === 'crypto') {
+            return 50.0;
+        }
+        if ($type === 'index') {
+            return 30.0;
+        }
+
+        return 20.0;
     }
 
     private function legacy_stage_entry_spread($spec) {
