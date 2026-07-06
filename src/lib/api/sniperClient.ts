@@ -76,9 +76,6 @@ import {
   mockSignals,
   mockUserProgress,
 } from "@/mocks/sniperData";
-import type {
-  DashboardSettings as SharedDashboardSettings,
-} from "../../../packages/contracts/src/index";
 
 const WORDPRESS_BACKEND_URL = "https://trader.stokvelsociety.co.za/wp-json";
 
@@ -422,7 +419,7 @@ export const apiClient = {
     mock = MOCK_MODE,
   ): Promise<{ ok: true }> {
     if (mock) return { ok: true };
-    return call("/user/settings", { method: "POST", body: payload as SharedDashboardSettings });
+    return call("/user/settings", { method: "POST", body: payload });
   },
   async postTwelveDataKey(
     payload: TwelveDataKeyPayload,
@@ -462,11 +459,11 @@ export const apiClient = {
 
   /** Force a backend market-data refresh + engine run for the given symbols (or full watchlist). */
   async postEngineBatch(
-    symbols?: Symbol[],
+    payload: EngineBatchPayload = {},
     mock = MOCK_MODE,
   ): Promise<{ ok: boolean; diagnostics: SymbolDiagnostic[] }> {
     if (mock) return { ok: true, diagnostics: [] };
-    return call("/user/engine-batch", { method: "POST", body: symbols ? { symbols } : {} });
+    return call("/user/engine-batch", { method: "POST", body: payload });
   },
 
   // Dedicated watchlist endpoints - changes persist immediately without a full settings save.

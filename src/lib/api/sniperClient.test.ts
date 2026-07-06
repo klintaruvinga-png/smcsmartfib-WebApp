@@ -343,7 +343,7 @@ describe("user account and related backend contract endpoints", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(apiClient.postEngineBatch(["EURUSD", "XAUUSD"], false)).resolves.toEqual({
+    await expect(apiClient.postEngineBatch({ symbols: ["EURUSD", "XAUUSD"] }, false)).resolves.toEqual({
       ok: true,
       diagnostics: [],
     });
