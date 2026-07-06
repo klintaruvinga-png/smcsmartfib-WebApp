@@ -315,6 +315,10 @@ export interface DashboardSettings {
   signalBoardSize?: 3 | 5 | 10;
 }
 
+export interface UserSettingsPayload extends Partial<DashboardSettings> {
+  watchlist?: Symbol[];
+}
+
 export interface RiskProfile {
   tier: "conservative" | "balanced" | "aggressive";
   maxConcurrentTrades: number;
@@ -323,6 +327,29 @@ export interface RiskProfile {
   ddCapPct: number;
   cooldownMin: number;
   updatedAt: string;
+}
+
+export interface RiskProfilePayload extends Partial<RiskProfile> {
+  updatedAt?: string;
+}
+
+export type UserAccountPayload = Partial<AccountState>;
+
+export interface TwelveDataKeyPayload {
+  apiKey: string;
+  testOnly?: boolean;
+}
+
+export interface ExecuteSignalsPayload {
+  signalIds: string[];
+}
+
+export interface EngineBatchPayload {
+  symbols?: Symbol[];
+}
+
+export interface WatchlistChangePayload {
+  symbol: Symbol;
 }
 
 export interface AccountState {

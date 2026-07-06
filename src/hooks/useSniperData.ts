@@ -547,7 +547,7 @@ export function useEngineBatch() {
   const queryClient = useQueryClient();
   return useMutation<{ ok: boolean; diagnostics: SymbolDiagnostic[] }, Error, Symbol[] | undefined>(
     {
-      mutationFn: (symbols) => apiClient.postEngineBatch(symbols),
+      mutationFn: (symbols) => apiClient.postEngineBatch(symbols ? { symbols } : {}),
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["snapshot"] });
         queryClient.invalidateQueries({ queryKey: ["live-signals"] });
