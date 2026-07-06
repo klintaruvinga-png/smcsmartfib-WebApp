@@ -45,13 +45,6 @@ import type {
   TwelveDataKeyStatus,
   TradePlan,
   UserProgress,
-  UserSettingsPayload,
-  RiskProfilePayload,
-  UserAccountPayload,
-  TwelveDataKeyPayload,
-  ExecuteSignalsPayload,
-  EngineBatchPayload,
-  WatchlistChangePayload,
 } from "@/types/sniper";
 import type {
   RawAccountTelemetryResponse,
@@ -406,7 +399,7 @@ export const apiClient = {
     if (mock) return mockAccount;
     return call("/user/account", { cacheBust: true });
   },
-  async postUserAccount(payload: UserAccountPayload, mock = MOCK_MODE): Promise<{ ok: true }> {
+  async postUserAccount(payload: Partial<AccountState>, mock = MOCK_MODE): Promise<{ ok: true }> {
     if (mock) return { ok: true };
     return call("/user/account", { method: "POST", body: payload });
   },
@@ -415,14 +408,14 @@ export const apiClient = {
     return call("/user/settings", { cacheBust: true });
   },
   async postUserSettings(
-    payload: UserSettingsPayload,
+    payload: Partial<DashboardSettings>,
     mock = MOCK_MODE,
   ): Promise<{ ok: true }> {
     if (mock) return { ok: true };
     return call("/user/settings", { method: "POST", body: payload });
   },
   async postTwelveDataKey(
-    payload: TwelveDataKeyPayload,
+    payload: { apiKey: string; testOnly?: boolean },
     mock = MOCK_MODE,
   ): Promise<{ ok: boolean; status: TwelveDataKeyStatus; message?: string }> {
     if (mock) return { ok: Boolean(payload.apiKey), status: payload.apiKey ? "ok" : "missing" };
@@ -443,14 +436,14 @@ export const apiClient = {
     );
   },
   async postUserRiskProfile(
-    payload: RiskProfilePayload,
+    payload: Partial<RiskProfile>,
     mock = MOCK_MODE,
   ): Promise<{ ok: true }> {
     if (mock) return { ok: true };
     return call("/user/risk-profile", { method: "POST", body: payload });
   },
   async postExecuteSignals(
-    payload: ExecuteSignalsPayload,
+    payload: { signalIds: string[] },
     mock = MOCK_MODE,
   ): Promise<{ ok: true; queued: number }> {
     if (mock) return { ok: true, queued: payload.signalIds.length };
@@ -459,11 +452,11 @@ export const apiClient = {
 
   /** Force a backend market-data refresh + engine run for the given symbols (or full watchlist). */
   async postEngineBatch(
-    payload: EngineBatchPayload = {},
+    symbols?: Symbol[],
     mock = MOCK_MODE,
   ): Promise<{ ok: boolean; diagnostics: SymbolDiagnostic[] }> {
     if (mock) return { ok: true, diagnostics: [] };
-    return call("/user/engine-batch", { method: "POST", body: payload });
+    return call("/user/engine-batch", { method: "POST", body: symbols ? { symbols } : {} });
   },
 
   // Dedicated watchlist endpoints - changes persist immediately without a full settings save.
@@ -480,7 +473,7 @@ export const apiClient = {
     }
     const result = await call<{ ok: boolean; watchlist?: Symbol[] }>("/user/watchlist/add", {
       method: "POST",
-      body: { symbol } as WatchlistChangePayload,
+      body: { symbol },
     });
     return {
       ok: result.ok,
@@ -497,7 +490,7 @@ export const apiClient = {
     }
     const result = await call<{ ok: boolean; watchlist?: Symbol[] }>("/user/watchlist/remove", {
       method: "POST",
-      body: { symbol } as WatchlistChangePayload,
+      body: { symbol },
     });
     return {
       ok: result.ok,
