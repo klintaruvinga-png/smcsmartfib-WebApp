@@ -1,0 +1,5 @@
+{
+  "issue": "fix local automation pipeline to avoid recurring error where stale artefacts are blocking the pipeline from continuing tasks, lock this as a known error and create permanent fixes so this does not happen again in future",
+  "research_hash": "fa9c5299587b380618ea4821c68df076da0c5cf1cbcc9ecae2e1790ce3a09b82",
+  "written_at": "2026-05-26T09:59:48.444Z"
+}

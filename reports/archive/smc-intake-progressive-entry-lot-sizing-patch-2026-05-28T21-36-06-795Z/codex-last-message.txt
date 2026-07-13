@@ -1,0 +1,27 @@
+**Outcome**
+
+This landed as a test-only hardening patch. The current repo state did not prove a production defect in `build_trade_plan()` or `post_execute_signals()`, so I kept `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` unchanged and pinned the contract instead:
+
+- backend plan lot derivation
+- stored-plan to queued-order staged lot mapping
+- dashboard rendering of backend `lotSize.e1/e2/e3`
+
+Key files changed are [fib-test-helpers.php](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/tests/php/fib-test-helpers.php), [test-progressive-lot-sizing.php](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/tests/php/test-progressive-lot-sizing.php), [test-execute-signals-stage-lots.php](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/tests/php/test-execute-signals-stage-lots.php), and [src/routes/-plan.test.tsx](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/routes/-plan.test.tsx).
+
+**Validation**
+
+Passed:
+
+- `php wordpress/smc-superfib-sniper/tests/php/test-progressive-lot-sizing.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-execute-signals-stage-lots.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php`
+- `npx vitest run src/routes/-plan.test.tsx`
+- `node scripts/validate-implementation.mjs`
+
+Artifacts are [reports/codex-implementation.md](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md), [BUG sweep](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-28_progressive-entry-lot-sizing.md), and [parity audit](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-0-backend-dashboard-progressive-lot-sizing-parity-2026-05-28.md).
+
+Branch: `codex/smc-intake-progressive-entry-lot-sizing-patch`  
+Commit: `3711db7`  
+PR: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/273
+
+No review comments are present on the PR yet.

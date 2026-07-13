@@ -1,0 +1,35 @@
+**Objective**
+
+Implemented the smallest safe patch for the `account-sync` / `symbol-sync` `user_id` handling contract on branch `codex/smc-intake-resolve-account-sync-symbol-sync-user`.
+
+**Root cause / patch**
+
+Repository reality did not match the original failure description exactly: the checked-in source already emits `user_id` and preserves init ordering. The remaining gap was observability on the live attach path. I kept payload/auth behavior unchanged and added only the missing diagnostics:
+
+- [mt5/MarketDataEngine.mqh](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/mt5/MarketDataEngine.mqh) now logs resolved `user_id` before `license-check`, `heartbeat`, `account-sync`, and `symbol-sync` dispatch.
+- [wordpress/smc-superfib-sniper/smc-superfib-sniper.php](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/smc-superfib-sniper.php) now logs auth success with the accepted `user_id` after `wp_set_current_user()`.
+
+Required artifacts were added/updated:
+- [reports/codex-implementation.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md)
+- [.github/docs/BUG_SWEEP_REPORT_2026-05-17_account-sync-symbol-sync-user-id-observability.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-17_account-sync-symbol-sync-user-id-observability.md)
+- [.github/migration/audits/phase-1-mt5-ea-post-init-user-id-parity-2026-05-17.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-1-mt5-ea-post-init-user-id-parity-2026-05-17.md)
+
+**Validation**
+
+Passed:
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php`
+- `npm run check:mql`
+- `npm run validate:impl`
+
+Not fully verified:
+- MetaEditor CLI compile was inconclusive: `MetaEditor64.exe` returned `exit=0` but produced no compiler log and no `.ex5` artifact.
+- Live MT5 attach, backend 200-response capture, and DB row verification for `smc_sf_account_snapshots` / `smc_sf_symbol_sync` are still pending.
+
+**PR**
+
+Commit: `fb86a6c`  
+PR: [#193](https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/193)  
+State: open, non-draft

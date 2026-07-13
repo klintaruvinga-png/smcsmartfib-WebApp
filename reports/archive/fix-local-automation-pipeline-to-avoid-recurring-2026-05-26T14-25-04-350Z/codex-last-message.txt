@@ -1,0 +1,20 @@
+**Outcome**
+
+Patched [scripts/pipeline-watcher.js](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/scripts/pipeline-watcher.js>) so `RESEARCHING` archives stale prior-issue plan/implementation artifacts before advancing to `PLANNING`, and so the watcher’s reset-sentinel path archives to `reports/archive/manual-reset-*` instead of leaving stale artifacts behind. Patched [scripts/reset-pipeline.js](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/scripts/reset-pipeline.js>) to archive plan/implementation artifacts and reset `.smc-workflow-state.json` to `IDLE` locally while preserving the existing sentinel flow.
+
+Documented the guard in [.github/copilot-instructions.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/copilot-instructions.md>), recorded the known failure in [reports/automation-update-log.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/automation-update-log.md>), wrote the required implementation artifacts in [reports/codex-implementation.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md>) and [reports/codex-implementation.meta.json](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.meta.json>), and generated the bug sweep at [.github/docs/BUG_SWEEP_REPORT_2026-05-26_pipeline-stale-artifacts.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-26_pipeline-stale-artifacts.md>). PR is open and non-draft: `#248` https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/248
+
+**Validation**
+
+Ran the required manual scenarios through a backup/restore harness:
+- stale prior-issue plan archived before `PLANNING`
+- matching current-cycle plan preserved across repeated watcher starts
+- `node scripts/reset-pipeline.js` archived plan/implementation artifacts and reset workflow state to `IDLE`
+
+Also ran:
+- `node scripts/validate-implementation.mjs` — pass
+- `npx eslint scripts/pipeline-watcher.js scripts/reset-pipeline.js` — pass
+
+**Notes**
+
+The smallest safe ambiguity resolution was keeping the repo’s existing sentinel-based reset architecture and adding local archive/reset behavior rather than rewriting reset around watcher termination. I did not replay a full live Claude/Codex/merge cycle, so that remains the main residual verification item post-merge. There are no review artifacts yet (`reports/codex-review.json` is absent), so there was nothing to remediate in the Claude review-fix stage. Existing unstaged workspace edits remain in `reports/copilot-research.md`, `reports/codex-plan.md`, and `reports/codex-plan.meta.json`.

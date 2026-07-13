@@ -1,0 +1,5 @@
+{
+  "issue": "SMC Intake - Check and fix 2-prong issue: After market open (post-weekend) watchlist shows only weekend-live instruments (cryptocurrencies); other watchlist instruments are not showing. In the signal engine, toggling between All Symbols and Watchlist only is broken.",
+  "research_hash": "0d0b414eaab673043776b22b979e96dbc230c77175b7fe29849d350f0976b1c9",
+  "written_at": "2026-05-25T11:36:54.778Z"
+}

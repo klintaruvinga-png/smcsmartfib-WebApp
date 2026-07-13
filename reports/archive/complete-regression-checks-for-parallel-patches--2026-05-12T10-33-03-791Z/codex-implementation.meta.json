@@ -1,0 +1,5 @@
+{
+  "issue": "Complete regression checks for parallel patches: confirm no soak evidence deletion, no API contract drift, verify admin routes load correctly, confirm export/print works, verify snapshot invalidation intact",
+  "plan_hash": "0d27c5ec5ac1fed3ff979e6344fb6be5f021d531448b46da29711bdc93387a09",
+  "written_at": "2026-05-12T10:27:39.044Z"
+}

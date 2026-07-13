@@ -1,0 +1,36 @@
+**Objective**
+
+Patched the post-init EA bridge payload gap. `/ea/heartbeat`, `/ea/account-sync`, and `/ea/symbol-sync` now send integer `user_id` from `wpUserId` in [mt5/MarketDataEngine.mqh](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/mt5/MarketDataEngine.mqh), with no backend auth relaxation and no change to the working license-check transport.
+
+**Root Cause / Exact Changes**
+
+`permission_ea_bridge()` was correct; the EA POST bodies were missing `user_id` after init. I applied the smallest safe patch:
+- Added top-level `user_id` to `SendHeartbeat()`, `SendAccountSync()`, and `SendSymbolSync()`.
+- Extended the existing PHP bridge tests to keep the backend guard explicit for omitted and zero `user_id`:
+  [test-ea-heartbeat.php](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php), [test-ea-account-sync.php](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php), [test-ea-symbol-sync.php](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php).
+- Wrote the required implementation/report artifacts, including [reports/codex-implementation.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md).
+
+**Acceptance Criteria**
+
+- Valid post-init EA POST calls now satisfy the backend `user_id` auth requirement.
+- Missing or zero `user_id` is still rejected by backend authority.
+- `SendLicenseCheck()` remains unchanged.
+
+**Regression Checks**
+
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-heartbeat.php` - PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php` - PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-symbol-sync.php` - PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php` - PASS
+- `npm run check:mql` - PASS
+- `npm run validate:impl` - PASS
+
+**Artifacts / PR**
+
+- Bug sweep: [BUG_SWEEP_REPORT_2026-05-17_ea-post-init-missing-user-id.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-17_ea-post-init-missing-user-id.md)
+- Parity audit: [phase-1-mt5-ea-post-init-user-id-parity-2026-05-17.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-1-mt5-ea-post-init-user-id-parity-2026-05-17.md)
+- Branch: `codex/license-gate-is-fixed-but-some-downstream-ea-bac`
+- Commit: `b556fee`
+- PR: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/192
+
+Remaining live risk is unchanged: a real MT5 attach is still needed to confirm backend 200s and fresh account/symbol rows after deployment.

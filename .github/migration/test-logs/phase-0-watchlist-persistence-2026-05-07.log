@@ -1,0 +1,35 @@
+Date: 2026-05-07
+Scope: Watchlist persistence / ghost tile regression hardening
+Update: frontend draft-sync and user-settings refetch race guard follow-up applied
+
+[php -l plugin syntax]
+Command: php -l wordpress\smc-superfib-sniper\smc-superfib-sniper.php
+Result: No syntax errors detected in wordpress\smc-superfib-sniper\smc-superfib-sniper.php
+
+[watchlist snapshot regression harness]
+Command: php wordpress\smc-superfib-sniper\tests\php\test-watchlist-snapshot-regression.php
+Result: watchlist snapshot regression checks passed
+Observed log: SMC_SF: engine snapshot invalidated for user 42 after watchlist change
+
+[rest bootstrap regression harness]
+Command: php wordpress\smc-superfib-sniper\tests\php\test-rest-bootstrap-settings.php
+Result: rest bootstrap settings regression checks passed
+
+[frontend production build]
+Command: npm run build
+Result: PASS
+Notes:
+- Client build completed successfully.
+- SSR build completed successfully.
+- No TypeScript or bundling errors in the touched watchlist/query paths.
+
+[follow-up frontend guards]
+Changes:
+- `useUserSettings()` now uses `staleTime: 30_000`
+- watchlist mutation refetch pass now includes `["user-settings"]`
+- Account add flow clears `newPair` before awaiting mutation and restores it on failure
+- dirty Account draft continues syncing `s.watchlist` from watchlist mutation results so `/user/settings` saves cannot revert the persisted watchlist
+
+Outstanding manual verification:
+- Confirm add/remove in a live authenticated WordPress session does not flicker back in Account.
+- Confirm removed symbols disappear from Live Radar / Signal Engine within one active refresh cycle.

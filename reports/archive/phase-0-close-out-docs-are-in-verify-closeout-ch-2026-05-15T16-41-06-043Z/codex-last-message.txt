@@ -1,0 +1,31 @@
+**Outcome**
+
+Implemented the Phase 0 closeout verification / Phase 1 docs pass on `codex/phase-0-close-out-docs-are-in-verify-closeout-ch`, pushed it, and opened PR [#184](https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/184).
+
+The patch does four things:
+- adds the canonical Phase 1 docs: [PHASE1_BRIDGE_ROADMAP.md](C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/migration/PHASE1_BRIDGE_ROADMAP.md), [PHASE1_TRACKER.md](C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/migration/PHASE1_TRACKER.md), [PHASE1_CHECKLIST.md](C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/migration/PHASE1_CHECKLIST.md)
+- archives the seven explicitly listed superseded Phase 0 checkpoint files under [phase-0-updates-prior-to-2026-05-15](C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/migration/archive/phase-0-updates-prior-to-2026-05-15/ARCHIVE_INDEX.md), archives `stratupdate.md`, and moves `phase3_mt5_simulation_test.php` into [wordpress/smc-superfib-sniper/tests/php](C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/tests/php/phase3_mt5_simulation_test.php)
+- updates the migration board to point at the new Phase 1 docs and repoints live historical references away from dead `phase-updates/` paths
+- adds the required watcher regression guard and fixes the stale watchlist unit test so the requested validation set passes
+
+Artifacts are in [reports/codex-implementation.md](C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md) and [BUG_SWEEP_REPORT_2026-05-15_phase1-closeout-doc-governance.md](C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-15_phase1-closeout-doc-governance.md). No parity audit was generated because this patch did not require parity re-validation.
+
+**Validation**
+
+Ran:
+- `node --test scripts/pipeline-watcher.test.mjs`
+- `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php`
+- `npx vitest run src/hooks/useSniperData.test.tsx src/hooks/useSniperData.watchlist.test.tsx`
+
+Also verified:
+- canonical Phase 0 closeout artifact remains in `.github/migration/phase-updates/`
+- `phase3_mt5_simulation_test.php` is gone from repo root
+- log files are ignored
+- working tree is clean after push
+
+**Notes**
+
+Two contract ambiguities were resolved and recorded in the implementation summary:
+- the contract said “move eight” Phase 0 files but only named seven, so only the seven named files were moved
+- `migration-status.md` shows `Overall Progress: 50%` while the Phase 1 row is `20%`; the new Phase 1 docs use the phase-specific `20%` value as the safer source of truth

@@ -1,0 +1,38 @@
+**Objective**
+
+Execution is blocked by a contract mismatch. I did not edit code.
+
+**Root Cause / Analysis**
+
+The runtime context says the issue is:
+
+- `Implement EA side routes for Phase 1 Bridge: missing 4 critical WebRequest calls in MT5 EA (license-check, heartbeat, account-sync, symbol-sync)`
+
+But the two required authoritative inputs say something materially different:
+
+- [reports/copilot-research.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/copilot-research.md) is a documentation-governance report about Phase 0 closeout / Phase 1 roadmap docs
+- [reports/codex-plan.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/codex-plan.md) is a hardening plan for:
+  - creating Phase 1 roadmap/tracker/checklist docs
+  - archiving prior Phase 0 docs
+  - moving root artifacts/logs
+  - explicitly making no MT5/backend/frontend code changes
+
+That directly conflicts with the stated implementation task. Per your stop conditions, this is a contract/repository-context conflict and I should stop rather than guess.
+
+**What’s missing**
+
+One of these needs to be corrected before I proceed:
+
+1. Updated `reports/copilot-research.md` and `reports/codex-plan.md` for the EA WebRequest route work, or
+2. An explicit instruction that runtime context overrides those two files and I should implement the MT5 EA patch directly.
+
+**Safe next step**
+
+If you want, send either:
+
+- corrected report files for the EA route task, or
+- a one-line override such as:
+
+`Runtime context overrides the current report files. Implement the MT5 EA WebRequest routes on branch codex/implement-ea-side-routes-for-phase-1-bridge-miss.`
+
+Once that is confirmed, I’ll continue end-to-end on the branch, patch the EA surgically, run validation, write `reports/codex-implementation.md`, commit, push, and open the normal PR.

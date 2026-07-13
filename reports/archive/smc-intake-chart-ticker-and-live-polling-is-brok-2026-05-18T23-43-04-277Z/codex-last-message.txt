@@ -1,0 +1,19 @@
+**Objective**
+
+Stopped under the contract’s explicit stop condition because the prescribed fix conflicts with repository reality.
+
+**Root cause / analysis**
+
+The contract says the MT5 heartbeat dispatch is missing from the periodic path. The repo already has an active heartbeat call in [mt5/SMC_MarketDataEA.mq5](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/mt5/SMC_MarketDataEA.mq5:271>) via `engine.SendHeartbeat()` inside `OnTimer()`. The handler itself exists in [mt5/MarketDataEngine.mqh](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/mt5/MarketDataEngine.mqh:466>) and posts to `baseUrl + "/ea/heartbeat"`.
+
+That means the contract’s “confirmed root cause” is false for this repo. Applying the planned patch would misdiagnose the issue and widen scope. I also found a separate repo inconsistency: [mt5/SMC_MarketDataEA.mq5](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/mt5/SMC_MarketDataEA.mq5:224>) references `HeartbeatIntervalTicks`, but no matching input declaration appears in the inspected file.
+
+**Exact changes**
+
+I wrote the required stop report at [reports/codex-implementation.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md>), created the required branch `codex/smc-intake-chart-ticker-and-live-polling-is-brok`, committed it as `92313b2` with message `docs: add stop report (contract conflict)`, and pushed the branch to origin.
+
+No code patch was applied. No validations were run, because the stop condition fired before safe implementation was possible.
+
+**Remaining blocker**
+
+A fresh repo-based diagnosis is needed for the actual chart ticker/live polling failure. The current contract is targeting the wrong failure path, so I did not open a PR.

@@ -1,0 +1,28 @@
+**Objective**
+
+Fixed the watchlist persistence path on branch `codex/fix-watchlist-persistence-symbols-persist-after-`, committed as `09fb909`, and opened PR [#179](https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/179).
+
+**Root Cause / Fix**
+
+The confirmed failure path was in the frontend cache lifecycle, not backend authority. [useSniperData.ts](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/hooks/useSniperData.ts>) already wrote the canonical watchlist into `["user-settings"]`, but it never invalidated that query after add/remove success. I added scoped `["user-settings"]` invalidation immediately after `writeCanonicalWatchlist` in both watchlist mutation success handlers.
+
+`account.tsx` was conditionally in scope and did require a patch. [account.tsx](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/routes/account.tsx>) was reading raw `queryClient.getQueryData(["user-settings"])` inside `syncDraftWatchlistFromCache`, so I changed that path to defer the draft sync until `useUserSettings` is settled and then consume the reactive canonical watchlist instead.
+
+**Validation**
+
+Added/updated tests in [useSniperData.test.tsx](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/hooks/useSniperData.test.tsx>) and [useSniperData.watchlist.test.tsx](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/hooks/useSniperData.watchlist.test.tsx>).
+
+Ran:
+- `npx vitest run src/hooks/useSniperData.test.tsx src/hooks/useSniperData.watchlist.test.tsx` → PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php` → PASS
+- `npx vitest run` → FAIL, unrelated pre-existing suite/config issues
+- `npx tsc --noEmit` → FAIL, unrelated pre-existing type errors
+
+Manual browser/staging validations from the contract were not executable in this CLI pass, so those remain open.
+
+**Artifacts**
+
+Implementation summary: [reports/codex-implementation.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md>)  
+Bug sweep: [.github/docs/BUG_SWEEP_REPORT_2026-05-15_watchlist-persistence.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-15_watchlist-persistence.md>)
+
+No parity audit was generated because this patch did not change Pine, MT5, backend formulas, or authority boundaries.

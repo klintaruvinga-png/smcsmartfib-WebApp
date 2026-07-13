@@ -17,32 +17,32 @@ describe("default backend URL resolution", () => {
   it("uses the configured build-time backend URL when present", () => {
     expect(
       resolveDefaultBackendUrl(
-        " https://custom.example/wp-json ",
+        " https://custom.example ",
         "https://smcsuperfibwebapp.klintaruvinga.workers.dev",
       ),
-    ).toBe("https://custom.example/wp-json");
+    ).toBe("https://custom.example");
   });
 
   it("uses the canonical WordPress backend on external frontend hosts", () => {
     expect(
       resolveDefaultBackendUrl(null, "https://smcsuperfibwebapp.klintaruvinga.workers.dev"),
-    ).toBe("https://trader.stokvelsociety.co.za/wp-json");
+    ).toBe("https://trader.stokvelsociety.co.za");
 
     expect(resolveDefaultBackendUrl(undefined, "https://smcsmartfib.lovable.app")).toBe(
-      "https://trader.stokvelsociety.co.za/wp-json",
+      "https://trader.stokvelsociety.co.za",
     );
   });
 
   it("keeps same-origin REST calls when served from the WordPress backend host", () => {
     expect(resolveDefaultBackendUrl(undefined, "http://trader.stokvelsociety.co.za:8080")).toBe(
-      "http://trader.stokvelsociety.co.za:8080/wp-json",
+      "http://trader.stokvelsociety.co.za:8080",
     );
   });
 });
 
 describe("fetchSoakReport", () => {
   beforeEach(() => {
-    setBackendUrl("https://example.com/wp-json");
+    setBackendUrl("https://example.com");
   });
 
   afterEach(() => {
@@ -133,7 +133,7 @@ describe("fetchSoakReport", () => {
 
 describe("user settings contract", () => {
   beforeEach(() => {
-    setBackendUrl("https://example.com/wp-json");
+    setBackendUrl("https://example.com");
   });
 
   afterEach(() => {
@@ -155,7 +155,7 @@ describe("user settings contract", () => {
     await expect(
       apiClient.postUserSettings(
         {
-          backendUrl: "https://example.com/wp-json",
+          backendUrl: "https://example.com",
           watchlist: ["EURUSD", "XAUUSD"],
         },
         false,
@@ -167,7 +167,7 @@ describe("user settings contract", () => {
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({
-          backendUrl: "https://example.com/wp-json",
+          backendUrl: "https://example.com",
           watchlist: ["EURUSD", "XAUUSD"],
         }),
       }),
@@ -177,7 +177,7 @@ describe("user settings contract", () => {
 
 describe("user risk profile contract", () => {
   beforeEach(() => {
-    setBackendUrl("https://example.com/wp-json");
+    setBackendUrl("https://example.com");
   });
 
   afterEach(() => {
@@ -229,7 +229,7 @@ describe("user risk profile contract", () => {
 
 describe("user account and related backend contract endpoints", () => {
   beforeEach(() => {
-    setBackendUrl("https://example.com/wp-json");
+    setBackendUrl("https://example.com");
   });
 
   afterEach(() => {
@@ -410,7 +410,7 @@ describe("user account and related backend contract endpoints", () => {
 
 describe("Phase 2 telemetry client reads", () => {
   beforeEach(() => {
-    setBackendUrl("https://example.com/wp-json");
+    setBackendUrl("https://example.com");
   });
 
   afterEach(() => {
@@ -648,7 +648,7 @@ describe("Phase 2 telemetry client reads", () => {
 
 describe("ladders client contract", () => {
   beforeEach(() => {
-    setBackendUrl("https://example.com/wp-json");
+    setBackendUrl("https://example.com");
   });
 
   afterEach(() => {
@@ -676,7 +676,7 @@ describe("ladders client contract", () => {
 
 describe("unified snapshot client contract", () => {
   beforeEach(() => {
-    setBackendUrl("https://example.com/wp-json");
+    setBackendUrl("https://example.com");
   });
 
   afterEach(() => {

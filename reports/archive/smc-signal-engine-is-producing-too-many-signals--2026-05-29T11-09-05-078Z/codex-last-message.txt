@@ -1,0 +1,44 @@
+**Objective**
+
+Stopped duplicate same-range MT5 candidate writes at the backend authority boundary without changing MT5 scoring, Pine formulas, frontend logic, or stale-data protections.
+
+PR: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/284  
+Branch: `codex/smc-signal-engine-is-producing-too-many-signals-`  
+Commit: `1665973`
+
+**Root Cause / Analysis**
+
+`post_ea_signal_candidates()` was persisting every valid MT5 candidate and only classifying Pine drift. There was no lifecycle gate to block a new candidate while the prior candidate for the same symbol/range was still active.
+
+**Patch Plan**
+
+Kept the patch backend-only and schema-free. The new gate checks the latest same-range MT5 candidate, then suppresses only when backend authority proves the prior one is still active: live pre-entry snapshot, live matching open position, or live matching pending order. Unresolved/stale authority fails open.
+
+**Exact Code Changes**
+
+- [smc-superfib-sniper.php](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/smc-superfib-sniper.php:3743>)  
+  Added same-range lookup, lifecycle helpers, suppression logic, and suppression/unresolved diagnostics before candidate persistence.
+- [test-mt5-snapshot-contract.php](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php:1090>)  
+  Added regressions for pre-entry suppression, open-position suppression, pending-order suppression, and post-entry release. Extended the local WPDB harness just enough to exercise the new backend queries.
+- [codex-implementation.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md:1>)  
+  Wrote the required implementation summary.
+- Generated:
+  [BUG_SWEEP_REPORT_2026-05-29_mt5-signal-lifecycle-suppression.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-29_mt5-signal-lifecycle-suppression.md:1>)
+  [phase-6-mt5-parity-2026-05-29.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-6-mt5-parity-2026-05-29.md:1>)
+
+**Acceptance Criteria**
+
+- Same-range duplicate candidate is suppressed while prior signal is still pre-entry valid.
+- Same-range duplicate candidate is suppressed while a matching live MT5 open position exists.
+- Same-range duplicate candidate is suppressed while a matching live MT5 pending order exists.
+- New same-range candidate is accepted once entry is crossed and no fresh matching live trade exists.
+- Stale/missing authority does not suppress.
+
+**Regression Checks**
+
+- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` passed.
+- `npx vitest run scripts/mt5-signal-dispatch.test.mjs` passed.
+- No PR review comments are present yet.
+- PR check status: `Workers Builds: smcsuperfibwebapp` was still `IN_PROGRESS` at last check.
+
+Manual verification still recommended in a live MT5 120-second dual-run cycle to confirm suppression and release behavior against real fills/stops.

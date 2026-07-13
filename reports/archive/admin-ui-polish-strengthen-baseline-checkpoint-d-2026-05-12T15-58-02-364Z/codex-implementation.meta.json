@@ -1,0 +1,5 @@
+{
+  "issue": "Admin UI polish—strengthen baseline/checkpoint distinction with icons/badges, surface age prominently in headers, improve print/export formatting to preserve evidence sections, and harden admin.tsx error handling with explicit operator-facing status messages on /admin/soak-report route",
+  "plan_hash": "bafd7382c115057a68021d79475b78dcb0c180ba76bb254b354fa3ce7839e088",
+  "written_at": "2026-05-12T13:22:22.888Z"
+}

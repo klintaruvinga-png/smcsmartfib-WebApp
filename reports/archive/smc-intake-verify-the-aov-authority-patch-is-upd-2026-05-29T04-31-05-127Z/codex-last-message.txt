@@ -1,0 +1,53 @@
+**Objective**
+
+Closed the confirmed MT5 parity gap without widening scope: signal fib input is now `M15/H1/H4` instead of M15-only, and authority-range lookup is bound to the selected trigger timeframe while preserving the existing AOV/equilibrium/RR formulas.
+
+**Root cause / exact code changes**
+
+- [FibEngine.mqh](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/mt5/FibEngine.mqh>)  
+  Added `BuildSignalFibLevelsForTF(...)`, stamped each `FibLevelOut` with `timeframe`, and made `BuildSignalFibLevels(...)` aggregate `M15/H1/H4` using the existing anchor/ratio math.
+- [SignalEngine.mqh](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/mt5/SignalEngine.mqh>)  
+  Moved authority-range reconstruction to happen after trigger selection and scoped it to `trig.timeframe`. MT5-local diagnostics now log trigger timeframe.
+- [MarketDataEngine.mqh](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/mt5/MarketDataEngine.mqh>)  
+  Updated the Phase 6 dispatch comment so it matches the live `M15/H1/H4` contract.
+- [mt5-signal-dispatch.test.mjs](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/scripts/mt5-signal-dispatch.test.mjs>)  
+  Replaced the old M15-only guard with a source-contract check for the helper, aggregated timeframe set, timeframe-aware authority lookup, and retained `AOV_EQUILIBRIUM_ZONE` / `AOV_EQUILIBRIUM_LEVEL` / `RR_BELOW_MIN` markers.
+
+Smallest-safe ambiguity resolution: I kept Pine, backend schema/payload, WordPress parity tests, and D1 signal selection out of scope because the contract did not prove they needed changes.
+
+**Acceptance criteria / regression checks**
+
+Passed:
+- `npx vitest run scripts/mt5-signal-dispatch.test.mjs`
+- `php wordpress/smc-superfib-sniper/tests/php/test-fib-parity.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-fib-ingestion.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-superfib-weighting.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-htf-authority-anchor.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-session-anchors.php`
+- `php scripts/parity-validator.php`
+- `php scripts/parity-validator.php --out reports/phase4-gate-2026-05-29.json`
+- `npm run validate:impl`
+
+Generated artifacts:
+- [codex-implementation.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md>)
+- [BUG_SWEEP_REPORT_2026-05-29_mt5-multitf-aov-signal-hardening.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-29_mt5-multitf-aov-signal-hardening.md>)
+- [phase-6-mt5-signal-parity-2026-05-29.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-6-mt5-signal-parity-2026-05-29.md>)
+- [phase4-gate-2026-05-29.json](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/phase4-gate-2026-05-29.json>)
+
+**PR / state**
+
+Branch: `codex/smc-intake-verify-the-aov-authority-patch-is-upd`  
+Commit: `8b476e8`  
+PR: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/275
+
+No actionable review comments were present when I checked. The only PR comment is a non-actionable Codex usage-limit notice. One PR check is still pending: `Workers Builds: smcsuperfibwebapp`.
+
+**Remaining risks**
+
+Repo-level parity is clean, but MT5 behavioral closeout is still unverified from this workspace. Still needed before claiming operational closeout:
+- one H1/H4 pass case in MT5 or Strategy Tester logs
+- one equilibrium block case
+- one RR-below-`2.0` block case
+- one clean `/ea/signal-candidates` dispatch cycle
+
+I left the pre-existing unrelated dirty `reports/` files untouched.

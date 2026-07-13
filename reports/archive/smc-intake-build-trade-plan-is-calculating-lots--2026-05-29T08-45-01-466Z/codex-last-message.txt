@@ -1,0 +1,17 @@
+**Result**
+
+Patched the backend sizing authority in [smc-superfib-sniper.php](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/smc-superfib-sniper.php:5331) so `build_trade_plan()` now sizes only from live `/account-telemetry` equity. If telemetry is stale, missing, or non-positive, the plan keeps its shape but returns zero risk, zero lots, and `state = 'INVALID'` instead of fabricating a tiny valid plan. I added the matching regressions in [test-progressive-lot-sizing.php](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/tests/php/test-progressive-lot-sizing.php:1) and the minimal telemetry bootstrap needed by that suite in [fib-test-helpers.php](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/tests/php/fib-test-helpers.php:130).
+
+Artifacts are in [reports/codex-implementation.md](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md:1), [.github/docs/BUG_SWEEP_REPORT_2026-05-29_trade-plan-telemetry-authority.md](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-29_trade-plan-telemetry-authority.md:1), and [.github/migration/audits/phase-4-trade-plan-sizing-parity-2026-05-29.md](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-4-trade-plan-sizing-parity-2026-05-29.md:1).
+
+**Validation**
+
+Ran:
+- `php wordpress/smc-superfib-sniper/tests/php/test-progressive-lot-sizing.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php`
+- `npx vitest run src/routes/-plan.test.tsx`
+- `npm run validate:impl`
+
+Committed as `4814da2` on `codex/smc-intake-build-trade-plan-is-calculating-lots-`, pushed, and opened PR `#282`: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/282
+
+No review comments exist yet on that PR. The branch still has unrelated unstaged report edits already present in the worktree: `reports/codex-plan.md`, `reports/codex-plan.meta.json`, and `reports/copilot-research.md`.

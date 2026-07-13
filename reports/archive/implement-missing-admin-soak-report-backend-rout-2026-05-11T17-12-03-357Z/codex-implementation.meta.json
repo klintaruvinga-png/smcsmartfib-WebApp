@@ -1,0 +1,5 @@
+{
+  "issue": "Implement missing /admin/soak-report backend route to fix 404 error and expose baseline_checkpoint for active Phase 0 soak validation",
+  "plan_hash": "b05ef5a055b5bd2f7c2eb7ada48e2b4aa0823a04e5ae6e0f8a7a1c8949b3d708",
+  "written_at": "2026-05-11T15:52:12.999Z"
+}

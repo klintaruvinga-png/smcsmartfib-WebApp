@@ -1,0 +1,28 @@
+**Objective**
+
+Stopped on the contract’s required stop path. The repo already contains the soak-reset route registration, so a further source patch would not logically fix the reported 404.
+
+**Root cause / analysis**
+
+Confirmed conflict between repo reality and live runtime:
+
+- Local backend code already registers `DELETE /sniper/v1/admin/soak-reset` unconditionally in [smc-superfib-sniper.php](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/smc-superfib-sniper.php:888>) and hooks `register_routes()` on `rest_api_init` in the same file at line 33.
+- Live route index at `https://trader.stokvelsociety.co.za/wp-json/sniper/v1` does not include `/admin/soak-reset`.
+- Live `DELETE https://trader.stokvelsociety.co.za/wp-json/sniper/v1/admin/soak-reset` returns `404`.
+
+That points to deployment/runtime drift: the active WordPress instance is not serving the plugin state represented by this repo.
+
+**Exact changes**
+
+Created the required stop report at [reports/codex-implementation.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md:1>). No code files were changed.
+
+**Delivery state**
+
+- Branch: `codex/smc-intake-admin-page-soak-reset-is-not-working-`
+- Commit: `bd79acf` (`docs: add stop report (contract conflict)`)
+- PR: #255  
+  https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/255
+
+**Acceptance / regression**
+
+No code patch was applied, so no repo tests were run. The only verification performed was the live backend evidence above. The next required action is to reconcile the deployed WordPress plugin/runtime with the repo version already containing the route, then re-test the admin reset flow.

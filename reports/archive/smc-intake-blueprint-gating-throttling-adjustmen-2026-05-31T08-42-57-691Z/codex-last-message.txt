@@ -1,0 +1,19 @@
+Implemented and pushed the contract on branch `codex/smc-intake-blueprint-gating-throttling-adjustmen`.
+
+PR opened: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/300  
+PR is normal, not draft. Cloudflare Workers build check passed. No review comments were present to address.
+
+Key changes:
+- Added backend `pending-blueprint` plan exposure for safe `ACTIVE_PRE_ENTRY` throttled ARMED setups.
+- Kept execution authority unchanged: `backendConfirmed` and `READY` gates remain authoritative.
+- Prevented `pending-blueprint` plans from persisting into `smc_sf_trade_plans`.
+- Updated PlanCard UI/types/tests for explicit non-executable pending blueprint rendering.
+- Added required implementation, bug sweep, parity, and verification artifacts.
+
+Validation:
+- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` passed
+- `php wordpress/smc-superfib-sniper/tests/php/test-execute-signals-stage-lots.php` passed
+- `npx vitest run src/routes/-plan.test.tsx` passed
+- `npm run build` passed
+- `npm run validate:impl` passed
+- `npm run lint` failed on unrelated existing Prettier issues outside this patch scope.

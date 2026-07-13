@@ -1,0 +1,20 @@
+**Outcome**
+
+Stopped on a contract conflict and recorded it in [codex-implementation.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md>).
+
+The two implementation targets in the contract do not match the current repo:
+- [src/routes/-book.page.tsx:79](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/routes/-book.page.tsx:79>) already renders groups from `positions`, and [src/routes/-book.page.tsx:82](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/routes/-book.page.tsx:82>) uses `snapPair` only for decoration, with the stale warning still present at [src/routes/-book.page.tsx:114](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/routes/-book.page.tsx:114>).
+- [src/hooks/useSniperData.ts:332](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/hooks/useSniperData.ts:332>) invalidates snapshot-adjacent queries only; it does not invalidate `["user-trades"]`, and the watchlist mutation path at [src/hooks/useSniperData.ts:370](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/hooks/useSniperData.ts:370>) / [src/hooks/useSniperData.ts:399](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/hooks/useSniperData.ts:399>) does not set an empty intermediate `user-trades` cache state.
+
+**Git / PR**
+
+Branch created and pushed: `codex/smc-intake-active-book-stream-is-causing-flicker`  
+Commit: `bdfc622`  
+PR: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/258
+
+**Verification**
+
+No code validations were run because the stop condition applied before any safe code change existed.  
+The repo still has unrelated pre-existing worktree changes (`reports/codex-plan*`, `.claude/settings.local.json`, deleted `reports/codex-implementation.meta.json`) that I did not touch.
+
+Next step is a revised contract tied to the current code path that is actually producing the flicker.

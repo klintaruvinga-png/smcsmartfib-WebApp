@@ -1,0 +1,17 @@
+{
+  "blocked_at": "2026-05-27T15:58:12.665Z",
+  "reason": "Command failed: C:\\Users\\LEONNA\\AppData\\Roaming\\npm\\\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe --print --output-format text",
+  "issue": "SMC Intake - Fix admin Health page issue: TypeError reading 'feedStatus' in index-HU_NwOvP.js",
+  "research_hash": "7b9acaa55589c812caabb19012ca8e8a67d8d5a854902280e6a6bdbbae4b20f8",
+  "retry_count": 3,
+  "permanent": true,
+  "resolution": [
+    "All automatic retries exhausted. Manual intervention required.",
+    "Option A: open Claude Code and harden the plan manually:",
+    "  reports/copilot-research.md -> .github/prompts/codex-plan-prompt.md",
+    "  save output to reports/codex-plan.md, write reports/codex-plan.meta.json,",
+    "  and set .smc-workflow-state.json state to READY_FOR_IMPLEMENTATION.",
+    "Option B: fix the Claude CLI (npm install -g @anthropic-ai/claude-code && claude auth)",
+    "  then delete this file — the pipeline will restart automatically."
+  ]
+}

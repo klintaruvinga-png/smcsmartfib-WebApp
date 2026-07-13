@@ -83,7 +83,7 @@ describe("useEngineHealth", () => {
       if (options.queryKey[0] === "user-settings") {
         return {
           data: {
-            backendUrl: "https://backend.example/wp-json",
+            backendUrl: "https://backend.example",
             refreshIntervalSec: 5,
             watchlist: [],
           },
@@ -121,7 +121,7 @@ describe("useAccountTelemetry", () => {
       if (options.queryKey[0] === "user-settings") {
         return {
           data: {
-            backendUrl: "https://backend.example/wp-json",
+            backendUrl: "https://backend.example",
             refreshIntervalSec: 5,
             watchlist: [],
           },
@@ -158,7 +158,7 @@ describe("useUserProgress", () => {
       if (options.queryKey[0] === "user-settings") {
         return {
           data: {
-            backendUrl: "https://backend.example/wp-json",
+            backendUrl: "https://backend.example",
             refreshIntervalSec: 5,
             watchlist: [],
           },
@@ -196,7 +196,7 @@ describe("useLiveSignals", () => {
       if (options.queryKey[0] === "user-settings") {
         return {
           data: {
-            backendUrl: "https://backend.example/wp-json",
+            backendUrl: "https://backend.example",
             refreshIntervalSec: 5,
             watchlist: [],
           },

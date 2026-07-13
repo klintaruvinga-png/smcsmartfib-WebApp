@@ -27,7 +27,7 @@ vi.mock("@/lib/api/sniperClient", () => ({
 import { useCanonicalWatchlist, useWatchlistAdd, useWatchlistRemove } from "./useSniperData";
 
 const baseSettings: DashboardSettings = {
-  backendUrl: "https://backend.example/wp-json",
+  backendUrl: "https://backend.example",
   apiKeyStatus: "ok",
   refreshIntervalSec: 5,
   staleThresholdSec: 30,

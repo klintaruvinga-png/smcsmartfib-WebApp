@@ -1,0 +1,5 @@
+{
+  "issue": "SMC Intake - Fix offline/weekend times for crypto market currently showing offline during weekend hours(regular market closure) Candles are being sent from EA to dashboard but cryptocurrencies are showing offline",
+  "research_hash": "7f1e80fa5f24c98f590d3962bf608a03926549debb6e395913f081ae4b3bf241",
+  "written_at": "2026-05-23T03:46:15.764Z"
+}

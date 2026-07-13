@@ -12,7 +12,7 @@ import { useEffect } from "react";
 import appCss from "../styles.css?url";
 import { AppShell } from "@/components/sniper/AppShell";
 import { Toaster } from "sonner";
-import { hasCredentials, clearCredentials, hasWordPressNonce } from "@/lib/auth";
+import { hasCredentials, clearCredentials } from "@/lib/auth";
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -91,7 +91,7 @@ function RootComponent() {
   const isLanding = location.pathname === "/";
 
   useEffect(() => {
-    if (!isLogin && !isLanding && !hasCredentials() && !hasWordPressNonce()) {
+    if (!isLogin && !isLanding && !hasCredentials()) {
       router.navigate({ to: "/login" });
     }
 

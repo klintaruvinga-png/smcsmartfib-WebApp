@@ -1,0 +1,53 @@
+**1. Objective**
+
+Fix the live-signals poll path so repeated `/live-signals` responses stay observable to the frontend without changing backend signal identity, candle anchoring, execution deduplication, or stale-data authority.
+
+**2. Root cause / analysis**
+
+Confirmed root cause was the route contract, not signal math. `get_live_signals()` returned cached snapshot signals with stable `id` and `createdAt` and no response-time field, so repeated polls could be structurally identical when candle time and direction were unchanged.
+
+One contract ambiguity existed in the PHP test harness: making `rest_ensure_response()` fully wrap arrays would have broken unrelated legacy route tests. I resolved that with an opt-in response wrapper used only by the new `/live-signals` regression.
+
+**3. Patch plan**
+
+Add the failing route-level regression first, patch `get_live_signals()` surgically, mirror the optional transport field in app/SDK types, write the required implementation/report artifacts, then run the contract validations and publish the branch/PR.
+
+**4. Exact code changes**
+
+- [wordpress/smc-superfib-sniper/smc-superfib-sniper.php](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/smc-superfib-sniper.php:4992)
+  Added response-only `polledAt` stamping inside `get_live_signals()` while preserving `id`, `createdAt`, snapshot reuse, and anti-cache headers.
+- [wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php:44)
+  Added header-capable REST test helpers plus a repeated-poll regression that proves stable `id` / `createdAt` / `backendConfirmed`, changing `polledAt`, and preserved `Cache-Control` / `Pragma`.
+- [src/types/sniper.ts](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/types/sniper.ts:154)
+  Added optional `polledAt?: string`.
+- [sdk/src/types/index.ts](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/sdk/src/types/index.ts:171)
+  Added optional `polledAt?: string`.
+- Reports generated:
+  [reports/codex-implementation.md](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md:1),
+  [reports/implementation-verification.md](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/implementation-verification.md:1),
+  [.github/docs/BUG_SWEEP_REPORT_2026-05-30_live-signals-polled-at-contract.md](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-30_live-signals-polled-at-contract.md:1),
+  [.github/migration/audits/phase-2-dashboard-live-signals-polled-at-parity-2026-05-30.md](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-2-dashboard-live-signals-polled-at-parity-2026-05-30.md:1).
+
+**5. Acceptance criteria**
+
+- Repeated `/live-signals` responses now keep `id` stable.
+- `createdAt` remains candle-anchored and unchanged.
+- `polledAt` changes per response.
+- Anti-cache headers remain intact.
+- App and SDK contracts accept the new field without making it authoritative.
+
+Manual live dashboard verification is still pending.
+
+**6. Regression checks**
+
+- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php` PASS
+- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` PASS
+- `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx src/routes/-signals.page.test.tsx src/routes/-plan.test.tsx` PASS
+- `npm run validate:impl` PASS
+- `npx tsc --noEmit` FAIL on existing unrelated `vite.config.ts` typing (`test` property not accepted by `LovableViteTanstackOptions`)
+
+Branch: `codex/signal-id-is-anchored-to-candle-time-not-clock-t`  
+Commit: `4f85eaa`  
+PR: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/288
+
+I checked PR review state immediately after opening it. There are no review comments yet, so there were no local review fixes to apply in this session.

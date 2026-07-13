@@ -11,7 +11,7 @@ import {
   AuthError,
   upsertSoakEvidence,
 } from "@/lib/api/sniperClient";
-import { getAuthHeader, hasCredentials, hasWordPressNonce } from "@/lib/auth";
+import { getAuthHeader, hasCredentials, hasBackendNonce } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -144,7 +144,7 @@ export function AdminPage() {
   const soakTypeManuallyChanged = useRef(false);
 
   useEffect(() => {
-    if (!hasCredentials() && !hasWordPressNonce()) {
+    if (!hasCredentials() && !hasBackendNonce()) {
       void router.navigate({ to: "/login" });
       return;
     }
@@ -173,7 +173,7 @@ export function AdminPage() {
   }, [router]);
 
   useEffect(() => {
-    if (!hasCredentials() && !hasWordPressNonce()) {
+    if (!hasCredentials() && !hasBackendNonce()) {
       return;
     }
 
@@ -208,7 +208,7 @@ export function AdminPage() {
   }, [router]);
 
   useEffect(() => {
-    if (!hasCredentials() && !hasWordPressNonce()) {
+    if (!hasCredentials() && !hasBackendNonce()) {
       return;
     }
 
@@ -301,7 +301,7 @@ export function AdminPage() {
             <div className="space-y-1">
               <div className="text-sm font-semibold text-sell">Access denied</div>
               <p className="text-xs text-dim">
-                This route is restricted to WordPress administrators. No backend diagnostics were
+                This route is restricted to Backend administrators. No backend diagnostics were
                 exposed.
               </p>
             </div>
@@ -1131,7 +1131,7 @@ export function AdminPage() {
                             backendHealthEndpoint: value,
                           }))
                         }
-                        placeholder="https://.../wp-json/sniper/v1/health"
+                        placeholder="https://.../sniper/v1/health"
                       />
                       <Field
                         label="T+0 health summary"
@@ -1705,7 +1705,7 @@ function resolveHealthEndpointHint() {
     return `${root.replace(/\/$/, "")}/sniper/v1/health`;
   }
 
-  return `${window.location.origin}/wp-json/sniper/v1/health`;
+  return `${window.location.origin}/sniper/v1/health`;
 }
 
 function resolveOperatorIdentifier(): string {

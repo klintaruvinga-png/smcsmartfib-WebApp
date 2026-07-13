@@ -1,0 +1,5 @@
+{
+  "issue": "Make dashboard admin health display clearly read-only and backend-driven so the UI shows backend-owned values and does not imply local editability",
+  "research_hash": "3c200eb28c62d902b21fe4502303e6d009073b356b11e75cbeec4503e6ed7bdc",
+  "written_at": "2026-05-11T23:52:59.695Z"
+}

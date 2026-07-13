@@ -171,7 +171,7 @@ describe("AdminPage", () => {
     apiMocks.getSnapshot.mockReset();
     apiMocks.fetchAdminHealth.mockResolvedValue(buildHealth());
     apiMocks.getUserSettings.mockResolvedValue({
-      backendUrl: "https://example.com/wp-json",
+      backendUrl: "https://example.com",
       apiKeyStatus: "present",
       refreshIntervalSec: 5,
       staleThresholdSec: 30,

@@ -1,0 +1,19 @@
+**Outcome**
+
+Patched [SessionManager.mqh](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/mt5/SessionManager.mqh:18) so crypto-prefixed normalized symbols bypass weekend closure in `IsMarketOpenForSymbol()` while FX and index session logic stay unchanged. Added [SessionManagerWeekendClassificationTest.mq5](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/mt5/SessionManagerWeekendClassificationTest.mq5:1) for Saturday UTC MT5 assertions, updated [test-market-data-service-source-filter.php](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php:225) to confirm crypto `LIVE` snapshots persist as `state='live'`, and wrote [reports/codex-implementation.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md:1) plus the required audit artifacts.
+
+Branch pushed: `codex/smc-intake-fix-offline-weekend-times-for-crypto-`  
+PR open: `#228` <https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/228>
+
+**Validation**
+
+Passed:
+- `node mt5/check-mql-includes.mjs`
+- `php wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php`
+- `php wordpress/smc-superfib-sniper/tests/php/phase3_mt5_simulation_test.php`
+
+Artifacts:
+- [.github/docs/BUG_SWEEP_REPORT_2026-05-23_crypto-weekend-offline-state.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-23_crypto-weekend-offline-state.md:1)
+- [.github/migration/audits/phase-3-mt5-parity-2026-05-23.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-3-mt5-parity-2026-05-23.md:1)
+
+Remaining risk: MetaEditor CLI compile was inconclusive here because it returned without a repo-local log or `.ex5`, so pre-merge still needs a human MT5 rebuild/reload plus a weekend soak confirming crypto stays live while FX stays closed. Unrelated local report churn remains uncommitted in the worktree.

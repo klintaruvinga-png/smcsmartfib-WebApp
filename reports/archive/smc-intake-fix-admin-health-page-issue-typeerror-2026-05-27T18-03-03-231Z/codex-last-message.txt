@@ -1,0 +1,19 @@
+**Objective**
+
+Patched the Admin/Health runtime crash on branch `codex/smc-intake-fix-admin-health-page-issue-typeerror` and opened a normal PR: `#264`  
+`https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/264`
+
+**Root cause / fix**
+
+`[src/routes/admin.tsx](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/routes/admin.tsx)` was dereferencing nested `health` fields in paths where the parent `health` container can legitimately be missing, especially checkpoint `snapshot_data`. I added one private resolver that maps partial/missing health to conservative display values only (`unknown` / `Unavailable`) and routed the backend cards, baseline summary/defaults, checkpoint summaries, and soak markdown export through it. I also added targeted regressions in `[src/routes/-admin.test.tsx](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/routes/-admin.test.tsx)` for `snapshot_data: {}` and partial health payloads.
+
+**Validation**
+
+`npx vitest run src/routes/-admin.test.tsx src/lib/api/sniperClient.test.ts` passed.  
+`npm run validate:impl` passed.
+
+Artifacts:
+- `[reports/codex-implementation.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md)`
+- `[.github/docs/BUG_SWEEP_REPORT_2026-05-27_admin-health-feedstatus-typeerror.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-27_admin-health-feedstatus-typeerror.md)`
+
+PR review status is currently empty, so there were no review fixes to apply yet. The remote PR check `Workers Builds: smcsuperfibwebapp` was still pending at the time I stopped. Unrelated pre-existing worktree changes were left untouched.

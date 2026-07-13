@@ -1,0 +1,19 @@
+Implemented the Phase 3 MT5 market-stream contract on branch `codex/smc-intake-build-ea-candle-engine-ohlc-spreads-s` and opened a normal PR: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/224
+
+The patch makes session/freshness evaluation symbol-aware on the MT5 side, fixes the EA timer to 10 seconds, emits explicit M1/M15 candle aliases in the webhook payload, and hardens `ea/market-stream` so incomplete dual-timeframe Phase 3 payloads fail with HTTP 400 instead of being silently accepted. MT5 persistence still stays backend-authoritative with `source='mt5'`, and duplicate candle writes still upsert.
+
+Validation:
+- Passed: `php -l` on the changed PHP files
+- Passed: `phase3_mt5_simulation_test.php`
+- Passed: `test-ea-market-stream.php`
+- Passed: `test-mt5-snapshot-contract.php`
+- Full PHP script sweep: one unrelated existing failure remained in `wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php` on streak counting
+- MT5 compile/runtime validation was not possible in this workspace
+
+Artifacts:
+- [codex-implementation.md](C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md)
+- [phase3-ea-implementation-report.md](C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/phase3-ea-implementation-report.md)
+- [BUG_SWEEP_REPORT_2026-05-22_ea-market-stream-phase3-contract.md](C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-22_ea-market-stream-phase3-contract.md)
+- [phase-3-mt5-parity-2026-05-22.md](C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-3-mt5-parity-2026-05-22.md)
+
+Commit: `9f41d62` `mt5: harden phase 3 market-stream contract`

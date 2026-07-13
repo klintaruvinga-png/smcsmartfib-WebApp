@@ -1,0 +1,5 @@
+{
+  "issue": "Harden admin.tsx error handling for /admin/soak-report so failures surface explicitly and the soak report UI does not fail silently",
+  "research_hash": "b91adb350e76581dd5d3b845afb640eee91d68a4005f5f36771525b83ade6938",
+  "written_at": "2026-05-11T23:25:02.223Z"
+}

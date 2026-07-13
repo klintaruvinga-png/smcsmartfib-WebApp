@@ -1,10 +1,10 @@
 /**
  * SMC SuperFIB API client.
- * One typed function per /wp-json/sniper/v1/* endpoint.
+ * One typed function per /sniper/v1/* endpoint.
  * In MOCK_MODE every function returns the typed mock model with state: 'mock'.
  */
 
-import { getAuthHeader, clearCredentials, getWordPressNonce } from "@/lib/auth";
+import { getAuthHeader, clearCredentials } from "@/lib/auth";
 import { assertValidSoakEvidencePayload } from "./soakEvidence";
 import {
   normalizeAccountTelemetry,
@@ -58,7 +58,7 @@ import type {
   RawOrderResponse,
   RawPositionResponse,
   RawUserProgressResponse,
-} from "../../../packages/contracts/src/normalizers";
+} from "../../../packages/contracts/src/index";
 
 import {
   mockAccount,
@@ -80,82 +80,45 @@ import type {
   DashboardSettings as SharedDashboardSettings,
 } from "../../../packages/contracts/src/index";
 
-const WORDPRESS_BACKEND_URL = "https://trader.stokvelsociety.co.za/wp-json";
-
 export function resolveDefaultBackendUrl(
   buildVal: string | null | undefined,
-  runtimeOrigin?: string,
 ): string {
-  const normalizedBuildVal = normalizeBackendUrl(buildVal);
-  if (normalizedBuildVal) return normalizedBuildVal;
+  const normalized = normalizeBackendUrl(buildVal);
+  if (normalized) return normalized;
+  throw new Error("VITE_SNIPER_BACKEND_URL must be configured");
+}
 
-  if (runtimeOrigin) {
-    try {
-      const { hostname, origin } = new URL(runtimeOrigin);
-      if (hostname === "trader.stokvelsociety.co.za") {
-        return `${origin}/wp-json`;
-      }
-    } catch {
-      // Fall through to the canonical WordPress REST host.
-    }
+function normalizeBackendUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.origin;
+  } catch {
+    return null;
   }
-
-  return WORDPRESS_BACKEND_URL;
 }
 
-const DEFAULT_BACKEND_URL = resolveDefaultBackendUrl(
-  import.meta.env.VITE_SNIPER_BACKEND_URL,
-  typeof window !== "undefined" ? window.location.origin : undefined,
-);
+const MOCK_MODE = import.meta.env.VITE_SNIPER_MOCK_MODE === "true";
 
-// Default to LIVE backend. Only use mock data when explicitly opted in via
-// VITE_SNIPER_MOCK_MODE=true. Previously this defaulted to mock in dev, which
-// made the UI look frozen because every poll returned the same static objects.
-export const MOCK_MODE =
-  String(import.meta.env.VITE_SNIPER_MOCK_MODE ?? "false").toLowerCase() === "true";
-
-let backendUrl = DEFAULT_BACKEND_URL;
-export function normalizeBackendUrl(url: string | null | undefined): string {
-  return typeof url === "string" ? url.trim() : "";
-}
-export function setBackendUrl(url: string | null | undefined) {
-  backendUrl = normalizeBackendUrl(url) || DEFAULT_BACKEND_URL;
-}
-export function getBackendUrl() {
-  return backendUrl;
-}
-
-interface RequestOpts {
+type RequestOpts = {
   method?: "GET" | "POST" | "DELETE";
   body?: unknown;
   skipAuthHeaders?: boolean;
-  /** When false, omit cookies/credentials from the fetch (e.g. public endpoints). Defaults to include. */
   authenticated?: boolean;
-  /** Allow successful responses with no payload body (e.g. known 204 endpoints). */
-  allowEmptyResponse?: boolean;
-  /** Add a cache-busting query param and bypass browser cache for time-sensitive GETs. */
   cacheBust?: boolean;
-}
+  allowEmptyResponse?: boolean;
+};
 
-export type AdminHealthResponse = EngineHealth;
+const backendUrl = resolveDefaultBackendUrl(
+  import.meta.env.VITE_SNIPER_BACKEND_URL,
+);
 
-function requireLaddersResponse(raw: unknown): TradePlan[] {
-  if (Array.isArray(raw)) return raw as TradePlan[];
-
-  throw new Error("/ladders: backend response missing ladder array");
-}
-
-function requireWatchlistResponse(path: string, watchlist: Symbol[] | undefined): Symbol[] {
-  if (!Array.isArray(watchlist)) {
-    const message = `${path}: backend response missing watchlist array`;
-    console.error(message);
-    throw new Error(message);
-  }
-
-  return watchlist;
-}
-
-async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
+async function call<T>(
+  path: string,
+  opts: RequestOpts = {},
+): Promise<T> {
   const headers: Record<string, string> = {};
   if (opts.body) headers["Content-Type"] = "application/json";
 
@@ -163,135 +126,82 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
     const authHeader = getAuthHeader();
     if (authHeader) {
       headers["Authorization"] = authHeader;
-    } else {
-      // Fall back to the WordPress REST nonce when served from WordPress.
-      const nonce = getWordPressNonce();
-      if (nonce) headers["X-WP-Nonce"] = nonce;
     }
   }
 
-  let url = `${backendUrl.replace(/\/$/, "")}/sniper/v1${path}`;
-  if ((opts.method ?? "GET") === "GET" && opts.cacheBust) {
-    url += `${url.includes("?") ? "&" : "?"}_=${Date.now()}`;
-  }
-
-  try {
-    const res = await fetch(url, {
-      method: opts.method ?? "GET",
-      headers,
-      cache: opts.cacheBust ? "no-store" : "default",
-      credentials: opts.authenticated === false ? "omit" : "include",
-      body: opts.body ? JSON.stringify(opts.body) : undefined,
-    });
-
-    if (res.status === 401) {
-      clearCredentials();
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("smc:auth-required"));
-      }
-      throw new AuthError();
-    }
-
-    if (!res.ok) {
-      const errorBody = await res.text();
-      throw new Error(`API ${path} failed: ${res.status}${errorBody ? ` - ${errorBody}` : ""}`);
-    }
-
-    // Only allow empty successful bodies for known no-content endpoints.
-    if (res.status === 204) {
-      if (opts.allowEmptyResponse) return {} as T;
-      throw new Error(`API ${path} failed: expected response body but got 204 No Content`);
-    }
-
-    const text = await res.text();
-    if (!text.trim()) {
-      if (opts.allowEmptyResponse) return {} as T;
-      throw new Error(`API ${path} failed: expected response body but got empty 2xx response`);
-    }
-
-    return JSON.parse(text) as T;
-  } catch (error) {
-    // CRITICAL: Never swallow errors. Log and rethrow so consumers can handle properly.
-    if (error instanceof AuthError) throw error;
-    if (error instanceof Error) throw error;
-    throw new Error(`API ${path} failed: ${String(error)}`);
-  }
-}
-
-export async function fetchAdminHealth(): Promise<AdminHealthResponse> {
-  return call<AdminHealthResponse>("/admin/health", { cacheBust: true });
-}
-
-export async function fetchSoakReport(): Promise<SoakReport> {
-  return call<SoakReport>("/admin/soak-report", { cacheBust: true });
-}
-
-export async function upsertSoakEvidence(payload: SoakEvidencePayload): Promise<SoakEvidenceRow> {
-  assertValidSoakEvidencePayload(payload);
-
-  return call<SoakEvidenceRow>("/admin/soak-evidence", {
-    method: "POST",
-    body: payload,
+  const url = `${backendUrl.replace(/\/$/, "")}/sniper/v1${path}`;
+  const cacheBust = opts.cacheBust ? `&_t=${Date.now()}` : "";
+  const response = await fetch(`${url}${cacheBust}`, {
+    method: opts.method ?? "GET",
+    headers,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+    credentials: "include",
   });
+
+  if (response.status === 401) {
+    clearCredentials();
+    window.dispatchEvent(new CustomEvent("smc:auth-required"));
+    throw new AuthError();
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`API error ${response.status}: ${text}`);
+  }
+
+  if (opts.allowEmptyResponse && response.status === 204) {
+    return {} as T;
+  }
+
+  return response.json();
 }
 
-export async function createSoakCheckpoint(opts?: {
-  operatorNotes?: string;
-  checkpointType?: "baseline" | "checkpoint";
-}): Promise<SoakCheckpointRow> {
-  return call<SoakCheckpointRow>("/admin/soak-checkpoint", {
-    method: "POST",
-    body: {
-      operator_notes: opts?.operatorNotes ?? "",
-      checkpoint_type: opts?.checkpointType ?? "checkpoint",
-    },
-  });
+function requireLaddersResponse(raw: unknown): TradePlan[] {
+  if (Array.isArray(raw)) return raw as TradePlan[];
+  if (raw && typeof raw === "object" && "ladders" in raw) {
+    return (raw as { ladders: TradePlan[] }).ladders;
+  }
+  throw new Error("Invalid ladders response");
 }
 
-export async function resetSoak(): Promise<{
-  reset: boolean;
-  deleted_checkpoints: number;
-  deleted_evidence: number;
-}> {
-  return call("/admin/soak-reset", { method: "DELETE" });
+function requireWatchlistResponse(endpoint: string, raw: Symbol[] | undefined): Symbol[] {
+  if (!raw) throw new Error(`${endpoint} did not return watchlist`);
+  return raw;
 }
 
-// Public / shared
+async function fetchAdminHealth(): Promise<AdminHealthResponse> {
+  const url = `${backendUrl.replace(/\/$/, "")}/sniper/v1/admin/health`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Admin health check failed: ${response.status}`);
+  return response.json();
+}
+
 export const apiClient = {
-  async getUnifiedSnapshot(mock = MOCK_MODE) {
-    if (mock) {
-      const wl = new Set(mockSettings.watchlist);
-      return {
-        prices: mockPrices.filter((p) => wl.has(p.symbol)),
-        regimes: mockRegimes.filter((r) => wl.has(r.symbol)),
-        gates: mockGates.filter((g) => wl.has(g.symbol)),
-        diagnostics: [] as SymbolDiagnostic[],
-      };
-    }
-    const snapshot = await call<{
-      prices: PairPrice[];
-      regimes: RegimeState[];
-      gates: GateState[];
-      diagnostics: SymbolDiagnostic[];
-    }>("/snapshot/unified", { cacheBust: true });
-    return normalizeSnapshot(snapshot);
+  // Public endpoints
+  async getPrices(mock = MOCK_MODE): Promise<PairPrice[]> {
+    if (mock) return mockPrices;
+    return call<PairPrice[]>("/prices", { cacheBust: true });
   },
-  /** Compatibility alias — delegates to getUnifiedSnapshot. */
-  async getSnapshot(mock = MOCK_MODE) {
-    return this.getUnifiedSnapshot(mock);
+  async getRegimes(mock = MOCK_MODE): Promise<RegimeState> {
+    if (mock) return mockRegimes;
+    return call<RegimeState>("/regimes", { cacheBust: true });
   },
-  async getChartSnapshot(
+  async getGates(mock = MOCK_MODE): Promise<GateState> {
+    if (mock) return mockGates;
+    return call<GateState>("/gates", { cacheBust: true });
+  },
+  async getCharts(
     symbol: Symbol,
-    timeframe = "15min",
+    timeframe: string,
     mock = MOCK_MODE,
   ): Promise<ChartSnapshot> {
     if (mock) {
       const candles = mockPriceSeries(symbol).map((p) => ({
-        time: new Date(p.t).toISOString(),
-        open: p.p,
-        high: p.p,
-        low: p.p,
-        close: p.p,
+        time: p.t,
+        open: p.o,
+        high: p.h,
+        low: p.l,
+        close: p.c,
       }));
       return {
         symbol,
@@ -507,4 +417,11 @@ export const apiClient = {
       watchlist: requireWatchlistResponse("/user/watchlist/remove", result.watchlist),
     };
   },
+};
+
+type AdminHealthResponse = {
+  status: string;
+  timestamp: string;
+  backend: string;
+  database?: string;
 };

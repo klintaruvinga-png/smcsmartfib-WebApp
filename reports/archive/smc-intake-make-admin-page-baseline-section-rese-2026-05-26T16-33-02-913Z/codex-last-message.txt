@@ -1,0 +1,15 @@
+Implemented on branch `codex/smc-intake-make-admin-page-baseline-section-rese` and opened PR `#251`: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/251
+
+The patch adds `PHASE_4_30_DAY` to the typed soak registry, preserves Phase 4 soak type through admin report inference/hydration, adds the Phase 4 option to the `/admin` soak picker, and replaces the single-shot baseline lock with an explicit `Start New Soak` local reset flow that re-enables baseline capture without deleting the prior backend-owned baseline checkpoint. I kept the smallest safe interpretation on the open schedule ambiguity: Phase 4 is registered as `30` days / `720` hours for `EURUSD`, `USDJPY`, and `XAUUSD`, but its checkpoint labels remain intentionally unset.
+
+Validation:
+- `npx vitest run src/routes/-admin.test.tsx` passed (`24` tests)
+- `npm run build` passed
+- `npx tsc --noEmit` still fails in existing `vite.config.ts` typing unrelated to this patch (`test` property rejected by `@lovable.dev/vite-tanstack-config`)
+
+Artifacts:
+- [reports/codex-implementation.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md>)
+- [BUG_SWEEP_REPORT_2026-05-26_admin-phase4-soak-baseline-reset.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-26_admin-phase4-soak-baseline-reset.md>)
+- [phase-4-dashboard-parity-2026-05-26.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-4-dashboard-parity-2026-05-26.md>)
+
+I left the unrelated existing worktree changes in `reports/*` untouched. The Claude Code review-fix stage has not been run here; it becomes the next step after PR review data is written.

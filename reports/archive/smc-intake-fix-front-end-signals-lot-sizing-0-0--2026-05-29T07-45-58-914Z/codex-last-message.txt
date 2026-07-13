@@ -1,0 +1,44 @@
+1. **Objective**
+
+Blocked the frontend from treating backend-authored sub-`0.01` stage lots as executable while preserving backend authority. Branch: `codex/smc-intake-fix-front-end-signals-lot-sizing-0-0-`. PR: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/280
+
+2. **Root cause / analysis**
+
+`isTradePlanComplete()` only checked TP/RR completeness, and the plan card rendered any finite lot value plus enabled `Send to execution` off `backendConfirmed && planComplete`. That let backend lots like `0.0` and `0.009` look actionable even though the PHP queue already skips stages below `0.01`.
+
+3. **Patch plan**
+
+Kept the patch frontend-only:
+- add a shared staged-lot executability helper
+- use it in the plan card for warning, display state, and CTA disablement
+- pin the failure path in the existing plan-page test file
+- leave backend math, queue behavior, and request payload unchanged
+
+4. **Exact code changes**
+
+- [src/routes/-plan.utils.ts](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/routes/-plan.utils.ts:3): added `MIN_EXECUTABLE_STAGE_LOT`, `isExecutableStageLotValue()`, and `hasExecutableStageLots()`.
+- [src/components/PlanCard.tsx](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/components/PlanCard.tsx:47): card now detects non-executable staged lots, shows a backend-authoritative warning, renders sub-minimum stages as `Below 0.01 lot`, disables the CTA, and still posts only `apiClient.postExecuteSignals({ signalIds: [signal.id] })` at [line 236](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/components/PlanCard.tsx:236).
+- [src/routes/-plan.test.tsx](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/routes/-plan.test.tsx:193): added helper coverage and the regression asserting warning presence, non-executable display, and disabled execution for `{ e1: 0, e2: 0.12, e3: 0.009 }`.
+
+5. **Acceptance criteria**
+
+Met:
+- sub-minimum backend stage lots no longer render as `0.00 lot` or rounded actionable labels
+- plan card shows a specific non-executable backend warning
+- `Send to execution` is disabled when any stage is below `0.01`
+- valid backend lot ladders still render unchanged
+- frontend payload shape remains unchanged
+
+6. **Regression checks**
+
+Passed:
+- `npx vitest run src/routes/-plan.test.tsx`
+- `php wordpress/smc-superfib-sniper/tests/php/test-execute-signals-stage-lots.php`
+
+Generated:
+- [reports/codex-implementation.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md:1)
+- [.github/docs/BUG_SWEEP_REPORT_2026-05-29_smc-intake-front-end-lot-sizing-0-0-lots.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-29_smc-intake-front-end-lot-sizing-0-0-lots.md:1)
+- [.github/migration/audits/phase-0-backend-dashboard-stage-lot-executability-parity-2026-05-29.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-0-backend-dashboard-stage-lot-executability-parity-2026-05-29.md:1)
+- [reports/plan-card-non-executable-stage-lot-dom-2026-05-29.html](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/plan-card-non-executable-stage-lot-dom-2026-05-29.html:1)
+
+No immediate review comments or review requests are present on PR `#280`. Pre-existing unstaged changes remain untouched in `reports/codex-plan.md`, `reports/codex-plan.meta.json`, and the deleted `reports/codex-implementation.meta.json`.

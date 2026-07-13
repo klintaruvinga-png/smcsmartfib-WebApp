@@ -1,0 +1,5 @@
+{
+  "issue": "SMC Intake - build_trade_plan() is calculating lots using a dead/empty account snapshot (equityUSC) instead of the live account balance visible in the app.",
+  "research_hash": "43a98476482cc151baefe9452c10ba36d12f78d9997f0a8328a70d48bf657706",
+  "written_at": "2026-05-29T08:27:35.236Z"
+}

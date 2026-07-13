@@ -1,0 +1,21 @@
+Implemented and pushed on `codex/fix-blueprint-gate-active-pre-entry`.
+
+PR: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/299  
+Commit: `6149c3b`
+
+Changed:
+- `build_symbol_state()` now keeps `ACTIVE_OPEN_POSITION` / `ACTIVE_PENDING_ORDER` as `WATCH`.
+- `ACTIVE_PRE_ENTRY` now caps structurally `READY` signals to `ARMED`, with `backendConfirmed=false` and `plan=null`.
+- Added PHP contract coverage for no prior candidate, pre-entry, open position, and pending order lifecycle paths.
+- Added:
+  - `reports/codex-implementation.md`
+  - `.github/docs/BUG_SWEEP_REPORT_2026-05-31_blueprint-gate-active-pre-entry.md`
+
+Validation passed:
+- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-execute-signals-stage-lots.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`
+- PR Cloudflare Workers build passed.
+
+No review comments were present to apply. Workspace still has the original untracked input files: `reports/copilot-research.md`, `reports/codex-plan.md`, `reports/codex-plan.meta.json`.

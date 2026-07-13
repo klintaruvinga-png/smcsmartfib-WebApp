@@ -1,0 +1,35 @@
+**Objective**
+
+Implemented the `/user/progress` backend contract and wired the Progress page Streak and Milestones panels to it, while leaving the existing Equity and Drawdown card authority unchanged.
+
+**What changed**
+
+Backend:
+- Added authenticated `GET /sniper/v1/user/progress` in [smc-superfib-sniper.php](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/smc-superfib-sniper.php)
+- `equity_pulse.equity_usc` reads from the same `account_telemetry` source as `/account-telemetry`
+- Milestones are derived only from confirmed persisted evidence
+- Streak is intentionally conservative: `current_streak_days = 0`, `state = "UNAVAILABLE"` until the active-day rule is approved
+
+Frontend:
+- Added `UserProgress` types, client normalizer, and `useUserProgress()`
+- Removed `PROGRESS_NOT_IMPLEMENTED` from [progress.tsx](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/routes/progress.tsx)
+- Streak and Milestones now render loading, error, unavailable, and live states from backend data
+- Equity and DD cards still use `useUserAccount()` and `useUserRiskProfile()`
+
+Artifacts:
+- Implementation summary: [reports/codex-implementation.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md)
+- Bug sweep: [.github/docs/BUG_SWEEP_REPORT_2026-05-20_progress-page-progress-contract.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-20_progress-page-progress-contract.md)
+- Parity audit: [.github/migration/audits/phase-2-backend-dashboard-progress-parity-2026-05-20.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-2-backend-dashboard-progress-parity-2026-05-20.md)
+
+**Validation**
+
+Passed:
+- `php wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php`
+- `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx src/routes/-progress.page.test.tsx`
+- `npx tsc --noEmit`
+- `npm run validate:impl`
+
+PR:
+- https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/213
+
+Remaining limitation: streak stays unavailable by design until the backend active-day definition is explicitly approved. Pre-existing unstaged edits in `reports/codex-plan*` and `reports/copilot-research.md` were left untouched and were not included in the commit.

@@ -1,0 +1,16 @@
+**Outcome**
+
+Patched the `/admin` soak workspace to be template-driven instead of Phase 0-only. The change adds typed soak templates in [src/types/sniper.ts](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/types/sniper.ts), updates the workspace in [src/routes/admin.tsx](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/routes/admin.tsx) to support Phase 0, Phase 3, and CUSTOM schedules, and extends [src/routes/-admin.test.tsx](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/routes/-admin.test.tsx) for the new selector flow.
+
+Artifacts were written to [reports/codex-implementation.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md), [.github/docs/BUG_SWEEP_REPORT_2026-05-22_admin-soak-template-selector.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-22_admin-soak-template-selector.md), and [.github/migration/audits/phase-3-dashboard-parity-2026-05-22.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-3-dashboard-parity-2026-05-22.md).
+
+**Validation**
+
+`npx tsc --noEmit --pretty false` passed.  
+`npx vitest run --environment jsdom src/routes/-admin.test.tsx` passed with 15/15 tests.
+
+Committed as `97cdb87` on `codex/smc-intake-admin-is-setup-to-dislay-backend-heal` and opened normal PR `#226`: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/226
+
+**Remaining risks**
+
+Phase 3 checkpoint names were not defined in `PHASE3_SOAK_WINDOW_TASKS.md`, so the contract fallback `T+24h`, `T+48h`, `T+72h` was used. Manual `/admin` browser verification was not completed because browser tooling was unavailable in this session. The backend contract still has no dedicated persisted soak-template field, and markdown export still uses the legacy `Phase 0 Soak Report` title.

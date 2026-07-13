@@ -1,0 +1,17 @@
+**Result**
+
+The plan route now ranks the full canonical-watchlist candidate set, filters to real ladder-backed plans, and renders the top 3 as compact unified cards. The selection logic stays verdict-led and preserves backend authority, incomplete-plan blocking, and the existing execution path.
+
+The main code is in [plan.tsx](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/routes/plan.tsx>) and [PlanCard.tsx](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/components/PlanCard.tsx>). Test coverage was extended in [-plan.test.tsx](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/routes/-plan.test.tsx>) for watchlist scope, top-3 limit, verdict-led ranking, full-array ranking, plan-object exclusion, and incomplete-plan preservation.
+
+**Validation**
+
+`npx vitest run src/routes/-plan.test.tsx` passed with 13/13 tests. `npx eslint src/routes/plan.tsx src/components/PlanCard.tsx src/routes/-plan.test.tsx` passed. `npm run build` passed.
+
+Artifacts:
+[reports/codex-implementation.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md>)
+[BUG_SWEEP_REPORT_2026-05-14_plan-card-top3-watchlist.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-14_plan-card-top3-watchlist.md>)
+
+Published on branch `codex/redesign-the-plan-cards-into-compact-unified-con`, commit `0f32a23`, PR: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/167
+
+Remaining note: the in-app browser automation path was not available in this session, so I could not do a live visual browser pass. The three contract input files under `reports/` were left untracked and untouched.

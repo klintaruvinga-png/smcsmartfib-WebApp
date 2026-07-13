@@ -1,0 +1,5 @@
+{
+  "issue": "Close the frontend/backend truth gap: dashboard shows stale data while backend health shows live, feedStatus mismatch between admin/health and dashboard status chip",
+  "plan_hash": "fb8ed012c71e9b63359e81b2ee611792256ffcc47a2016e8510916dd1ed7ff24",
+  "written_at": "2026-05-15T08:07:53.861Z"
+}

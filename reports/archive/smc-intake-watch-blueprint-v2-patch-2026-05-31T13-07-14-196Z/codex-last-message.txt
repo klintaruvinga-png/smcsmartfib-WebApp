@@ -1,0 +1,18 @@
+Implemented and pushed.
+
+PR: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/306  
+Branch: `codex/smc-intake-watch-blueprint-v2-patch`  
+Commit: `ee9c589 fix: relax pending blueprint structural gate`
+
+Changed:
+- Relaxed ARMED/READY pending-blueprint guard to require sweep only.
+- Updated PHP contract test for weak-displacement sweep-present ARMED pending blueprint.
+- Added no-persistence assertion for pending blueprint rows.
+- Added required implementation summary, metadata, bug sweep, and parity audit.
+
+Validation passed:
+- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
+- `npx vitest run src/routes/-plan.test.tsx` — 24 passed
+- `npm run validate:impl`
+
+PR is normal/open, not draft. Current checks are passing, and there are no actionable review comments yet. The pre-existing untracked `reports/copilot-research.md`, `reports/codex-plan.md`, and related plan files were left uncommitted.

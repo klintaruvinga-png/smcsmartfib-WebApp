@@ -1,0 +1,59 @@
+**Objective**
+
+Phase 2 intake is implemented on `codex/smc-intake-begin-phase-2-implementation` and opened as a normal PR: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/211
+
+**Root Cause / Analysis**
+
+The Phase 1 intake path accepted market-stream data but did not persist backend-authoritative trade telemetry for positions, pending orders, and account metrics, so the dashboard still depended on legacy/non-authoritative paths for key trade-state views. The patch adds Phase 2 telemetry ingestion, persistence, read endpoints, and frontend rewiring without weakening stale-data or backend-truth boundaries.
+
+**Patch Applied**
+
+Backend:
+- Added Phase 2 telemetry tables and ingestion/read logic in [smc-superfib-sniper.php](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/smc-superfib-sniper.php).
+- Added GET endpoints for `/account-telemetry`, `/positions`, and `/orders`.
+- Kept Phase 1 payloads backward-compatible.
+- Enforced `schema_version` for Phase 2 telemetry payloads only.
+- Added persistence, overwrite-by-ticket behavior, absence sweep, and read-time direction normalization.
+
+EA:
+- Extended [MarketDataEngine.mqh](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/mt5/MarketDataEngine.mqh) to emit Phase 2 telemetry on the existing `/ea/market-stream` payload.
+
+Frontend:
+- Rewired dashboard trade/account consumers to backend telemetry in:
+  - [sniperClient.ts](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/lib/api/sniperClient.ts)
+  - [useSniperData.ts](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/hooks/useSniperData.ts)
+  - [WalletOverview.tsx](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/components/sniper/WalletOverview.tsx)
+  - [book.tsx](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/routes/book.tsx)
+  - [orders.tsx](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/routes/orders.tsx)
+  - [analytics.tsx](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/routes/analytics.tsx)
+
+Tests and reports:
+- Added backend Phase 2 coverage in [test-phase2-trade-telemetry.php](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php).
+- Updated frontend/api/hook/route tests.
+- Wrote required implementation summary: [codex-implementation.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md)
+- Generated bug sweep: [.github/docs/BUG_SWEEP_REPORT_2026-05-20_smc-intake-phase-2.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-20_smc-intake-phase-2.md)
+
+Ambiguity resolved:
+- Smallest safe interpretation for `schema_version`: Phase 1-only payloads without it still succeed; Phase 2 telemetry payloads missing it are rejected and audited.
+
+**Validation**
+
+Passed:
+- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+- `php -l wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php`
+- `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx src/components/sniper/WalletOverview.test.tsx src/routes/-book.page.test.tsx src/routes/-orders.page.test.tsx src/routes/-analytics.page.test.tsx`
+- `npm run check:mql`
+- `npm run build`
+- `node scripts/validate-implementation.mjs`
+
+Git state:
+- Commit: `7f16b02` `feat: implement phase 2 trade telemetry`
+- Branch pushed: `codex/smc-intake-begin-phase-2-implementation`
+- PR is open and non-draft
+- Worktree is clean
+
+**Remaining Risks**
+
+Live MT5 runtime telemetry still needs end-to-end verification against a real terminal/account. Route testability required exporting route components, which is build-safe here but should be revisited later if TanStack route-module warnings become a packaging concern.

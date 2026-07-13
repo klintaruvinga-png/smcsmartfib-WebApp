@@ -1,0 +1,5 @@
+{
+  "issue": "SMC - Signal engine is producing too many signals within the same range as a result we are producing too many and cannot really follow or track a signal once it has been generated. Signals are valid as long as entry price has not been crossed, signals invalidate if entry price has triggered but the SL is crossed. Do not push/generate new signals if previous signal is still valid",
+  "research_hash": "3bdce1b5648fb6ed6f78dd32e51ebf296d2904967abace88869e39461d9cfa4c",
+  "written_at": "2026-05-29T10:20:52.510Z"
+}

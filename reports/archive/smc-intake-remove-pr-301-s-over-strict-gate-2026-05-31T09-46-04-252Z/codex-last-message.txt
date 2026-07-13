@@ -1,0 +1,22 @@
+Implemented and opened normal PR #302:
+
+https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/302
+
+Commit: `4574eec fix: relax pending blueprint lifecycle gate`
+
+Changed:
+- Relaxed `build_pending_or_confirmed_plan()` so pending blueprints no longer depend on lifecycle diagnostic readiness.
+- Added PHP regression coverage for live ARMED structural setup with no lifecycle diagnostic.
+- Preserved weak-displacement, WATCH, stale/blocked, and non-persistence protections.
+- Added required implementation summary, bug sweep, and parity audit artifacts.
+
+Validation:
+- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` passed
+- `php wordpress/smc-superfib-sniper/tests/php/test-fib-parity.php` passed
+- `php scripts/parity-validator.php` passed, 100% parity
+- `npm run build` passed
+- `npm run validate:impl` passed
+- PR Cloudflare Workers build passed
+- `npm run lint` still fails on unrelated existing Prettier/style issues outside this patch scope
+
+Worktree note: untracked input files remain unstaged: `reports/codex-plan.md`, `reports/codex-plan.meta.json`, `reports/copilot-research.md`.

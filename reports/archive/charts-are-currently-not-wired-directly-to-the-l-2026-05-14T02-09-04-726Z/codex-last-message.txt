@@ -1,0 +1,12 @@
+**Outcome**
+
+Wired `/charts` to the live snapshot poll in [charts.tsx](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/routes/charts.tsx>) by adding a route-local `buildLiveChartSeries()` helper. It now merges `price.mid` into the rendered series on each snapshot poll, replacing the last point when the backend candle looks in-progress and appending otherwise. `TVChart` was left unchanged because its existing `[series]` effect already replays `setData()` correctly.
+
+Added focused coverage in [\-charts.test.ts](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/routes/-charts.test.ts>) for append, replace, null-guard, and timestamp uniqueness. I also made a small compile-only fix in [\-admin.test.tsx](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/routes/-admin.test.tsx>) because stale enum literals were blocking `tsc --noEmit`. Required artifacts are in [BUG_SWEEP_REPORT_2026-05-14_live-chart-polling.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-14_live-chart-polling.md>) and [codex-implementation.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md>).
+
+**Validation**
+
+Ran `npx vitest run src/routes/-charts.test.ts`, `npx tsc --noEmit`, and `npm run build`; all passed. Branch `codex/charts-are-currently-not-wired-directly-to-the-l` is pushed with commit `c4c2193`, and the normal PR is open: `#162`  
+https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/162
+
+Remaining limitation: I could not run the Browser toolchain in-session, so `/charts` live-route behavior, overlay positioning, and unchanged poll cadence still need manual browser verification. Pre-existing unstaged changes in `reports/copilot-research.md`, `reports/codex-plan.md`, `reports/codex-plan.meta.json`, and deletion of `reports/.codex-implementation-failed.json` were left untouched.

@@ -1,0 +1,43 @@
+**Objective**
+
+Patch the recurring US30/NAS100 offline path without widening scope, keep MT5 as authority, and open a normal PR.
+
+**Root cause / analysis**
+
+The repo already had correct alias normalization and backend `offline` mapping. The remaining gap was the startup subscription boundary in [SMC_MarketDataEA.mq5](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/mt5/SMC_MarketDataEA.mq5:200>): there was no explicit post-resolution `SymbolSelect()` pass with per-symbol diagnostics at the exact `g_symArray[]` handoff the contract targeted. If a non-chart symbol is not effectively subscribed, `SymbolInfoTick()` can later return `false`, freshness ages to `DISCONNECTED`, and backend/dashboard correctly show `offline`.
+
+**Patch plan**
+
+Add the smallest safe `OnInit()` guard only, leave `OnTimer()`, backend mapping, session windows, and symbol aliases unchanged, then generate the required audit/report artifacts.
+
+**Exact code changes**
+
+In [SMC_MarketDataEA.mq5](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/mt5/SMC_MarketDataEA.mq5:200>) I added an explicit loop over resolved symbols that calls `SymbolSelect(g_symArray[i], true)` before `engine.Initialize()`, logging `[SymbolSelect] ... OK` or a warning with the MT5 error code.  
+I also updated the prior audit criterion in [phase-0-mt5-multisymbol-parity-2026-05-03.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-0-mt5-multisymbol-parity-2026-05-03.md:112>) and created the required artifacts:
+[phase-0-mt5-parity-2026-05-27.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-0-mt5-parity-2026-05-27.md>),
+[BUG_SWEEP_REPORT_2026-05-27_us30-nas100-symbolselect.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-27_us30-nas100-symbolselect.md>),
+[fix-us30-nas100-symbolselect.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/fix-us30-nas100-symbolselect.md>),
+and the required [codex-implementation.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md:1>).
+
+**Acceptance criteria**
+
+Code-side acceptance is met: the startup subscription pass now exists at the required boundary, with explicit observability, and no stale-data protections were weakened.  
+Live acceptance is still pending operator verification: MT5 Journal `[SymbolSelect] US30/NAS100: OK`, backend live rows during US equity session, dashboard live badges during session, and preserved pre-market `offline`.
+
+**Regression checks**
+
+Passed:
+- `npm run check:mql`
+- `php wordpress/smc-superfib-sniper/tests/php/phase3_mt5_simulation_test.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php`
+- `npm run build`
+
+Not fully verified:
+- `MetaEditor64.exe` CLI compile attempt was inconclusive from this workspace. It exited without surfacing a usable compiler log or fresh workspace-visible `.ex5`.
+
+PR opened: #256  
+https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/256
+
+No PR review artifact exists yet: `reports/codex-review.json` is still missing, and the PR has no reviews at this point. Pre-existing unstaged changes remain in `reports/copilot-research.md`, `reports/codex-plan.md`, and related meta files; they were not included in the commit.

@@ -1,0 +1,14 @@
+**Outcome**
+
+Patched the MT5 compile failure on branch `codex/smc-intake-fix-ea-compile-errors` and opened a normal PR: `#250`  
+https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/250
+
+The code change is surgical: [RegimeEngine.mqh](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/mt5/RegimeEngine.mqh>) and [SignalEngine.mqh](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/mt5/SignalEngine.mqh>) now use anonymous class-scope `enum` constants instead of illegal inline `static const int` declarations. Values were preserved exactly: `20`, `14`, `25`, `15`, `8`. Required artifacts are in [codex-implementation.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md>), [BUG_SWEEP_REPORT_2026-05-26_smc-intake-fix-ea-compile-errors.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-26_smc-intake-fix-ea-compile-errors.md>), and [phase-6-mt5-parity-2026-05-26.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-6-mt5-parity-2026-05-26.md>).
+
+**Validation**
+
+`node mt5/check-mql-includes.mjs` passed. The implementation artifact validator passed. A pre/post grep confirmed the unsupported `static const int ... =` pattern was removed from in-scope `mt5/*.mqh` files.
+
+MetaEditor CLI compile is still inconclusive in this workspace: `MetaEditor64.exe` exited `0` but produced no repo-local compiler log or `.ex5` artifact, so I did not claim compile success. Pre-existing unrelated local changes in `.claude/settings.local.json`, `reports/codex-plan.md`, `reports/codex-plan.meta.json`, and `reports/copilot-research.md` were left unstaged and out of the commit.
+
+No PR review fixes were applied yet because there are no review findings available locally at this point.

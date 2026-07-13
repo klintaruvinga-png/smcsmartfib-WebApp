@@ -1,0 +1,5 @@
+{
+  "issue": "Fix watchlist persistence: symbols persist after removal or are replaced by other removed symbols, noticed with AUDCAD and EURJPY. Confirm root cause: stale user-settings cache, stale query invalidation, or incorrect symbol set synchronization. Patch live watchlist mutation flow in useSniperData.ts / account.tsx and verify removed symbols stay removed, no ghost reappearance, no unexpected replacement.",
+  "plan_hash": "5c0a95a318c10ade39088afd1c5f78c917fd2909d354289e0adc255c18fb8b85",
+  "written_at": "2026-05-15T09:37:58.177Z"
+}

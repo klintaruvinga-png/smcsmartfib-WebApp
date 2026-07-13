@@ -1,0 +1,5 @@
+{
+  "issue": "SMC Intake - using the attached docs, lets work on phase 3 closeout by doing the following; 1. Update the Phase 3 72 hour soak baseline to completion 2. Update the SQL query results for Crypto weekend, live and offline and EA resume tasks 3. Update EA Compile logs as success - MarketDataEngine.mqh code generated 0 0 errors, 0 warnings, 7358 ms elapsed, cpu='AVX2 + FMA3' 4. Confirm 72h engine health stats as per soak report 5. Attach Existing Phase 3 Audit Artifacts 5. Outstanding Coverage Gaps to Document (do not block gate, but must be recorded) Both Phase 2 engine audits flagged these as incomplete — carry them into the Phase 3 closeout as known open items: Dedicated regime replay parity suite — not yet executed Dedicated signal replay parity suite (multi-case, multi-pair) — not yet executed Track lead assignments (TASK 10) — all three tracks still show TBD",
+  "research_hash": "753fb96bf7b96559c3f530ba968f67f893bf2da0da725d52d8e9c10d5ae5dc2b",
+  "written_at": "2026-05-25T05:15:57.613Z"
+}

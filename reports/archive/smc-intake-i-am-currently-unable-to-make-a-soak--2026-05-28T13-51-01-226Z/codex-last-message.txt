@@ -1,0 +1,19 @@
+**Objective**
+
+Restored the blocked Phase 4 soak checkpoint path on `/admin` without widening scope.
+
+**Root cause / patch**
+
+`PHASE_4_30_DAY` was a fixed template with `defaultCheckpointCount: 0` and `checkpointLabels: []`, while only `CUSTOM` exposes schedule inputs. That forced Phase 4 into the same disabled warning path as an invalid custom schedule.
+
+I patched [src/types/sniper.ts](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/types/sniper.ts) so Phase 4 now carries a fixed four-checkpoint cadence: `T+7d`, `T+14d`, `T+21d`, `T+30d`. I updated [src/routes/-admin.test.tsx](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/routes/-admin.test.tsx) to lock Phase 4 label rendering, Phase 4 checkpoint button enablement after baseline exists, and preserved invalid-`CUSTOM` blocking.
+
+**Validation**
+
+`npx vitest run src/routes/-admin.test.tsx`, `npm run build`, and `npm run validate:impl` all passed. I also wrote the required implementation summary at [reports/codex-implementation.md](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md) and bug sweep report at [.github/docs/BUG_SWEEP_REPORT_2026-05-28_phase4-soak-checkpoint-template.md](/C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-28_phase4-soak-checkpoint-template.md).
+
+Branch: `codex/smc-intake-i-am-currently-unable-to-make-a-soak-`  
+Commit: `2ae4541`  
+PR: [#270](https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/270)
+
+Remaining risk: the approved repo artifact defines the weekly/final Phase 4 cadence, but not exact UI wording, so `T+7d` / `T+14d` / `T+21d` / `T+30d` is the smallest safe label interpretation. Manual authenticated `/admin` verification is still pending. Unrelated workspace artifacts remain unstaged: `reports/copilot-research.md`, `reports/codex-plan.md`, and `reports/codex-plan.meta.json`.

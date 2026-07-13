@@ -1,0 +1,29 @@
+**Stopped**
+
+The implementation contract is internally inconsistent with the stated issue, so I did not guess.
+
+- Runtime context issue: `SMC Intake - Fix EA compile errors`
+- `reports/copilot-research.md`: MT5 compile-error research
+- `reports/codex-plan.md`: frontend soak-form changes in `src/routes/admin.tsx`, and it explicitly says EA compile errors are out of scope
+
+Applying the plan would have changed the wrong subsystem, so I stopped under the contract-conflict rule.
+
+**What I completed**
+
+- Created branch `codex/smc-intake-fix-ea-compile-errors`
+- Recreated and committed the required stop report: [reports/codex-implementation.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md)
+- Pushed the branch
+- Opened a normal PR: `#246`  
+  `https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/246`
+
+Commit: `1c363e2`  
+Tests run: none, because the stop happened before code changes.  
+Bug sweep / parity audit: not generated, because no implementation was applied.
+
+**Exact ambiguity resolved**
+
+I treated the mismatch between the requested MT5 EA fix and the authoritative frontend-only plan as a hard stop, which is the smallest safe interpretation of the contract.
+
+**What is needed next**
+
+A corrected implementation contract that matches the actual EA compile-error issue and names the MT5 patch surface to change. Once that exists, I can execute the real fix on the same branch or a replacement branch if you prefer.

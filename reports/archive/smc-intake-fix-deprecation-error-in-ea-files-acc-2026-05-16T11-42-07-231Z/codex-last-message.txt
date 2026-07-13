@@ -1,0 +1,34 @@
+**Objective**
+
+Fixed the MT5 deprecation in [MarketDataEngine.mqh](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/mt5/MarketDataEngine.mqh:518>) on branch `codex/smc-intake-fix-deprecation-error-in-ea-files-acc`.
+
+**Root Cause / Analysis**
+
+`SendAccountSync()` was still using deprecated `ACCOUNT_FREEMARGIN`. I confirmed the repo had exactly one occurrence, and the local MetaTrader MQL5 includes use `AccountInfoDouble(ACCOUNT_MARGIN_FREE)`, so this was a straight SDK-name drift issue, not a logic or contract issue.
+
+**Exact Code Changes**
+
+- [MarketDataEngine.mqh](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/mt5/MarketDataEngine.mqh:518>)
+  Replaced:
+  `AccountInfoDouble(ACCOUNT_FREEMARGIN)`
+  with:
+  `AccountInfoDouble(ACCOUNT_MARGIN_FREE)`
+- [codex-implementation.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md:1>)
+  Wrote the required implementation summary with validations, artifacts, risks, and ambiguity resolution.
+
+**Acceptance Criteria / Regression Checks**
+
+- `git diff -- mt5/MarketDataEngine.mqh` showed exactly one token change on one line
+- `rg "ACCOUNT_FREEMARGIN" mt5` returned zero results after patch
+- `rg "ACCOUNT_MARGIN_FREE" mt5` returned exactly one result at line 518
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-account-sync.php` passed
+
+**Artifacts**
+
+- Commit: `85167bb`
+- PR: `#189`
+  https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/189
+
+**Remaining Risk**
+
+Automated MT5 compile verification could not be conclusively observed from the local `MetaEditor64.exe` CLI here because it returned without a compiler log or artifact. Everything else required by the contract was completed.

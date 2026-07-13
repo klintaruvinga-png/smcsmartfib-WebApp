@@ -1,0 +1,58 @@
+**Objective**
+
+Phase 3 closeout was implemented as a doc-only patch on branch `codex/smc-intake-using-the-attached-docs-lets-work-on-` and opened as PR [#236](https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/236).
+
+**Root Cause / Analysis**
+
+The verified Phase 3 evidence existed in the intake artifacts, but the standalone closeout record required by the contract was missing from the repo. No backend, MT5, Pine, or dashboard logic change was warranted.
+
+**Patch Plan**
+
+Create the new closeout artifact, write the required implementation summary before validation, verify watcher behavior and report-only scope, then commit, push, and open a normal PR.
+
+**Exact Code Changes**
+
+Created [phase3-closeout.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/phase3-closeout.md) with:
+- 72h closeout checkpoint
+- final engine health stats
+- SQL resume/live/offline evidence
+- `MarketDataEngine.mqh` compile success
+- Phase 3 artifact registry
+- carried Phase 2 coverage gaps
+
+Updated [codex-implementation.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md) with:
+- issue summary
+- implemented root cause
+- files changed
+- validation record
+- generated reports
+- remaining risks
+- ambiguity handling
+
+**Acceptance Criteria**
+
+Met:
+- `reports/phase3-closeout.md` exists with all 6 required sections
+- required Phase 3 metrics and gap lines are present
+- patch stayed under `reports/` only
+- PR opened as a normal PR, not draft
+
+**Regression Checks**
+
+Verified:
+- `scripts/pipeline-watcher.js` does not key off `reports/phase3-closeout.md`
+- no source files were touched
+- no bug sweep report required for this contract scope
+- no parity audit required for this contract scope
+
+Open item:
+- `reports/codex-review.json` is not present yet, so there were no local review findings to remediate in the Claude review-fix stage during this turn.
+
+**Ambiguities Resolved**
+
+- Kept the artifact registry filenames exactly as specified by contract instead of inferring alternate repo paths.
+- Used the runtime-provided branch name instead of the plan’s suggested branch name.
+
+**Notes**
+
+The workspace still has unrelated pre-existing local `reports/` changes outside this commit, and there is a separate local-only commit in the workspace that I did not rewrite or push. The PR itself contains the intended Phase 3 closeout commit only.

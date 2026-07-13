@@ -1,0 +1,16 @@
+Implemented and opened normal PR #304: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/304
+
+Patch:
+- Added `placeholderData: keepPreviousData` to `useLiveSignals()` and `useLadders()`.
+- Added hook-level regression coverage for both query observers.
+- Added required implementation summary/meta and bug sweep report.
+
+Verification:
+- `npx vitest run src/hooks/useSniperData.test.tsx` passed, 10 tests.
+- `npx vitest run src/routes/-plan.test.tsx` passed, 22 tests.
+- `npm run validate:impl` passed.
+- PR is open, not draft, mergeable, and current check rollup shows success.
+
+Commit: `550cd63 fix: retain signal and ladder query continuity`
+
+Note: the contract input files remain untracked locally: `reports/codex-plan.md`, `reports/codex-plan.meta.json`, `reports/copilot-research.md`. I did not stage them because they were inputs, not implementation outputs.

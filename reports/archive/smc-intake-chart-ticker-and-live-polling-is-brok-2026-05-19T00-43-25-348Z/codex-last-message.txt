@@ -1,0 +1,8 @@
+**Stopped**
+
+The contract could not be applied safely. Change B-1 assumes heartbeat is unwired, but this branch already calls `engine.SendHeartbeat();` in [mt5/SMC_MarketDataEA.mq5](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/mt5/SMC_MarketDataEA.mq5:271>). That directly conflicts with the contract’s required pre-check, so I stopped instead of patching the wrong failure path.
+
+I wrote the mandatory stop artifact at [reports/codex-implementation.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md:1>), committed only that file, pushed `codex/smc-intake-chart-ticker-and-live-polling-is-brok`, and opened a normal PR: `#204`  
+`https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/204`
+
+No runtime code was changed. No validations were run, because the stop condition was hit before implementation. The one ambiguity I resolved was branch selection: the contract suggested split branches, but runtime context required the single `codex/...` branch, so I used that.

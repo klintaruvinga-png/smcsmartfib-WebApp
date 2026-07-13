@@ -1,0 +1,359 @@
+﻿
+Deprecated: SMC_SuperFib_Sniper_REST::get_live_signals(): Implicitly marking parameter $request as nullable is deprecated, the explicit nullable type must be used instead in C:\Users\Kudzie\OneDrive\All Final Softwares\SMC SuperFib Dashboard\smcsmartfib-WebApp\wordpress\smc-superfib-sniper\smc-superfib-sniper.php on line 5613
+Testing EA Market Stream Endpoint
+=================================
+
+Test 1: Valid payload with snapshot and candle
+php : [SMC_SF] ea/market-stream ingested symbol=EURUSD freshness=LIVE 
+session=London
+At line:1 char:104
++ ... ib-WebApp'; php wordpress/smc-superfib-sniper/tests/php/test-ea-marke ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([SMC_SF] ea/mar... session=London 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Γ£ô SUCCESS: Response OK
+  Snapshots inserted: 1
+  Candles inserted: 1
+Γ£ô SUCCESS: Snapshot stored in database
+  Symbol: EURUSD
+  Source: mt5
+  State: live
+Γ£ô SUCCESS: MT5 change_pct_1d derived from day open
+Γ£ô SUCCESS: Candle stored in database
+  Symbol: EURUSD
+  Timeframe: 15min
+  Source: mt5
+Γ£ô SUCCESS: MT5 timeframe normalized to internal value
+SUCCESS: Snapshot preserves broker timestamp for accurate staleness detection
+SUCCESS: MT5 push clears stale Twelve Data per-symbol cooldown transients
+SUCCESS: EA push writes backendSync heartbeat
+Γ£ô SUCCESS: Freshness transient stored
+Γ£ô SUCCESS: Session transient stored
+
+Test 2: Alternate header name X-API-KEY accepted
+Γ£ô SUCCESS: X-API-KEY header accepted
+
+Test 3: Missing user_id rejected by EA permission gate
+Γ£ô SUCCESS: Missing user_id correctly rejected
+
+Test 4: Stale data rejection (>300 seconds old) returns 422 Unprocessable Entity
+SMC SuperFIB EA bridge auth failed: missing user_id.
+Γ£ô SUCCESS: Stale data correctly rejected with HTTP 422
+
+Test 5: Invalid payload (missing symbol)
+Γ£ô SUCCESS: Invalid payload correctly rejected
+
+Test 6: Snapshot only payload
+Γ£ô SUCCESS: Snapshot-only payload accepted
+
+Test 7: Invalid OHLC candle silently rejected (snapshot still inserted)
+OHLC GUARD: Rejecting M1 candle with invalid OHLC for EURUSD | O=1.085 
+H=1.0848 L=1.0843 C=1.0851
+Γ£ô SUCCESS: Invalid OHLC candle rejected; snapshot still stored
+
+Test 8: INF bid rejected with HTTP 422 (BUG-001 patch: structured error response)
+Γ£ô SUCCESS: INF bid correctly returns WP_Error invalid_prices HTTP 422
+
+Test 8b: bid > ask rejected with HTTP 422 (BUG-001 patch)
+Γ£ô SUCCESS: bid > ask correctly returns WP_Error invalid_prices HTTP 422
+
+Test 9: Non-numeric tick_volume (array) clamped to 0 (Codex P2 guard)
+Γ£ô SUCCESS: Non-numeric tick_volume (array) clamped to 0 (not silently 1)
+
+Test 10: Negative tick_volume clamped to 0 (BUG-001 regression guard)
+Γ£ô SUCCESS: Negative tick_volume clamped to 0 (stored as 0, not -999)
+Test 11: Missing timestamp with valid past candle ΓÇö server-time fallback allows insert (BUG-001 guard)
+Γ£ô SUCCESS: Past candle inserted when timestamp absent (server-time fallback active)
+Test 12: quote_time alias accepted (canonical REST contract ΓÇö BUG-001 2026-05-15)
+Γ£ô SUCCESS: quote_time alias accepted; snapshot inserted
+
+Test 13: candles[] array shim accepted (canonical REST contract ΓÇö BUG-001 2026-05-15)
+Γ£ô SUCCESS: candles[] array shim accepted; candle promoted and stored
+
+Test 14: Stale quote_time rejected with 422 (staleness guard on alias)
+Γ£ô SUCCESS: Stale quote_time correctly rejected with HTTP 422
+Test 15: Same source retry does not increment source_count
+[APPLY_WHERE] Processing conditions, initial rows=0
+[APPLY_WHERE] Filtering on feed_key = ICMARKETS|LONDON
+[APPLY_WHERE] After feed_key filter: 0 rows
+[APPLY_WHERE] Filtering on normalized_symbol = EURUSD
+[APPLY_WHERE] After normalized_symbol filter: 0 rows
+[APPLY_WHERE] Pattern for timeframe did not match
+[APPLY_WHERE] Pattern for candle_open_time did not match
+[APPLY_WHERE] Filtering on symbol = EURUSD
+[APPLY_WHERE] After symbol filter: 0 rows
+[TESTDB] get_results for wp_smc_sf_market_candles with 0 rows. Conditions: 
+feed_key = 'ICMARKETS|LONDON' AND normalized_symbol = 'EURUSD' AND timeframe = 
+'15min' AND candle_open_time = '2026-06-09 06:55:33' LIMIT 1
+[APPLY_WHERE] Processing conditions, initial rows=0
+[APPLY_WHERE] Filtering on feed_key = ICMARKETS|LONDON
+[APPLY_WHERE] After feed_key filter: 0 rows
+[APPLY_WHERE] Filtering on normalized_symbol = EURUSD
+[APPLY_WHERE] After normalized_symbol filter: 0 rows
+[APPLY_WHERE] Filtering on timeframe = 15min
+[APPLY_WHERE] After timeframe filter: 0 rows
+[APPLY_WHERE] Filtering on candle_open_time = 2026-06-09 06:55:33
+[APPLY_WHERE] After candle_open_time filter: 0 rows
+[APPLY_WHERE] Filtering on symbol = EURUSD
+[APPLY_WHERE] After symbol filter: 0 rows
+[TESTDB] After apply_where_filters: 0 rows remain
+[DEBUG UPSERT] NO existing row found for 
+ICMARKETS|LONDON|EURUSD|15min|2026-06-09 06:55:33. Creating new with 
+source_hash=18670d20a529fbf21647e09096061b1c
+[SMC_SF] ea/market-stream ingested symbol=EURUSD freshness=LIVE session=London
+[APPLY_WHERE] Processing conditions, initial rows=1
+[APPLY_WHERE] Filtering on feed_key = ICMARKETS|LONDON
+[APPLY_WHERE] After feed_key filter: 1 rows
+[APPLY_WHERE] Filtering on normalized_symbol = EURUSD
+[APPLY_WHERE] After normalized_symbol filter: 1 rows
+[APPLY_WHERE] Pattern for timeframe did not match
+[APPLY_WHERE] Pattern for candle_open_time did not match
+[APPLY_WHERE] Filtering on symbol = EURUSD
+[APPLY_WHERE] After symbol filter: 1 rows
+[TESTDB] get_results for wp_smc_sf_market_candles with 1 rows. Conditions: 
+feed_key = 'ICMARKETS|LONDON' AND normalized_symbol = 'EURUSD' AND timeframe = 
+'15min' AND candle_open_time = '2026-06-09 06:55:33' LIMIT 1
+[TESTDB] First row: {"id":null,"feed_key":"ICMARKETS|LONDON","normalized_symbol
+":"EURUSD","timeframe":"15min","candle_open_time":"2026-06-09 06:55:33","open":
+1.085,"high":1.0855,"low":1.0848,"close":1.0852,"volume":"100","source_count":1
+,"source_hashes":"[\"18670d20a529fbf21647e09096061b1c\"]","first_seen_at":"2026
+-06-09 06:57:03","last_seen_at":"2026-06-09 06:57:03","confidence":"single"}
+[APPLY_WHERE] Processing conditions, initial rows=1
+[APPLY_WHERE] Filtering on feed_key = ICMARKETS|LONDON
+[APPLY_WHERE] After feed_key filter: 1 rows
+[APPLY_WHERE] Filtering on normalized_symbol = EURUSD
+[APPLY_WHERE] After normalized_symbol filter: 1 rows
+[APPLY_WHERE] Filtering on timeframe = 15min
+[APPLY_WHERE] After timeframe filter: 1 rows
+[APPLY_WHERE] Filtering on candle_open_time = 2026-06-09 06:55:33
+[APPLY_WHERE] After candle_open_time filter: 1 rows
+[APPLY_WHERE] Filtering on symbol = EURUSD
+[APPLY_WHERE] After symbol filter: 0 rows
+[TESTDB] After apply_where_filters: 0 rows remain
+[DEBUG UPSERT] NO existing row found for 
+ICMARKETS|LONDON|EURUSD|15min|2026-06-09 06:55:33. Creating new with 
+source_hash=18670d20a529fbf21647e09096061b1c
+[SMC_SF] ea/market-stream ingested symbol=EURUSD freshness=LIVE session=London
+Γ£ô SUCCESS: Same-source retry did not increment source_count (still 1)
+[TEST DEBUG] wp_smc_sf_market_candles after retries: [{"id":null,"feed_key":"IC
+MARKETS|LONDON","normalized_symbol":"EURUSD","timeframe":"15min","candle_open_t
+ime":"2026-06-09 06:55:33","open":1.085,"high":1.0855,"low":1.0848,"close":1.08
+52,"volume":"100","source_count":1,"source_hashes":"[\"18670d20a529fbf21647e090
+96061b1c\"]","first_seen_at":"2026-06-09 06:57:03","last_seen_at":"2026-06-09 
+06:57:03","confidence":"single"}]
+
+Test 16: Second distinct source with same OHLC promotes confidence to 'confirmed'
+[APPLY_WHERE] Processing conditions, initial rows=1
+[APPLY_WHERE] Filtering on feed_key = ICMARKETS|LONDON
+[APPLY_WHERE] After feed_key filter: 1 rows
+[APPLY_WHERE] Filtering on normalized_symbol = EURUSD
+[APPLY_WHERE] After normalized_symbol filter: 1 rows
+[APPLY_WHERE] Pattern for timeframe did not match
+[APPLY_WHERE] Pattern for candle_open_time did not match
+[APPLY_WHERE] Filtering on symbol = EURUSD
+[APPLY_WHERE] After symbol filter: 1 rows
+[TESTDB] get_results for wp_smc_sf_market_candles with 0 rows. Conditions: 
+feed_key = 'ICMARKETS|LONDON' AND normalized_symbol = 'EURUSD' AND timeframe = 
+'15min' AND candle_open_time = '2026-06-09 06:55:13' LIMIT 1
+[APPLY_WHERE] Processing conditions, initial rows=0
+[APPLY_WHERE] Filtering on feed_key = ICMARKETS|LONDON
+[APPLY_WHERE] After feed_key filter: 0 rows
+[APPLY_WHERE] Filtering on normalized_symbol = EURUSD
+[APPLY_WHERE] After normalized_symbol filter: 0 rows
+Γ£ù FAILED: confidence='single' source_count=1 (expected confirmed/2)
+
+Test 17: Second distinct source with different OHLC sets confidence='disputed', canonical OHLC unchanged
+[APPLY_WHERE] Filtering on timeframe = 15min
+[APPLY_WHERE] After timeframe filter: 0 rows
+[APPLY_WHERE] Filtering on candle_open_time = 2026-06-09 06:55:13
+[APPLY_WHERE] After candle_open_time filter: 0 rows
+[APPLY_WHERE] Filtering on symbol = EURUSD
+[APPLY_WHERE] After symbol filter: 0 rows
+[TESTDB] After apply_where_filters: 0 rows remain
+[DEBUG UPSERT] NO existing row found for 
+ICMARKETS|LONDON|EURUSD|15min|2026-06-09 06:55:13. Creating new with 
+source_hash=18670d20a529fbf21647e09096061b1c
+[SMC_SF] ea/market-stream ingested symbol=EURUSD freshness=LIVE session=London
+[TEST DEBUG T16-A] wp_smc_sf_market_candles after first dispatch: [{"id":null,"
+feed_key":"ICMARKETS|LONDON","normalized_symbol":"EURUSD","timeframe":"15min","
+candle_open_time":"2026-06-09 06:55:13","open":1.085,"high":1.0855,"low":1.0848
+,"close":1.0852,"volume":null,"source_count":1,"source_hashes":"[\"18670d20a529
+fbf21647e09096061b1c\"]","first_seen_at":"2026-06-09 
+06:57:03","last_seen_at":"2026-06-09 06:57:03","confidence":"single"}]
+[APPLY_WHERE] Processing conditions, initial rows=1
+[APPLY_WHERE] Filtering on feed_key = ICMARKETS|LONDON
+[APPLY_WHERE] After feed_key filter: 1 rows
+[APPLY_WHERE] Filtering on normalized_symbol = EURUSD
+[APPLY_WHERE] After normalized_symbol filter: 1 rows
+[APPLY_WHERE] Pattern for timeframe did not match
+[APPLY_WHERE] Pattern for candle_open_time did not match
+[APPLY_WHERE] Filtering on symbol = EURUSD
+[APPLY_WHERE] After symbol filter: 1 rows
+[TESTDB] get_results for wp_smc_sf_market_candles with 1 rows. Conditions: 
+feed_key = 'ICMARKETS|LONDON' AND normalized_symbol = 'EURUSD' AND timeframe = 
+'15min' AND candle_open_time = '2026-06-09 06:55:13' LIMIT 1
+[TESTDB] First row: {"id":null,"feed_key":"ICMARKETS|LONDON","normalized_symbol
+":"EURUSD","timeframe":"15min","candle_open_time":"2026-06-09 06:55:13","open":
+1.085,"high":1.0855,"low":1.0848,"close":1.0852,"volume":null,"source_count":1,
+"source_hashes":"[\"18670d20a529fbf21647e09096061b1c\"]","first_seen_at":"2026-
+06-09 06:57:03","last_seen_at":"2026-06-09 06:57:03","confidence":"single"}
+[APPLY_WHERE] Processing conditions, initial rows=1
+[APPLY_WHERE] Filtering on feed_key = ICMARKETS|LONDON
+[APPLY_WHERE] After feed_key filter: 1 rows
+[APPLY_WHERE] Filtering on normalized_symbol = EURUSD
+[APPLY_WHERE] After normalized_symbol filter: 1 rows
+[APPLY_WHERE] Filtering on timeframe = 15min
+[APPLY_WHERE] After timeframe filter: 1 rows
+[APPLY_WHERE] Filtering on candle_open_time = 2026-06-09 06:55:13
+[APPLY_WHERE] After candle_open_time filter: 1 rows
+[APPLY_WHERE] Filtering on symbol = EURUSD
+[APPLY_WHERE] After symbol filter: 0 rows
+[TESTDB] After apply_where_filters: 0 rows remain
+[DEBUG UPSERT] NO existing row found for 
+ICMARKETS|LONDON|EURUSD|15min|2026-06-09 06:55:13. Creating new with 
+source_hash=6ffa9d537557a387348658fe0a47fcba
+[SMC_SF] ea/market-stream ingested symbol=EURUSD freshness=LIVE session=London
+[TEST DEBUG T16-B] wp_smc_sf_market_candles after second dispatch: [{"id":null,
+"feed_key":"ICMARKETS|LONDON","normalized_symbol":"EURUSD","timeframe":"15min",
+"candle_open_time":"2026-06-09 06:55:13","open":1.085,"high":1.0855,"low":1.084
+8,"close":1.0852,"volume":null,"source_count":1,"source_hashes":"[\"6ffa9d53755
+7a387348658fe0a47fcba\"]","first_seen_at":"2026-06-09 
+06:57:03","last_seen_at":"2026-06-09 06:57:03","confidence":"single"}]
+[APPLY_WHERE] Processing conditions, initial rows=1
+[APPLY_WHERE] Filtering on feed_key = ICMARKETS|LONDON
+[APPLY_WHERE] After feed_key filter: 1 rows
+[APPLY_WHERE] Filtering on normalized_symbol = EURUSD
+[APPLY_WHERE] After normalized_symbol filter: 1 rows
+[APPLY_WHERE] Pattern for timeframe did not match
+[APPLY_WHERE] Pattern for candle_open_time did not match
+[APPLY_WHERE] Filtering on symbol = EURUSD
+[APPLY_WHERE] After symbol filter: 1 rows
+[TESTDB] get_results for wp_smc_sf_market_candles with 0 rows. Conditions: 
+feed_key = 'ICMARKETS|LONDON' AND normalized_symbol = 'EURUSD' AND timeframe = 
+'15min' AND candle_open_time = '2026-06-09 06:54:53' LIMIT 1
+[APPLY_WHERE] Processing conditions, initial rows=0
+[APPLY_WHERE] Filtering on feed_key = ICMARKETS|LONDON
+[APPLY_WHERE] After feed_key filter: 0 rows
+Γ£ù FAILED: confidence='single' open=1.0851 (expected disputed, open=1.0850)
+
+Test 18: fetch_shared_market_candles ignores rows from a different feed_key
+Γ£ô SUCCESS: Different feed_key returns no shared candles (foreign rows ignored)
+
+Test 19: Stale shared candles trigger fallback (return empty)
+Γ£ô SUCCESS: Stale shared candles return empty (fallback triggered)
+
+Test 20: M15 canonical rows derive correct H1/H4 OHLC in order
+
+Fatal error: Uncaught RuntimeException: H1 derived candle should be returned from M15 source rows in C:\Users\Kudzie\OneDrive\All Final Softwares\SMC SuperFib Dashboard\smcsmartfib-WebApp\wordpress\smc-superfib-sniper\tests\php\test-ea-market-stream.php:429
+Stack trace:
+#0 C:\Users\Kudzie\OneDrive\All Final Softwares\SMC SuperFib Dashboard\smcsmartfib-WebApp\wordpress\smc-superfib-sniper\tests\php\test-ea-market-stream.php(1179): assert_test(false, 'H1 derived cand...')
+#1 C:\Users\Kudzie\OneDrive\All Final Softwares\SMC SuperFib Dashboard\smcsmartfib-WebApp\wordpress\smc-superfib-sniper\tests\php\test-ea-market-stream.php(1333): test_ea_market_stream()
+#2 {main}
+  thrown in C:\Users\Kudzie\OneDrive\All Final Softwares\SMC SuperFib Dashboard\smcsmartfib-WebApp\wordpress\smc-superfib-sniper\tests\php\test-ea-market-stream.php on line 429
+[APPLY_WHERE] Filtering on normalized_symbol = EURUSD
+[APPLY_WHERE] After normalized_symbol filter: 0 rows
+[APPLY_WHERE] Filtering on timeframe = 15min
+[APPLY_WHERE] After timeframe filter: 0 rows
+[APPLY_WHERE] Filtering on candle_open_time = 2026-06-09 06:54:53
+[APPLY_WHERE] After candle_open_time filter: 0 rows
+[APPLY_WHERE] Filtering on symbol = EURUSD
+[APPLY_WHERE] After symbol filter: 0 rows
+[TESTDB] After apply_where_filters: 0 rows remain
+[DEBUG UPSERT] NO existing row found for 
+ICMARKETS|LONDON|EURUSD|15min|2026-06-09 06:54:53. Creating new with 
+source_hash=18670d20a529fbf21647e09096061b1c
+[SMC_SF] ea/market-stream ingested symbol=EURUSD freshness=LIVE session=London
+[APPLY_WHERE] Processing conditions, initial rows=1
+[APPLY_WHERE] Filtering on feed_key = ICMARKETS|LONDON
+[APPLY_WHERE] After feed_key filter: 1 rows
+[APPLY_WHERE] Filtering on normalized_symbol = EURUSD
+[APPLY_WHERE] After normalized_symbol filter: 1 rows
+[APPLY_WHERE] Pattern for timeframe did not match
+[APPLY_WHERE] Pattern for candle_open_time did not match
+[APPLY_WHERE] Filtering on symbol = EURUSD
+[APPLY_WHERE] After symbol filter: 1 rows
+[TESTDB] get_results for wp_smc_sf_market_candles with 1 rows. Conditions: 
+feed_key = 'ICMARKETS|LONDON' AND normalized_symbol = 'EURUSD' AND timeframe = 
+'15min' AND candle_open_time = '2026-06-09 06:54:53' LIMIT 1
+[TESTDB] First row: {"id":null,"feed_key":"ICMARKETS|LONDON","normalized_symbol
+":"EURUSD","timeframe":"15min","candle_open_time":"2026-06-09 06:54:53","open":
+1.085,"high":1.0855,"low":1.0848,"close":1.0852,"volume":null,"source_count":1,
+"source_hashes":"[\"18670d20a529fbf21647e09096061b1c\"]","first_seen_at":"2026-
+06-09 06:57:03","last_seen_at":"2026-06-09 06:57:03","confidence":"single"}
+[APPLY_WHERE] Processing conditions, initial rows=1
+[APPLY_WHERE] Filtering on feed_key = ICMARKETS|LONDON
+[APPLY_WHERE] After feed_key filter: 1 rows
+[APPLY_WHERE] Filtering on normalized_symbol = EURUSD
+[APPLY_WHERE] After normalized_symbol filter: 1 rows
+[APPLY_WHERE] Filtering on timeframe = 15min
+[APPLY_WHERE] After timeframe filter: 1 rows
+[APPLY_WHERE] Filtering on candle_open_time = 2026-06-09 06:54:53
+[APPLY_WHERE] After candle_open_time filter: 1 rows
+[APPLY_WHERE] Filtering on symbol = EURUSD
+[APPLY_WHERE] After symbol filter: 0 rows
+[TESTDB] After apply_where_filters: 0 rows remain
+[DEBUG UPSERT] NO existing row found for 
+ICMARKETS|LONDON|EURUSD|15min|2026-06-09 06:54:53. Creating new with 
+source_hash=4f9f8e133b89b07a051060f26fc33264
+[SMC_SF] ea/market-stream ingested symbol=EURUSD freshness=LIVE session=London
+[TESTDB] get_results for wp_smc_sf_market_candles with 1 rows. Conditions: 
+feed_key = 'LOCAL_BROKER|LONDON' AND normalized_symbol = 'EURUSD' AND 
+timeframe = '15min' AND confidence <> 'disputed' ORDER BY candle_open_time 
+DESC LIMIT 50
+[TESTDB] First row: {"id":null,"feed_key":"FOREIGN_BROKER|LONDON","normalized_s
+ymbol":"EURUSD","timeframe":"15min","candle_open_time":"2026-06-09 06:42:03","o
+pen":1.08,"high":1.081,"low":1.0795,"close":1.0805,"volume":"50.0000","source_c
+ount":1,"source_hashes":"[\"abc\"]","first_seen_at":"2026-06-09 
+06:57:03","last_seen_at":"2026-06-09 06:57:03","confidence":"single"}
+[APPLY_WHERE] Processing conditions, initial rows=1
+[APPLY_WHERE] Filtering on feed_key = LOCAL_BROKER|LONDON
+[APPLY_WHERE] Row feed_key 'FOREIGN_BROKER|LONDON' !== 'LOCAL_BROKER|LONDON'
+[APPLY_WHERE] After feed_key filter: 0 rows
+[APPLY_WHERE] Filtering on normalized_symbol = EURUSD
+[APPLY_WHERE] After normalized_symbol filter: 0 rows
+[APPLY_WHERE] Filtering on timeframe = 15min
+[APPLY_WHERE] After timeframe filter: 0 rows
+[APPLY_WHERE] Pattern for candle_open_time did not match
+[APPLY_WHERE] Filtering on symbol = EURUSD
+[APPLY_WHERE] After symbol filter: 0 rows
+[TESTDB] After apply_where_filters: 0 rows remain
+[TESTDB] get_results for wp_smc_sf_market_candles with 1 rows. Conditions: 
+feed_key = 'STALEBROKER' AND normalized_symbol = 'EURUSD' AND timeframe = 
+'15min' AND confidence <> 'disputed' ORDER BY candle_open_time DESC LIMIT 50
+[TESTDB] First row: {"id":null,"feed_key":"STALEBROKER","normalized_symbol":"EU
+RUSD","timeframe":"15min","candle_open_time":"2026-06-09 04:57:03","open":1.08,
+"high":1.081,"low":1.0795,"close":1.0805,"volume":"50.0000","source_count":1,"s
+ource_hashes":"[\"abc\"]","first_seen_at":"2026-06-09 
+04:57:03","last_seen_at":"2026-06-09 04:57:03","confidence":"single"}
+[APPLY_WHERE] Processing conditions, initial rows=1
+[APPLY_WHERE] Filtering on feed_key = STALEBROKER
+[APPLY_WHERE] After feed_key filter: 1 rows
+[APPLY_WHERE] Filtering on normalized_symbol = EURUSD
+[APPLY_WHERE] After normalized_symbol filter: 1 rows
+[APPLY_WHERE] Filtering on timeframe = 15min
+[APPLY_WHERE] After timeframe filter: 1 rows
+[APPLY_WHERE] Pattern for candle_open_time did not match
+[APPLY_WHERE] Filtering on symbol = EURUSD
+[APPLY_WHERE] After symbol filter: 0 rows
+[TESTDB] After apply_where_filters: 0 rows remain
+[TESTDB] get_results for wp_smc_sf_market_candles with 4 rows. Conditions: 
+feed_key = 'H1H4_TEST_FEED' AND normalized_symbol = 'EURUSD' AND timeframe = 
+'15min' AND confidence <> 'disputed' ORDER BY candle_open_time DESC LIMIT 40
+[TESTDB] First row: {"id":null,"feed_key":"H1H4_TEST_FEED","normalized_symbol":
+"EURUSD","timeframe":"15min","candle_open_time":"2026-06-09 05:57:03","open":1.
+1,"high":1.101,"low":1.099,"close":1.1005,"volume":"100.0000","source_count":1,
+"source_hashes":"[]","first_seen_at":"2026-06-09 
+05:57:03","last_seen_at":"2026-06-09 05:57:03","confidence":"confirmed"}
+[APPLY_WHERE] Processing conditions, initial rows=4
+[APPLY_WHERE] Filtering on feed_key = H1H4_TEST_FEED
+[APPLY_WHERE] After feed_key filter: 4 rows
+[APPLY_WHERE] Filtering on normalized_symbol = EURUSD
+[APPLY_WHERE] After normalized_symbol filter: 4 rows
+[APPLY_WHERE] Filtering on timeframe = 15min
+[APPLY_WHERE] After timeframe filter: 4 rows
+[APPLY_WHERE] Pattern for candle_open_time did not match
+[APPLY_WHERE] Filtering on symbol = EURUSD
+[APPLY_WHERE] After symbol filter: 0 rows
+[TESTDB] After apply_where_filters: 0 rows remain

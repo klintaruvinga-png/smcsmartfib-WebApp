@@ -1,0 +1,5 @@
+{
+  "issue": "SMC Intake - /admin is setup to dislay Backend healt and the soak section was made for the phase 0 72 hour soak thats now finished making the soak section obsolete/useless. Currently we need to establish a baseline for the phase 3 soak. Update and adapt the soak section so admin can select the type of soak, duration, and number of checkpoints. use the Phase 0, phase 3 and other soaks to decide the templates to use for each soak type",
+  "research_hash": "856e07190d675c1520f0cb58c14b3b2d45b96681431b27e904c888c835ce0a2c",
+  "written_at": "2026-05-22T17:45:28.411Z"
+}

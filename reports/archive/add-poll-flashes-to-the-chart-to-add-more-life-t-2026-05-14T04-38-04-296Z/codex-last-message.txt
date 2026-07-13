@@ -1,0 +1,20 @@
+**Outcome**
+
+Implemented the chart pulse + candle countdown patch on branch `codex/add-poll-flashes-to-the-chart-to-add-more-life-t`, committed as `78d4872`, pushed, and opened a normal PR: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/164
+
+The live quote path now drives a chart-local pulse in [TVChart.tsx](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/components/sniper/TVChart.tsx), while [charts.tsx](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/routes/charts.tsx) derives backend-authoritative flash state and an intraday candle countdown through [chartCountdown.ts](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/lib/chartCountdown.ts). Styling was added in [styles.css](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/styles.css), and coverage was added in [\-charts.test.ts](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/routes/-charts.test.ts), [chartCountdown.test.tsx](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/lib/chartCountdown.test.tsx), and [TVChart.test.tsx](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/components/sniper/TVChart.test.tsx).
+
+**Validation**
+
+Ran:
+- `npx vitest run "src/routes/-charts.test.ts" "src/lib/chartCountdown.test.tsx" "src/components/sniper/TVChart.test.tsx"`
+- `npx eslint "src/routes/charts.tsx" "src/components/sniper/TVChart.tsx" "src/lib/chartCountdown.ts" "src/lib/chartCountdown.test.tsx" "src/routes/-charts.test.ts" "src/components/sniper/TVChart.test.tsx"`
+- `npm run build`
+
+Artifacts are in [reports/codex-implementation.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md), [BUG_SWEEP_REPORT_2026-05-14_chart-poll-flash-countdown.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-14_chart-poll-flash-countdown.md), and [phase-0-dashboard-parity-2026-05-14.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-0-dashboard-parity-2026-05-14.md).
+
+**Notes**
+
+I resolved one contract/repo mismatch explicitly: the repo uses `1min/15min/1day` style timeframe strings, not `1m/15m/1d`, and the current chart snapshot does not expose `nextCandleAt`, so I did not widen `ChartSnapshot`. I also kept daily/weekly countdowns unsupported per the safer interpretation.
+
+Left untouched in the worktree: `reports/copilot-research.md`, `reports/codex-plan.md`, and `reports/codex-plan.meta.json`.

@@ -1,0 +1,5 @@
+{
+  "issue": "Charts are currently not wired directly to the live price polling and are often lagging. ensure charts update in real time as price and candle data polls",
+  "research_hash": "2bb94d550441946fda81eee9d456d85ebdb398cde4c3c2b3f376ac0054e9b043",
+  "written_at": "2026-05-14T01:49:39.741Z"
+}

@@ -1,0 +1,5 @@
+{
+  "issue": "SMC Intake - /admin page soak reset is not working so we can start a new soak. Error: API /admin/soak-reset failed: 404 - {\"code\":\"rest_no_route\",\"message\":\"No route was found matching the URL and request method.\",\"data\":{\"status\":404}}",
+  "plan_hash": "f4763d3159bbe46c00f791eebdcf414e01d30120458f76966ad39310c8298dc0",
+  "written_at": "2026-05-27T05:38:22.849Z"
+}

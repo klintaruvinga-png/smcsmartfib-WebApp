@@ -1,0 +1,5 @@
+{
+  "issue": "SMC Intake - US30 and NAS100 keep going offline however the deployed list in the EA is EURUSD, USDJPY, GBPUSD, AUDUSD, USDCAD, USDCHF, NZDUSD, EURJPY, EURGBP,GBPJPY, EURCHF, AUDJPY, EURAUD, BTCUSD, ETHUSD,SOLUSD,DXYUSD,US Tech 100, US SP 500, Wall Street 30, USDCAD,USDCHF,USDZAR, CHFJPY,AUDCAD, GOLD, XAUUSD. Check logs and trackers for the same issue as I had to previously deal with this issue and add a permanent fix.",
+  "research_hash": "80bb34dbb39bd8658caf031161ac421b3385c78bfd1b8622e91b1783dac066c5",
+  "written_at": "2026-05-27T05:56:15.786Z"
+}

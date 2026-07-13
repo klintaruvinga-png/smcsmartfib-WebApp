@@ -1,0 +1,31 @@
+**Implemented**
+
+PR is open: `#237`  
+https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/237
+
+The fix is scoped to the two actual failure paths:
+- `mt5/SessionManager.mqh` now reopens the shared non-crypto weekend gate at Sunday `21:00 UTC`, so FX symbols do not stay stuck `CLOSED` until the first fresh tick.
+- `wordpress/smc-superfib-sniper/class-market-data-service.php` now reinterprets stale `CLOSED -> offline` snapshots as `stale` on read once broker-time shows the market should be open, while preserving `DISCONNECTED -> offline`.
+- `src/hooks/useSniperData.ts` and `src/routes/signals.tsx` now do comparison-only symbol normalization for watchlist filtering (`.r`, `.m`, `.pro`, compact broker suffixes, trailing `+`, `-ECN` style variants), and `signals.tsx` has DEV-only filter diagnostics.
+
+Artifacts:
+- [codex-implementation.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md)
+- [BUG_SWEEP_REPORT_2026-05-25_post-weekend-watchlist-signal-gate.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-25_post-weekend-watchlist-signal-gate.md)
+- [phase-0-mt5-backend-dashboard-parity-2026-05-25.md](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-0-mt5-backend-dashboard-parity-2026-05-25.md)
+
+**Validation**
+
+Passed:
+- `npm run check:mql`
+- `php wordpress/smc-superfib-sniper/tests/php/phase3_mt5_simulation_test.php`
+- `npx vitest run` (`89` tests passed)
+- `npm run build`
+- `rg -n "\[SignalsPage\] watchlist filter" dist` returned no matches
+- `npm run validate:impl`
+
+Constraint:
+- I did not execute an MT5 runtime locally, so the MQL side is validated by the added `.mq5` regression scripts plus `check:mql`, not by live EA execution.
+
+**Remaining**
+
+Manual Monday-open verification is still required after deploy: confirm at least one FX major and one index reappear in the watchlist within the expected post-open window, and confirm `All Symbols` exceeds `Watchlist` once non-crypto candidates are flowing.

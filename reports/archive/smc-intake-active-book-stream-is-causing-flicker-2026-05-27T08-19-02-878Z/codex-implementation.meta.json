@@ -1,0 +1,5 @@
+{
+  "issue": "SMC Intake - Active Book stream is causing flickers and position/book persistance issues in between polls/refreshes. So instead of a continueous steady stream, some positions/symbols may flicker on and off as they get updated",
+  "plan_hash": "751e87d199ad475ae382b8bb5dc203f83cb9199b374f0de12c3384982ea718bf",
+  "written_at": "2026-05-27T07:30:40.433Z"
+}

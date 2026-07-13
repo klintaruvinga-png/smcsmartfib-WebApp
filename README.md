@@ -12,7 +12,7 @@ The dashboard stack and the TradingView Pine indicator ship on separate version 
 ## Components
 
 - Dashboard: TanStack/Vite frontend in `src/`
-- WordPress plugin: REST backend in `wordpress/smc-superfib-sniper/`
+- Backend service: Node.js + TypeScript + Express + PostgreSQL in `backend/`
 - Pine indicator: TradingView study in `SMC_SuperFib_v13.1.3.pine`
 - MT5 EA: market-stream and execution counterpart under `mt5/`
 
@@ -20,5 +20,5 @@ The dashboard stack and the TradingView Pine indicator ship on separate version 
 
 - Frontend package metadata lives in `package.json`
 - Dashboard UI version label is defined in `src/lib/version.ts`
-- WordPress plugin install and runtime notes are in `wordpress/smc-superfib-sniper/README.md`
+- Backend service setup and deployment instructions are in `backend/README.md`
 - Frontend and backend environment specifics should be taken from the active deployment configuration for this repo

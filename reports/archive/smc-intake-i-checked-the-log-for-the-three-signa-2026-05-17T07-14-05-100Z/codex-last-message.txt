@@ -1,0 +1,13 @@
+Fixed the actual defect: [`mt5/MarketDataEngine.mqh`](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/mt5/MarketDataEngine.mqh) was building `GET /ea/license-check` without `user_id`. I added `user_id=<wpUserId>` to the query string, left backend auth semantics unchanged, and added a regression case in [`wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php`](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php) that proves query-param-only `user_id` passes auth with an empty JSON body. I also updated [`reports/phase-1-ea-bridge-implementation-report.md`](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/phase-1-ea-bridge-implementation-report.md), [`reports/codex-implementation.md`](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md), [`.github/docs/BUG_SWEEP_REPORT_2026-05-17_ea-license-check-missing-user-id.md`](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-17_ea-license-check-missing-user-id.md), and [`.github/migration/audits/phase-1-mt5-ea-license-check-parity-2026-05-17.md`](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-1-mt5-ea-license-check-parity-2026-05-17.md).
+
+Validation passed:
+- `php wordpress/smc-superfib-sniper/tests/php/test-ea-license-check.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-cors-regression.php`
+- Manual local harness checks: missing `user_id` -> 400, `user_id=0` -> 400, valid query-param `user_id` -> 200, and success still binds `wp_set_current_user()` to user `7`
+
+Git state:
+- Branch: `codex/smc-intake-i-checked-the-log-for-the-three-signa`
+- Commit: `4210495` `fix(ea-license-check): send user_id in GET query`
+- PR: `#191` https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/191
+
+Remaining risk is unchanged from the contract: live MT5 deployment/log confirmation is still needed to prove the rebuilt EA now reaches `license allowed` or `license blocked` in production. The untracked contract input files in `reports/` were left untouched and are not part of the PR.

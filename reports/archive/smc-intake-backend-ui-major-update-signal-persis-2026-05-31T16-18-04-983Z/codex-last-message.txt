@@ -1,0 +1,25 @@
+Implemented and opened normal PR #307:
+
+https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/307
+
+Commit: `5d46acf fix: add live signal persistence arbiter`
+
+What changed:
+- `/live-signals` now reads durable backend board rows from `smc_sf_signals`.
+- Raw snapshot `WATCH` signals are no longer returned as display cards.
+- Current stale/blocker diagnostics hide persisted display rows.
+- Added contract coverage for durable board reads, `WATCH` rejection, blocker rejection, stable `id`/`createdAt`, and envelope-only `polledAt`.
+- Generated required bug sweep, parity audit, and implementation summary artifacts.
+
+Validation:
+- `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` passed.
+- `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx src/routes/-signals.page.test.tsx src/routes/-plan.test.tsx` passed: 44 tests.
+- `npm run build` passed.
+- `npm run validate:impl` passed.
+- Cloudflare Workers PR deployment check passed.
+
+Notes:
+- `npm test -- --run ...` and `npm run typecheck` are unavailable because those scripts do not exist.
+- `npx tsc --noEmit` still fails on existing `vite.config.ts` typing around the `test` property, unrelated to this patch.
+- PR has no review requests/comments to address yet; only the Cloudflare deployment comment is present.
+- Untracked input files remain unstaged: `reports/codex-plan.md`, `reports/codex-plan.meta.json`, `reports/copilot-research.md`.

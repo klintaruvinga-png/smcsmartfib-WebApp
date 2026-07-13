@@ -1,0 +1,40 @@
+**Objective**
+Patched the live-signals freshness regression without changing backend snapshot authority. The work is on branch `codex/smc-intake-investigate-a-signal-freshness-regres`, commit `a9a7cbe`, PR [#283](https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/283).
+
+**Root Cause / Analysis**
+- `/live-signals` returned a normal success response with no explicit anti-cache headers.
+- `apiClient.getLiveSignals()` was not using the existing `cacheBust` + fetch `no-store` path.
+- `useLiveSignals()` inherited the global `staleTime: 10_000`.
+- `ensure_engine_snapshot()` was confirmed as backend authority and was left unchanged.
+
+**Patch Plan**
+Applied the narrow contract only: harden the origin response, harden the live-signals client request, harden the live-signals query freshness, then add regression tests and required reports.
+
+**Exact Code Changes**
+- [smc-superfib-sniper.php](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/wordpress/smc-superfib-sniper/smc-superfib-sniper.php:4758>): `get_live_signals()` now sets `Cache-Control: no-store, no-cache, must-revalidate` and `Pragma: no-cache` on the successful response only.
+- [sniperClient.ts](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/lib/api/sniperClient.ts:452>): `apiClient.getLiveSignals()` now calls `/live-signals` with `cacheBust: true`.
+- [useSniperData.ts](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/hooks/useSniperData.ts:117>): `useLiveSignals()` now sets `staleTime: 0`.
+- [sniperClient.test.ts](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/lib/api/sniperClient.test.ts:280>): added regression coverage for the cache-bust token and fetch `cache: "no-store"`.
+- [useSniperData.test.tsx](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/src/hooks/useSniperData.test.tsx:176>): added regression coverage for `["live-signals"]`, `enabled: true`, `staleTime: 0`, and preserved poll cadence.
+- Reports generated:
+  - [codex-implementation.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md:1>)
+  - [implementation-verification.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/implementation-verification.md:1>)
+  - [BUG_SWEEP_REPORT_2026-05-29_live-signals-freshness-contract.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-29_live-signals-freshness-contract.md:1>)
+  - [phase-2-dashboard-live-signals-freshness-parity-2026-05-29.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-2-dashboard-live-signals-freshness-parity-2026-05-29.md:1>)
+
+**Acceptance Criteria**
+- Backend snapshot authority preserved: yes.
+- `/live-signals` body contract unchanged: yes.
+- Origin anti-cache headers added on the live-signals route: yes.
+- Live-signals client now issues cache-busted `no-store` GETs: yes.
+- Live-signals query no longer inherits the global stale window: yes.
+- Normal PR opened, not draft: yes.
+
+**Regression Checks**
+- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php` passed.
+- `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx` passed: 2 files, 16 tests.
+- `npm run validate:impl` passed.
+- PR #283 is open and the visible `Workers Builds: smcsuperfibwebapp` check is passing.
+- No actionable review comments were present at PR creation time.
+
+Manual runtime verification is still pending: authenticated network inspection for `/live-signals`, per-poll `_=` tokens, origin headers on deployed traffic, and `/snapshot` vs `/live-signals` parity after a real backend update cycle. I left the pre-existing unstaged edits in `reports/copilot-research.md`, `reports/codex-plan.md`, and `reports/codex-plan.meta.json` out of this commit.

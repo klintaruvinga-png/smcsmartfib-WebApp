@@ -1,0 +1,12 @@
+**Objective**
+
+Implemented the watchlist persistence fix on branch `codex/investigate-watchlist-persistence-mismatch-affec`, committed as `ab72782`, pushed, and opened PR `#181`: https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/181
+
+The real issue was contract drift, not `AUDCAD` normalization. `AUDCAD` was already supported in the backend. I patched `post_user_settings()` to return the canonical persisted `watchlist`, made watchlist snapshot invalidation explicitly change-based with no-op warnings, removed the watchlist hooks’ immediate `["user-settings"]` refetch so stale GETs cannot overwrite the canonical mutation result, and hardened malformed watchlist-response logging in `sniperClient`. I also updated the PHP and Vitest regressions plus generated the required artifacts: [reports/codex-implementation.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/reports/codex-implementation.md>), [BUG_SWEEP_REPORT_2026-05-15_watchlist-persistence-mismatch.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/docs/BUG_SWEEP_REPORT_2026-05-15_watchlist-persistence-mismatch.md>), and [phase-0-watchlist-persistence-parity-2026-05-15.md](</C:/Users/LEONNA/OneDrive/All Final Softwares/SMC SuperFib Dashboard/smcsmartfib-WebApp/.github/migration/audits/phase-0-watchlist-persistence-parity-2026-05-15.md>).
+
+Validation run:
+- `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
+- `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`
+- `npx vitest run src/hooks/useSniperData.watchlist.test.tsx`
+
+Manual staging verification of the Account -> Live Radar `AUDCAD` add/remove flow was not run here. I left the user-provided untracked inputs `reports/copilot-research.md`, `reports/codex-plan.md`, and `reports/codex-plan.meta.json` untouched and unstaged.
