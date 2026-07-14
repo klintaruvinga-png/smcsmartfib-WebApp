@@ -28,7 +28,8 @@ const apiMocks = vi.hoisted(() => {
     createSoakCheckpoint: vi.fn(),
     upsertSoakEvidence: vi.fn(),
     getUserSettings: vi.fn(),
-    getSnapshot: vi.fn(),
+    getUnifiedSnapshot: vi.fn(),
+    getAdminHealth: vi.fn(),
   };
 });
 
@@ -46,7 +47,8 @@ vi.mock("@/lib/auth", () => authMocks);
 vi.mock("@/lib/api/sniperClient", () => ({
   apiClient: {
     getUserSettings: apiMocks.getUserSettings,
-    getSnapshot: apiMocks.getSnapshot,
+    getUnifiedSnapshot: apiMocks.getUnifiedSnapshot,
+    getAdminHealth: apiMocks.getAdminHealth,
   },
   createSoakCheckpoint: apiMocks.createSoakCheckpoint,
   fetchAdminHealth: apiMocks.fetchAdminHealth,
@@ -168,17 +170,19 @@ describe("AdminPage", () => {
     apiMocks.fetchAdminHealth.mockReset();
     apiMocks.fetchSoakReport.mockReset();
     apiMocks.getUserSettings.mockReset();
-    apiMocks.getSnapshot.mockReset();
+    apiMocks.getUnifiedSnapshot.mockReset();
+    apiMocks.getAdminHealth.mockReset();
     apiMocks.fetchAdminHealth.mockResolvedValue(buildHealth());
+    apiMocks.getAdminHealth.mockResolvedValue(buildHealth());
     apiMocks.getUserSettings.mockResolvedValue({
-      backendUrl: "https://example.com/wp-json",
+      backendUrl: "https://example.com",
       apiKeyStatus: "present",
       refreshIntervalSec: 5,
       staleThresholdSec: 30,
       watchlist: ["EURUSD", "GBPUSD"],
       riskAllocation: { perTradePct: 1, dailyMaxPct: 3, ddCapPct: 5 },
     });
-    apiMocks.getSnapshot.mockResolvedValue({
+    apiMocks.getUnifiedSnapshot.mockResolvedValue({
       prices: [],
       diagnostics: [],
     });
@@ -201,7 +205,7 @@ describe("AdminPage", () => {
     expect(
       screen.getByText("Read-only - values are owned and updated by the backend."),
     ).toBeTruthy();
-    expect(apiMocks.fetchAdminHealth).toHaveBeenCalledTimes(1);
+    expect(apiMocks.getAdminHealth).toHaveBeenCalledTimes(1);
 
     const healthSection = document.querySelector(
       '[data-section="backend-health-readonly"]',
@@ -221,7 +225,7 @@ describe("AdminPage", () => {
   });
 
   it("renders the existing access denied surface when admin health fails to load", async () => {
-    apiMocks.fetchAdminHealth.mockRejectedValueOnce(new Error("admin health unavailable"));
+    apiMocks.getAdminHealth.mockRejectedValueOnce(new Error("admin health unavailable"));
     apiMocks.fetchSoakReport.mockResolvedValue(buildSoakReport());
 
     render(<AdminPage />);
@@ -230,10 +234,10 @@ describe("AdminPage", () => {
     expect(screen.getByText("Administrator capability required")).toBeTruthy();
     expect(
       screen.getByText(
-        "This route is restricted to WordPress administrators. No backend diagnostics were exposed.",
+        "This route is restricted to Backend administrators. No backend diagnostics were exposed.",
       ),
     ).toBeTruthy();
-    expect(apiMocks.fetchAdminHealth).toHaveBeenCalledTimes(1);
+    expect(apiMocks.getAdminHealth).toHaveBeenCalledTimes(1);
   });
 
   it("surfaces initial soak report load failures and recovers on retry", async () => {
@@ -349,7 +353,7 @@ describe("AdminPage", () => {
     const partialHealth = buildPartialHealth();
     const report = buildSoakReport();
     report.health = partialHealth;
-    apiMocks.fetchAdminHealth.mockResolvedValue(partialHealth);
+    apiMocks.getAdminHealth.mockResolvedValue(partialHealth);
     apiMocks.fetchSoakReport.mockResolvedValue(report);
 
     if (!("createObjectURL" in URL)) {

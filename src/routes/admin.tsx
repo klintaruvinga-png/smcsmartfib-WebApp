@@ -4,14 +4,13 @@ import { AlertTriangle, CheckCircle2, ClipboardList, Flag, Lock, ShieldCheck } f
 import {
   apiClient,
   createSoakCheckpoint,
-  fetchAdminHealth,
   fetchSoakReport,
   resetSoak,
   type AdminHealthResponse,
   AuthError,
   upsertSoakEvidence,
 } from "@/lib/api/sniperClient";
-import { getAuthHeader, hasCredentials, hasWordPressNonce } from "@/lib/auth";
+import { getAuthHeader, hasCredentials, hasBackendNonce } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -144,7 +143,7 @@ export function AdminPage() {
   const soakTypeManuallyChanged = useRef(false);
 
   useEffect(() => {
-    if (!hasCredentials() && !hasWordPressNonce()) {
+    if (!hasCredentials() && !hasBackendNonce()) {
       void router.navigate({ to: "/login" });
       return;
     }
@@ -153,7 +152,7 @@ export function AdminPage() {
 
     void (async () => {
       try {
-        const health = await fetchAdminHealth();
+        const health = await apiClient.getAdminHealth();
         if (!cancelled) {
           setState({ kind: "ready", health });
         }
@@ -173,7 +172,7 @@ export function AdminPage() {
   }, [router]);
 
   useEffect(() => {
-    if (!hasCredentials() && !hasWordPressNonce()) {
+    if (!hasCredentials() && !hasBackendNonce()) {
       return;
     }
 
@@ -208,7 +207,7 @@ export function AdminPage() {
   }, [router]);
 
   useEffect(() => {
-    if (!hasCredentials() && !hasWordPressNonce()) {
+    if (!hasCredentials() && !hasBackendNonce()) {
       return;
     }
 
@@ -218,13 +217,13 @@ export function AdminPage() {
       try {
         const [settings, snapshot] = await Promise.all([
           apiClient.getUserSettings(),
-          apiClient.getSnapshot(),
+          apiClient.getUnifiedSnapshot(),
         ]);
         if (cancelled) return;
 
         const derived = deriveAutoBaselineFields(
           settings,
-          snapshot.prices ?? [],
+          (snapshot.prices ?? []) as PairPrice[],
           snapshot.diagnostics ?? [],
         );
         setAutoBaselineFields(derived);
@@ -301,7 +300,7 @@ export function AdminPage() {
             <div className="space-y-1">
               <div className="text-sm font-semibold text-sell">Access denied</div>
               <p className="text-xs text-dim">
-                This route is restricted to WordPress administrators. No backend diagnostics were
+                This route is restricted to Backend administrators. No backend diagnostics were
                 exposed.
               </p>
             </div>
@@ -1131,7 +1130,7 @@ export function AdminPage() {
                             backendHealthEndpoint: value,
                           }))
                         }
-                        placeholder="https://.../wp-json/sniper/v1/health"
+                        placeholder="https://.../sniper/v1/health"
                       />
                       <Field
                         label="T+0 health summary"
@@ -1705,7 +1704,7 @@ function resolveHealthEndpointHint() {
     return `${root.replace(/\/$/, "")}/sniper/v1/health`;
   }
 
-  return `${window.location.origin}/wp-json/sniper/v1/health`;
+  return `${window.location.origin}/sniper/v1/health`;
 }
 
 function resolveOperatorIdentifier(): string {
