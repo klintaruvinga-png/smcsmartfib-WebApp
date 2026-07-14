@@ -118,9 +118,6 @@ export function normalizeBackendUrl(url: string | null | undefined): string {
 export function setBackendUrl(url: string | null | undefined) {
   backendUrl = normalizeBackendUrl(url) || DEFAULT_BACKEND_URL;
 }
-export function getBackendUrl() {
-  return backendUrl;
-}
 
 interface RequestOpts {
   method?: "GET" | "POST" | "DELETE";
@@ -273,10 +270,6 @@ export const apiClient = {
     }>("/snapshot/unified", { cacheBust: true });
     return normalizeSnapshot(snapshot);
   },
-  /** Compatibility alias — delegates to getUnifiedSnapshot. */
-  async getSnapshot(mock = MOCK_MODE) {
-    return this.getUnifiedSnapshot(mock);
-  },
   async getChartSnapshot(
     symbol: Symbol,
     timeframe = "15min",
@@ -414,10 +407,7 @@ export const apiClient = {
     if (mock) return mockSettings;
     return call("/user/settings", { cacheBust: true });
   },
-  async postUserSettings(
-    payload: UserSettingsPayload,
-    mock = MOCK_MODE,
-  ): Promise<{ ok: true }> {
+  async postUserSettings(payload: UserSettingsPayload, mock = MOCK_MODE): Promise<{ ok: true }> {
     if (mock) return { ok: true };
     return call("/user/settings", { method: "POST", body: payload });
   },
@@ -442,10 +432,7 @@ export const apiClient = {
       await call<RawUserProgressResponse>("/user/progress", { cacheBust: true }),
     );
   },
-  async postUserRiskProfile(
-    payload: RiskProfilePayload,
-    mock = MOCK_MODE,
-  ): Promise<{ ok: true }> {
+  async postUserRiskProfile(payload: RiskProfilePayload, mock = MOCK_MODE): Promise<{ ok: true }> {
     if (mock) return { ok: true };
     return call("/user/risk-profile", { method: "POST", body: payload });
   },

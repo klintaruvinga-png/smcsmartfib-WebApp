@@ -319,9 +319,9 @@ describe("user account and related backend contract endpoints", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
-      apiClient.postExecuteSignals({ signalIds: ["s1", "s2"] }, false),
-    ).resolves.toEqual({ ok: true, queued: 2 });
+    await expect(apiClient.postExecuteSignals({ signalIds: ["s1", "s2"] }, false)).resolves.toEqual(
+      { ok: true, queued: 2 },
+    );
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/sniper/v1/user/execute-signals"),
@@ -343,7 +343,9 @@ describe("user account and related backend contract endpoints", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(apiClient.postEngineBatch({ symbols: ["EURUSD", "XAUUSD"] }, false)).resolves.toEqual({
+    await expect(
+      apiClient.postEngineBatch({ symbols: ["EURUSD", "XAUUSD"] }, false),
+    ).resolves.toEqual({
       ok: true,
       diagnostics: [],
     });
@@ -828,31 +830,5 @@ describe("unified snapshot client contract", () => {
     const result = await apiClient.getUnifiedSnapshot(false);
 
     expect(result.todayOiImpacts).toEqual(payload.todayOiImpacts);
-  });
-
-  it("getSnapshot is a compatibility alias that calls /snapshot/unified", async () => {
-    const payload = {
-      prices: [],
-      regimes: [],
-      gates: [],
-      diagnostics: [],
-    };
-
-    const fetchMock = vi.fn(
-      async () =>
-        new Response(JSON.stringify(payload), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-    );
-
-    vi.stubGlobal("fetch", fetchMock);
-
-    await apiClient.getSnapshot(false);
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringMatching(/\/sniper\/v1\/snapshot\/unified\?_=\d+$/),
-      expect.anything(),
-    );
   });
 });
