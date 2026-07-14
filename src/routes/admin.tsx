@@ -4,7 +4,6 @@ import { AlertTriangle, CheckCircle2, ClipboardList, Flag, Lock, ShieldCheck } f
 import {
   apiClient,
   createSoakCheckpoint,
-  fetchAdminHealth,
   fetchSoakReport,
   resetSoak,
   type AdminHealthResponse,
@@ -153,7 +152,7 @@ export function AdminPage() {
 
     void (async () => {
       try {
-        const health = await fetchAdminHealth();
+        const health = await apiClient.getAdminHealth();
         if (!cancelled) {
           setState({ kind: "ready", health });
         }
@@ -218,7 +217,7 @@ export function AdminPage() {
       try {
         const [settings, snapshot] = await Promise.all([
           apiClient.getUserSettings(),
-          apiClient.getSnapshot(),
+          apiClient.getUnifiedSnapshot(),
         ]);
         if (cancelled) return;
 

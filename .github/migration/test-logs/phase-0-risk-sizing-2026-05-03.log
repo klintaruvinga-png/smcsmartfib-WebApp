@@ -1,7 +1,0 @@
-2026-05-03T09:05:37+02:00
-Command: php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php
-Result: No syntax errors detected in wordpress/smc-superfib-sniper/smc-superfib-sniper.php
-
-2026-05-03T09:05:37+02:00
-Command: php wordpress/smc-superfib-sniper/tests/php/test-pip-value-parity.php
-Result: pip-value regression checks passed

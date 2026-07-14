@@ -130,7 +130,8 @@ async function call<T>(
   }
 
   const url = `${backendUrl.replace(/\/$/, "")}/sniper/v1${path}`;
-  const cacheBust = opts.cacheBust ? `&_t=${Date.now()}` : "";
+  const sep = path.includes("?") ? "&" : "?";
+  const cacheBust = opts.cacheBust ? `${sep}_t=${Date.now()}` : "";
   const response = await fetch(`${url}${cacheBust}`, {
     method: opts.method ?? "GET",
     headers,
@@ -222,6 +223,17 @@ export const apiClient = {
       `/charts?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`,
       { cacheBust: true },
     );
+  },
+  async getChartSnapshot(
+    symbol: Symbol,
+    timeframe: string,
+    mock = MOCK_MODE,
+  ): Promise<ChartSnapshot> {
+    return this.getCharts(symbol, timeframe, mock);
+  },
+  async getUnifiedSnapshot(): Promise<UnifiedSnapshot> {
+    const raw = await call<UnifiedSnapshotRaw>("/snapshot/unified", { cacheBust: true });
+    return normalizeUnifiedSnapshot(raw);
   },
   async getLiveSignals(mock = MOCK_MODE, boardSize?: 3 | 5 | 10): Promise<SignalCandidate[]> {
     const response = await this.getDisplaySignals(mock, boardSize);
@@ -418,6 +430,58 @@ export const apiClient = {
     };
   },
 };
+
+type UnifiedSnapshotRaw = {
+  prices: Array<Record<string, unknown> & { source_count?: number | null }>;
+  regimes?: unknown;
+  gates?: unknown;
+  diagnostics?: unknown;
+  todayOiImpacts?: unknown;
+  [key: string]: unknown;
+};
+
+type UnifiedSnapshot = Omit<UnifiedSnapshotRaw, "prices"> & {
+  prices: Array<Record<string, unknown> & { source_count?: number }>;
+};
+
+function normalizeUnifiedSnapshot(raw: UnifiedSnapshotRaw): UnifiedSnapshot {
+  return {
+    ...raw,
+    prices: (raw.prices ?? []).map((p) => ({ ...p, source_count: p.source_count ?? undefined })),
+  };
+}
+
+export async function fetchSoakReport(): Promise<SoakReport> {
+  const authHeader = getAuthHeader();
+  const res = await fetch(
+    `${backendUrl.replace(/\/$/, "")}/sniper/v1/admin/soak-report`,
+    {
+      method: "GET",
+      headers: authHeader ? { Authorization: authHeader } : undefined,
+      credentials: "include",
+    },
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API /admin/soak-report failed: ${res.status} - ${text}`);
+  }
+  return res.json();
+}
+
+export async function createSoakCheckpoint(
+  payload: { checkpointType: string; operatorNotes?: string },
+): Promise<SoakCheckpointRow> {
+  return call<SoakCheckpointRow>("/admin/soak-checkpoint", { method: "POST", body: payload });
+}
+
+export async function upsertSoakEvidence(payload: SoakEvidencePayload): Promise<SoakEvidenceRow> {
+  assertValidSoakEvidencePayload(payload);
+  return call<SoakEvidenceRow>("/admin/soak-evidence", { method: "POST", body: payload });
+}
+
+export async function resetSoak(): Promise<{ ok: true }> {
+  return call<{ ok: true }>("/admin/soak-reset", { method: "POST", body: {} });
+}
 
 type AdminHealthResponse = {
   status: string;

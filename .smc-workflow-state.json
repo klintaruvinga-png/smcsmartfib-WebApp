@@ -1,9 +1,0 @@
-{
-  "workflow": "research-and-plan",
-  "state": "IDLE",
-  "issue": "SMC Intake - MT5 vs Twelve Data authority",
-  "editing_locked": false,
-  "started_at": "2026-06-15T14:57:11.316Z",
-  "idled_at": "2026-06-15T17:52:00.000Z",
-  "idle_reason": "Manual pipeline cancellation requested"
-}
