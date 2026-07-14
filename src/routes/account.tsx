@@ -426,9 +426,10 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
               <button
                 onClick={() => removePair(p)}
                 disabled={watchlistBusy}
-                className="text-mute hover:text-sell disabled:opacity-40"
+                className="p-2 rounded hover:bg-bg2/60 text-mute hover:text-sell disabled:opacity-40"
+                aria-label={`Remove ${p} from watchlist`}
               >
-                <X className="h-3 w-3" />
+                <X className="h-3.5 w-3.5" />
               </button>
             </span>
           ))}
