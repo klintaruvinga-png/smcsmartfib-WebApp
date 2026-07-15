@@ -63,7 +63,7 @@ Not before:
 
 - Shared contracts package runtime adoption is not authorized before Phase 5/6 readiness.
 - MT5 transport/domain split is not authorized before Phase 6.
-- WordPress monolith shrink work is not authorized before later post-authority stabilization.
+- WordPress monolith shrink work is not authorized before later post-authority stabilization (superseded by BACKEND-5 architecture refactoring and WordPress decommissioning phase)
 
 Live planning artifacts for this alignment:
 
@@ -82,7 +82,7 @@ Live planning artifacts for this alignment:
 | 1     | MT5 bridge infrastructure               | **COMPLETE**      | 100%       | None — gate passed 2026-05-20                                                              | 2026-06-01 ✅         |
 | 2     | Read-only trade telemetry               | **COMPLETE**      | 100%       | None — gate passed 2026-05-22                                                              | 2026-05-22 ✅         |
 | 3     | MT5 market data engine                  | **COMPLETE**      | 100%       | None — gate cleared; T0 admin baseline captured 2026-05-27                                 | 2026-05-25 ✅         |
-| 4     | Fib engine migration                    | **READ-ONLY TESTING** | 75%        | Paired MT5/Pine exports + weekend/sparse-data evidence (no code changes during backend migration) | 2026-08-15            |
+| 4     | Fib engine migration                    | **IN-PROGRESS** | 75%        | Paired MT5/Pine exports + weekend/sparse-data evidence (no code changes during backend migration) | 2026-08-15            |
 | 4A    | Production hardening + domain contracts | **READY**         | 0%         | Parallel only; no fib/regime/signal scoring changes during Phase 4 soak                    | Parallel with Phase 4 |
 | **BACKEND** | **WordPress → Node.js/TanStack Start migration** | **IN-PROGRESS** | 0% | Foundation setup, contracts, database | 2026-09-15 |
 | 5     | Regime & chop engine                    | **CODE COMPLETE** | 70%        | Phase 4 live gate + operator deployment                                                    | 2026-09-15            |
