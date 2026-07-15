@@ -218,7 +218,7 @@ export function AdminPage() {
       try {
         const [settings, snapshot] = await Promise.all([
           apiClient.getUserSettings(),
-          apiClient.getSnapshot(),
+          apiClient.getUnifiedSnapshot(),
         ]);
         if (cancelled) return;
 

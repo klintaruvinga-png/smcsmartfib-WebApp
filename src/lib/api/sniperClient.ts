@@ -45,6 +45,13 @@ import type {
   TwelveDataKeyStatus,
   TradePlan,
   UserProgress,
+  UserSettingsPayload,
+  RiskProfilePayload,
+  UserAccountPayload,
+  TwelveDataKeyPayload,
+  ExecuteSignalsPayload,
+  EngineBatchPayload,
+  WatchlistChangePayload,
 } from "@/types/sniper";
 import type {
   RawAccountTelemetryResponse,
@@ -110,9 +117,6 @@ export function normalizeBackendUrl(url: string | null | undefined): string {
 }
 export function setBackendUrl(url: string | null | undefined) {
   backendUrl = normalizeBackendUrl(url) || DEFAULT_BACKEND_URL;
-}
-export function getBackendUrl() {
-  return backendUrl;
 }
 
 interface RequestOpts {
@@ -266,10 +270,6 @@ export const apiClient = {
     }>("/snapshot/unified", { cacheBust: true });
     return normalizeSnapshot(snapshot);
   },
-  /** Compatibility alias — delegates to getUnifiedSnapshot. */
-  async getSnapshot(mock = MOCK_MODE) {
-    return this.getUnifiedSnapshot(mock);
-  },
   async getChartSnapshot(
     symbol: Symbol,
     timeframe = "15min",
@@ -399,7 +399,7 @@ export const apiClient = {
     if (mock) return mockAccount;
     return call("/user/account", { cacheBust: true });
   },
-  async postUserAccount(payload: Partial<AccountState>, mock = MOCK_MODE): Promise<{ ok: true }> {
+  async postUserAccount(payload: UserAccountPayload, mock = MOCK_MODE): Promise<{ ok: true }> {
     if (mock) return { ok: true };
     return call("/user/account", { method: "POST", body: payload });
   },
@@ -407,15 +407,12 @@ export const apiClient = {
     if (mock) return mockSettings;
     return call("/user/settings", { cacheBust: true });
   },
-  async postUserSettings(
-    payload: Partial<DashboardSettings>,
-    mock = MOCK_MODE,
-  ): Promise<{ ok: true }> {
+  async postUserSettings(payload: UserSettingsPayload, mock = MOCK_MODE): Promise<{ ok: true }> {
     if (mock) return { ok: true };
     return call("/user/settings", { method: "POST", body: payload });
   },
   async postTwelveDataKey(
-    payload: { apiKey: string; testOnly?: boolean },
+    payload: TwelveDataKeyPayload,
     mock = MOCK_MODE,
   ): Promise<{ ok: boolean; status: TwelveDataKeyStatus; message?: string }> {
     if (mock) return { ok: Boolean(payload.apiKey), status: payload.apiKey ? "ok" : "missing" };
@@ -435,15 +432,12 @@ export const apiClient = {
       await call<RawUserProgressResponse>("/user/progress", { cacheBust: true }),
     );
   },
-  async postUserRiskProfile(
-    payload: Partial<RiskProfile>,
-    mock = MOCK_MODE,
-  ): Promise<{ ok: true }> {
+  async postUserRiskProfile(payload: RiskProfilePayload, mock = MOCK_MODE): Promise<{ ok: true }> {
     if (mock) return { ok: true };
     return call("/user/risk-profile", { method: "POST", body: payload });
   },
   async postExecuteSignals(
-    payload: { signalIds: string[] },
+    payload: ExecuteSignalsPayload,
     mock = MOCK_MODE,
   ): Promise<{ ok: true; queued: number }> {
     if (mock) return { ok: true, queued: payload.signalIds.length };
@@ -452,11 +446,11 @@ export const apiClient = {
 
   /** Force a backend market-data refresh + engine run for the given symbols (or full watchlist). */
   async postEngineBatch(
-    symbols?: Symbol[],
+    payload: EngineBatchPayload = {},
     mock = MOCK_MODE,
   ): Promise<{ ok: boolean; diagnostics: SymbolDiagnostic[] }> {
     if (mock) return { ok: true, diagnostics: [] };
-    return call("/user/engine-batch", { method: "POST", body: symbols ? { symbols } : {} });
+    return call("/user/engine-batch", { method: "POST", body: payload });
   },
 
   // Dedicated watchlist endpoints - changes persist immediately without a full settings save.
@@ -473,7 +467,7 @@ export const apiClient = {
     }
     const result = await call<{ ok: boolean; watchlist?: Symbol[] }>("/user/watchlist/add", {
       method: "POST",
-      body: { symbol },
+      body: { symbol } as WatchlistChangePayload,
     });
     return {
       ok: result.ok,
@@ -490,7 +484,7 @@ export const apiClient = {
     }
     const result = await call<{ ok: boolean; watchlist?: Symbol[] }>("/user/watchlist/remove", {
       method: "POST",
-      body: { symbol },
+      body: { symbol } as WatchlistChangePayload,
     });
     return {
       ok: result.ok,

@@ -241,7 +241,7 @@ function HeaderChips() {
       <button
         onClick={() => void handleRefresh()}
         disabled={isRefreshing}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-bd bg-bg2/60 text-mute hover:text-tx hover:border-bd2 transition-colors disabled:opacity-50"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-bd bg-bg2/60 text-mute hover:text-tx hover:border-bd2 transition-colors disabled:opacity-50"
         aria-label="Refresh"
       >
         <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />

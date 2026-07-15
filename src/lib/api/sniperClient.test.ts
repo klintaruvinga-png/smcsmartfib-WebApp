@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/auth", () => ({
   clearCredentials: vi.fn(),
@@ -127,6 +127,285 @@ describe("fetchSoakReport", () => {
 
     await expect(fetchSoakReport()).rejects.toThrow(
       /API \/admin\/soak-report failed: 500 - {"error":"table_init_failed","detail":"dbDelta unavailable"}/,
+    );
+  });
+});
+
+describe("user settings contract", () => {
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("posts the shared settings payload to the backend settings endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      apiClient.postUserSettings(
+        {
+          backendUrl: "https://example.com/wp-json",
+          watchlist: ["EURUSD", "XAUUSD"],
+        },
+        false,
+      ),
+    ).resolves.toEqual({ ok: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/user/settings"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          backendUrl: "https://example.com/wp-json",
+          watchlist: ["EURUSD", "XAUUSD"],
+        }),
+      }),
+    );
+  });
+});
+
+describe("user risk profile contract", () => {
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("posts the shared risk-profile payload to the backend risk-profile endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      apiClient.postUserRiskProfile(
+        {
+          tier: "balanced",
+          maxConcurrentTrades: 2,
+          perTradePct: 1.5,
+          dailyMaxPct: 4,
+          ddCapPct: 8,
+          cooldownMin: 15,
+        },
+        false,
+      ),
+    ).resolves.toEqual({ ok: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/user/risk-profile"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          tier: "balanced",
+          maxConcurrentTrades: 2,
+          perTradePct: 1.5,
+          dailyMaxPct: 4,
+          ddCapPct: 8,
+          cooldownMin: 15,
+        }),
+      }),
+    );
+  });
+});
+
+describe("user account and related backend contract endpoints", () => {
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("posts the shared account payload to the backend account endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      apiClient.postUserAccount(
+        {
+          balanceUSC: 10000,
+          equityUSC: 9950,
+          marginUsedPct: 20,
+          drawdownPct: 1,
+          openPositions: 1,
+          pendingOrders: 0,
+          todayPnlUSC: -50,
+          todayPnlPct: -0.5,
+          state: "live",
+        },
+        false,
+      ),
+    ).resolves.toEqual({ ok: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/user/account"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          balanceUSC: 10000,
+          equityUSC: 9950,
+          marginUsedPct: 20,
+          drawdownPct: 1,
+          openPositions: 1,
+          pendingOrders: 0,
+          todayPnlUSC: -50,
+          todayPnlPct: -0.5,
+          state: "live",
+        }),
+      }),
+    );
+  });
+
+  it("posts the shared twelve-data-key payload to the backend endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true, status: "ok" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      apiClient.postTwelveDataKey({ apiKey: "test-key", testOnly: true }, false),
+    ).resolves.toEqual({ ok: true, status: "ok" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/user/twelve-data-key"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ apiKey: "test-key", testOnly: true }),
+      }),
+    );
+  });
+
+  it("posts the shared execute signals payload to the backend endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true, queued: 2 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiClient.postExecuteSignals({ signalIds: ["s1", "s2"] }, false)).resolves.toEqual(
+      { ok: true, queued: 2 },
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/user/execute-signals"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ signalIds: ["s1", "s2"] }),
+      }),
+    );
+  });
+
+  it("posts the shared engine batch payload to the backend endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true, diagnostics: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      apiClient.postEngineBatch({ symbols: ["EURUSD", "XAUUSD"] }, false),
+    ).resolves.toEqual({
+      ok: true,
+      diagnostics: [],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/user/engine-batch"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ symbols: ["EURUSD", "XAUUSD"] }),
+      }),
+    );
+  });
+
+  it("posts the shared watchlist add payload to the backend endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true, watchlist: ["EURUSD"] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiClient.postWatchlistAdd("EURUSD", false)).resolves.toEqual({
+      ok: true,
+      watchlist: ["EURUSD"],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/user/watchlist/add"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ symbol: "EURUSD" }),
+      }),
+    );
+  });
+
+  it("posts the shared watchlist remove payload to the backend endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true, watchlist: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiClient.postWatchlistRemove("EURUSD", false)).resolves.toEqual({
+      ok: true,
+      watchlist: [],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/user/watchlist/remove"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ symbol: "EURUSD" }),
+      }),
     );
   });
 });
@@ -552,6 +831,8 @@ describe("unified snapshot client contract", () => {
 
     expect(result.todayOiImpacts).toEqual(payload.todayOiImpacts);
   });
+});
+
 
   it("getSnapshot is a compatibility alias that calls /snapshot/unified", async () => {
     const payload = {

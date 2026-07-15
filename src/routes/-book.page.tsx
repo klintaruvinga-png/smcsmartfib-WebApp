@@ -511,10 +511,7 @@ function SymbolCard({
           <EquityImpactBadge value={equityImpactPct} baselineQuality={todayBaselineQuality} />
         </span>
         <span
-          className={cn(
-            "font-mono text-sm tabular-nums",
-            groupPnl >= 0 ? "text-buy" : "text-sell",
-          )}
+          className={cn("font-mono text-sm tabular-nums", groupPnl >= 0 ? "text-buy" : "text-sell")}
         >
           {fmtCurrency(groupPnl, currency, true)}
         </span>

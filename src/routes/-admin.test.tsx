@@ -28,7 +28,7 @@ const apiMocks = vi.hoisted(() => {
     createSoakCheckpoint: vi.fn(),
     upsertSoakEvidence: vi.fn(),
     getUserSettings: vi.fn(),
-    getSnapshot: vi.fn(),
+    getUnifiedSnapshot: vi.fn(),
   };
 });
 
@@ -46,7 +46,7 @@ vi.mock("@/lib/auth", () => authMocks);
 vi.mock("@/lib/api/sniperClient", () => ({
   apiClient: {
     getUserSettings: apiMocks.getUserSettings,
-    getSnapshot: apiMocks.getSnapshot,
+    getUnifiedSnapshot: apiMocks.getUnifiedSnapshot,
   },
   createSoakCheckpoint: apiMocks.createSoakCheckpoint,
   fetchAdminHealth: apiMocks.fetchAdminHealth,
@@ -168,7 +168,7 @@ describe("AdminPage", () => {
     apiMocks.fetchAdminHealth.mockReset();
     apiMocks.fetchSoakReport.mockReset();
     apiMocks.getUserSettings.mockReset();
-    apiMocks.getSnapshot.mockReset();
+    apiMocks.getUnifiedSnapshot.mockReset();
     apiMocks.fetchAdminHealth.mockResolvedValue(buildHealth());
     apiMocks.getUserSettings.mockResolvedValue({
       backendUrl: "https://example.com/wp-json",
@@ -178,7 +178,7 @@ describe("AdminPage", () => {
       watchlist: ["EURUSD", "GBPUSD"],
       riskAllocation: { perTradePct: 1, dailyMaxPct: 3, ddCapPct: 5 },
     });
-    apiMocks.getSnapshot.mockResolvedValue({
+    apiMocks.getUnifiedSnapshot.mockResolvedValue({
       prices: [],
       diagnostics: [],
     });

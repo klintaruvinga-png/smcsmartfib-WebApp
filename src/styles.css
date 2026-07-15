@@ -79,6 +79,7 @@
   --warn: #f1b65c;
   --info: #59a8ff;
   --violet: #9e8cff;
+  --ok: #46d19a;
 
   --tx: #ffffff;
   --dim: #c4d2e4;
@@ -164,6 +165,9 @@
   }
   .text-violet {
     color: var(--violet);
+  }
+  .text-ok {
+    color: var(--ok);
   }
 
   .bg-bg {

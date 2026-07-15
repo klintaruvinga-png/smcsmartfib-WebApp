@@ -20,7 +20,7 @@ describe("run-phase4-parity.ps1 automation contract", () => {
 
   test("guards repo/dependencies/auth and supports non-interactive failure", () => {
     const source = readScript();
-    const candleExporter = fs.readFileSync(candleExporterPath, 'utf8');
+    const candleExporter = fs.readFileSync(candleExporterPath, "utf8");
 
     expect(source).toContain("mt5/FibEngine.mqh");
     expect(source).toMatch(/Get-Command\s+\$cmd/);
