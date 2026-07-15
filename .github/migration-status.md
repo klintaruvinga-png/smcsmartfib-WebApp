@@ -30,14 +30,6 @@ Phase 4A is authorized only as parallel hardening and contract work. It must not
 
 ---
 
-## Control Update - 2026-07-15
-
-Backend migration is now the primary development focus. MT5 Phase 4 continues in read-only testing mode - no code changes to MT5 engines during backend migration.
-
-Phase 4 parity validation continues as scheduled, but development resources shift to backend implementation.
-
----
-
 ## Architecture Refactor Alignment - 2026-06-17
 
 Phase 4 remains the active migration blocker. The architecture review in `reports/architecture-review-clean-hexagonal-plan-2026-06-17.md` does not reopen any closed gate and does not change the current sequencing authority of this migration board.
@@ -74,6 +66,16 @@ Live planning artifacts for this alignment:
 
 ---
 
+## Control Update - 2026-07-15
+
+Backend migration is now the primary development focus. MT5 Phase 4 continues in read-only testing mode - no code changes to MT5 engines during backend migration.
+
+Phase 4 parity validation continues as scheduled, but development resources shift to backend implementation.
+
+**Note**: The backend migration plan (BACKEND-0 through BACKEND-5) supersedes the earlier WordPress decommissioning restriction in the Architecture Refactor Alignment section. The new plan provides a structured, phased approach to WordPress decommissioning as part of the overall backend migration.
+
+---
+
 ## Phase Summary
 
 | Phase | Objective                               | Status            | % Complete | Blocker                                                                                    | Target End            |
@@ -82,7 +84,7 @@ Live planning artifacts for this alignment:
 | 1     | MT5 bridge infrastructure               | **COMPLETE**      | 100%       | None — gate passed 2026-05-20                                                              | 2026-06-01 ✅         |
 | 2     | Read-only trade telemetry               | **COMPLETE**      | 100%       | None — gate passed 2026-05-22                                                              | 2026-05-22 ✅         |
 | 3     | MT5 market data engine                  | **COMPLETE**      | 100%       | None — gate cleared; T0 admin baseline captured 2026-05-27                                 | 2026-05-25 ✅         |
-| 4     | Fib engine migration                    | **IN-PROGRESS** | 75%        | Paired MT5/Pine exports + weekend/sparse-data evidence (no code changes during backend migration) | 2026-08-15            |
+| 4     | Fib engine migration                    | **READ-ONLY TESTING** | 75%        | Paired MT5/Pine exports + weekend/sparse-data evidence (no code changes during backend migration) | 2026-08-15            |
 | 4A    | Production hardening + domain contracts | **READY**         | 0%         | Parallel only; no fib/regime/signal scoring changes during Phase 4 soak                    | Parallel with Phase 4 |
 | **BACKEND** | **WordPress → Node.js/TanStack Start migration** | **IN-PROGRESS** | 0% | Foundation setup, contracts, database | 2026-09-23 |
 | 5     | Regime & chop engine                    | **CODE COMPLETE** | 70%        | Phase 4 live gate + operator deployment                                                    | 2026-09-15            |
@@ -321,7 +323,7 @@ Market-Stream Auth:
 
 **Objective**: Port fib calculations into MT5, validate against Pine  
 **Owner**: Track A + Track B (both admin)  
-**Status**: IN-PROGRESS — code implementation complete 2026-05-25; timeframe contract corrected 2026-05-28; EA deployed live and T0 soak baseline captured 2026-05-27; corrected runtime verification confirmed 2026-05-28; synthetic validator PASS artifact present; final paired-export gate still open  
+**Status**: READ-ONLY TESTING — code implementation complete 2026-05-25; no code changes permitted during backend migration; timeframe contract corrected 2026-05-28; EA deployed live and T0 soak baseline captured 2026-05-27; corrected runtime verification confirmed 2026-05-28; synthetic validator PASS artifact present; final paired-export gate still open  
 **Prerequisites**: Phase 3 complete ✅  
 **Completion Target**: 2026-08-15  
 **Branch**: `Phase-4-Implementation` — [PR #239](https://github.com/klintaruvinga-png/smcsmartfib-WebApp/pull/239)
