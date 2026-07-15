@@ -63,6 +63,14 @@ These wrappers are documented in `docs/agents/skill-index.md` and implemented as
 - Avoid broad formatting-only diffs during logic fixes.
 - Before automation or workflow changes, inspect `.github/workflows/`, package scripts, and workflow state/report files.
 
+## Documentation Tracking Requirements
+- **Trackers**: Always update migration status trackers (`.github/migration-status.md`) when phase progress changes
+- **Checklists**: Update phase checklists and task completion status as work progresses
+- **Plan Docs**: Keep implementation plans current with actual progress and blockers
+- **Status Updates**: Document all phase transitions, blockers, and completion events
+- **Evidence**: Capture validation results and test outputs in appropriate report files
+- **Cross-Reference**: Ensure plans reference current status documents and vice versa
+
 ## Testing and Evidence Rules
 - Do not claim tests passed unless you actually ran the command and cited the output.
 - If a requested validation is not available, explain it clearly.

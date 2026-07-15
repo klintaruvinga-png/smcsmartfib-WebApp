@@ -1,9 +1,9 @@
 # SMC SuperFIB → MT5 Migration Status Board
 
-**Last Updated**: 2026-06-17
-**Current Phase**: 4 (Fib Engine Migration — IN-PROGRESS; code complete 2026-05-25; timeframe contract corrected 2026-05-28; corrected H4 runtime verified 2026-05-28; synthetic validator PASS exists; live paired-export corpus and manual closeout still pending)
-**Overall Progress**: 88% (Phases 0–4 code complete; Phases 5/5B/6 code complete pre-emptively; Phases 7–9 scaffolded; only Phase 4 live paired-export validation + operator acceptance remain before Phase 5 deployment)
-**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 COMPLETE (2026-05-25; T0 admin baseline captured 2026-05-27, conditional closeout cleared) — Phase 4 IN-PROGRESS (code complete; corrected H4 runtime verified 2026-05-28; synthetic parity tooling PASS recorded; live paired exports plus weekend/sparse-data evidence still missing) — Phases 5/5B/6 CODE COMPLETE (pre-emptive; gated on Phase 4) — Phases 7–9 SCAFFOLDED (gated)
+**Last Updated**: 2026-07-15
+**Current Phase**: BACKEND MIGRATION (Active) + Phase 4 (Read-Only Testing)
+**Overall Progress**: 88% MT5 Migration + 0% Backend Migration (New Priority)
+**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 COMPLETE (2026-05-25; T0 admin baseline captured 2026-05-27, conditional closeout cleared) — Phase 4 READ-ONLY TESTING (code complete; corrected H4 runtime verified 2026-05-28; synthetic parity tooling PASS recorded; live paired exports plus weekend/sparse-data evidence still missing) — BACKEND MIGRATION IN-PROGRESS (started 2026-07-15) — Phases 5/5B/6 CODE COMPLETE (pre-emptive; gated on Phase 4) — Phases 7–9 SCAFFOLDED (gated)
 
 > Snapshot: Phase 0 gate passed 2026-05-15. Post-fix validation soak at 16:37 UTC confirmed NAS100 (29,263.70) and US30 (49,756.00) both LIVE during active US equity session; XAUUSD (4,556.34) LIVE with candle-history gate cleared. Backend soak: 259,464 engine runs / 0 errors / 69,262 candles over 24h. Frontend feed-status chip lag (BUG-001 staleTime:0) resolved. Watchlist persistence 100% parity. AUDUSD/ETHUSD chop-gate classified as correct live behavior — not a blocker. Full closeout evidence: `.github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md`.
 
@@ -27,6 +27,14 @@ The latest evidence shows:
 - Final Phase 4 closeout still requires 99%+ paired-export parity, zero critical mismatches, weekend/sparse-data evidence, and operator export acceptance.
 
 Phase 4A is authorized only as parallel hardening and contract work. It must not change fib math, regime scoring, signal gates, or dashboard signal truth during the active Phase 4 soak unless explicitly marked read-only.
+
+---
+
+## Control Update - 2026-07-15
+
+Backend migration is now the primary development focus. MT5 Phase 4 continues in read-only testing mode - no code changes to MT5 engines during backend migration.
+
+Phase 4 parity validation continues as scheduled, but development resources shift to backend implementation.
 
 ---
 
@@ -74,8 +82,9 @@ Live planning artifacts for this alignment:
 | 1     | MT5 bridge infrastructure               | **COMPLETE**      | 100%       | None — gate passed 2026-05-20                                                              | 2026-06-01 ✅         |
 | 2     | Read-only trade telemetry               | **COMPLETE**      | 100%       | None — gate passed 2026-05-22                                                              | 2026-05-22 ✅         |
 | 3     | MT5 market data engine                  | **COMPLETE**      | 100%       | None — gate cleared; T0 admin baseline captured 2026-05-27                                 | 2026-05-25 ✅         |
-| 4     | Fib engine migration                    | **IN-PROGRESS**   | 75%        | Paired MT5/Pine exports + weekend/sparse-data evidence + final paired-input validator gate | 2026-08-15            |
+| 4     | Fib engine migration                    | **READ-ONLY TESTING** | 75%        | Paired MT5/Pine exports + weekend/sparse-data evidence (no code changes during backend migration) | 2026-08-15            |
 | 4A    | Production hardening + domain contracts | **READY**         | 0%         | Parallel only; no fib/regime/signal scoring changes during Phase 4 soak                    | Parallel with Phase 4 |
+| **BACKEND** | **WordPress → Node.js/TanStack Start migration** | **IN-PROGRESS** | 0% | Foundation setup, contracts, database | 2026-09-15 |
 | 5     | Regime & chop engine                    | **CODE COMPLETE** | 70%        | Phase 4 live gate + operator deployment                                                    | 2026-09-15            |
 | 5B    | Fundamentals regime feed                | **CODE COMPLETE** | 65%        | Phase 5 parity gate                                                                        | 2026-10-01            |
 | 6     | Signal engine dual-run                  | **CODE COMPLETE** | 60%        | Phase 5B gate + fib→signal wiring sprint                                                   | 2026-10-15            |
@@ -83,6 +92,12 @@ Live planning artifacts for this alignment:
 | 8     | Semi-automation layer                   | **SCAFFOLDED**    | 20%        | Phase 7 complete                                                                           | 2026-12-01            |
 | 9     | SaaS & licensing system                 | **SCAFFOLDED**    | 20%        | Phase 8 complete                                                                           | 2026-12-15            |
 | 10    | Pine transition strategy                | NOT-STARTED       | 0%         | Phase 9 complete                                                                           | 2027-01-01            |
+| BACKEND-0 | Foundation setup (contracts, database, project structure) | NOT-STARTED | 0% | Shared contracts, PostgreSQL provider | 2026-07-22 |
+| BACKEND-1 | Core API implementation (auth, settings, market data) | NOT-STARTED | 0% | BACKEND-0 complete | 2026-08-05 |
+| BACKEND-2 | MT5 integration and dual-write configuration | NOT-STARTED | 0% | BACKEND-1 complete | 2026-08-12 |
+| BACKEND-3 | Signal and plan endpoints | NOT-STARTED | 0% | BACKEND-2 complete | 2026-08-26 |
+| BACKEND-4 | Transition and cutover | NOT-STARTED | 0% | BACKEND-3 complete | 2026-09-09 |
+| BACKEND-5 | Architecture refactoring and WordPress decommissioning | NOT-STARTED | 0% | BACKEND-4 complete | 2026-09-23 |
 
 ---
 
@@ -91,7 +106,7 @@ Live planning artifacts for this alignment:
 | Track                   | Lead  | Phase Focus                                                                   | Status                                                                                     |
 | ----------------------- | ----- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | **Track A — MT5 EA**    | admin | Phases 1–7 (bridge, telemetry, candle engine, fib, regime, signal, execution) | Phase 1 COMPLETE (2026-05-20) — Phase 2 implementation validated by Track A signoff        |
-| **Track B — Backend**   | admin | Phases 1–9 (APIs, freshness, telemetry, licensing)                            | Phase 1 COMPLETE (2026-05-20) — Phase 2 implementation validated by Track B signoff        |
+| **Track B — Backend**   | admin | Phases 1–9 (APIs, freshness, telemetry, licensing) + BACKEND MIGRATION (WordPress → Node.js) | Phase 1 COMPLETE (2026-05-20) — Phase 2 implementation validated by Track B signoff — BACKEND MIGRATION STARTED (2026-07-15) |
 | **Track C — Dashboard** | admin | Phases 2–9 (visualization, execution console, analytics)                      | Phase 0 complete — Phase 2 dashboard read-only implementation validated by Track C signoff |
 
 ---
@@ -369,6 +384,61 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 - **[GOVERNANCE]** Synthetic PASS artifact is not the final gate — `reports/phase4-gate.json` currently proves validator tooling only because `scripts/parity-validator.php` was run without paired `--mt5-file` and `--pine-file` inputs
 - **[OPERATOR]** Authenticated MT5 fib export path confirmed — operator capture succeeded for `EURUSD`, `USDJPY`, `XAUUSD` and snapshots were saved to `./snapshots/20260531_041253/`
 - **[OPERATOR]** Live parity corpus not yet complete — no committed paired `mt5-levels.json` or `pine-levels.json` artifacts exist yet, and MT5 must continue running against real market data until the 30-day capture window and manual scenario checks are complete before the gate can be validated
+
+---
+
+## Backend Migration: WordPress → Node.js/TanStack Start
+
+**Objective**: Migrate from WordPress REST backend to standalone Node.js/TanStack Start backend on Cloudflare Workers with PostgreSQL
+
+**Status**: IN-PROGRESS (Started 2026-07-15)
+
+**Strategy**: 
+- Drop-in replacement first (WordPress API compatibility)
+- Gradual endpoint-by-endpoint cutover
+- MT5 dual-write during transition
+- WordPress as fallback during migration
+- Architectural refactoring after successful migration
+
+**Prerequisites**: Phase 0-3 COMPLETE ✅
+
+**Implementation Plan**: See `C:\Users\Kudzie\.windsurf\plans\backend-migration-plan-cd6eb8.md`
+
+### Phase BACKEND-0: Foundation Setup
+**Objective**: Set up shared contracts, database, and project structure
+**Status**: NOT-STARTED
+**Target**: 2026-07-22
+**Blockers**: Shared contracts, PostgreSQL provider
+
+### Phase BACKEND-1: Core API Implementation
+**Objective**: Implement auth, settings, and market data endpoints
+**Status**: NOT-STARTED
+**Target**: 2026-08-05
+**Blockers**: BACKEND-0 complete
+
+### Phase BACKEND-2: MT5 Integration
+**Objective**: Configure dual-write and EA bridge endpoints
+**Status**: NOT-STARTED
+**Target**: 2026-08-12
+**Blockers**: BACKEND-1 complete
+
+### Phase BACKEND-3: Signal & Plan Endpoints
+**Objective**: Migrate signal processing and trade planning
+**Status**: NOT-STARTED
+**Target**: 2026-08-26
+**Blockers**: BACKEND-2 complete
+
+### Phase BACKEND-4: Transition & Cutover
+**Objective**: Gradual endpoint migration and data migration
+**Status**: NOT-STARTED
+**Target**: 2026-09-09
+**Blockers**: BACKEND-3 complete
+
+### Phase BACKEND-5: Architecture Refactoring
+**Objective**: Implement hexagonal architecture and decommission WordPress
+**Status**: NOT-STARTED
+**Target**: 2026-09-23
+**Blockers**: BACKEND-4 complete
 
 ---
 
