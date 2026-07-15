@@ -4,9 +4,6 @@
   "private": true,
   "sideEffects": false,
   "type": "module",
-  "workspaces": [
-    "packages/*"
-  ],
   "scripts": {
     "dev": "node ./node_modules/vite/bin/vite.js dev",
     "build": "node ./node_modules/vite/bin/vite.js build",
