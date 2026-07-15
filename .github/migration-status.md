@@ -84,7 +84,7 @@ Live planning artifacts for this alignment:
 | 3     | MT5 market data engine                  | **COMPLETE**      | 100%       | None — gate cleared; T0 admin baseline captured 2026-05-27                                 | 2026-05-25 ✅         |
 | 4     | Fib engine migration                    | **IN-PROGRESS** | 75%        | Paired MT5/Pine exports + weekend/sparse-data evidence (no code changes during backend migration) | 2026-08-15            |
 | 4A    | Production hardening + domain contracts | **READY**         | 0%         | Parallel only; no fib/regime/signal scoring changes during Phase 4 soak                    | Parallel with Phase 4 |
-| **BACKEND** | **WordPress → Node.js/TanStack Start migration** | **IN-PROGRESS** | 0% | Foundation setup, contracts, database | 2026-09-15 |
+| **BACKEND** | **WordPress → Node.js/TanStack Start migration** | **IN-PROGRESS** | 0% | Foundation setup, contracts, database | 2026-09-23 |
 | 5     | Regime & chop engine                    | **CODE COMPLETE** | 70%        | Phase 4 live gate + operator deployment                                                    | 2026-09-15            |
 | 5B    | Fundamentals regime feed                | **CODE COMPLETE** | 65%        | Phase 5 parity gate                                                                        | 2026-10-01            |
 | 6     | Signal engine dual-run                  | **CODE COMPLETE** | 60%        | Phase 5B gate + fib→signal wiring sprint                                                   | 2026-10-15            |
@@ -402,39 +402,45 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 
 **Prerequisites**: Phase 0-3 COMPLETE ✅
 
-**Implementation Plan**: See `C:\Users\Kudzie\.windsurf\plans\backend-migration-plan-cd6eb8.md`
+**Implementation Plan**: See the BACKEND-0 through BACKEND-5 phase sections below in this document for the current implementation plan.
 
 ### Phase BACKEND-0: Foundation Setup
+
 **Objective**: Set up shared contracts, database, and project structure
 **Status**: NOT-STARTED
 **Target**: 2026-07-22
 **Blockers**: Shared contracts, PostgreSQL provider
 
 ### Phase BACKEND-1: Core API Implementation
+
 **Objective**: Implement auth, settings, and market data endpoints
 **Status**: NOT-STARTED
 **Target**: 2026-08-05
 **Blockers**: BACKEND-0 complete
 
 ### Phase BACKEND-2: MT5 Integration
+
 **Objective**: Configure dual-write and EA bridge endpoints
 **Status**: NOT-STARTED
 **Target**: 2026-08-12
 **Blockers**: BACKEND-1 complete
 
 ### Phase BACKEND-3: Signal & Plan Endpoints
+
 **Objective**: Migrate signal processing and trade planning
 **Status**: NOT-STARTED
 **Target**: 2026-08-26
 **Blockers**: BACKEND-2 complete
 
 ### Phase BACKEND-4: Transition & Cutover
+
 **Objective**: Gradual endpoint migration and data migration
 **Status**: NOT-STARTED
 **Target**: 2026-09-09
 **Blockers**: BACKEND-3 complete
 
 ### Phase BACKEND-5: Architecture Refactoring
+
 **Objective**: Implement hexagonal architecture and decommission WordPress
 **Status**: NOT-STARTED
 **Target**: 2026-09-23
