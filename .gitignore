@@ -45,6 +45,9 @@ dist-ssr
 # Workflow state (runtime only)
 .smc-workflow-state.json
 
+# Generated PR description scratch file (draft lives on GitHub, not in repo)
+pr-description.txt
+
 # Pipeline runner runtime artifacts (never commit)
 reports/archive/
 reports/.pipeline-lock.json
