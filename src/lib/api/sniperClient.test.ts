@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/auth", () => ({
   clearCredentials: vi.fn(),
@@ -6,31 +6,44 @@ vi.mock("@/lib/auth", () => ({
   getWordPressNonce: vi.fn(() => "test-nonce"),
 }));
 
-import { apiClient, fetchSoakReport, resolveDefaultBackendUrl } from "./sniperClient";
+import {
+  apiClient,
+  fetchSoakReport,
+  resolveDefaultBackendUrl,
+  setBackendUrl,
+} from "./sniperClient";
 
 describe("default backend URL resolution", () => {
   it("uses the configured build-time backend URL when present", () => {
-    expect(resolveDefaultBackendUrl(" https://custom.example ")).toBe("https://custom.example");
+    expect(
+      resolveDefaultBackendUrl(
+        " https://custom.example/wp-json ",
+        "https://smcsuperfibwebapp.klintaruvinga.workers.dev",
+      ),
+    ).toBe("https://custom.example/wp-json");
   });
 
-  it("throws when no build-time backend URL is configured", () => {
-    expect(() => resolveDefaultBackendUrl(null)).toThrow(
-      /VITE_SNIPER_BACKEND_URL must be configured/,
-    );
-    expect(() => resolveDefaultBackendUrl(undefined)).toThrow(
-      /VITE_SNIPER_BACKEND_URL must be configured/,
+  it("uses the canonical WordPress backend on external frontend hosts", () => {
+    expect(
+      resolveDefaultBackendUrl(null, "https://smcsuperfibwebapp.klintaruvinga.workers.dev"),
+    ).toBe("https://trader.stokvelsociety.co.za/wp-json");
+
+    expect(resolveDefaultBackendUrl(undefined, "https://smcsmartfib.lovable.app")).toBe(
+      "https://trader.stokvelsociety.co.za/wp-json",
     );
   });
 
-  it("normalizes a valid URL to its origin, preserving the port", () => {
-    expect(resolveDefaultBackendUrl("http://trader.stokvelsociety.co.za:8080")).toBe(
-      "http://trader.stokvelsociety.co.za:8080",
+  it("keeps same-origin REST calls when served from the WordPress backend host", () => {
+    expect(resolveDefaultBackendUrl(undefined, "http://trader.stokvelsociety.co.za:8080")).toBe(
+      "http://trader.stokvelsociety.co.za:8080/wp-json",
     );
   });
 });
 
 describe("fetchSoakReport", () => {
-  beforeEach(() => {});
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -119,7 +132,9 @@ describe("fetchSoakReport", () => {
 });
 
 describe("user settings contract", () => {
-  beforeEach(() => {});
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -140,7 +155,7 @@ describe("user settings contract", () => {
     await expect(
       apiClient.postUserSettings(
         {
-          backendUrl: "https://example.com",
+          backendUrl: "https://example.com/wp-json",
           watchlist: ["EURUSD", "XAUUSD"],
         },
         false,
@@ -152,7 +167,7 @@ describe("user settings contract", () => {
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({
-          backendUrl: "https://example.com",
+          backendUrl: "https://example.com/wp-json",
           watchlist: ["EURUSD", "XAUUSD"],
         }),
       }),
@@ -161,7 +176,9 @@ describe("user settings contract", () => {
 });
 
 describe("user risk profile contract", () => {
-  beforeEach(() => {});
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -211,7 +228,9 @@ describe("user risk profile contract", () => {
 });
 
 describe("user account and related backend contract endpoints", () => {
-  beforeEach(() => {});
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -324,7 +343,9 @@ describe("user account and related backend contract endpoints", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(apiClient.postEngineBatch(["EURUSD", "XAUUSD"], false)).resolves.toEqual({
+    await expect(
+      apiClient.postEngineBatch({ symbols: ["EURUSD", "XAUUSD"] }, false),
+    ).resolves.toEqual({
       ok: true,
       diagnostics: [],
     });
@@ -390,7 +411,9 @@ describe("user account and related backend contract endpoints", () => {
 });
 
 describe("Phase 2 telemetry client reads", () => {
-  beforeEach(() => {});
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -581,9 +604,10 @@ describe("Phase 2 telemetry client reads", () => {
     await expect(apiClient.getLiveSignals(false)).resolves.toEqual(signals);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringMatching(/\/sniper\/v1\/live-signals\?_t=\d+$/),
+      expect.stringMatching(/\/sniper\/v1\/live-signals\?_=\d+$/),
       expect.objectContaining({
         method: "GET",
+        cache: "no-store",
       }),
     );
   });
@@ -615,16 +639,19 @@ describe("Phase 2 telemetry client reads", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringMatching(/\/sniper\/v1\/charts\?symbol=EURUSD&timeframe=15min&_t=\d+$/),
+      expect.stringMatching(/\/sniper\/v1\/charts\?symbol=EURUSD&timeframe=15min&_=\d+$/),
       expect.objectContaining({
         method: "GET",
+        cache: "no-store",
       }),
     );
   });
 });
 
 describe("ladders client contract", () => {
-  beforeEach(() => {});
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -644,13 +671,15 @@ describe("ladders client contract", () => {
     );
 
     await expect(apiClient.getLadders(undefined, false)).rejects.toThrow(
-      "Invalid ladders response",
+      "/ladders: backend response missing ladder array",
     );
   });
 });
 
 describe("unified snapshot client contract", () => {
-  beforeEach(() => {});
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -690,9 +719,10 @@ describe("unified snapshot client contract", () => {
     expect(result.prices[0].symbol).toBe("EURUSD");
 
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringMatching(/\/sniper\/v1\/snapshot\/unified\?_t=\d+$/),
+      expect.stringMatching(/\/sniper\/v1\/snapshot\/unified\?_=\d+$/),
       expect.objectContaining({
         method: "GET",
+        cache: "no-store",
       }),
     );
   });
@@ -800,5 +830,33 @@ describe("unified snapshot client contract", () => {
     const result = await apiClient.getUnifiedSnapshot(false);
 
     expect(result.todayOiImpacts).toEqual(payload.todayOiImpacts);
+  });
+});
+
+
+  it("getSnapshot is a compatibility alias that calls /snapshot/unified", async () => {
+    const payload = {
+      prices: [],
+      regimes: [],
+      gates: [],
+      diagnostics: [],
+    };
+
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiClient.getSnapshot(false);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/sniper\/v1\/snapshot\/unified\?_=\d+$/),
+      expect.anything(),
+    );
   });
 });

@@ -9,8 +9,9 @@ import {
 } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { SettingsQueryErrorState } from "@/components/sniper/SettingsQueryErrorState";
-import { DivergenceBanner } from "@/components/sniper/Warnings";
+import { DivergenceBanner, WarningLine } from "@/components/sniper/Warnings";
 import { AlertTriangle, Search } from "lucide-react";
+import { MOCK_MODE } from "@/lib/api/sniperClient";
 import { useCallback, useState } from "react";
 import { deduplicateById } from "@/lib/utils";
 import { WalletOverview } from "@/components/sniper/WalletOverview";
@@ -118,6 +119,7 @@ export function PlanPage() {
 
   const getFreshnessState = () => {
     if (divergentCount > 0) return "pending-sync";
+    if (MOCK_MODE) return "mock";
     if (!snapshot) return "unavailable";
 
     const hasNonLivePrice = snapshot.prices.some((p) => p.state !== "live");
@@ -281,6 +283,12 @@ export function PlanPage() {
   return (
     <div className="space-y-5">
       <WalletOverview />
+
+      {MOCK_MODE && (
+        <WarningLine level="warn">
+          App running in MOCK_MODE. Real REST calls disabled - all data is synthetic.
+        </WarningLine>
+      )}
 
       <div className="flex items-center justify-between gap-3">
         <div>
