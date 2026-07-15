@@ -2,6 +2,7 @@
   "name": "@smc-superfib/contracts",
   "version": "1.0.0",
   "description": "Shared type contracts and normalizers for SMC SuperFIB platform",
+  "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,7 +15,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "vitest"
+    "test": "vitest",
+    "prepare": "npm run build"
   },
   "keywords": [
     "contracts",
