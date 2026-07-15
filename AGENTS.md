@@ -60,7 +60,7 @@ These wrappers are documented in `docs/agents/skill-index.md` and implemented as
 - Do not delete branches.
 - Do not delete platform-specific config files.
 - Do not remove lockfiles without an explicit repo-specific reason.
-+- **package-lock.json governance note**: The lockfile must remain consistent with `package.json`. If optional peer dependencies are restored on the remote branch, regenerate locally with `npm install` and commit the resulting `package-lock.json` so history stays reproducible. Flag any lockfile drift in the PR description.
+- **package-lock.json governance note**: The lockfile must remain consistent with `package.json`. If optional peer dependencies are restored on the remote branch, regenerate locally with `npm install` and commit the resulting `package-lock.json` so history stays reproducible. Flag any lockfile drift in the PR description.
 - Avoid broad formatting-only diffs during logic fixes.
 - Before automation or workflow changes, inspect `.github/workflows/`, package scripts, and workflow state/report files.
 
