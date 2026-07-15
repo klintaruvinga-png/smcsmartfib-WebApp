@@ -1,0 +1,36 @@
+{
+  "name": "@smc-superfib/contracts",
+  "version": "1.0.0",
+  "description": "Shared type contracts and normalizers for SMC SuperFIB platform",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "contracts",
+    "types",
+    "normalizers",
+    "smc",
+    "superfib"
+  ],
+  "author": "SMC SuperFIB",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "dist",
+    "src"
+  ]
+}

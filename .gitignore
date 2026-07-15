@@ -45,6 +45,9 @@ dist-ssr
 # Workflow state (runtime only)
 .smc-workflow-state.json
 
+# Generated PR description scratch file (draft lives on GitHub, not in repo)
+pr-description.txt
+
 # Pipeline runner runtime artifacts (never commit)
 reports/archive/
 reports/.pipeline-lock.json
@@ -60,10 +63,19 @@ reports/codex-review.json
 reports/.claude-hardening-blocked.json
 reports/.manual-session
 src/routeTree.gen.ts
+# TypeScript source files (explicit, no broad blanket patterns)
+# Ignore build artifacts
+*.tsbuildinfo
+@types/
+
+# Contracts package
+packages/contracts/dist/
+packages/contracts/node_modules/
+
+# SDK package
+sdk/dist/
+
+# Main app source
+src/**/*.test.ts
 src/routeTree.gen.ts
-*.ts
-!packages/
-!packages/contracts/
-!packages/contracts/src/
-!packages/contracts/src/*.ts
 .claude/
