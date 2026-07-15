@@ -15,7 +15,6 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "vitest",
     "prepare": "npm run build"
   },
   "keywords": [
@@ -28,8 +27,7 @@
   "author": "SMC SuperFIB",
   "license": "MIT",
   "devDependencies": {
-    "typescript": "^5.0.0",
-    "vitest": "^1.0.0"
+    "typescript": "^5.0.0"
   },
   "files": [
     "dist",
