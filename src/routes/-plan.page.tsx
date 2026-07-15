@@ -119,6 +119,7 @@ export function PlanPage() {
 
   const getFreshnessState = () => {
     if (divergentCount > 0) return "pending-sync";
+    if (MOCK_MODE) return "mock";
     if (!snapshot) return "unavailable";
 
     const hasNonLivePrice = snapshot.prices.some((p) => p.state !== "live");
