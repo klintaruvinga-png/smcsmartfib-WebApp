@@ -64,6 +64,7 @@ These wrappers are documented in `docs/agents/skill-index.md` and implemented as
 - Before automation or workflow changes, inspect `.github/workflows/`, package scripts, and workflow state/report files.
 
 ## Documentation Tracking Requirements
+
 - **Trackers**: Always update migration status trackers (`.github/migration-status.md`) when phase progress changes
 - **Checklists**: Update phase checklists and task completion status as work progresses
 - **Plan Docs**: Keep implementation plans current with actual progress and blockers
