@@ -1,4 +1,4 @@
-const KEY = "smc_wp_auth";
+const KEY = "smc_auth";
 
 type WordPressWindow = Window & {
   SNIPER?: { nonce?: string };
@@ -33,4 +33,10 @@ export function getWordPressNonce(): string | null {
   if (typeof window === "undefined") return null;
   const wpWindow = window as WordPressWindow;
   return wpWindow.SNIPER?.nonce ?? wpWindow.wpApiSettings?.nonce ?? null;
+}
+
+// Backend migration: Basic-auth credential check (replaces the WordPress nonce
+// where the new standalone backend is the auth source).
+export function hasBackendNonce(): boolean {
+  return hasCredentials();
 }

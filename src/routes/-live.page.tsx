@@ -120,8 +120,8 @@ export function LivePage() {
           if (showPending) {
             return <PendingCard key={symbol} symbol={symbol} />;
           }
-          const regime = data.regimes.find((r) => r.symbol === price!.symbol);
-          const gate = data.gates.find((g) => g.symbol === price!.symbol);
+          const regime = data.regimes?.find((r) => r.symbol === price!.symbol);
+          const gate = data.gates?.find((g) => g.symbol === price!.symbol);
           const diagnostic = (data.diagnostics ?? []).find((d) => d.symbol === price!.symbol);
           return (
             <PriceCard

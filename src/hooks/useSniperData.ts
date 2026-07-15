@@ -3,6 +3,13 @@ import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tansta
 import type { UseQueryOptions } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 import { apiClient, normalizeBackendUrl, setBackendUrl } from "@/lib/api/sniperClient";
+import type { UnifiedSnapshot } from "@/lib/api/sniperClient";
+import type { UseQueryResult } from "@tanstack/react-query";
+
+/** Local alias kept for call-site clarity (normalizeBackendUrl already returns string). */
+function normalizeBackendUrlString(url: string | null | undefined): string {
+  return normalizeBackendUrl(url);
+}
 import { reconcileUserTrades, type TradeContinuityState } from "@/lib/tradeContinuity";
 import type { DashboardSettings, Symbol, SymbolDiagnostic, TradePlan } from "@/types/sniper";
 
@@ -45,7 +52,7 @@ function usePollingQueryState() {
       settingsQuery.isLoading);
   const settingsLoadFailed = settings === undefined && Boolean(settingsQuery.isError);
   const pollMs = pendingSettingsLoad ? null : resolvePollMs(settings);
-  const backendUrl = normalizeBackendUrl(settings?.backendUrl);
+  const backendUrl = normalizeBackendUrlString(settings?.backendUrl);
   const backendReady = backendUrl.length > 0;
   const missingBackendUrl = !pendingSettingsLoad && !settingsLoadFailed && backendUrl.length === 0;
   const settingsLoadError =
@@ -96,7 +103,7 @@ function useLivePollingDiagnostics(
   }, [backendReady, label, pendingSettingsLoad, pollMs]);
 }
 
-export function useSnapshot() {
+export function useSnapshot(): UseQueryResult<UnifiedSnapshot, Error> {
   const { backendReady, pendingSettingsLoad, pollMs } = usePollingQueryState();
   // CRITICAL: Only enable query when backend is ready AND pollMs is valid (not null).
   // Prevents orphaned queries and race conditions during initialization.
@@ -318,7 +325,7 @@ export function normalizeSymbolForWatchlistComparison(symbol: string | null | un
 function normalizeDashboardSettings(settings: DashboardSettings): DashboardSettings {
   return {
     ...settings,
-    backendUrl: normalizeBackendUrl(settings.backendUrl),
+    backendUrl: normalizeBackendUrlString(settings.backendUrl),
     watchlist: normalizeWatchlist(settings.watchlist),
   };
 }

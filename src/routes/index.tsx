@@ -1,7 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Activity } from "lucide-react";
-import { hasCredentials, hasWordPressNonce } from "@/lib/auth";
+import { hasCredentials, hasBackendNonce } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
   component: LandingLoader,
@@ -26,7 +26,7 @@ function LandingLoader() {
     const leaveTimer = setTimeout(() => setLeaving(true), leaveAt);
 
     const navTimer = setTimeout(() => {
-      const authed = hasCredentials() || hasWordPressNonce();
+      const authed = hasCredentials() || hasBackendNonce();
       router.navigate({ to: authed ? "/plan" : "/login" });
     }, LANDING_DELAY_MS);
 

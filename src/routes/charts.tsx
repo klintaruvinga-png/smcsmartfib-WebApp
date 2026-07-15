@@ -105,7 +105,7 @@ function ChartsPage() {
 
   const { data: chart } = useQuery<ChartSnapshot>({
     queryKey: ["chart", activeSymbol],
-    queryFn: () => apiClient.getChartSnapshot(activeSymbol as Symbol),
+    queryFn: () => apiClient.getChartSnapshot(activeSymbol as Symbol, "15min"),
     enabled: backendReady && pollMs !== null && activeSymbol !== null,
     refetchInterval: backendReady ? (pollMs ?? false) : false,
   });
