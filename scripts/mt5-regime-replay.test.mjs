@@ -139,13 +139,19 @@ describe("MT5 regime dispatch parity guard", () => {
     expect(marketDataEngine).toContain('"{\\\"regimes\\\":" + batchJson + "}"');
 
     // Verify route registration wires the correct path, method, and callback
-    expect(routeRegistrar).toContain("array('path' => '/ea/regime-snapshot', 'methods' => WP_REST_Server::CREATABLE, 'callback' => 'post_ea_regime_snapshot', 'permission' => 'ea_bridge')");
+    expect(routeRegistrar).toContain(
+      "array('path' => '/ea/regime-snapshot', 'methods' => WP_REST_Server::CREATABLE, 'callback' => 'post_ea_regime_snapshot', 'permission' => 'ea_bridge')",
+    );
 
     // Verify handler function exists
-    expect(wordpressPlugin).toContain("public function post_ea_regime_snapshot(WP_REST_Request $request)");
+    expect(wordpressPlugin).toContain(
+      "public function post_ea_regime_snapshot(WP_REST_Request $request)",
+    );
 
     // Verify payload validation gate: regimes array is required
-    expect(wordpressPlugin).toContain("if (!is_array($payload) || !isset($payload['regimes']) || !is_array($payload['regimes']))");
+    expect(wordpressPlugin).toContain(
+      "if (!is_array($payload) || !isset($payload['regimes']) || !is_array($payload['regimes']))",
+    );
     expect(wordpressPlugin).toContain("new WP_Error('invalid_payload', 'regimes array required'");
 
     // Verify validation constraints: actual array declarations
@@ -153,6 +159,8 @@ describe("MT5 regime dispatch parity guard", () => {
     expect(wordpressPlugin).toContain("$valid_regimes = array('TRENDING', 'RANGING', 'CHOP')");
 
     // Verify validation gate: actual in_array check
-    expect(wordpressPlugin).toContain("!in_array($htf_bias, $valid_bias, true) || !in_array($ltf_regime, $valid_regimes, true)");
+    expect(wordpressPlugin).toContain(
+      "!in_array($htf_bias, $valid_bias, true) || !in_array($ltf_regime, $valid_regimes, true)",
+    );
   });
 });
