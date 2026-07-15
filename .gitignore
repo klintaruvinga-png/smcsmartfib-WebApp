@@ -70,4 +70,6 @@ src/routeTree.gen.ts
 !packages/contracts/src/
 !packages/contracts/src/*.ts
 !packages/contracts/src/**/*.ts
+!sdk/src/**/*.ts
+!src/**/*.ts
 .claude/
