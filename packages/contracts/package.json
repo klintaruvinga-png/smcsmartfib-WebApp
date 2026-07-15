@@ -16,7 +16,8 @@
     "build": "tsc",
     "prepare": "tsc",
     "dev": "tsc --watch",
-    "test": "vitest"
+    "test": "vitest",
+    "prepare": "npm run build"
   },
   "keywords": [
     "contracts",
