@@ -4,6 +4,9 @@ import { fetchMarketData, MarketDataError } from "../../../lib/market-data/handl
 
 export default defineEventHandler(async (event) => {
   const payload = await requireAuth(event);
+  if (!payload.sub) {
+    throw createError({ statusCode: 401, message: "Invalid token: missing subject" });
+  }
   const query = getQuery(event);
   try {
     return await fetchMarketData(payload.sub, query);

@@ -22,12 +22,11 @@ export async function fetchMarketData(userId: string, rawQuery: unknown) {
   const { symbol, timeframe, family } = parsed.data;
   const sym = symbol.toUpperCase();
 
-  const rows: MarketDataRow[] = await getMarketDataByUserId(userId, sym, timeframe, 200);
-  const filtered = family ? rows.filter((r) => r.family === family) : rows;
+  const rows: MarketDataRow[] = await getMarketDataByUserId(userId, sym, timeframe, family, 200);
 
   // Group by timeframe -> family -> levels[] (matches WordPress response shape).
   const fibs: Record<string, Record<string, Array<{ ratio: number; price: number; calculated_at: string }>>> = {};
-  for (const row of filtered) {
+  for (const row of rows) {
     fibs[row.timeframe] ??= {};
     fibs[row.timeframe][row.family] ??= [];
     fibs[row.timeframe][row.family].push({

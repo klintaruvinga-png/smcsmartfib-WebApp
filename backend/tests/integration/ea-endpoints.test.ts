@@ -35,7 +35,7 @@ describe("EA fib-levels endpoint", () => {
     expect(r.levels_failed).toBe(1);
     expect(r.symbol).toBe("EURUSD");
     expect(r.ok).toBe(false);
-    expect(getDbCalls().filter((c) => c.method === "insert").length).toBe(2);
+    expect(getDbCalls().filter((c) => c.method === "insert").length).toBe(1);
   });
 
   it("invalid payload (zod)", async () => {

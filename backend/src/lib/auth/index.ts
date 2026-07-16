@@ -1,5 +1,4 @@
 import { SignJWT, jwtVerify } from "jose";
-import bcrypt from "bcryptjs";
 
 function getJwtSecret(): Uint8Array {
   const secret = process.env.JWT_SECRET;
@@ -48,12 +47,93 @@ export async function createRefreshToken(): Promise<string> {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/**
+ * Hash a password using PBKDF2 with Web Crypto API (edge-compatible).
+ * Returns a string in the format: salt$iterations$hash
+ * PBKDF2-SHA256 with 100,000 iterations is recommended by OWASP for password hashing.
+ */
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 10);
+  const salt = new Uint8Array(16);
+  crypto.getRandomValues(salt);
+  const iterations = 100000;
+
+  const passwordBuffer = new TextEncoder().encode(password);
+  const importedKey = await crypto.subtle.importKey(
+    "raw",
+    passwordBuffer,
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: salt,
+      iterations: iterations,
+      hash: "SHA-256",
+    },
+    importedKey,
+    256
+  );
+
+  const saltHex = Array.from(salt, b => b.toString(16).padStart(2, "0")).join("");
+  const hashHex = Array.from(new Uint8Array(derivedBits), b => b.toString(16).padStart(2, "0")).join("");
+
+  return `${saltHex}$${iterations}$${hashHex}`;
 }
 
+/**
+ * Verify a password against a hash created by hashPassword.
+ * Also supports legacy bcrypt hashes for backwards compatibility during migration.
+ */
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(password, hash);
+  // Check if this is a legacy bcrypt hash (starts with $2a$, $2b$, or $2y$)
+  if (hash.startsWith("$2a$") || hash.startsWith("$2b$") || hash.startsWith("$2y$")) {
+    // For backwards compatibility with existing bcrypt hashes, dynamically import bcrypt
+    const bcrypt = await import("bcryptjs");
+    return bcrypt.default.compare(password, hash);
+  }
+
+  // Parse PBKDF2 hash format: salt$iterations$hash
+  const parts = hash.split("$");
+  if (parts.length !== 3) {
+    return false;
+  }
+
+  const [saltHex, iterationsStr, expectedHashHex] = parts;
+  const iterations = parseInt(iterationsStr, 10);
+
+  if (isNaN(iterations)) {
+    return false;
+  }
+
+  // Convert hex strings back to Uint8Arrays
+  const salt = new Uint8Array(saltHex.match(/.{2}/g)?.map(byte => parseInt(byte, 16)) || []);
+
+  const passwordBuffer = new TextEncoder().encode(password);
+  const importedKey = await crypto.subtle.importKey(
+    "raw",
+    passwordBuffer,
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: salt,
+      iterations: iterations,
+      hash: "SHA-256",
+    },
+    importedKey,
+    256
+  );
+
+  const actualHashHex = Array.from(new Uint8Array(derivedBits), b => b.toString(16).padStart(2, "0")).join("");
+
+  return actualHashHex === expectedHashHex;
 }
 
 export async function hashToken(token: string): Promise<string> {

@@ -158,13 +158,14 @@ export async function getMarketData(
 /**
  * Dashboard market-data getter keyed by internal user id (JWT `sub`).
  * Newest-first, capped at `limit` (default 200); ratio/price as numbers.
- * `timeframe` is optional: when omitted, rows for all timeframes are returned.
+ * `timeframe` and `family` are optional: when omitted, rows for all timeframes/families are returned.
  * Each row includes its `timeframe` so the dashboard can group by it.
  */
 export async function getMarketDataByUserId(
   userId: string,
   symbol: string,
   timeframe?: FibTimeframe,
+  family?: FibFamily,
   limit = 200
 ): Promise<MarketDataRow[]> {
   const conditions = [
@@ -173,6 +174,9 @@ export async function getMarketDataByUserId(
   ];
   if (timeframe) {
     conditions.push(eq(fibLevels.timeframe, timeframe));
+  }
+  if (family) {
+    conditions.push(eq(fibLevels.family, family));
   }
 
   const rows = await db

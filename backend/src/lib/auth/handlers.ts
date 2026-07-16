@@ -63,7 +63,8 @@ export async function loginUser(
 export async function registerUser(
   email: string,
   password: string,
-  username?: string
+  username?: string,
+  meta?: { userAgent?: string | null; ipAddress?: string | null }
 ) {
   if (!email || !password) throw new AuthError(400, "Email and password required");
   if (password.length < 8)
@@ -75,7 +76,9 @@ export async function registerUser(
       email: user.email,
       role: user.role,
     });
-    return { accessToken, user: toUserView(user) };
+    const refreshToken = await createRefreshToken();
+    await createRefreshSession(user.id, refreshToken, meta?.userAgent ?? null, meta?.ipAddress ?? null);
+    return { accessToken, refreshToken, user: toUserView(user) };
   } catch (err: any) {
     if (err && err.code === "23505") throw new AuthError(409, "Email already exists");
     throw err;

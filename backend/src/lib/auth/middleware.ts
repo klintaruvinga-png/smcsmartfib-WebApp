@@ -1,5 +1,5 @@
 import { H3Event, getHeader, createError } from "h3";
-import { verifyAccessToken, JwtPayload } from "./index";
+import { verifyAccessToken, JwtPayload, hashToken } from "./index";
 import { getUserByApiKey } from "../db/queries";
 import type { User } from "../db/schema";
 
@@ -8,7 +8,7 @@ export async function requireAuth(event: H3Event): Promise<JwtPayload> {
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     throw createError({ statusCode: 401, message: "Missing or invalid Authorization header" });
   }
-  const token = authHeader.slice(7);
+  const token = authHeader.slice(7).trim();
   const payload = await verifyAccessToken(token);
   if (!payload) {
     throw createError({ statusCode: 401, message: "Invalid or expired token" });
@@ -22,7 +22,8 @@ export async function requireEaAuth(event: H3Event): Promise<User> {
   if (!apiKey) {
     throw createError({ statusCode: 401, message: "Missing X-EA-API-Key header" });
   }
-  const user = await getUserByApiKey(apiKey);
+  const hashedApiKey = await hashToken(apiKey);
+  const user = await getUserByApiKey(hashedApiKey);
   if (!user || user.role !== "ea") {
     throw createError({ statusCode: 401, message: "Invalid or missing EA API key" });
   }

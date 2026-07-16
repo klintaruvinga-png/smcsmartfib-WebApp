@@ -58,8 +58,9 @@ describe("market-data endpoint", () => {
     expect(r.fibs["H1"]["LTF_SF"][0].price).toBe(1.1);
   });
 
-  it("family filter (JS-level)", async () => {
-    setDbResult(threeRows);
+  it("family filter (DB-level)", async () => {
+    // Mock returns only LTF_SF rows to simulate DB-level filtering
+    setDbResult([threeRows[0], threeRows[2]]);
     const r = await fetchMarketData("u1", { symbol: "eurusd", family: "LTF_SF" });
     expect(r.fibs["H1"]["LTF_SF"]).toBeDefined();
     expect(r.fibs["H1"]["HTF_AF"]).toBeUndefined();

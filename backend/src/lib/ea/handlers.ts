@@ -38,25 +38,36 @@ export async function submitEaFibLevels(eaApiKey: string, rawBody: unknown) {
       ["LTF_SF", tfEntry.ltf_sf],
       ["HTF_AF", tfEntry.htf_af],
     ];
+
+    // Collect all valid levels for this timeframe into one batch
+    const batch: FibLevelInput[] = [];
     for (const [family, entries] of families) {
       for (const { ratio, price } of entries) {
         if (!VALID_RATIOS.includes(ratio)) {
           failed++;
           continue;
         }
-        try {
-          await createFibLevel(
-            eaApiKey,
-            sym,
-            tfEntry.timeframe as FibTimeframe,
-            null,
-            [{ family, ratio, price } as FibLevelInput]
-          );
-          inserted++;
-        } catch {
-          failed++;
-        }
+        batch.push({ family, ratio, price } as FibLevelInput);
       }
+    }
+
+    // Skip empty batches (all levels were invalid)
+    if (batch.length === 0) {
+      continue;
+    }
+
+    // Call createFibLevel once per timeframe with the entire batch
+    try {
+      await createFibLevel(
+        eaApiKey,
+        sym,
+        tfEntry.timeframe as FibTimeframe,
+        null,
+        batch
+      );
+      inserted += batch.length;
+    } catch {
+      failed += batch.length;
     }
   }
 
