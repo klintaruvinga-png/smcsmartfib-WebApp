@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS public.users (
   role         TEXT NOT NULL DEFAULT 'user'
                  CHECK (role IN ('user', 'admin', 'ea')),
   ea_api_key   TEXT UNIQUE,
+  password_hash TEXT,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -42,6 +43,7 @@ CREATE TABLE IF NOT EXISTS public.fib_levels (
                   CHECK (ratio IN (-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300)),
   price         DECIMAL(20, 8) NOT NULL,
   source        VARCHAR(20) NOT NULL DEFAULT 'mt5',
+  trend         TEXT,
   calculated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   received_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   -- Matches WordPress wp_smc_sf_fib_levels UNIQUE KEY fib_lookup exactly.

@@ -409,9 +409,21 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 ### Phase BACKEND-0: Foundation Setup
 
 **Objective**: Set up shared contracts, database, and project structure
-**Status**: NOT-STARTED
+**Status**: IN-PROGRESS — Database Layer COMPLETE (2026-07-16); shared contracts + provider wiring pending
 **Target**: 2026-07-22
 **Blockers**: Shared contracts, PostgreSQL provider
+
+#### BACKEND-0 · Database Layer (2026-07-16) — COMPLETE
+- Restructured `backend/src/db/` → `backend/src/lib/db/` (canonical layout); repointed `drizzle.config.ts`.
+- Extended Drizzle schema + `001_init.sql`: `users.password_hash` (TEXT) and `fib_levels.trend` (TEXT) to support the new query functions.
+- Hand-authored `backend/src/lib/db/types.ts` (Supabase `Database` type) — `supabase gen types --local` is unavailable here (no Docker); mirrors the extended migration.
+- Implemented 8 query functions across `queries/{fib-levels,users,ea-sessions}.ts` + `queries/index.ts` (single entry point).
+  - fib-levels: `createFibLevel` (batch upsert, WordPress `wpdb->replace` parity), `getLatestFibLevels`, `getMarketData`.
+  - users: `createUser` (bcrypt-hashed `password_hash`), `getUserByApiKey`, `getUserById`, `verifyUserPassword`.
+  - ea-sessions: `createEaSession`, `updateEaSessionPing`, `getActiveEaSessions`.
+- Added `backend/vitest.config.ts` + mocked integration tests (`tests/integration/*`) — 14/14 passing; `tsc --noEmit` clean.
+- **Evidence**: `node node_modules/vitest/vitest.mjs run tests/integration` → 14 passed; `node node_modules/typescript/bin/tsc --noEmit` → exit 0.
+- **Caveat**: Local Supabase/Docker not running, so tests mock the Drizzle client; live-DB validation deferred to when a Supabase instance is available. `users.id` FK to `auth.users` means the auth user must pre-exist in production (custom `password_hash` is query-layer only).
 
 ### Phase BACKEND-1: Core API Implementation
 
@@ -791,6 +803,7 @@ Phase 7 GATE: BLOCKED (hard gate in is_phase6_gate_cleared)
 
 | Week     | Generated  | Phases On-Track                            | Phases At-Risk                           | Phases Blocked | Action Items                                                                                                                  |
 | -------- | ---------- | ------------------------------------------ | ---------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 2026-W29 | 2026-07-16 | BACKEND-0 Database Layer COMPLETE           | Shared contracts, PostgreSQL provider    | None           | DB layer restructured to `src/lib/db`; 8 query fns + types + 14 mocked integration tests passing; `tsc` clean. Live-DB validation deferred (no Docker). |
 | 2026-W22 | 2026-05-27 | Phase 3 COMPLETE; Phase 4 live soak active | Phase 4 live parity gate                 | None           | EA deployed live. T0 baseline captured/exported. Await 30-day corpus, Pine snapshots, and validator run.                      |
 | 2026-W20 | 2026-05-14 | Phase 1 groundwork                         | Phase 0 signal/freshness parity closeout | Phase 0        | Fix NAS100/US30 freshness, XAUUSD candle history, and chop-gate blockers before any phase advance                             |
 | 2026-W21 | 2026-05-25 | Phase 3 COMPLETE — Phase 4 authorized      | Phase 4 Track A lead unassigned          | None           | 72h soak CLOSED. Gate CONDITIONAL PASS. Bug sweep harness repaired. Phase 4 docs created. T0 admin baseline pending operator. |
