@@ -821,6 +821,63 @@ Phase 7 GATE: BLOCKED (hard gate in is_phase6_gate_cleared)
 
 ---
 
+## Architecture Refactor Summary (2026-06-17)
+
+**Key Findings from Architecture Review**:
+- Repository is a trading platform workspace containing React dashboard, WordPress REST backend, MT5 EA, SDK, and operational automation
+- Core problem: authoritative business rules spread across multiple layers with inconsistent ownership
+- Backend truth mixed with transport/persistence logic, MT5 logic mirrors backend instead of publishing canonical facts
+- Frontend hooks contain application orchestration, authority handling, cache policy, and domain normalization
+- Solution: backend must become explicit authority host for every business truth before broader extraction
+
+**Source-of-Truth Matrix**:
+- Signal truth: WordPress backend operational authority, Pine parity reference → Phase 6 consolidation
+- Plan truth: WordPress backend authority → Phase 7 consolidation
+- Regime truth: WordPress backend operational authority, Pine parity reference → Phase 5 consolidation
+- License truth: WordPress backend authority → Phase 9 consolidation
+- Dashboard truth: Backend owns data truth; frontend owns view-state only → Phase 7 consolidation
+
+**Route-to-Use-Case Mapping**:
+- EA Bridge Ingest routes target BridgeIngestService, HeartbeatService, AccountSyncService, etc.
+- Market/Regime/Signal reads target DashboardSnapshotService, SignalBoardQueryService, etc.
+- Plan/Execution routes target TradePlanService, ExecutionRequestService, etc.
+- Admin/Soak/Telemetry routes target AdminHealthService, SoakReportService, etc.
+
+**Projection and Contract Inventory**:
+- Key projection surfaces: engine_snapshot cache, display_signals, trade_plans, regime_snapshots, mt5_signal_candidates
+- Contract duplication risks: frontend vs SDK types, client normalization, plan policy, freshness vocabulary
+- All runtime changes to these surfaces must wait for owning migration phase
+
+## Canonical Feed Stabilization Implementation (2026-06-17)
+
+**Objective**: Ensure all authenticated users share the same fresh price/candle/regime inputs per normalized symbol.
+
+**Code Changes Implemented**:
+- **PHP Backend**: Wired `CanonicalMarketResolver` into `fetch_shared_market_quote()` and `fetch_candles()` to select freshest feed_key across all users. Added `no_cache_response()` to `get_regimes()` and `get_market_data_authority()` for strict cache control.
+- **TypeScript Frontend**: Added conditional placeholder guard in `useSniperData.ts` - when any price is `state !== 'live'`, force fresh fetch instead of using `keepPreviousData`.
+- **Tests**: Upgraded `test-canonical-market-resolver.php` from stub tests to 6 comprehensive regression test specifications.
+
+**Verification Commands**:
+```bash
+# Cache header smoke test
+curl -I https://trader.stokvelsociety.co.za/wp-json/sniper/v1/regimes
+# Must include: Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+
+# Two-user parity validation
+export PARITY_USER_A=user_parity_a
+export PARITY_USER_B=user_parity_b
+export PARITY_PASSWORD=your_password
+scripts/collect-parity-baseline.sh > reports/pre-patch.json
+scripts/collect-parity-validation.sh > reports/post-patch.json
+```
+
+**Success Criteria After Merge**:
+- Two authenticated users on same watchlist get identical `feed_key` per symbol
+- Stale prices marked with `state: 'stale'`, not `'live'`
+- `/regimes` and `/market-data-authority` return cache headers
+- Plan page doesn't show stale price via placeholder
+- No regressions in existing signal logic
+
 ## Document Links
 
 - Migration Plan: [See root migration specification]
@@ -828,6 +885,10 @@ Phase 7 GATE: BLOCKED (hard gate in is_phase6_gate_cleared)
 - Phase Checklists / Updates: `.github/migration/phase-updates/`
 - Test Logs: `.github/migration/test-logs/`
 - Risk Register: `.github/migration/RISK_REGISTER.md` (created 2026-05-25)
+- Architecture Review: `reports/architecture-review-clean-hexagonal-plan-2026-06-17.md` (merged summary above)
+- Source-of-Truth Matrix: `reports/source-of-truth-matrix-2026-06-17.md` (merged summary above)
+- Route-to-Use-Case Map: `reports/route-to-use-case-map-2026-06-17.md` (merged summary above)
+- Projection Inventory: `reports/projection-and-contract-inventory-2026-06-17.md` (merged summary above)
 
 ---
 

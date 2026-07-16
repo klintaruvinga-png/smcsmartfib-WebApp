@@ -72,6 +72,13 @@ These wrappers are documented in `docs/agents/skill-index.md` and implemented as
 - **Status Updates**: Document all phase transitions, blockers, and completion events
 - **Evidence**: Capture validation results and test outputs in appropriate report files
 - **Cross-Reference**: Ensure plans reference current status documents and vice versa
+- **Mandatory Documentation Updates**: Agents MUST update all relevant documentation per task, including but not limited to:
+  - Migration status trackers when phase progress changes
+  - Implementation plans when blockers or scope changes occur
+  - Architecture documentation when structural changes are made
+  - API/route documentation when endpoints are modified
+  - README files when user-facing features change
+  - Any other documentation directly impacted by the task
 
 ## Testing and Evidence Rules
 - Do not claim tests passed unless you actually ran the command and cited the output.

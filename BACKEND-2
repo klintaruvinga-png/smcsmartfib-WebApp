@@ -1,8 +1,0 @@
-# BACKEND-2 Governance Implication
-
-This component requires Phase 4 compatibility review. Key considerations:
-- API version alignment with MT5/EA integration
-- Cache invalidation strategy for pipeline changes
-- Frontend/backend data synchronization constraints
-
-Marked for PR review - validation requirements in AGENTS.md
