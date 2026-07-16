@@ -48,7 +48,7 @@ export const fibLevels = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     eaApiKey: text("ea_api_key")
       .notNull()
-      .references(() => users.eaApiKey),
+      .references(() => users.eaApiKey, { onUpdate: "cascade", onDelete: "cascade" }),
     symbol: varchar("symbol", { length: 24 }).notNull(),
     timeframe: varchar("timeframe", { length: 16 }).$type<FibTimeframe>().notNull(),
     family: varchar("family", { length: 16 }).$type<FibFamily>().notNull(),
@@ -95,7 +95,7 @@ export const eaSessions = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     eaApiKey: text("ea_api_key")
       .notNull()
-      .references(() => users.eaApiKey),
+      .references(() => users.eaApiKey, { onUpdate: "cascade", onDelete: "cascade" }),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),

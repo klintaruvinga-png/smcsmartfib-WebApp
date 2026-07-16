@@ -30,102 +30,124 @@ JWT_SECRET=super-secret-change-in-production
 
 ### 0.2 Database Schema Migration (PostgreSQL)
 
+> Canonical source of truth: `backend/src/db/migrations/001_init.sql`. The
+> snippet below mirrors it. Note: there is **no** `market_data` table — the
+> dashboard reads directly from `fib_levels` (grouped by timeframe → family →
+> ratio), which matches WordPress parity exactly.
+
 ```sql
--- supabase/migrations/001_initial_schema.sql
+-- backend/src/db/migrations/001_init.sql
 
 -- Users (extends Supabase auth.users)
 CREATE TABLE public.users (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  email TEXT UNIQUE NOT NULL,
-  username TEXT UNIQUE,
-  full_name TEXT,
-  avatar_url TEXT,
-  role TEXT DEFAULT 'user' CHECK (role IN ('user', 'admin', 'ea')),
-  ea_api_key TEXT UNIQUE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  id           UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email        TEXT UNIQUE NOT NULL,
+  username     TEXT UNIQUE,
+  full_name    TEXT,
+  avatar_url   TEXT,
+  role         TEXT NOT NULL DEFAULT 'user'
+                 CHECK (role IN ('user', 'admin', 'ea')),
+  ea_api_key   TEXT UNIQUE,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Fib Levels (EA submissions)
+CREATE INDEX idx_users_ea_api_key ON public.users(ea_api_key);
+
+-- Fib Levels (EA submissions). Granularity matches WordPress wp_smc_sf_fib_levels.
+-- UNIQUE KEY fib_lookup excludes calculated_at so the ingest endpoint upserts
+-- (ON CONFLICT DO UPDATE) the latest value per (user, symbol, tf, family, ratio)
+-- — mirroring WordPress wpdb->replace semantics.
 CREATE TABLE public.fib_levels (
-  id BIGSERIAL PRIMARY KEY,
-  ea_api_key TEXT NOT NULL REFERENCES public.users(ea_api_key),
-  symbol TEXT NOT NULL,
-  timeframe TEXT NOT NULL,
-  fib_data JSONB NOT NULL,
-  current_price DECIMAL(20,8),
-  trend TEXT CHECK (trend IN ('bullish', 'bearish', 'neutral')),
-  calculated_at TIMESTAMPTZ DEFAULT NOW(),
-  received_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(ea_api_key, symbol, timeframe, calculated_at)
+  id            BIGSERIAL PRIMARY KEY,
+  user_id       UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  ea_api_key    TEXT NOT NULL REFERENCES public.users(ea_api_key)
+                  ON UPDATE CASCADE ON DELETE CASCADE,
+  symbol        VARCHAR(24) NOT NULL,
+  timeframe     VARCHAR(16) NOT NULL
+                  CHECK (timeframe IN ('M15', 'H1', 'H4', 'D1')),
+  family        VARCHAR(16) NOT NULL
+                  CHECK (family IN ('LTF_SF', 'HTF_AF')),
+  ratio         DECIMAL(10, 4) NOT NULL
+                  CHECK (ratio IN (-200,-162.5,-100,-62.5,-25,0,25,50,62.5,75,100,125,162.5,200,262.5,300)),
+  price         DECIMAL(20, 8) NOT NULL,
+  source        VARCHAR(20) NOT NULL DEFAULT 'mt5',
+  calculated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  received_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT fib_lookup UNIQUE (user_id, symbol, timeframe, family, ratio)
 );
 
-CREATE INDEX idx_fib_levels_lookup ON fib_levels(symbol, timeframe, calculated_at DESC);
-CREATE INDEX idx_fib_levels_ea ON fib_levels(ea_api_key, received_at DESC);
+CREATE INDEX idx_fib_levels_lookup
+  ON public.fib_levels (user_id, symbol, timeframe, family, calculated_at DESC);
+CREATE INDEX idx_fib_levels_symbol_time
+  ON public.fib_levels (user_id, symbol, calculated_at DESC);
 
--- Market Data (Dashboard fetches)
-CREATE TABLE public.market_data (
-  id BIGSERIAL PRIMARY KEY,
-  symbol TEXT NOT NULL,
-  timeframe TEXT NOT NULL,
-  fib_levels JSONB NOT NULL,
-  current_price DECIMAL(20,8),
-  trend TEXT CHECK (trend IN ('bullish', 'bearish', 'neutral')),
-  source TEXT DEFAULT 'ea' CHECK (source IN ('ea', 'manual', 'calculated')),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(symbol, timeframe, created_at)
-);
-
-CREATE INDEX idx_market_data_lookup ON market_data(symbol, timeframe, created_at DESC);
-
--- EA Sessions (for tracking active EAs)
+-- EA Sessions (connection / heartbeat tracking)
 CREATE TABLE public.ea_sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  ea_api_key TEXT NOT NULL REFERENCES public.users(ea_api_key),
-  ip_address INET,
-  user_agent TEXT,
-  connected_at TIMESTAMPTZ DEFAULT NOW(),
-  last_ping TIMESTAMPTZ DEFAULT NOW(),
-  status TEXT DEFAULT 'connected' CHECK (status IN ('connected', 'disconnected', 'error'))
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ea_api_key   TEXT NOT NULL REFERENCES public.users(ea_api_key)
+                  ON UPDATE CASCADE ON DELETE CASCADE,
+  user_id      UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  ip_address   INET,
+  user_agent   TEXT,
+  connected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_ping    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  status       TEXT NOT NULL DEFAULT 'connected'
+                 CHECK (status IN ('connected', 'disconnected', 'error'))
 );
 
-CREATE INDEX idx_ea_sessions_ea ON ea_sessions(ea_api_key, status);
+CREATE INDEX idx_ea_sessions_ea ON public.ea_sessions(ea_api_key, status);
 
--- Enable RLS
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.fib_levels ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.market_data ENABLE ROW LEVEL SECURITY;
+-- RLS
+ALTER TABLE public.users       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fib_levels  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ea_sessions ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies
-CREATE POLICY "Users can read own profile" ON public.users
-  FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Admins can read all users" ON public.users
-  FOR SELECT USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin'));
+-- SECURITY DEFINER helper avoids infinite recursion on public.users policies.
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin'
+  );
+$$;
 
-CREATE POLICY "EA can insert own fib levels" ON public.fib_levels
-  FOR INSERT WITH CHECK (ea_api_key = (SELECT ea_api_key FROM public.users WHERE id = auth.uid()));
-CREATE POLICY "Users can read market data" ON public.market_data
-  FOR SELECT USING (true);
-CREATE POLICY "EA can insert market data" ON public.market_data
-  FOR INSERT WITH CHECK (source = 'ea');
+CREATE POLICY "users_read_own" ON public.users
+  FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "users_admin_read_all" ON public.users
+  FOR SELECT USING (public.is_admin());
+
+CREATE POLICY "fib_levels_owner_read" ON public.fib_levels
+  FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "fib_levels_admin_read" ON public.fib_levels
+  FOR SELECT USING (public.is_admin());
+
+CREATE POLICY "ea_sessions_owner_read" ON public.ea_sessions
+  FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "ea_sessions_admin_read" ON public.ea_sessions
+  FOR SELECT USING (public.is_admin());
 ```
+
+> **Security note (EA writes):** EA ingest uses the Supabase **service role**
+> key server-side, which bypasses RLS — there are deliberately **no** client-side
+> INSERT policies on `fib_levels`. Authenticating EA writes via RLS
+> (`source = 'ea'` or `auth.uid()` alone) is not secure; the X-EA-API-Key flow
+> validates the EA server-side and writes with the service role.
 
 ### 0.3 Local Dev Environment
 - [ ] Install Supabase CLI: `npm i -g supabase`
 - [ ] Link project: `supabase link --project-ref <ref>`
 - [ ] Push migrations: `supabase db push`
-- [ ] Generate types: `supabase gen types typescript --local > apps/web/src/lib/db/types.ts`
-- [ ] Install Drizzle ORM: `npm i drizzle-orm @supabase/supabase-js` (in apps/web)
+- [ ] Generate types: `supabase gen types typescript --local > backend/src/lib/db/types.ts`
+- [ ] Install Drizzle ORM: `npm i drizzle-orm @supabase/supabase-js` (in backend)
 
 ---
 
 ## Phase 1: Database Layer & Types (Day 1-2)
 
-### 1.1 Database Client & Schema (apps/web/src/lib/db/)
+### 1.1 Database Client & Schema (backend/src/lib/db/)
 
 ```
-apps/web/src/lib/db/
+backend/src/lib/db/
 ├── index.ts              # Drizzle client + Supabase connection
 ├── schema.ts             # Drizzle schema (mirrors Supabase tables)
 ├── types.ts              # TypeScript types (from supabase gen types)
@@ -137,7 +159,7 @@ apps/web/src/lib/db/
 └── migrations/           # Drizzle migrations (mirror Supabase)
 ```
 
-**apps/web/src/lib/db/index.ts**
+**backend/src/lib/db/index.ts**
 ```typescript
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
@@ -148,9 +170,9 @@ const client = postgres(connectionString, { prepare: false });
 export const db = drizzle(client, { schema });
 ```
 
-**apps/web/src/lib/db/schema.ts** (Drizzle schema matching Supabase)
+**backend/src/lib/db/schema.ts** (Drizzle schema matching Supabase)
 
-### 1.2 Database Queries (apps/web/src/lib/db/queries/)
+### 1.2 Database Queries (backend/src/lib/db/queries/)
 
 Key queries needed:
 - `createFibLevel(eaApiKey, symbol, timeframe, fibData, currentPrice, trend)`
@@ -166,20 +188,20 @@ Key queries needed:
 
 ## Phase 2: Authentication & EA Middleware (Day 2-3)
 
-### 2.1 Auth Utilities (apps/web/src/lib/auth/)
+### 2.1 Auth Utilities (backend/src/lib/auth/)
 
 ```
-apps/web/src/lib/auth/
+backend/src/lib/auth/
 ├── index.ts              # JWT utilities, password hashing
 ├── middleware.ts         # Auth middleware for API routes
 ├── ea-auth.ts           # X-EA-API-Key validation
 └── session.ts           # Session management
 ```
 
-**apps/web/src/lib/auth/ea-auth.ts**
+**backend/src/lib/auth/ea-auth.ts**
 ```typescript
 import { db } from '../db';
-import { users } from '../db/schema';
+import { users, eaSessions } from '../db/schema';
 import { eq } from 'drizzle-orm';
 
 export async function validateEaApiKey(apiKey: string) {
@@ -193,14 +215,13 @@ export async function validateEaApiKey(apiKey: string) {
     return { valid: false, user: null };
   }
   
-  // Update last ping
+  // Record/refresh EA session. ea_sessions has no upsert key, so we insert.
+  // userId is required by the schema; status/lastPing default in the table.
   await db.insert(eaSessions).values({
     eaApiKey: apiKey,
+    userId: user.id,
     status: 'connected',
     lastPing: new Date(),
-  }).onConflictDoUpdate({
-    target: eaSessions.eaApiKey,
-    set: { lastPing: new Date(), status: 'connected' }
   });
   
   return { valid: true, user };
@@ -213,7 +234,7 @@ export function extractEaApiKey(request: Request): string | null {
 }
 ```
 
-**apps/web/src/lib/auth/middleware.ts**
+**backend/src/lib/auth/middleware.ts**
 ```typescript
 import { createMiddleware } from 'hono/factory';
 import { validateEaApiKey, extractEaApiKey } from './ea-auth';
@@ -251,14 +272,13 @@ export const userAuthMiddleware = createMiddleware(async (c, next) => {
 });
 ```
 
-### 2.2 Auth API Routes (apps/web/src/routes/api/auth/)
+### 2.2 Auth API Routes (backend/src/routes/api/auth/)
 
 ```
-apps/web/src/routes/api/auth/
+backend/src/routes/api/auth/
 ├── login.ts      # POST /api/auth/login
 ├── register.ts   # POST /api/auth/register
-├── me.ts         # GET /api/auth/me
-└── logout.ts     # POST /api/auth/logout
+└── me.ts         # GET /api/auth/me
 ```
 
 **login.ts**
@@ -288,7 +308,7 @@ export const loginRoute = factory.createHandlers(async (c) => {
 
 ## Phase 3: Phase 4 Critical Endpoints (Day 3-4)
 
-### 3.1 EA Fib Levels Submission (apps/web/src/routes/api/ea/fib-levels.ts)
+### 3.1 EA Fib Levels Submission (backend/src/routes/api/ea/fib-levels.ts)
 
 **POST /api/ea/fib-levels** — Matches WordPress `POST /wp-json/smc/v1/ea/fib-levels`
 
@@ -296,23 +316,26 @@ export const loginRoute = factory.createHandlers(async (c) => {
 import { createFactory } from 'hono/factory';
 import { z } from 'zod';
 import { db } from '../../lib/db';
-import { fibLevels, marketData } from '../../lib/db/schema';
+import { fibLevels } from '../../lib/db/schema';
+import { eq, and } from 'drizzle-orm';
 import { eaAuthMiddleware } from '../../lib/auth/middleware';
 
+// Mirrors WordPress wp_smc_sf_fib_levels payload + 16-ratio whitelist.
+const VALID_RATIOS = [
+  -200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300,
+];
+const levelEntrySchema = z.object({
+  ratio: z.number(),
+  price: z.number(),
+});
+const tfEntrySchema = z.object({
+  timeframe: z.enum(['M15', 'H1', 'H4', 'D1']),
+  ltf_sf: z.array(levelEntrySchema).default([]),
+  htf_af: z.array(levelEntrySchema).default([]),
+});
 const fibLevelSchema = z.object({
-  symbol: z.string().min(1).max(20),
-  timeframe: z.enum(['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1', 'W1', 'MN']),
-  fibData: z.object({
-    levels: z.array(z.object({
-      level: z.number(),
-      price: z.number(),
-      label: z.string().optional(),
-    })),
-    high: z.number(),
-    low: z.number(),
-    trend: z.enum(['bullish', 'bearish', 'neutral']),
-  }),
-  currentPrice: z.number().optional(),
+  symbol: z.string().min(1).max(24),
+  levels: z.array(tfEntrySchema),
   calculatedAt: z.string().datetime().optional(),
 });
 
@@ -323,53 +346,62 @@ export const createFibLevelRoute = factory.createHandlers(
   async (c) => {
     const body = await c.req.json();
     const parsed = fibLevelSchema.safeParse(body);
-    
     if (!parsed.success) {
       return c.json({ error: 'Invalid payload', details: parsed.error.flatten() }, 400);
     }
-    
+
     const eaUser = c.get('eaUser');
-    const { symbol, timeframe, fibData, currentPrice, calculatedAt } = parsed.data;
-    
-    // Insert into fib_levels (EA submission log)
-    const [fibLevel] = await db.insert(fibLevels).values({
-      eaApiKey: eaUser.eaApiKey,
+    const { symbol, levels, calculatedAt } = parsed.data;
+    const when = calculatedAt ? new Date(calculatedAt) : new Date();
+
+    let inserted = 0;
+    let failed = 0;
+
+    for (const tfEntry of levels) {
+      const famMap: Record<string, { ratio: number; price: number }[]> = {
+        LTF_SF: tfEntry.ltf_sf,
+        HTF_AF: tfEntry.htf_af,
+      };
+      for (const [family, entries] of Object.entries(famMap)) {
+        for (const { ratio, price } of entries) {
+          if (!VALID_RATIOS.includes(ratio)) { failed++; continue; }
+          try {
+            // Upsert parity: fib_lookup is (user_id, symbol, timeframe, family,
+            // ratio) — ON CONFLICT DO UPDATE overwrites the latest value, mirroring
+            // WordPress wpdb->replace (calculated_at is intentionally excluded).
+            await db.insert(fibLevels).values({
+              userId: eaUser.id,
+              eaApiKey: eaUser.eaApiKey,
+              symbol: symbol.toUpperCase(),
+              timeframe: tfEntry.timeframe,
+              family,
+              ratio: String(ratio) as unknown as number,
+              price: String(price) as unknown as number,
+              source: 'mt5',
+              calculatedAt: when,
+            }).onConflictDoUpdate({
+              target: [fibLevels.userId, fibLevels.symbol, fibLevels.timeframe, fibLevels.family, fibLevels.ratio],
+              set: { price: String(price) as unknown as number, calculatedAt: when, source: 'mt5' },
+            });
+            inserted++;
+          } catch {
+            failed++;
+          }
+        }
+      }
+    }
+
+    return c.json({
+      ok: failed === 0,
       symbol: symbol.toUpperCase(),
-      timeframe,
-      fibData,
-      currentPrice: currentPrice ?? fibData.fibData?.levels?.[0]?.price ?? null,
-      trend: fibData.trend,
-      calculatedAt: calculatedAt ? new Date(calculatedAt) : new Date(),
-    }).returning();
-    
-    // Upsert into market_data (dashboard read path)
-    await db.insert(marketData).values({
-      symbol: symbol.toUpperCase(),
-      timeframe,
-      fibLevels: fibData,
-      currentPrice: currentPrice ?? fibData.fibData?.levels?.[0]?.price ?? null,
-      trend: fibData.trend,
-      source: 'ea',
-    }).onConflictDoUpdate({
-      target: [marketData.symbol, marketData.timeframe],
-      set: {
-        fibLevels: fibData,
-        currentPrice: currentPrice ?? fibData.fibData?.levels?.[0]?.price ?? null,
-        trend: fibData.trend,
-        createdAt: new Date(),
-      },
-    });
-    
-    return c.json({ 
-      success: true, 
-      id: fibLevel.id,
-      message: 'Fib levels received and processed' 
-    }, 201);
+      levels_written: inserted,
+      levels_failed: failed,
+    }, failed === 0 ? 201 : 207);
   }
 );
 ```
 
-### 3.2 Market Data Fetch (apps/web/src/routes/api/market-data/fib-levels.ts)
+### 3.2 Market Data Fetch (backend/src/routes/api/market-data/fib-levels.ts)
 
 **GET /api/market-data/fib-levels** — Matches WordPress `GET /wp-json/smc/v1/market-data/fib-levels`
 
@@ -377,54 +409,54 @@ export const createFibLevelRoute = factory.createHandlers(
 import { createFactory } from 'hono/factory';
 import { z } from 'zod';
 import { db } from '../../lib/db';
-import { marketData } from '../../lib/db/schema';
-import { eq, desc, and } from 'drizzle-orm';
+import { fibLevels } from '../../lib/db/schema';
+import { eq, desc, and, gte } from 'drizzle-orm';
 import { userAuthMiddleware } from '../../lib/auth/middleware';
 
 const querySchema = z.object({
-  symbol: z.string().min(1).max(20).optional(),
-  timeframe: z.enum(['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1', 'W1', 'MN']).optional(),
-  limit: z.coerce.number().min(1).max(100).default(50),
+  symbol: z.string().min(1).max(24),
+  timeframe: z.enum(['M15', 'H1', 'H4', 'D1']).optional(),
+  family: z.enum(['LTF_SF', 'HTF_AF']).optional(),
   since: z.string().datetime().optional(),
 });
 
 const factory = createFactory();
 
 export const getFibLevelsRoute = factory.createHandlers(
-  userAuthMiddleware, // Optional: make public for dashboard, auth for admin
+  userAuthMiddleware, // make public for dashboard; require JWT for admin views
   async (c) => {
-    const query = c.req.query();
-    const parsed = querySchema.safeParse(query);
-    
+    const parsed = querySchema.safeParse(c.req.query());
     if (!parsed.success) {
       return c.json({ error: 'Invalid query', details: parsed.error.flatten() }, 400);
     }
-    
-    const { symbol, timeframe, limit, since } = parsed.data;
-    
-    const conditions = [];
-    if (symbol) conditions.push(eq(marketData.symbol, symbol.toUpperCase()));
-    if (timeframe) conditions.push(eq(marketData.timeframe, timeframe));
-    if (since) conditions.push(gte(marketData.createdAt, new Date(since)));
-    
-    const results = await db
+    const { symbol, timeframe, family, since } = parsed.data;
+
+    const conditions = [eq(fibLevels.userId, c.get('user').sub)];
+    conditions.push(eq(fibLevels.symbol, symbol.toUpperCase()));
+    if (timeframe) conditions.push(eq(fibLevels.timeframe, timeframe));
+    if (family) conditions.push(eq(fibLevels.family, family));
+    if (since) conditions.push(gte(fibLevels.calculatedAt, new Date(since)));
+
+    const rows = await db
       .select()
-      .from(marketData)
-      .where(conditions.length ? and(...conditions) : undefined)
-      .orderBy(desc(marketData.createdAt))
-      .limit(limit);
-    
-    return c.json({
-      data: results.map(r => ({
-        symbol: r.symbol,
-        timeframe: r.timeframe,
-        fibLevels: r.fibLevels,
-        currentPrice: r.currentPrice,
-        trend: r.trend,
-        timestamp: r.createdAt,
-      })),
-      count: results.length,
-    });
+      .from(fibLevels)
+      .where(and(...conditions))
+      .orderBy(desc(fibLevels.calculatedAt))
+      .limit(2000);
+
+    // Group by timeframe -> family -> levels[] (matches WordPress response shape)
+    const fibs: Record<string, Record<string, { ratio: number; price: number; calculated_at: string }[]>> = {};
+    for (const row of rows) {
+      fibs[row.timeframe] ??= {};
+      fibs[row.timeframe][row.family] ??= [];
+      fibs[row.timeframe][row.family].push({
+        ratio: Number(row.ratio),
+        price: Number(row.price),
+        calculated_at: row.calculatedAt.toISOString(),
+      });
+    }
+
+    return c.json({ ok: true, symbol: symbol.toUpperCase(), fibs, anchor_debug: {} });
   }
 );
 ```
@@ -433,12 +465,12 @@ export const getFibLevelsRoute = factory.createHandlers(
 
 ## Phase 4: User Profile & Session Endpoints (Day 4-5)
 
-### 4.1 User Routes (apps/web/src/routes/api/users/)
+### 4.1 User Routes (backend/src/routes/api/users/)
 
 **GET /api/users/:id** — User profile for dashboard
 
 ```typescript
-// apps/web/src/routes/api/users/[id].ts
+// backend/src/routes/api/users/[id].ts
 import { createFactory } from 'hono/factory';
 import { db } from '../../../lib/db';
 import { users } from '../../../lib/db/schema';
@@ -481,119 +513,113 @@ export const getUserRoute = factory.createHandlers(
 
 ## Phase 5: Shadow Mode & Data Sync (Day 5-6)
 
-### 5.1 WordPress → TanStack Sync Service (apps/web/src/lib/sync/)
+### 5.1 WordPress → TanStack Sync Service (backend/src/lib/sync/)
 
 ```
-apps/web/src/lib/sync/
+backend/src/lib/sync/
 ├── wordpress-client.ts   # WordPress REST API client
 ├── sync-service.ts       # Sync orchestration
 ├── fib-level-sync.ts     # Fib level sync logic
 └── scheduler.ts          # Cron scheduler
 ```
 
-**apps/web/src/lib/sync/wordpress-client.ts**
+**backend/src/lib/sync/wordpress-client.ts**
 ```typescript
 const WP_BASE = process.env.WORDPRESS_API_URL!; // e.g. https://smartfib.com/wp-json/smc/v1
 const WP_API_KEY = process.env.WORDPRESS_API_KEY!;
+const FETCH_TIMEOUT_MS = 10_000;
 
-export async function fetchWpFibLevels(params: { symbol?: string; timeframe?: string; limit?: number }) {
+export async function fetchWpFibLevels(params: {
+  symbol?: string;
+  timeframe?: string;
+  page?: number;
+  limit?: number;
+}) {
   const search = new URLSearchParams();
   if (params.symbol) search.set('symbol', params.symbol);
   if (params.timeframe) search.set('timeframe', params.timeframe);
+  if (params.page) search.set('page', String(params.page));
   if (params.limit) search.set('per_page', String(params.limit));
-  
-  const res = await fetch(`${WP_BASE}/market-data/fib-levels?${search}`, {
-    headers: { 'Authorization': `Bearer ${WP_API_KEY}` },
-  });
-  
-  if (!res.ok) throw new Error(`WP fetch failed: ${res.status}`);
-  return res.json();
-}
 
-export async function fetchWpFibLevelById(id: number) {
-  const res = await fetch(`${WP_BASE}/ea/fib-levels/${id}`, {
-    headers: { 'Authorization': `Bearer ${WP_API_KEY}` },
-  });
-  return res.json();
+  // Bounded timeout so a hung WordPress call can't stall the sync loop.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(`${WP_BASE}/market-data/fib-levels?${search}`, {
+      headers: { Authorization: `Bearer ${WP_API_KEY}` },
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`WP fetch failed: ${res.status}`);
+    return res.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 ```
 
-**apps/web/src/lib/sync/fib-level-sync.ts**
+**backend/src/lib/sync/fib-level-sync.ts**
 ```typescript
 import { db } from '../db';
-import { fibLevels, marketData } from '../db/schema';
+import { fibLevels } from '../db/schema';
 import { fetchWpFibLevels } from './wordpress-client';
-import { eq, and } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
+// WordPress GET /market-data/fib-levels returns:
+//   { ok, symbol, fibs: { [tf]: { LTF_SF: [{ratio,price,calculated_at}], HTF_AF: [...] } }, anchor_debug }
+// Explode that into ratio-level rows in fib_levels (matches the EA ingest path;
+// there is NO market_data table in the canonical schema).
 export async function syncFibLevelsFromWordPress(since?: Date) {
+  const PAGE_SIZE = 100;
   let page = 1;
   let hasMore = true;
   let synced = 0;
-  
+
   while (hasMore) {
-    const wpData = await fetchWpFibLevels({ 
-      limit: 100, 
-      // WordPress uses page-based pagination
-    });
-    
-    if (!wpData.data?.length) break;
-    
-    for (const item of wpData.data) {
-      const calculatedAt = new Date(item.calculated_at || item.date);
-      if (since && calculatedAt <= since) {
-        hasMore = false;
-        break;
-      }
-      
-      // Check if already exists
-      const [existing] = await db.select()
-        .from(fibLevels)
-        .where(and(
-          eq(fibLevels.symbol, item.symbol),
-          eq(fibLevels.timeframe, item.timeframe),
-          eq(fibLevels.calculatedAt, calculatedAt)
-        ))
-        .limit(1);
-      
-      if (!existing) {
-        await db.insert(fibLevels).values({
-          eaApiKey: item.ea_api_key,
-          symbol: item.symbol,
-          timeframe: item.timeframe,
-          fibData: item.fib_data,
-          currentPrice: item.current_price,
-          trend: item.trend,
-          calculatedAt,
-          receivedAt: new Date(item.received_at || item.date),
-        });
-        
-        // Also upsert market_data for dashboard
-        await db.insert(marketData).values({
-          symbol: item.symbol,
-          timeframe: item.timeframe,
-          fibLevels: item.fib_data,
-          currentPrice: item.current_price,
-          trend: item.trend,
-          source: 'ea',
-          createdAt: calculatedAt,
-        }).onConflictDoUpdate({
-          target: [marketData.symbol, marketData.timeframe],
-          set: { fibLevels: item.fib_data, currentPrice: item.current_price, trend: item.trend },
-        });
-        
-        synced++;
+    const wpData = await fetchWpFibLevels({ page, limit: PAGE_SIZE });
+    const fibs = wpData?.fibs ?? {};
+    const tfKeys = Object.keys(fibs);
+    if (tfKeys.length === 0) break;
+
+    for (const tf of tfKeys) {
+      for (const family of ['LTF_SF', 'HTF_AF'] as const) {
+        for (const lvl of fibs[tf]?.[family] ?? []) {
+          const calculatedAt = new Date(lvl.calculated_at ?? lvl.date);
+          if (since && calculatedAt <= since) continue;
+
+          try {
+            await db.insert(fibLevels).values({
+              // Shadow sync writes under the configured EA user for the symbol.
+              userId: process.env.SHADOW_SYNC_USER_ID!,
+              eaApiKey: process.env.SHADOW_SYNC_EA_API_KEY!,
+              symbol: String(wpData.symbol).toUpperCase(),
+              timeframe: tf,
+              family,
+              ratio: String(lvl.ratio) as unknown as number,
+              price: String(lvl.price) as unknown as number,
+              source: 'mt5',
+              calculatedAt,
+            }).onConflictDoUpdate({
+              target: [fibLevels.userId, fibLevels.symbol, fibLevels.timeframe, fibLevels.family, fibLevels.ratio],
+              set: { price: String(lvl.price) as unknown as number, calculatedAt, source: 'mt5' },
+            });
+            synced++;
+          } catch (err) {
+            console.error('[Shadow Sync] insert failed', err);
+          }
+        }
       }
     }
-    
+
     page++;
-    if (wpData.data.length < 100) hasMore = false;
+    if (tfKeys.length < PAGE_SIZE) hasMore = false;
   }
-  
+
   return { synced, timestamp: new Date() };
 }
 ```
 
-### 5.2 Sync Scheduler (apps/web/src/lib/sync/scheduler.ts)
+### 5.2 Sync Scheduler (backend/src/lib/sync/scheduler.ts)
 
 ```typescript
 import { syncFibLevelsFromWordPress } from './fib-level-sync';
@@ -627,7 +653,7 @@ export function startShadowSync(intervalMs = 5 * 60 * 1000) {
 **GET /api/admin/shadow-validation** — Compare WP vs TanStack data
 
 ```typescript
-// apps/web/src/routes/api/admin/shadow-validation.ts
+// backend/src/routes/api/admin/shadow-validation.ts
 export const shadowValidationRoute = factory.createHandlers(
   userAuthMiddleware,
   async (c) => {
@@ -635,35 +661,47 @@ export const shadowValidationRoute = factory.createHandlers(
     if (user.role !== 'admin') return c.json({ error: 'Forbidden' }, 403);
     
     const { symbol, timeframe, limit = 20 } = c.req.query();
-    
-    // Fetch from both sources
-    const [wpData, tsData] = await Promise.all([
+
+    // Fetch from both sources. WordPress returns { ok, symbol, fibs: { tf: {
+    // LTF_SF: [{ratio,price,calculated_at}], HTF_AF: [...] } }, anchor_debug }.
+    // TanStack stores the same data at ratio-level granularity in fib_levels.
+    const [wpData, tsRows] = await Promise.all([
       fetchWpFibLevels({ symbol, timeframe, limit }),
-      db.select().from(marketData)
+      db.select().from(fibLevels)
         .where(and(
-          symbol ? eq(marketData.symbol, symbol.toUpperCase()) : undefined,
-          timeframe ? eq(marketData.timeframe, timeframe) : undefined,
+          symbol ? eq(fibLevels.symbol, symbol.toUpperCase()) : undefined,
+          timeframe ? eq(fibLevels.timeframe, timeframe) : undefined,
         ))
-        .orderBy(desc(marketData.createdAt))
+        .orderBy(desc(fibLevels.calculatedAt))
         .limit(limit),
     ]);
-    
-    // Compare
-    const mismatches = [];
-    for (let i = 0; i < Math.max(wpData.data.length, tsData.length); i++) {
-      const wp = wpData.data[i];
-      const ts = tsData[i];
-      
-      if (!wp && ts) mismatches.push({ type: 'extra_in_tanstack', ts });
-      else if (wp && !ts) mismatches.push({ type: 'missing_in_tanstack', wp });
-      else if (JSON.stringify(wp.fib_data) !== JSON.stringify(ts.fibLevels)) {
-        mismatches.push({ type: 'data_mismatch', wp, ts });
+
+    // Group TanStack rows into the WordPress tf -> family -> levels shape.
+    const tsFibs: Record<string, Record<string, { ratio: number; price: number }[]>> = {};
+    for (const row of tsRows) {
+      tsFibs[row.timeframe] ??= {};
+      tsFibs[row.timeframe][row.family] ??= [];
+      tsFibs[row.timeframe][row.family].push({ ratio: Number(row.ratio), price: Number(row.price) });
+    }
+
+    // Compare parity: every WordPress (tf, family, ratio) must exist in TanStack.
+    const mismatches: unknown[] = [];
+    const wpFibs = wpData?.fibs ?? {};
+    for (const [tf, families] of Object.entries(wpFibs)) {
+      for (const [family, levels] of Object.entries(families)) {
+        const tsLevels = tsFibs[tf]?.[family] ?? [];
+        for (const lvl of levels) {
+          const hit = tsLevels.find(
+            (t) => Number(t.ratio) === Number(lvl.ratio) && Number(t.price) === Number(lvl.price)
+          );
+          if (!hit) mismatches.push({ type: 'missing_in_tanstack', tf, family, lvl });
+        }
       }
     }
-    
+
     return c.json({
-      wordpressCount: wpData.data.length,
-      tanstackCount: tsData.length,
+      wordpressCount: Object.keys(wpFibs).length,
+      tanstackCount: tsRows.length,
       match: mismatches.length === 0,
       mismatches,
     });
@@ -675,10 +713,10 @@ export const shadowValidationRoute = factory.createHandlers(
 
 ## Phase 6: Local Dev Configuration (Day 6)
 
-### 6.1 Nitro Dev Server Config (apps/web/nitro.config.ts)
+### 6.1 Nitro Dev Server Config (backend/nitro.config.ts)
 
 ```typescript
-import { defineNitroConfig } from 'nitropack/config';
+import { defineNitroConfig } from 'nitro/config';
 
 export default defineNitroConfig({
   devServer: {
@@ -702,7 +740,7 @@ export default defineNitroConfig({
 });
 ```
 
-### 6.2 Database Plugin (apps/web/server/plugins/db.ts)
+### 6.2 Database Plugin (backend/server/plugins/db.ts)
 
 ```typescript
 import { db } from '~/lib/db';
@@ -713,18 +751,21 @@ export default defineNitroPlugin(() => {
 });
 ```
 
-### 6.3 Package.json Scripts (apps/web/package.json)
+### 6.3 Package.json Scripts (backend/package.json)
 
 ```json
 {
   "scripts": {
-    "dev": "nitropack dev",
-    "build": "nitropack build",
-    "preview": "nitropack preview",
+    "dev": "nitro dev",
+    "build": "nitro build",
+    "preview": "nitro preview",
+    "start": "node .output/server/index.mjs",
     "db:push": "supabase db push",
     "db:types": "supabase gen types typescript --local > src/lib/db/types.ts",
+    "typecheck": "tsc --noEmit",
     "sync:shadow": "tsx scripts/shadow-sync.ts",
-    "validate:shadow": "tsx scripts/validate-shadow.ts"
+    "validate:shadow": "tsx scripts/validate-shadow.ts",
+    "test:integration": "vitest run tests/integration"
   }
 }
 ```
@@ -733,10 +774,10 @@ export default defineNitroPlugin(() => {
 
 ## Phase 7: Integration Tests (Day 6-7)
 
-### 7.1 Test Setup (apps/web/tests/)
+### 7.1 Test Setup (backend/tests/)
 
 ```
-apps/web/tests/
+backend/tests/
 ├── setup.ts              # Vitest setup
 ├── integration/
 │   ├── auth.test.ts      # Login, register, me
@@ -752,60 +793,54 @@ apps/web/tests/
 ### 7.2 Example Integration Test
 
 ```typescript
-// apps/web/tests/integration/ea-fib-levels.test.ts
+// backend/tests/integration/ea-fib-levels.test.ts
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestClient, testEaApiKey } from '../utils/test-client';
 import { db } from '../../src/lib/db';
-import { fibLevels, marketData } from '../../src/lib/db/schema';
+import { fibLevels } from '../../src/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 describe('POST /api/ea/fib-levels', () => {
   let client: ReturnType<typeof createTestClient>;
-  
+
   beforeAll(async () => {
     client = createTestClient();
     await db.delete(fibLevels);
-    await db.delete(marketData);
   });
-  
+
   it('accepts valid EA fib level submission', async () => {
+    // WordPress-shaped payload: levels[] -> { timeframe, ltf_sf[], htf_af[] }.
     const payload = {
       symbol: 'EURUSD',
-      timeframe: 'H1',
-      fibData: {
-        levels: [
-          { level: 0, price: 1.0850, label: '0%' },
-          { level: 0.236, price: 1.0820, label: '23.6%' },
-          { level: 0.382, price: 1.0800, label: '38.2%' },
-          { level: 0.5, price: 1.0780, label: '50%' },
-          { level: 0.618, price: 1.0760, label: '61.8%' },
-          { level: 1, price: 1.0720, label: '100%' },
-        ],
-        high: 1.0850,
-        low: 1.0720,
-        trend: 'bullish',
-      },
-      currentPrice: 1.0800,
+      levels: [
+        {
+          timeframe: 'H1',
+          ltf_sf: [
+            { ratio: 0, price: 1.0850 },
+            { ratio: 0.236, price: 1.0820 },
+            { ratio: 0.382, price: 1.0800 },
+            { ratio: 0.5, price: 1.0780 },
+            { ratio: 0.618, price: 1.0760 },
+            { ratio: 1, price: 1.0720 },
+          ],
+          htf_af: [],
+        },
+      ],
     };
-    
+
     const res = await client.post('/api/ea/fib-levels', payload, {
       headers: { 'X-EA-API-Key': testEaApiKey },
     });
-    
+
     expect(res.status).toBe(201);
-    expect(res.body.success).toBe(true);
-    expect(res.body.id).toBeDefined();
-    
-    // Verify market_data upsert
-    const [market] = await db.select()
-      .from(marketData)
-      .where(eq(marketData.symbol, 'EURUSD'))
-      .limit(1);
-    
-    expect(market).toBeDefined();
-    expect(market.fibLevels.levels).toHaveLength(6);
-    expect(market.trend).toBe('bullish');
+    expect(res.body.ok).toBe(true);
+
+    // Verify ratio-level rows written to fib_levels (6 for LTF_SF above).
+    const rows = await db.select().from(fibLevels).where(eq(fibLevels.symbol, 'EURUSD'));
+    expect(rows).toHaveLength(6);
+    expect(rows.every((r) => r.family === 'LTF_SF')).toBe(true);
   });
-  
+
   it('rejects invalid API key', async () => {
     const res = await client.post('/api/ea/fib-levels', {}, {
       headers: { 'X-EA-API-Key': 'invalid-key' },
@@ -829,7 +864,7 @@ describe('POST /api/ea/fib-levels', () => {
 
 ## Phase 8: Phase 4 Test Execution & Validation (Day 7-8)
 
-### 8.1 Update Cypress Tests (apps/web/tests/e2e/)
+### 8.1 Update Cypress Tests (backend/tests/e2e/)
 
 Update base URL in `cypress.config.ts`:
 ```typescript
@@ -844,10 +879,12 @@ export default defineConfig({
 ### 8.2 Test Data Seeding Script
 
 ```typescript
-// apps/web/scripts/seed-phase4-test-data.ts
+// backend/scripts/seed-phase4-test-data.ts
 import { db } from '../src/lib/db';
-import { fibLevels, marketData, users } from '../src/lib/db/schema';
+import { fibLevels, users } from '../src/lib/db/schema';
 import { hashPassword } from '../src/lib/auth';
+
+const VALID_RATIOS = [-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300];
 
 export async function seedPhase4TestData() {
   // Create test EA user
@@ -857,36 +894,28 @@ export async function seedPhase4TestData() {
     role: 'ea',
     eaApiKey: 'ea-test-key-phase4',
   }).returning();
-  
-  // Seed fib levels for Cypress tests
+
+  // Seed ratio-level fib rows for Cypress tests (no market_data table).
   const testData = [
-    { symbol: 'EURUSD', timeframe: 'H1', trend: 'bullish', price: 1.0850 },
-    { symbol: 'GBPUSD', timeframe: 'H1', trend: 'bearish', price: 1.2650 },
-    { symbol: 'USDJPY', timeframe: 'H4', trend: 'neutral', price: 149.50 },
+    { symbol: 'EURUSD', timeframe: 'H1', price: 1.0850 },
+    { symbol: 'GBPUSD', timeframe: 'H1', price: 1.2650 },
+    { symbol: 'USDJPY', timeframe: 'H4', price: 149.50 },
   ];
-  
+
   for (const d of testData) {
-    const fibData = generateFibData(d.price, d.trend);
-    
-    await db.insert(fibLevels).values({
+    const rows = VALID_RATIOS.map((ratio) => ({
+      userId: eaUser.id,
       eaApiKey: eaUser.eaApiKey,
       symbol: d.symbol,
       timeframe: d.timeframe,
-      fibData,
-      currentPrice: d.price,
-      trend: d.trend,
-    });
-    
-    await db.insert(marketData).values({
-      symbol: d.symbol,
-      timeframe: d.timeframe,
-      fibLevels: fibData,
-      currentPrice: d.price,
-      trend: d.trend,
-      source: 'ea',
-    });
+      family: 'LTF_SF' as const,
+      ratio: String(ratio) as unknown as number,
+      price: String(d.price * (1 + ratio / 100)) as unknown as number,
+      source: 'mt5' as const,
+    }));
+    await db.insert(fibLevels).values(rows);
   }
-  
+
   console.log('Phase 4 test data seeded');
   return eaUser.eaApiKey;
 }
@@ -909,7 +938,7 @@ export async function seedPhase4TestData() {
 
 ## Phase 9: Cloudflare Workers Deployment (Post-Phase 4)
 
-### 9.1 Wrangler Config (apps/web/wrangler.toml)
+### 9.1 Wrangler Config (backend/wrangler.toml)
 
 ```toml
 name = "smartfib-api"
@@ -940,7 +969,7 @@ binding = "ASSETS"
 ## File Structure Summary
 
 ```
-apps/web/
+backend/
 ├── src/
 │   ├── lib/
 │   │   ├── auth/
@@ -964,8 +993,7 @@ apps/web/
 │   │       ├── auth/
 │   │       │   ├── login.ts
 │   │       │   ├── register.ts
-│   │       │   ├── me.ts
-│   │       │   └── logout.ts
+│   │       │   └── me.ts
 │   │       ├── ea/
 │   │       │   └── fib-levels.ts
 │   │       ├── market-data/
@@ -1035,7 +1063,7 @@ npm i -D tsx
 - [ ] Shadow sync runs every 5min without errors for 24h
 - [ ] Shadow validation shows 0 mismatches for 100+ records
 - [ ] All Phase 4 Cypress tests pass against TanStack Start
-- [ ] Auth flow works: register → login → me → logout
+- [ ] Auth flow works: register → login → me
 - [ ] EA can submit fib levels, dashboard can fetch them
 
 ---
@@ -1046,9 +1074,9 @@ npm i -D tsx
 2. **Day 1-2**: Database layer + types
 3. **Day 2-3**: Auth middleware + endpoints
 4. **Day 3-4**: Phase 4 critical endpoints
-4. **Day 4-5**: User endpoints
-5. **Day 5-6**: Shadow sync + validation
-6. **Day 6-7**: Integration tests + seed scripts
-7. **Day 7-8**: Cypress Phase 4 execution + validation
+5. **Day 4-5**: User endpoints
+6. **Day 5-6**: Shadow sync + validation
+7. **Day 6-7**: Integration tests + seed scripts
+8. **Day 7-8**: Cypress Phase 4 execution + validation
 
 **Estimated: 8 working days to Phase 4 validation**

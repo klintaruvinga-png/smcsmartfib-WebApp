@@ -40,79 +40,85 @@
 Run via Supabase SQL Editor or `supabase db push`:
 
 ```sql
+-- Canonical source of truth: backend/src/db/migrations/001_init.sql
+-- No market_data table — the dashboard reads directly from fib_levels.
+
 -- users (extends auth.users)
 CREATE TABLE public.users (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  email TEXT UNIQUE NOT NULL,
-  username TEXT UNIQUE,
-  full_name TEXT,
-  avatar_url TEXT,
-  role TEXT DEFAULT 'user' CHECK (role IN ('user','admin','ea')),
-  ea_api_key TEXT UNIQUE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  id           UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email        TEXT UNIQUE NOT NULL,
+  username     TEXT UNIQUE,
+  full_name    TEXT,
+  avatar_url   TEXT,
+  role         TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user','admin','ea')),
+  ea_api_key   TEXT UNIQUE,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- fib_levels (EA submissions log)
+CREATE INDEX idx_users_ea_api_key ON public.users(ea_api_key);
+
+-- fib_levels (EA submissions; granularity matches WordPress wp_smc_sf_fib_levels)
 CREATE TABLE public.fib_levels (
-  id BIGSERIAL PRIMARY KEY,
-  ea_api_key TEXT NOT NULL REFERENCES public.users(ea_api_key),
-  symbol TEXT NOT NULL,
-  timeframe TEXT NOT NULL,
-  fib_data JSONB NOT NULL,
-  current_price DECIMAL(20,8),
-  trend TEXT CHECK (trend IN ('bullish','bearish','neutral')),
-  calculated_at TIMESTAMPTZ DEFAULT NOW(),
-  received_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(ea_api_key, symbol, timeframe, calculated_at)
+  id            BIGSERIAL PRIMARY KEY,
+  user_id       UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  ea_api_key    TEXT NOT NULL REFERENCES public.users(ea_api_key) ON UPDATE CASCADE ON DELETE CASCADE,
+  symbol        VARCHAR(24) NOT NULL,
+  timeframe     VARCHAR(16) NOT NULL CHECK (timeframe IN ('M15','H1','H4','D1')),
+  family        VARCHAR(16) NOT NULL CHECK (family IN ('LTF_SF','HTF_AF')),
+  ratio         DECIMAL(10,4) NOT NULL CHECK (ratio IN (-200,-162.5,-100,-62.5,-25,0,25,50,62.5,75,100,125,162.5,200,262.5,300)),
+  price         DECIMAL(20,8) NOT NULL,
+  source        VARCHAR(20) NOT NULL DEFAULT 'mt5',
+  calculated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  received_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT fib_lookup UNIQUE (user_id, symbol, timeframe, family, ratio)
 );
-CREATE INDEX idx_fib_levels_lookup ON fib_levels(symbol, timeframe, calculated_at DESC);
-CREATE INDEX idx_fib_levels_ea ON fib_levels(ea_api_key, received_at DESC);
 
--- market_data (Dashboard read path)
-CREATE TABLE public.market_data (
-  id BIGSERIAL PRIMARY KEY,
-  symbol TEXT NOT NULL,
-  timeframe TEXT NOT NULL,
-  fib_levels JSONB NOT NULL,
-  current_price DECIMAL(20,8),
-  trend TEXT CHECK (trend IN ('bullish','bearish','neutral')),
-  source TEXT DEFAULT 'ea' CHECK (source IN ('ea','manual','calculated')),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(symbol, timeframe, created_at)
-);
-CREATE INDEX idx_market_data_lookup ON market_data(symbol, timeframe, created_at DESC);
+CREATE INDEX idx_fib_levels_lookup ON public.fib_levels (user_id, symbol, timeframe, family, calculated_at DESC);
+CREATE INDEX idx_fib_levels_symbol_time ON public.fib_levels (user_id, symbol, calculated_at DESC);
 
 -- ea_sessions (EA connection tracking)
 CREATE TABLE public.ea_sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  ea_api_key TEXT NOT NULL REFERENCES public.users(ea_api_key),
-  ip_address INET,
-  user_agent TEXT,
-  connected_at TIMESTAMPTZ DEFAULT NOW(),
-  last_ping TIMESTAMPTZ DEFAULT NOW(),
-  status TEXT DEFAULT 'connected' CHECK (status IN ('connected','disconnected','error'))
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ea_api_key   TEXT NOT NULL REFERENCES public.users(ea_api_key) ON UPDATE CASCADE ON DELETE CASCADE,
+  user_id      UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  ip_address   INET,
+  user_agent   TEXT,
+  connected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_ping    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  status       TEXT NOT NULL DEFAULT 'connected' CHECK (status IN ('connected','disconnected','error'))
 );
-CREATE INDEX idx_ea_sessions_ea ON ea_sessions(ea_api_key, status);
 
--- RLS Policies
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.fib_levels ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.market_data ENABLE ROW LEVEL SECURITY;
+CREATE INDEX idx_ea_sessions_ea ON public.ea_sessions(ea_api_key, status);
+
+-- RLS
+ALTER TABLE public.users       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fib_levels  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ea_sessions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users read own profile" ON public.users FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Admins read all users" ON public.users FOR SELECT USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin'));
+-- SECURITY DEFINER helper avoids infinite recursion on public.users policies.
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin');
+$$;
 
-CREATE POLICY "EA inserts own fib levels" ON public.fib_levels FOR INSERT WITH CHECK (ea_api_key = (SELECT ea_api_key FROM public.users WHERE id = auth.uid()));
-CREATE POLICY "Public reads market data" ON public.market_data FOR SELECT USING (true);
-CREATE POLICY "EA inserts market data" ON public.market_data FOR INSERT WITH CHECK (source = 'ea');
+CREATE POLICY "users_read_own" ON public.users FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "users_admin_read_all" ON public.users FOR SELECT USING (public.is_admin());
+
+CREATE POLICY "fib_levels_owner_read" ON public.fib_levels FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "fib_levels_admin_read" ON public.fib_levels FOR SELECT USING (public.is_admin());
+
+CREATE POLICY "ea_sessions_owner_read" ON public.ea_sessions FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "ea_sessions_admin_read" ON public.ea_sessions FOR SELECT USING (public.is_admin());
+
+-- EA writes use the Supabase service role key server-side (RLS bypassed);
+-- there are deliberately NO client-side INSERT policies on fib_levels.
 ```
 
 ### Local Dev Environment (Day 1)
 - [ ] `npm i -g supabase` → `supabase link --project-ref <ref>` → `supabase db push`
-- [ ] `supabase gen types typescript --local > apps/web/src/lib/db/types.ts`
-- [ ] `npm i drizzle-orm @supabase/supabase-js postgres` (in `apps/web`)
+- [ ] `supabase gen types typescript --local > backend/src/lib/db/types.ts`
+- [ ] `npm i drizzle-orm @supabase/supabase-js postgres` (in `backend`)
 - [ ] Verify `npm run dev` starts Nitro on `http://localhost:3000`
 
 ---
@@ -129,7 +135,7 @@ CREATE POLICY "EA inserts market data" ON public.market_data FOR INSERT WITH CHE
 | 6 | User Profile | GET | `/api/users/:id` | JWT | **P1** — Dashboard auth |
 
 ### Supporting Infrastructure
-- [ ] Drizzle schema + queries (`apps/web/src/lib/db/`)
+- [ ] Drizzle schema + queries (`backend/src/lib/db/`)
 - [ ] Auth utilities: JWT sign/verify, password hash, `X-EA-API-Key` middleware
 - [ ] Shadow sync service: WordPress → TanStack Start (5-min cron)
 - [ ] Shadow validation endpoint: `GET /api/admin/shadow-validation`
@@ -151,7 +157,7 @@ CREATE POLICY "EA inserts market data" ON public.market_data FOR INSERT WITH CHE
 ## File Structure (New)
 
 ```
-apps/web/
+backend/
 ├── src/
 │   ├── lib/
 │   │   ├── db/
@@ -177,8 +183,7 @@ apps/web/
 │           ├── auth/
 │           │   ├── login.ts
 │           │   ├── register.ts
-│           │   ├── me.ts
-│           │   └── logout.ts
+│           │   └── me.ts
 │           ├── ea/
 │           │   └── fib-levels.ts
 │           ├── market-data/
@@ -194,16 +199,18 @@ apps/web/
 
 ---
 
-## Scripts to Add (`apps/web/package.json`)
+## Scripts to Add (`backend/package.json`)
 
 ```json
 {
   "scripts": {
-    "dev": "nitropack dev",
-    "build": "nitropack build",
-    "preview": "nitropack preview",
+    "dev": "nitro dev",
+    "build": "nitro build",
+    "preview": "nitro preview",
+    "start": "node .output/server/index.mjs",
     "db:push": "supabase db push",
     "db:types": "supabase gen types typescript --local > src/lib/db/types.ts",
+    "typecheck": "tsc --noEmit",
     "sync:shadow": "tsx scripts/shadow-sync.ts",
     "validate:shadow": "tsx scripts/validate-shadow.ts",
     "test:integration": "vitest run tests/integration"
@@ -234,4 +241,4 @@ Then proceed sequentially through Phases 1-6 above.
 - [Approved Backend Migration Plan](../docs/backend-migration-plan.md)
 - [Architecture Implementation Plan](../docs/architecture/BACKEND_MIGRATION_IMPLEMENTATION_PLAN.md)
 - [WordPress REST API Endpoints](../wordpress-rest-api.php) — 45+ endpoints to eventually migrate
-- [Phase 4 Cypress Tests](../apps/web/tests/e2e/) — validates the 2 critical endpoints
+- [Phase 4 Cypress Tests](../backend/tests/e2e/) — validates the 2 critical endpoints

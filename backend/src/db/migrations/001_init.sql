@@ -32,7 +32,7 @@ CREATE INDEX IF NOT EXISTS idx_users_ea_api_key ON public.users(ea_api_key);
 CREATE TABLE IF NOT EXISTS public.fib_levels (
   id            BIGSERIAL PRIMARY KEY,
   user_id       UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  ea_api_key    TEXT NOT NULL REFERENCES public.users(ea_api_key),
+  ea_api_key    TEXT NOT NULL REFERENCES public.users(ea_api_key) ON UPDATE CASCADE ON DELETE CASCADE,
   symbol        VARCHAR(24) NOT NULL,
   timeframe     VARCHAR(16) NOT NULL
                   CHECK (timeframe IN ('M15', 'H1', 'H4', 'D1')),
@@ -61,7 +61,7 @@ CREATE INDEX IF NOT EXISTS idx_fib_levels_symbol_time
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.ea_sessions (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  ea_api_key   TEXT NOT NULL REFERENCES public.users(ea_api_key),
+  ea_api_key   TEXT NOT NULL REFERENCES public.users(ea_api_key) ON UPDATE CASCADE ON DELETE CASCADE,
   user_id      UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   ip_address   INET,
   user_agent   TEXT,
@@ -80,27 +80,35 @@ ALTER TABLE public.users       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fib_levels  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ea_sessions ENABLE ROW LEVEL SECURITY;
 
+-- SECURITY DEFINER helper: checks admin role WITHOUT triggering recursive RLS on
+-- public.users. Runs as the function owner (bypasses RLS on users) and pins
+-- search_path to avoid search-path injection. Used by all admin policies below.
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin'
+  );
+$$;
+
 -- Users: read own profile; admins read all.
 CREATE POLICY "users_read_own" ON public.users
   FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "users_admin_read_all" ON public.users
-  FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
-  );
+  FOR SELECT USING (public.is_admin());
 
 -- fib_levels: owner reads own rows; EA service role writes (server-side, uses
 -- supabase service role key so RLS bypasses for ingest).
 CREATE POLICY "fib_levels_owner_read" ON public.fib_levels
   FOR SELECT USING (user_id = auth.uid());
 CREATE POLICY "fib_levels_admin_read" ON public.fib_levels
-  FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
-  );
+  FOR SELECT USING (public.is_admin());
 
 -- ea_sessions: owner reads own sessions.
 CREATE POLICY "ea_sessions_owner_read" ON public.ea_sessions
   FOR SELECT USING (user_id = auth.uid());
 CREATE POLICY "ea_sessions_admin_read" ON public.ea_sessions
-  FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
-  );
+  FOR SELECT USING (public.is_admin());

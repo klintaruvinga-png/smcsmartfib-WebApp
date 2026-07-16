@@ -15,7 +15,7 @@ and deploys to Cloudflare Workers for production.
 
 ```bash
 # 1. Create a Supabase project, then fill in backend/.env.local
-cp .env.local .env.local   # already present; replace placeholder values
+cp .env.example .env.local   # copy the template, then replace placeholder values
 
 # 2. Push the database schema
 supabase db push          # or paste 001_init.sql into the Supabase SQL editor
