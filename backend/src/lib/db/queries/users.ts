@@ -6,9 +6,11 @@
  * custom-password auth path (distinct from Supabase auth.users). DB errors are
  * intentionally allowed to propagate to the caller.
  *
- * NOTE: `users.id` has a foreign key to Supabase `auth.users(id)`. In production
- * the auth user must pre-exist; in Phase 1 unit tests the db client is mocked so
- * the FK is never exercised.
+ * NOTE: `users.id` is a standalone UUID. The historical foreign key to
+ * Supabase `auth.users(id)` was removed (see 003_drop_users_auth_fk.sql)
+ * because this is a fully custom auth flow: passwords live in
+ * `public.users.password_hash` and sessions are custom jose JWTs, so no
+ * `auth.users` row is ever created or required.
  */
 import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";

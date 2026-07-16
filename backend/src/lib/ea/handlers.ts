@@ -39,16 +39,15 @@ export async function submitEaFibLevels(eaApiKey: string, rawBody: unknown) {
       ["HTF_AF", tfEntry.htf_af ?? []],
     ];
 
-    // Collect all valid levels for this timeframe into one batch, deduplicating by family+ratio
+    // Collect all valid levels for this timeframe into one deduplicated batch.
+    // Duplicate (family, ratio) pairs collapse to a single row via the Map key.
     const batchMap = new Map<string, FibLevelInput>();
-    let validCount = 0;
     for (const [family, entries] of families) {
       for (const { ratio, price } of entries) {
         if (!VALID_RATIOS.includes(ratio)) {
           failed++;
           continue;
         }
-        validCount++;
         const key = `${family}:${ratio}`;
         batchMap.set(key, { family, ratio, price } as FibLevelInput);
       }
@@ -61,7 +60,10 @@ export async function submitEaFibLevels(eaApiKey: string, rawBody: unknown) {
       continue;
     }
 
-    // Call createFibLevel once per timeframe with the entire batch
+    // Call createFibLevel once per timeframe with the entire batch. Count the
+    // deduplicated rows actually written (batch.length), not the raw valid-entry
+    // count, so levels_written is not overstated when duplicate (family, ratio)
+    // pairs are submitted in one payload.
     try {
       await createFibLevel(
         eaApiKey,
@@ -70,9 +72,9 @@ export async function submitEaFibLevels(eaApiKey: string, rawBody: unknown) {
         null,
         batch
       );
-      inserted += validCount;
+      inserted += batch.length;
     } catch {
-      failed += validCount;
+      failed += batch.length;
     }
   }
 

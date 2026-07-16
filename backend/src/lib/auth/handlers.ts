@@ -7,6 +7,7 @@ import {
   createAccessToken,
   createRefreshToken,
   verifyPassword,
+  PBKDF2_ITERATIONS,
 } from "./index";
 import {
   createRefreshSession,
@@ -32,6 +33,13 @@ function toUserView(u: User): AuthUserView {
   return { id: u.id, email: u.email, role: u.role, username: u.username };
 }
 
+// Constant-cost PBKDF2 hash used only to equalize response timing on the
+// not-found path so an attacker cannot enumerate registered emails by
+// measuring login latency (the real hash check is skipped when no user row
+// exists). Valid PBKDF2 format is salt$iterations$hash; the iteration count
+// must match PBKDF2_ITERATIONS so both paths cost the same.
+const DUMMY_PASSWORD_HASH = `00000000000000000000000000000000$${PBKDF2_ITERATIONS}$0000000000000000000000000000000000000000000000000000000000000000`;
+
 export async function loginUser(
   email: string,
   password: string,
@@ -43,11 +51,15 @@ export async function loginUser(
     .from(users)
     .where(eq(users.email, email))
     .limit(1);
-  if (
-    !user ||
-    !user.passwordHash ||
-    !(await verifyPassword(password, user.passwordHash))
-  ) {
+
+  // Run a constant-cost verification whether or not the user exists so response
+  // latency does not reveal whether the email is registered (user-enumeration
+  // hardening). When the row/ hash is missing we verify against the dummy hash,
+  // which costs the same as a real check.
+  const hashToCheck = user?.passwordHash ?? DUMMY_PASSWORD_HASH;
+  const passwordOk = await verifyPassword(password, hashToCheck);
+
+  if (!user || !passwordOk) {
     throw new AuthError(401, "Invalid credentials");
   }
   const accessToken = await createAccessToken({

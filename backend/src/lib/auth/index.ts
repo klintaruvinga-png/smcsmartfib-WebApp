@@ -11,6 +11,10 @@ function getJwtSecret(): Uint8Array {
 const ACCESS_TOKEN_EXPIRY = "15m";
 export const REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
+// PBKDF2-SHA256 iteration count for password hashing. Recommended by OWASP
+// (2023). Exported so the login timing-equalization dummy hash stays in sync.
+export const PBKDF2_ITERATIONS = 600000;
+
 export interface JwtPayload {
   sub: string;
   email: string;
@@ -55,7 +59,7 @@ export async function createRefreshToken(): Promise<string> {
 export async function hashPassword(password: string): Promise<string> {
   const salt = new Uint8Array(16);
   crypto.getRandomValues(salt);
-  const iterations = 600000;
+  const iterations = PBKDF2_ITERATIONS;
 
   const passwordBuffer = new TextEncoder().encode(password);
   const importedKey = await crypto.subtle.importKey(
