@@ -35,6 +35,7 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   role: text("role").$type<UserRole>().notNull().default("user"),
   eaApiKey: text("ea_api_key").unique(),
+  passwordHash: text("password_hash"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -55,6 +56,7 @@ export const fibLevels = pgTable(
     ratio: decimal("ratio", { precision: 10, scale: 4 }).notNull(),
     price: decimal("price", { precision: 20, scale: 8 }).notNull(),
     source: text("source").$type<FibSource>().notNull().default("mt5"),
+    trend: text("trend"),
     calculatedAt: timestamp("calculated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
