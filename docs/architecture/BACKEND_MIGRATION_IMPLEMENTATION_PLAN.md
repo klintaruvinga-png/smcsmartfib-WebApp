@@ -214,14 +214,22 @@ export async function validateEaApiKey(apiKey: string) {
   if (!user || user.role !== 'ea') {
     return { valid: false, user: null };
   }
-  
-  // Record/refresh EA session. ea_sessions has no upsert key, so we insert.
-  // userId is required by the schema; status/lastPing default in the table.
+
+  // Upsert EA session using composite key (ea_api_key, user_id) to refresh
+  // existing connected sessions instead of creating duplicates. Update lastPing
+  // and status on repeated requests. Stale sessions (lastPing older than 5 min)
+  // should be cleaned up periodically via a scheduled task.
   await db.insert(eaSessions).values({
     eaApiKey: apiKey,
     userId: user.id,
     status: 'connected',
     lastPing: new Date(),
+  }).onConflictDoUpdate({
+    target: [eaSessions.eaApiKey, eaSessions.userId],
+    set: {
+      status: 'connected',
+      lastPing: new Date(),
+    },
   });
   
   return { valid: true, user };
@@ -423,7 +431,7 @@ const querySchema = z.object({
 const factory = createFactory();
 
 export const getFibLevelsRoute = factory.createHandlers(
-  userAuthMiddleware, // make public for dashboard; require JWT for admin views
+  userAuthMiddleware, // JWT required - route filters by c.get('user').sub
   async (c) => {
     const parsed = querySchema.safeParse(c.req.query());
     if (!parsed.success) {
@@ -581,9 +589,12 @@ export async function syncFibLevelsFromWordPress(since?: Date) {
     const tfKeys = Object.keys(fibs);
     if (tfKeys.length === 0) break;
 
+    let recordsThisPage = 0;
     for (const tf of tfKeys) {
       for (const family of ['LTF_SF', 'HTF_AF'] as const) {
-        for (const lvl of fibs[tf]?.[family] ?? []) {
+        const levels = fibs[tf]?.[family] ?? [];
+        recordsThisPage += levels.length;
+        for (const lvl of levels) {
           const calculatedAt = new Date(lvl.calculated_at ?? lvl.date);
           if (since && calculatedAt <= since) continue;
 
@@ -612,7 +623,10 @@ export async function syncFibLevelsFromWordPress(since?: Date) {
     }
 
     page++;
-    if (tfKeys.length < PAGE_SIZE) hasMore = false;
+    // Determine hasMore from total nested level records, or WordPress pagination
+    // metadata if available (wpData.total, wpData.hasMore, etc.), rather than
+    // timeframe key count which maxes at 4.
+    hasMore = recordsThisPage >= PAGE_SIZE || (wpData.hasMore ?? false);
   }
 
   return { synced, timestamp: new Date() };
@@ -684,13 +698,17 @@ export const shadowValidationRoute = factory.createHandlers(
       tsFibs[row.timeframe][row.family].push({ ratio: Number(row.ratio), price: Number(row.price) });
     }
 
-    // Compare parity: every WordPress (tf, family, ratio) must exist in TanStack.
+    // Compare parity bidirectionally: normalize tf/family/ratio/price on both sides.
     const mismatches: unknown[] = [];
     const wpFibs = wpData?.fibs ?? {};
+    let wpRecordCount = 0;
+
+    // Check WordPress → TanStack (missing in TanStack)
     for (const [tf, families] of Object.entries(wpFibs)) {
       for (const [family, levels] of Object.entries(families)) {
         const tsLevels = tsFibs[tf]?.[family] ?? [];
         for (const lvl of levels) {
+          wpRecordCount++;
           const hit = tsLevels.find(
             (t) => Number(t.ratio) === Number(lvl.ratio) && Number(t.price) === Number(lvl.price)
           );
@@ -699,8 +717,21 @@ export const shadowValidationRoute = factory.createHandlers(
       }
     }
 
+    // Check TanStack → WordPress (unexpected in TanStack)
+    for (const [tf, families] of Object.entries(tsFibs)) {
+      for (const [family, levels] of Object.entries(families)) {
+        const wpLevels = wpFibs[tf]?.[family] ?? [];
+        for (const lvl of levels) {
+          const hit = wpLevels.find(
+            (w: any) => Number(w.ratio) === Number(lvl.ratio) && Number(w.price) === Number(lvl.price)
+          );
+          if (!hit) mismatches.push({ type: 'unexpected_in_tanstack', tf, family, lvl });
+        }
+      }
+    }
+
     return c.json({
-      wordpressCount: Object.keys(wpFibs).length,
+      wordpressCount: wpRecordCount,
       tanstackCount: tsRows.length,
       match: mismatches.length === 0,
       mismatches,
@@ -810,6 +841,7 @@ describe('POST /api/ea/fib-levels', () => {
 
   it('accepts valid EA fib level submission', async () => {
     // WordPress-shaped payload: levels[] -> { timeframe, ltf_sf[], htf_af[] }.
+    // Use only canonical VALID_RATIOS from line 324-326 above.
     const payload = {
       symbol: 'EURUSD',
       levels: [
@@ -817,11 +849,11 @@ describe('POST /api/ea/fib-levels', () => {
           timeframe: 'H1',
           ltf_sf: [
             { ratio: 0, price: 1.0850 },
-            { ratio: 0.236, price: 1.0820 },
-            { ratio: 0.382, price: 1.0800 },
-            { ratio: 0.5, price: 1.0780 },
-            { ratio: 0.618, price: 1.0760 },
-            { ratio: 1, price: 1.0720 },
+            { ratio: 25, price: 1.0820 },
+            { ratio: 50, price: 1.0800 },
+            { ratio: 62.5, price: 1.0780 },
+            { ratio: 75, price: 1.0760 },
+            { ratio: 100, price: 1.0720 },
           ],
           htf_af: [],
         },
@@ -835,7 +867,7 @@ describe('POST /api/ea/fib-levels', () => {
     expect(res.status).toBe(201);
     expect(res.body.ok).toBe(true);
 
-    // Verify ratio-level rows written to fib_levels (6 for LTF_SF above).
+    // Verify ratio-level rows written to fib_levels (6 valid ratios submitted).
     const rows = await db.select().from(fibLevels).where(eq(fibLevels.symbol, 'EURUSD'));
     expect(rows).toHaveLength(6);
     expect(rows.every((r) => r.family === 'LTF_SF')).toBe(true);
@@ -864,17 +896,11 @@ describe('POST /api/ea/fib-levels', () => {
 
 ## Phase 8: Phase 4 Test Execution & Validation (Day 7-8)
 
-### 8.1 Update Cypress Tests (backend/tests/e2e/)
+### 8.1 E2E Test Setup
 
-Update base URL in `cypress.config.ts`:
-```typescript
-export default defineConfig({
-  e2e: {
-    baseUrl: 'http://localhost:3000',
-    // ...
-  },
-});
-```
+Note: No Cypress configuration exists yet in the repository. E2E validation will be
+performed via integration tests (`npm run test:integration`) and manual QA until
+a dedicated E2E framework is configured.
 
 ### 8.2 Test Data Seeding Script
 
@@ -932,7 +958,7 @@ export async function seedPhase4TestData() {
 | Market data fetch | `npm run test:integration -- market-data` | All pass |
 | Shadow sync runs | `npm run sync:shadow` | Logs show sync |
 | Shadow validation | `npm run validate:shadow` | `match: true` |
-| Cypress Phase 4 | `npm run test:e2e -- --spec "phase4*"` | All pass |
+| E2E Phase 4 tests | Manual QA or integration tests | All pass |
 
 ---
 

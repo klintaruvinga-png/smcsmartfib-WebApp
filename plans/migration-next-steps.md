@@ -128,7 +128,7 @@ CREATE POLICY "ea_sessions_admin_read" ON public.ea_sessions FOR SELECT USING (p
 | Phase | Endpoint | Method | Path | Auth | Priority |
 |-------|----------|--------|------|------|----------|
 | 1 | EA Fib Submission | POST | `/api/ea/fib-levels` | `X-EA-API-Key` | **P0** — Phase 4 blocker |
-| 2 | Market Data Fetch | GET | `/api/market-data/fib-levels` | JWT (optional) | **P0** — Phase 4 blocker |
+| 2 | Market Data Fetch | GET | `/api/market-data/fib-levels` | JWT (required) | **P0** — Phase 4 blocker |
 | 3 | User Login | POST | `/api/auth/login` | — | **P1** — Dashboard auth |
 | 4 | User Register | POST | `/api/auth/register` | — | **P1** — Dashboard auth |
 | 5 | Current User | GET | `/api/auth/me` | JWT | **P1** — Dashboard auth |
