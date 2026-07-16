@@ -30,6 +30,9 @@ export type MarketFibLevel = {
   calculatedAt: string;
 };
 
+/** Market data row that also carries its timeframe so callers can group by it. */
+export type MarketDataRow = MarketFibLevel & { timeframe: FibTimeframe };
+
 /**
  * Resolve the internal user UUID from an EA API key. Rows are scoped per-user
  * for WordPress parity. Throws if the key is unknown.
@@ -150,4 +153,43 @@ export async function getMarketData(
   // Same query shape as getLatestFibLevels; kept as a distinct named entry
   // point for the dashboard per the migration plan.
   return getLatestFibLevels(eaApiKey, symbol, timeframe, limit);
+}
+
+/**
+ * Dashboard market-data getter keyed by internal user id (JWT `sub`).
+ * Newest-first, capped at `limit` (default 200); ratio/price as numbers.
+ * `timeframe` is optional: when omitted, rows for all timeframes are returned.
+ * Each row includes its `timeframe` so the dashboard can group by it.
+ */
+export async function getMarketDataByUserId(
+  userId: string,
+  symbol: string,
+  timeframe?: FibTimeframe,
+  limit = 200
+): Promise<MarketDataRow[]> {
+  const conditions = [
+    eq(fibLevels.userId, userId),
+    eq(fibLevels.symbol, symbol),
+  ];
+  if (timeframe) {
+    conditions.push(eq(fibLevels.timeframe, timeframe));
+  }
+
+  const rows = await db
+    .select()
+    .from(fibLevels)
+    .where(and(...conditions))
+    .orderBy(desc(fibLevels.calculatedAt))
+    .limit(limit);
+
+  return rows.map((row) => ({
+    id: row.id,
+    family: row.family,
+    ratio: Number(row.ratio),
+    price: Number(row.price),
+    source: row.source,
+    trend: row.trend,
+    calculatedAt: row.calculatedAt.toISOString(),
+    timeframe: row.timeframe,
+  }));
 }

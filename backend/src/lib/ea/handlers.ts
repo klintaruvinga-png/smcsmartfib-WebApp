@@ -1,0 +1,64 @@
+import { z } from "zod";
+import { createFibLevel, type FibLevelInput } from "../db/queries";
+import type { FibFamily, FibTimeframe } from "../db/schema";
+
+const VALID_RATIOS = [-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300];
+
+const levelEntrySchema = z.object({ ratio: z.number(), price: z.number() });
+const tfEntrySchema = z.object({
+  timeframe: z.enum(["M15", "H1", "H4", "D1"]),
+  ltf_sf: z.array(levelEntrySchema).default([]),
+  htf_af: z.array(levelEntrySchema).default([]),
+});
+const fibLevelSchema = z.object({
+  symbol: z.string().min(1).max(24),
+  levels: z.array(tfEntrySchema),
+  calculatedAt: z.string().datetime().optional(),
+});
+
+export class EaEndpointError extends Error {
+  constructor(public statusCode: number, message: string, public data?: unknown) {
+    super(message);
+    this.name = "EaEndpointError";
+  }
+}
+
+export async function submitEaFibLevels(eaApiKey: string, rawBody: unknown) {
+  const parsed = fibLevelSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    throw new EaEndpointError(400, "Invalid payload", parsed.error.flatten());
+  }
+  const { symbol, levels } = parsed.data;
+  const sym = symbol.toUpperCase();
+  let inserted = 0;
+  let failed = 0;
+
+  for (const tfEntry of levels) {
+    const families: Array<[FibFamily, { ratio: number; price: number }[]]> = [
+      ["LTF_SF", tfEntry.ltf_sf],
+      ["HTF_AF", tfEntry.htf_af],
+    ];
+    for (const [family, entries] of families) {
+      for (const { ratio, price } of entries) {
+        if (!VALID_RATIOS.includes(ratio)) {
+          failed++;
+          continue;
+        }
+        try {
+          await createFibLevel(
+            eaApiKey,
+            sym,
+            tfEntry.timeframe as FibTimeframe,
+            null,
+            [{ family, ratio, price } as FibLevelInput]
+          );
+          inserted++;
+        } catch {
+          failed++;
+        }
+      }
+    }
+  }
+
+  return { ok: failed === 0, symbol: sym, levels_written: inserted, levels_failed: failed };
+}

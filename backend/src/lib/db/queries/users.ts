@@ -26,19 +26,21 @@ export async function createUser(
   email: string,
   password: string,
   role: UserRole = "user",
-  eaApiKey?: string
+  eaApiKey?: string,
+  username?: string
 ): Promise<User> {
   // Hash the plaintext password before persistence (cost factor 10).
   const passwordHash = await bcrypt.hash(password, 10);
 
-  // `id` has no DB default, so generate one. Omit `eaApiKey` when undefined so
-  // we don't insert a literal `undefined` (which Drizzle would reject).
+  // `id` has no DB default, so generate one. Omit `eaApiKey` / `username` when
+  // undefined so we don't insert a literal `undefined` (which Drizzle rejects).
   const values: {
     id: string;
     email: string;
     role: UserRole;
     passwordHash: string;
     eaApiKey?: string;
+    username?: string;
   } = {
     id: randomUUID(),
     email,
@@ -47,6 +49,9 @@ export async function createUser(
   };
   if (eaApiKey !== undefined) {
     values.eaApiKey = eaApiKey;
+  }
+  if (username !== undefined) {
+    values.username = username;
   }
 
   const [row] = await db.insert(users).values(values).returning();

@@ -8,6 +8,7 @@ import { vi } from "vitest";
 const shared = vi.hoisted(() => {
   const calls: Array<{ method: string; args: unknown[] }> = [];
   const state: { result: unknown } = { result: [] };
+  let insertError: Error | null = null;
 
   const makeChain = () => {
     const chain: Record<string, unknown> = {};
@@ -31,6 +32,11 @@ const shared = vi.hoisted(() => {
     select: () => makeChain(),
     insert: (...args: unknown[]) => {
       calls.push({ method: "insert", args });
+      if (insertError) throw insertError;
+      return makeChain();
+    },
+    delete: (...args: unknown[]) => {
+      calls.push({ method: "delete", args });
       return makeChain();
     },
     update: (...args: unknown[]) => {
@@ -51,6 +57,9 @@ const shared = vi.hoisted(() => {
     resetCalls: () => {
       calls.length = 0;
     },
+    setInsertError: (e: Error | null) => {
+      insertError = e;
+    },
   };
 });
 
@@ -58,3 +67,4 @@ export const dbMock = shared.db;
 export const setDbResult = shared.setDbResult;
 export const getDbCalls = shared.getDbCalls;
 export const resetCalls = shared.resetCalls;
+export const setInsertError = shared.setInsertError;

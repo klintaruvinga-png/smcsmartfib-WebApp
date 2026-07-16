@@ -114,9 +114,30 @@ export const eaSessions = pgTable(
   })
 );
 
+export const refreshSessions = pgTable(
+  "refresh_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    userAgent: text("user_agent"),
+    ipAddress: inet("ip_address"),
+  },
+  (table) => ({
+    userIdIdx: index("idx_refresh_sessions_user").on(table.userId),
+    expiresIdx: index("idx_refresh_sessions_expires").on(table.expiresAt),
+  })
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type FibLevel = typeof fibLevels.$inferSelect;
 export type NewFibLevel = typeof fibLevels.$inferInsert;
 export type EaSession = typeof eaSessions.$inferSelect;
 export type NewEaSession = typeof eaSessions.$inferInsert;
+export type RefreshSession = typeof refreshSessions.$inferSelect;
+export type NewRefreshSession = typeof refreshSessions.$inferInsert;
