@@ -1,6 +1,6 @@
 # Phase Implementation Summary
 
-Consolidated summary of all MT5 migration phases. For detailed implementation specs, refer to migration status and individual phase archives.
+Consolidated summary of all MT5 migration phases. For detailed implementation specs, refer to `.github/migration-status.md` (comprehensive migration tracking), `.github/migration/archive/ARCHIVE_INDEX.md` (historical phase records), and `.github/migration/phase-updates/` (phase-specific updates).
 
 ## Phase Overview
 

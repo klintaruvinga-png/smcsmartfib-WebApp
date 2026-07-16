@@ -859,14 +859,37 @@ Phase 7 GATE: BLOCKED (hard gate in is_phase6_gate_cleared)
 
 **Verification Commands**:
 ```bash
-# Cache header smoke test
-curl -I https://trader.stokvelsociety.co.za/wp-json/sniper/v1/regimes
-# Must include: Cache-Control: no-store, no-cache, must-revalidate, max-age=0
-
-# Two-user parity validation
+# Cache header smoke test with authenticated users
 export PARITY_USER_A=user_parity_a
 export PARITY_USER_B=user_parity_b
 export PARITY_PASSWORD=your_password
+
+# Authenticate and obtain tokens
+TOKEN_A=$(curl -s -X POST https://trader.stokvelsociety.co.za/wp-json/auth/login \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$PARITY_USER_A\",\"password\":\"$PARITY_PASSWORD\"}" \
+  | jq -r '.token // .access_token')
+
+TOKEN_B=$(curl -s -X POST https://trader.stokvelsociety.co.za/wp-json/auth/login \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$PARITY_USER_B\",\"password\":\"$PARITY_PASSWORD\"}" \
+  | jq -r '.token // .access_token')
+
+# Verify anti-cache headers for PARITY_USER_A
+curl -I -H "Authorization: Bearer $TOKEN_A" https://trader.stokvelsociety.co.za/wp-json/sniper/v1/regimes
+# Must include all three anti-cache headers:
+# - Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+# - Expires: 0
+# - Pragma: no-cache
+
+# Verify anti-cache headers for PARITY_USER_B
+curl -I -H "Authorization: Bearer $TOKEN_B" https://trader.stokvelsociety.co.za/wp-json/sniper/v1/regimes
+# Must include all three anti-cache headers:
+# - Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+# - Expires: 0
+# - Pragma: no-cache
+
+# Two-user parity validation
 scripts/collect-parity-baseline.sh > reports/pre-patch.json
 scripts/collect-parity-validation.sh > reports/post-patch.json
 ```
@@ -881,6 +904,7 @@ scripts/collect-parity-validation.sh > reports/post-patch.json
 ## Document Links
 
 - Migration Plan: [See root migration specification]
+- Phase Implementation Summary: `PHASE_IMPLEMENTATION_SUMMARY.md` (consolidated phase overview)
 - Parity Audit Archives: `.github/migration/audits/`
 - Phase Checklists / Updates: `.github/migration/phase-updates/`
 - Test Logs: `.github/migration/test-logs/`
