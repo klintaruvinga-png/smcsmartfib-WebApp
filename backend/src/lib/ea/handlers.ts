@@ -35,21 +35,26 @@ export async function submitEaFibLevels(eaApiKey: string, rawBody: unknown) {
 
   for (const tfEntry of levels) {
     const families: Array<[FibFamily, { ratio: number; price: number }[]]> = [
-      ["LTF_SF", tfEntry.ltf_sf],
-      ["HTF_AF", tfEntry.htf_af],
+      ["LTF_SF", tfEntry.ltf_sf ?? []],
+      ["HTF_AF", tfEntry.htf_af ?? []],
     ];
 
-    // Collect all valid levels for this timeframe into one batch
-    const batch: FibLevelInput[] = [];
+    // Collect all valid levels for this timeframe into one batch, deduplicating by family+ratio
+    const batchMap = new Map<string, FibLevelInput>();
+    let validCount = 0;
     for (const [family, entries] of families) {
       for (const { ratio, price } of entries) {
         if (!VALID_RATIOS.includes(ratio)) {
           failed++;
           continue;
         }
-        batch.push({ family, ratio, price } as FibLevelInput);
+        validCount++;
+        const key = `${family}:${ratio}`;
+        batchMap.set(key, { family, ratio, price } as FibLevelInput);
       }
     }
+
+    const batch = Array.from(batchMap.values());
 
     // Skip empty batches (all levels were invalid)
     if (batch.length === 0) {
@@ -65,9 +70,9 @@ export async function submitEaFibLevels(eaApiKey: string, rawBody: unknown) {
         null,
         batch
       );
-      inserted += batch.length;
+      inserted += validCount;
     } catch {
-      failed += batch.length;
+      failed += validCount;
     }
   }
 
