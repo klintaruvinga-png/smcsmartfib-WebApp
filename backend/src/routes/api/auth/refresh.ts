@@ -2,7 +2,7 @@ import { defineEventHandler, readBody, createError } from "h3";
 import { refreshAccessToken, AuthError } from "../../../lib/auth/handlers";
 
 export default defineEventHandler(async (event) => {
-  const { refresh_token } = await readBody(event);
+  const { refresh_token } = (await readBody(event)) ?? {};
   try {
     return await refreshAccessToken(refresh_token);
   } catch (err) {

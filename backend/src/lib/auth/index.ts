@@ -131,9 +131,29 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
     256
   );
 
-  const actualHashHex = Array.from(new Uint8Array(derivedBits), b => b.toString(16).padStart(2, "0")).join("");
+  const actualBytes = new Uint8Array(derivedBits);
+  const expectedBytes = new Uint8Array(
+    expectedHashHex.match(/.{2}/g)?.map((byte) => parseInt(byte, 16)) || []
+  );
 
-  return actualHashHex === expectedHashHex;
+  // Constant-time comparison so rejection timing does not reveal how many
+  // leading bytes of the derived hash matched (side-channel hardening).
+  return constantTimeEqual(actualBytes, expectedBytes);
+}
+
+/**
+ * Constant-time comparison of two byte arrays. A length mismatch returns false
+ * immediately (hash lengths are fixed and not secret); otherwise every byte is
+ * compared so total time does not depend on the position of the first
+ * difference. Edge/Web-Crypto compatible (no Node `crypto.timingSafeEqual`).
+ */
+function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a[i] ^ b[i];
+  }
+  return diff === 0;
 }
 
 export async function hashToken(token: string): Promise<string> {

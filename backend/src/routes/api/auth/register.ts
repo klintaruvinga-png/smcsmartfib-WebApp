@@ -2,7 +2,7 @@ import { defineEventHandler, readBody, getHeader, getRequestIP, createError } fr
 import { registerUser, AuthError } from "../../../lib/auth/handlers";
 
 export default defineEventHandler(async (event) => {
-  const { email, password, username } = await readBody(event);
+  const { email, password, username } = (await readBody(event)) ?? {};
   try {
     return await registerUser(email, password, username, {
       userAgent: getHeader(event, "user-agent"),

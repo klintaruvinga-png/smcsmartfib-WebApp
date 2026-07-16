@@ -56,7 +56,12 @@ export async function loginUser(
     role: user.role,
   });
   const refreshToken = await createRefreshToken();
-  await createRefreshSession(user.id, refreshToken, meta.userAgent, meta.ipAddress);
+  await createRefreshSession(
+    user.id,
+    refreshToken,
+    meta.userAgent ?? null,
+    meta.ipAddress ?? null
+  );
   return { accessToken, refreshToken, user: toUserView(user) };
 }
 
