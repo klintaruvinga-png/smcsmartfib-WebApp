@@ -44,7 +44,11 @@ CREATE TABLE IF NOT EXISTS public.fib_levels (
   source        VARCHAR(20) NOT NULL DEFAULT 'mt5',
   calculated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   received_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (user_id, symbol, timeframe, family, ratio, calculated_at)
+  -- Matches WordPress wp_smc_sf_fib_levels UNIQUE KEY fib_lookup exactly.
+  -- calculated_at is intentionally excluded so the EA ingest endpoint can
+  -- upsert (ON CONFLICT DO UPDATE) the latest value per (user, symbol, tf,
+  -- family, ratio) — mirroring WordPress wpdb->replace semantics.
+  CONSTRAINT fib_lookup UNIQUE (user_id, symbol, timeframe, family, ratio)
 );
 
 CREATE INDEX IF NOT EXISTS idx_fib_levels_lookup

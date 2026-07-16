@@ -75,13 +75,16 @@ export const fibLevels = pgTable(
       table.symbol,
       table.calculatedAt.desc()
     ),
+    // Matches WordPress wp_smc_sf_fib_levels UNIQUE KEY fib_lookup exactly.
+    // calculated_at is excluded so the EA ingest endpoint upserts (ON CONFLICT
+    // DO UPDATE) the latest value per (user, symbol, tf, family, ratio),
+    // mirroring WordPress wpdb->replace semantics.
     uniq: uniqueIndex("fib_lookup").on(
       table.userId,
       table.symbol,
       table.timeframe,
       table.family,
-      table.ratio,
-      table.calculatedAt
+      table.ratio
     ),
   })
 );
