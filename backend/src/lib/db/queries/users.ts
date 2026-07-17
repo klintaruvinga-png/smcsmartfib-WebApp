@@ -12,12 +12,19 @@
  * `public.users.password_hash` and sessions are custom jose JWTs, so no
  * `auth.users` row is ever created or required.
  */
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../index";
 import { users } from "../schema";
-import type { User, UserRole } from "../schema";
+import type { User, UserRole, UserSettings } from "../schema";
 import { hashToken, hashPassword, verifyPassword } from "../../auth/index";
+
+export class SettingsError extends Error {
+  constructor(public statusCode: number, message: string) {
+    super(message);
+    this.name = "SettingsError";
+  }
+}
 
 /**
  * Create a user profile row with a PBKDF2-hashed password.
@@ -107,4 +114,40 @@ export async function verifyUserPassword(
   hash: string
 ): Promise<boolean> {
   return verifyPassword(plain, hash);
+}
+
+/**
+ * Retrieve a user's structured settings (JSONB column).
+ * Returns `{}` when the user or their settings are absent so callers always
+ * receive a valid object.
+ */
+export async function getUserSettings(userId: string): Promise<UserSettings> {
+  const [row] = await db
+    .select({ settings: users.settings })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return (row?.settings ?? {}) as UserSettings;
+}
+
+/**
+ * Patch a user's settings using JSONB `||` merge (atomic, no read-before-write
+ * race). Only the supplied top-level keys are merged; existing keys are preserved.
+ * Returns the full merged settings object. Throws SettingsError(404) if the
+ * user row does not exist.
+ */
+export async function updateUserSettings(
+  userId: string,
+  settings: UserSettings
+): Promise<UserSettings> {
+  const [row] = await db
+    .update(users)
+    .set({
+      settings: sql`COALESCE(${users.settings}, '{}'::jsonb) || ${JSON.stringify(settings)}::jsonb`,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId))
+    .returning({ settings: users.settings });
+  if (!row) throw new SettingsError(404, "User not found");
+  return row.settings as UserSettings;
 }
