@@ -116,7 +116,6 @@ BACKEND-3/4/5 as previously defined are **superseded**. Their intent (signal end
 | 3     | MT5 market data engine                  | **COMPLETE**      | 100%       | None — gate cleared; T0 admin baseline captured 2026-05-27                                 | 2026-05-25 ✅         |
 | 4     | Fib engine migration                    | **READ-ONLY TESTING** | 75%        | Paired MT5/Pine exports + weekend/sparse-data evidence (no code changes during backend migration) | 2026-08-15            |
 | 4A    | Production hardening + domain contracts | **READY**         | 0%         | Parallel only; no fib/regime/signal scoring changes during Phase 4 soak                    | Parallel with Phase 4 |
-| **BACKEND** | **WordPress → Node.js/TanStack Start migration** | **IN-PROGRESS** | 0% | Foundation setup, contracts, database | 2026-09-23 |
 | 5     | Regime & chop engine                    | **CODE COMPLETE** | 70%        | Phase 4 live gate + operator deployment                                                    | 2026-09-15            |
 | 5B    | Fundamentals regime feed                | **CODE COMPLETE** | 65%        | Phase 5 parity gate                                                                        | 2026-10-01            |
 | 6     | Signal engine dual-run                  | **CODE COMPLETE** | 60%        | Phase 5B gate + fib→signal wiring sprint                                                   | 2026-10-15            |
@@ -490,6 +489,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 **Canonical Plan**: [plans/backend-2-restoration-plan.md](../../plans/backend-2-restoration-plan.md)
 
 #### BACKEND-2a · Architecture Cleanup & Configuration
+
 - [ ] Rename `VITE_SNIPER_BACKEND_URL` → `VITE_API_URL` (`.env.example` + `sniperClient.ts`)
 - [ ] Remove WordPress nonce fallback + `resolveDefaultBackendUrl()` from `sniperClient.ts`
 - [ ] Drop `WORDPRESS_API_URL` / `WORDPRESS_API_KEY` from `backend/.env.example` + `nitro.config.ts`
@@ -497,6 +497,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 - **Acceptance**: Frontend builds/runs on `VITE_API_URL`; no WordPress references remain
 
 #### BACKEND-2b · Service Layer Foundation
+
 - [ ] Create `backend/src/lib/services/{snapshot,signal,chart,market,telemetry}/` (index + queries + validators)
 - [ ] Base pattern: each service owns DB access, validation, business logic; returns domain objects
 - [ ] Refactor `lib/market-data/handlers.ts`, `lib/ea/handlers.ts`, `lib/auth/handlers.ts` into services
@@ -504,12 +505,14 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 - **Acceptance**: Service layer structure present; existing handlers call services
 
 #### BACKEND-2c · App-Boot Endpoints
+
 - [ ] `GET /api/snapshot/unified` → `SnapshotService.getUnifiedSnapshot(userId)`
 - [ ] `GET /api/charts` (symbol, timeframe) → `ChartService.getChartSnapshot(...)`
 - [ ] `GET /api/session` → market session detection
 - **Acceptance**: Frontend boots and loads initial data; tests pass
 
 #### BACKEND-2d · Core Trading Endpoints
+
 - [ ] `GET /api/signals` (board_size, scope) → `SignalService.getLiveSignals(...)`
 - [ ] `GET /api/ladders` → `SignalService.getLadders(...)`
 - [ ] `GET /api/health` (engine health) → `TelemetryService.getEngineHealth(...)`
@@ -517,6 +520,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 - **Acceptance**: Signals, ladders, engine health, account telemetry render
 
 #### BACKEND-2e · MT5 Read-Only Ingestion
+
 - [ ] `POST /api/ea/market-stream` → `MarketDataService.ingestMarketStream(...)` (updates `market_snapshots`)
 - [ ] `POST /api/ea/heartbeat` → `TelemetryService.recordHeartbeat(...)` (updates `ea_sessions`)
 - [ ] `POST /api/ea/account-sync` → `TelemetryService.syncAccount(...)` (updates `account_telemetry`)
@@ -524,11 +528,13 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 - **Acceptance**: MT5 writes market data; no execution endpoints yet
 
 #### BACKEND-2f · Data Migration
+
 - [ ] If WordPress backup exists: transform `wp_users`/`wp_usermeta`/`wp_smc_sf_*` → PostgreSQL; validate; rollback plan
 - [ ] Else: seed test users, watchlists, fib levels, signals, trade plans, snapshots, telemetry
 - **Acceptance**: Production data migrated OR test data seeded and displayed
 
 #### BACKEND-2g · Testing & Validation
+
 - [ ] Integration tests for all new endpoints + services in isolation
 - [ ] E2E: boot, login, MT5 data load, signal display, settings persistence
 - [ ] Performance (<500ms most endpoints) + security (JWT, EA key, injection, CORS)

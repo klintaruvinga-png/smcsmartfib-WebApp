@@ -24,7 +24,7 @@
 | 1 | **Migration Scope** | **Option C** — Phase 4 endpoints + core auth/session (6 total) | Phase 4 needs 2 endpoints; dashboard needs 4 auth endpoints. 6 is manageable in 1-2 weeks; 40+ remaining endpoints migrate incrementally after cutover. |
 | 2 | **Database** | **Option A** — Supabase PostgreSQL immediately | Approved plan specifies PostgreSQL. Supabase provides Auth + Postgres + Realtime in one setup (~15 min). Avoids SQLite → Postgres migration debt. Phase 4 load tests need real concurrency. |
 | 3 | **Deployment** | **Option B** — Local Nitro dev server first, Cloudflare Workers after Phase 4 | `npm run dev` works instantly. Cloudflare Workers config (`wrangler deploy`) is a separate step once API surface is validated. Repo already has `nitro.config.ts` with `preset: 'cloudflare'`. |
-| 4 | **Transition Strategy** | ~~Option C — Shadow mode with parity validation~~ **SUPERSEDED** — WordPress permanently down; no shadow mode, cutover, or fallback. Direct WordPress-free restoration (see `backend-2-restoration-plan.md`). |
+| 4 | **Transition Strategy** | ~~Option C — Shadow mode with parity validation~~ **SUPERSEDED** | WordPress permanently down; no shadow mode, cutover, or fallback. Direct WordPress-free restoration (see `backend-2-restoration-plan.md`). |
 | 5 | **EA Authentication** | **Option B** — Simple `X-EA-API-Key` header for `/api/ea/*`; HMAC-SHA256 deferred | `X-EA-API-Key` (role `ea`) retained. HMAC replay protection is a later hardening step, not part of the restoration. No WordPress cookie/nonce path. |
 
 ---
@@ -197,10 +197,8 @@ backend/
 │           │   └── fib-levels.ts
 │           ├── market-data/
 │           │   └── fib-levels.ts
-│           ├── users/
-│           │   └── [id].ts
-│           └── admin/
-│               └── shadow-validation.ts
+│           └── users/
+│               └── [id].ts
 ├── nitro.config.ts
 ├── package.json (updated scripts)
 └── .env.local (gitignored)

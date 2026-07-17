@@ -74,7 +74,7 @@ WordPress dependencies.
 
 **Acceptance Criteria:**
 - Frontend builds and runs with `VITE_API_URL` configuration
-- No WordPress references remain in codebase
+- No runtime or configuration dependency on WordPress remains in the codebase
 - Database schema supports Phase 1/2 data models
 - Migration documentation updated
 
@@ -84,7 +84,8 @@ WordPress dependencies.
 
 **Tasks:**
 1. Create service structure:
-   ```
+
+   ```text
    backend/src/lib/services/
    ├── snapshot/
    │   ├── index.ts           # SnapshotService
@@ -149,6 +150,7 @@ WordPress dependencies.
    - Database: Optional caching of session state
 
 **Database Schema Additions:**
+
 ```sql
 -- Snapshots (current market state)
 CREATE TABLE market_snapshots (
@@ -209,13 +211,13 @@ CREATE TABLE candles (
 - Integration tests pass for all endpoints
 - Database schema supports snapshot/regime/gate/candle data
 
-### Phase 4: Phase 2 Endpoints (Core Trading)
+### Phase 4: Core Trading Endpoints
 
 **Objective:** Implement endpoints for market analysis and trading signals.
 
 **Endpoints to Implement:**
 
-1. `GET /api/signals` (or `/api/live-signals`)
+1. `GET /api/signals`
    - Query params: `board_size`, `scope` (watchlist|global)
    - Returns: `{ signals: SignalCandidate[], polledAt, meta: { boardSize, totalActive } }`
    - Service: `SignalService.getLiveSignals(userId, options)`
@@ -238,6 +240,7 @@ CREATE TABLE candles (
    - Database: Query account metrics from EA sessions
 
 **Database Schema Additions:**
+
 ```sql
 -- Signals
 CREATE TABLE signals (
@@ -305,6 +308,21 @@ CREATE TABLE account_telemetry (
 
 **Objective:** Establish MT5 → API data flow without trading execution.
 
+**Database Schema Additions:**
+
+```sql
+-- Broker symbol registry (MT5 EA reported symbol list)
+CREATE TABLE broker_symbols (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  symbol VARCHAR(24) NOT NULL,
+  broker VARCHAR(64),
+  active BOOLEAN DEFAULT true,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, symbol)
+);
+```
+
 **Endpoints to Implement:**
 
 1. `POST /api/ea/market-stream`
@@ -329,7 +347,7 @@ CREATE TABLE account_telemetry (
    - Auth: `X-EA-API-Key` header
    - Body: List of broker symbols
    - Service: `MarketDataService.syncSymbols(eaApiKey, symbols)`
-   - Database: Update symbol registry
+   - Database: Upsert into `broker_symbols` (per user, by symbol)
 
 **MT5 EA Configuration:**
 - Update MT5 EA to point to new backend URL
@@ -451,6 +469,7 @@ CREATE TABLE account_telemetry (
 - **SettingsService**: User preferences and configuration
 
 **Service Pattern:**
+
 ```typescript
 // Example service structure
 class SnapshotService {
@@ -473,6 +492,7 @@ class SnapshotService {
 ## Frontend Integration
 
 **Configuration Changes:**
+
 ```env
 # .env.example
 VITE_API_URL=http://localhost:3000/api

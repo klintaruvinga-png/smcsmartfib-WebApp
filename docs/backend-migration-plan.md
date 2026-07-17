@@ -48,10 +48,10 @@ We will follow a strict layered architectural pattern to decouple transport, bus
 1. **Routes Layer (`src/routes/api/`)**:
    - Handles HTTP transport details, header extraction, Zod schema validation.
    - Delegates business execution to the corresponding Services.
-2. **Services Layer (`src/lib/server/services/`)**:
+2. **Services Layer (`backend/src/lib/services/`)**:
    - Encapsulates trading domain rules, SF ladder calculations, and heartbeat state transitions.
    - Calls Repositories for data reads and persistence.
-3. **Repositories Layer (`src/lib/server/repositories/`)**:
+3. **Repositories Layer (`backend/src/lib/db/`)**:
    - Manages database querying using a PostgreSQL client pool (e.g. `pg` or `postgres.js`).
    - Translates database records into domain models.
 4. **Database Layer (PostgreSQL)**:
@@ -67,7 +67,7 @@ We will follow a strict layered architectural pattern to decouple transport, bus
 > user routes. HMAC replay protection can be added later as a hardening step, not as part
 > of the initial restoration.
 
-To prevent replay attacks and secure MT5 EA telemetry writes, we implement an HMAC-SHA256 signature verification middleware for all `/api/ea/*` routes:
+To prevent replay attacks and secure MT5 EA telemetry writes, we document an HMAC-SHA256 signature verification middleware below — **non-active; deferred hardening** (the live scheme is `X-EA-API-Key` for `/api/ea/*` plus JWT Bearer for user routes):
 
 ### Authentication Parameters & Headers:
 - `X-Client-ID`: Unique identifier for the MT5 terminal installation.
@@ -75,8 +75,8 @@ To prevent replay attacks and secure MT5 EA telemetry writes, we implement an HM
 - `X-Nonce`: A single-use random UUID to prevent replay attacks (checked against a database cache to ensure uniqueness).
 - `X-Signature`: HMAC-SHA256 signature generated using the client's shared API Secret.
 
-### Signature Validation Protocol:
-```
+### Signature Validation Protocol (non-active — future hardening):
+```text
 Message = X-Client-ID + ":" + X-Timestamp + ":" + X-Nonce + ":" + Request_Body_String
 Expected_Signature = HMAC_SHA256(Message, API_Secret)
 Validate(Received_Signature === Expected_Signature)
@@ -294,11 +294,11 @@ BACKEND-2 plan.
 
 ## 6. Migration Execution Checklist
 
-- [ ] **Step 1**: Initialize PostgreSQL connection pooling in `src/lib/server/db.ts`.
+- [ ] **Step 1**: Initialize PostgreSQL connection pooling in `backend/src/lib/db/`.
 - [ ] **Step 2**: Execute SQL schema migrations on PostgreSQL (Supabase/Neon).
-- [ ] **Step 3**: Implement authentication session services (JWT-based cookie validation) and EA HMAC verification service.
-- [ ] **Step 4**: Code the database repository Layer (`src/lib/server/repositories/`).
-- [ ] **Step 5**: Code business logic layer (`src/lib/server/services/`).
+- [ ] **Step 3**: Implement authentication session services (JWT-based cookie validation). (EA HMAC verification is **deferred** — future hardening, not part of the initial restoration; `X-EA-API-Key` is the live EA auth.)
+- [ ] **Step 4**: Code the database repository Layer (`backend/src/lib/db/`).
+- [ ] **Step 5**: Code business logic layer (`backend/src/lib/services/`).
 - [ ] **Step 6**: Code the HTTP request endpoints transport layer (`src/routes/api/`).
 - [ ] **Step 7**: Update frontend API client (`src/lib/api/sniperClient.ts`) to request relative `/api` paths.
 - [ ] **Step 8**: Perform MT5 integration tests & parity audits to guarantee parity.

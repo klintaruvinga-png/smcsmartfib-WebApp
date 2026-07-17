@@ -1081,10 +1081,8 @@ backend/
 │   │       │   └── fib-levels.ts
 │   │       ├── market-data/
 │   │       │   └── fib-levels.ts
-│   │       ├── users/
-│   │       │   └── [id].ts
-│   │       └── admin/
-│   │           └── shadow-validation.ts
+│   │       └── users/
+│   │           └── [id].ts
 │   └── server/
 │       └── plugins/
 │           └── db.ts
@@ -1092,9 +1090,7 @@ backend/
 │   ├── integration/
 │   └── e2e/
 ├── scripts/
-│   ├── seed-phase4-test-data.ts
-│   ├── shadow-sync.ts
-│   └── validate-shadow.ts
+│   └── seed-phase4-test-data.ts
 ├── nitro.config.ts
 ├── wrangler.toml
 ├── drizzle.config.ts

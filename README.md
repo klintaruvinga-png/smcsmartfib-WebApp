@@ -25,5 +25,5 @@ The dashboard stack and the TradingView Pine indicator ship on separate version 
 
 - Frontend package metadata lives in `package.json`
 - Dashboard UI version label is defined in `src/lib/version.ts`
-- WordPress plugin install and runtime notes are in `wordpress/smc-superfib-sniper/README.md`
+- WordPress plugin install and runtime notes are in `wordpress/smc-superfib-sniper/README.md` — **historical; the WordPress backend is permanently down and is being removed** (see `plans/backend-2-restoration-plan.md`). Active backend setup is in `backend/README.md`.
 - Frontend and backend environment specifics should be taken from the active deployment configuration for this repo

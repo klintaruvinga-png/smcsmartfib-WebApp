@@ -42,7 +42,7 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
 - ❌ Avoid final migration cutover
 - ❌ Avoid MT5 engine modifications
 
-**After Phase 4 Gate Passes**:
+**BACKEND-2 Execution Track (parallel with Phase 4)**:
 - ✅ Execute BACKEND-2 (MT5 integration — read-only ingest)
 - ✅ Execute the core-trading endpoints (signals, ladders, health, account-telemetry)
 - ⌫ ~~Begin shadow-mode sync~~ — RETIRED (WordPress down)
@@ -197,7 +197,7 @@ removed. Their useful content is redistributed:
   - **Evidence**: Security audit passes
 
 #### Cleanup & Monitoring (Week 11-12)
-**Dependency**: BACKEND-5 complete
+**Dependency**: BACKEND-2 complete (post-restoration gate)
 
 - [ ] **Infrastructure Cleanup** (Priority: MEDIUM)
   - Remove deprecated WordPress code
@@ -410,7 +410,6 @@ npx wrangler deploy
 - API domain: `api.smartfib.com`
 - CNAME to Cloudflare Workers
 - SSL/TLS via Cloudflare
-- DNS failover to WordPress during cutover
 
 ### Monitoring & Logging
 
