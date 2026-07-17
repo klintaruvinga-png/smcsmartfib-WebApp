@@ -495,14 +495,16 @@ jobs:
 - **Contingency**: Focus resources on MT5 engine fixes, resume backend later
 
 **Risk 2: Shadow Mode Parity Issues**
-- **Impact**: Cutover delayed, data inconsistency
-- **Mitigation**: Extended shadow mode (14+ days), comprehensive validation
-- **Contingency**: Fix parity issues before cutover, extend shadow mode
+> **RETIRED (2026-07-17):** Shadow mode risk superseded by WordPress-free BACKEND-2 plan. No WordPress source to validate against.
+- ~~Impact: Cutover delayed, data inconsistency~~ — RETIRED
+- ~~Mitigation: Extended shadow mode (14+ days), comprehensive validation~~ — RETIRED
+- ~~Contingency: Fix parity issues before cutover, extend shadow mode~~ — RETIRED
 
 **Risk 3: Cutover Failure**
-- **Impact**: Downtime, user impact, data loss
-- **Mitigation**: Comprehensive rollback procedures, maintenance window
-- **Contingency**: Immediate rollback to WordPress, investigate failure
+> **RETIRED (2026-07-17):** Cutover risk superseded by WordPress-free BACKEND-2 plan. No WordPress to cut over from or roll back to.
+- ~~Impact: Downtime, user impact, data loss~~ — RETIRED
+- ~~Mitigation: Comprehensive rollback procedures, maintenance window~~ — RETIRED
+- ~~Contingency: Immediate rollback to WordPress, investigate failure~~ — RETIRED
 
 **Risk 4: Performance Degradation**
 - **Impact**: Poor user experience, system instability
@@ -539,16 +541,18 @@ jobs:
 - Health check: 100% uptime
 
 **Shadow Mode** (Week 6)
-- Data parity: 100%
-- Sync frequency: Every 5 minutes
-- Error rate: <0.1%
-- Validation endpoint: Operational
+> **RETIRED (2026-07-17):** Shadow mode metrics superseded by WordPress-free BACKEND-2 plan. No WordPress source to sync or validate against.
+- ~~Data parity: 100%~~ — RETIRED
+- ~~Sync frequency: Every 5 minutes~~ — RETIRED
+- ~~Error rate: <0.1%~~ — RETIRED
+- ~~Validation endpoint: Operational~~ — RETIRED
 
 **Cutover** (Week 8)
-- Downtime: <5 minutes
-- Error rate: <1%
-- Response time p95: <200ms
-- Rollback success: 100%
+> **RETIRED (2026-07-17):** Cutover metrics superseded by WordPress-free BACKEND-2 plan. No WordPress to cut over from.
+- ~~Downtime: <5 minutes~~ — RETIRED
+- ~~Error rate: <1%~~ — RETIRED
+- ~~Response time p95: <200ms~~ — RETIRED
+- ~~Rollback success: 100%~~ — RETIRED
 
 **Post-Migration** (Week 12)
 - Performance: Targets met
@@ -588,25 +592,28 @@ jobs:
 5. Begin BACKEND-2 implementation planning
 
 ### Short Term (Next 2 Weeks)
+> **RETIRED (2026-07-17):** Items below referencing WordPress client, shadow mode, cutover, or decommission are superseded by the WordPress-free BACKEND-2 plan. See [`backend-2-restoration-plan.md`](./backend-2-restoration-plan.md) for current next actions.
 1. Monitor Phase 4 progress
 2. Prepare BACKEND-2 implementation plan
 3. Set up staging environment
 4. Configure CI/CD pipeline
-5. Begin WordPress client implementation
+5. ~~Begin WordPress client implementation~~ — RETIRED (no WordPress to integrate with)
 
 ### Medium Term (Next 4-6 Weeks)
-1. Execute BACKEND-2 (after Phase 4 gate passes)
-2. Execute BACKEND-3
-3. Implement shadow mode sync
+> **RETIRED (2026-07-17):** Items below referencing shadow mode, cutover, rollback, or decommission are superseded by the WordPress-free BACKEND-2 plan. See [`backend-2-restoration-plan.md`](./backend-2-restoration-plan.md) for current next actions.
+1. Execute BACKEND-2 (WordPress-Free Restoration; not gated on Phase 4)
+2. ~~Execute BACKEND-3~~ — RETIRED (folded into BACKEND-2 Phase 4)
+3. ~~Implement shadow mode sync~~ — RETIRED (no WordPress source)
 4. Configure monitoring and alerting
-5. Test rollback procedures
+5. ~~Test rollback procedures~~ — RETIRED (no WordPress to roll back to)
 
 ### Long Term (Next 8-12 Weeks)
-1. Execute gradual endpoint migration
-2. Perform data migration
-3. Execute cutover
-4. Decommission WordPress
-5. Complete architecture refactoring
+> **RETIRED (2026-07-17):** Items below referencing cutover or WordPress decommission are superseded by the WordPress-free BACKEND-2 plan. Data migration is BACKEND-2 Phase 6. See [`backend-2-restoration-plan.md`](./backend-2-restoration-plan.md) for current next actions.
+1. ~~Execute gradual endpoint migration~~ — RETIRED (endpoints delivered in BACKEND-2)
+2. Perform data migration (BACKEND-2 Phase 6)
+3. ~~Execute cutover~~ — RETIRED (no WordPress to cut over from)
+4. ~~Decommission WordPress~~ — RETIRED (WordPress compatibility removed in BACKEND-2 Phase 1)
+5. Complete architecture refactoring (service layer in BACKEND-2 Phase 2)
 
 ---
 

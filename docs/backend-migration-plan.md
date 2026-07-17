@@ -88,19 +88,19 @@ Validate(Received_Signature === Expected_Signature)
 
 ## 4. Revised Database Schema (PostgreSQL DDL & Indexing)
 
-> **Naming reconciliation (2026-07-17):** The DDL below uses `smc_sf_*`-prefixed table
-> names. The canonical BACKEND-2 plan ([plans/backend-2-restoration-plan.md](../plans/backend-2-restoration-plan.md))
-> uses unprefixed names (`market_snapshots`, `market_regimes`, `signal_gates`, `candles`,
-> `signals`, `trade_plans`, `engine_runs`, `account_telemetry`). **Reconcile to one
-> convention before authoring migration `005_add_phase1_tables.sql`.** The unprefixed names
-> from the BACKEND-2 plan are the current target; treat this section's DDL as the structural
-> reference and align names/columns accordingly.
+> **Naming convention (2026-07-17):** The DDL below uses **unprefixed table names** as the
+> canonical standard for the dedicated application database — matching PostgreSQL best
+> practice and the WordPress-free BACKEND-2 plan
+> ([plans/backend-2-restoration-plan.md](../plans/backend-2-restoration-plan.md)), e.g.
+> `users`, `fib_levels`, `candles`, `market_snapshots`, `signals`, `trade_plans`,
+> `engine_runs`, `account_telemetry`. Author migration `005_add_phase1_tables.sql` using
+> these unprefixed names.
 
 Below is the DDL required for the PostgreSQL database, translating old SQLite types to PostgreSQL types (`SERIAL`, `TIMESTAMP`, `JSONB`, etc.) and adding indexes for query performance.
 
 ```sql
 -- 1. Users and Profiles
-CREATE TABLE smc_sf_users (
+CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -110,14 +110,14 @@ CREATE TABLE smc_sf_users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE smc_sf_user_settings (
-    user_id UUID PRIMARY KEY REFERENCES smc_sf_users(id) ON DELETE CASCADE,
+CREATE TABLE user_settings (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     settings JSONB NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE smc_sf_integrations (
-    user_id UUID NOT NULL REFERENCES smc_sf_users(id) ON DELETE CASCADE,
+CREATE TABLE integrations (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     provider VARCHAR(64) NOT NULL,
     encrypted_secret TEXT,
     key_status VARCHAR(32) NOT NULL DEFAULT 'missing',
@@ -126,9 +126,9 @@ CREATE TABLE smc_sf_integrations (
 );
 
 -- 2. Market Data
-CREATE TABLE smc_sf_candles (
+CREATE TABLE candles (
     id BIGSERIAL PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES smc_sf_users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     symbol VARCHAR(24) NOT NULL,
     timeframe VARCHAR(16) NOT NULL,
     candle_time TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -142,8 +142,8 @@ CREATE TABLE smc_sf_candles (
     UNIQUE(user_id, symbol, timeframe, candle_time)
 );
 
-CREATE TABLE smc_sf_snapshots (
-    user_id UUID NOT NULL REFERENCES smc_sf_users(id) ON DELETE CASCADE,
+CREATE TABLE snapshots (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     symbol VARCHAR(24) NOT NULL,
     bid DECIMAL(20,8) NOT NULL DEFAULT 0,
     ask DECIMAL(20,8) NOT NULL DEFAULT 0,
@@ -156,8 +156,8 @@ CREATE TABLE smc_sf_snapshots (
     PRIMARY KEY (user_id, symbol)
 );
 
-CREATE TABLE smc_sf_fib_levels (
-    user_id UUID NOT NULL REFERENCES smc_sf_users(id) ON DELETE CASCADE,
+CREATE TABLE fib_levels (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     symbol VARCHAR(24) NOT NULL,
     family VARCHAR(32) NOT NULL,
     ratio DECIMAL(10,4) NOT NULL,
@@ -169,9 +169,9 @@ CREATE TABLE smc_sf_fib_levels (
 );
 
 -- 3. Signals & Trade Lifecycle
-CREATE TABLE smc_sf_signals (
+CREATE TABLE signals (
     id VARCHAR(64) PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES smc_sf_users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     symbol VARCHAR(24) NOT NULL,
     direction VARCHAR(8) NOT NULL,
     status VARCHAR(16) NOT NULL,
@@ -183,16 +183,16 @@ CREATE TABLE smc_sf_signals (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE smc_sf_trade_plans (
-    signal_id VARCHAR(64) PRIMARY KEY REFERENCES smc_sf_signals(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES smc_sf_users(id) ON DELETE CASCADE,
+CREATE TABLE trade_plans (
+    signal_id VARCHAR(64) PRIMARY KEY REFERENCES signals(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     plan JSONB NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE smc_sf_trade_queue (
+CREATE TABLE trade_queue (
     id VARCHAR(64) PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES smc_sf_users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     signal_id VARCHAR(64) NOT NULL,
     payload JSONB NOT NULL,
     state VARCHAR(32) NOT NULL DEFAULT 'pending-sync',
@@ -200,8 +200,8 @@ CREATE TABLE smc_sf_trade_queue (
 );
 
 -- 4. EA Telemetry
-CREATE TABLE smc_sf_account_telemetry (
-    user_id UUID NOT NULL REFERENCES smc_sf_users(id) ON DELETE CASCADE,
+CREATE TABLE account_telemetry (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     account_id VARCHAR(64) NOT NULL,
     terminal_id VARCHAR(96) NOT NULL,
     balance DECIMAL(20,8) NOT NULL DEFAULT 0,
@@ -218,9 +218,9 @@ CREATE TABLE smc_sf_account_telemetry (
     PRIMARY KEY (user_id, account_id, terminal_id)
 );
 
-CREATE TABLE smc_sf_trade_positions (
+CREATE TABLE trade_positions (
     deterministic_key VARCHAR(191) PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES smc_sf_users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     account_id VARCHAR(64) NOT NULL,
     terminal_id VARCHAR(96) NOT NULL,
     position_id VARCHAR(64) NOT NULL,
@@ -245,26 +245,26 @@ CREATE TABLE smc_sf_trade_positions (
 );
 
 -- 5. Auditing & Security Logs
-CREATE TABLE smc_sf_audit_events (
+CREATE TABLE audit_events (
     id BIGSERIAL PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES smc_sf_users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     event_type VARCHAR(64) NOT NULL,
     payload JSONB NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE smc_sf_used_nonces (
+CREATE TABLE used_nonces (
     nonce VARCHAR(64) PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 6. Performance Indexes
-CREATE INDEX idx_candles_lookup ON smc_sf_candles (user_id, symbol, timeframe, candle_time DESC);
-CREATE INDEX idx_snapshots_user_symbol ON smc_sf_snapshots (user_id, symbol);
-CREATE INDEX idx_signals_user_status ON smc_sf_signals (user_id, status, created_at DESC);
-CREATE INDEX idx_positions_user_state ON smc_sf_trade_positions (user_id, state);
-CREATE INDEX idx_audit_user_event ON smc_sf_audit_events (user_id, event_type, created_at DESC);
-CREATE INDEX idx_used_nonces_ttl ON smc_sf_used_nonces (created_at);
+CREATE INDEX idx_candles_lookup ON candles (user_id, symbol, timeframe, candle_time DESC);
+CREATE INDEX idx_snapshots_user_symbol ON snapshots (user_id, symbol);
+CREATE INDEX idx_signals_user_status ON signals (user_id, status, created_at DESC);
+CREATE INDEX idx_positions_user_state ON trade_positions (user_id, state);
+CREATE INDEX idx_audit_user_event ON audit_events (user_id, event_type, created_at DESC);
+CREATE INDEX idx_used_nonces_ttl ON used_nonces (created_at);
 ```
 
 ---

@@ -1,6 +1,6 @@
 # SMC SuperFIB → MT5 Migration Status Board
 
-**Last Updated**: 2026-07-15
+**Last Updated**: 2026-07-17
 **Current Phase**: BACKEND-2 WordPress-Free Restoration (Active) + Phase 4 (Read-Only Testing)
 **Overall Progress**: 88% MT5 Migration + BACKEND-1 COMPLETE (foundation: auth, settings, market data) + BACKEND-2 WordPress-Free Restoration IN-PROGRESS (started 2026-07-17)
 **Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 COMPLETE (2026-05-25; T0 admin baseline captured 2026-05-27, conditional closeout cleared) — Phase 4 READ-ONLY TESTING (code complete; corrected H4 runtime verified 2026-05-28; synthetic parity tooling PASS recorded; live paired exports plus weekend/sparse-data evidence still missing) — BACKEND-1 COMPLETE (2026-07-17; auth + settings + market-data endpoints, 47 tests) — BACKEND-2 IN-PROGRESS (2026-07-17; WordPress-free restoration, service-oriented architecture) — Phases 5/5B/6 CODE COMPLETE (pre-emptive; gated on Phase 4) — Phases 7–9 SCAFFOLDED (gated)
@@ -95,7 +95,7 @@ The WordPress backend (`https://trader.stokvelsociety.co.za/wp-json`) is **perma
 
 | Phase | Old scope | New scope |
 | ----- | --------- | --------- |
-| BACKEND-0 | Foundation setup | COMPLETE (DB layer, shared contracts, provider wiring pending) |
+| BACKEND-0 | Foundation setup | IN-PROGRESS (90% - DB layer complete; provider wiring pending) |
 | BACKEND-1 | Core API (auth, settings, market data) | COMPLETE (2026-07-17; 47 tests) |
 | BACKEND-2 | MT5 dual-write + cutover prep | **REDEFINED** → WordPress-Free Restoration (7 sub-phases, 15–23 days) |
 | BACKEND-3 | Signal & plan endpoints | Folded into BACKEND-2 (Phase 4) |
