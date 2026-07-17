@@ -123,7 +123,7 @@ BACKEND-3/4/5 as previously defined are **superseded**. Their intent (signal end
 | 8     | Semi-automation layer                   | **SCAFFOLDED**    | 20%        | Phase 7 complete                                                                           | 2026-12-01            |
 | 9     | SaaS & licensing system                 | **SCAFFOLDED**    | 20%        | Phase 8 complete                                                                           | 2026-12-15            |
 | 10    | Pine transition strategy                | NOT-STARTED       | 0%         | Phase 9 complete                                                                           | 2027-01-01            |
-| BACKEND-0 | Foundation setup (contracts, database, project structure) | COMPLETE | 90% | PostgreSQL provider wiring (non-blocking) | 2026-07-22 |
+| BACKEND-0 | Foundation setup (contracts, database, project structure) | IN-PROGRESS | 90% | Database layer complete; PostgreSQL provider wiring in progress (non-blocking) | 2026-07-22 |
 | BACKEND-1 | Core API implementation (auth, settings, market data) | COMPLETE | 100% | None — 47 integration tests green | 2026-07-17 ✅ |
 | BACKEND-2 | **WordPress-Free Restoration** (service layer + app-boot/core-trading endpoints + MT5 read-only ingest + data migration) | IN-PROGRESS | 0% | BACKEND-1 complete; WordPress permanently down | 2026-08-09 (15–23 day window) |
 | BACKEND-3 | _Superseded_ — signal/plan endpoints folded into BACKEND-2 Phase 4 | — | — | — | — |
@@ -433,7 +433,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 
 **Prerequisites**: Phase 0-3 COMPLETE ✅ · BACKEND-1 COMPLETE ✅
 
-**Implementation Plan**: See the BACKEND-0 / BACKEND-1 (complete) and BACKEND-2 (WordPress-Free Restoration) sections below. BACKEND-3/4/5 are superseded — their intent is absorbed into BACKEND-2. Canonical plan: [plans/backend-2-restoration-plan.md](../plans/backend-2-restoration-plan.md).
+**Implementation Plan**: See the BACKEND-0 (DB layer complete; provider wiring in progress) / BACKEND-1 (complete) and BACKEND-2 (WordPress-Free Restoration) sections below. BACKEND-3/4/5 are superseded — their intent is absorbed into BACKEND-2. Canonical plan: [plans/backend-2-restoration-plan.md](../plans/backend-2-restoration-plan.md).
 
 ### Phase BACKEND-0: Foundation Setup
 
@@ -493,7 +493,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 - [ ] Rename `VITE_SNIPER_BACKEND_URL` → `VITE_API_URL` (`.env.example` + `sniperClient.ts`)
 - [ ] Remove WordPress nonce fallback + `resolveDefaultBackendUrl()` from `sniperClient.ts`
 - [ ] Drop `WORDPRESS_API_URL` / `WORDPRESS_API_KEY` from `backend/.env.example` + `nitro.config.ts`
-- [ ] Add Phase 1/2 tables (snapshots, regimes, gates, candles, signals, trade_plans, engine_runs, account_telemetry) — migration `005_add_phase1_tables.sql` + Drizzle schema
+- [ ] Add Phase 3/4 tables (snapshots, regimes, gates, candles, signals, trade_plans, engine_runs, account_telemetry), provisioned early in this phase — migration `005_add_phase1_tables.sql` + Drizzle schema
 - **Acceptance**: Frontend builds/runs on `VITE_API_URL`; no runtime or configuration dependency on WordPress remains
 
 #### BACKEND-2b · Service Layer Foundation
@@ -516,7 +516,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 - [ ] `GET /api/signals` (board_size, scope) → `SignalService.getLiveSignals(...)`
 - [ ] `GET /api/ladders` → `SignalService.getLadders(...)`
 - [ ] `GET /api/health` (engine health) → `TelemetryService.getEngineHealth(...)`
-- [ ] `GET /api/account-telemetry` → `TelemetryService.getAccountTelemetry(...)`
+- [ ] `GET /api/account-telemetry` (query `account_id`, `terminal_id`) → `TelemetryService.getAccountTelemetry(userId, accountId?, terminalId?)`
 - **Acceptance**: Signals, ladders, engine health, account telemetry render
 
 #### BACKEND-2e · MT5 Read-Only Ingestion
