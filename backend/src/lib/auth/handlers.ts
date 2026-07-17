@@ -2,11 +2,13 @@ import { db } from "../db";
 import { users } from "../db/schema";
 import type { User } from "../db/schema";
 import { eq } from "drizzle-orm";
-import { createUser, getUserById } from "../db/queries";
+import { createUser, getUserById, updateUserPasswordHash } from "../db/queries";
 import {
   createAccessToken,
   createRefreshToken,
   verifyPassword,
+  hashPassword,
+  isBcryptHash,
   PBKDF2_ITERATIONS,
 } from "./index";
 import {
@@ -62,6 +64,23 @@ export async function loginUser(
   if (!user || !passwordOk) {
     throw new AuthError(401, "Invalid credentials");
   }
+
+  // After successful authentication, check if the user has a legacy bcrypt hash
+  // and asynchronously upgrade it to PBKDF2. This is a fire-and-forget operation
+  // that doesn't block the login response.
+  if (user.passwordHash && isBcryptHash(user.passwordHash)) {
+    // Fire-and-forget: upgrade the hash in the background without blocking the response
+    (async () => {
+      try {
+        const newHash = await hashPassword(password);
+        await updateUserPasswordHash(user.id, newHash);
+      } catch (err) {
+        // Log the error but don't crash or block the login
+        console.error(`Failed to upgrade bcrypt hash for user ${user.id}:`, err);
+      }
+    })();
+  }
+
   const accessToken = await createAccessToken({
     sub: user.id,
     email: user.email,

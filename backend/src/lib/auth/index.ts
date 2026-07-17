@@ -88,12 +88,19 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 /**
+ * Check if a password hash is a legacy bcrypt hash (starts with $2a$, $2b$, or $2y$).
+ */
+export function isBcryptHash(hash: string): boolean {
+  return hash.startsWith("$2a$") || hash.startsWith("$2b$") || hash.startsWith("$2y$");
+}
+
+/**
  * Verify a password against a hash created by hashPassword.
  * Also supports legacy bcrypt hashes for backwards compatibility during migration.
  */
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   // Check if this is a legacy bcrypt hash (starts with $2a$, $2b$, or $2y$)
-  if (hash.startsWith("$2a$") || hash.startsWith("$2b$") || hash.startsWith("$2y$")) {
+  if (isBcryptHash(hash)) {
     // For backwards compatibility with existing bcrypt hashes, dynamically import bcrypt
     const bcrypt = await import("bcryptjs");
     return bcrypt.default.compare(password, hash);

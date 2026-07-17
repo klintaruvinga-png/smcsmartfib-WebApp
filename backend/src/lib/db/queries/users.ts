@@ -82,6 +82,20 @@ export async function getUserById(id: string): Promise<User | null> {
 }
 
 /**
+ * Update a user's password hash by user ID.
+ * Used to upgrade legacy bcrypt hashes to PBKDF2 after successful authentication.
+ */
+export async function updateUserPasswordHash(
+  userId: string,
+  newPasswordHash: string
+): Promise<void> {
+  await db
+    .update(users)
+    .set({ passwordHash: newPasswordHash })
+    .where(eq(users.id, userId));
+}
+
+/**
  * Verify a plaintext password against a stored hash.
  * Supports both PBKDF2 and legacy bcrypt hashes.
  * Returns true if they match, false otherwise.
