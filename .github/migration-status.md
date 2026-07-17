@@ -444,7 +444,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 
 #### BACKEND-1 · Settings Endpoint (2026-07-17) — COMPLETE
 - `settings JSONB` column added to `users` (`schema.ts` + `migrations/004_add_user_settings.sql`, default `'{}'::jsonb`). Normalizes the WordPress `wp_usermeta` key/value store into one structured object (notifications / theme / watchlist / risk).
-- PATCH semantics via atomic JSONB `||` merge (`COALESCE(settings,'{}') || patch::jsonb`) — no read-before-write race; partial updates preserve untouched keys.
+- PATCH semantics via an atomic transaction with an application-level deep merge (read current settings, deep-merge the patch in code, write back inside the transaction) — partial nested updates preserve untouched keys.
 - Zod validation (`lib/user/settings-schema.ts`): every field optional; `theme` enum (`light|dark|system`); `risk.maxRiskPercent` validated to 0–100 range.
 - Route `src/routes/api/user/settings.ts`: `GET` returns settings, `PUT`/`POST` validates + merges; `requireAuth` + no-store cache headers; mirrors `market-data/fib-levels.ts` conventions.
 - `SettingsError` (404 user-not-found) thrown from `lib/db/queries/users.ts`, converted to `createError` at the route.
