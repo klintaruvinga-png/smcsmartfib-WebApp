@@ -7,14 +7,14 @@ import { vi } from "vitest";
 // hoisted result to an intermediate `shared` binding and re-export its properties.
 const shared = vi.hoisted(() => {
   const calls: Array<{ method: string; args: unknown[] }> = [];
-  const state: { result: unknown } = { result: [] };
+  const state: { result: unknown; resultQueue: unknown[] } = { result: [], resultQueue: [] };
   let insertError: Error | null = null;
 
   const makeChain = () => {
     const chain: Record<string, unknown> = {};
     const builderMethods = [
       "select", "from", "where", "orderBy", "limit", "values",
-      "onConflictDoUpdate", "set", "returning", "innerJoin", "leftJoin",
+      "onConflictDoUpdate", "set", "returning", "innerJoin", "leftJoin", "for",
     ];
     for (const m of builderMethods) {
       chain[m] = (...args: unknown[]) => {
@@ -22,14 +22,20 @@ const shared = vi.hoisted(() => {
         return chain;
       };
     }
-    // Make the chain awaitable: `await db.select()....` resolves to state.result.
-    chain.then = (resolve: (value: unknown) => void) =>
-      Promise.resolve(state.result).then(resolve);
+    // Make the chain awaitable: `await db.select()....` resolves to the next
+    // result from the queue (if available) or falls back to state.result.
+    chain.then = (resolve: (value: unknown) => void) => {
+      const result = state.resultQueue.length > 0 ? state.resultQueue.shift() : state.result;
+      return Promise.resolve(result).then(resolve);
+    };
     return chain;
   };
 
   const db: Record<string, unknown> = {
-    select: () => makeChain(),
+    select: (...args: unknown[]) => {
+      calls.push({ method: "select", args });
+      return makeChain();
+    },
     insert: (...args: unknown[]) => {
       calls.push({ method: "insert", args });
       if (insertError) throw insertError;
@@ -53,6 +59,9 @@ const shared = vi.hoisted(() => {
     setDbResult: (r: unknown) => {
       state.result = r;
     },
+    setDbResultQueue: (queue: unknown[]) => {
+      state.resultQueue = queue;
+    },
     getDbCalls: () => calls,
     resetCalls: () => {
       calls.length = 0;
@@ -65,6 +74,7 @@ const shared = vi.hoisted(() => {
 
 export const dbMock = shared.db;
 export const setDbResult = shared.setDbResult;
+export const setDbResultQueue = shared.setDbResultQueue;
 export const getDbCalls = shared.getDbCalls;
 export const resetCalls = shared.resetCalls;
 export const setInsertError = shared.setInsertError;

@@ -29,6 +29,18 @@ curl localhost:3000/api/health
 # => {"status":"ok","service":"smc-superfib-backend",...}
 ```
 
+## Endpoints
+
+| Method | Route | Auth | Purpose |
+|--------|-------|------|---------|
+| POST | `/api/auth/login` | — | Email + password → access/refresh tokens |
+| POST | `/api/auth/register` | — | Create user (Supabase auth + profile) |
+| GET | `/api/auth/me` | Bearer | Current user view |
+| POST | `/api/auth/refresh` | Refresh token | Rotate to a new token pair |
+| POST | `/api/ea/fib-levels` | X-EA-API-Key (role `ea`) | EA ingest (zod-validated) |
+| GET | `/api/market-data/fib-levels` | Bearer | Fib levels grouped by timeframe → family |
+| GET / PUT | `/api/user/settings` | Bearer | Read / PATCH user preferences (JSONB) |
+
 ## Scripts
 
 | Script | Purpose |

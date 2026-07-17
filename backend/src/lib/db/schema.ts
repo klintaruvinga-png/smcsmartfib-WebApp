@@ -15,6 +15,7 @@ import {
   decimal,
   timestamp,
   inet,
+  jsonb,
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
@@ -24,6 +25,27 @@ export type FibSource = "mt5" | "manual" | "calculated";
 export type EaSessionStatus = "connected" | "disconnected" | "error";
 export type FibFamily = "LTF_SF" | "HTF_AF";
 export type FibTimeframe = "M15" | "H1" | "H4" | "D1";
+
+/**
+ * Structured user preferences. Stored as a single JSONB column on `users`
+ * (default '{}'). This normalizes the WordPress wp_usermeta key/value store
+ * into one object for TanStack. The shadow-sync phase (gated) is responsible
+ * for mapping individual usermeta keys into these fields.
+ */
+export type UserSettings = {
+  notifications?: {
+    email?: boolean;
+    push?: boolean;
+    tradeAlerts?: boolean;
+  };
+  theme?: "light" | "dark" | "system";
+  watchlist?: string[];
+  risk?: {
+    maxRiskPercent?: number;
+    defaultLotSize?: number;
+    riskRewardRatio?: number;
+  };
+};
 
 export const users = pgTable("users", {
   // id mirrors Supabase auth.users.id (UUID). The FK to auth.users is enforced
@@ -38,6 +60,9 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  // Structured user preferences (notifications/theme/watchlist/risk).
+  // Mirrors WordPress wp_usermeta normalized into one JSONB object.
+  settings: jsonb("settings").$type<UserSettings>().notNull().default({}),
 });
 
 export const fibLevels = pgTable(
