@@ -426,7 +426,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 
 **Strategy** (revised 2026-07-17 — WordPress-free):
 - WordPress is treated as permanently down; no compatibility, shadow sync, dual-write, or fallback
-- Frontend reconfigured to `VITE_API_URL`; JWT is the sole auth model
+- Frontend reconfigured to `VITE_API_URL`; JWT authenticates user-facing routes while `X-EA-API-Key` authenticates EA-ingestion routes
 - Domain services (SnapshotService, SignalService, ChartService, MarketDataService, TelemetryService) own DB access, validation, and business logic; route handlers are thin wrappers
 - Endpoints implemented in dependency order: app boot → core trading → MT5 read-only ingest → data migration → testing
 - MT5 ingestion is read-only first; order/execution endpoints deferred
@@ -458,7 +458,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 
 **Objective**: Implement auth, settings, and market data endpoints
 **Status**: COMPLETE — Auth + market-data endpoints COMPLETE (2026-07-16); settings endpoint COMPLETE (2026-07-17)
-**Target**: 2026-08-05
+**Target**: 2026-08-05 (original) · COMPLETE 2026-07-17
 **Blockers**: None (BACKEND-0 database layer sufficient for current endpoints; provider wiring non-blocking)
 
 #### BACKEND-1 · Auth + Critical Endpoints (2026-07-16) — COMPLETE
@@ -516,7 +516,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 - [ ] `GET /api/signals` (board_size, scope) → `SignalService.getLiveSignals(...)`
 - [ ] `GET /api/ladders` → `SignalService.getLadders(...)`
 - [ ] `GET /api/health` (engine health) → `TelemetryService.getEngineHealth(...)`
-- [ ] `GET /api/account-telemetry` (query `account_id`, `terminal_id`) → `TelemetryService.getAccountTelemetry(userId, accountId?, terminalId?)`
+- [ ] `GET /api/account-telemetry` (required `account_id`, `terminal_id`) → `TelemetryService.getAccountTelemetry(userId, accountId, terminalId)`
 - **Acceptance**: Signals, ladders, engine health, account telemetry render
 
 #### BACKEND-2e · MT5 Read-Only Ingestion

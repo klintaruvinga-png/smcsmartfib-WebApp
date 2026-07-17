@@ -235,10 +235,10 @@ CREATE TABLE candles (
    - Database: Query latest engine run status
 
 4. `GET /api/account-telemetry`
-   - Query params: `account_id`, `terminal_id` (select which connected MT5 account/terminal; optional — returns the latest/primary record when omitted)
+   - Query params: `account_id`, `terminal_id` (both required — together with `user_id` they form the `account_telemetry` primary key and pinpoint one record)
    - Returns: `AccountTelemetry` (singular record for the selected account/terminal; `account_telemetry` stores one row per `user_id` + `account_id` + `terminal_id`)
-   - Service: `TelemetryService.getAccountTelemetry(userId, accountId?, terminalId?)`
-   - Database: Query the matching account/terminal row from `account_telemetry` (EA sessions)
+   - Service: `TelemetryService.getAccountTelemetry(userId, accountId, terminalId)`
+   - Database: Query the matching `user_id` + `account_id` + `terminal_id` row from `account_telemetry` (EA sessions)
 
 **Database Schema Additions:**
 
