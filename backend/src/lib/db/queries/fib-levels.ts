@@ -30,6 +30,9 @@ export type MarketFibLevel = {
   calculatedAt: string;
 };
 
+/** Market data row that also carries its timeframe so callers can group by it. */
+export type MarketDataRow = MarketFibLevel & { timeframe: FibTimeframe };
+
 /**
  * Resolve the internal user UUID from an EA API key. Rows are scoped per-user
  * for WordPress parity. Throws if the key is unknown.
@@ -54,7 +57,8 @@ export async function createFibLevel(
   symbol: string,
   timeframe: FibTimeframe,
   trend: string | null,
-  levels: FibLevelInput[]
+  levels: FibLevelInput[],
+  calculatedAt?: Date
 ): Promise<void> {
   const userId = await resolveUserIdByApiKey(eaApiKey);
 
@@ -69,7 +73,7 @@ export async function createFibLevel(
     price: String(l.price),
     source: "mt5" as const,
     trend,
-    calculatedAt: new Date(),
+    calculatedAt: calculatedAt || new Date(),
     receivedAt: new Date(),
   }));
 
@@ -150,4 +154,52 @@ export async function getMarketData(
   // Same query shape as getLatestFibLevels; kept as a distinct named entry
   // point for the dashboard per the migration plan.
   return getLatestFibLevels(eaApiKey, symbol, timeframe, limit);
+}
+
+/**
+ * Dashboard market-data getter keyed by internal user id (JWT `sub`).
+ * Newest-first, capped at `limit` (default 200); ratio/price as numbers.
+ * `timeframe` and `family` are optional: when omitted, rows for all timeframes/families are returned.
+ * Each row includes its `timeframe` so the dashboard can group by it.
+ *
+ * Scoping note: Per the confirmed architecture, the dashboard login account owns the EA license.
+ * EA-submitted fib levels are stored under the EA account's userId (resolved from EA API key).
+ * The JWT `sub` passed here equals that same userId, so the filter correctly returns the user's own data.
+ * This is intentional per the single-account model where dashboard identity owns EA license.
+ */
+export async function getMarketDataByUserId(
+  userId: string,
+  symbol: string,
+  timeframe?: FibTimeframe,
+  family?: FibFamily,
+  limit = 200
+): Promise<MarketDataRow[]> {
+  const conditions = [
+    eq(fibLevels.userId, userId),
+    eq(fibLevels.symbol, symbol),
+  ];
+  if (timeframe) {
+    conditions.push(eq(fibLevels.timeframe, timeframe));
+  }
+  if (family) {
+    conditions.push(eq(fibLevels.family, family));
+  }
+
+  const rows = await db
+    .select()
+    .from(fibLevels)
+    .where(and(...conditions))
+    .orderBy(desc(fibLevels.calculatedAt))
+    .limit(limit);
+
+  return rows.map((row) => ({
+    id: row.id,
+    family: row.family,
+    ratio: Number(row.ratio),
+    price: Number(row.price),
+    source: row.source,
+    trend: row.trend,
+    calculatedAt: row.calculatedAt.toISOString(),
+    timeframe: row.timeframe,
+  }));
 }

@@ -428,9 +428,19 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 ### Phase BACKEND-1: Core API Implementation
 
 **Objective**: Implement auth, settings, and market data endpoints
-**Status**: NOT-STARTED
+**Status**: IN-PROGRESS — Auth + market-data endpoints COMPLETE (2026-07-16); settings endpoint pending
 **Target**: 2026-08-05
 **Blockers**: BACKEND-0 complete
+
+#### BACKEND-1 · Auth + Critical Endpoints (2026-07-16) — COMPLETE
+- Auth utilities (`src/lib/auth/index.ts`): `jose` HS256 access tokens (15m), random refresh tokens, bcrypt password hashing, SHA-256 token hashing. `JWT_SECRET` read lazily from env.
+- Middleware (`src/lib/auth/middleware.ts`): `requireAuth` (Bearer JWT → `event.context.authUser`), `requireEaAuth` (X-EA-API-Key + role `ea` → `event.context.eaUser`).
+- `refresh_sessions` table added to `schema.ts` + `migrations/002_add_refresh_sessions.sql` (indexes + RLS read/delete policies).
+- 4 auth endpoints: `POST /api/auth/login`, `POST /api/auth/register`, `GET /api/auth/me`, `POST /api/auth/refresh` — business logic extracted to `src/lib/auth/handlers.ts` (pure, testable) with thin h3 wrappers.
+- True refresh-token rotation: `refresh` invalidates the old session and issues a new access+refresh pair.
+- 2 critical endpoints: `POST /api/ea/fib-levels` (zod-validated, per-ratio `VALID_RATIOS` check, WordPress grouped payload) and `GET /api/market-data/fib-levels` (groups by timeframe → family → levels, parity with WordPress).
+- Tests: 21 new integration tests (auth 18, ea-endpoints 3, market-data 4) + 14 from Phase 1 = 39 passing; `tsc --noEmit` clean.
+- **Caveat**: `npm` scripts `typecheck`/`test:integration` are broken (`.bin` shims point at a stray OneDrive path — npm symlink bug); run `node node_modules/typescript/bin/tsc --noEmit` and `node node_modules/vitest/vitest.mjs run tests/integration` directly. Live-DB validation deferred (no Docker).
 
 ### Phase BACKEND-2: MT5 Integration
 
@@ -804,6 +814,7 @@ Phase 7 GATE: BLOCKED (hard gate in is_phase6_gate_cleared)
 | Week     | Generated  | Phases On-Track                            | Phases At-Risk                           | Phases Blocked | Action Items                                                                                                                  |
 | -------- | ---------- | ------------------------------------------ | ---------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | 2026-W29 | 2026-07-16 | BACKEND-0 Database Layer COMPLETE           | Shared contracts, PostgreSQL provider    | None           | DB layer restructured to `src/lib/db`; 8 query fns + types + 14 mocked integration tests passing; `tsc` clean. Live-DB validation deferred (no Docker). |
+| 2026-W29 | 2026-07-16 | BACKEND-1 Auth + critical endpoints COMPLETE | Settings endpoint; live-DB validation    | None           | jose JWT auth + refresh-token rotation; 4 auth + 2 EA/market-data endpoints; refresh_sessions table; 21 new tests (39 total) passing; `tsc` clean. |
 | 2026-W22 | 2026-05-27 | Phase 3 COMPLETE; Phase 4 live soak active | Phase 4 live parity gate                 | None           | EA deployed live. T0 baseline captured/exported. Await 30-day corpus, Pine snapshots, and validator run.                      |
 | 2026-W20 | 2026-05-14 | Phase 1 groundwork                         | Phase 0 signal/freshness parity closeout | Phase 0        | Fix NAS100/US30 freshness, XAUUSD candle history, and chop-gate blockers before any phase advance                             |
 | 2026-W21 | 2026-05-25 | Phase 3 COMPLETE — Phase 4 authorized      | Phase 4 Track A lead unassigned          | None           | 72h soak CLOSED. Gate CONDITIONAL PASS. Bug sweep harness repaired. Phase 4 docs created. T0 admin baseline pending operator. |
