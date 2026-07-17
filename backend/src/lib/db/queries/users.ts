@@ -12,7 +12,7 @@
  * `public.users.password_hash` and sessions are custom jose JWTs, so no
  * `auth.users` row is ever created or required.
  */
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../index";
 import { users } from "../schema";
