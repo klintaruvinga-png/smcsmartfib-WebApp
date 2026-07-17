@@ -7,6 +7,7 @@
  */
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { createClient } from "@supabase/supabase-js";
 import * as schema from "./schema";
 
 const connectionString =
@@ -31,3 +32,16 @@ const client = postgres(connectionString, {
 export const db = drizzle(client, { schema });
 export { schema };
 export { client as pgClient };
+
+// Supabase Auth client for user management (uses service role for admin operations)
+const supabaseUrl = process.env.SUPABASE_URL ?? "";
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+
+export const supabase = supabaseUrl && supabaseServiceKey
+  ? createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+  : null;

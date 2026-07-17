@@ -21,7 +21,8 @@ import { hashToken, hashPassword, verifyPassword } from "../../auth/index";
 
 /**
  * Create a user profile row with a PBKDF2-hashed password.
- * Generates a UUID for `id` (the column has no DB default).
+ * If an id is provided, uses it (for Supabase auth FK compatibility).
+ * Otherwise generates a UUID for `id` (the column has no DB default).
  * If an eaApiKey is provided, it is hashed before storage.
  * Returns the inserted row.
  */
@@ -30,12 +31,13 @@ export async function createUser(
   password: string,
   role: UserRole = "user",
   eaApiKey?: string,
-  username?: string
+  username?: string,
+  id?: string
 ): Promise<User> {
   // Hash the plaintext password before persistence using edge-compatible PBKDF2.
   const passwordHash = await hashPassword(password);
 
-  // `id` has no DB default, so generate one. Omit `eaApiKey` / `username` when
+  // Use provided id or generate one. Omit `eaApiKey` / `username` when
   // undefined so we don't insert a literal `undefined` (which Drizzle rejects).
   const values: {
     id: string;
@@ -45,7 +47,7 @@ export async function createUser(
     eaApiKey?: string;
     username?: string;
   } = {
-    id: randomUUID(),
+    id: id ?? randomUUID(),
     email,
     role,
     passwordHash,

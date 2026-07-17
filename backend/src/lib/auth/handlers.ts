@@ -1,4 +1,4 @@
-import { db } from "../db";
+import { db, supabase } from "../db";
 import { users } from "../db/schema";
 import type { User } from "../db/schema";
 import { eq } from "drizzle-orm";
@@ -90,8 +90,8 @@ export async function loginUser(
   await createRefreshSession(
     user.id,
     refreshToken,
-    meta.userAgent ?? null,
-    meta.ipAddress ?? null
+    meta?.userAgent ?? null,
+    meta?.ipAddress ?? null
   );
   return { accessToken, refreshToken, user: toUserView(user) };
 }
@@ -106,7 +106,27 @@ export async function registerUser(
   if (password.length < 8)
     throw new AuthError(400, "Password must be at least 8 characters");
   try {
-    const user = await createUser(email, password, "user", undefined, username);
+    // Create Supabase auth user first to satisfy FK constraint
+    if (!supabase) {
+      throw new AuthError(500, "Supabase client not configured");
+    }
+    
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+    
+    if (authError || !authData.user) {
+      // Handle Supabase-specific errors
+      if (authError?.message?.includes("already registered")) {
+        throw new AuthError(409, "Email already exists");
+      }
+      throw new AuthError(500, "Failed to create auth user");
+    }
+    
+    // Create database user with the auth user's ID
+    const user = await createUser(email, password, "user", undefined, username, authData.user.id);
     const accessToken = await createAccessToken({
       sub: user.id,
       email: user.email,
@@ -116,7 +136,20 @@ export async function registerUser(
     await createRefreshSession(user.id, refreshToken, meta?.userAgent ?? null, meta?.ipAddress ?? null);
     return { accessToken, refreshToken, user: toUserView(user) };
   } catch (err: any) {
-    if (err && err.code === "23505") throw new AuthError(409, "Email already exists");
+    if (err instanceof AuthError) throw err;
+    if (err && err.code === "23505") {
+      // Parse constraint name from error detail to return specific message
+      const constraint = err.detail?.match(/constraint "([^"]+)"/)?.[1];
+      if (constraint === "users_email_key") {
+        throw new AuthError(409, "Email already exists");
+      } else if (constraint === "users_username_key") {
+        throw new AuthError(409, "Username already exists");
+      } else if (constraint === "users_ea_api_key_key") {
+        throw new AuthError(409, "EA API key already exists");
+      }
+      // Fallback for other unique constraints
+      throw new AuthError(409, "A record with this information already exists");
+    }
     throw err;
   }
 }

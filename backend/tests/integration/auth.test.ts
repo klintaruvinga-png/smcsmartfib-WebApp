@@ -6,7 +6,19 @@ import { dbMock, setDbResult, getDbCalls, resetCalls, setInsertError } from "./d
 // so setting it here (module load) is enough for jose to sign/verify.
 process.env.JWT_SECRET = "test-secret-key-for-unit-tests-must-be-long-enough-32bytes";
 
-vi.mock("../../src/lib/db/index", () => ({ db: dbMock }));
+vi.mock("../../src/lib/db/index", () => ({ 
+  db: dbMock,
+  supabase: {
+    auth: {
+      admin: {
+        createUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "mock-auth-user-id" } },
+          error: null
+        })
+      }
+    }
+  }
+}));
 
 import { loginUser, registerUser, getMeUser, refreshAccessToken, AuthError } from "../../src/lib/auth/handlers";
 import { requireAuth, requireEaAuth } from "../../src/lib/auth/middleware";

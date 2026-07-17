@@ -161,11 +161,10 @@ export async function getMarketData(
  * `timeframe` and `family` are optional: when omitted, rows for all timeframes/families are returned.
  * Each row includes its `timeframe` so the dashboard can group by it.
  *
- * Scoping note: EA-submitted fib levels are stored under the EA account's id
- * (resolved from the EA API key in createFibLevel). Per the WordPress-parity
- * account model, the dashboard login account IS that same EA account, so the
- * JWT `sub` passed here equals the EA account id and the filter below matches
- * the ingested rows. This is intentional, not a mismatch.
+ * Scoping note: Per the confirmed architecture, the dashboard login account owns the EA license.
+ * EA-submitted fib levels are stored under the EA account's userId (resolved from EA API key).
+ * The JWT `sub` passed here equals that same userId, so the filter correctly returns the user's own data.
+ * This is intentional per the single-account model where dashboard identity owns EA license.
  */
 export async function getMarketDataByUserId(
   userId: string,
