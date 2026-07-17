@@ -127,7 +127,7 @@ WordPress dependencies.
 - Existing handlers refactored to use services
 - Integration tests updated to test services directly
 
-### Phase 3: Phase 1 Endpoints (App Boot)
+### Phase 3: App-Boot Endpoints
 
 **Objective:** Implement endpoints required for app initialization.
 
@@ -299,7 +299,7 @@ CREATE TABLE account_telemetry (
 ```
 
 **Acceptance Criteria:**
-- All Phase 2 endpoints implemented and tested
+- All Phase 4 (core-trading) endpoints implemented and tested
 - Frontend can display signals, ladders, and engine health
 - Integration tests pass for all endpoints
 - Database schema supports signals/trade-plans/engine telemetry

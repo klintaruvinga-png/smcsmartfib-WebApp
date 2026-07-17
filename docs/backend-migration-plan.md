@@ -70,12 +70,14 @@ We will follow a strict layered architectural pattern to decouple transport, bus
 To prevent replay attacks and secure MT5 EA telemetry writes, we document an HMAC-SHA256 signature verification middleware below — **non-active; deferred hardening** (the live scheme is `X-EA-API-Key` for `/api/ea/*` plus JWT Bearer for user routes):
 
 ### Authentication Parameters & Headers:
+
 - `X-Client-ID`: Unique identifier for the MT5 terminal installation.
 - `X-Timestamp`: Current UTC epoch timestamp (requests with timestamps older than 5 minutes / 300 seconds are rejected).
 - `X-Nonce`: A single-use random UUID to prevent replay attacks (checked against a database cache to ensure uniqueness).
 - `X-Signature`: HMAC-SHA256 signature generated using the client's shared API Secret.
 
 ### Signature Validation Protocol (non-active — future hardening):
+
 ```text
 Message = X-Client-ID + ":" + X-Timestamp + ":" + X-Nonce + ":" + Request_Body_String
 Expected_Signature = HMAC_SHA256(Message, API_Secret)
@@ -296,7 +298,7 @@ BACKEND-2 plan.
 
 - [ ] **Step 1**: Initialize PostgreSQL connection pooling in `backend/src/lib/db/`.
 - [ ] **Step 2**: Execute SQL schema migrations on PostgreSQL (Supabase/Neon).
-- [ ] **Step 3**: Implement authentication session services (JWT-based cookie validation). (EA HMAC verification is **deferred** — future hardening, not part of the initial restoration; `X-EA-API-Key` is the live EA auth.)
+- [ ] **Step 3**: Implement authentication session services (JWT Bearer-token validation). (EA HMAC verification is **deferred** — future hardening, not part of the initial restoration; `X-EA-API-Key` is the live EA auth.)
 - [ ] **Step 4**: Code the database repository Layer (`backend/src/lib/db/`).
 - [ ] **Step 5**: Code business logic layer (`backend/src/lib/services/`).
 - [ ] **Step 6**: Code the HTTP request endpoints transport layer (`src/routes/api/`).

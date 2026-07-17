@@ -5,7 +5,7 @@
 **Overall Progress**: 88% MT5 Migration + BACKEND-1 COMPLETE (foundation: auth, settings, market data) + BACKEND-2 WordPress-Free Restoration IN-PROGRESS (started 2026-07-17)
 **Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 COMPLETE (2026-05-25; T0 admin baseline captured 2026-05-27, conditional closeout cleared) — Phase 4 READ-ONLY TESTING (code complete; corrected H4 runtime verified 2026-05-28; synthetic parity tooling PASS recorded; live paired exports plus weekend/sparse-data evidence still missing) — BACKEND-1 COMPLETE (2026-07-17; auth + settings + market-data endpoints, 47 tests) — BACKEND-2 IN-PROGRESS (2026-07-17; WordPress-free restoration, service-oriented architecture) — Phases 5/5B/6 CODE COMPLETE (pre-emptive; gated on Phase 4) — Phases 7–9 SCAFFOLDED (gated)
 
-> **Strategy change (2026-07-17)**: WordPress is treated as **permanently down**. The prior shadow-mode / dual-write / WordPress-as-fallback strategy is retired. The new BACKEND-2 plan ([plans/backend-2-restoration-plan.md](../../plans/backend-2-restoration-plan.md)) removes all WordPress references, standardizes on JWT, and rebuilds the backend around domain services. There is no WordPress cutover or decommission phase — WordPress compatibility is removed outright.
+> **Strategy change (2026-07-17)**: WordPress is treated as **permanently down**. The prior shadow-mode / dual-write / WordPress-as-fallback strategy is retired. The new BACKEND-2 plan ([plans/backend-2-restoration-plan.md](../plans/backend-2-restoration-plan.md)) removes all WordPress references, standardizes on JWT, and rebuilds the backend around domain services. There is no WordPress cutover or decommission phase — WordPress compatibility is removed outright.
 
 > Snapshot: Phase 0 gate passed 2026-05-15. Post-fix validation soak at 16:37 UTC confirmed NAS100 (29,263.70) and US30 (49,756.00) both LIVE during active US equity session; XAUUSD (4,556.34) LIVE with candle-history gate cleared. Backend soak: 259,464 engine runs / 0 errors / 69,262 candles over 24h. Frontend feed-status chip lag (BUG-001 staleTime:0) resolved. Watchlist persistence 100% parity. AUDUSD/ETHUSD chop-gate classified as correct live behavior — not a blocker. Full closeout evidence: `.github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md`.
 
@@ -433,7 +433,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 
 **Prerequisites**: Phase 0-3 COMPLETE ✅ · BACKEND-1 COMPLETE ✅
 
-**Implementation Plan**: See the BACKEND-0 / BACKEND-1 (complete) and BACKEND-2 (WordPress-Free Restoration) sections below. BACKEND-3/4/5 are superseded — their intent is absorbed into BACKEND-2. Canonical plan: [plans/backend-2-restoration-plan.md](../../plans/backend-2-restoration-plan.md).
+**Implementation Plan**: See the BACKEND-0 / BACKEND-1 (complete) and BACKEND-2 (WordPress-Free Restoration) sections below. BACKEND-3/4/5 are superseded — their intent is absorbed into BACKEND-2. Canonical plan: [plans/backend-2-restoration-plan.md](../plans/backend-2-restoration-plan.md).
 
 ### Phase BACKEND-0: Foundation Setup
 
@@ -486,7 +486,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 **Status**: IN-PROGRESS (started 2026-07-17)
 **Target**: 2026-08-09 (15–23 day total window)
 **Blockers**: None (BACKEND-1 complete; WordPress permanently down)
-**Canonical Plan**: [plans/backend-2-restoration-plan.md](../../plans/backend-2-restoration-plan.md)
+**Canonical Plan**: [plans/backend-2-restoration-plan.md](../plans/backend-2-restoration-plan.md)
 
 #### BACKEND-2a · Architecture Cleanup & Configuration
 
@@ -494,7 +494,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 - [ ] Remove WordPress nonce fallback + `resolveDefaultBackendUrl()` from `sniperClient.ts`
 - [ ] Drop `WORDPRESS_API_URL` / `WORDPRESS_API_KEY` from `backend/.env.example` + `nitro.config.ts`
 - [ ] Add Phase 1/2 tables (snapshots, regimes, gates, candles, signals, trade_plans, engine_runs, account_telemetry) — migration `005_add_phase1_tables.sql` + Drizzle schema
-- **Acceptance**: Frontend builds/runs on `VITE_API_URL`; no WordPress references remain
+- **Acceptance**: Frontend builds/runs on `VITE_API_URL`; no runtime or configuration dependency on WordPress remains
 
 #### BACKEND-2b · Service Layer Foundation
 
