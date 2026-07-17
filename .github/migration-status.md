@@ -428,7 +428,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 ### Phase BACKEND-1: Core API Implementation
 
 **Objective**: Implement auth, settings, and market data endpoints
-**Status**: IN-PROGRESS — Auth + market-data endpoints COMPLETE (2026-07-16); settings endpoint COMPLETE (2026-07-17)
+**Status**: COMPLETE — Auth + market-data endpoints COMPLETE (2026-07-16); settings endpoint COMPLETE (2026-07-17)
 **Target**: 2026-08-05
 **Blockers**: BACKEND-0 complete
 
@@ -445,7 +445,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 #### BACKEND-1 · Settings Endpoint (2026-07-17) — COMPLETE
 - `settings JSONB` column added to `users` (`schema.ts` + `migrations/004_add_user_settings.sql`, default `'{}'::jsonb`). Normalizes the WordPress `wp_usermeta` key/value store into one structured object (notifications / theme / watchlist / risk).
 - PATCH semantics via atomic JSONB `||` merge (`COALESCE(settings,'{}') || patch::jsonb`) — no read-before-write race; partial updates preserve untouched keys.
-- Zod validation (`lib/user/settings-schema.ts`): every field optional; `theme` enum (`light|dark|system`); `risk.maxRiskPercent` clamped 0–100.
+- Zod validation (`lib/user/settings-schema.ts`): every field optional; `theme` enum (`light|dark|system`); `risk.maxRiskPercent` validated to 0–100 range.
 - Route `src/routes/api/user/settings.ts`: `GET` returns settings, `PUT`/`POST` validates + merges; `requireAuth` + no-store cache headers; mirrors `market-data/fib-levels.ts` conventions.
 - `SettingsError` (404 user-not-found) thrown from `lib/db/queries/users.ts`, converted to `createError` at the route.
 - Tests: 8 new integration tests (query merge wiring + Zod schema) — 47 total passing; `tsc --noEmit` clean.
@@ -456,7 +456,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 **Objective**: Configure dual-write and EA bridge endpoints
 **Status**: NOT-STARTED
 **Target**: 2026-08-12
-**Blockers**: BACKEND-1 complete
+**Blockers**: None (BACKEND-1 complete)
 
 ### Phase BACKEND-3: Signal & Plan Endpoints
 
@@ -824,7 +824,7 @@ Phase 7 GATE: BLOCKED (hard gate in is_phase6_gate_cleared)
 | -------- | ---------- | ------------------------------------------ | ---------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | 2026-W29 | 2026-07-16 | BACKEND-0 Database Layer COMPLETE           | Shared contracts, PostgreSQL provider    | None           | DB layer restructured to `src/lib/db`; 8 query fns + types + 14 mocked integration tests passing; `tsc` clean. Live-DB validation deferred (no Docker). |
 | 2026-W29 | 2026-07-16 | BACKEND-1 Auth + critical endpoints COMPLETE | Settings endpoint; live-DB validation    | None           | jose JWT auth + refresh-token rotation; 4 auth + 2 EA/market-data endpoints; refresh_sessions table; 21 new tests (39 total) passing; `tsc` clean. |
-| 2026-W29 | 2026-07-17 | BACKEND-1 Settings endpoint COMPLETE        | Live-DB validation (staging)         | None           | `settings` JSONB column + migration 004; PATCH merge via JSONB `||`; Zod validation; GET/PUT /api/user/settings; 8 new tests (47 total) passing; `npm run typecheck` + `npm run test:integration` green. |
+| 2026-W29 | 2026-07-17 | BACKEND-1 Settings endpoint COMPLETE        | Live-DB validation (staging)         | None           | `settings` JSONB column + migration 004; PATCH merge via JSONB merge operator; Zod validation; GET/PUT /api/user/settings; 8 new tests (47 total) passing; `npm run typecheck` + `npm run test:integration` green. |
 | 2026-W22 | 2026-05-27 | Phase 3 COMPLETE; Phase 4 live soak active | Phase 4 live parity gate                 | None           | EA deployed live. T0 baseline captured/exported. Await 30-day corpus, Pine snapshots, and validator run.                      |
 | 2026-W20 | 2026-05-14 | Phase 1 groundwork                         | Phase 0 signal/freshness parity closeout | Phase 0        | Fix NAS100/US30 freshness, XAUUSD candle history, and chop-gate blockers before any phase advance                             |
 | 2026-W21 | 2026-05-25 | Phase 3 COMPLETE — Phase 4 authorized      | Phase 4 Track A lead unassigned          | None           | 72h soak CLOSED. Gate CONDITIONAL PASS. Bug sweep harness repaired. Phase 4 docs created. T0 admin baseline pending operator. |

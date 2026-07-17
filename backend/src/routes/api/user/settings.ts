@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
       return await getUserSettings(payload.sub);
     }
 
-    if (event.method === "PUT" || event.method === "POST") {
+    if (event.method === "PUT" || event.method === "POST" || event.method === "PATCH") {
       const body = await readBody(event);
       const parsed = userSettingsSchema.safeParse(body);
       if (!parsed.success) {

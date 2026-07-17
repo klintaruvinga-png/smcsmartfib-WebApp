@@ -131,23 +131,68 @@ export async function getUserSettings(userId: string): Promise<UserSettings> {
 }
 
 /**
- * Patch a user's settings using JSONB `||` merge (atomic, no read-before-write
- * race). Only the supplied top-level keys are merged; existing keys are preserved.
- * Returns the full merged settings object. Throws SettingsError(404) if the
- * user row does not exist.
+ * Deep-merge helper: recursively merges `patch` into `base`, preserving nested
+ * properties that aren't present in `patch`.
+ */
+function deepMerge(base: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
+  const result = { ...base };
+  for (const key in patch) {
+    const patchValue = patch[key];
+    const baseValue = result[key];
+    if (
+      patchValue !== null &&
+      typeof patchValue === "object" &&
+      !Array.isArray(patchValue) &&
+      baseValue !== null &&
+      typeof baseValue === "object" &&
+      !Array.isArray(baseValue)
+    ) {
+      result[key] = deepMerge(
+        baseValue as Record<string, unknown>,
+        patchValue as Record<string, unknown>
+      );
+    } else {
+      result[key] = patchValue;
+    }
+  }
+  return result;
+}
+
+/**
+ * Patch a user's settings using a transaction-based read-modify-write with deep
+ * merge. Preserves nested properties (e.g., updating `notifications.email` won't
+ * clobber `notifications.push`). Returns the full merged settings object.
+ * Throws SettingsError(404) if the user row does not exist.
  */
 export async function updateUserSettings(
   userId: string,
   settings: UserSettings
 ): Promise<UserSettings> {
-  const [row] = await db
-    .update(users)
-    .set({
-      settings: sql`COALESCE(${users.settings}, '{}'::jsonb) || ${JSON.stringify(settings)}::jsonb`,
-      updatedAt: new Date(),
-    })
-    .where(eq(users.id, userId))
-    .returning({ settings: users.settings });
-  if (!row) throw new SettingsError(404, "User not found");
-  return row.settings as UserSettings;
+  return await db.transaction(async (tx) => {
+    // Read current settings
+    const [current] = await tx
+      .select({ settings: users.settings })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!current) throw new SettingsError(404, "User not found");
+
+    // Deep-merge in application code
+    const currentSettings = (current.settings ?? {}) as Record<string, unknown>;
+    const merged = deepMerge(currentSettings, settings as Record<string, unknown>);
+
+    // Write back the merged result
+    const [row] = await tx
+      .update(users)
+      .set({
+        settings: merged,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning({ settings: users.settings });
+
+    if (!row) throw new SettingsError(404, "User not found");
+    return row.settings as UserSettings;
+  });
 }

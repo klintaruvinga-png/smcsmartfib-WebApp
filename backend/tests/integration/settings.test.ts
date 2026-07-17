@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { dbMock, setDbResult, getDbCalls, resetCalls } from "./dbMock";
+import { dbMock, setDbResult, setDbResultQueue, getDbCalls, resetCalls } from "./dbMock";
 import { users } from "../../src/lib/db/schema";
 import { userSettingsSchema } from "../../src/lib/user/settings-schema";
 
@@ -27,27 +27,51 @@ describe("user settings queries", () => {
     expect(await getUserSettings("u-1")).toEqual({ theme: "dark" });
   });
 
-  it("updateUserSettings issues the JSONB merge and returns the post-merge row", async () => {
-    // The JSONB `||` merge runs in Postgres; the mock returns what the DB
-    // would return after merging the patch into the existing row. We assert the
-    // handler returns that merged row and that the update targets `users`.
-    const merged = {
+  it("updateUserSettings deep-merges in a transaction, preserving nested properties", async () => {
+    // Set up the scenario: current settings have nested notifications with both
+    // email and push properties. We'll patch only email; push should be preserved.
+    const currentSettings = {
       theme: "dark",
       watchlist: ["EURUSD"],
-      notifications: { email: true },
+      notifications: { email: false, push: true },
     };
-    setDbResult([{ settings: merged }]);
-    const result = await updateUserSettings("u-1", { notifications: { email: true } });
-    expect(result).toEqual(merged);
 
-    const updateCall = getDbCalls().find((c) => c.method === "update");
-    expect(updateCall).toBeDefined();
-    expect(updateCall!.args[0]).toBe(users);
+    const mergedSettings = {
+      theme: "dark",
+      watchlist: ["EURUSD"],
+      notifications: { email: true, push: true },
+    };
 
-    // The merge is expressed as a SQL expression (atomic, no read-before-write).
-    const setCall = getDbCalls().find((c) => c.method === "set");
+    // Use the result queue to simulate the transaction flow:
+    // 1. First query (SELECT current settings) returns currentSettings
+    // 2. Second query (UPDATE.returning()) returns the merged result
+    setDbResultQueue([
+      [{ settings: currentSettings }],  // SELECT result
+      [{ settings: mergedSettings }],   // UPDATE.returning() result
+    ]);
+
+    const patch = { notifications: { email: true } };
+    const result = await updateUserSettings("u-1", patch);
+
+    // Verify the returned result has the deep-merged structure
+    expect(result).toEqual(mergedSettings);
+    expect(result.notifications?.push).toBe(true); // Preserved from original
+    expect(result.notifications?.email).toBe(true); // Updated from patch
+
+    // Verify transaction, SELECT, and UPDATE calls occurred
+    const calls = getDbCalls();
+    expect(calls.some((c) => c.method === "select")).toBe(true);
+    expect(calls.some((c) => c.method === "update")).toBe(true);
+
+    // Verify the UPDATE.set() call received the deep-merged settings
+    const setCall = calls.find((c) => c.method === "set");
     expect(setCall).toBeDefined();
-    expect((setCall!.args[0] as Record<string, unknown>).settings).toBeDefined();
+    const setArg = setCall!.args[0] as Record<string, unknown>;
+    expect(setArg.settings).toBeDefined();
+    // The settings passed to .set() should have both email and push (deep merge result)
+    const settingsInSet = setArg.settings as Record<string, unknown>;
+    expect((settingsInSet.notifications as Record<string, unknown>)?.email).toBe(true);
+    expect((settingsInSet.notifications as Record<string, unknown>)?.push).toBe(true);
   });
 
   it("updateUserSettings throws SettingsError(404) when the user is missing", async () => {
