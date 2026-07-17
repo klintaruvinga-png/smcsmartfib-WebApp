@@ -94,8 +94,8 @@ Phase 4 parity validation continues as scheduled, but development resources shif
 | 8     | Semi-automation layer                   | **SCAFFOLDED**    | 20%        | Phase 7 complete                                                                           | 2026-12-01            |
 | 9     | SaaS & licensing system                 | **SCAFFOLDED**    | 20%        | Phase 8 complete                                                                           | 2026-12-15            |
 | 10    | Pine transition strategy                | NOT-STARTED       | 0%         | Phase 9 complete                                                                           | 2027-01-01            |
-| BACKEND-0 | Foundation setup (contracts, database, project structure) | NOT-STARTED | 0% | Shared contracts, PostgreSQL provider | 2026-07-22 |
-| BACKEND-1 | Core API implementation (auth, settings, market data) | NOT-STARTED | 0% | BACKEND-0 complete | 2026-08-05 |
+| BACKEND-0 | Foundation setup (contracts, database, project structure) | IN-PROGRESS | 90% | PostgreSQL provider wiring | 2026-07-22 |
+| BACKEND-1 | Core API implementation (auth, settings, market data) | COMPLETE | 100% | None | 2026-08-05 |
 | BACKEND-2 | MT5 integration and dual-write configuration | NOT-STARTED | 0% | BACKEND-1 complete | 2026-08-12 |
 | BACKEND-3 | Signal and plan endpoints | NOT-STARTED | 0% | BACKEND-2 complete | 2026-08-26 |
 | BACKEND-4 | Transition and cutover | NOT-STARTED | 0% | BACKEND-3 complete | 2026-09-09 |
@@ -409,9 +409,9 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 ### Phase BACKEND-0: Foundation Setup
 
 **Objective**: Set up shared contracts, database, and project structure
-**Status**: IN-PROGRESS — Database Layer COMPLETE (2026-07-16); shared contracts + provider wiring pending
+**Status**: IN-PROGRESS — Database Layer COMPLETE (2026-07-16); shared contracts authored; provider wiring pending
 **Target**: 2026-07-22
-**Blockers**: Shared contracts, PostgreSQL provider
+**Blockers**: PostgreSQL provider wiring
 
 #### BACKEND-0 · Database Layer (2026-07-16) — COMPLETE
 - Restructured `backend/src/db/` → `backend/src/lib/db/` (canonical layout); repointed `drizzle.config.ts`.
@@ -430,7 +430,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 **Objective**: Implement auth, settings, and market data endpoints
 **Status**: COMPLETE — Auth + market-data endpoints COMPLETE (2026-07-16); settings endpoint COMPLETE (2026-07-17)
 **Target**: 2026-08-05
-**Blockers**: BACKEND-0 complete
+**Blockers**: None (BACKEND-0 database layer sufficient for current endpoints; provider wiring non-blocking)
 
 #### BACKEND-1 · Auth + Critical Endpoints (2026-07-16) — COMPLETE
 - Auth utilities (`src/lib/auth/index.ts`): `jose` HS256 access tokens (15m), random refresh tokens, bcrypt password hashing, SHA-256 token hashing. `JWT_SECRET` read lazily from env.
@@ -446,10 +446,10 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 - `settings JSONB` column added to `users` (`schema.ts` + `migrations/004_add_user_settings.sql`, default `'{}'::jsonb`). Normalizes the WordPress `wp_usermeta` key/value store into one structured object (notifications / theme / watchlist / risk).
 - PATCH semantics via an atomic transaction with an application-level deep merge (read current settings, deep-merge the patch in code, write back inside the transaction) — partial nested updates preserve untouched keys.
 - Zod validation (`lib/user/settings-schema.ts`): every field optional; `theme` enum (`light|dark|system`); `risk.maxRiskPercent` validated to 0–100 range.
-- Route `src/routes/api/user/settings.ts`: `GET` returns settings, `PUT`/`POST` validates + merges; `requireAuth` + no-store cache headers; mirrors `market-data/fib-levels.ts` conventions.
+- Route `src/routes/api/user/settings.ts`: `GET` returns settings, `PUT`/`POST`/`PATCH` validates + merges; `requireAuth` + no-store cache headers; mirrors `market-data/fib-levels.ts` conventions.
 - `SettingsError` (404 user-not-found) thrown from `lib/db/queries/users.ts`, converted to `createError` at the route.
 - Tests: 8 new integration tests (query merge wiring + Zod schema) — 47 total passing; `tsc --noEmit` clean.
-- **Parity note**: WordPress `usermeta` → JSONB mapping is owned by the gated shadow-sync phase (BACKEND-3), not this endpoint.
+- **Parity note**: API/schema parity only; WordPress `usermeta` full data mapping/shadow-sync owned by BACKEND-3 shadow-mode phase, not yet implemented.
 
 ### Phase BACKEND-2: MT5 Integration
 
@@ -822,9 +822,9 @@ Phase 7 GATE: BLOCKED (hard gate in is_phase6_gate_cleared)
 
 | Week     | Generated  | Phases On-Track                            | Phases At-Risk                           | Phases Blocked | Action Items                                                                                                                  |
 | -------- | ---------- | ------------------------------------------ | ---------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| 2026-W29 | 2026-07-16 | BACKEND-0 Database Layer COMPLETE           | Shared contracts, PostgreSQL provider    | None           | DB layer restructured to `src/lib/db`; 8 query fns + types + 14 mocked integration tests passing; `tsc` clean. Live-DB validation deferred (no Docker). |
+| 2026-W29 | 2026-07-16 | BACKEND-0 Database Layer COMPLETE           | PostgreSQL provider wiring    | None           | DB layer restructured to `src/lib/db`; 8 query fns + types + 14 mocked integration tests passing; `tsc` clean. Shared contracts authored. Live-DB validation deferred (no Docker). |
 | 2026-W29 | 2026-07-16 | BACKEND-1 Auth + critical endpoints COMPLETE | Settings endpoint; live-DB validation    | None           | jose JWT auth + refresh-token rotation; 4 auth + 2 EA/market-data endpoints; refresh_sessions table; 21 new tests (39 total) passing; `tsc` clean. |
-| 2026-W29 | 2026-07-17 | BACKEND-1 Settings endpoint COMPLETE        | Live-DB validation (staging)         | None           | `settings` JSONB column + migration 004; PATCH merge via JSONB merge operator; Zod validation; GET/PUT /api/user/settings; 8 new tests (47 total) passing; `npm run typecheck` + `npm run test:integration` green. |
+| 2026-W29 | 2026-07-17 | BACKEND-1 Settings endpoint COMPLETE        | Live-DB validation (staging)         | None           | `settings` JSONB column + migration 004; PATCH merge via transaction-based application deep merge; Zod validation; GET/PUT/POST/PATCH /api/user/settings; 8 new tests (47 total) passing; `npm run typecheck` + `npm run test:integration` green. |
 | 2026-W22 | 2026-05-27 | Phase 3 COMPLETE; Phase 4 live soak active | Phase 4 live parity gate                 | None           | EA deployed live. T0 baseline captured/exported. Await 30-day corpus, Pine snapshots, and validator run.                      |
 | 2026-W20 | 2026-05-14 | Phase 1 groundwork                         | Phase 0 signal/freshness parity closeout | Phase 0        | Fix NAS100/US30 freshness, XAUUSD candle history, and chop-gate blockers before any phase advance                             |
 | 2026-W21 | 2026-05-25 | Phase 3 COMPLETE — Phase 4 authorized      | Phase 4 Track A lead unassigned          | None           | 72h soak CLOSED. Gate CONDITIONAL PASS. Bug sweep harness repaired. Phase 4 docs created. T0 admin baseline pending operator. |
