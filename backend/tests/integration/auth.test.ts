@@ -14,7 +14,8 @@ vi.mock("../../src/lib/db/index", () => ({
         createUser: vi.fn().mockResolvedValue({
           data: { user: { id: "mock-auth-user-id" } },
           error: null
-        })
+        }),
+        deleteUser: vi.fn().mockResolvedValue({ error: null })
       }
     }
   }

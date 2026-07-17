@@ -57,7 +57,8 @@ export async function createFibLevel(
   symbol: string,
   timeframe: FibTimeframe,
   trend: string | null,
-  levels: FibLevelInput[]
+  levels: FibLevelInput[],
+  calculatedAt?: Date
 ): Promise<void> {
   const userId = await resolveUserIdByApiKey(eaApiKey);
 
@@ -72,7 +73,7 @@ export async function createFibLevel(
     price: String(l.price),
     source: "mt5" as const,
     trend,
-    calculatedAt: new Date(),
+    calculatedAt: calculatedAt || new Date(),
     receivedAt: new Date(),
   }));
 

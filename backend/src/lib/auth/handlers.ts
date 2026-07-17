@@ -105,6 +105,8 @@ export async function registerUser(
   if (!email || !password) throw new AuthError(400, "Email and password required");
   if (password.length < 8)
     throw new AuthError(400, "Password must be at least 8 characters");
+  let createdAuthUserId: string | null = null;
+  
   try {
     // Create Supabase auth user first to satisfy FK constraint
     if (!supabase) {
@@ -119,11 +121,13 @@ export async function registerUser(
     
     if (authError || !authData.user) {
       // Handle Supabase-specific errors
-      if (authError?.message?.includes("already registered")) {
+      if (authError?.message?.includes("already registered") || authError?.message?.includes("already been registered")) {
         throw new AuthError(409, "Email already exists");
       }
       throw new AuthError(500, "Failed to create auth user");
     }
+    
+    createdAuthUserId = authData.user.id;
     
     // Create database user with the auth user's ID
     const user = await createUser(email, password, "user", undefined, username, authData.user.id);
@@ -136,15 +140,30 @@ export async function registerUser(
     await createRefreshSession(user.id, refreshToken, meta?.userAgent ?? null, meta?.ipAddress ?? null);
     return { accessToken, refreshToken, user: toUserView(user) };
   } catch (err: any) {
+    // Cleanup: if we created a Supabase auth user but failed to create the local user,
+    // delete the auth user to prevent email lockout
+    if (createdAuthUserId && supabase) {
+      try {
+        await supabase.auth.admin.deleteUser(createdAuthUserId);
+      } catch (cleanupError) {
+        // Log cleanup failure but don't mask the original error
+        console.error("[registerUser] Failed to cleanup orphaned auth user:", cleanupError);
+      }
+    }
+    
     if (err instanceof AuthError) throw err;
     if (err && err.code === "23505") {
       // Parse constraint name from error detail to return specific message
-      const constraint = err.detail?.match(/constraint "([^"]+)"/)?.[1];
-      if (constraint === "users_email_key") {
+      // postgres.js format: Key (email)=(x) already exists.
+      // Standard format: Key (email)=(x) violates constraint "users_email_key"
+      const constraint = err.detail?.match(/constraint "([^"]+)"/)?.[1] || 
+                        err.detail?.match(/Key \(([^)]+)\)=/)?.[1];
+      
+      if (constraint === "users_email_key" || constraint === "email") {
         throw new AuthError(409, "Email already exists");
-      } else if (constraint === "users_username_key") {
+      } else if (constraint === "users_username_key" || constraint === "username") {
         throw new AuthError(409, "Username already exists");
-      } else if (constraint === "users_ea_api_key_key") {
+      } else if (constraint === "users_ea_api_key_key" || constraint === "ea_api_key") {
         throw new AuthError(409, "EA API key already exists");
       }
       // Fallback for other unique constraints

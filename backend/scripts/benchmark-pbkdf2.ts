@@ -84,7 +84,7 @@ async function main() {
     console.log(`Warning: All tested counts exceeded 500ms. Consider server-side optimization`);
   }
 
-  console.log("\nCurrent setting: 600,000 iterations (OWASP 2023 recommendation)");
+  console.log("\nCurrent setting: 500,000 iterations (benchmark-tested for <500ms latency)");
 }
 
 main().catch(console.error);

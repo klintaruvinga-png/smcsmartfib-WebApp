@@ -55,7 +55,7 @@ export async function createRefreshToken(): Promise<string> {
 /**
  * Hash a password using PBKDF2 with Web Crypto API (edge-compatible).
  * Returns a string in the format: salt$iterations$hash
- * PBKDF2-SHA256 with 600,000 iterations is recommended by OWASP for password hashing.
+ * PBKDF2-SHA256 with 500,000 iterations (benchmark-tested for <500ms latency).
  */
 export async function hashPassword(password: string): Promise<string> {
   const salt = new Uint8Array(16);

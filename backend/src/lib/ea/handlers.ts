@@ -28,7 +28,7 @@ export async function submitEaFibLevels(eaApiKey: string, rawBody: unknown) {
   if (!parsed.success) {
     throw new EaEndpointError(400, "Invalid payload", parsed.error.flatten());
   }
-  const { symbol, levels } = parsed.data;
+  const { symbol, levels, calculatedAt } = parsed.data;
   const sym = symbol.toUpperCase();
   let inserted = 0;
   let failed = 0;
@@ -70,7 +70,8 @@ export async function submitEaFibLevels(eaApiKey: string, rawBody: unknown) {
         sym,
         tfEntry.timeframe as FibTimeframe,
         null,
-        batch
+        batch,
+        calculatedAt ? new Date(calculatedAt) : undefined
       );
       inserted += batch.length;
     } catch {
