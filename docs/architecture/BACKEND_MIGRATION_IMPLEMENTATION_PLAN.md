@@ -1,11 +1,61 @@
 # Backend Migration Implementation Plan
 
-**Status**: Ready for Implementation  
-**Scope**: Phase 4 Critical Endpoints + Core Auth/Session (6 endpoints total)  
-**Strategy**: Shadow Mode → WordPress Parity Validation → Cutover  
-**Database**: PostgreSQL via Supabase (immediate setup)  
-**Deployment**: Local Nitro Dev Server → Cloudflare Workers (post-Phase 4)  
-**Security**: X-EA-API-Key for Phase 4 → HMAC-SHA256 post-cutover
+> **SUPERSEDED STRATEGY (2026-07-17) — WordPress-Free BACKEND-2.**
+> WordPress is permanently down. The **Shadow Mode → WordPress Parity Validation → Cutover**
+> strategy below is retired: there is no live WordPress source to shadow-sync or cut over from.
+> The authoritative plan is now [`plans/backend-2-restoration-plan.md`](../../plans/backend-2-restoration-plan.md)
+> (service-oriented architecture, zero WordPress dependencies, `VITE_API_URL`, JWT-only auth,
+> `SnapshotService`/`SignalService`/`ChartService`/`MarketDataService`/`TelemetryService`).
+> This document is retained as the historical Phase 0–4 implementation record (BACKEND-0/1 are
+> complete); Phase 5 (Shadow Mode) and the HMAC post-cutover items below are obsolete.
+
+**Status**: BACKEND-0 + BACKEND-1 COMPLETE (2026-07-17); BACKEND-2 IN-PROGRESS  
+**Scope**: WordPress-Free Restoration — service layer + app-boot/core-trading endpoints + MT5 read-only ingest + data migration (see canonical plan)  
+**Strategy**: Remove WordPress entirely → service-oriented endpoints in dependency order → MT5 read-only ingest → seed/migrate data  
+**Database**: PostgreSQL via Supabase  
+**Deployment**: Local Nitro Dev Server → Cloudflare Workers  
+**Security**: `X-EA-API-Key` for `/api/ea/*` ingest; JWT (Bearer) for user routes; no WordPress cookie/nonce path
+
+---
+
+## Service Layer Architecture (NEW — WordPress-Free BACKEND-2)
+
+Routes become thin wrappers; domain services own database access, validation, and
+business logic, and return domain objects (not DB rows). This replaces the endpoint-first
+`handlers.ts` modules currently in `backend/src/lib/{auth,ea,market-data}/`.
+
+```
+backend/src/lib/services/
+├── snapshot/
+│   ├── index.ts        # SnapshotService.getUnifiedSnapshot(userId)
+│   ├── queries.ts      # market_snapshots / market_regimes / signal_gates reads
+│   └── validators.ts   # watchlist/access validation
+├── signal/
+│   ├── index.ts        # SignalService.getLiveSignals / getLadders
+│   ├── queries.ts      # signals / trade_plans reads
+│   └── validators.ts
+├── chart/
+│   ├── index.ts        # ChartService.getChartSnapshot(userId, symbol, timeframe)
+│   ├── queries.ts      # candles + fib_levels reads
+│   └── validators.ts
+├── market/
+│   ├── index.ts        # MarketDataService.ingestMarketStream / syncSymbols
+│   ├── queries.ts      # market_snapshots writes, symbol registry
+│   └── validators.ts
+└── telemetry/
+    ├── index.ts        # TelemetryService.getEngineHealth / getAccountTelemetry / recordHeartbeat / syncAccount
+    ├── queries.ts      # engine_runs / account_telemetry / ea_sessions
+    └── validators.ts
+```
+
+**Base pattern** (per canonical plan):
+1. Validate caller access / input.
+2. Query the database for the latest data.
+3. Apply business logic (filtering, transformation).
+4. Persist (if mutating) and return a domain object.
+
+Services are unit-testable in isolation; integration tests should target services
+directly, not transport concerns.
 
 ---
 
@@ -519,9 +569,16 @@ export const getUserRoute = factory.createHandlers(
 
 ---
 
-## Phase 5: Shadow Mode & Data Sync (Day 5-6)
+## Phase 5: Shadow Mode & Data Sync (Day 5-6) — RETIRED (WordPress permanently down)
 
-### 5.1 WordPress → TanStack Sync Service (backend/src/lib/sync/)
+> **Removed from scope (2026-07-17).** WordPress is permanently down, so there is no
+> live source to shadow-sync or validate against. This entire phase — the WordPress REST
+> client, sync service, scheduler, and `GET /api/admin/shadow-validation` — is obsolete.
+> Data migration is now handled by **BACKEND-2 Phase 6 (Data Migration)** in the canonical
+> plan: migrate a WordPress backup if one exists, otherwise seed test data. The service
+> layer that replaces this sync logic is documented below.
+
+### 5.1 WordPress → TanStack Sync Service (RETIRED — do not implement)
 
 ```
 backend/src/lib/sync/
@@ -633,7 +690,7 @@ export async function syncFibLevelsFromWordPress(since?: Date) {
 }
 ```
 
-### 5.2 Sync Scheduler (backend/src/lib/sync/scheduler.ts)
+### 5.2 Sync Scheduler (RETIRED — do not implement)
 
 ```typescript
 import { syncFibLevelsFromWordPress } from './fib-level-sync';
@@ -662,7 +719,7 @@ export function startShadowSync(intervalMs = 5 * 60 * 1000) {
 }
 ```
 
-### 5.3 Shadow Mode Validation Endpoint
+### 5.3 Shadow Mode Validation Endpoint (RETIRED — `GET /api/admin/shadow-validation` removed)
 
 **GET /api/admin/shadow-validation** — Compare WP vs TanStack data
 
@@ -765,8 +822,7 @@ export default defineNitroConfig({
     databaseUrl: process.env.DATABASE_URL,
     eaApiKey: process.env.EA_API_KEY,
     jwtSecret: process.env.JWT_SECRET,
-    wordpressApiUrl: process.env.WORDPRESS_API_URL,
-    wordpressApiKey: process.env.WORDPRESS_API_KEY,
+    // WordPress removed (2026-07-17): no WORDPRESS_API_URL / WORDPRESS_API_KEY
   },
 });
 ```
@@ -1009,11 +1065,12 @@ backend/
 │   │   │   ├── types.ts
 │   │   │   ├── queries/
 │   │   │   └── migrations/
-│   │   └── sync/
-│   │       ├── wordpress-client.ts
-│   │       ├── sync-service.ts
-│   │       ├── fib-level-sync.ts
-│   │       └── scheduler.ts
+│   │   └── services/                # NEW: domain services (replaces lib/sync + endpoint-first handlers)
+│   │       ├── snapshot/             # SnapshotService
+│   │       ├── signal/               # SignalService
+│   │       ├── chart/                # ChartService
+│   │       ├── market/               # MarketDataService
+│   │       └── telemetry/            # TelemetryService
 │   ├── routes/
 │   │   └── api/
 │   │       ├── auth/
@@ -1074,7 +1131,7 @@ npm i -D tsx
 | Risk | Mitigation |
 |------|------------|
 | Supabase connection issues local | Use Supabase CLI local dev (`supabase start`) |
-| WordPress API changes | Shadow mode validates parity before cutover |
+| WordPress permanently down | Out of scope — no shadow mode; restore via `VITE_API_URL` + service layer + data seed/migration (BACKEND-2) |
 | EA API key mismatch | Validate key format in middleware, log failures |
 | Data loss during sync | Upsert with conflict resolution, idempotent sync |
 | Phase 4 tests fail | Seed script ensures deterministic test data |
@@ -1086,11 +1143,9 @@ npm i -D tsx
 
 - [ ] All 6 API endpoints return 200/201 for valid requests
 - [ ] All 6 API endpoints return 400/401/403 for invalid requests
-- [ ] Shadow sync runs every 5min without errors for 24h
-- [ ] Shadow validation shows 0 mismatches for 100+ records
-- [ ] All Phase 4 Cypress tests pass against TanStack Start
 - [ ] Auth flow works: register → login → me
 - [ ] EA can submit fib levels, dashboard can fetch them
+- [ ] (Retired) Shadow sync / shadow validation — WordPress is permanently down; superseded by BACKEND-2 data migration (seed or backup import)
 
 ---
 
@@ -1101,8 +1156,12 @@ npm i -D tsx
 3. **Day 2-3**: Auth middleware + endpoints
 4. **Day 3-4**: Phase 4 critical endpoints
 5. **Day 4-5**: User endpoints
-6. **Day 5-6**: Shadow sync + validation
+6. **Day 5-6**: ~~Shadow sync + validation~~ — RETIRED (WordPress down); superseded by BACKEND-2 data migration
 7. **Day 6-7**: Integration tests + seed scripts
 8. **Day 7-8**: Cypress Phase 4 execution + validation
 
-**Estimated: 8 working days to Phase 4 validation**
+> **Note**: This Next Steps list is the legacy Phase 0–4 plan (now COMPLETE for BACKEND-0/1).
+> The active restoration work follows [`plans/backend-2-restoration-plan.md`](../../plans/backend-2-restoration-plan.md)
+> (7 sub-phases, 15–23 days).
+
+**Estimated: 8 working days to Phase 4 validation (legacy; BACKEND-2 total 15–23 days)**

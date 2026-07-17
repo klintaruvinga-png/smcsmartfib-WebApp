@@ -2,18 +2,27 @@
 
 This roadmap coordinates the WordPress → Node.js/TanStack Start backend migration with Phase 4 MT5 fib engine validation, providing a phased approach that minimizes context switching while ensuring safe cutover from the legacy WordPress backend.
 
+> **STRATEGY UPDATE (2026-07-17) — WordPress-Free BACKEND-2.**
+> WordPress is **permanently down**, so the shadow-mode sync, dual-write, cutover, and
+> decommission narrative in this roadmap no longer applies. The authoritative plan is now
+> [`backend-2-restoration-plan.md`](./backend-2-restoration-plan.md): a service-oriented,
+> zero-WordPress restoration (`VITE_API_URL`, JWT-only auth, domain services) delivered in
+> 7 sub-phases over 15–23 days. Sections below that describe shadow sync, dual-write,
+> WordPress cutover, and WordPress decommission are **RETIRED** — see the inline notes.
+> This file remains useful for the phased sequencing of MT5 validation vs. backend work.
+
 ---
 
 ## Executive Summary
 
 **Current State**: Phase 4 MT5 fib engine is in read-only testing mode (parity gate not yet passed). Backend migration BACKEND-0 is ~90% complete (database layer, shared contracts already authored; provider wiring pending) and BACKEND-1 is COMPLETE (auth, critical endpoints, and settings endpoint all implemented).
 
-**Strategic Approach**: Complete backend foundation in parallel with Phase 4 validation, then execute shadow-mode sync and controlled cutover after Phase 4 gate passes. This prevents debugging two major systems simultaneously while maintaining project momentum.
+**Strategic Approach (revised 2026-07-17)**: WordPress is permanently down, so the backend is restored directly via the WordPress-free BACKEND-2 plan — no shadow-mode sync, no cutover. Complete the backend foundation (BACKEND-0/1) and the service-oriented BACKEND-2 restoration in parallel with Phase 4 validation. This prevents debugging two major systems simultaneously while maintaining project momentum.
 
 **Key Dependencies**: 
-- BACKEND-2 through BACKEND-5 are gated on Phase 4 completion
-- WordPress cutover requires successful shadow-mode parity validation
-- Final migration blocked until MT5 engine is proven stable
+- BACKEND-2 (WordPress-Free Restoration) is gated only on BACKEND-1 completion, not on Phase 4
+- No WordPress cutover — compatibility is removed outright in BACKEND-2 Phase 1
+- MT5 engine validation (Phase 4) remains a separate track; backend restoration does not wait for it
 
 ---
 
@@ -34,10 +43,10 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
 - ❌ Avoid MT5 engine modifications
 
 **After Phase 4 Gate Passes**:
-- ✅ Execute BACKEND-2 (MT5 integration)
-- ✅ Execute BACKEND-3 (signal endpoints)
-- ✅ Begin shadow-mode sync
-- ✅ Plan controlled cutover
+- ✅ Execute BACKEND-2 (MT5 integration — read-only ingest)
+- ✅ Execute the core-trading endpoints (signals, ladders, health, account-telemetry)
+- ⌫ ~~Begin shadow-mode sync~~ — RETIRED (WordPress down)
+- ⌫ ~~Plan controlled cutover~~ — RETIRED (no WordPress to cut over from)
 
 **If Phase 4 Uncovers Issues**:
 - Pause backend migration at BACKEND-1
@@ -105,159 +114,86 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
 
 ### Medium Phase (Weeks 3-6): Integration & Shadow Mode
 
-**Objective**: Execute BACKEND-2 and BACKEND-3, establish shadow-mode sync with WordPress.
+**Objective**: Execute the WordPress-free BACKEND-2 restoration (service layer + app-boot/core-trading endpoints + MT5 read-only ingest). See [`backend-2-restoration-plan.md`](./backend-2-restoration-plan.md).
 
-#### BACKEND-2: MT5 Integration (Week 3-4)
-**Dependency**: Phase 4 gate MUST PASS before starting
+#### BACKEND-2: WordPress-Free Restoration (was "MT5 Integration")
+**Dependency**: BACKEND-1 complete (Phase 4 NOT required)
 
-- [ ] **MT5 Dual-Write Configuration** (Priority: CRITICAL)
-  - Configure MT5 EA to write to both WordPress and TanStack endpoints
-  - Implement fallback mechanism (WordPress primary, TanStack secondary)
-  - Add write confirmation and retry logic
-  - Configure dual-write monitoring and alerts
-  - **Evidence**: MT5 logs show successful dual-writes, error rates <1%
-
-- [ ] **EA Bridge Endpoints** (Priority: HIGH)
-  - `POST /api/ea/heartbeat` - MT5 heartbeat ingestion
-  - `POST /api/ea/account-sync` - account metadata sync
+- [ ] **MT5 Read-Only Ingestion** (Priority: CRITICAL) — replaces dual-write
+  - `POST /api/ea/market-stream` - market snapshot ingestion → `market_snapshots`
+  - `POST /api/ea/heartbeat` - MT5 heartbeat ingestion → `ea_sessions`
+  - `POST /api/ea/account-sync` - account telemetry → `account_telemetry`
   - `POST /api/ea/symbol-sync` - broker symbol sync
-  - `GET /api/ea/license-check` - license validation
-  - Parity with existing WordPress EA routes
-  - **Evidence**: Integration tests pass, MT5 EA connects successfully
+  - No dual-write, no WordPress primary/fallback (WordPress is down)
+  - **Evidence**: MT5 EA writes data; integration tests pass
 
-- [ ] **Telemetry Pipeline** (Priority: MEDIUM)
-  - Implement MT5 → backend telemetry ingestion
-  - Add candle data streaming endpoints
-  - Configure freshness monitoring
-  - Add stale-data detection and alerting
-  - **Evidence**: Real-time telemetry dashboard operational
+- [ ] **App-Boot + Core-Trading Endpoints** (Priority: HIGH)
+  - `GET /api/snapshot/unified`, `GET /api/charts`, `GET /api/session` (app boot)
+  - `GET /api/signals`, `GET /api/ladders`, `GET /api/health`, `GET /api/account-telemetry`
+  - Backed by SnapshotService / SignalService / ChartService / MarketDataService / TelemetryService
+  - **Evidence**: Frontend boots and renders signals, ladders, engine health
 
-#### BACKEND-3: Signal & Plan Endpoints (Week 5-6)
-**Dependency**: BACKEND-2 complete
+- [ ] **Service Layer Foundation** (Priority: HIGH)
+  - `backend/src/lib/services/{snapshot,signal,chart,market,telemetry}/`
+  - Refactor endpoint-first `handlers.ts` into services
+  - **Evidence**: Services unit-tested in isolation; routes are thin wrappers
+
+#### BACKEND-3: Signal & Plan Endpoints (folded into BACKEND-2 Phase 4)
+**Dependency**: Now part of BACKEND-2 (no separate gate). Per [`backend-2-restoration-plan.md`](./backend-2-restoration-plan.md) these are delivered as `GET /api/signals`, `GET /api/ladders`, etc., backed by `SignalService`.
 
 - [ ] **Signal Processing Endpoints** (Priority: HIGH)
-  - `POST /api/signals/generate` - signal generation requests
-  - `GET /api/signals/:id` - signal retrieval
-  - `GET /api/signals/history` - signal history
-  - Integration with MT5 signal engine
-  - **Evidence**: Signal generation matches MT5 output
-
-- [ ] **Trade Planning Endpoints** (Priority: HIGH)
-  - `POST /api/trade-plans` - create trade plan
-  - `GET /api/trade-plans/:id` - retrieve trade plan
-  - `PUT /api/trade-plans/:id` - update trade plan
-  - `DELETE /api/trade-plans/:id` - delete trade plan
-  - Integration with dashboard plan cards
-  - **Evidence**: Dashboard plan cards functional
+  - `GET /api/signals` (board_size, scope) - live signal board
+  - `GET /api/ladders` - trade plans for dashboard plan cards
+  - Backed by `SignalService.getLiveSignals` / `getLadders`
+  - **Evidence**: Signals/ladders render; match MT5 output where available
 
 - [ ] **Regime & Chop Data** (Priority: MEDIUM)
-  - `GET /api/market-data/regime` - regime classification
-  - `GET /api/market-data/chop-score` - chop score calculation
-  - Integration with MT5 regime engine
-  - **Evidence**: Regime data matches MT5 calculations
+  - `GET /api/snapshot/unified` carries regimes + gates (vs. separate WP routes)
+  - Backed by `SnapshotService` + `market_regimes` / `signal_gates` tables
+  - **Evidence**: Regime/gate state renders in snapshot
 
-#### Shadow Mode Setup (Week 6)
-**Dependency**: BACKEND-3 complete
+#### Shadow Mode Setup (Week 6) — RETIRED (WordPress permanently down)
+No WordPress source exists to sync from or validate against. The WordPress client,
+shadow sync service, scheduler, and `GET /api/admin/shadow-validation` are **removed
+from scope**. Data migration is handled by BACKEND-2 Phase 6 (import a WordPress backup
+if one exists, otherwise seed test data).
 
-- [ ] **WordPress Client Implementation** (Priority: CRITICAL)
-  - Create `backend/src/lib/sync/wordpress-client.ts`
-  - Implement authenticated WordPress REST API client
-  - Add timeout and retry logic
-  - Configure rate limiting
-  - **Evidence**: Successful WordPress API calls in logs
-
-- [ ] **Shadow Sync Service** (Priority: CRITICAL)
-  - Create `backend/src/lib/sync/fib-level-sync.ts`
-  - Implement WordPress → TanStack fib level sync
-  - Add incremental sync (since timestamp)
-  - Configure sync frequency (5min intervals)
-  - **Evidence**: Sync logs show record counts matching WordPress
-
-- [ ] **Sync Scheduler** (Priority: HIGH)
-  - Create `backend/src/lib/sync/scheduler.ts`
-  - Implement cron-based sync scheduling
-  - Add error handling and retry logic
-  - Configure sync monitoring and alerts
-  - **Evidence**: Scheduled syncs running every 5 minutes
-
-- [ ] **Shadow Validation Endpoint** (Priority: HIGH)
-  - `GET /api/admin/shadow-validation` - parity comparison
-  - Implement bidirectional parity checks
-  - Add mismatch reporting and alerting
-  - Configure validation thresholds
-  - **Evidence**: Validation endpoint returns 100% parity
-
-**Success Criteria**:
-- MT5 dual-write operational with <1% error rate
+**Success Criteria** (revised, WordPress-free):
+- MT5 read-only ingestion operational (market-stream, heartbeat, account-sync, symbol-sync)
 - All signal/plan endpoints functional
-- Shadow sync achieves 100% parity with WordPress
-- Validation endpoint confirms data consistency
-- No data loss during sync operations
+- Service layer present; routes are thin wrappers
+- Data migration/seed complete; frontend renders migrated or seeded data
+- No data loss during migration
 
 ---
 
 ### Long Term Phase (Weeks 7-12): Cutover & Decommission
 
-**Objective**: Execute BACKEND-4 and BACKEND-5, perform controlled cutover, retire WordPress.
+**Objective**: Complete the WordPress-free restoration (BACKEND-2) and harden the service-oriented architecture. The old BACKEND-4 (cutover) and BACKEND-5 (WP decommission) are obsolete — there is no WordPress to cut over from or decommission via migration; WordPress compatibility is removed outright in BACKEND-2 Phase 1.
 
-#### BACKEND-4: Transition & Cutover (Week 7-8)
-**Dependency**: Shadow mode parity 100% for 7+ days
+#### BACKEND-4 / BACKEND-5 — SUPERSEDED (no WordPress cutover or decommission phase)
+The previously planned Transition & Cutover and Architecture Refactoring phases assumed a
+live WordPress to migrate away from. With WordPress permanently down, those phases are
+removed. Their useful content is redistributed:
+- **Data migration** → BACKEND-2 Phase 6 (import WordPress backup if available, else seed).
+- **Architecture refactoring (service layer, DI)** → BACKEND-2 Phase 2 (service foundation).
+- **Performance optimization / security hardening** → ongoing post-restoration work; HMAC-SHA256 EA auth is deferred (JWT + `X-EA-API-Key` is the model).
 
-- [ ] **Gradual Endpoint Migration** (Priority: CRITICAL)
-  - Migrate read-only endpoints first (market data, user profile)
-  - Monitor error rates and performance
-  - Add feature flags for rollback capability
-  - Configure DNS failover
-  - **Evidence**: Gradual migration plan approved, rollback tested
-
-- [ ] **Data Migration** (Priority: CRITICAL)
-  - Migrate historical data from WordPress to Supabase
-  - Validate data integrity post-migration
-  - Configure data backup and recovery
-  - Test data rollback procedures
-  - **Evidence**: Data validation passes, backup confirmed
-
-- [ ] **Cutover Execution** (Priority: CRITICAL)
-  - Schedule maintenance window (low-traffic period)
-  - Execute final WordPress → TanStack sync
-  - Switch DNS to point to TanStack backend
-  - Monitor system health and error rates
-  - **Evidence**: Successful cutover, <5min downtime
-
-- [ ] **Rollback Procedures** (Priority: HIGH)
-  - Document rollback triggers and procedures
-  - Test rollback to WordPress
-  - Configure automated rollback on critical errors
-  - **Evidence**: Rollback tested and documented
-
-#### BACKEND-5: Architecture Refactoring (Week 9-10)
-**Dependency**: BACKEND-4 complete, WordPress cutover successful
-
-- [ ] **WordPress Decommission** (Priority: HIGH)
-  - Disable WordPress write endpoints
-  - Archive WordPress database
-  - Remove WordPress from load balancer
-  - Clean up WordPress infrastructure
-  - **Evidence**: WordPress infrastructure decommissioned
-
-- [ ] **Hexagonal Architecture Implementation** (Priority: MEDIUM)
-  - Refactor to hexagonal architecture (ports/adapters)
-  - Implement domain layer separation
-  - Add dependency injection
-  - **Evidence**: Architecture review passes
+- [ ] **Hexagonal / Service-Oriented Architecture** (Priority: MEDIUM)
+  - Domain services own DB access, validation, business logic (BACKEND-2 Phase 2)
+  - Routes are thin wrappers; services unit-tested in isolation
+  - **Evidence**: Architecture review passes; services present
 
 - [ ] **Performance Optimization** (Priority: MEDIUM)
   - Database query optimization
-  - Add caching layers (Redis)
   - Implement connection pooling
   - Configure CDN for static assets
-  - **Evidence**: Performance benchmarks meet targets
+  - **Evidence**: Performance benchmarks meet targets (<500ms most endpoints)
 
 - [ ] **Security Hardening** (Priority: HIGH)
-  - Implement HMAC-SHA256 for EA authentication
-  - Add request signing validation
-  - Configure WAF rules
-  - Implement security audit logging
+  - Enforce JWT (Bearer) for user routes; `X-EA-API-Key` for `/api/ea/*`
+  - Configure WAF rules; security audit logging
+  - (HMAC-SHA256 deferred)
   - **Evidence**: Security audit passes
 
 #### Cleanup & Monitoring (Week 11-12)
@@ -293,9 +229,14 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
 
 ---
 
-## WordPress Integration Strategy
+## WordPress Integration Strategy — RETIRED (WordPress permanently down)
 
-### Shadow Mode Architecture
+> **Entire section obsolete (2026-07-17).** With no live WordPress, there is no shadow
+> mode, cutover, rollback-to-WordPress, or decommission procedure. Data migration is now
+> BACKEND-2 Phase 6 (backup import or seed). The subsections below are retained only as
+> historical record.
+
+### Shadow Mode Architecture (RETIRED)
 
 **Phase 1: Read-Only Shadow** (Week 6-7)
 - TanStack backend reads from WordPress via sync service
@@ -340,7 +281,7 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
 - User acceptance testing
 - Performance benchmarking
 
-### Rollback Strategy
+### Rollback Strategy (RETIRED — no WordPress to roll back to)
 
 **Automatic Rollback Triggers**
 - Error rate >5% for 5 minutes
@@ -361,7 +302,7 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
 - Document rollback times and success rates
 - Refine rollback procedures based on testing
 
-### Cutover Checklist
+### Cutover Checklist (RETIRED)
 
 **Pre-Cutover** (24 hours before)
 - [ ] Shadow mode parity 100% for 7+ days
@@ -387,7 +328,7 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
 - [ ] Update stakeholders on success
 - [ ] Plan WordPress decommission timeline
 
-### Decommission Checklist
+### Decommission Checklist (RETIRED)
 
 **Pre-Decommission** (1 week before)
 - [ ] TanStack backend stable for 14+ days
@@ -418,19 +359,17 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
 **Development** (Local)
 - Nitro dev server on localhost:3000
 - Local Supabase instance (via Docker)
-- Mock WordPress for testing
+- Frontend `VITE_API_URL=http://localhost:3000/api` (no WordPress)
 - Environment: `.env.local`
 
 **Staging** (Cloudflare Workers)
 - Nitro build with Cloudflare preset
 - Supabase staging project
-- WordPress staging instance
 - Environment: `.env.staging`
 
 **Production** (Cloudflare Workers)
 - Nitro build with Cloudflare preset
 - Supabase production project
-- WordPress production (during shadow mode)
 - Environment: `.env.production`
 
 ### Secrets Management
@@ -443,15 +382,13 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
 
 **Authentication**
 - `JWT_SECRET` - JWT signing secret
-- `EA_API_KEY` - MT5 EA authentication key
-
-**WordPress Integration**
-- `WORDPRESS_API_URL` - WordPress REST API URL
-- `WORDPRESS_API_KEY` - WordPress API key for sync
+- `EA_API_KEY` - MT5 EA authentication key (validated as `X-EA-API-Key`)
 
 **Cloudflare**
 - `CLOUDFLARE_ACCOUNT_ID` - Cloudflare account ID
 - `CLOUDFLARE_API_TOKEN` - Cloudflare API token
+
+> **Removed (2026-07-17):** `WORDPRESS_API_URL` / `WORDPRESS_API_KEY` — WordPress is permanently down.
 
 ### Cloudflare Workers Deployment
 
@@ -498,7 +435,7 @@ npx wrangler deploy
 **Health Checks**
 - `/api/health` endpoint
 - Database connectivity check
-- External service availability (WordPress API)
+- External service availability (MT5 EA reachability, optional)
 - Automated health checks every 30 seconds
 
 ### CI/CD Pipeline
@@ -693,19 +630,19 @@ jobs:
 - ✅ Settings endpoint (GET/PUT/POST/PATCH /api/user/settings, transaction with row-locking `SELECT ... FOR UPDATE` + application deep merge, 47/47 tests)
 - ⏳ API documentation (deferred to deployment phase)
 
-**BACKEND-2 through BACKEND-5**: NOT STARTED
+**BACKEND-2 (WordPress-Free Restoration)**: IN-PROGRESS (started 2026-07-17) — 7 sub-phases, 15–23 days. See [`backend-2-restoration-plan.md`](./backend-2-restoration-plan.md).
+**BACKEND-3 / BACKEND-4 / BACKEND-5**: SUPERSEDED — folded into BACKEND-2 (signal endpoints, service layer, data migration); no WordPress cutover/decommission phase.
 
 ### Key Dependencies
 
 **External Dependencies**
 - Supabase (PostgreSQL database)
 - Cloudflare Workers (serverless platform)
-- WordPress (legacy backend during transition)
 
 **Internal Dependencies**
-- Phase 4 MT5 fib engine (must pass parity gate)
-- Frontend dashboard (requires backend API contracts)
-- MT5 EA (requires backend endpoints)
+- Phase 4 MT5 fib engine (separate validation track; backend restoration does not wait for it)
+- Frontend dashboard (requires backend API contracts via `VITE_API_URL`)
+- MT5 EA (requires backend endpoints; read-only ingest first)
 
 ### Documentation References
 

@@ -5,11 +5,21 @@
 **Target Architecture**: Full-Stack TanStack Start / Nitro application running on Cloudflare Workers/Pages  
 **Database**: PostgreSQL (Supabase, Neon, or Managed PostgreSQL)  
 
+> **STRATEGY UPDATE (2026-07-17) — WordPress-Free.**
+> WordPress is **permanently down**, so the WordPress dual-write / shadow-sync / cutover
+> framing in this plan no longer applies. The authoritative plan is now
+> [`plans/backend-2-restoration-plan.md`](../plans/backend-2-restoration-plan.md): a
+> service-oriented, zero-WordPress restoration using `VITE_API_URL`, JWT-only auth, and
+> domain services (`SnapshotService`, `SignalService`, `ChartService`, `MarketDataService`,
+> `TelemetryService`). This document remains useful for its layered architecture, EA
+> ingestion security notes, and endpoint mapping, but the dual-write strategy and the
+> HMAC post-cutover item are deferred/out of scope.
+
 ---
 
 ## 1. Overview & Objective
 
-With WordPress closed off, the SMC SuperFib WebApp requires a new backend hosting model. Rather than deploying a separate API service, we will migrate all REST endpoints and ingestion handlers directly into the existing **TanStack Start** codebase. 
+With WordPress **permanently down**, the SMC SuperFib WebApp requires a new backend hosting model. Rather than deploying a separate API service, we will migrate all REST endpoints and ingestion handlers directly into the existing **TanStack Start** codebase. The new WordPress-free plan ([plans/backend-2-restoration-plan.md](../plans/backend-2-restoration-plan.md)) prioritizes restoring frontend functionality via a service-oriented architecture. 
 
 Because TanStack Start compiles to a serverless Nitro server, it runs natively on **Cloudflare Workers** (matching the current wrangler configuration). This creates a single unified repository and deployment pipeline for both frontend and backend.
 
@@ -51,6 +61,12 @@ We will follow a strict layered architectural pattern to decouple transport, bus
 
 ## 3. Cryptographic EA Ingestion Security
 
+> **Status (2026-07-17):** The HMAC-SHA256 scheme below is **deferred**. The WordPress-free
+> BACKEND-2 restoration keeps the existing `X-EA-API-Key` header (validated server-side
+> against the `users` table, role `ea`) for `/api/ea/*` ingestion, plus JWT (Bearer) for
+> user routes. HMAC replay protection can be added later as a hardening step, not as part
+> of the initial restoration.
+
 To prevent replay attacks and secure MT5 EA telemetry writes, we implement an HMAC-SHA256 signature verification middleware for all `/api/ea/*` routes:
 
 ### Authentication Parameters & Headers:
@@ -69,6 +85,14 @@ Validate(Received_Signature === Expected_Signature)
 ---
 
 ## 4. Revised Database Schema (PostgreSQL DDL & Indexing)
+
+> **Naming reconciliation (2026-07-17):** The DDL below uses `smc_sf_*`-prefixed table
+> names. The canonical BACKEND-2 plan ([plans/backend-2-restoration-plan.md](../plans/backend-2-restoration-plan.md))
+> uses unprefixed names (`market_snapshots`, `market_regimes`, `signal_gates`, `candles`,
+> `signals`, `trade_plans`, `engine_runs`, `account_telemetry`). **Reconcile to one
+> convention before authoring migration `005_add_phase1_tables.sql`.** The unprefixed names
+> from the BACKEND-2 plan are the current target; treat this section's DDL as the structural
+> reference and align names/columns accordingly.
 
 Below is the DDL required for the PostgreSQL database, translating old SQLite types to PostgreSQL types (`SERIAL`, `TIMESTAMP`, `JSONB`, etc.) and adding indexes for query performance.
 
@@ -245,19 +269,26 @@ CREATE INDEX idx_used_nonces_ttl ON smc_sf_used_nonces (created_at);
 
 ## 5. REST Endpoint API Mapping
 
-All REST API paths will be mapped to modern TS endpoints nested inside `src/routes/api/`:
+All REST API paths are implemented as TS endpoints nested inside `src/routes/api/`. The
+**Legacy WP route** column is historical (WordPress is permanently down); the **Start API
+Path** is the live target, and **Service** shows the owning domain service from the
+BACKEND-2 plan.
 
-| WordPress Endpoints | Target Start API Path | Transport Layer Handler |
-|---------------------|-----------------------|-------------------------|
-| `GET /health` | `GET /api/health` | `src/routes/api/health.ts` |
-| `GET /admin/soak-report` | `GET /api/admin/soak-report` | `src/routes/api/admin/soak-report.ts` |
-| `GET /snapshot/unified` | `GET /api/snapshot/unified` | `src/routes/api/snapshot/unified.ts` |
-| `GET /ladders` | `GET /api/ladders` | `src/routes/api/ladders.ts` |
-| `POST /user/settings` | `POST /api/user/settings` | `src/routes/api/user/settings.ts` |
-| `POST /ea/market-stream` | `POST /api/ea/market-stream` | `src/routes/api/ea/market-stream.ts` |
-| `POST /ea/heartbeat` | `POST /api/ea/heartbeat` | `src/routes/api/ea/heartbeat.ts` |
-| `POST /ea/account-sync` | `POST /api/ea/account-sync` | `src/routes/api/ea/account-sync.ts` |
-| `POST /ea/symbol-sync` | `POST /api/ea/symbol-sync` | `src/routes/api/ea/symbol-sync.ts` |
+| Legacy WP route (down) | Start API Path | Service / Handler |
+|------------------------|----------------|------------------|
+| `GET /health` | `GET /api/health` | `TelemetryService.getEngineHealth` |
+| `GET /admin/soak-report` | `GET /api/admin/soak-report` | Admin/soak service |
+| `GET /snapshot/unified` | `GET /api/snapshot/unified` | `SnapshotService.getUnifiedSnapshot` (BACKEND-2c) |
+| `GET /charts` | `GET /api/charts` | `ChartService.getChartSnapshot` (BACKEND-2c) |
+| `GET /session` | `GET /api/session` | Market session detection (BACKEND-2c) |
+| `GET /live-signals` | `GET /api/signals` | `SignalService.getLiveSignals` (BACKEND-2d) |
+| `GET /ladders` | `GET /api/ladders` | `SignalService.getLadders` (BACKEND-2d) |
+| `GET /account-telemetry` | `GET /api/account-telemetry` | `TelemetryService.getAccountTelemetry` (BACKEND-2d) |
+| `POST /user/settings` | `GET/PUT/POST/PATCH /api/user/settings` | Settings service (BACKEND-1, done) |
+| `POST /ea/market-stream` | `POST /api/ea/market-stream` | `MarketDataService.ingestMarketStream` (BACKEND-2e) |
+| `POST /ea/heartbeat` | `POST /api/ea/heartbeat` | `TelemetryService.recordHeartbeat` (BACKEND-2e) |
+| `POST /ea/account-sync` | `POST /api/ea/account-sync` | `TelemetryService.syncAccount` (BACKEND-2e) |
+| `POST /ea/symbol-sync` | `POST /api/ea/symbol-sync` | `MarketDataService.syncSymbols` (BACKEND-2e) |
 
 ---
 
