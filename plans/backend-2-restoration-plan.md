@@ -396,10 +396,13 @@ CREATE TABLE broker_symbols (
    - Account telemetry
 
 **Acceptance Criteria:**
-- Production data migrated OR test data seeded
 - Data validation scripts pass
 - Frontend can display migrated/seeded data
 - Rollback procedure documented (if migration)
+
+**Validation vs production readiness:**
+- Seeded test data satisfies **development/staging-only validation** — it does NOT count as production restoration.
+- **Production readiness gate**: production acceptance requires restored production data (import the WordPress backup if one exists; if no backup exists, obtain explicit sign-off that there is no production data to restore). Seeding alone is never sufficient for production acceptance.
 
 ### Phase 7: Testing & Validation
 

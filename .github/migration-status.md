@@ -530,8 +530,8 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 #### BACKEND-2f · Data Migration
 
 - [ ] If WordPress backup exists: transform `wp_users`/`wp_usermeta`/`wp_smc_sf_*` → PostgreSQL; validate; rollback plan
-- [ ] Else: seed test users, watchlists, fib levels, signals, trade plans, snapshots, telemetry
-- **Acceptance**: Production data migrated OR test data seeded and displayed
+- [ ] Else (no backup): seed test users, watchlists, fib levels, signals, trade plans, snapshots, telemetry — **development/staging validation only**
+- **Acceptance**: Production migration (from backup) required for production acceptance; seeded test data is development/staging-only and does not satisfy production readiness
 
 #### BACKEND-2g · Testing & Validation
 
