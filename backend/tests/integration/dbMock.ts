@@ -14,7 +14,7 @@ const shared = vi.hoisted(() => {
     const chain: Record<string, unknown> = {};
     const builderMethods = [
       "select", "from", "where", "orderBy", "limit", "values",
-      "onConflictDoUpdate", "set", "returning", "innerJoin", "leftJoin",
+      "onConflictDoUpdate", "set", "returning", "innerJoin", "leftJoin", "for",
     ];
     for (const m of builderMethods) {
       chain[m] = (...args: unknown[]) => {

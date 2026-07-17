@@ -17,9 +17,9 @@ beforeEach(() => {
 });
 
 describe("user settings queries", () => {
-  it("getUserSettings returns {} when no row exists", async () => {
+  it("getUserSettings throws SettingsError(404) when the user row is missing", async () => {
     setDbResult([]);
-    expect(await getUserSettings("u-1")).toEqual({});
+    await expect(getUserSettings("u-1")).rejects.toBeInstanceOf(SettingsError);
   });
 
   it("getUserSettings returns the stored settings object", async () => {

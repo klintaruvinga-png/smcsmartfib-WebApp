@@ -76,7 +76,7 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
 #### BACKEND-1 Completion (Days 4-7)
 - [x] **Settings Endpoint** (Priority: HIGH) — **DONE** (2026-07-17, PR #430)
   - `GET /api/user/settings` - retrieve user preferences
-  - `PUT`/`POST`/`PATCH` `/api/user/settings` - update user preferences (transaction-based application deep merge)
+  - `PUT`/`POST`/`PATCH` `/api/user/settings` - update user preferences (transaction with row-locking `SELECT ... FOR UPDATE` + application deep merge)
   - Schema: notifications, theme, watchlist defaults, risk parameters
   - API/schema parity only; WordPress usermeta full data mapping owned by shadow-sync phase (BACKEND-3)
   - **Evidence**: 8 new integration tests; full suite 47/47 green; `npm run typecheck` clean
@@ -690,7 +690,7 @@ jobs:
 - ✅ Auth endpoints (login, register, me, refresh)
 - ✅ EA endpoints (fib-levels submission)
 - ✅ Market data endpoints (fib-levels retrieval)
-- ✅ Settings endpoint (GET/PUT/POST/PATCH /api/user/settings, transaction-based application deep merge, 47/47 tests)
+- ✅ Settings endpoint (GET/PUT/POST/PATCH /api/user/settings, transaction with row-locking `SELECT ... FOR UPDATE` + application deep merge, 47/47 tests)
 - ⏳ API documentation (deferred to deployment phase)
 
 **BACKEND-2 through BACKEND-5**: NOT STARTED

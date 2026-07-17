@@ -118,8 +118,8 @@ export async function verifyUserPassword(
 
 /**
  * Retrieve a user's structured settings (JSONB column).
- * Returns `{}` when the user or their settings are absent so callers always
- * receive a valid object.
+ * Throws SettingsError(404) if the user row does not exist; otherwise returns
+ * the settings object (defaulting to `{}` when the column is empty).
  */
 export async function getUserSettings(userId: string): Promise<UserSettings> {
   const [row] = await db
@@ -127,7 +127,8 @@ export async function getUserSettings(userId: string): Promise<UserSettings> {
     .from(users)
     .where(eq(users.id, userId))
     .limit(1);
-  return (row?.settings ?? {}) as UserSettings;
+  if (!row) throw new SettingsError(404, "User not found");
+  return (row.settings ?? {}) as UserSettings;
 }
 
 /**
@@ -160,21 +161,22 @@ function deepMerge(base: Record<string, unknown>, patch: Record<string, unknown>
 
 /**
  * Patch a user's settings using a transaction-based read-modify-write with deep
- * merge. Preserves nested properties (e.g., updating `notifications.email` won't
- * clobber `notifications.push`). Returns the full merged settings object.
- * Throws SettingsError(404) if the user row does not exist.
+ * merge. The read takes a row lock (`SELECT ... FOR UPDATE`) so concurrent updates
+ * are serialized; nested properties are preserved (e.g., updating
+ * `notifications.email` won't clobber `notifications.push`). Returns the full
+ * merged settings object. Throws SettingsError(404) if the user row does not exist.
  */
 export async function updateUserSettings(
   userId: string,
   settings: UserSettings
 ): Promise<UserSettings> {
   return await db.transaction(async (tx) => {
-    // Read current settings
+    // Read current settings, locking the row so concurrent updates serialize.
     const [current] = await tx
       .select({ settings: users.settings })
       .from(users)
       .where(eq(users.id, userId))
-      .limit(1);
+      .for("update");
 
     if (!current) throw new SettingsError(404, "User not found");
 
