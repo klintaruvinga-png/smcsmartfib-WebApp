@@ -219,11 +219,12 @@ Consolidated summary of all MT5 migration phases. For detailed implementation sp
 
 ## Migration Governance
 
-**Current Focus**: Backend migration (WordPress → TanStack Start/Node.js) is now primary development focus. MT5 Phase 4 continues in read-only testing mode.
+**Current Focus**: Backend restoration (WordPress-free, service-oriented) is now primary development focus. MT5 Phase 4 continues in read-only testing mode.
 
 **Control Updates**:
-- Phase 4 remains active migration blocker
-- No code changes to MT5 engines during backend migration
-- Backend migration plan (BACKEND-0 through BACKEND-5) supersedes earlier WordPress decommissioning restrictions
+- Phase 4 remains an active migration blocker for the *MT5 engine* track (no code changes to MT5 engines during backend work).
+- WordPress is **permanently down** — the prior shadow-mode / dual-write / cutover strategy is retired. The backend is restored directly via the WordPress-free BACKEND-2 plan ([plans/backend-2-restoration-plan.md](./plans/backend-2-restoration-plan.md)): `VITE_API_URL`, JWT-only auth, domain services.
+- BACKEND-1 (auth, settings, market data) is COMPLETE (2026-07-17). The old BACKEND-2 (MT5 dual-write) is **redefined** to the WordPress-free restoration; BACKEND-3/4/5 are superseded.
+- The legacy "BACKEND-0 through BACKEND-5" supersession note no longer applies — WordPress decommission is now part of BACKEND-2 Phase 1 (remove references), not a later phase.
 
 **For detailed migration status and gate tracking**, see `.github/migration-status.md`.

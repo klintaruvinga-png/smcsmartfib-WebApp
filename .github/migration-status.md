@@ -1,9 +1,11 @@
 # SMC SuperFIB → MT5 Migration Status Board
 
-**Last Updated**: 2026-07-15
-**Current Phase**: BACKEND MIGRATION (Active) + Phase 4 (Read-Only Testing)
-**Overall Progress**: 88% MT5 Migration + 0% Backend Migration (New Priority)
-**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 COMPLETE (2026-05-25; T0 admin baseline captured 2026-05-27, conditional closeout cleared) — Phase 4 READ-ONLY TESTING (code complete; corrected H4 runtime verified 2026-05-28; synthetic parity tooling PASS recorded; live paired exports plus weekend/sparse-data evidence still missing) — BACKEND MIGRATION IN-PROGRESS (started 2026-07-15) — Phases 5/5B/6 CODE COMPLETE (pre-emptive; gated on Phase 4) — Phases 7–9 SCAFFOLDED (gated)
+**Last Updated**: 2026-07-17
+**Current Phase**: BACKEND-2 WordPress-Free Restoration (Active) + Phase 4 (Read-Only Testing)
+**Overall Progress**: 88% MT5 Migration + BACKEND-1 COMPLETE (foundation: auth, settings, market data) + BACKEND-2 WordPress-Free Restoration IN-PROGRESS (started 2026-07-17)
+**Status**: Phase 0 COMPLETE — Phase 1 COMPLETE (2026-05-20) — Phase 2 COMPLETE (2026-05-22) — Phase 3 COMPLETE (2026-05-25; T0 admin baseline captured 2026-05-27, conditional closeout cleared) — Phase 4 READ-ONLY TESTING (code complete; corrected H4 runtime verified 2026-05-28; synthetic parity tooling PASS recorded; live paired exports plus weekend/sparse-data evidence still missing) — BACKEND-1 COMPLETE (2026-07-17; auth + settings + market-data endpoints, 47 tests) — BACKEND-2 IN-PROGRESS (2026-07-17; WordPress-free restoration, service-oriented architecture) — Phases 5/5B/6 CODE COMPLETE (pre-emptive; gated on Phase 4) — Phases 7–9 SCAFFOLDED (gated)
+
+> **Strategy change (2026-07-17)**: WordPress is treated as **permanently down**. The prior shadow-mode / dual-write / WordPress-as-fallback strategy is retired. The new BACKEND-2 plan ([plans/backend-2-restoration-plan.md](../plans/backend-2-restoration-plan.md)) removes all WordPress references, standardizes on JWT, and rebuilds the backend around domain services. There is no WordPress cutover or decommission phase — WordPress compatibility is removed outright.
 
 > Snapshot: Phase 0 gate passed 2026-05-15. Post-fix validation soak at 16:37 UTC confirmed NAS100 (29,263.70) and US30 (49,756.00) both LIVE during active US equity session; XAUUSD (4,556.34) LIVE with candle-history gate cleared. Backend soak: 259,464 engine runs / 0 errors / 69,262 candles over 24h. Frontend feed-status chip lag (BUG-001 staleTime:0) resolved. Watchlist persistence 100% parity. AUDUSD/ETHUSD chop-gate classified as correct live behavior — not a blocker. Full closeout evidence: `.github/migration/phase-updates/phase0-soak-closeout-final-2026-05-15.md`.
 
@@ -57,6 +59,8 @@ Not before:
 - MT5 transport/domain split is not authorized before Phase 6.
 - WordPress monolith shrink work is not authorized before later post-authority stabilization (superseded by BACKEND-5 architecture refactoring and WordPress decommissioning phase)
 
+> **2026-07-17 revision**: Because WordPress is permanently down, the "WordPress monolith shrink" restriction no longer applies — removing WordPress references is now the **first** step of BACKEND-2a, not a deferred post-stabilization task. The MT5/contract restrictions above remain in force.
+
 Live planning artifacts for this alignment:
 
 - `reports/source-of-truth-matrix-2026-06-17.md`
@@ -76,6 +80,32 @@ Phase 4 parity validation continues as scheduled, but development resources shif
 
 ---
 
+## Control Update - 2026-07-17 (WordPress-Free BACKEND-2)
+
+The WordPress backend (`https://trader.stokvelsociety.co.za/wp-json`) is **permanently down**; the dashboard currently cannot function against it. The backend migration strategy is revised accordingly:
+
+- **No shadow-mode sync.** `GET /api/admin/shadow-validation` and the WordPress REST client are removed from scope. There is no live WordPress source to validate against.
+- **No dual-write / WordPress-as-fallback.** The old BACKEND-2 ("MT5 integration and dual-write configuration") is redefined — see below.
+- **WordPress compatibility removed outright.** `VITE_SNIPER_BACKEND_URL` → `VITE_API_URL`; WordPress-nonce fallback and `resolveDefaultBackendUrl()` removed; `WORDPRESS_API_URL` / `WORDPRESS_API_KEY` dropped from config.
+- **JWT is the only auth model.** `X-EA-API-Key` remains for `/api/ea/*` ingest; no WordPress cookie/nonce path.
+- **Service-oriented architecture.** Domain services (SnapshotService, SignalService, ChartService, MarketDataService, TelemetryService) own DB access, validation, and business logic; route handlers become thin wrappers.
+- **MT5 ingestion is read-only first.** EA writes prices/heartbeats/account telemetry; order/execution endpoints deferred.
+
+**Revised BACKEND phase map:**
+
+| Phase | Old scope | New scope |
+| ----- | --------- | --------- |
+| BACKEND-0 | Foundation setup | IN-PROGRESS (90% - DB layer complete; provider wiring pending) |
+| BACKEND-1 | Core API (auth, settings, market data) | COMPLETE (2026-07-17; 47 tests) |
+| BACKEND-2 | MT5 dual-write + cutover prep | **REDEFINED** → WordPress-Free Restoration (7 sub-phases, 15–23 days) |
+| BACKEND-3 | Signal & plan endpoints | Folded into BACKEND-2 (Phase 4) |
+| BACKEND-4 | Transition & cutover | Obsolete — no WordPress to cut over from |
+| BACKEND-5 | Architecture refactor + WP decommission | Obsolete — WP compatibility removed in BACKEND-2 Phase 1 |
+
+BACKEND-3/4/5 as previously defined are **superseded**. Their intent (signal endpoints, architecture hardening) is absorbed into BACKEND-2.
+
+---
+
 ## Phase Summary
 
 | Phase | Objective                               | Status            | % Complete | Blocker                                                                                    | Target End            |
@@ -86,7 +116,6 @@ Phase 4 parity validation continues as scheduled, but development resources shif
 | 3     | MT5 market data engine                  | **COMPLETE**      | 100%       | None — gate cleared; T0 admin baseline captured 2026-05-27                                 | 2026-05-25 ✅         |
 | 4     | Fib engine migration                    | **READ-ONLY TESTING** | 75%        | Paired MT5/Pine exports + weekend/sparse-data evidence (no code changes during backend migration) | 2026-08-15            |
 | 4A    | Production hardening + domain contracts | **READY**         | 0%         | Parallel only; no fib/regime/signal scoring changes during Phase 4 soak                    | Parallel with Phase 4 |
-| **BACKEND** | **WordPress → Node.js/TanStack Start migration** | **IN-PROGRESS** | 0% | Foundation setup, contracts, database | 2026-09-23 |
 | 5     | Regime & chop engine                    | **CODE COMPLETE** | 70%        | Phase 4 live gate + operator deployment                                                    | 2026-09-15            |
 | 5B    | Fundamentals regime feed                | **CODE COMPLETE** | 65%        | Phase 5 parity gate                                                                        | 2026-10-01            |
 | 6     | Signal engine dual-run                  | **CODE COMPLETE** | 60%        | Phase 5B gate + fib→signal wiring sprint                                                   | 2026-10-15            |
@@ -94,12 +123,12 @@ Phase 4 parity validation continues as scheduled, but development resources shif
 | 8     | Semi-automation layer                   | **SCAFFOLDED**    | 20%        | Phase 7 complete                                                                           | 2026-12-01            |
 | 9     | SaaS & licensing system                 | **SCAFFOLDED**    | 20%        | Phase 8 complete                                                                           | 2026-12-15            |
 | 10    | Pine transition strategy                | NOT-STARTED       | 0%         | Phase 9 complete                                                                           | 2027-01-01            |
-| BACKEND-0 | Foundation setup (contracts, database, project structure) | IN-PROGRESS | 90% | PostgreSQL provider wiring | 2026-07-22 |
-| BACKEND-1 | Core API implementation (auth, settings, market data) | COMPLETE | 100% | None | 2026-08-05 |
-| BACKEND-2 | MT5 integration and dual-write configuration | NOT-STARTED | 0% | BACKEND-1 complete | 2026-08-12 |
-| BACKEND-3 | Signal and plan endpoints | NOT-STARTED | 0% | BACKEND-2 complete | 2026-08-26 |
-| BACKEND-4 | Transition and cutover | NOT-STARTED | 0% | BACKEND-3 complete | 2026-09-09 |
-| BACKEND-5 | Architecture refactoring and WordPress decommissioning | NOT-STARTED | 0% | BACKEND-4 complete | 2026-09-23 |
+| BACKEND-0 | Foundation setup (contracts, database, project structure) | IN-PROGRESS | 90% | Database layer complete; PostgreSQL provider wiring in progress (non-blocking) | 2026-07-22 |
+| BACKEND-1 | Core API implementation (auth, settings, market data) | COMPLETE | 100% | None — 47 integration tests green | 2026-07-17 ✅ |
+| BACKEND-2 | **WordPress-Free Restoration** (service layer + app-boot/core-trading endpoints + MT5 read-only ingest + data migration) | IN-PROGRESS | 0% | BACKEND-1 complete; WordPress permanently down | 2026-08-09 (15–23 day window) |
+| BACKEND-3 | _Superseded_ — signal/plan endpoints folded into BACKEND-2 Phase 4 | — | — | — | — |
+| BACKEND-4 | _Superseded_ — no WordPress cutover to perform | — | — | — | — |
+| BACKEND-5 | _Superseded_ — WP compatibility removed in BACKEND-2 Phase 1 | — | — | — | — |
 
 ---
 
@@ -395,16 +424,16 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 
 **Status**: IN-PROGRESS (Started 2026-07-15)
 
-**Strategy**: 
-- Drop-in replacement first (WordPress API compatibility)
-- Gradual endpoint-by-endpoint cutover
-- MT5 dual-write during transition
-- WordPress as fallback during migration
-- Architectural refactoring after successful migration
+**Strategy** (revised 2026-07-17 — WordPress-free):
+- WordPress is treated as permanently down; no compatibility, shadow sync, dual-write, or fallback
+- Frontend reconfigured to `VITE_API_URL`; JWT authenticates user-facing routes while `X-EA-API-Key` authenticates EA-ingestion routes
+- Domain services (SnapshotService, SignalService, ChartService, MarketDataService, TelemetryService) own DB access, validation, and business logic; route handlers are thin wrappers
+- Endpoints implemented in dependency order: app boot → core trading → MT5 read-only ingest → data migration → testing
+- MT5 ingestion is read-only first; order/execution endpoints deferred
 
-**Prerequisites**: Phase 0-3 COMPLETE ✅
+**Prerequisites**: Phase 0-3 COMPLETE ✅ · BACKEND-1 COMPLETE ✅
 
-**Implementation Plan**: See the BACKEND-0 through BACKEND-5 phase sections below in this document for the current implementation plan.
+**Implementation Plan**: See the BACKEND-0 (DB layer complete; provider wiring in progress) / BACKEND-1 (complete) and BACKEND-2 (WordPress-Free Restoration) sections below. BACKEND-3/4/5 are superseded — their intent is absorbed into BACKEND-2. Canonical plan: [plans/backend-2-restoration-plan.md](../plans/backend-2-restoration-plan.md).
 
 ### Phase BACKEND-0: Foundation Setup
 
@@ -429,7 +458,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 
 **Objective**: Implement auth, settings, and market data endpoints
 **Status**: COMPLETE — Auth + market-data endpoints COMPLETE (2026-07-16); settings endpoint COMPLETE (2026-07-17)
-**Target**: 2026-08-05
+**Target**: 2026-08-05 (original) · COMPLETE 2026-07-17
 **Blockers**: None (BACKEND-0 database layer sufficient for current endpoints; provider wiring non-blocking)
 
 #### BACKEND-1 · Auth + Critical Endpoints (2026-07-16) — COMPLETE
@@ -449,35 +478,69 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 - Route `src/routes/api/user/settings.ts`: `GET` returns settings (404 if the user row is absent), `PUT`/`POST`/`PATCH` validates + merges; `requireAuth` + no-store cache headers; mirrors `market-data/fib-levels.ts` conventions.
 - `SettingsError` (404 user-not-found) thrown from `lib/db/queries/users.ts`, converted to `createError` at the route.
 - Tests: 8 new integration tests (query merge wiring + Zod schema) — 47 total passing; `tsc --noEmit` clean.
-- **Parity note**: API/schema parity only; WordPress `usermeta` full data mapping/shadow-sync owned by BACKEND-3 shadow-mode phase, not yet implemented.
+- **Parity note**: API/schema parity only; WordPress `usermeta` full data mapping is owned by BACKEND-2 Phase 6 (Data Migration) — migrate the backup if available, otherwise seed test data. No shadow-sync phase.
 
-### Phase BACKEND-2: MT5 Integration
+### Phase BACKEND-2: WordPress-Free Restoration
 
-**Objective**: Configure dual-write and EA bridge endpoints
-**Status**: NOT-STARTED
-**Target**: 2026-08-12
-**Blockers**: None (BACKEND-1 complete)
+**Objective**: Restore frontend functionality with a service-oriented, zero-WordPress backend
+**Status**: IN-PROGRESS (started 2026-07-17)
+**Target**: 2026-08-09 (15–23 day total window)
+**Blockers**: None (BACKEND-1 complete; WordPress permanently down)
+**Canonical Plan**: [plans/backend-2-restoration-plan.md](../plans/backend-2-restoration-plan.md)
 
-### Phase BACKEND-3: Signal & Plan Endpoints
+#### BACKEND-2a · Architecture Cleanup & Configuration
 
-**Objective**: Migrate signal processing and trade planning
-**Status**: NOT-STARTED
-**Target**: 2026-08-26
-**Blockers**: BACKEND-2 complete
+- [ ] Rename `VITE_SNIPER_BACKEND_URL` → `VITE_API_URL` (`.env.example` + `sniperClient.ts`)
+- [ ] Remove WordPress nonce fallback + `resolveDefaultBackendUrl()` from `sniperClient.ts`
+- [ ] Drop `WORDPRESS_API_URL` / `WORDPRESS_API_KEY` from `backend/.env.example` + `nitro.config.ts`
+- [ ] Add Phase 3/4 tables (snapshots, regimes, gates, candles, signals, trade_plans, engine_runs, account_telemetry), provisioned early in this phase — migration `005_add_phase1_tables.sql` + Drizzle schema
+- **Acceptance**: Frontend builds/runs on `VITE_API_URL`; no runtime or configuration dependency on WordPress remains
 
-### Phase BACKEND-4: Transition & Cutover
+#### BACKEND-2b · Service Layer Foundation
 
-**Objective**: Gradual endpoint migration and data migration
-**Status**: NOT-STARTED
-**Target**: 2026-09-09
-**Blockers**: BACKEND-3 complete
+- [ ] Create `backend/src/lib/services/{snapshot,signal,chart,market,telemetry}/` (index + queries + validators)
+- [ ] Base pattern: each service owns DB access, validation, business logic; returns domain objects
+- [ ] Refactor `lib/market-data/handlers.ts`, `lib/ea/handlers.ts`, `lib/auth/handlers.ts` into services
+- [ ] Thin route wrappers; integration tests target services directly
+- **Acceptance**: Service layer structure present; existing handlers call services
 
-### Phase BACKEND-5: Architecture Refactoring
+#### BACKEND-2c · App-Boot Endpoints
 
-**Objective**: Implement hexagonal architecture and decommission WordPress
-**Status**: NOT-STARTED
-**Target**: 2026-09-23
-**Blockers**: BACKEND-4 complete
+- [ ] `GET /api/snapshot/unified` → `SnapshotService.getUnifiedSnapshot(userId)`
+- [ ] `GET /api/charts` (symbol, timeframe) → `ChartService.getChartSnapshot(...)`
+- [ ] `GET /api/session` → market session detection
+- **Acceptance**: Frontend boots and loads initial data; tests pass
+
+#### BACKEND-2d · Core Trading Endpoints
+
+- [ ] `GET /api/signals` (board_size, scope) → `SignalService.getLiveSignals(...)`
+- [ ] `GET /api/ladders` → `SignalService.getLadders(...)`
+- [ ] `GET /api/health` (engine health) → `TelemetryService.getEngineHealth(...)`
+- [ ] `GET /api/account-telemetry` (required `account_id`, `terminal_id`) → `TelemetryService.getAccountTelemetry(userId, accountId, terminalId)`
+- **Acceptance**: Signals, ladders, engine health, account telemetry render
+
+#### BACKEND-2e · MT5 Read-Only Ingestion
+
+- [ ] `POST /api/ea/market-stream` → `MarketDataService.ingestMarketStream(...)` (updates `market_snapshots`)
+- [ ] `POST /api/ea/heartbeat` → `TelemetryService.recordHeartbeat(...)` (updates `ea_sessions`)
+- [ ] `POST /api/ea/account-sync` → `TelemetryService.syncAccount(...)` (updates `account_telemetry`)
+- [ ] `POST /api/ea/symbol-sync` → `MarketDataService.syncSymbols(...)`
+- **Acceptance**: MT5 writes market data; no execution endpoints yet
+
+#### BACKEND-2f · Data Migration
+
+- [ ] If WordPress backup exists: transform `wp_users`/`wp_usermeta`/`wp_smc_sf_*` → PostgreSQL; validate; rollback plan
+- [ ] Else (no backup): seed test users, watchlists, fib levels, signals, trade plans, snapshots, telemetry — **development/staging validation only**
+- **Acceptance**: Production migration (from backup) required for production acceptance; seeded test data is development/staging-only and does not satisfy production readiness
+
+#### BACKEND-2g · Testing & Validation
+
+- [ ] Integration tests for all new endpoints + services in isolation
+- [ ] E2E: boot, login, MT5 data load, signal display, settings persistence
+- [ ] Performance (<500ms most endpoints) + security (JWT, EA key, injection, CORS)
+- **Acceptance**: All tests green; MT5 pipeline stable 24h+
+
+> **Superseded**: The prior BACKEND-3 (signal/plan endpoints), BACKEND-4 (cutover), and BACKEND-5 (WP decommission) are obsolete under the WordPress-free strategy — their intent is absorbed into BACKEND-2c/2d (endpoints) and 2a (WP removal).
 
 ---
 

@@ -4,6 +4,17 @@
 **Branch**: `main` (target: feature branch for migration)  
 **Context**: Post-research, pre-implementation — decisions recorded for Phase 0 kickoff
 
+> **SUPERSEDED (2026-07-17) — WordPress-Free BACKEND-2.**
+> WordPress is **permanently down**. The shadow-mode / dual-write / WordPress-as-fallback
+> decisions and infrastructure below are obsolete. The authoritative plan is now
+> [`backend-2-restoration-plan.md`](./backend-2-restoration-plan.md): service-oriented,
+> zero-WordPress, `VITE_API_URL`, JWT-only auth. Key revisions:
+> - Decision 4 (Shadow mode) → removed; no WordPress source to validate against.
+> - Decision 5 (EA auth) → `X-EA-API-Key` retained for `/api/ea/*`; no HMAC-for-cutover needed.
+> - `WORDPRESS_API_URL` / `WORDPRESS_API_KEY` → dropped.
+> - Shadow sync service / `shadow-validation` endpoint → removed (BACKEND-2 Phase 6 = data migration/seed).
+> This file is retained as a historical Phase 0 kickoff record (BACKEND-0/1 now complete).
+
 ---
 
 ## Decision Summary
@@ -13,8 +24,8 @@
 | 1 | **Migration Scope** | **Option C** — Phase 4 endpoints + core auth/session (6 total) | Phase 4 needs 2 endpoints; dashboard needs 4 auth endpoints. 6 is manageable in 1-2 weeks; 40+ remaining endpoints migrate incrementally after cutover. |
 | 2 | **Database** | **Option A** — Supabase PostgreSQL immediately | Approved plan specifies PostgreSQL. Supabase provides Auth + Postgres + Realtime in one setup (~15 min). Avoids SQLite → Postgres migration debt. Phase 4 load tests need real concurrency. |
 | 3 | **Deployment** | **Option B** — Local Nitro dev server first, Cloudflare Workers after Phase 4 | `npm run dev` works instantly. Cloudflare Workers config (`wrangler deploy`) is a separate step once API surface is validated. Repo already has `nitro.config.ts` with `preset: 'cloudflare'`. |
-| 4 | **Transition Strategy** | **Option C** — Shadow mode with parity validation | WordPress stays live. TanStack Start receives EA data in parallel. Validation endpoint (`GET /api/admin/shadow-validation`) compares row counts & field parity. Cutover only after 24h zero mismatches. |
-| 5 | **EA Authentication** | **Option B** — Simple `X-EA-API-Key` header for Phase 4; HMAC-SHA256 later | WordPress uses `X-EA-API-Key` today. Keep parity for Phase 4. Implement HMAC-SHA256 with nonces/timestamps in post-cutover increment. |
+| 4 | **Transition Strategy** | ~~Option C — Shadow mode with parity validation~~ **SUPERSEDED** | WordPress permanently down; no shadow mode, cutover, or fallback. Direct WordPress-free restoration (see `backend-2-restoration-plan.md`). |
+| 5 | **EA Authentication** | **Option B** — Simple `X-EA-API-Key` header for `/api/ea/*`; HMAC-SHA256 deferred | `X-EA-API-Key` (role `ea`) retained. HMAC replay protection is a later hardening step, not part of the restoration. No WordPress cookie/nonce path. |
 
 ---
 
@@ -32,8 +43,7 @@
   DATABASE_URL=postgresql://postgres:xxx@db.xxx.supabase.co:5432/postgres
   EA_API_KEY=ea-secure-key-change-in-production
   JWT_SECRET=super-secret-change-in-production
-  WORDPRESS_API_URL=https://smartfib.com/wp-json/smc/v1
-  WORDPRESS_API_KEY=wp-api-key-for-shadow-sync
+  # WordPress removed (2026-07-17): WORDPRESS_API_URL / WORDPRESS_API_KEY dropped
   ```
 
 ### Database Schema (Day 0-1)
@@ -137,9 +147,9 @@ CREATE POLICY "ea_sessions_admin_read" ON public.ea_sessions FOR SELECT USING (p
 ### Supporting Infrastructure
 - [ ] Drizzle schema + queries (`backend/src/lib/db/`)
 - [ ] Auth utilities: JWT sign/verify, password hash, `X-EA-API-Key` middleware
-- [ ] Shadow sync service: WordPress → TanStack Start (5-min cron)
-- [ ] Shadow validation endpoint: `GET /api/admin/shadow-validation`
-- [ ] Integration tests for all 6 endpoints (Vitest + Supertest)
+- [ ] Domain services (`backend/src/lib/services/{snapshot,signal,chart,market,telemetry}/`) — see `backend-2-restoration-plan.md`
+- [ ] Integration tests for all endpoints (Vitest + Supertest)
+- [ ] ~~Shadow sync service / shadow-validation endpoint~~ — REMOVED (WordPress down)
 
 ---
 
@@ -149,8 +159,8 @@ CREATE POLICY "ea_sessions_admin_read" ON public.ea_sessions FOR SELECT USING (p
 |------|----------|---------|
 | **Phase 0 Complete** | Supabase live, schema pushed, `npm run dev` serves API | `curl localhost:3000/api/health` |
 | **Phase 1-2 Complete** | EA can POST fib levels; Dashboard GET returns data | Cypress Phase 4 tests pass against local |
-| **Shadow Mode** | `/api/admin/shadow-validation` returns `match: true` for 24h | `curl -H "Authorization: Bearer <admin>" localhost:3000/api/admin/shadow-validation` |
-| **Cutover Ready** | Zero mismatches, MT5 EA URL updated, DNS switched | Manual verification |
+| **Shadow Mode** | ~~`/api/admin/shadow-validation` returns `match: true`~~ — REMOVED (no WordPress source) | Superseded by BACKEND-2 Phase 6 data migration / seed |
+| **Cutover Ready** | ~~Zero mismatches, MT5 EA URL updated, DNS switched~~ — N/A (no WordPress cutover) | Manual verification of `VITE_API_URL` + MT5 EA URL |
 
 ---
 
@@ -174,10 +184,9 @@ backend/
 │   │   │   ├── middleware.ts     # Hono middleware
 │   │   │   ├── ea-auth.ts        # X-EA-API-Key validation
 │   │   │   └── session.ts        # Session helpers
-│   │   └── sync/
-│   │       ├── wordpress-client.ts
-│   │       ├── fib-level-sync.ts
-│   │       └── scheduler.ts
+│   │   └── services/
+│   │       ├── snapshot/  signal/  chart/  market/  telemetry/
+│   │       └── (replaces lib/sync + endpoint-first handlers)
 │   └── routes/
 │       └── api/
 │           ├── auth/
@@ -188,10 +197,8 @@ backend/
 │           │   └── fib-levels.ts
 │           ├── market-data/
 │           │   └── fib-levels.ts
-│           ├── users/
-│           │   └── [id].ts
-│           └── admin/
-│               └── shadow-validation.ts
+│           └── users/
+│               └── [id].ts
 ├── nitro.config.ts
 ├── package.json (updated scripts)
 └── .env.local (gitignored)
@@ -211,8 +218,8 @@ backend/
     "db:push": "supabase db push",
     "db:types": "supabase gen types typescript --local > src/lib/db/types.ts",
     "typecheck": "tsc --noEmit",
-    "sync:shadow": "tsx scripts/shadow-sync.ts",
-    "validate:shadow": "tsx scripts/validate-shadow.ts",
+    "sync:data": "tsx scripts/data-migration.ts",
+    "seed:test": "tsx scripts/seed-test-data.ts",
     "test:integration": "vitest run tests/integration"
   }
 }

@@ -12,13 +12,18 @@ The dashboard stack and the TradingView Pine indicator ship on separate version 
 ## Components
 
 - Dashboard: TanStack/Vite frontend in `src/`
-- WordPress plugin: REST backend in `wordpress/smc-superfib-sniper/`
+- WordPress plugin: REST backend in `wordpress/smc-superfib-sniper/` — **legacy; the WordPress backend is permanently down and is being removed** (see the WordPress-free BACKEND-2 restoration plan in `plans/backend-2-restoration-plan.md`)
 - Pine indicator: TradingView study in `SMC_SuperFib_v13.1.3.pine`
 - MT5 EA: market-stream and execution counterpart under `mt5/`
+- Backend: TanStack Start / Nitro API in `backend/` (auth, settings, market data live; app-boot/core-trading endpoints in progress)
+
+> **Backend status (2026-07-17):** The dashboard now targets the TanStack Start backend via
+> `VITE_API_URL` (formerly `VITE_SNIPER_BACKEND_URL`). The WordPress REST backend is no
+> longer used.
 
 ## Setup pointers
 
 - Frontend package metadata lives in `package.json`
 - Dashboard UI version label is defined in `src/lib/version.ts`
-- WordPress plugin install and runtime notes are in `wordpress/smc-superfib-sniper/README.md`
+- WordPress plugin install and runtime notes are in `wordpress/smc-superfib-sniper/README.md` — **historical; the WordPress backend is permanently down and is being removed** (see `plans/backend-2-restoration-plan.md`). Active backend setup is in `backend/README.md`.
 - Frontend and backend environment specifics should be taken from the active deployment configuration for this repo
