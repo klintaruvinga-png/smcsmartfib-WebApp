@@ -50,11 +50,9 @@ We will follow a strict layered architectural pattern to decouple transport, bus
    - Delegates business execution to the corresponding Services.
 2. **Services Layer (`backend/src/lib/services/`)**:
    - Encapsulates trading domain rules, SF ladder calculations, and heartbeat state transitions.
-   - Calls Repositories for data reads and persistence.
-3. **Repositories Layer (`backend/src/lib/db/`)**:
-   - Manages database querying using a PostgreSQL client pool (e.g. `pg` or `postgres.js`).
-   - Translates database records into domain models.
-4. **Database Layer (PostgreSQL)**:
+   - Owns its database access, validation, and business logic directly (per the canonical BACKEND-2 restoration plan — no separate repository layer).
+   - Each service returns domain objects, not database rows, and is testable in isolation.
+3. **Database Layer (PostgreSQL)**:
    - Primary data storage using Supabase, Neon, or a managed PostgreSQL instance.
 
 ---
