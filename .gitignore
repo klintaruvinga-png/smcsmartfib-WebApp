@@ -79,3 +79,7 @@ sdk/dist/
 src/**/*.test.ts
 src/routeTree.gen.ts
 .claude/
+# EOM (Executive Operations Manager) generated artifacts — do not commit
+TRACKER.md
+.eom_*
+.githooks/post-commit
