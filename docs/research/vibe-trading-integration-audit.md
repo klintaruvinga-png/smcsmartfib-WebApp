@@ -2,8 +2,10 @@
 
 **Audited:** 2026-07-19
 **Sources (verified by code inspection, not the secondary report):**
-- `klintaruvinga-png/smcsmartfib-WebApp` — cloned, read `mt5/*.mqh`, `backend/src/**`, `CONTEXT.md`, `DESIGN.md`, `data/*.json`
-- `HKUDS/Vibe-Trading` — cloned, read `pyproject.toml`, `agent/src/skills/**`, `agent/src/shadow_account/**`, `agent/backtest/engines/forex.py`, `agent/api_server.py`
+- `klintaruvinga-png/smcsmartfib-WebApp` — commit SHA/tag not recorded at audit time (local repo). Inspected files: `mt5/*.mqh`, `backend/src/**`, `CONTEXT.md`, `DESIGN.md`, `data/*.json`
+- `HKUDS/Vibe-Trading` — commit SHA/tag not recorded at audit time (external clone). Inspected files: `pyproject.toml`, `agent/src/skills/**`, `agent/src/shadow_account/**`, `agent/backtest/engines/forex.py`, `agent/api_server.py`
+
+> **Note:** Exact commit SHAs or tags for the inspected code should be recorded in future audits to ensure reproducibility. For `HKUDS/Vibe-Trading`, verify the specific commit against the upstream repository when implementing integration.
 
 > **Important correction to the input report:** the supplied "deep research report" researched `smcsmartfib-WebApp` but described it as a *vague Python/JS app with unknown internals*. That is wrong. The repo is a mature **TanStack Start (React/TS) + Nitro backend + Supabase + MT5 EA** stack that **already implements** symbol normalization, a regime/bias engine, an SMC fib engine (LTF_SF + HTF_AF), and a confidence-tiered signal engine. Large portions of the report's "Superfib needs X" framing are therefore misdirected. This audit re-bases the integration analysis on the *actual* code.
 
@@ -27,11 +29,11 @@
 
 ## 2. Genuine gaps in SuperFIB that Vibe-Trading fills
 
-Verified absent in SuperFIB source (`grep` for `backtest|portfolio|position.?size|kelly|risk.?parity|rebalanc|shadow|allocation` returned only WordPress `riskAllocation` ladder sizing and retired "shadow-mode" WP-sync docs — **no portfolio engine, no backtester, no position-sizing model, no shadow-account**):
+SuperFIB **already has** per-signal risk allocation (`wordpress/smc-superfib-sniper/class-settings-service.php` `sanitize_risk_allocation`: `perTradePct`, `dailyMaxPct`, `ddCapPct`) and ladder-leg stop-loss sizing logic (`mt5/SignalEngine.mqh` `ComputeSwingSL`: H4 swing-fractal SL placement with pip-based buffer). What is **absent** (verified by inspection of `backend/src/routes/api/**/*.ts` and grep for `portfolio|backtest|position.?size|kelly|risk.?parity|rebalanc|shadow` in backend/MT5 entry points) is:
 
 | Gap | Vibe-Trading asset (verified) | Reuse path |
 |---|---|---|
-| **Hedge-fund portfolio allocation** | `skills/asset-allocation` — 5 optimizers (`equal_volatility`, `risk_parity`, `mean_variance`, `max_diversification`, `turnover_aware`) + MPT/Black-Litterman/risk-budgeting/all-weather theory + rebalancing triggers | Port the optimizer math into a TS/Python service behind a new `/api/portfolio` route. **Highest-value pull for your long-term buy/hold method.** |
+| **Portfolio-level allocation and position-sizing** (not per-signal risk caps, which already exist) | `skills/asset-allocation` — 5 optimizers (`equal_volatility`, `risk_parity`, `mean_variance`, `max_diversification`, `turnover_aware`) + MPT/Black-Litterman/risk-budgeting/all-weather theory + rebalancing triggers | Port the optimizer math into a TS/Python service behind a new `/api/portfolio` route. **Highest-value pull for your long-term buy/hold method.** |
 | **Backtesting (spread/swap/pip-accurate)** | `backtest/engines/forex.py` — FX spot/CFD engine, 24×5, spread-as-commission, 50:1–500:1 leverage, swap at daily close, `_pip_value()` JPY-aware, `_SPREAD_PIPS` table | Wrap as a Python microservice; call from Nitro backend. Lets you validate SMC fib strategies historically. |
 | **Mine your own profitable trades into rules** | `src/shadow_account/` — `extractor.py` (FIFO pair → KMeans → decision tree → rules), `codegen.py` (rules→`signal_engine.py`+`config.json`), `reporter.py` (HTML/PDF) | Given your live MT5 journal/CSV, this extracts *your* edge as code. Unique, high-value, offline-capable. |
 | **Strategy generation + evaluation** | `skills/strategy-generate` — parse intent → `config.json` + `signal_engine.py` contract → backtest → metrics.csv | Authoring layer on top of the backtester. |
@@ -74,15 +76,33 @@ Verified absent in SuperFIB source (`grep` for `backtest|portfolio|position.?siz
 
 ---
 
-## 5. Architecture note
+## 5. Architecture note (recommended integration pattern)
 
-SuperFIB is TS/Nitro/Supabase; Vibe is Python/FastAPI/DuckDB. The clean integration is **not** to merge repos. Stand up Vibe's quant modules as a **Python side-service** (FastAPI) behind SuperFIB's Nitro backend:
-- `/portfolio/optimize` ← `asset-allocation`
-- `/backtest/run` ← `backtest/engines`
-- `/shadow/mine` ← `shadow_account`
-- `/research/*` ← selected skills (sec-edgar, global-macro, risk-analysis)
+SuperFIB is TS/Nitro/Supabase; Vibe is Python/FastAPI/DuckDB. The clean integration is **not** to merge repos. Stand up Vibe's quant modules as a **Python side-service** (FastAPI) behind SuperFIB's Nitro backend.
 
-SuperFIB frontend calls its own Nitro routes; Nitro fans out to the Python service. Keeps the TS app clean and lets Vibe upgrade independently. This matches Vibe's own `api_server.py` + `mcp_server.py` design.
+**Proposed Nitro public routes → internal FastAPI endpoints:**
+- `/api/portfolio` → `POST /portfolio/optimize` (asset-allocation)
+- `/api/backtest` → `POST /backtest/run` (backtest engines)
+- `/api/shadow/mine` → `POST /shadow/mine` (shadow_account extractor)
+- `/api/research/*` → `/research/*` (sec-edgar, global-macro, risk-analysis)
+
+**Authentication contract:**
+- Client calls Nitro public route with `Authorization: Bearer <jwt>` (for dashboard users) or `x-ea-api-key: <key>` (for MT5 EA).
+- Nitro authenticates the caller using existing middleware (`backend/src/lib/auth/middleware.ts`: `requireAuth` / `requireEaAuth`).
+- Nitro then calls the internal FastAPI service with a **separate service credential** (e.g., `Authorization: Bearer <service-token>` or `X-Service-Key: <internal-key>`), **NOT** by forwarding the client's JWT or API key.
+- Nitro explicitly propagates caller identity in the FastAPI request body (e.g., `{"user_id": "...", "role": "..."}`) so the Python service has audit context.
+
+**Request/response schemas:**
+- `/api/portfolio` request: `{ "user_id": string, "symbols": string[], "constraints": { "max_position_pct": number, "rebalance_threshold": number }, "optimizer": "risk_parity" | "equal_volatility" | ... }`
+- `/api/portfolio` response: `{ "allocations": { [symbol: string]: number }, "metrics": { "expected_return": number, "volatility": number }, "rebalance_needed": boolean }`
+- `/api/backtest` request: `{ "user_id": string, "strategy_config": { ... }, "date_range": { "start": string, "end": string }, "symbols": string[] }`
+- `/api/backtest` response: `{ "metrics": { "sharpe": number, "max_drawdown": number, "total_return": number }, "equity_curve": [...], "trades": [...] }`
+
+**Timeouts and failure behavior:**
+- Nitro → FastAPI calls: 30s timeout (configurable), retry once on 5xx, fail-fast on 4xx.
+- On FastAPI service unavailable: Nitro returns `503 Service Temporarily Unavailable` to client with `Retry-After` header.
+
+**Current state:** As of this audit (2026-07-19, commit ec847883), the FastAPI service and `/api/portfolio` route **do not yet exist** in the SuperFIB codebase. The above is the recommended integration contract for implementation. SuperFIB's existing Nitro auth middleware already handles `Authorization` and `x-ea-api-key` headers; the service-credential pattern is net-new.
 
 ---
 
