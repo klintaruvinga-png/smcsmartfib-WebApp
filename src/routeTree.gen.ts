@@ -15,6 +15,7 @@ import { Route as PlanRouteImport } from './routes/plan'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LiveRouteImport } from './routes/live'
+import { Route as JournalRouteImport } from './routes/journal'
 import { Route as ChartsRouteImport } from './routes/charts'
 import { Route as BookRouteImport } from './routes/book'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
@@ -51,6 +52,11 @@ const LoginRoute = LoginRouteImport.update({
 const LiveRoute = LiveRouteImport.update({
   id: '/live',
   path: '/live',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JournalRoute = JournalRouteImport.update({
+  id: '/journal',
+  path: '/journal',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChartsRoute = ChartsRouteImport.update({
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof AnalyticsRoute
   '/book': typeof BookRoute
   '/charts': typeof ChartsRoute
+  '/journal': typeof JournalRoute
   '/live': typeof LiveRoute
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRoute
@@ -111,6 +118,7 @@ export interface FileRoutesByTo {
   '/analytics': typeof AnalyticsRoute
   '/book': typeof BookRoute
   '/charts': typeof ChartsRoute
+  '/journal': typeof JournalRoute
   '/live': typeof LiveRoute
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRoute
@@ -127,6 +135,7 @@ export interface FileRoutesById {
   '/analytics': typeof AnalyticsRoute
   '/book': typeof BookRoute
   '/charts': typeof ChartsRoute
+  '/journal': typeof JournalRoute
   '/live': typeof LiveRoute
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/book'
     | '/charts'
+    | '/journal'
     | '/live'
     | '/login'
     | '/orders'
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/book'
     | '/charts'
+    | '/journal'
     | '/live'
     | '/login'
     | '/orders'
@@ -174,6 +185,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/book'
     | '/charts'
+    | '/journal'
     | '/live'
     | '/login'
     | '/orders'
@@ -190,6 +202,7 @@ export interface RootRouteChildren {
   AnalyticsRoute: typeof AnalyticsRoute
   BookRoute: typeof BookRoute
   ChartsRoute: typeof ChartsRoute
+  JournalRoute: typeof JournalRoute
   LiveRoute: typeof LiveRoute
   LoginRoute: typeof LoginRoute
   OrdersRoute: typeof OrdersRoute
@@ -240,6 +253,13 @@ declare module '@tanstack/react-router' {
       path: '/live'
       fullPath: '/live'
       preLoaderRoute: typeof LiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/journal': {
+      id: '/journal'
+      path: '/journal'
+      fullPath: '/journal'
+      preLoaderRoute: typeof JournalRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/charts': {
@@ -311,6 +331,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnalyticsRoute: AnalyticsRoute,
   BookRoute: BookRoute,
   ChartsRoute: ChartsRoute,
+  JournalRoute: JournalRoute,
   LiveRoute: LiveRoute,
   LoginRoute: LoginRoute,
   OrdersRoute: OrdersRoute,
