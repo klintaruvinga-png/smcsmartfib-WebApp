@@ -35,3 +35,4 @@ Trading dashboard + Vibe-Trading agent. Pine/MT5 parity rules. Monorepo: Vite fr
 
 ## Changelog
 - 2026-07-20 — Synced from EOM/projects.json by sync_trackers.py
+- 2026-07-20 — SMC-06 implemented: trade journal + risk-limit workflow (PR #434). Migration 005 + base 001-004 applied to Supabase Dev (remote confirmed up to date). Routes live-ready.
