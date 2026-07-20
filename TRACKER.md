@@ -23,6 +23,7 @@ Synced from: EOM/projects.json
 | SMC-04 | Dashboard plan cards | Pending | — |
 | SMC-05 | Workflow runner state stabilization | Pending | — |
 | SMC-06 | Vibe-Trading agent: trade journal + risk limits workflow | Done | — |
+| SMC-06.1 | Trade journal dashboard UI (/journal page) | Done | — |
 
 ## Blockers / Risks
 
@@ -36,3 +37,4 @@ Trading dashboard + Vibe-Trading agent. Pine/MT5 parity rules. Monorepo: Vite fr
 ## Changelog
 - 2026-07-20 — Synced from EOM/projects.json by sync_trackers.py
 - 2026-07-20 — SMC-06 implemented: trade journal + risk-limit workflow (PR #434). Migration 005 + base 001-004 applied to Supabase Dev (remote confirmed up to date). Routes live-ready.
+- 2026-07-20 — SMC-06.1: /journal dashboard UI (PR #435). journalClient + useJournal hooks + page. vite build passes, tsc clean on new files.
