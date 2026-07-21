@@ -1,42 +1,36 @@
-const KEY = "smc_auth";
+const ACCESS_TOKEN_KEY = "smc_access_token";
+const REFRESH_TOKEN_KEY = "smc_refresh_token";
 
-type WordPressWindow = Window & {
-  SNIPER?: { nonce?: string };
-  wpApiSettings?: { nonce?: string };
-};
+export function setTokens(accessToken: string, refreshToken: string): void {
+  if (typeof window !== "undefined") {
+    sessionStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+    sessionStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  }
+}
 
-export function setCredentials(username: string, appPassword: string): void {
-  sessionStorage.setItem(KEY, btoa(`${username}:${appPassword}`));
+export function getAccessToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return sessionStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+export function getRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return sessionStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
 export function getAuthHeader(): string | null {
-  if (typeof window === "undefined") return null;
-  const v = sessionStorage.getItem(KEY);
-  return v ? `Basic ${v}` : null;
+  const token = getAccessToken();
+  return token ? `Bearer ${token}` : null;
 }
 
 export function clearCredentials(): void {
-  if (typeof window !== "undefined") sessionStorage.removeItem(KEY);
+  if (typeof window !== "undefined") {
+    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+  }
 }
 
 export function hasCredentials(): boolean {
   if (typeof window === "undefined") return false;
-  return Boolean(sessionStorage.getItem(KEY));
-}
-
-export function hasWordPressNonce(): boolean {
-  if (typeof window === "undefined") return false;
-  return Boolean(getWordPressNonce());
-}
-
-export function getWordPressNonce(): string | null {
-  if (typeof window === "undefined") return null;
-  const wpWindow = window as WordPressWindow;
-  return wpWindow.SNIPER?.nonce ?? wpWindow.wpApiSettings?.nonce ?? null;
-}
-
-// Backend migration: Basic-auth credential check (replaces the WordPress nonce
-// where the new standalone backend is the auth source).
-export function hasBackendNonce(): boolean {
-  return hasCredentials();
+  return Boolean(getAccessToken());
 }
