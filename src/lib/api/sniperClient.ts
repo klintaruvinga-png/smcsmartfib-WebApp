@@ -144,8 +144,6 @@ interface RequestOpts {
   allowEmptyResponse?: boolean;
   /** Add a cache-busting query param and bypass browser cache for time-sensitive GETs. */
   cacheBust?: boolean;
-  /** Internal flag to prevent infinite refresh loops on retries. */
-  _isRetry?: boolean;
 }
 
 export type AdminHealthResponse = EngineHealth;
@@ -166,7 +164,7 @@ function requireWatchlistResponse(path: string, watchlist: Symbol[] | undefined)
   return watchlist;
 }
 
-async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
+async function call<T>(path: string, opts: RequestOpts = {}, isRetry = false): Promise<T> {
   const headers: Record<string, string> = {};
   if (opts.body) headers["Content-Type"] = "application/json";
 
@@ -191,7 +189,8 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     });
 
-    if (res.status === 401 && !opts.skipAuthHeaders && !opts._isRetry) {
+    if (res.status === 401 && !opts.skipAuthHeaders) {
+      if (isRetry) throw new AuthError();
       // Try to refresh the token
       if (!isRefreshing) {
         isRefreshing = true;
@@ -200,7 +199,7 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
           isRefreshing = false;
           onTokenRefreshed(newToken);
           // Retry the original request with the new token
-          return call<T>(path, { ...opts, _isRetry: true });
+          return call<T>(path, opts, true);
         } catch (refreshError) {
           isRefreshing = false;
           onTokenRefreshed(null);
@@ -214,14 +213,11 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
         // Wait for the refresh to complete
         return new Promise<T>((resolve, reject) => {
           subscribeTokenRefresh((token) => {
-            if (token === null) {
-              reject(new AuthError());
-            } else {
-              try {
-                resolve(call<T>(path, { ...opts, _isRetry: true }));
-              } catch (err) {
-                reject(err);
-              }
+            if (!token) return reject(new AuthError());
+            try {
+              resolve(call<T>(path, opts, true));
+            } catch (err) {
+              reject(err);
             }
           });
         });
