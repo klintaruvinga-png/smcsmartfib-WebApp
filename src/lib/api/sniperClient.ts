@@ -4,7 +4,13 @@
  * In MOCK_MODE every function returns the typed mock model with state: 'mock'.
  */
 
-import { getAuthHeader, clearCredentials, getAccessToken, getRefreshToken, setTokens } from "@/lib/auth";
+import {
+  getAuthHeader,
+  clearCredentials,
+  getAccessToken,
+  getRefreshToken,
+  setTokens,
+} from "@/lib/auth";
 import { assertValidSoakEvidencePayload } from "./soakEvidence";
 import {
   normalizeAccountTelemetry,
@@ -85,6 +91,10 @@ const DEFAULT_BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:30
 export const MOCK_MODE =
   String(import.meta.env.VITE_SNIPER_MOCK_MODE ?? "false").toLowerCase() === "true";
 
+export function normalizeBackendUrl(url: string | null | undefined): string {
+  return typeof url === "string" ? url.trim() : "";
+}
+
 let backendUrl = DEFAULT_BACKEND_URL;
 export function setBackendUrl(url: string | null | undefined) {
   backendUrl = normalizeBackendUrl(url) || DEFAULT_BACKEND_URL;
@@ -92,13 +102,13 @@ export function setBackendUrl(url: string | null | undefined) {
 
 // Flag to prevent infinite refresh loops
 let isRefreshing = false;
-let refreshSubscribers: Array<(token: string) => void> = [];
+let refreshSubscribers: Array<(token: string | null) => void> = [];
 
-function subscribeTokenRefresh(callback: (token: string) => void) {
+function subscribeTokenRefresh(callback: (token: string | null) => void) {
   refreshSubscribers.push(callback);
 }
 
-function onTokenRefreshed(token: string) {
+function onTokenRefreshed(token: string | null) {
   refreshSubscribers.forEach((callback) => callback(token));
   refreshSubscribers = [];
 }
@@ -191,6 +201,7 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
           return call<T>(path, opts);
         } catch (refreshError) {
           isRefreshing = false;
+          onTokenRefreshed(null);
           clearCredentials();
           if (typeof window !== "undefined") {
             window.dispatchEvent(new CustomEvent("smc:auth-required"));
@@ -201,10 +212,14 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
         // Wait for the refresh to complete
         return new Promise<T>((resolve, reject) => {
           subscribeTokenRefresh((token) => {
-            try {
-              resolve(call<T>(path, opts));
-            } catch (err) {
-              reject(err);
+            if (token === null) {
+              reject(new AuthError());
+            } else {
+              try {
+                resolve(call<T>(path, opts));
+              } catch (err) {
+                reject(err);
+              }
             }
           });
         });

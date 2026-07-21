@@ -1,7 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { Activity, LogIn } from "lucide-react";
-import { setTokens, clearCredentials } from "@/lib/auth";
+import { setTokens } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -35,6 +35,11 @@ function LoginPage() {
       }
 
       const data = await response.json();
+
+      if (!data.accessToken || !data.refreshToken) {
+        throw new Error("Invalid login response: missing tokens");
+      }
+
       setTokens(data.accessToken, data.refreshToken);
 
       // Brief pause so the success state is perceptible before transitioning.
@@ -63,10 +68,11 @@ function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="rounded-lg border border-bd bg-bg1/60 p-4 space-y-4">
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-mono uppercase tracking-wider text-mute">
+              <label htmlFor="email" className="block text-[10px] font-mono uppercase tracking-wider text-mute">
                 Email
               </label>
               <input
+                id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -77,10 +83,11 @@ function LoginPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-mono uppercase tracking-wider text-mute">
+              <label htmlFor="password" className="block text-[10px] font-mono uppercase tracking-wider text-mute">
                 Password
               </label>
               <input
+                id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
