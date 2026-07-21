@@ -1,14 +1,14 @@
 /**
  * SMC-06.1 journal API client.
  * Talks to the Nitro backend /api/journal + /api/risk endpoints.
- * Mirrors sniperClient conventions: typed fns, Basic auth header from @/lib/auth,
- * base URL from VITE_SMC_BACKEND_URL (falls back to localhost dev).
+ * Mirrors sniperClient conventions: typed fns, JWT Bearer auth header from @/lib/auth,
+ * base URL from VITE_API_URL (falls back to localhost dev).
  */
 import { getAuthHeader } from "@/lib/auth";
 
 const JOURNAL_BACKEND_URL =
-  (import.meta.env.VITE_SMC_BACKEND_URL as string | undefined)?.replace(/\/$/, "") ??
-  "http://localhost:3000";
+  (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ??
+  "http://localhost:3000/api";
 
 export type TradeDirection = "long" | "short";
 export type TradeStatus = "open" | "closed" | "cancelled";

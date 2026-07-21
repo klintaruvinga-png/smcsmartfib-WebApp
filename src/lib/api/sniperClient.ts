@@ -4,7 +4,13 @@
  * In MOCK_MODE every function returns the typed mock model with state: 'mock'.
  */
 
-import { getAuthHeader, clearCredentials, getWordPressNonce } from "@/lib/auth";
+import {
+  getAuthHeader,
+  clearCredentials,
+  getAccessToken,
+  getRefreshToken,
+  setTokens,
+} from "@/lib/auth";
 import { assertValidSoakEvidencePayload } from "./soakEvidence";
 import {
   normalizeAccountTelemetry,
@@ -77,33 +83,7 @@ import {
   mockUserProgress,
 } from "@/mocks/sniperData";
 
-const WORDPRESS_BACKEND_URL = "https://trader.stokvelsociety.co.za/wp-json";
-
-export function resolveDefaultBackendUrl(
-  buildVal: string | null | undefined,
-  runtimeOrigin?: string,
-): string {
-  const normalizedBuildVal = normalizeBackendUrl(buildVal);
-  if (normalizedBuildVal) return normalizedBuildVal;
-
-  if (runtimeOrigin) {
-    try {
-      const { hostname, origin } = new URL(runtimeOrigin);
-      if (hostname === "trader.stokvelsociety.co.za") {
-        return `${origin}/wp-json`;
-      }
-    } catch {
-      // Fall through to the canonical WordPress REST host.
-    }
-  }
-
-  return WORDPRESS_BACKEND_URL;
-}
-
-const DEFAULT_BACKEND_URL = resolveDefaultBackendUrl(
-  import.meta.env.VITE_SNIPER_BACKEND_URL,
-  typeof window !== "undefined" ? window.location.origin : undefined,
-);
+const DEFAULT_BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 
 // Default to LIVE backend. Only use mock data when explicitly opted in via
 // VITE_SNIPER_MOCK_MODE=true. Previously this defaulted to mock in dev, which
@@ -111,12 +91,50 @@ const DEFAULT_BACKEND_URL = resolveDefaultBackendUrl(
 export const MOCK_MODE =
   String(import.meta.env.VITE_SNIPER_MOCK_MODE ?? "false").toLowerCase() === "true";
 
-let backendUrl = DEFAULT_BACKEND_URL;
 export function normalizeBackendUrl(url: string | null | undefined): string {
   return typeof url === "string" ? url.trim() : "";
 }
+
+let backendUrl = DEFAULT_BACKEND_URL;
 export function setBackendUrl(url: string | null | undefined) {
   backendUrl = normalizeBackendUrl(url) || DEFAULT_BACKEND_URL;
+}
+
+// Flag to prevent infinite refresh loops
+let isRefreshing = false;
+let refreshSubscribers: Array<(token: string | null) => void> = [];
+
+function subscribeTokenRefresh(callback: (token: string | null) => void) {
+  refreshSubscribers.push(callback);
+}
+
+function onTokenRefreshed(token: string | null) {
+  refreshSubscribers.forEach((callback) => callback(token));
+  refreshSubscribers = [];
+}
+
+async function refreshAccessToken(): Promise<string> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    throw new Error("No refresh token available");
+  }
+
+  const response = await fetch(`${backendUrl}/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refreshToken }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Token refresh failed");
+  }
+
+  const data = await response.json();
+  if (!data.accessToken || !data.refreshToken) {
+    throw new Error("Invalid refresh response: missing tokens");
+  }
+  setTokens(data.accessToken, data.refreshToken);
+  return data.accessToken;
 }
 
 interface RequestOpts {
@@ -149,7 +167,7 @@ function requireWatchlistResponse(path: string, watchlist: Symbol[] | undefined)
   return watchlist;
 }
 
-async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
+async function call<T>(path: string, opts: RequestOpts = {}, isRetry = false): Promise<T> {
   const headers: Record<string, string> = {};
   if (opts.body) headers["Content-Type"] = "application/json";
 
@@ -157,14 +175,10 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
     const authHeader = getAuthHeader();
     if (authHeader) {
       headers["Authorization"] = authHeader;
-    } else {
-      // Fall back to the WordPress REST nonce when served from WordPress.
-      const nonce = getWordPressNonce();
-      if (nonce) headers["X-WP-Nonce"] = nonce;
     }
   }
 
-  let url = `${backendUrl.replace(/\/$/, "")}/sniper/v1${path}`;
+  let url = `${backendUrl.replace(/\/$/, "")}${path}`;
   if ((opts.method ?? "GET") === "GET" && opts.cacheBust) {
     url += `${url.includes("?") ? "&" : "?"}_=${Date.now()}`;
   }
@@ -178,12 +192,45 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     });
 
-    if (res.status === 401) {
-      clearCredentials();
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("smc:auth-required"));
+    if (res.status === 401 && !opts.skipAuthHeaders) {
+      if (isRetry) {
+        clearCredentials();
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("smc:auth-required"));
+        }
+        throw new AuthError();
       }
-      throw new AuthError();
+      // Try to refresh the token
+      if (!isRefreshing) {
+        isRefreshing = true;
+        try {
+          const newToken = await refreshAccessToken();
+          isRefreshing = false;
+          onTokenRefreshed(newToken);
+          // Retry the original request with the new token
+          return call<T>(path, opts, true);
+        } catch (refreshError) {
+          isRefreshing = false;
+          onTokenRefreshed(null);
+          clearCredentials();
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("smc:auth-required"));
+          }
+          throw new AuthError();
+        }
+      } else {
+        // Wait for the refresh to complete
+        return new Promise<T>((resolve, reject) => {
+          subscribeTokenRefresh((token) => {
+            if (!token) return reject(new AuthError());
+            try {
+              resolve(call<T>(path, opts, true));
+            } catch (err) {
+              reject(err);
+            }
+          });
+        });
+      }
     }
 
     if (!res.ok) {
@@ -213,7 +260,7 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
 }
 
 export async function fetchAdminHealth(): Promise<AdminHealthResponse> {
-  return call<AdminHealthResponse>("/admin/health", { cacheBust: true });
+  return call<AdminHealthResponse>("/health", { cacheBust: true });
 }
 
 export async function fetchSoakReport(): Promise<SoakReport> {
@@ -328,7 +375,7 @@ export const apiClient = {
     if (boardSize) params.set("board_size", String(boardSize));
     if (scope === "global") params.set("scope", "global");
     const qs = params.toString();
-    const path = qs ? `/live-signals?${qs}` : "/live-signals";
+    const path = qs ? `/signals?${qs}` : "/signals";
     const raw = await call<LiveSignalsResponse | SignalCandidate[]>(path, {
       cacheBust: true,
     });
