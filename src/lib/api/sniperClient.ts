@@ -130,6 +130,9 @@ async function refreshAccessToken(): Promise<string> {
   }
 
   const data = await response.json();
+  if (!data.accessToken || !data.refreshToken) {
+    throw new Error("Invalid refresh response: missing tokens");
+  }
   setTokens(data.accessToken, data.refreshToken);
   return data.accessToken;
 }
@@ -190,7 +193,13 @@ async function call<T>(path: string, opts: RequestOpts = {}, isRetry = false): P
     });
 
     if (res.status === 401 && !opts.skipAuthHeaders) {
-      if (isRetry) throw new AuthError();
+      if (isRetry) {
+        clearCredentials();
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("smc:auth-required"));
+        }
+        throw new AuthError();
+      }
       // Try to refresh the token
       if (!isRefreshing) {
         isRefreshing = true;

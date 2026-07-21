@@ -34,3 +34,20 @@ export function hasCredentials(): boolean {
   if (typeof window === "undefined") return false;
   return Boolean(getAccessToken());
 }
+
+// WordPress compatibility shims for routes still using old auth model
+// These will be removed once all routes are migrated to JWT
+export function hasWordPressNonce(): boolean {
+  // WordPress nonce is no longer used; defer to JWT credentials
+  return hasCredentials();
+}
+
+export function getWordPressNonce(): string | null {
+  // WordPress nonce is no longer used; return null
+  return null;
+}
+
+export function hasBackendNonce(): boolean {
+  // Backend nonce is no longer used; defer to JWT credentials
+  return hasCredentials();
+}
