@@ -144,6 +144,8 @@ interface RequestOpts {
   allowEmptyResponse?: boolean;
   /** Add a cache-busting query param and bypass browser cache for time-sensitive GETs. */
   cacheBust?: boolean;
+  /** Internal flag to prevent infinite refresh loops on retries. */
+  _isRetry?: boolean;
 }
 
 export type AdminHealthResponse = EngineHealth;
@@ -189,7 +191,7 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     });
 
-    if (res.status === 401 && !opts.skipAuthHeaders) {
+    if (res.status === 401 && !opts.skipAuthHeaders && !opts._isRetry) {
       // Try to refresh the token
       if (!isRefreshing) {
         isRefreshing = true;
@@ -198,7 +200,7 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
           isRefreshing = false;
           onTokenRefreshed(newToken);
           // Retry the original request with the new token
-          return call<T>(path, opts);
+          return call<T>(path, { ...opts, _isRetry: true });
         } catch (refreshError) {
           isRefreshing = false;
           onTokenRefreshed(null);
@@ -216,7 +218,7 @@ async function call<T>(path: string, opts: RequestOpts = {}): Promise<T> {
               reject(new AuthError());
             } else {
               try {
-                resolve(call<T>(path, opts));
+                resolve(call<T>(path, { ...opts, _isRetry: true }));
               } catch (err) {
                 reject(err);
               }
