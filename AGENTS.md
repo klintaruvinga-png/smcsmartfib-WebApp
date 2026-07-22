@@ -1,5 +1,9 @@
 # SMC SuperFIB Dashboard Agent and Skill Operating Model
 
+## Cross-Cutting Rules (load before project-specific rules)
+**Single source of truth:** `docs/GOVERNANCE.md` in this repo (synced read-only copy). Canonical/edited source: `C:\Users\Kudzie\OneDrive\SS - Apps & Software\EOM\GOVERNANCE.md`.
+Every session in this repo MUST load GOVERNANCE.md first. It defines the EOM automation contract (registry/TRACKER sync, cron cadence, non-draft PR rules, verify-don't-assume), the BrainWorks producer protocol (read-only curation, append-only observations.jsonl), and the cross-project documentation rule. This repo's rules below are additional, not a replacement.
+
 ## Purpose
 This repo supports interchangeable use of three agent environments:
 - Claude Code
