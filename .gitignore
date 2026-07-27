@@ -83,3 +83,6 @@ src/routeTree.gen.ts
 TRACKER.md
 .eom_*
 .githooks/post-commit
+
+# Secrets — never commit
+backend/.env
