@@ -1,4 +1,4 @@
-import { db, supabase } from "../db";
+import { db } from "../db";
 import { users } from "../db/schema";
 import type { User } from "../db/schema";
 import { eq } from "drizzle-orm";
@@ -105,32 +105,16 @@ export async function registerUser(
   if (!email || !password) throw new AuthError(400, "Email and password required");
   if (password.length < 8)
     throw new AuthError(400, "Password must be at least 8 characters");
-  let createdAuthUserId: string | null = null;
-  
+
+  // NOTE: This is a fully custom auth flow. Passwords live in public.users.password_hash,
+  // sessions are custom jose JWTs, and the public.users.id -> auth.users(id) FK was dropped
+  // (see migration 003_drop_users_auth_fk.sql), so NO Supabase Auth user is created.
+  // Supabase Auth's `handle_new_user` trigger on auth.users calls seed_user_pairs() and
+  // fails, which would roll back any auth.admin.createUser call. Because nothing in the
+  // app reads auth.users, we skip Supabase Auth entirely and keep the flow self-contained.
   try {
-    // Create Supabase auth user first to satisfy FK constraint
-    if (!supabase) {
-      throw new AuthError(500, "Supabase client not configured");
-    }
-    
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-    });
-    
-    if (authError || !authData.user) {
-      // Handle Supabase-specific errors
-      if (authError?.message?.includes("already registered") || authError?.message?.includes("already been registered")) {
-        throw new AuthError(409, "Email already exists");
-      }
-      throw new AuthError(500, "Failed to create auth user");
-    }
-    
-    createdAuthUserId = authData.user.id;
-    
-    // Create database user with the auth user's ID
-    const user = await createUser(email, password, "user", undefined, username, authData.user.id);
+    // Create the database user (standalone UUID). No auth.users row is (or needs to be) created.
+    const user = await createUser(email, password, "user", undefined, username);
     const accessToken = await createAccessToken({
       sub: user.id,
       email: user.email,
@@ -140,17 +124,6 @@ export async function registerUser(
     await createRefreshSession(user.id, refreshToken, meta?.userAgent ?? null, meta?.ipAddress ?? null);
     return { accessToken, refreshToken, user: toUserView(user) };
   } catch (err: any) {
-    // Cleanup: if we created a Supabase auth user but failed to create the local user,
-    // delete the auth user to prevent email lockout
-    if (createdAuthUserId && supabase) {
-      try {
-        await supabase.auth.admin.deleteUser(createdAuthUserId);
-      } catch (cleanupError) {
-        // Log cleanup failure but don't mask the original error
-        console.error("[registerUser] Failed to cleanup orphaned auth user:", cleanupError);
-      }
-    }
-    
     if (err instanceof AuthError) throw err;
     if (err && err.code === "23505") {
       // Parse constraint name from error detail to return specific message
