@@ -55,15 +55,24 @@ async function main() {
   }
 
   // Verify
+  const REQUIRED_TABLES = ['users', 'fib_levels', 'ea_sessions', 'refresh_sessions', 'trades', 'risk_limits'];
   const tables = await sql.unsafe(
     `SELECT table_name FROM information_schema.tables
      WHERE table_schema = 'public'
        AND table_name IN ('users','fib_levels','ea_sessions','refresh_sessions','trades','risk_limits')
      ORDER BY table_name`
   );
+  const foundTables = tables.map((t) => t.table_name);
   console.log(
-    `[apply-migrations] Present tables: ${tables.map((t) => t.table_name).join(", ") || "(none)"}`
+    `[apply-migrations] Present tables: ${foundTables.join(", ") || "(none)"}`
   );
+
+  const missingTables = REQUIRED_TABLES.filter(t => !foundTables.includes(t));
+  if (missingTables.length > 0) {
+    await sql.end();
+    throw new Error(`Missing required tables: ${missingTables.join(", ")}`);
+  }
+
   await sql.end();
   console.log("[apply-migrations] Done.");
 }

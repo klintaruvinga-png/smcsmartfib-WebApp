@@ -30,7 +30,7 @@ Browser
   -> Vercel (frontend, TanStack Start; VITE_API_URL = https://<backend-host>/api)
   -> Node host (backend, Nitro node-server :PORT)
        -> Supabase Postgres (dev project, pooler 6543 for runtime, 5432 for migrations)
-       -> Supabase Auth (service role, for register)
+       -> Custom auth (jose JWTs, passwords in public.users.password_hash)
 ```
 
 ## Sequencing
@@ -48,7 +48,7 @@ Browser
 ## Required from Kudzie (gating step 5, 7, 8)
 
 - Supabase `SUPABASE_URL` (https://yfodcdqpkgpbrzdpeqtb.supabase.co)
-- `SUPABASE_ANON_KEY` + `SUPABASE_SERVICE_ROLE_KEY` (for register)
+- `SUPABASE_ANON_KEY` (for runtime queries if needed)
 - `DATABASE_URL` (pooler 6543) + `DIRECT_DATABASE_URL` (5432) for postgres.js
 - `JWT_SECRET` (session signing)
 - `EA_API_KEY` (keep dev value; not needed for user creation)
@@ -61,7 +61,7 @@ Browser
 |------|---------|---------|
 | Backend compiles | `cd backend && npm run build` | `.output/server/index.mjs` exists |
 | Frontend compiles | `npm run build` | `dist/server/server.js` + `dist/client` exist |
-| Migrations applied | `node scripts/apply-migrations.mjs` (DIRECT_DATABASE_URL set) | all 6 tables present |
+| Migrations applied | `cd backend && node scripts/apply-migrations.mjs` (DIRECT_DATABASE_URL set) | all 6 tables present |
 | One live user | `curl -X POST .../api/auth/register` | 200 + accessToken |
 | Login works | `curl -X POST .../api/auth/login` | 200 + accessToken |
 | /me works | `curl .../api/auth/me -H Bearer` | 200 + user view |
@@ -71,7 +71,9 @@ Browser
 ## Notes / risks
 
 - `postgres.js` + Supabase pooler requires `prepare:false` (already set in db/index.ts).
-- `register` needs Supabase service-role key; `login`/app boot do not.
+- `register` uses custom auth flow (jose JWTs, passwords in public.users.password_hash); no
+  Supabase Auth service-role key is needed for registration (see backend/src/lib/auth/handlers.ts
+  lines 109-114: "NO Supabase Auth user is created").
 - `VITE_API_URL` is build-time: backend must be deployed and its URL known before the
   production frontend build/deploy. Dev default stays `http://localhost:3000/api`.
 - Vercel CLI is not installed/auth'd in this environment and cannot complete interactive
