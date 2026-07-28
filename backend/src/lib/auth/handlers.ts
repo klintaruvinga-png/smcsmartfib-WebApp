@@ -1,4 +1,4 @@
-import { db, supabase } from "../db";
+import { db } from "../db";
 import { users } from "../db/schema";
 import type { User } from "../db/schema";
 import { eq } from "drizzle-orm";
