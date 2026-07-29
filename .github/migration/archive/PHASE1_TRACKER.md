@@ -35,29 +35,29 @@
 
 ## Deliverables
 
-| Deliverable | Track owner | Status | Completion / ETA |
-|---|---|---|---|
-| `POST /ea/heartbeat` implemented | Track B | ✅ DONE | Verified in `reports/phase-1-ea-bridge-implementation-report.md` |
-| `POST /ea/account-sync` implemented | Track B | ✅ DONE | Verified in `reports/phase-1-ea-bridge-implementation-report.md` |
-| `POST /ea/symbol-sync` implemented | Track B | ✅ DONE | Verified in `reports/phase-1-ea-bridge-implementation-report.md` |
-| `GET /ea/license-check` implemented | Track B | ✅ DONE | Verified in `reports/phase-1-ea-bridge-implementation-report.md` |
-| Existing `POST /ea/market-stream` route retained for bridge validation | Track A + Track B | ✅ LIVE | Route working; auth passing; candles rejected for weekend stale data (expected behavior) |
-| MT5 EA deployment to validation terminal | Track A | ✅ LIVE | Branch `fix/gate-heartbeat-debug-log-behind-flag` deployed; EA running; all 5 routes firing |
-| Bridge route live validation | Track A + Track B | ✅ DONE | All 5 routes confirmed operational; all scenario tests PASS; 48h continuity verified |
-| Phase 1 PASSED declaration | Track A + Track B | ✅ DONE | Completed; Phase 1 gate closed and Phase 2 handoff ready |
+| Deliverable                                                            | Track owner       | Status  | Completion / ETA                                                                            |
+| ---------------------------------------------------------------------- | ----------------- | ------- | ------------------------------------------------------------------------------------------- |
+| `POST /ea/heartbeat` implemented                                       | Track B           | ✅ DONE | Verified in `reports/phase-1-ea-bridge-implementation-report.md`                            |
+| `POST /ea/account-sync` implemented                                    | Track B           | ✅ DONE | Verified in `reports/phase-1-ea-bridge-implementation-report.md`                            |
+| `POST /ea/symbol-sync` implemented                                     | Track B           | ✅ DONE | Verified in `reports/phase-1-ea-bridge-implementation-report.md`                            |
+| `GET /ea/license-check` implemented                                    | Track B           | ✅ DONE | Verified in `reports/phase-1-ea-bridge-implementation-report.md`                            |
+| Existing `POST /ea/market-stream` route retained for bridge validation | Track A + Track B | ✅ LIVE | Route working; auth passing; candles rejected for weekend stale data (expected behavior)    |
+| MT5 EA deployment to validation terminal                               | Track A           | ✅ LIVE | Branch `fix/gate-heartbeat-debug-log-behind-flag` deployed; EA running; all 5 routes firing |
+| Bridge route live validation                                           | Track A + Track B | ✅ DONE | All 5 routes confirmed operational; all scenario tests PASS; 48h continuity verified        |
+| Phase 1 PASSED declaration                                             | Track A + Track B | ✅ DONE | Completed; Phase 1 gate closed and Phase 2 handoff ready                                    |
 
 ---
 
 ## Blocker Log
 
-| Blocker | Opened | Owner | Status | Resolution / ETA |
-|---|---|---|---|---|
-| ~~Live terminal verification pending for heartbeat, account-sync, symbol-sync, and market-stream~~ | 2026-05-15 | Track A + Track B | ✅ RESOLVED | All 5 routes verified live and operational as of 2026-05-18; proceeding to scenario testing |
-| Phase 1 roadmap / tracker / checklist missing from canonical docs | 2026-05-15 | Program governance | ✅ RESOLVED | Resolved by `PHASE1_BRIDGE_ROADMAP.md`, `PHASE1_TRACKER.md`, and `PHASE1_CHECKLIST.md` |
-| Validation environment facts not yet recorded in canonical docs | 2026-05-15 | Track A | ✅ RESOLVED | Recorded: Deriv.com / Deriv-Demo / Account 32206603 / MT5 build 5836 / EA deployed on `fix/gate-heartbeat-debug-log-behind-flag` / WebRequest enabled / bridge auth configured - 2026-05-18 |
-| Heartbeat not executing in initial EA deployment | 2026-05-17 | Track A | ✅ RESOLVED | Terminal was running stale EA binary; branch `fix/gate-heartbeat-debug-log-behind-flag` with heartbeat logic deployed; confirmed working at 08:07 UTC 2026-05-18 |
-| ~~Field scenario testing pending (restart, VPS, network, license rejection, duplicate protection)~~ | 2026-05-18 | Track A + Track B | RESOLVED | Terminal restart PASS; VPS/network outage recovery PASS via bundled shared-hosting test; duplicate protection PASS; invalid-license rejection PASS |
-| 48h continuity window complete | 2026-05-20 | Track A + Track B | ✅ PASS | Completed; Phase 1 gate closed and Phase 2 handoff ready |
+| Blocker                                                                                             | Opened     | Owner              | Status      | Resolution / ETA                                                                                                                                                                            |
+| --------------------------------------------------------------------------------------------------- | ---------- | ------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~Live terminal verification pending for heartbeat, account-sync, symbol-sync, and market-stream~~  | 2026-05-15 | Track A + Track B  | ✅ RESOLVED | All 5 routes verified live and operational as of 2026-05-18; proceeding to scenario testing                                                                                                 |
+| Phase 1 roadmap / tracker / checklist missing from canonical docs                                   | 2026-05-15 | Program governance | ✅ RESOLVED | Resolved by `PHASE1_BRIDGE_ROADMAP.md`, `PHASE1_TRACKER.md`, and `PHASE1_CHECKLIST.md`                                                                                                      |
+| Validation environment facts not yet recorded in canonical docs                                     | 2026-05-15 | Track A            | ✅ RESOLVED | Recorded: Deriv.com / Deriv-Demo / Account 32206603 / MT5 build 5836 / EA deployed on `fix/gate-heartbeat-debug-log-behind-flag` / WebRequest enabled / bridge auth configured - 2026-05-18 |
+| Heartbeat not executing in initial EA deployment                                                    | 2026-05-17 | Track A            | ✅ RESOLVED | Terminal was running stale EA binary; branch `fix/gate-heartbeat-debug-log-behind-flag` with heartbeat logic deployed; confirmed working at 08:07 UTC 2026-05-18                            |
+| ~~Field scenario testing pending (restart, VPS, network, license rejection, duplicate protection)~~ | 2026-05-18 | Track A + Track B  | RESOLVED    | Terminal restart PASS; VPS/network outage recovery PASS via bundled shared-hosting test; duplicate protection PASS; invalid-license rejection PASS                                          |
+| 48h continuity window complete                                                                      | 2026-05-20 | Track A + Track B  | ✅ PASS     | Completed; Phase 1 gate closed and Phase 2 handoff ready                                                                                                                                    |
 
 ---
 
@@ -78,8 +78,8 @@
 
 ## Integration Handoff
 
-| Gate trigger | Transfers to Phase 2 | Destination scope |
-|---|---|---|
+| Gate trigger                                               | Transfers to Phase 2                                                                 | Destination scope                                                        |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
 | Phase 1 PASSED declaration with Track A + Track B sign-off | Validated bridge transport, terminal telemetry confidence, and backend bridge routes | Read-only trade telemetry and dashboard instrumentation begin in Phase 2 |
 
 ---

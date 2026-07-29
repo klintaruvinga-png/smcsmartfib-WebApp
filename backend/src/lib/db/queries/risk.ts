@@ -6,25 +6,17 @@
  */
 import { eq } from "drizzle-orm";
 import { db } from "../index";
-import {
-  riskLimits,
-  trades,
-  type NewRiskLimits,
-  type RiskLimits,
-} from "../schema";
+import { riskLimits, trades, type NewRiskLimits, type RiskLimits } from "../schema";
 import { getOpenTrades, getTodaysRealizedPnl } from "./journal";
 
 export async function getRiskLimits(userId: string): Promise<RiskLimits | undefined> {
-  const [row] = await db
-    .select()
-    .from(riskLimits)
-    .where(eq(riskLimits.userId, userId));
+  const [row] = await db.select().from(riskLimits).where(eq(riskLimits.userId, userId));
   return row;
 }
 
 export async function upsertRiskLimits(
   userId: string,
-  input: Partial<NewRiskLimits>
+  input: Partial<NewRiskLimits>,
 ): Promise<RiskLimits> {
   const [row] = await db
     .insert(riskLimits)

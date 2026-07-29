@@ -13,17 +13,17 @@ This audit re-validates the Phase 1 MT5 EA bridge contract after the post-licens
 
 ## Contract surfaces checked
 
-| Surface | MT5 EA | Backend | Result |
-|---|---|---|---|
-| Shared owner id | Class member `wpUserId` set by `Initialize(..., userId)` | `permission_ea_bridge()` requires `user_id > 0` | MATCH |
-| Heartbeat route | `POST /wp-json/sniper/v1/ea/heartbeat` with JSON `user_id` | `post_ea_heartbeat()` behind `permission_ea_bridge()` | MATCH |
-| Account-sync route | `POST /wp-json/sniper/v1/ea/account-sync` with JSON `user_id` | `post_ea_account_sync()` behind `permission_ea_bridge()` | MATCH |
-| Symbol-sync route | `POST /wp-json/sniper/v1/ea/symbol-sync` with JSON `user_id` | `post_ea_symbol_sync()` behind `permission_ea_bridge()` | MATCH |
-| Auth header | `X-EA-API-Key` reused in `cachedHeaders` | `get_ea_api_key()` validates before user binding | MATCH |
-| `user_id` extraction order | JSON body top-level field | `ea_request_value()` reads JSON payload before query params | MATCH |
-| Invalid `user_id` behavior | No sender-side bypass | `smc_sf_user_required` for missing or zero values | MATCH |
-| Initialization order | `SendAccountSync()` -> `SendSymbolSync()` -> `EventSetTimer()` | No contract change required | MATCH |
-| Live attach diagnostics | Dispatch log now prints `user_id` before each bridge call | Auth success log now prints resolved `user_id` after binding | MATCH |
+| Surface                    | MT5 EA                                                         | Backend                                                      | Result |
+| -------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------ | ------ |
+| Shared owner id            | Class member `wpUserId` set by `Initialize(..., userId)`       | `permission_ea_bridge()` requires `user_id > 0`              | MATCH  |
+| Heartbeat route            | `POST /wp-json/sniper/v1/ea/heartbeat` with JSON `user_id`     | `post_ea_heartbeat()` behind `permission_ea_bridge()`        | MATCH  |
+| Account-sync route         | `POST /wp-json/sniper/v1/ea/account-sync` with JSON `user_id`  | `post_ea_account_sync()` behind `permission_ea_bridge()`     | MATCH  |
+| Symbol-sync route          | `POST /wp-json/sniper/v1/ea/symbol-sync` with JSON `user_id`   | `post_ea_symbol_sync()` behind `permission_ea_bridge()`      | MATCH  |
+| Auth header                | `X-EA-API-Key` reused in `cachedHeaders`                       | `get_ea_api_key()` validates before user binding             | MATCH  |
+| `user_id` extraction order | JSON body top-level field                                      | `ea_request_value()` reads JSON payload before query params  | MATCH  |
+| Invalid `user_id` behavior | No sender-side bypass                                          | `smc_sf_user_required` for missing or zero values            | MATCH  |
+| Initialization order       | `SendAccountSync()` -> `SendSymbolSync()` -> `EventSetTimer()` | No contract change required                                  | MATCH  |
+| Live attach diagnostics    | Dispatch log now prints `user_id` before each bridge call      | Auth success log now prints resolved `user_id` after binding | MATCH  |
 
 ## Evidence re-validated
 

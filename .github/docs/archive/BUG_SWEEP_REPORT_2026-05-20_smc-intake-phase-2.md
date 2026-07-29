@@ -11,13 +11,13 @@ Issue: SMC Intake - Begin Phase 2 Implementation
 
 ### Findings addressed
 
-| ID | Severity | Area | Finding | Fix |
-| --- | --- | --- | --- | --- |
-| P2-001 | High | Backend truth | No authoritative storage existed for MT5 account metrics, positions, or pending orders. | Added `smc_sf_account_telemetry`, `smc_sf_trade_positions`, and `smc_sf_trade_orders` with deterministic upserts. |
-| P2-002 | High | Stale data | Missing fresh-batch positions/orders would have remained visible indefinitely. | Added schema-gated sweep logic that closes/inactivates rows absent from a valid fresh batch. |
-| P2-003 | High | Authority boundary | Dashboard trade/account panels were still reading `/user/trades` and `/user/account`. | Rewired telemetry surfaces to `/account-telemetry`, `/positions`, and `/orders`; audit endpoints remain non-authoritative. |
-| P2-004 | Medium | Safety gate | The contract was internally ambiguous on `schema_version` for Phase 1 compatibility. | Preserved Phase 1-only payload acceptance; reject only Phase 2 telemetry payloads missing `schema_version`. |
-| P2-005 | Medium | UX integrity | Book/orders/analytics surfaces could previously render empty states on backend failure. | Added explicit unavailable/degraded states for telemetry fetch failures. |
+| ID     | Severity | Area               | Finding                                                                                 | Fix                                                                                                                        |
+| ------ | -------- | ------------------ | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| P2-001 | High     | Backend truth      | No authoritative storage existed for MT5 account metrics, positions, or pending orders. | Added `smc_sf_account_telemetry`, `smc_sf_trade_positions`, and `smc_sf_trade_orders` with deterministic upserts.          |
+| P2-002 | High     | Stale data         | Missing fresh-batch positions/orders would have remained visible indefinitely.          | Added schema-gated sweep logic that closes/inactivates rows absent from a valid fresh batch.                               |
+| P2-003 | High     | Authority boundary | Dashboard trade/account panels were still reading `/user/trades` and `/user/account`.   | Rewired telemetry surfaces to `/account-telemetry`, `/positions`, and `/orders`; audit endpoints remain non-authoritative. |
+| P2-004 | Medium   | Safety gate        | The contract was internally ambiguous on `schema_version` for Phase 1 compatibility.    | Preserved Phase 1-only payload acceptance; reject only Phase 2 telemetry payloads missing `schema_version`.                |
+| P2-005 | Medium   | UX integrity       | Book/orders/analytics surfaces could previously render empty states on backend failure. | Added explicit unavailable/degraded states for telemetry fetch failures.                                                   |
 
 ### Residual risks
 

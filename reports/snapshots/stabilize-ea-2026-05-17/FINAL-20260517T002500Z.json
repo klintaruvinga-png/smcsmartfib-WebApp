@@ -22,9 +22,7 @@
   "migration_status_post_patch": {
     "current_phase": "1 (MT5 Bridge Infrastructure)",
     "overall_progress": "50%",
-    "blockers_addressed": [
-      "LINT-001: Prettier errors in scripts/ files resolved"
-    ],
+    "blockers_addressed": ["LINT-001: Prettier errors in scripts/ files resolved"],
     "remaining_blockers": [
       "MIGRATION-PHASE1-001: Live MT5 terminal verification for /ea/heartbeat, /ea/account-sync, /ea/symbol-sync, /ea/license-check — requires Track A live terminal execution"
     ],

@@ -10,26 +10,26 @@
 
 ## Wiring And Data Authority
 
-| Severity | Component | Root Cause | Impact |
-| --- | --- | --- | --- |
-| HIGH | `src/routes/account.tsx` settings save path | `saveSettings()` called `setBackendUrl()` before `postUserSettings()`, so a backend URL edit redirected the save request to the target backend instead of the current authority. | Backend migration settings could fail to persist, persist on the wrong host, or immediately refetch from an authority that did not own the just-saved config. |
-| MEDIUM | `src/hooks/useSniperData.ts` / `src/lib/api/sniperClient.ts` backend URL normalization | Backend URLs were treated as truthy without trimming, and `useUserSettings()` only updated the in-memory client when the stored URL was non-empty. | Whitespace-only URLs could falsely mark the backend as ready, and empty stored URLs could leave the client pinned to a stale endpoint after reload. |
+| Severity | Component                                                                              | Root Cause                                                                                                                                                                       | Impact                                                                                                                                                        |
+| -------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| HIGH     | `src/routes/account.tsx` settings save path                                            | `saveSettings()` called `setBackendUrl()` before `postUserSettings()`, so a backend URL edit redirected the save request to the target backend instead of the current authority. | Backend migration settings could fail to persist, persist on the wrong host, or immediately refetch from an authority that did not own the just-saved config. |
+| MEDIUM   | `src/hooks/useSniperData.ts` / `src/lib/api/sniperClient.ts` backend URL normalization | Backend URLs were treated as truthy without trimming, and `useUserSettings()` only updated the in-memory client when the stored URL was non-empty.                               | Whitespace-only URLs could falsely mark the backend as ready, and empty stored URLs could leave the client pinned to a stale endpoint after reload.           |
 
 # Surgical Fixes Applied
 
-| File | Exact hardening |
-| --- | --- |
-| `src/routes/account.tsx` | Normalized `backendUrl` on save, posted settings before switching live reads, cached the saved settings locally, skipped immediate `/user/settings` refetch when the backend authority changed, and only then switched the API client to the new backend. |
-| `src/hooks/useSniperData.ts` | Normalized stored backend URLs, made `useBackendReady()` depend on trimmed values, and always synchronized the in-memory client from stored settings. |
-| `src/lib/api/sniperClient.ts` | Added shared backend URL normalization and ensured `setBackendUrl()` trims input before falling back to the default backend. |
+| File                          | Exact hardening                                                                                                                                                                                                                                           |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/routes/account.tsx`      | Normalized `backendUrl` on save, posted settings before switching live reads, cached the saved settings locally, skipped immediate `/user/settings` refetch when the backend authority changed, and only then switched the API client to the new backend. |
+| `src/hooks/useSniperData.ts`  | Normalized stored backend URLs, made `useBackendReady()` depend on trimmed values, and always synchronized the in-memory client from stored settings.                                                                                                     |
+| `src/lib/api/sniperClient.ts` | Added shared backend URL normalization and ensured `setBackendUrl()` trims input before falling back to the default backend.                                                                                                                              |
 
 # Parity Verification Results
 
-| Area | Result | Notes |
-| --- | --- | --- |
-| Fib parity | Unchanged | No fib logic changed in this pass. |
-| Regime parity | Unchanged | No regime classification logic changed in this pass. |
-| Signal parity | Unchanged | No signal generation or blocker rules changed in this pass. |
+| Area                               | Result                               | Notes                                                                                                                 |
+| ---------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| Fib parity                         | Unchanged                            | No fib logic changed in this pass.                                                                                    |
+| Regime parity                      | Unchanged                            | No regime classification logic changed in this pass.                                                                  |
+| Signal parity                      | Unchanged                            | No signal generation or blocker rules changed in this pass.                                                           |
 | Freshness/backend-authority parity | 100% on audited settings-switch path | Dashboard no longer changes write authority before persistence and no longer treats whitespace backend URLs as ready. |
 
 # Remaining Risks

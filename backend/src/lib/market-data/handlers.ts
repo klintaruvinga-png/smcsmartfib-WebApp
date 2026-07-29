@@ -8,7 +8,11 @@ const querySchema = z.object({
 });
 
 export class MarketDataError extends Error {
-  constructor(public statusCode: number, message: string, public data?: unknown) {
+  constructor(
+    public statusCode: number,
+    message: string,
+    public data?: unknown,
+  ) {
     super(message);
     this.name = "MarketDataError";
   }
@@ -25,7 +29,10 @@ export async function fetchMarketData(userId: string, rawQuery: unknown) {
   const rows: MarketDataRow[] = await getMarketDataByUserId(userId, sym, timeframe, family, 200);
 
   // Group by timeframe -> family -> levels[] (matches WordPress response shape).
-  const fibs: Record<string, Record<string, Array<{ ratio: number; price: number; calculated_at: string }>>> = {};
+  const fibs: Record<
+    string,
+    Record<string, Array<{ ratio: number; price: number; calculated_at: string }>>
+  > = {};
   for (const row of rows) {
     fibs[row.timeframe] ??= {};
     fibs[row.timeframe][row.family] ??= [];

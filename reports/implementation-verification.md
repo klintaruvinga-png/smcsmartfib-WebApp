@@ -2,12 +2,12 @@
 
 ## Automated validation
 
-| Check | Result | Evidence |
-| --- | --- | --- |
-| `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | PASS | No syntax errors detected after adding response-time `polledAt` stamping inside `get_live_signals()`. |
-| `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` | PASS | The new repeated-poll regression proves stable `id` / `createdAt` / `backendConfirmed`, changing `polledAt`, and preserved anti-cache headers. |
-| `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx src/routes/-signals.page.test.tsx src/routes/-plan.test.tsx` | PASS | 4 test files passed, 37 tests passed. |
-| `npx tsc --noEmit` | FAIL | Existing unrelated repository error in `vite.config.ts`: `test` is not a known property of `LovableViteTanstackOptions`. |
+| Check                                                                                                                                          | Result | Evidence                                                                                                                                       |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`                                                                                 | PASS   | No syntax errors detected after adding response-time `polledAt` stamping inside `get_live_signals()`.                                          |
+| `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`                                                                   | PASS   | The new repeated-poll regression proves stable `id` / `createdAt` / `backendConfirmed`, changing `polledAt`, and preserved anti-cache headers. |
+| `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx src/routes/-signals.page.test.tsx src/routes/-plan.test.tsx` | PASS   | 4 test files passed, 37 tests passed.                                                                                                          |
+| `npx tsc --noEmit`                                                                                                                             | FAIL   | Existing unrelated repository error in `vite.config.ts`: `test` is not a known property of `LovableViteTanstackOptions`.                       |
 
 ## Response-contract evidence
 

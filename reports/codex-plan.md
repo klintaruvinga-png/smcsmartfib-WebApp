@@ -2,13 +2,11 @@
 
 ### 1. Issue validation
 
-
 - **Confirmed**: Backend provenance metadata (`sourceDetail`, `feed_key`, `source_count`) was being exposed in the `Live Radar` UI.
 - **Confirmed**: Users should see a stable, unified frontend without broker-specific or source-specific labels.
 - **Confirmed**: Compatibility with the SDK and other internal tools must be maintained by keeping the fields in the types.
 
 ### 2. Implementation contract
-
 
 #### File: `src/types/sniper.ts` & `sdk/src/types/index.ts`
 
@@ -59,6 +57,6 @@
 ### 8. Implementation handoff
 
 - **Branch naming**: `fix/price-feed-stability` (current)
-- **Commit grouping**: 
+- **Commit grouping**:
   - `fix(ui): remove backend provenance metadata from live radar`
   - `chore(types): mark metadata fields as internal for compatibility`

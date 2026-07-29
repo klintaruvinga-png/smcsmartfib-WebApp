@@ -10,14 +10,13 @@ import postgres from "postgres";
 import { createClient } from "@supabase/supabase-js";
 import * as schema from "./schema";
 
-const connectionString =
-  process.env.DATABASE_URL ?? process.env.SUPABASE_DATABASE_URL ?? "";
+const connectionString = process.env.DATABASE_URL ?? process.env.SUPABASE_DATABASE_URL ?? "";
 
 if (!connectionString) {
   // Surface a clear error at boot rather than a cryptic connection failure.
   console.warn(
     "[db] DATABASE_URL / SUPABASE_DATABASE_URL is not set. " +
-      "Database queries will fail until it is provided via .env.local."
+      "Database queries will fail until it is provided via .env.local.",
   );
 }
 
@@ -37,11 +36,12 @@ export { client as pgClient };
 const supabaseUrl = process.env.SUPABASE_URL ?? "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 
-export const supabase = supabaseUrl && supabaseServiceKey
-  ? createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-  : null;
+export const supabase =
+  supabaseUrl && supabaseServiceKey
+    ? createClient(supabaseUrl, supabaseServiceKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      })
+    : null;

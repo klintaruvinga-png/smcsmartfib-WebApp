@@ -1,10 +1,6 @@
 import { defineEventHandler, readBody, createError, setHeader } from "h3";
 import { requireAuth } from "../../../lib/auth/middleware";
-import {
-  getUserSettings,
-  updateUserSettings,
-  SettingsError,
-} from "../../../lib/db/queries/users";
+import { getUserSettings, updateUserSettings, SettingsError } from "../../../lib/db/queries/users";
 import { userSettingsSchema } from "../../../lib/user/settings-schema";
 import type { UserSettings } from "../../../lib/db/schema";
 

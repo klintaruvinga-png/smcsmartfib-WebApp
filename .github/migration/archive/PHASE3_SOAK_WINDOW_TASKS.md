@@ -92,10 +92,10 @@
 
 All 10 tasks complete + Phase 3 soak gate queries pass (2026-05-25) → Phase 4 permitted to start.
 
-| Task | Dependency |
-|------|-----------|
-| Tasks 1–2 | None — start immediately |
-| Tasks 3–5 | None — start after Task 1 |
-| Tasks 6–8 | None — planning only, start any time |
-| Task 9 | Passive — weekend observation, no action required |
-| Task 10 | Human decision — assign at any time |
+| Task      | Dependency                                        |
+| --------- | ------------------------------------------------- |
+| Tasks 1–2 | None — start immediately                          |
+| Tasks 3–5 | None — start after Task 1                         |
+| Tasks 6–8 | None — planning only, start any time              |
+| Task 9    | Passive — weekend observation, no action required |
+| Task 10   | Human decision — assign at any time               |

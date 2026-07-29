@@ -22,11 +22,11 @@ This audit covered the dashboard freshness-authority path only. The goal was to 
 
 ### Fib Engine (Phase 4)
 
-| Metric | Pine Value | MT5 Value | Match | Accuracy |
-|--------|-----------|----------|-------|----------|
-| Fib render authority in touched scope | Backend passthrough | Backend passthrough | ✓ | 100% |
-| Fib-derived display state | Unchanged | Unchanged | ✓ | 100% |
-| **Fib Parity Score** | — | — | — | **100%** |
+| Metric                                | Pine Value          | MT5 Value           | Match | Accuracy |
+| ------------------------------------- | ------------------- | ------------------- | ----- | -------- |
+| Fib render authority in touched scope | Backend passthrough | Backend passthrough | ✓     | 100%     |
+| Fib-derived display state             | Unchanged           | Unchanged           | ✓     | 100%     |
+| **Fib Parity Score**                  | —                   | —                   | —     | **100%** |
 
 **Observations**: No fib-anchor or fib-level logic was touched in this pass; no drift introduced.
 
@@ -34,12 +34,12 @@ This audit covered the dashboard freshness-authority path only. The goal was to 
 
 ### Regime Engine (Phase 5)
 
-| Metric | Pine Classification | MT5 Classification | Match | Accuracy |
-|--------|-------------------|------------------|-------|----------|
-| Regime stale styling source | Backend state | Dashboard now consumes backend state only | ✓ | 100% |
-| Client-clock override | Not permitted | Removed | ✓ | 100% |
-| Chop warning ownership | Backend/diagnostic | Backend/diagnostic | ✓ | 100% |
-| **Regime Parity Score** | — | — | — | **100%** |
+| Metric                      | Pine Classification | MT5 Classification                        | Match | Accuracy |
+| --------------------------- | ------------------- | ----------------------------------------- | ----- | -------- |
+| Regime stale styling source | Backend state       | Dashboard now consumes backend state only | ✓     | 100%     |
+| Client-clock override       | Not permitted       | Removed                                   | ✓     | 100%     |
+| Chop warning ownership      | Backend/diagnostic  | Backend/diagnostic                        | ✓     | 100%     |
+| **Regime Parity Score**     | —                   | —                                         | —     | **100%** |
 
 **Observations**: The previous client-side stale recomputation could contradict backend truth. That drift has been removed in the scanned path.
 
@@ -47,12 +47,12 @@ This audit covered the dashboard freshness-authority path only. The goal was to 
 
 ### Signal Engine (Phase 6)
 
-| Metric | Pine Signal | MT5 Signal | Match | Accuracy |
-|--------|------------|-----------|-------|----------|
-| Freshness warning source | Backend authority | Dashboard now consumes backend authority | ✓ | 100% |
-| Header live-strip eligibility | Live quotes only | Live/mock quotes only | ✓ | 100% |
-| Invalid timestamp display | Explicitly non-authoritative | `unknown` / `just now` fallback | ✓ | 100% |
-| **Signal Parity Score** | — | — | — | **100%** |
+| Metric                        | Pine Signal                  | MT5 Signal                               | Match | Accuracy |
+| ----------------------------- | ---------------------------- | ---------------------------------------- | ----- | -------- |
+| Freshness warning source      | Backend authority            | Dashboard now consumes backend authority | ✓     | 100%     |
+| Header live-strip eligibility | Live quotes only             | Live/mock quotes only                    | ✓     | 100%     |
+| Invalid timestamp display     | Explicitly non-authoritative | `unknown` / `just now` fallback          | ✓     | 100%     |
+| **Signal Parity Score**       | —                            | —                                        | —     | **100%** |
 
 **Observations**: No signal formula, confirmation, or execution code changed. The parity gain is in dashboard truth presentation, not signal generation math.
 
@@ -60,20 +60,20 @@ This audit covered the dashboard freshness-authority path only. The goal was to 
 
 ## Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-|-------|----------|-------|-----------|---------|
-| Browser clock could override backend `live` into stale UI state | HIGH | 1 | Fixed in `src/routes/live.tsx` | No |
-| Header ticker accepted stale/offline quotes | MEDIUM | 1 | Fixed in `src/components/sniper/AppShell.tsx` | No |
-| Invalid timestamps rendered `NaNd ago` | MEDIUM | 1 | Fixed in `src/lib/format.ts` | No |
+| Issue                                                           | Severity | Count | Resolution                                    | Blocker |
+| --------------------------------------------------------------- | -------- | ----- | --------------------------------------------- | ------- |
+| Browser clock could override backend `live` into stale UI state | HIGH     | 1     | Fixed in `src/routes/live.tsx`                | No      |
+| Header ticker accepted stale/offline quotes                     | MEDIUM   | 1     | Fixed in `src/components/sniper/AppShell.tsx` | No      |
+| Invalid timestamps rendered `NaNd ago`                          | MEDIUM   | 1     | Fixed in `src/lib/format.ts`                  | No      |
 
 ---
 
 ## Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-|------|-----------|--------|----------|
-| Full replay parity matrix | Not recomputed | This run was scoped to dashboard freshness authority | ✓ |
-| Vite bundle check | Not completed | Sandbox blocks `esbuild` child-process spawn | ✓ |
+| Item                      | Difference     | Reason                                               | Accepted |
+| ------------------------- | -------------- | ---------------------------------------------------- | -------- |
+| Full replay parity matrix | Not recomputed | This run was scoped to dashboard freshness authority | ✓        |
+| Vite bundle check         | Not completed  | Sandbox blocks `esbuild` child-process spawn         | ✓        |
 
 ---
 

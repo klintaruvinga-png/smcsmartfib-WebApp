@@ -11,11 +11,7 @@ export default defineEventHandler(async (event) => {
   setHeader(event, "Cache-Control", "no-store, no-cache, must-revalidate, private");
 
   if (event.method === "GET") {
-    const status = (getQuery(event).status as string) as
-      | "open"
-      | "closed"
-      | "cancelled"
-      | undefined;
+    const status = getQuery(event).status as string as "open" | "closed" | "cancelled" | undefined;
     return await listTrades(payload.sub, { status });
   }
 

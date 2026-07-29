@@ -23,6 +23,7 @@ This is NOT indicator-only.
 The dashboard, backend, REST layer, refresh engine, and signal engine are first-class systems and must be treated as production-critical infrastructure.
 
 You are performing:
+
 1. Full bug scan
 2. Wiring audit
 3. Parity verification
@@ -107,9 +108,9 @@ MANDATORY INSPECTION PASSES
 
 Run all passes below.
 
------------------------------------
-PASS 1 — Runtime & Stability Scan
------------------------------------
+---
+
+## PASS 1 — Runtime & Stability Scan
 
 Search for:
 
@@ -129,9 +130,9 @@ Search for:
 - Backend/frontend timing conflicts
 - Improper debounce/throttle logic
 
------------------------------------
-PASS 2 — Wiring & Hook Audit
------------------------------------
+---
+
+## PASS 2 — Wiring & Hook Audit
 
 Search for:
 
@@ -147,9 +148,9 @@ Search for:
 - Missing subscriptions
 - Unreachable code branches
 
------------------------------------
-PASS 3 — Data Contract Verification
------------------------------------
+---
+
+## PASS 3 — Data Contract Verification
 
 Verify parity across:
 
@@ -170,9 +171,9 @@ Search for:
 - Backend fields never rendered
 - Frontend-required fields not returned
 
------------------------------------
-PASS 4 — Refresh & Stale-State Audit
------------------------------------
+---
+
+## PASS 4 — Refresh & Stale-State Audit
 
 Inspect all:
 
@@ -200,9 +201,9 @@ Specifically detect:
 - Refresh loops blocked by stale guards
 - Frontend fallback logic overriding backend truth
 
------------------------------------
-PASS 5 — Signal Engine Integrity Audit
------------------------------------
+---
+
+## PASS 5 — Signal Engine Integrity Audit
 
 Verify:
 
@@ -227,9 +228,9 @@ Flag any path where:
 - Regime gate permanently blocks readiness
 - Frontend and backend disagree on truth state
 
------------------------------------
-PASS 6 — Parity Audit
------------------------------------
+---
+
+## PASS 6 — Parity Audit
 
 Verify Pine, backend, and dashboard remain aligned for:
 
@@ -247,9 +248,9 @@ Verify Pine, backend, and dashboard remain aligned for:
 
 Flag all drift risks.
 
------------------------------------
-PASS 7 — Cleanup Sweep
------------------------------------
+---
+
+## PASS 7 — Cleanup Sweep
 
 Find:
 
@@ -266,6 +267,7 @@ Find:
 - Commented-out experimental systems
 
 Only remove code if:
+
 - It is provably unused OR
 - It duplicates active logic OR
 - It introduces risk/confusion
@@ -315,8 +317,8 @@ REQUIRED OUTPUT FORMAT
 # SMC SuperFIB Full-Stack Stabilization Report
 
 ====================================================
-1. EXECUTIVE SUMMARY
-====================================================
+
+1. # EXECUTIVE SUMMARY
 
 Provide:
 
@@ -329,9 +331,7 @@ Provide:
 - Number of fixes applied
 - Remaining high-risk areas
 
-====================================================
-2. CONFIRMED PROBLEM AREAS
-====================================================
+# ==================================================== 2. CONFIRMED PROBLEM AREAS
 
 Group by category:
 
@@ -348,6 +348,7 @@ Group by category:
 For each issue use:
 
 ### [ISSUE-ID] Short title
+
 - File(s):
 - Layer:
 - Severity:
@@ -356,13 +357,12 @@ For each issue use:
 - Impact:
 - Why this matters:
 
-====================================================
-3. SURGICAL FIXES APPLIED
-====================================================
+# ==================================================== 3. SURGICAL FIXES APPLIED
 
 For every applied fix:
 
 ### [FIX-ID] Fix title
+
 - Fixes:
 - Files changed:
 - Root cause addressed:
@@ -376,9 +376,7 @@ For every applied fix:
 
 Include exact logic improvements.
 
-====================================================
-4. PARITY VERIFICATION RESULTS
-====================================================
+# ==================================================== 4. PARITY VERIFICATION RESULTS
 
 Verify whether Pine, backend, and dashboard are aligned for:
 
@@ -392,24 +390,22 @@ Verify whether Pine, backend, and dashboard are aligned for:
 - Dashboard rendering
 
 Explicitly identify:
+
 - Fully aligned systems
 - Partially drifting systems
 - High-risk parity gaps
 
-====================================================
-5. REMAINING RISKS
-====================================================
+# ==================================================== 5. REMAINING RISKS
 
 List unresolved or intentionally deferred risks.
 
 For each:
+
 - Why it was not changed
 - What future refactor may be needed
 - Risk if left unchanged
 
-====================================================
-6. REGRESSION TEST CHECKLIST
-====================================================
+# ==================================================== 6. REGRESSION TEST CHECKLIST
 
 Provide explicit regression checks for:
 
@@ -425,15 +421,11 @@ Provide explicit regression checks for:
 - Multi-refresh stability
 - Engine restart resilience
 
-====================================================
-7. SAFE PATCH ORDER
-====================================================
+# ==================================================== 7. SAFE PATCH ORDER
 
 List safest implementation/deployment order.
 
-====================================================
-8. DO NOT TOUCH LIST
-====================================================
+# ==================================================== 8. DO NOT TOUCH LIST
 
 Identify risky files/functions/endpoints requiring separate approval before major changes.
 
@@ -485,6 +477,7 @@ IMPORTANT FINAL RULE
 Do NOT stop at analysis.
 
 You must:
+
 - scan,
 - verify,
 - patch,

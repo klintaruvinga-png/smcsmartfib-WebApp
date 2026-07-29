@@ -18,13 +18,10 @@ import type { EaSession, EaSessionStatus } from "../schema";
 export async function createEaSession(
   eaApiKey: string,
   ip: string | null,
-  userAgent: string | null
+  userAgent: string | null,
 ): Promise<EaSession> {
   // Resolve the owning user from the EA API key.
-  const [u] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.eaApiKey, eaApiKey));
+  const [u] = await db.select({ id: users.id }).from(users).where(eq(users.eaApiKey, eaApiKey));
   if (!u) throw new Error("No user found for EA API key");
 
   // Omit id / connectedAt / lastPing / status — those use DB defaults.
@@ -57,18 +54,11 @@ export async function updateEaSessionPing(eaApiKey: string): Promise<void> {
  * Return the EA's currently-active (status='connected') sessions, newest ping
  * first.
  */
-export async function getActiveEaSessions(
-  eaApiKey: string
-): Promise<EaSession[]> {
+export async function getActiveEaSessions(eaApiKey: string): Promise<EaSession[]> {
   return db
     .select()
     .from(eaSessions)
-    .where(
-      and(
-        eq(eaSessions.eaApiKey, eaApiKey),
-        eq(eaSessions.status, "connected")
-      )
-    )
+    .where(and(eq(eaSessions.eaApiKey, eaApiKey), eq(eaSessions.status, "connected")))
     .orderBy(desc(eaSessions.lastPing));
 }
 

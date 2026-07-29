@@ -5,11 +5,7 @@ import { userSettingsSchema } from "../../src/lib/user/settings-schema";
 
 vi.mock("../../src/lib/db/index", () => ({ db: dbMock }));
 
-import {
-  getUserSettings,
-  updateUserSettings,
-  SettingsError,
-} from "../../src/lib/db/queries/users";
+import { getUserSettings, updateUserSettings, SettingsError } from "../../src/lib/db/queries/users";
 
 beforeEach(() => {
   resetCalls();
@@ -46,8 +42,8 @@ describe("user settings queries", () => {
     // 1. First query (SELECT current settings) returns currentSettings
     // 2. Second query (UPDATE.returning()) returns the merged result
     setDbResultQueue([
-      [{ settings: currentSettings }],  // SELECT result
-      [{ settings: mergedSettings }],   // UPDATE.returning() result
+      [{ settings: currentSettings }], // SELECT result
+      [{ settings: mergedSettings }], // UPDATE.returning() result
     ]);
 
     const patch = { notifications: { email: true } };
@@ -77,7 +73,7 @@ describe("user settings queries", () => {
   it("updateUserSettings throws SettingsError(404) when the user is missing", async () => {
     setDbResult([]);
     await expect(updateUserSettings("u-x", { theme: "light" })).rejects.toBeInstanceOf(
-      SettingsError
+      SettingsError,
     );
   });
 });

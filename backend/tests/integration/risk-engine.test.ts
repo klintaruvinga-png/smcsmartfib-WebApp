@@ -13,7 +13,7 @@ describe("evaluateTrade", () => {
     const result = evaluateTrade(
       baseLimits,
       { openTrades: [], todaysPnl: 0 },
-      { symbol: "XAUUSD", direction: "long", lotSize: 1 }
+      { symbol: "XAUUSD", direction: "long", lotSize: 1 },
     );
     expect(result.allowed).toBe(true);
     expect(result.reasons).toHaveLength(0);
@@ -30,7 +30,7 @@ describe("evaluateTrade", () => {
         ],
         todaysPnl: 0,
       },
-      { symbol: "XAUUSD", direction: "long", lotSize: 1 }
+      { symbol: "XAUUSD", direction: "long", lotSize: 1 },
     );
     expect(result.allowed).toBe(false);
     expect(result.reasons.some((r) => r.includes("max 3"))).toBe(true);
@@ -40,7 +40,7 @@ describe("evaluateTrade", () => {
     const result = evaluateTrade(
       baseLimits,
       { openTrades: [], todaysPnl: 0 },
-      { symbol: "XAUUSD", direction: "long", lotSize: 5 }
+      { symbol: "XAUUSD", direction: "long", lotSize: 5 },
     );
     expect(result.allowed).toBe(false);
     expect(result.reasons.some((r) => r.includes("max position size"))).toBe(true);
@@ -50,7 +50,7 @@ describe("evaluateTrade", () => {
     const result = evaluateTrade(
       baseLimits,
       { openTrades: [{ symbol: "XAUUSD", lotSize: 4 }], todaysPnl: 0 },
-      { symbol: "XAUUSD", direction: "long", lotSize: 2 }
+      { symbol: "XAUUSD", direction: "long", lotSize: 2 },
     );
     expect(result.allowed).toBe(false);
     expect(result.reasons.some((r) => r.includes("exposure"))).toBe(true);
@@ -60,7 +60,7 @@ describe("evaluateTrade", () => {
     const result = evaluateTrade(
       baseLimits,
       { openTrades: [], todaysPnl: -450 },
-      { symbol: "XAUUSD", direction: "long", lotSize: 1, estimatedRisk: 100 }
+      { symbol: "XAUUSD", direction: "long", lotSize: 1, estimatedRisk: 100 },
     );
     expect(result.allowed).toBe(false);
     expect(result.reasons.some((r) => r.includes("daily loss limit"))).toBe(true);
@@ -71,7 +71,7 @@ describe("evaluateTrade", () => {
     const result = evaluateTrade(
       baseLimits,
       { openTrades: [{ symbol: "EURUSD", lotSize: 1, pnl: 50 }], todaysPnl: 50 },
-      { symbol: "XAUUSD", direction: "long", lotSize: 1 }
+      { symbol: "XAUUSD", direction: "long", lotSize: 1 },
     );
     expect(result.allowed).toBe(true);
   });

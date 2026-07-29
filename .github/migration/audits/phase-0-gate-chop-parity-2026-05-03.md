@@ -11,6 +11,7 @@
 ## Executive Summary
 
 A critical gate/chop contract violation was detected and patched in this run. The live PHP backend `build_symbol_state()` function never blocked the gate when `chop >= 0.7`, despite:
+
 1. The SMC methodology requiring gate BLOCKED in F3 caution (high-chop equilibrium) zones
 2. The mock data specification explicitly showing EURUSD (chop=0.71) as `BLOCKED` with reason `"chop > 0.7"`
 3. The signal engine correctly computing `f3_chop = 'caution'` and excluding 'F3-clear' from confluence when chop >= 0.7
@@ -21,16 +22,16 @@ The patch restores full gate/chop parity. Current parity: **100%** (gate contrac
 
 ## Parity Score
 
-| Check | Before Patch | After Patch | Status |
-|-------|-------------|-------------|--------|
-| Gate BLOCKED when chop >= 0.7 | ✗ FAIL | ✓ PASS | Fixed |
-| Gate BUY/SELL when chop < 0.7 | ✓ PASS | ✓ PASS | Stable |
-| Gate BLOCKED when candles < 30 | ✓ PASS | ✓ PASS | Stable |
-| Gate BLOCKED when price = 0 | ✓ PASS | ✓ PASS | Stable |
-| Gate BLOCKED when key missing | ✓ PASS | ✓ PASS | Stable |
-| f3_chop='caution' when chop >= 0.7 | ✓ PASS | ✓ PASS | Stable |
-| Confluence excludes F3-clear when chop >= 0.7 | ✓ PASS | ✓ PASS | Stable |
-| Signal backendConfirmed=false when gate BLOCKED | ✓ PASS | ✓ PASS | Stable |
+| Check                                           | Before Patch | After Patch | Status |
+| ----------------------------------------------- | ------------ | ----------- | ------ |
+| Gate BLOCKED when chop >= 0.7                   | ✗ FAIL       | ✓ PASS      | Fixed  |
+| Gate BUY/SELL when chop < 0.7                   | ✓ PASS       | ✓ PASS      | Stable |
+| Gate BLOCKED when candles < 30                  | ✓ PASS       | ✓ PASS      | Stable |
+| Gate BLOCKED when price = 0                     | ✓ PASS       | ✓ PASS      | Stable |
+| Gate BLOCKED when key missing                   | ✓ PASS       | ✓ PASS      | Stable |
+| f3_chop='caution' when chop >= 0.7              | ✓ PASS       | ✓ PASS      | Stable |
+| Confluence excludes F3-clear when chop >= 0.7   | ✓ PASS       | ✓ PASS      | Stable |
+| Signal backendConfirmed=false when gate BLOCKED | ✓ PASS       | ✓ PASS      | Stable |
 
 **Overall Gate/Chop Parity**: 8/8 → **100%**
 
@@ -46,18 +47,19 @@ This created a silent contract mismatch: the mock data showed what the system SH
 
 ### Affected Scenarios
 
-| Scenario | chop value | Gate (before) | Gate (after) |
-|----------|-----------|--------------|-------------|
-| EURUSD ranging | 0.71 | BUY or SELL | BLOCKED ✓ |
-| Any pair at equilibrium | ≥ 0.70 | BUY or SELL | BLOCKED ✓ |
-| Trending pair | 0.22 | BUY | BUY ✓ |
-| Strong trend | 0.05 | SELL | SELL ✓ |
+| Scenario                | chop value | Gate (before) | Gate (after) |
+| ----------------------- | ---------- | ------------- | ------------ |
+| EURUSD ranging          | 0.71       | BUY or SELL   | BLOCKED ✓    |
+| Any pair at equilibrium | ≥ 0.70     | BUY or SELL   | BLOCKED ✓    |
+| Trending pair           | 0.22       | BUY           | BUY ✓        |
+| Strong trend            | 0.05       | SELL          | SELL ✓       |
 
 ### Chop Calculation Verification
 
 `$chop = round(max(0, min(1, 1 - (abs($move) / $range))), 2)`
 
 Where:
+
 - `$move = close - first_close` (net directional movement over 120 candles)
 - `$range = high - low` (total price range over 120 candles)
 
@@ -74,15 +76,16 @@ This is mathematically consistent with the `$bias = RANGING` classification (tri
 
 ### Gate Contract: Mock vs Backend
 
-| Symbol | Mock Gate | Mock Reason | Backend Gate (before) | Backend Gate (after) |
-|--------|-----------|-------------|----------------------|---------------------|
-| GBPUSD (chop=0.22) | BOTH | — | BUY or SELL | BUY or SELL ✓ |
-| AUDUSD (chop=0.34) | SELL | — | SELL | SELL ✓ |
-| EURUSD (chop=0.71) | BLOCKED | "chop > 0.7" | BUY or SELL ✗ | BLOCKED ✓ |
-| NZDUSD (chop=0.45) | SELL | — | SELL | SELL ✓ |
-| USDJPY (chop=0.18) | BUY | — | BUY | BUY ✓ |
+| Symbol             | Mock Gate | Mock Reason  | Backend Gate (before) | Backend Gate (after) |
+| ------------------ | --------- | ------------ | --------------------- | -------------------- |
+| GBPUSD (chop=0.22) | BOTH      | —            | BUY or SELL           | BUY or SELL ✓        |
+| AUDUSD (chop=0.34) | SELL      | —            | SELL                  | SELL ✓               |
+| EURUSD (chop=0.71) | BLOCKED   | "chop > 0.7" | BUY or SELL ✗         | BLOCKED ✓            |
+| NZDUSD (chop=0.45) | SELL      | —            | SELL                  | SELL ✓               |
+| USDJPY (chop=0.18) | BUY       | —            | BUY                   | BUY ✓                |
 
 ### Parity Before Patch: 4/5 = 80%
+
 ### Parity After Patch: 5/5 = 100%
 
 ---
@@ -100,13 +103,13 @@ This is mathematically consistent with the `$bias = RANGING` classification (tri
 
 ## Migration Readiness
 
-| Dimension | Status |
-|-----------|--------|
-| Gate/chop contract | ✓ PASS (patched) |
-| Signal verdict consistency | ✓ PASS (f3_chop caution already working) |
-| Mock data parity | ✓ 100% |
-| Backend authority | ✓ Preserved |
-| MT5 parity impact | No impact (MT5 does not compute gate; backend-only) |
-| Pine parity | ✓ Gate-blocked at 0.7 matches Pine F3 chop rule |
+| Dimension                  | Status                                              |
+| -------------------------- | --------------------------------------------------- |
+| Gate/chop contract         | ✓ PASS (patched)                                    |
+| Signal verdict consistency | ✓ PASS (f3_chop caution already working)            |
+| Mock data parity           | ✓ 100%                                              |
+| Backend authority          | ✓ Preserved                                         |
+| MT5 parity impact          | No impact (MT5 does not compute gate; backend-only) |
+| Pine parity                | ✓ Gate-blocked at 0.7 matches Pine F3 chop rule     |
 
 **Migration readiness for gate/chop contract**: PASS (conditional on live soak)

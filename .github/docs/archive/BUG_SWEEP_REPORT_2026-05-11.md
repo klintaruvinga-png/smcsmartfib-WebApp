@@ -10,15 +10,15 @@
 
 ## Executive Summary
 
-| Item | Status |
-|---|---|
-| Overall system health | STABLE |
-| Bugs found | 3 (1 medium, 1 low, 1 info) |
-| Bugs fixed | 1 (BUG-001 OHLC guard) |
-| Remaining risks | Pre-existing prettier lint failures (non-blocking) |
-| Migration readiness | Phase 0 soak — EA route confirmed operational |
-| Snapshot archive | reports/snapshots/stabilize-ea-2026-05-11/ |
-| Rollback command | `git reset --hard 98ceaecf455506c4ae17d1a3914267d4ae306370` |
+| Item                  | Status                                                      |
+| --------------------- | ----------------------------------------------------------- |
+| Overall system health | STABLE                                                      |
+| Bugs found            | 3 (1 medium, 1 low, 1 info)                                 |
+| Bugs fixed            | 1 (BUG-001 OHLC guard)                                      |
+| Remaining risks       | Pre-existing prettier lint failures (non-blocking)          |
+| Migration readiness   | Phase 0 soak — EA route confirmed operational               |
+| Snapshot archive      | reports/snapshots/stabilize-ea-2026-05-11/                  |
+| Rollback command      | `git reset --hard 98ceaecf455506c4ae17d1a3914267d4ae306370` |
 
 ---
 
@@ -26,11 +26,11 @@
 
 ### BUG-001 — Missing OHLC Consistency Validation (FIXED)
 
-| Field | Value |
-|---|---|
-| Severity | MEDIUM |
-| System | EA Market Stream / Candle Ingestion |
-| Status | FIXED in commit 116e36b0 |
+| Field    | Value                               |
+| -------- | ----------------------------------- |
+| Severity | MEDIUM                              |
+| System   | EA Market Stream / Candle Ingestion |
+| Status   | FIXED in commit 116e36b0            |
 
 **Description:** The `post_ea_market_stream()` handler stored candles without verifying that `high >= max(open, close)` and `low <= min(open, close)`. A logically corrupt OHLC candle (e.g. where `high < open`, which could occur due to a broker data error or MQL5 initialization fault) would be persisted and passed to the signal engine's Fib level calculation.
 
@@ -44,11 +44,11 @@
 
 ### BUG-002 — Pre-existing Prettier Lint Failures (NOT FIXED — non-blocking)
 
-| Field | Value |
-|---|---|
-| Severity | LOW |
-| System | Frontend build quality |
-| Status | Pre-existing — not introduced by this sweep |
+| Field    | Value                                       |
+| -------- | ------------------------------------------- |
+| Severity | LOW                                         |
+| System   | Frontend build quality                      |
+| Status   | Pre-existing — not introduced by this sweep |
 
 **Description:** `npm run lint` produces 90 `prettier/prettier` errors across `src/routes/admin.tsx`, `src/routes/index.tsx`, `src/routes/plan.tsx`, and others. All errors are whitespace/line-break formatting only — no logic issues. The build (`npm run build`) succeeds.
 
@@ -68,15 +68,16 @@ The workflow spec describes a payload using `quote_time`, `server_time`, and a `
 
 ### PATCH-001: OHLC Consistency Guard
 
-| Field | Value |
-|---|---|
-| File | `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` |
-| Lines added | +35 |
-| Regression test | `tests/php/test-ea-market-stream.php` Test 6 |
-| Rollback before | `rollback/stabilize-ea-2026-05-11-before-patches` |
-| Rollback after | `rollback/stabilize-ea-2026-05-11-after-patch-1` |
+| Field           | Value                                                   |
+| --------------- | ------------------------------------------------------- |
+| File            | `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` |
+| Lines added     | +35                                                     |
+| Regression test | `tests/php/test-ea-market-stream.php` Test 6            |
+| Rollback before | `rollback/stabilize-ea-2026-05-11-before-patches`       |
+| Rollback after  | `rollback/stabilize-ea-2026-05-11-after-patch-1`        |
 
 Logic hardened:
+
 - New `validate_ohlc()`: `high >= max(open,close) && low <= min(open,close)`
 - Applied in M1 candle block and M15 candle block as `elseif (!$this->validate_ohlc($candle))`
 - Invalid candle: logs OHLC GUARD message, calls `audit()` with `ea.market_stream.invalid_ohlc`, does NOT return error — snapshot insert continues normally
@@ -86,22 +87,22 @@ Logic hardened:
 
 ## EA Integration Status
 
-| Attribute | Value |
-|---|---|
-| Route | `POST /wp-json/sniper/v1/ea/market-stream` |
-| Auth required | YES |
-| Auth header | `X-EA-API-Key` (also: `X-API-KEY`, `x_ea_api_key`, `x_api_key`) |
-| Auth mechanism | `hash_equals()` against `SMC_SF_EA_API_KEY` constant/env |
-| user_id required | YES (in JSON body) |
-| Missing token | 401 `smc_sf_api_key_missing` |
-| Unconfigured secret | 503 `smc_sf_api_key_unconfigured` |
-| Invalid token | 403 `smc_sf_api_key_invalid` |
-| Missing user_id | 400 `smc_sf_user_required` |
-| Invalid user_id | 403 `smc_sf_user_invalid` |
-| wp_set_current_user | Called in permission callback before `return true` |
-| Stale data rejection | >300s → 400 `stale_data`; warn-only at 120–300s |
-| Candle stale rejection | >180s for M1; >1800s for M15 (inside `insert_mt5_candle()`) |
-| OHLC validation | YES (as of PATCH-001) |
+| Attribute                 | Value                                                                                                                                                |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Route                     | `POST /wp-json/sniper/v1/ea/market-stream`                                                                                                           |
+| Auth required             | YES                                                                                                                                                  |
+| Auth header               | `X-EA-API-Key` (also: `X-API-KEY`, `x_ea_api_key`, `x_api_key`)                                                                                      |
+| Auth mechanism            | `hash_equals()` against `SMC_SF_EA_API_KEY` constant/env                                                                                             |
+| user_id required          | YES (in JSON body)                                                                                                                                   |
+| Missing token             | 401 `smc_sf_api_key_missing`                                                                                                                         |
+| Unconfigured secret       | 503 `smc_sf_api_key_unconfigured`                                                                                                                    |
+| Invalid token             | 403 `smc_sf_api_key_invalid`                                                                                                                         |
+| Missing user_id           | 400 `smc_sf_user_required`                                                                                                                           |
+| Invalid user_id           | 403 `smc_sf_user_invalid`                                                                                                                            |
+| wp_set_current_user       | Called in permission callback before `return true`                                                                                                   |
+| Stale data rejection      | >300s → 400 `stale_data`; warn-only at 120–300s                                                                                                      |
+| Candle stale rejection    | >180s for M1; >1800s for M15 (inside `insert_mt5_candle()`)                                                                                          |
+| OHLC validation           | YES (as of PATCH-001)                                                                                                                                |
 | Payload contract (actual) | `{user_id, symbol, normalized_symbol, timeframe, timestamp, bid, ask, freshness, session, candle{time,open,high,low,close,volume}, candle_m15{...}}` |
 
 **Test curl commands:**
@@ -152,15 +153,15 @@ curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-st
 
 ## Parity Verification
 
-| Layer | Status |
-|---|---|
-| Pine vs Backend Fib levels | Confirmed aligned (see phase-6-signal-parity-2026-05-03.md) |
-| MT5 EA timestamp → PHP | UTC ISO 8601 via `TimeToIso8601()`, correctly parsed with `strtotime()` |
-| MQL5 field names vs PHP handler | Aligned: both use `timestamp`, `candle`, `candle_m15` |
-| Backend age_sec | Computed from `updated_at` (broker timestamp), not server fetch time |
-| Frontend FreshnessBadge | Uses `state` from backend response — no local age computation |
-| Signal backendConfirmed | Only set when `status=READY && data_live` in backend |
-| execute_signals gate | Checks `backend_confirmed=1 AND status='READY'` in DB |
+| Layer                           | Status                                                                  |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| Pine vs Backend Fib levels      | Confirmed aligned (see phase-6-signal-parity-2026-05-03.md)             |
+| MT5 EA timestamp → PHP          | UTC ISO 8601 via `TimeToIso8601()`, correctly parsed with `strtotime()` |
+| MQL5 field names vs PHP handler | Aligned: both use `timestamp`, `candle`, `candle_m15`                   |
+| Backend age_sec                 | Computed from `updated_at` (broker timestamp), not server fetch time    |
+| Frontend FreshnessBadge         | Uses `state` from backend response — no local age computation           |
+| Signal backendConfirmed         | Only set when `status=READY && data_live` in backend                    |
+| execute_signals gate            | Checks `backend_confirmed=1 AND status='READY'` in DB                   |
 
 ---
 

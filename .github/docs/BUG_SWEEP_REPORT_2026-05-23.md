@@ -10,9 +10,9 @@
 
 ## Freshness and stale-state integrity
 
-| Severity | Component | Root cause | Impact | Status |
-| --- | --- | --- | --- | --- |
-| HIGH | Engine snapshot cache | `is_engine_snapshot_current()` only validated watchlist parity plus `meta.computedAt`, and ignored the age of cached live prices inside the snapshot. With `refreshIntervalSec > staleThresholdSec`, a snapshot could remain cache-valid after MT5 quotes had already gone stale. | False LIVE window on `/snapshot`, `/live-signals`, and `/ladders`; backend-confirmed signals and gates could be served after quote truth had degraded. | Patched |
+| Severity | Component             | Root cause                                                                                                                                                                                                                                                                        | Impact                                                                                                                                                 | Status  |
+| -------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| HIGH     | Engine snapshot cache | `is_engine_snapshot_current()` only validated watchlist parity plus `meta.computedAt`, and ignored the age of cached live prices inside the snapshot. With `refreshIntervalSec > staleThresholdSec`, a snapshot could remain cache-valid after MT5 quotes had already gone stale. | False LIVE window on `/snapshot`, `/live-signals`, and `/ladders`; backend-confirmed signals and gates could be served after quote truth had degraded. | Patched |
 
 # Surgical Fixes Applied
 
@@ -56,6 +56,7 @@
 - MT5 quote timestamp normalization and snapshot persistence rules.
 - `determine_engine_blocker()` stale/rate-limit authority logic.
 - Session anchor and HTF authority fib calculations without a separate parity approval pass.
+
 # SMC SuperFIB Bug Sweep Report — 2026-05-23
 
 **Workflow ID**: stabilize-ea-2026-05-23  
@@ -82,27 +83,27 @@
 
 ### BUG-001 — Prettier Lint Errors (LOW)
 
-| Attribute | Value |
-|---|---|
-| Severity | LOW |
-| Component | TypeScript source — test and route files |
-| Files | `src/routes/-admin.test.tsx`, `src/routes/admin.tsx`, `src/types/sniper.ts` |
+| Attribute  | Value                                                                                                                                    |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Severity   | LOW                                                                                                                                      |
+| Component  | TypeScript source — test and route files                                                                                                 |
+| Files      | `src/routes/-admin.test.tsx`, `src/routes/admin.tsx`, `src/types/sniper.ts`                                                              |
 | Root Cause | Prettier formatting drift from Phase 2/3 development (trailing commas, line-break rules not consistently applied after recent additions) |
-| Impact | Lint CI gate fails with 8 fixable errors |
-| Blocker | No |
-| Status | FIXED in PATCH-001 |
+| Impact     | Lint CI gate fails with 8 fixable errors                                                                                                 |
+| Blocker    | No                                                                                                                                       |
+| Status     | FIXED in PATCH-001                                                                                                                       |
 
 ### BUG-002 — test-phase2-trade-telemetry.php streak assertion failure (LOW)
 
-| Attribute | Value |
-|---|---|
-| Severity | LOW |
-| Component | PHP test harness |
-| File | `wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php` |
+| Attribute  | Value                                                                                                                                                                                                                    |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Severity   | LOW                                                                                                                                                                                                                      |
+| Component  | PHP test harness                                                                                                                                                                                                         |
+| File       | `wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php`                                                                                                                                                |
 | Root Cause | Streak calculator asserts `current_streak_days = 1` but the test mock's UTC date boundary handling does not always match the CALENDAR_DAY_WITH_ANY_COMPLETED_ENGINE_RUN definition when the test runs near UTC midnight. |
-| Impact | PHP test suite shows 1 failing test — does not affect production streak logic. |
-| Blocker | No |
-| Status | PRE-EXISTING (noted in 2026-05-22 parity audit). Deferred to dedicated test-harness fix. |
+| Impact     | PHP test suite shows 1 failing test — does not affect production streak logic.                                                                                                                                           |
+| Blocker    | No                                                                                                                                                                                                                       |
+| Status     | PRE-EXISTING (noted in 2026-05-22 parity audit). Deferred to dedicated test-harness fix.                                                                                                                                 |
 
 ---
 
@@ -110,67 +111,67 @@
 
 ### PATCH-001 — Prettier Formatting Fix
 
-| Field | Value |
-|---|---|
-| Files changed | `src/routes/-admin.test.tsx`, `src/routes/admin.tsx`, `src/types/sniper.ts` |
-| Logic hardened | None — formatting only |
-| Regression protection | Lint gate now enforces 0 errors |
-| Rollback point before | `rollback/stabilize-ea-2026-05-23-before-patches` (cd3cf5b1) |
-| Rollback point after | `rollback/stabilize-ea-2026-05-23-after-patch-1` (12f281d5) |
-| Commit | 12f281d5d7307caf0861872a9b6a175077eebd93 |
+| Field                 | Value                                                                       |
+| --------------------- | --------------------------------------------------------------------------- |
+| Files changed         | `src/routes/-admin.test.tsx`, `src/routes/admin.tsx`, `src/types/sniper.ts` |
+| Logic hardened        | None — formatting only                                                      |
+| Regression protection | Lint gate now enforces 0 errors                                             |
+| Rollback point before | `rollback/stabilize-ea-2026-05-23-before-patches` (cd3cf5b1)                |
+| Rollback point after  | `rollback/stabilize-ea-2026-05-23-after-patch-1` (12f281d5)                 |
+| Commit                | 12f281d5d7307caf0861872a9b6a175077eebd93                                    |
 
 ---
 
 ## EA Integration Status
 
-| Parameter | Value |
-|---|---|
-| Route | `POST /wp-json/sniper/v1/ea/market-stream` |
-| Auth model | Shared-secret API key via `X-EA-API-Key` header |
-| Required header | `X-EA-API-Key` (also accepted: `X-API-KEY`, `x_ea_api_key`, `x_api_key`) |
-| Secret env | `SMC_SF_EA_API_KEY` (PHP constant or getenv fallback) |
-| Comparison | `hash_equals()` — timing-safe |
-| `user_id` required | Yes — checked at permission layer |
-| Payload validation | Full — stale rejection at 300s, OHLC validation, epoch candle guard |
-| Stale data rejection | 422 for `quote_time` older than 300 seconds |
+| Parameter            | Value                                                                                 |
+| -------------------- | ------------------------------------------------------------------------------------- |
+| Route                | `POST /wp-json/sniper/v1/ea/market-stream`                                            |
+| Auth model           | Shared-secret API key via `X-EA-API-Key` header                                       |
+| Required header      | `X-EA-API-Key` (also accepted: `X-API-KEY`, `x_ea_api_key`, `x_api_key`)              |
+| Secret env           | `SMC_SF_EA_API_KEY` (PHP constant or getenv fallback)                                 |
+| Comparison           | `hash_equals()` — timing-safe                                                         |
+| `user_id` required   | Yes — checked at permission layer                                                     |
+| Payload validation   | Full — stale rejection at 300s, OHLC validation, epoch candle guard                   |
+| Stale data rejection | 422 for `quote_time` older than 300 seconds                                           |
 | Auth error responses | 401 (missing), 503 (unconfigured), 403 (invalid), 400 (no user_id), 403 (bad user_id) |
-| Status | **CONFIRMED CORRECT** |
+| Status               | **CONFIRMED CORRECT**                                                                 |
 
 ### Additional EA Routes (Phase 1)
 
-| Route | Auth | Status |
-|---|---|---|
-| `POST /sniper/v1/ea/heartbeat` | EA key + user_id | CONFIRMED CORRECT |
+| Route                             | Auth             | Status            |
+| --------------------------------- | ---------------- | ----------------- |
+| `POST /sniper/v1/ea/heartbeat`    | EA key + user_id | CONFIRMED CORRECT |
 | `POST /sniper/v1/ea/account-sync` | EA key + user_id | CONFIRMED CORRECT |
-| `POST /sniper/v1/ea/symbol-sync` | EA key + user_id | CONFIRMED CORRECT |
+| `POST /sniper/v1/ea/symbol-sync`  | EA key + user_id | CONFIRMED CORRECT |
 | `GET /sniper/v1/ea/license-check` | EA key + user_id | CONFIRMED CORRECT |
 
 ---
 
 ## Parity Verification
 
-| Domain | Result | Notes |
-|---|---|---|
-| EA payload → PHP handler field alignment | PASS | All fields match: symbol, normalized_symbol, timeframe, quote_time, bid, ask, spread, freshness, session, candle, candle_m15, candle_*_aliases |
-| Stale-data rejection parity | PASS | Backend rejects >300s; warns 120–300s; candle staleness gated separately at 180s |
-| OHLC validation | PASS | high ≥ max(open,close), low ≤ min(open,close) enforced for M1 and M15 |
-| Freshness authority | PASS | Backend remains authoritative; frontend useStreamingTicks is visual-only; VerdictBadge gates on backend is_live |
-| Signal engine gating | PASS | No stale prices qualify signals; backend truth not moved to frontend |
-| Watchlist persistence | PASS | 100% parity — mutations invalidate engine snapshot cache |
-| Fib parity | PASS (unchanged) | Last direct fib suite pass 2026-05-22. No fib logic changed. |
-| PHP/MQL5 timestamp handling | PASS | Both use UTC; ISO 8601 format on the wire |
+| Domain                                   | Result           | Notes                                                                                                                                            |
+| ---------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| EA payload → PHP handler field alignment | PASS             | All fields match: symbol, normalized*symbol, timeframe, quote_time, bid, ask, spread, freshness, session, candle, candle_m15, candle*\*\_aliases |
+| Stale-data rejection parity              | PASS             | Backend rejects >300s; warns 120–300s; candle staleness gated separately at 180s                                                                 |
+| OHLC validation                          | PASS             | high ≥ max(open,close), low ≤ min(open,close) enforced for M1 and M15                                                                            |
+| Freshness authority                      | PASS             | Backend remains authoritative; frontend useStreamingTicks is visual-only; VerdictBadge gates on backend is_live                                  |
+| Signal engine gating                     | PASS             | No stale prices qualify signals; backend truth not moved to frontend                                                                             |
+| Watchlist persistence                    | PASS             | 100% parity — mutations invalidate engine snapshot cache                                                                                         |
+| Fib parity                               | PASS (unchanged) | Last direct fib suite pass 2026-05-22. No fib logic changed.                                                                                     |
+| PHP/MQL5 timestamp handling              | PASS             | Both use UTC; ISO 8601 format on the wire                                                                                                        |
 
 ---
 
 ## Migration Status Update
 
-| Phase | Status | Notes |
-|---|---|---|
-| Phase 0 | **COMPLETE** (2026-05-15) | All blockers resolved; soak evidence captured |
-| Phase 1 | **COMPLETE** (2026-05-20) | 48h bridge continuity confirmed |
-| Phase 2 | **COMPLETE** (2026-05-22) | Read-only trade telemetry live; streak LIVE |
-| Phase 3 | **IN PROGRESS** (90%) | Code complete; 72h soak window open since 2026-05-22 |
-| Phase 4+ | NOT STARTED | Blocked on Phase 3 gate |
+| Phase    | Status                    | Notes                                                |
+| -------- | ------------------------- | ---------------------------------------------------- |
+| Phase 0  | **COMPLETE** (2026-05-15) | All blockers resolved; soak evidence captured        |
+| Phase 1  | **COMPLETE** (2026-05-20) | 48h bridge continuity confirmed                      |
+| Phase 2  | **COMPLETE** (2026-05-22) | Read-only trade telemetry live; streak LIVE          |
+| Phase 3  | **IN PROGRESS** (90%)     | Code complete; 72h soak window open since 2026-05-22 |
+| Phase 4+ | NOT STARTED               | Blocked on Phase 3 gate                              |
 
 ### Migration Blockers After This Sweep
 
@@ -181,33 +182,33 @@
 
 ## Regression Checklist
 
-| Check | Result |
-|---|---|
-| `npm run lint` | ✅ 0 errors, 9 warnings (all pre-existing, non-fatal) |
-| `npm run build` | ✅ PASS (vite built in 9.70s) |
-| `npm run check:mql` | ✅ PASS (MQL include verification passed) |
-| `php -l smc-superfib-sniper.php` | ✅ No syntax errors |
-| `php -l class-market-data-service.php` | ✅ No syntax errors |
-| `test-ea-market-stream.php` (14 tests) | ✅ PASS |
-| `test-mt5-snapshot-contract.php` | ✅ PASS |
-| `test-ea-heartbeat.php` | ✅ PASS |
-| `test-ea-account-sync.php` | ✅ PASS |
-| `test-ea-license-check.php` | ✅ PASS |
-| `test-ea-symbol-sync.php` | ✅ PASS |
-| `test-fib-parity.php` | ✅ PASS |
-| `test-cors-regression.php` | ✅ PASS |
-| `phase3_mt5_simulation_test.php` | ✅ PASS |
-| `test-watchlist-snapshot-regression.php` | ✅ PASS |
-| `test-phase2-trade-telemetry.php` | ⚠️ FAIL (pre-existing streak assertion — outside Phase 3 seam) |
-| EA endpoint rejects missing `X-EA-API-Key` | ✅ 401 confirmed (test 1) |
-| EA endpoint rejects invalid token | ✅ 403 confirmed (test 2) |
-| EA endpoint rejects missing `user_id` | ✅ 400 confirmed (test 3) |
-| EA endpoint rejects stale `quote_time` | ✅ 422 confirmed (test 14) |
-| EA endpoint rejects malformed payload | ✅ 400 confirmed |
-| `authority-diagnostics` returns 401 unauthenticated | ✅ Confirmed — uses `permission_user` |
-| Admin routes require `manage_options` | ✅ Confirmed — uses `permission_admin` |
-| Dashboard does not fake live state | ✅ `useStreamingTicks` is visual-only; `useEngineHealth` has `staleTime:0` |
-| Signal engine does not run on stale data | ✅ Freshness gates enforced server-side |
+| Check                                               | Result                                                                     |
+| --------------------------------------------------- | -------------------------------------------------------------------------- |
+| `npm run lint`                                      | ✅ 0 errors, 9 warnings (all pre-existing, non-fatal)                      |
+| `npm run build`                                     | ✅ PASS (vite built in 9.70s)                                              |
+| `npm run check:mql`                                 | ✅ PASS (MQL include verification passed)                                  |
+| `php -l smc-superfib-sniper.php`                    | ✅ No syntax errors                                                        |
+| `php -l class-market-data-service.php`              | ✅ No syntax errors                                                        |
+| `test-ea-market-stream.php` (14 tests)              | ✅ PASS                                                                    |
+| `test-mt5-snapshot-contract.php`                    | ✅ PASS                                                                    |
+| `test-ea-heartbeat.php`                             | ✅ PASS                                                                    |
+| `test-ea-account-sync.php`                          | ✅ PASS                                                                    |
+| `test-ea-license-check.php`                         | ✅ PASS                                                                    |
+| `test-ea-symbol-sync.php`                           | ✅ PASS                                                                    |
+| `test-fib-parity.php`                               | ✅ PASS                                                                    |
+| `test-cors-regression.php`                          | ✅ PASS                                                                    |
+| `phase3_mt5_simulation_test.php`                    | ✅ PASS                                                                    |
+| `test-watchlist-snapshot-regression.php`            | ✅ PASS                                                                    |
+| `test-phase2-trade-telemetry.php`                   | ⚠️ FAIL (pre-existing streak assertion — outside Phase 3 seam)             |
+| EA endpoint rejects missing `X-EA-API-Key`          | ✅ 401 confirmed (test 1)                                                  |
+| EA endpoint rejects invalid token                   | ✅ 403 confirmed (test 2)                                                  |
+| EA endpoint rejects missing `user_id`               | ✅ 400 confirmed (test 3)                                                  |
+| EA endpoint rejects stale `quote_time`              | ✅ 422 confirmed (test 14)                                                 |
+| EA endpoint rejects malformed payload               | ✅ 400 confirmed                                                           |
+| `authority-diagnostics` returns 401 unauthenticated | ✅ Confirmed — uses `permission_user`                                      |
+| Admin routes require `manage_options`               | ✅ Confirmed — uses `permission_admin`                                     |
+| Dashboard does not fake live state                  | ✅ `useStreamingTicks` is visual-only; `useEngineHealth` has `staleTime:0` |
+| Signal engine does not run on stale data            | ✅ Freshness gates enforced server-side                                    |
 
 ---
 

@@ -52,7 +52,11 @@
       "system": "EA Market Stream Handler",
       "description": "When timestamp is absent from the EA payload but candles are present, $stream_timestamp becomes null. The open/future candle guard (if ($stream_timestamp && strtotime(candle.time) >= strtotime($stream_timestamp))) is skipped, allowing a forming/open candle (not yet closed) to be stored. The staleness age check (age_seconds > max_age_sec) is also bypassed entirely.",
       "root_cause": "insert_mt5_candle() receives $stream_timestamp = $payload['timestamp'] ?? null. Both the future-candle guard and the age staleness guard are wrapped in if ($stream_timestamp) blocks. When null, both checks are skipped.",
-      "impact_zones": ["EA Market Stream Ingestion", "Signal Engine (stale candle data)", "Dashboard (incorrect candle history)"],
+      "impact_zones": [
+        "EA Market Stream Ingestion",
+        "Signal Engine (stale candle data)",
+        "Dashboard (incorrect candle history)"
+      ],
       "proposed_fix": "When $stream_timestamp is null and a candle is present, fall back to time() (server clock) as $stream_timestamp. This ensures the future-candle and staleness guards are always applied. The EA always sends timestamp, so this only affects non-standard callers."
     },
     {
@@ -61,7 +65,10 @@
       "system": "EA Market Stream Handler — HTTP response semantics",
       "description": "Stale payload rejection returns HTTP 400 (Bad Request) instead of HTTP 422 (Unprocessable Entity). Per the workflow spec and REST semantics, a stale quote_time is a business logic / data validity failure, not a malformed request. The error code 'stale_data' is correct but the HTTP status is wrong.",
       "root_cause": "post_ea_market_stream() calls new WP_Error('stale_data', ..., array('status' => 400)) for both the unparseable-timestamp and age-exceeded rejection paths.",
-      "impact_zones": ["EA Market Stream REST API", "EA retry logic (semantic clarity only — EA does not branch on 400 vs 422)"],
+      "impact_zones": [
+        "EA Market Stream REST API",
+        "EA retry logic (semantic clarity only — EA does not branch on 400 vs 422)"
+      ],
       "proposed_fix": "Change status from 400 to 422 for both stale_data rejections. Update regression test to assert code 422."
     },
     {

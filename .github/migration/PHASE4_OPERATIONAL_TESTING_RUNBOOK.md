@@ -23,6 +23,7 @@ Both tests must be completed and evidence captured before Phase 4 gate can close
 **Timeline**: Execute during the first weekend inside Phase 4 soak window (2026-06-01/06-02)  
 **Markets involved**: FX (EURUSD, USDJPY, GBPUSD), Equities (US30, NAS100), Crypto (BTCUSD, ETHUSD)  
 **Key transitions**:
+
 - Friday 21:00 UTC: Market close (US equity EOD)
 - Saturday 00:00 UTC: FX/Equity offline; Crypto 24/7
 - Sunday 22:00 UTC: Weekend close (FX closes; Asia prepares)
@@ -43,6 +44,7 @@ curl -X GET "https://[backend]/wp-json/sniper/v1/market-data/fib-levels" \
 ```
 
 **Expected Evidence**:
+
 - ✅ FX levels (EURUSD, USDJPY, GBPUSD): fresh, `updatedAt` within last 60s
 - ✅ Equity levels (US30, NAS100): fresh, `updatedAt` within last 60s
 - ✅ Crypto levels (BTCUSD, ETHUSD): fresh, `updatedAt` within last 60s
@@ -63,12 +65,14 @@ curl -X GET "https://[backend]/wp-json/sniper/v1/market-data/fib-levels" \
 ```
 
 **Expected Evidence**:
+
 - ✅ FX levels (EURUSD, USDJPY, GBPUSD): stale or frozen (no update since Friday 21:00 UTC)
 - ✅ Equity levels (US30, NAS100): offline/not-live signal (market closed)
 - ✅ Crypto levels (BTCUSD, ETHUSD): **fresh**, `updatedAt` within last 60s (24/7 market)
 - ✅ Dashboard signal board shows FX/Equity as OFFLINE; Crypto as LIVE
 
-**Pass Criteria**: 
+**Pass Criteria**:
+
 - Stale timestamps on FX/Equity (no candle progression)
 - Fresh timestamps on Crypto (candle progression continues)
 
@@ -85,6 +89,7 @@ curl -X GET "https://[backend]/wp-json/sniper/v1/market-data/regime" \
 ```
 
 **Expected Evidence**:
+
 - ✅ FX regime: TRANSITIONAL or stale (market closed)
 - ✅ Crypto regime: active classification (TRENDING, RANGING, or CHOP per live H1 action)
 - ✅ Backend logs show no errors during weekend gap: `grep "FibEngine\|RegimeEngine\|ERROR" mt5-journal.log | tail -50`
@@ -109,6 +114,7 @@ curl -X GET "https://[backend]/wp-json/sniper/v1/market-data/fib-levels?symbol=E
 ```
 
 **Expected Evidence**:
+
 - ✅ USDJPY: fresh levels, `updatedAt` within last 60s (Asia JPY session active)
 - ✅ EURUSD: stale or unchanged (FX markets offline, Euro sleeps until London open)
 - ✅ Crypto: continues fresh (24/7)
@@ -129,6 +135,7 @@ curl -X GET "https://[backend]/wp-json/sniper/v1/market-data/fib-levels" \
 ```
 
 **Expected Evidence**:
+
 - ✅ EURUSD: fresh levels resume, `updatedAt` within last 60s
 - ✅ GBPUSD: fresh levels resume
 - ✅ XAUUSD: fresh levels (gold follows London session)
@@ -154,6 +161,7 @@ curl -X GET "https://[backend]/wp-json/sniper/v1/market-data/fib-levels?symbol=N
 ```
 
 **Expected Evidence**:
+
 - ✅ US30: fresh levels, `updatedAt` within last 60s
 - ✅ NAS100: fresh levels resume
 - ✅ All markets (FX, crypto, equities): live and updating normally
@@ -182,6 +190,7 @@ curl -X GET "https://[backend]/wp-json/sniper/v1/market-data/fib-levels?symbol=E
 ```
 
 **Expected Evidence**:
+
 - ✅ 16 ratios present for LTF_SF and HTF_AF
 - ✅ All timeframes (M15, H1, H4, D1) have valid levels
 - ✅ `levels_written=128` in backend log (full matrix)
@@ -208,6 +217,7 @@ grep "FibEngine\|ERROR\|NaN\|exception" mt5-journal.log | grep "20260626"
 ```
 
 **Expected Evidence**:
+
 - ✅ No errors in backend logs during sparse window
 - ✅ No `NaN` or crash entries in MT5 journal
 - ✅ Levels either **hold stale** (if no new candles) or **update** (if new candle formed)
@@ -228,6 +238,7 @@ curl -X GET "https://[backend]/wp-json/sniper/v1/market-data/fib-levels?symbol=E
 ```
 
 **Expected Evidence**:
+
 - ✅ Levels resume normal updates (M15 candles close every 15 min)
 - ✅ All 16 ratios present again
 - ✅ `levels_written=128` resumed in backend log
@@ -250,6 +261,7 @@ curl -X GET "https://[backend]/wp-json/sniper/v1/market-data/fib-levels?symbol=E
 - [ ] ✅ **Verdict**: PASS / FAIL / CONDITIONAL
 
 **Operator Sign-Off**:
+
 ```
 Name: ________________
 Date: ________________
@@ -265,6 +277,7 @@ Notes: ________________________________________________
 - [ ] ✅ **Verdict**: PASS / FAIL / CONDITIONAL
 
 **Operator Sign-Off**:
+
 ```
 Name: ________________
 Date: ________________

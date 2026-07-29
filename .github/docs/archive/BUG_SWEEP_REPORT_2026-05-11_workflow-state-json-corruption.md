@@ -10,14 +10,14 @@
 
 ## Executive Summary
 
-| Item | Status |
-|---|---|
-| Overall pipeline health | STABLE after fix |
-| Root cause | Trailing XML garbage appended to `.smc-workflow-state.json` |
-| Impact | Watcher stalled in parse-error loop; `PLANNING` state never advanced |
-| Fix applied | `readState()` self-repair guard in `pipeline-watcher.js` |
-| Regression guard added | YES — auto-truncates and rewrites on trailing-garbage corruption |
-| Future scan signal | `"Workflow state self-repaired"` in pipeline-runner.log |
+| Item                    | Status                                                               |
+| ----------------------- | -------------------------------------------------------------------- |
+| Overall pipeline health | STABLE after fix                                                     |
+| Root cause              | Trailing XML garbage appended to `.smc-workflow-state.json`          |
+| Impact                  | Watcher stalled in parse-error loop; `PLANNING` state never advanced |
+| Fix applied             | `readState()` self-repair guard in `pipeline-watcher.js`             |
+| Regression guard added  | YES — auto-truncates and rewrites on trailing-garbage corruption     |
+| Future scan signal      | `"Workflow state self-repaired"` in pipeline-runner.log              |
 
 ---
 
@@ -25,12 +25,12 @@
 
 ### BUG-001 — Workflow State JSON Corrupted by Trailing XML Garbage (FIXED)
 
-| Field | Value |
-|---|---|
-| Severity | HIGH |
-| System | Pipeline watcher / workflow state |
-| File | `.smc-workflow-state.json` |
-| Status | FIXED — self-repair guard added |
+| Field    | Value                             |
+| -------- | --------------------------------- |
+| Severity | HIGH                              |
+| System   | Pipeline watcher / workflow state |
+| File     | `.smc-workflow-state.json`        |
+| Status   | FIXED — self-repair guard added   |
 
 **Description:** `.smc-workflow-state.json` contained valid JSON followed by XML/tool-call
 artefact content (`</content><parameter name="filePath">...`) appended after the closing `}`.
@@ -53,13 +53,14 @@ No automation steps could proceed. The watcher process remained alive and appear
 
 **Fix applied:** Added self-repair logic to `readState()` in `scripts/pipeline-watcher.js`.
 After a `JSON.parse` failure the function now:
+
 1. Re-reads the raw file
 2. Finds the last `}` character
 3. Truncates everything after it and attempts a second `JSON.parse`
 4. If successful: logs `Workflow state self-repaired: removed N bytes of trailing garbage`,
    overwrites the file with clean JSON via `writeJson()`, and returns the recovered state
 5. If the second parse also fails: logs `Workflow state file is unrecoverable — manual
-   intervention required` and returns `null` (existing behaviour)
+intervention required` and returns `null` (existing behaviour)
 
 **Files changed:** `scripts/pipeline-watcher.js` — `readState()` function only.
 
@@ -69,13 +70,13 @@ After a `JSON.parse` failure the function now:
 
 Future bug and regression scans should watch for these log patterns in `reports/pipeline-runner.log`:
 
-| Log line | Meaning | Action |
-|---|---|---|
-| `Invalid workflow state file: Unexpected non-whitespace character after JSON at position N` | Trailing garbage corruption | Check if followed by `self-repaired` line; if not, inspect file manually |
-| `Workflow state self-repaired: removed N bytes of trailing garbage` | Auto-repair fired and succeeded | Informational — log the occurrence, investigate write source |
-| `Workflow state file is unrecoverable` | Corruption too severe for auto-repair | Manual intervention required — restore from archive or reset to IDLE |
-| `PLANNING detected - running Claude plan hardening` absent after `PLANNING` state set | Watcher stalled, state not being evaluated | Check for repeated `Invalid workflow state file` entries above |
-| `WARNING: Claude CLI health check failed` | Claude CLI unreachable at watcher startup | Transient network: verify with `claude --version`; if persistent, reinstall/reauth |
+| Log line                                                                                    | Meaning                                    | Action                                                                             |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `Invalid workflow state file: Unexpected non-whitespace character after JSON at position N` | Trailing garbage corruption                | Check if followed by `self-repaired` line; if not, inspect file manually           |
+| `Workflow state self-repaired: removed N bytes of trailing garbage`                         | Auto-repair fired and succeeded            | Informational — log the occurrence, investigate write source                       |
+| `Workflow state file is unrecoverable`                                                      | Corruption too severe for auto-repair      | Manual intervention required — restore from archive or reset to IDLE               |
+| `PLANNING detected - running Claude plan hardening` absent after `PLANNING` state set       | Watcher stalled, state not being evaluated | Check for repeated `Invalid workflow state file` entries above                     |
+| `WARNING: Claude CLI health check failed`                                                   | Claude CLI unreachable at watcher startup  | Transient network: verify with `claude --version`; if persistent, reinstall/reauth |
 
 ---
 
@@ -106,13 +107,13 @@ code path. Prevention measures:
 
 ## Parity Impact
 
-| Layer | Impact |
-|---|---|
-| Pine trading formulas | None |
-| MT5 / EA ingestion | None |
-| Backend PHP | None |
-| Dashboard frontend | None |
-| Pipeline automation | Fix applied — watcher now self-heals on this corruption class |
+| Layer                 | Impact                                                        |
+| --------------------- | ------------------------------------------------------------- |
+| Pine trading formulas | None                                                          |
+| MT5 / EA ingestion    | None                                                          |
+| Backend PHP           | None                                                          |
+| Dashboard frontend    | None                                                          |
+| Pipeline automation   | Fix applied — watcher now self-heals on this corruption class |
 
 ## Do Not Touch
 

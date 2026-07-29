@@ -17,26 +17,28 @@ Phase 0 (Stabilization) is **complete**. The 72-hour restart soak window closed 
 
 ### Backend Soak Health (2026-05-15 16:37 UTC)
 
-| Metric | Value | Status |
-|--------|-------|--------|
-| Backend sync | live | ✅ |
-| Engine run state | live | ✅ |
-| Engine runs (24h) | 259,464 total / 746 success / **0 errors** | ✅ |
-| Candles (24h) | 69,262 | ✅ |
-| Snapshots (24h) | 27 | ✅ |
-| Last batch | 2026-05-15 16:37:26 UTC | ✅ |
-| Last engine run | 2026-05-15 16:37:37 UTC | ✅ |
-| Watchlist symbols live | 10/10 | ✅ |
+| Metric                 | Value                                      | Status |
+| ---------------------- | ------------------------------------------ | ------ |
+| Backend sync           | live                                       | ✅     |
+| Engine run state       | live                                       | ✅     |
+| Engine runs (24h)      | 259,464 total / 746 success / **0 errors** | ✅     |
+| Candles (24h)          | 69,262                                     | ✅     |
+| Snapshots (24h)        | 27                                         | ✅     |
+| Last batch             | 2026-05-15 16:37:26 UTC                    | ✅     |
+| Last engine run        | 2026-05-15 16:37:37 UTC                    | ✅     |
+| Watchlist symbols live | 10/10                                      | ✅     |
 
 ### NAS100 / US30 Equity-Session Validation
 
 **Root cause** (confirmed 2026-05-14): `SessionManager` used FX-only hours; equity indices reported `FRESHNESS_STALE` during off-session because off-session EA pushes were rejected as stale.
 
-**Fix** (merged 2026-05-14):  
-- MT5 EA now emits `CLOSED` with current timestamp for NAS100/US30 outside 13:30–20:00 UTC.  
+**Fix** (merged 2026-05-14):
+
+- MT5 EA now emits `CLOSED` with current timestamp for NAS100/US30 outside 13:30–20:00 UTC.
 - PHP health check now excludes equity-index off-session symbols from the live-symbols count.
 
 **Live validation** (2026-05-15 16:37 UTC — within active US equity session):
+
 - NAS100: **29,263.70 LIVE**, BEAR regime, BUY gate, batch at 16:37 UTC ✅
 - US30: **49,756.00 LIVE**, BEAR regime, BUY gate, batch at 16:37 UTC ✅
 - Signal Engine: NAS100 LONG ARMED, BACKEND confirmed ✅
@@ -48,6 +50,7 @@ Phase 0 (Stabilization) is **complete**. The 72-hour restart soak window closed 
 **Fix** (merged 2026-05-14): Alias map updated in `SymbolNormalizer.mqh`; GOLD, US100, DJ30, and other common renames now resolve to canonical names.
 
 **Live validation** (2026-05-15):
+
 - XAUUSD: **4,556.34 LIVE**, BEAR regime, BUY gate, chop 0.34 (below 0.7 F3 threshold) ✅
 - Candle-history gate cleared ✅
 - Post-restart accumulation window elapsed (fix merged 2026-05-14; >7.5h confirmed by 2026-05-15 batch timestamps) ✅
@@ -65,10 +68,12 @@ Status: **RESOLVED** ✅
 ### Watchlist Persistence Verification
 
 **Defects resolved** (2026-05-15):
+
 - `post_user_settings()` omitted the canonical watchlist array in its response → patched, PHP regression covered
 - Watchlist hooks refetched `user-settings` after canonical mutation success, risking stale-overwrite → patched, Vitest covered
 
 **Parity audit** (`phase-0-watchlist-persistence-parity-2026-05-15.md`):
+
 - Watchlist parity score: **100%**
 - PHP regression harness: ✅ green
 - Vitest watchlist hook suite: ✅ green
@@ -82,20 +87,20 @@ Status: **RESOLVED** ✅
 
 ## Phase 0 Success Criteria — Final Checklist
 
-| Criterion | Status | Evidence |
-|-----------|--------|----------|
-| Price feed stable for 72h+ | ✅ PASS | 259,464 engine runs / 0 errors over 24h; soak window 2026-05-11 to 2026-05-15 |
-| Feed status shows `stale` (not `rate-limited`) when EA symbols age out | ✅ PASS | Logs captured: `RESULT=stale`, `feed_any_rate_limited=false`; confirmed across all checkpoints |
-| MT5 M1 → 15min candle aggregation working for all symbols (≥30 candles) | ✅ PASS | 69,262 candles/24h; all 10 watchlist symbols live; NAS100/US30/XAUUSD resolved |
-| Full Pine/backend/dashboard parity audit (>95%) | ✅ PASS | 100% on all audited paths (fib, regime, signal, watchlist); ref: `phase-0-full-parity-2026-05-14.md` and `phase-0-watchlist-persistence-parity-2026-05-15.md` |
-| No false LIVE states | ✅ PASS | 4-day soak; only genuinely live symbols show LIVE |
-| No stale-loop deadlocks | ✅ PASS | 259,464 runs, 0 errors; no rapid flip detected |
-| No false `rate-limited` for EA-authoritative symbols | ✅ PASS | `feed_any_rate_limited=false` throughout soak |
-| No stale engine snapshot reuse after watchlist changes | ✅ PASS | `smc_sf_engine_snapshot` invalidation verified on all watchlist mutation paths |
-| NAS100/US30 equity-session freshness | ✅ PASS | Both LIVE at 16:37 UTC 2026-05-15 (active US session) |
-| XAUUSD candle-history readiness | ✅ PASS | LIVE with BUY gate; candle-history gate cleared post GOLD alias fix |
-| Frontend feed-status chip truth parity | ✅ PASS | BUG-001 fixed; `staleTime: 0` on `engine-health` query |
-| Watchlist persistence (no symbol flashback / ghost tiles) | ✅ PASS | 100% parity; regression suites green |
+| Criterion                                                               | Status  | Evidence                                                                                                                                                      |
+| ----------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Price feed stable for 72h+                                              | ✅ PASS | 259,464 engine runs / 0 errors over 24h; soak window 2026-05-11 to 2026-05-15                                                                                 |
+| Feed status shows `stale` (not `rate-limited`) when EA symbols age out  | ✅ PASS | Logs captured: `RESULT=stale`, `feed_any_rate_limited=false`; confirmed across all checkpoints                                                                |
+| MT5 M1 → 15min candle aggregation working for all symbols (≥30 candles) | ✅ PASS | 69,262 candles/24h; all 10 watchlist symbols live; NAS100/US30/XAUUSD resolved                                                                                |
+| Full Pine/backend/dashboard parity audit (>95%)                         | ✅ PASS | 100% on all audited paths (fib, regime, signal, watchlist); ref: `phase-0-full-parity-2026-05-14.md` and `phase-0-watchlist-persistence-parity-2026-05-15.md` |
+| No false LIVE states                                                    | ✅ PASS | 4-day soak; only genuinely live symbols show LIVE                                                                                                             |
+| No stale-loop deadlocks                                                 | ✅ PASS | 259,464 runs, 0 errors; no rapid flip detected                                                                                                                |
+| No false `rate-limited` for EA-authoritative symbols                    | ✅ PASS | `feed_any_rate_limited=false` throughout soak                                                                                                                 |
+| No stale engine snapshot reuse after watchlist changes                  | ✅ PASS | `smc_sf_engine_snapshot` invalidation verified on all watchlist mutation paths                                                                                |
+| NAS100/US30 equity-session freshness                                    | ✅ PASS | Both LIVE at 16:37 UTC 2026-05-15 (active US session)                                                                                                         |
+| XAUUSD candle-history readiness                                         | ✅ PASS | LIVE with BUY gate; candle-history gate cleared post GOLD alias fix                                                                                           |
+| Frontend feed-status chip truth parity                                  | ✅ PASS | BUG-001 fixed; `staleTime: 0` on `engine-health` query                                                                                                        |
+| Watchlist persistence (no symbol flashback / ghost tiles)               | ✅ PASS | 100% parity; regression suites green                                                                                                                          |
 
 ---
 
@@ -107,25 +112,25 @@ Both symbols remain chop-gate blocked at time of closeout (AUDUSD chop 0.25, ETH
 
 ## Remaining Deferred Items (Non-Blocking)
 
-| Item | Deferred Reason | Next Action |
-|------|-----------------|-------------|
-| Manual staging watchlist add/remove smoke test | Requires live WordPress environment; repo harness regression green | Run during Phase 1 setup smoke tests |
-| Live frontend ≤2s feed-status convergence proof | Requires manual observation during active session with admin panel open | Capture screenshot evidence during next active session |
-| Full `tsc --noEmit` clean pass | Pre-existing TypeScript errors in `PlanCard.tsx`, `charts.tsx`, `-plan.test.tsx` unrelated to Phase 0 | Tracked separately in Phase 1 |
+| Item                                            | Deferred Reason                                                                                       | Next Action                                            |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Manual staging watchlist add/remove smoke test  | Requires live WordPress environment; repo harness regression green                                    | Run during Phase 1 setup smoke tests                   |
+| Live frontend ≤2s feed-status convergence proof | Requires manual observation during active session with admin panel open                               | Capture screenshot evidence during next active session |
+| Full `tsc --noEmit` clean pass                  | Pre-existing TypeScript errors in `PlanCard.tsx`, `charts.tsx`, `-plan.test.tsx` unrelated to Phase 0 | Tracked separately in Phase 1                          |
 
 ---
 
 ## Files Changed for Phase 0 Closeout
 
-| File | Change |
-|------|--------|
-| `src/hooks/useSniperData.ts` | `staleTime: 0` on `useEngineHealth()` — feed status frontend fix |
-| `src/hooks/useSniperData.test.tsx` | New: hook-level regression test for staleTime contract |
-| `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | Watchlist mutation responses now return canonical array; settings save returns watchlist |
-| `src/hooks/useSniperData.watchlist.test.tsx` | New: Vitest watchlist hook regression suite |
-| `mt5/SymbolNormalizer.mqh` | GOLD → XAUUSD alias (and other common broker renames) |
-| `wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php` | PHP watchlist regression harness |
-| `wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php` | Tests 12–14: quote_time alias, candles[] shim, stale rejection |
+| File                                                                             | Change                                                                                   |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `src/hooks/useSniperData.ts`                                                     | `staleTime: 0` on `useEngineHealth()` — feed status frontend fix                         |
+| `src/hooks/useSniperData.test.tsx`                                               | New: hook-level regression test for staleTime contract                                   |
+| `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`                          | Watchlist mutation responses now return canonical array; settings save returns watchlist |
+| `src/hooks/useSniperData.watchlist.test.tsx`                                     | New: Vitest watchlist hook regression suite                                              |
+| `mt5/SymbolNormalizer.mqh`                                                       | GOLD → XAUUSD alias (and other common broker renames)                                    |
+| `wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php` | PHP watchlist regression harness                                                         |
+| `wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php`              | Tests 12–14: quote_time alias, candles[] shim, stale rejection                           |
 
 ---
 
@@ -144,6 +149,6 @@ Both symbols remain chop-gate blocked at time of closeout (AUDUSD chop 0.25, ETH
 ## Gate Decision
 
 **Phase 0: COMPLETE**  
-**Phase 1 (MT5 Bridge Infrastructure): UNBLOCKED**  
+**Phase 1 (MT5 Bridge Infrastructure): UNBLOCKED**
 
 All Phase 0 success criteria are confirmed met as of 2026-05-15. The program may advance to Phase 1.

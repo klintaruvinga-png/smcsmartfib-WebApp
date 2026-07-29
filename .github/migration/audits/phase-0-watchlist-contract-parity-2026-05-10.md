@@ -22,12 +22,12 @@ This audit covers a contract-only hardening patch. No Pine formulas, MT5 engines
 
 ### Fib Engine
 
-| Metric | Before Patch | After Patch | Match | Accuracy |
-|---|---|---|---|---|
-| Fib anchors | Unchanged | Unchanged | Yes | 100% |
-| Fib levels | Unchanged | Unchanged | Yes | 100% |
-| LTF/HTA family mapping | Unchanged | Unchanged | Yes | 100% |
-| **Fib Parity Score** | - | - | - | **100%** |
+| Metric                 | Before Patch | After Patch | Match | Accuracy |
+| ---------------------- | ------------ | ----------- | ----- | -------- |
+| Fib anchors            | Unchanged    | Unchanged   | Yes   | 100%     |
+| Fib levels             | Unchanged    | Unchanged   | Yes   | 100%     |
+| LTF/HTA family mapping | Unchanged    | Unchanged   | Yes   | 100%     |
+| **Fib Parity Score**   | -            | -           | -     | **100%** |
 
 **Observations**: No fib logic touched.
 
@@ -35,12 +35,12 @@ This audit covers a contract-only hardening patch. No Pine formulas, MT5 engines
 
 ### Regime Engine
 
-| Metric | Before Patch | After Patch | Match | Accuracy |
-|---|---|---|---|---|
-| Bias classification | Unchanged | Unchanged | Yes | 100% |
-| Chop gating | Unchanged | Unchanged | Yes | 100% |
-| Freshness gating | Unchanged | Unchanged | Yes | 100% |
-| **Regime Parity Score** | - | - | - | **100%** |
+| Metric                  | Before Patch | After Patch | Match | Accuracy |
+| ----------------------- | ------------ | ----------- | ----- | -------- |
+| Bias classification     | Unchanged    | Unchanged   | Yes   | 100%     |
+| Chop gating             | Unchanged    | Unchanged   | Yes   | 100%     |
+| Freshness gating        | Unchanged    | Unchanged   | Yes   | 100%     |
+| **Regime Parity Score** | -            | -           | -     | **100%** |
 
 **Observations**: No regime logic touched.
 
@@ -48,12 +48,12 @@ This audit covers a contract-only hardening patch. No Pine formulas, MT5 engines
 
 ### Signal Engine
 
-| Metric | Before Patch | After Patch | Match | Accuracy |
-|---|---|---|---|---|
-| READY confirmation rules | Unchanged | Unchanged | Yes | 100% |
-| Entry / SL / TP derivation | Unchanged | Unchanged | Yes | 100% |
-| Backend confirmation discipline | Unchanged | Unchanged | Yes | 100% |
-| **Signal Parity Score** | - | - | - | **100%** |
+| Metric                          | Before Patch | After Patch | Match | Accuracy |
+| ------------------------------- | ------------ | ----------- | ----- | -------- |
+| READY confirmation rules        | Unchanged    | Unchanged   | Yes   | 100%     |
+| Entry / SL / TP derivation      | Unchanged    | Unchanged   | Yes   | 100%     |
+| Backend confirmation discipline | Unchanged    | Unchanged   | Yes   | 100%     |
+| **Signal Parity Score**         | -            | -           | -     | **100%** |
 
 **Observations**: No signal-generation logic touched.
 
@@ -61,13 +61,13 @@ This audit covers a contract-only hardening patch. No Pine formulas, MT5 engines
 
 ### Watchlist Contract
 
-| Metric | Previous Behavior | Current Behavior | Match | Accuracy |
-|---|---|---|---|---|
-| `/user/watchlist/*` persistence | Supported symbols only | Supported symbols only | Yes | 100% |
-| `post_user_settings()` persistence | Sanitized but unsupported symbols could persist | Supported symbols only | Yes | 100% |
-| `save_watchlist()` helper | Sanitized but unsupported symbols could persist | Supported symbols only | Yes | 100% |
-| `get_settings()` reload path | Corrupt unsupported symbols could rehydrate | Unsupported symbols dropped on read | Yes | 100% |
-| **Watchlist Contract Score** | - | - | - | **100%** |
+| Metric                             | Previous Behavior                               | Current Behavior                    | Match | Accuracy |
+| ---------------------------------- | ----------------------------------------------- | ----------------------------------- | ----- | -------- |
+| `/user/watchlist/*` persistence    | Supported symbols only                          | Supported symbols only              | Yes   | 100%     |
+| `post_user_settings()` persistence | Sanitized but unsupported symbols could persist | Supported symbols only              | Yes   | 100%     |
+| `save_watchlist()` helper          | Sanitized but unsupported symbols could persist | Supported symbols only              | Yes   | 100%     |
+| `get_settings()` reload path       | Corrupt unsupported symbols could rehydrate     | Unsupported symbols dropped on read | Yes   | 100%     |
+| **Watchlist Contract Score**       | -                                               | -                                   | -     | **100%** |
 
 **Observations**: Backend symbol support is now a single-source contract across settings and watchlist routes. Alias normalization remains intact (`XAU/USD` -> `XAUUSD`).
 
@@ -75,20 +75,20 @@ This audit covers a contract-only hardening patch. No Pine formulas, MT5 engines
 
 ## Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-|---|---|---|---|---|
-| Unsupported watchlist symbols could persist through settings paths | HIGH | 1 | Patched in plugin + regression test | No |
-| PHP harnesses missing deactivation-hook stubs | MEDIUM | 6 files | Patched in tests | No |
-| CORS regression expectation drift | LOW | 1 | Patched in test | No |
+| Issue                                                              | Severity | Count   | Resolution                          | Blocker |
+| ------------------------------------------------------------------ | -------- | ------- | ----------------------------------- | ------- |
+| Unsupported watchlist symbols could persist through settings paths | HIGH     | 1       | Patched in plugin + regression test | No      |
+| PHP harnesses missing deactivation-hook stubs                      | MEDIUM   | 6 files | Patched in tests                    | No      |
+| CORS regression expectation drift                                  | LOW      | 1       | Patched in test                     | No      |
 
 ---
 
 ## Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-|---|---|---|---|
-| Existing user rows containing unsupported symbols | Symbols disappear after next settings read | This is the intended correction to restore backend contract truth | Yes |
-| Global frontend lint drift | Unrelated formatting failures remain | Outside this PHP-focused patch scope | Yes |
+| Item                                              | Difference                                 | Reason                                                            | Accepted |
+| ------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------- | -------- |
+| Existing user rows containing unsupported symbols | Symbols disappear after next settings read | This is the intended correction to restore backend contract truth | Yes      |
+| Global frontend lint drift                        | Unrelated formatting failures remain       | Outside this PHP-focused patch scope                              | Yes      |
 
 ---
 

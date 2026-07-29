@@ -11,14 +11,14 @@ import {
   isBcryptHash,
   PBKDF2_ITERATIONS,
 } from "./index";
-import {
-  createRefreshSession,
-  validateRefreshSession,
-  deleteRefreshSession,
-} from "../db/queries";
+import { createRefreshSession, validateRefreshSession, deleteRefreshSession } from "../db/queries";
 
 export class AuthError extends Error {
-  constructor(public statusCode: number, message: string, public code?: string) {
+  constructor(
+    public statusCode: number,
+    message: string,
+    public code?: string,
+  ) {
     super(message);
     this.name = "AuthError";
   }
@@ -45,14 +45,10 @@ const DUMMY_PASSWORD_HASH = `00000000000000000000000000000000$${PBKDF2_ITERATION
 export async function loginUser(
   email: string,
   password: string,
-  meta: { userAgent?: string | null; ipAddress?: string | null }
+  meta: { userAgent?: string | null; ipAddress?: string | null },
 ) {
   if (!email || !password) throw new AuthError(400, "Email and password required");
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
+  const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
   // Run a constant-cost verification whether or not the user exists so response
   // latency does not reveal whether the email is registered (user-enumeration
@@ -91,7 +87,7 @@ export async function loginUser(
     user.id,
     refreshToken,
     meta?.userAgent ?? null,
-    meta?.ipAddress ?? null
+    meta?.ipAddress ?? null,
   );
   return { accessToken, refreshToken, user: toUserView(user) };
 }
@@ -100,11 +96,10 @@ export async function registerUser(
   email: string,
   password: string,
   username?: string,
-  meta?: { userAgent?: string | null; ipAddress?: string | null }
+  meta?: { userAgent?: string | null; ipAddress?: string | null },
 ) {
   if (!email || !password) throw new AuthError(400, "Email and password required");
-  if (password.length < 8)
-    throw new AuthError(400, "Password must be at least 8 characters");
+  if (password.length < 8) throw new AuthError(400, "Password must be at least 8 characters");
 
   // NOTE: This is a fully custom auth flow. Passwords live in public.users.password_hash,
   // sessions are custom jose JWTs, and the public.users.id -> auth.users(id) FK was dropped
@@ -121,7 +116,12 @@ export async function registerUser(
       role: user.role,
     });
     const refreshToken = await createRefreshToken();
-    await createRefreshSession(user.id, refreshToken, meta?.userAgent ?? null, meta?.ipAddress ?? null);
+    await createRefreshSession(
+      user.id,
+      refreshToken,
+      meta?.userAgent ?? null,
+      meta?.ipAddress ?? null,
+    );
     return { accessToken, refreshToken, user: toUserView(user) };
   } catch (err: any) {
     if (err instanceof AuthError) throw err;
@@ -129,9 +129,10 @@ export async function registerUser(
       // Parse constraint name from error detail to return specific message
       // postgres.js format: Key (email)=(x) already exists.
       // Standard format: Key (email)=(x) violates constraint "users_email_key"
-      const constraint = err.detail?.match(/constraint "([^"]+)"/)?.[1] || 
-                        err.detail?.match(/Key \(([^)]+)\)=/)?.[1];
-      
+      const constraint =
+        err.detail?.match(/constraint "([^"]+)"/)?.[1] ||
+        err.detail?.match(/Key \(([^)]+)\)=/)?.[1];
+
       if (constraint === "users_email_key" || constraint === "email") {
         throw new AuthError(409, "Email already exists");
       } else if (constraint === "users_username_key" || constraint === "username") {
@@ -157,11 +158,7 @@ export async function refreshAccessToken(refreshToken: string) {
   const session = await validateRefreshSession(refreshToken);
   if (!session) throw new AuthError(401, "Invalid or expired refresh token");
   // True rotation: invalidate the old refresh token, issue a brand-new pair.
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, session.userId))
-    .limit(1);
+  const [user] = await db.select().from(users).where(eq(users.id, session.userId)).limit(1);
   if (!user) throw new AuthError(404, "User not found");
   await deleteRefreshSession(refreshToken);
   const newRefresh = await createRefreshToken();
@@ -169,7 +166,7 @@ export async function refreshAccessToken(refreshToken: string) {
     user.id,
     newRefresh,
     session.userAgent ?? null,
-    session.ipAddress ?? null
+    session.ipAddress ?? null,
   );
   const accessToken = await createAccessToken({
     sub: user.id,

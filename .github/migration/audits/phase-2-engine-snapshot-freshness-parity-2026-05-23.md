@@ -11,26 +11,26 @@
 
 ## Freshness authority
 
-| Metric | Expected behavior | Result | Status |
-| --- | --- | --- | --- |
-| Cached live snapshot validity | Cached engine snapshots must expire when live quote timestamps exceed `staleThresholdSec`, even if `computedAt` is still inside `refreshIntervalSec`. | Regression added and passed. | PASS |
-| MT5 snapshot timestamp truth | Quote/candle storage must preserve MT5 source timestamps. | `test-mt5-snapshot-contract.php` and `test-market-data-service-source-filter.php` passed. | PASS |
-| Watchlist snapshot integrity | Watchlist mismatches must invalidate cached engine snapshots before reuse. | `test-watchlist-snapshot-regression.php` passed. | PASS |
+| Metric                        | Expected behavior                                                                                                                                     | Result                                                                                    | Status |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------ |
+| Cached live snapshot validity | Cached engine snapshots must expire when live quote timestamps exceed `staleThresholdSec`, even if `computedAt` is still inside `refreshIntervalSec`. | Regression added and passed.                                                              | PASS   |
+| MT5 snapshot timestamp truth  | Quote/candle storage must preserve MT5 source timestamps.                                                                                             | `test-mt5-snapshot-contract.php` and `test-market-data-service-source-filter.php` passed. | PASS   |
+| Watchlist snapshot integrity  | Watchlist mismatches must invalidate cached engine snapshots before reuse.                                                                            | `test-watchlist-snapshot-regression.php` passed.                                          | PASS   |
 
 ## Fib engine
 
-| Metric | Suite | Result | Status |
-| --- | --- | --- | --- |
-| Fib level parity | `test-fib-parity.php` | Passed | PASS |
-| Session anchor parity | `test-session-anchors.php` | Passed | PASS |
-| HTF authority anchor parity | `test-htf-authority-anchor.php` | Passed | PASS |
+| Metric                      | Suite                           | Result | Status |
+| --------------------------- | ------------------------------- | ------ | ------ |
+| Fib level parity            | `test-fib-parity.php`           | Passed | PASS   |
+| Session anchor parity       | `test-session-anchors.php`      | Passed | PASS   |
+| HTF authority anchor parity | `test-htf-authority-anchor.php` | Passed | PASS   |
 
 ## Regime and signal governance
 
-| Metric | Scope | Result | Status |
-| --- | --- | --- | --- |
+| Metric                        | Scope                                                                                        | Result                    | Status                 |
+| ----------------------------- | -------------------------------------------------------------------------------------------- | ------------------------- | ---------------------- |
 | Regime stale-state governance | Indirectly exercised through engine snapshot cache invalidation and MT5 stale blocker paths. | Passed in sampled checks. | PASS WITH COVERAGE GAP |
-| Signal stale-state governance | Live-signal stale blocker and MT5 authority contract preserved after patch. | Passed in sampled checks. | PASS WITH COVERAGE GAP |
+| Signal stale-state governance | Live-signal stale blocker and MT5 authority contract preserved after patch.                  | Passed in sampled checks. | PASS WITH COVERAGE GAP |
 
 # Drift Analysis
 
@@ -40,11 +40,11 @@
 
 # Comparison Matrix
 
-| Layer | Before patch | After patch | Notes |
-| --- | --- | --- | --- |
-| Backend cache gate | Trusted `computedAt` only. | Requires symbol parity, fresh `computedAt`, and fresh live quote timestamps. | Removes false-LIVE reuse window. |
-| Dashboard live-signal consumer | Could receive stale-but-cache-valid backend truth. | Receives recomputed backend output once live quote timestamps age out. | Architecture preserved. |
-| MT5 timestamp authority | Source timestamps already authoritative. | Preserved. | Existing contract suites stayed green. |
+| Layer                          | Before patch                                       | After patch                                                                  | Notes                                  |
+| ------------------------------ | -------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------- |
+| Backend cache gate             | Trusted `computedAt` only.                         | Requires symbol parity, fresh `computedAt`, and fresh live quote timestamps. | Removes false-LIVE reuse window.       |
+| Dashboard live-signal consumer | Could receive stale-but-cache-valid backend truth. | Receives recomputed backend output once live quote timestamps age out.       | Architecture preserved.                |
+| MT5 timestamp authority        | Source timestamps already authoritative.           | Preserved.                                                                   | Existing contract suites stayed green. |
 
 # Acceptance Criteria
 

@@ -19,13 +19,14 @@
 
 # Confirmed Problems
 
-| Severity | Category | Problem | Root Cause | Impact |
-|----------|----------|---------|------------|--------|
-| HIGH | Dashboard build / plan rendering | `npx tsc --noEmit` failed in `src/components/PlanCard.tsx` on optional numeric values | `Number.isFinite()` did not narrow `number \| undefined` for `.toFixed()` and `fmtPrice()` calls under strict TypeScript | Production build and CI compile could fail even though runtime fallback rendering existed |
-| HIGH | Dashboard build / charts route | `src/routes/charts.tsx` referenced `import.meta.vitest` without a declared type | Strict TypeScript rejected the Vitest-only meta field on the route debug guard | Compile instability on chart route blocked full workspace type verification |
-| MEDIUM | Wiring / route discovery | `src/routes/live.utils.ts` was treated as a route file by TanStack Router | Helper lived under `src/routes/` without the ignored `-` prefix | Repeated route-tree warnings polluted verification runs and obscured real routing issues |
+| Severity | Category                         | Problem                                                                               | Root Cause                                                                                                               | Impact                                                                                    |
+| -------- | -------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| HIGH     | Dashboard build / plan rendering | `npx tsc --noEmit` failed in `src/components/PlanCard.tsx` on optional numeric values | `Number.isFinite()` did not narrow `number \| undefined` for `.toFixed()` and `fmtPrice()` calls under strict TypeScript | Production build and CI compile could fail even though runtime fallback rendering existed |
+| HIGH     | Dashboard build / charts route   | `src/routes/charts.tsx` referenced `import.meta.vitest` without a declared type       | Strict TypeScript rejected the Vitest-only meta field on the route debug guard                                           | Compile instability on chart route blocked full workspace type verification               |
+| MEDIUM   | Wiring / route discovery         | `src/routes/live.utils.ts` was treated as a route file by TanStack Router             | Helper lived under `src/routes/` without the ignored `-` prefix                                                          | Repeated route-tree warnings polluted verification runs and obscured real routing issues  |
 
 Blocker assessment:
+
 - Blocks current phase: No
 - Blocks build verification: Yes before patch, No after patch
 - Timeline impact if unresolved: Immediate CI/build drift
@@ -35,14 +36,14 @@ Blocker assessment:
 
 # Surgical Fixes Applied
 
-| File | Change | Hardening |
-|------|--------|-----------|
-| `src/components/PlanCard.tsx` | Added `isFiniteNumber()` type guard and routed optional lot/price/R:R formatting through it | Prevents future optional numeric display helpers from compiling unsafely while preserving existing `--` fallbacks |
-| `src/routes/charts.tsx` | Replaced direct `import.meta.vitest` access with `"vitest" in import.meta` runtime detection | Keeps the debug-only branch dev-only while staying type-safe under strict builds |
-| `src/routes/-plan.test.tsx` | Normalized optional `stops` merging in the plan test builder | Locks regression coverage to the current `TradePlan` contract instead of depending on implicit optional spread behavior |
-| `src/routes/live.tsx` | Updated helper import path | Preserved live radar logic after helper relocation |
-| `src/routes/-live.test.ts` | Updated helper import path | Kept stale/offline live-radar regression coverage attached to the moved helper |
-| `src/routes/-live.utils.ts` | Re-homed the Live Radar helper under the ignored route-file prefix | Removes false-positive route discovery without changing backend freshness truth logic |
+| File                          | Change                                                                                       | Hardening                                                                                                               |
+| ----------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `src/components/PlanCard.tsx` | Added `isFiniteNumber()` type guard and routed optional lot/price/R:R formatting through it  | Prevents future optional numeric display helpers from compiling unsafely while preserving existing `--` fallbacks       |
+| `src/routes/charts.tsx`       | Replaced direct `import.meta.vitest` access with `"vitest" in import.meta` runtime detection | Keeps the debug-only branch dev-only while staying type-safe under strict builds                                        |
+| `src/routes/-plan.test.tsx`   | Normalized optional `stops` merging in the plan test builder                                 | Locks regression coverage to the current `TradePlan` contract instead of depending on implicit optional spread behavior |
+| `src/routes/live.tsx`         | Updated helper import path                                                                   | Preserved live radar logic after helper relocation                                                                      |
+| `src/routes/-live.test.ts`    | Updated helper import path                                                                   | Kept stale/offline live-radar regression coverage attached to the moved helper                                          |
+| `src/routes/-live.utils.ts`   | Re-homed the Live Radar helper under the ignored route-file prefix                           | Removes false-positive route discovery without changing backend freshness truth logic                                   |
 
 No Pine formulas, MT5 logic, REST contracts, stale thresholds, or signal-engine decision paths were changed.
 
@@ -57,11 +58,11 @@ No Pine formulas, MT5 logic, REST contracts, stale thresholds, or signal-engine 
 
 Scoped parity metrics:
 
-| Surface | Previous | Current | Trend | Status | Action |
-|---------|----------|---------|-------|--------|--------|
-| Dashboard build integrity | FAIL (`tsc`) | PASS | Improving | PASS | None |
-| Live Radar helper wiring | PASS | PASS | Stable | PASS | None |
-| Chart route debug guard | FAIL (`tsc`) | PASS | Improving | PASS | None |
+| Surface                   | Previous     | Current | Trend     | Status | Action |
+| ------------------------- | ------------ | ------- | --------- | ------ | ------ |
+| Dashboard build integrity | FAIL (`tsc`) | PASS    | Improving | PASS   | None   |
+| Live Radar helper wiring  | PASS         | PASS    | Stable    | PASS   | None   |
+| Chart route debug guard   | FAIL (`tsc`) | PASS    | Improving | PASS   | None   |
 
 ---
 

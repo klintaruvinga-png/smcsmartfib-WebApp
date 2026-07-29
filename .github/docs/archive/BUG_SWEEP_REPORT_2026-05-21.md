@@ -30,11 +30,11 @@ The authoritative final state for 2026-05-21 is:
 
 # Confirmed Problems
 
-| Severity | ID | Category | Component | Root Cause | Impact | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| HIGH | BUG-002 | Freshness / data-contract parity | `wordpress/smc-superfib-sniper/class-market-data-service.php` | The service-level timestamp normalizer did not strip trailing timezone abbreviations such as `UTC`, so valid broker timestamps could parse-fail and fall back to receipt time. | MT5 ticks/candles stored through `store_tick_snapshot()` or `store_candle_m1()` could appear fresher than they really were. | Patched |
-| LOW | BUG-001 | Tooling / repo hygiene | `src/` formatting surface | Pre-existing Prettier drift caused `npm run lint` to fail with style-only errors. | Lint noise and merge friction, but no logic corruption. | Patched |
-| INFO | OBS-001 | Observability | `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | The `candles[]` compatibility layer in `/ea/market-stream` consumed only index `0` without surfacing that extra entries were ignored. | Callers sending multi-candle arrays got no diagnostic even though full batch ingestion is Phase 3 scope. | Instrumented |
+| Severity | ID      | Category                         | Component                                                     | Root Cause                                                                                                                                                                     | Impact                                                                                                                      | Status       |
+| -------- | ------- | -------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| HIGH     | BUG-002 | Freshness / data-contract parity | `wordpress/smc-superfib-sniper/class-market-data-service.php` | The service-level timestamp normalizer did not strip trailing timezone abbreviations such as `UTC`, so valid broker timestamps could parse-fail and fall back to receipt time. | MT5 ticks/candles stored through `store_tick_snapshot()` or `store_candle_m1()` could appear fresher than they really were. | Patched      |
+| LOW      | BUG-001 | Tooling / repo hygiene           | `src/` formatting surface                                     | Pre-existing Prettier drift caused `npm run lint` to fail with style-only errors.                                                                                              | Lint noise and merge friction, but no logic corruption.                                                                     | Patched      |
+| INFO     | OBS-001 | Observability                    | `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`       | The `candles[]` compatibility layer in `/ea/market-stream` consumed only index `0` without surfacing that extra entries were ignored.                                          | Callers sending multi-candle arrays got no diagnostic even though full batch ingestion is Phase 3 scope.                    | Instrumented |
 
 # Root Cause / Analysis
 
@@ -52,15 +52,15 @@ The authoritative final state for 2026-05-21 is:
 
 # Surgical Fixes Applied
 
-| File | Change | Effect |
-| --- | --- | --- |
-| `wordpress/smc-superfib-sniper/class-market-data-service.php` | Hardened `normalize_market_timestamp()` to strip trailing timezone abbreviations before UTC pinning. | Prevents valid MT5 broker timestamps from falling back to server receipt time. |
-| `wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php` | Added regression cases for UTC-suffixed tick and candle timestamps. | Guards helper-path freshness truth from drifting again. |
-| `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | Earlier same-day patch added `error_log()` plus `audit()` when `candles[]` contains more than one entry. | Makes Phase 3 batch-ingestion gap visible without changing current behavior. |
-| `src/routes/progress.tsx` | Earlier same-day Prettier auto-fix. | Restored formatting compliance. |
-| `src/routes/analytics.tsx` | Earlier same-day Prettier auto-fix. | Restored formatting compliance. |
-| `src/lib/api/sniperClient.ts` | Earlier same-day Prettier auto-fix. | Restored formatting compliance. |
-| `src/lib/api/sniperClient.test.ts` | Earlier same-day Prettier auto-fix. | Restored formatting compliance. |
+| File                                                                                 | Change                                                                                                   | Effect                                                                         |
+| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `wordpress/smc-superfib-sniper/class-market-data-service.php`                        | Hardened `normalize_market_timestamp()` to strip trailing timezone abbreviations before UTC pinning.     | Prevents valid MT5 broker timestamps from falling back to server receipt time. |
+| `wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php` | Added regression cases for UTC-suffixed tick and candle timestamps.                                      | Guards helper-path freshness truth from drifting again.                        |
+| `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`                              | Earlier same-day patch added `error_log()` plus `audit()` when `candles[]` contains more than one entry. | Makes Phase 3 batch-ingestion gap visible without changing current behavior.   |
+| `src/routes/progress.tsx`                                                            | Earlier same-day Prettier auto-fix.                                                                      | Restored formatting compliance.                                                |
+| `src/routes/analytics.tsx`                                                           | Earlier same-day Prettier auto-fix.                                                                      | Restored formatting compliance.                                                |
+| `src/lib/api/sniperClient.ts`                                                        | Earlier same-day Prettier auto-fix.                                                                      | Restored formatting compliance.                                                |
+| `src/lib/api/sniperClient.test.ts`                                                   | Earlier same-day Prettier auto-fix.                                                                      | Restored formatting compliance.                                                |
 
 # Exact Code Changes
 
@@ -70,14 +70,14 @@ The authoritative final state for 2026-05-21 is:
 
 # Parity Verification Results
 
-| Domain | Result | Notes |
-| --- | --- | --- |
-| MT5 timestamp freshness parity | PASS | ISO, dot-format, and `UTC`-suffix timestamps preserve broker time after patch. |
-| Fib parity | PASS | No drift observed in executed fib/session/HTF anchor suites. |
-| Backend authority | PASS | Backend remains source of truth for freshness, signal state, and verdicts. |
-| Dashboard fidelity | PASS | No UI behavior change from the merged same-day fixes; formatting-only cleanup on frontend files. |
-| Regime parity | PENDING | No dedicated regime suite rerun in the targeted timestamp pass. |
-| Signal parity | PARTIAL | Indirectly exercised through health/snapshot tests only; no direct signal replay suite in this run. |
+| Domain                         | Result  | Notes                                                                                               |
+| ------------------------------ | ------- | --------------------------------------------------------------------------------------------------- |
+| MT5 timestamp freshness parity | PASS    | ISO, dot-format, and `UTC`-suffix timestamps preserve broker time after patch.                      |
+| Fib parity                     | PASS    | No drift observed in executed fib/session/HTF anchor suites.                                        |
+| Backend authority              | PASS    | Backend remains source of truth for freshness, signal state, and verdicts.                          |
+| Dashboard fidelity             | PASS    | No UI behavior change from the merged same-day fixes; formatting-only cleanup on frontend files.    |
+| Regime parity                  | PENDING | No dedicated regime suite rerun in the targeted timestamp pass.                                     |
+| Signal parity                  | PARTIAL | Indirectly exercised through health/snapshot tests only; no direct signal replay suite in this run. |
 
 # Acceptance Criteria
 

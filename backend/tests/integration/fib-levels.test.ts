@@ -4,11 +4,7 @@ import { fibLevels } from "../../src/lib/db/schema";
 
 vi.mock("../../src/lib/db/index", () => ({ db: dbMock }));
 
-import {
-  createFibLevel,
-  getLatestFibLevels,
-  getMarketData,
-} from "../../src/lib/db/queries";
+import { createFibLevel, getLatestFibLevels, getMarketData } from "../../src/lib/db/queries";
 
 beforeEach(() => {
   resetCalls();
@@ -26,9 +22,7 @@ describe("fib-levels queries", () => {
   it("createFibLevel throws when the EA API key is unknown", async () => {
     setDbResult([]);
     await expect(
-      createFibLevel("bad", "EURUSD", "H1", null, [
-        { family: "LTF_SF", ratio: 50, price: 1.1 },
-      ])
+      createFibLevel("bad", "EURUSD", "H1", null, [{ family: "LTF_SF", ratio: 50, price: 1.1 }]),
     ).rejects.toThrow(/No user found/);
   });
 

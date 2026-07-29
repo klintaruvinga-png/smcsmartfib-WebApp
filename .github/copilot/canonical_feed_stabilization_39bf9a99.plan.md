@@ -50,18 +50,18 @@ flowchart TD
 
 **First backend divergence points** (in order of impact):
 
-| Layer | Issue | File |
-|-------|-------|------|
-| Price | Shared quote hardcodes `state: 'live'` regardless of age | [`fetch_shared_market_quote()`](wordpress/smc-superfib-sniper/smc-superfib-sniper.php) ~9302–9315 |
-| Authority | `is_mt5_authoritative()` uses `PHP_INT_MAX` — dead MT5 never loses authority | ~9707–9715 |
-| Feed key | `resolve_user_shared_feed_key()` reads **only user meta** — stale feed_key never rotates to a fresh canonical feed | ~5410–5415 |
-| Candles | `fetch_candles()` uses user-locked feed_key → different candle histories → different regimes/signals | ~7736–7738 |
-| Engine | Full pipeline is per-user: settings, snapshot cache, display board | `ensure_engine_snapshot()` ~9110, `reconcile_live_signal_board()` ~6204 |
-| Dedupe | `/snapshot/unified` dedupes broker suffixes **within one user's price array only** | ~2147–2151 |
+| Layer     | Issue                                                                                                              | File                                                                                              |
+| --------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Price     | Shared quote hardcodes `state: 'live'` regardless of age                                                           | [`fetch_shared_market_quote()`](wordpress/smc-superfib-sniper/smc-superfib-sniper.php) ~9302–9315 |
+| Authority | `is_mt5_authoritative()` uses `PHP_INT_MAX` — dead MT5 never loses authority                                       | ~9707–9715                                                                                        |
+| Feed key  | `resolve_user_shared_feed_key()` reads **only user meta** — stale feed_key never rotates to a fresh canonical feed | ~5410–5415                                                                                        |
+| Candles   | `fetch_candles()` uses user-locked feed_key → different candle histories → different regimes/signals               | ~7736–7738                                                                                        |
+| Engine    | Full pipeline is per-user: settings, snapshot cache, display board                                                 | `ensure_engine_snapshot()` ~9110, `reconcile_live_signal_board()` ~6204                           |
+| Dedupe    | `/snapshot/unified` dedupes broker suffixes **within one user's price array only**                                 | ~2147–2151                                                                                        |
 
 ### Still/stale price feed — root cause
 
-1. **`fetch_shared_market_quote()` returns `state: 'live'`** even when age is within `max_age_sec` but past `staleThresholdSec` (age check returns null only when *above* max, but surviving rows are always labeled live).
+1. **`fetch_shared_market_quote()` returns `state: 'live'`** even when age is within `max_age_sec` but past `staleThresholdSec` (age check returns null only when _above_ max, but surviving rows are always labeled live).
 2. **`is_mt5_authoritative()` never expires** — `refresh_prices()` keeps calling MT5 path with stale shared/per-user rows.
 3. **User locked to stale `feed_key`** in user meta with no DB fallback to the freshest `market_quotes_latest` row for the same normalized symbol.
 4. **Frontend soft-masking**: React Query `keepPreviousData` + tick interpolation can show a moving/still price between polls even when backend state is stale (Live page respects backend `price.state`; Plan page uses client-clock `staleThresholdSec` — cross-page asymmetry).
@@ -88,12 +88,14 @@ Frontend is **not creating signal truth** — it polls `/snapshot/unified` and `
 Add new file [`wordpress/smc-superfib-sniper/class-canonical-market-resolver.php`](wordpress/smc-superfib-sniper/class-canonical-market-resolver.php) — pure resolver, no REST logic:
 
 **`resolve_canonical_feed_key(string $normalized_symbol, string $user_feed_key, int $stale_threshold_sec): array`**
+
 - If `$user_feed_key` has a fresh row in `market_quotes_latest` → use it (log: `rotation_reason= user_feed_fresh`).
 - Else query `market_quotes_latest` for `$normalized_symbol` across all feed_keys, pick row with newest `updated_at` within `$stale_threshold_sec`.
 - If none fresh → return stale/offline metadata with the least-stale row for explicit state (never fake live).
 - Internal-only log fields: `feed_key`, `feed_key_age`, `rotation_reason`, `canonical_resolver_path`.
 
 **`resolve_canonical_quote(string $normalized_symbol, int $stale_threshold_sec): ?array`**
+
 - Uses resolver feed_key selection above.
 - Returns quote with **computed `state`** (`live` / `stale` / `offline`) from `iso_age_sec()` vs threshold — mirrors per-user snapshot logic.
 - Strips provenance from public payload (keep `sourceDetail`/`feed_key`/`source_count` as internal-only keys already marked in frontend types).
@@ -107,6 +109,7 @@ Add new file [`wordpress/smc-superfib-sniper/class-canonical-market-resolver.php
 5. **`refresh_prices()`** — pass canonical quote into engine input array.
 
 **Preserved intentionally:**
+
 - Per-user display signal board (lifecycle, entry hits, board size) — user-scoped execution state is OK.
 - Pine/fib/entry/SL/TP/chop formulas untouched.
 - Existing REST routes and response shapes — additive `meta.canonicalResolvedAt` optional, no breaking removals.
@@ -130,6 +133,7 @@ $response->header('Expires', '0');
 ```
 
 Apply to endpoints currently missing it:
+
 - `get_regimes()` (~5665)
 - `get_market_data_authority()` (~2525)
 - `get_user_settings()` / session endpoints that return dynamic auth-sensitive data
@@ -139,17 +143,21 @@ Verify with `curl -I` on: `/snapshot/unified`, `/live-signals`, `/ladders`, `/ch
 ### Phase 4 — Frontend hardening (secondary, cannot fix divergence alone)
 
 [`src/lib/version.ts`](src/lib/version.ts) + [`vite.config.ts`](vite.config.ts):
+
 - Inject `__BUILD_ID__` (git short SHA or CI timestamp) at build time.
 - Add `SCHEMA_VERSION` constant; on app boot ([`src/router.tsx`](src/router.tsx) or auth init), if stored schema ≠ current, invalidate React Query cache keys `snapshot`, `live-signals`, `ladders` and log console-safe mismatch (do **not** wipe user preferences like watchlist/backendUrl unless schema mismatch on unsafe keys).
 
 [`src/hooks/useSniperData.ts`](src/hooks/useSniperData.ts):
+
 - When snapshot poll returns any price with `state !== 'live'`, **do not** use `keepPreviousData` for that symbol's price display path (or clear placeholder on stale transition).
 - Add dev-only `console.debug('[SMC] backendUrl=', getBackendUrl())` on settings load for parity diagnostics.
 
 [`src/routes/-plan.page.tsx`](src/routes/-plan.page.tsx):
+
 - Align `getFreshnessState()` with Live page — trust backend `price.state` first; use client-clock `staleThresholdSec` only as secondary guard (removes Plan/Live asymmetry for same snapshot).
 
 [`src/lib/api/sniperClient.ts`](src/lib/api/sniperClient.ts):
+
 - Ensure 401/403 paths never fall back to cached snapshot data (already throws `AuthError` — add test assertion).
 
 No Cloudflare cache rules (out of scope per deployment context).
@@ -158,25 +166,27 @@ No Cloudflare cache rules (out of scope per deployment context).
 
 New PHP test file: [`wordpress/smc-superfib-sniper/tests/php/test-canonical-market-resolver.php`](wordpress/smc-superfib-sniper/tests/php/test-canonical-market-resolver.php)
 
-| # | Test |
-|---|------|
-| 1 | Two user contexts, same normalized symbol + fresh shared quote → identical bid/ask/mid/state |
-| 2 | User-scoped stale feed_key → resolver rotates to fresher feed_key for same symbol |
-| 3 | Stale shared quote (> threshold) → not `live`; MT5 authority false |
-| 4 | Stale MT5 authority → explicit stale/offline, no Twelve Data masquerade as live |
-| 5 | Resolver does not switch to unrelated symbol feed |
-| 6 | `/snapshot/unified` emits no-store/no-cache/Expires headers |
-| 7 | Unauthorized request → no fake live fallback payload |
-| 8 | Candle shortfall from disputed feed_key excluded; canonical feed_key candles used for both users |
+| #   | Test                                                                                             |
+| --- | ------------------------------------------------------------------------------------------------ |
+| 1   | Two user contexts, same normalized symbol + fresh shared quote → identical bid/ask/mid/state     |
+| 2   | User-scoped stale feed_key → resolver rotates to fresher feed_key for same symbol                |
+| 3   | Stale shared quote (> threshold) → not `live`; MT5 authority false                               |
+| 4   | Stale MT5 authority → explicit stale/offline, no Twelve Data masquerade as live                  |
+| 5   | Resolver does not switch to unrelated symbol feed                                                |
+| 6   | `/snapshot/unified` emits no-store/no-cache/Expires headers                                      |
+| 7   | Unauthorized request → no fake live fallback payload                                             |
+| 8   | Candle shortfall from disputed feed_key excluded; canonical feed_key candles used for both users |
 
 Extend [`test-ea-market-stream.php`](wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php): shared quote state reflects age (not always live).
 
 Frontend tests ([`src/hooks/useSniperData.test.tsx`](src/hooks/useSniperData.test.tsx), [`src/lib/api/sniperClient.test.ts`](src/lib/api/sniperClient.test.ts)):
+
 - Schema version mismatch clears unsafe query cache
 - Stale snapshot poll does not retain previous live price via placeholder
 - `grep`-style assertion: no render of `feed_key`/`source_count`/`sourceDetail` in routes (existing test coverage extended)
 
 Run commands:
+
 ```bash
 php wordpress/smc-superfib-sniper/tests/php/test-canonical-market-resolver.php
 php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php
@@ -231,17 +241,17 @@ Each report includes: executive summary, confirmed missing layer, root causes, f
 
 ## Files to Change (Expected)
 
-| File | Change |
-|------|--------|
-| `wordpress/smc-superfib-sniper/class-canonical-market-resolver.php` | **New** resolver |
-| `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | Wire resolver, fix stale/authority, cache headers |
-| `wordpress/smc-superfib-sniper/tests/php/test-canonical-market-resolver.php` | **New** regression suite |
-| `wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php` | Extend shared-quote state tests |
-| `src/lib/version.ts` | Schema version + build ID export |
-| `vite.config.ts` | Inject build ID define |
-| `src/hooks/useSniperData.ts` | Stale placeholder guard, backend URL log |
-| `src/routes/-plan.page.tsx` | Backend-first freshness |
-| `src/lib/api/sniperClient.ts` | Minor auth/cache hardening if gaps found |
-| `reports/...` + `.github/docs/...` + `.github/migration/audits/...` | Investigation reports |
+| File                                                                         | Change                                            |
+| ---------------------------------------------------------------------------- | ------------------------------------------------- |
+| `wordpress/smc-superfib-sniper/class-canonical-market-resolver.php`          | **New** resolver                                  |
+| `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`                      | Wire resolver, fix stale/authority, cache headers |
+| `wordpress/smc-superfib-sniper/tests/php/test-canonical-market-resolver.php` | **New** regression suite                          |
+| `wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php`          | Extend shared-quote state tests                   |
+| `src/lib/version.ts`                                                         | Schema version + build ID export                  |
+| `vite.config.ts`                                                             | Inject build ID define                            |
+| `src/hooks/useSniperData.ts`                                                 | Stale placeholder guard, backend URL log          |
+| `src/routes/-plan.page.tsx`                                                  | Backend-first freshness                           |
+| `src/lib/api/sniperClient.ts`                                                | Minor auth/cache hardening if gaps found          |
+| `reports/...` + `.github/docs/...` + `.github/migration/audits/...`          | Investigation reports                             |
 
 **Do Not Touch:** Pine scripts, fib anchor logic, entry/SL/TP formulas, chop rules, Cloudflare config, MT5 EA (unless ingest contract gap proven).

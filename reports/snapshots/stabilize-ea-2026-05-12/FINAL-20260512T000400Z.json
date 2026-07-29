@@ -27,9 +27,7 @@
       "bug_id": "BUG-002",
       "severity": "LOW",
       "description": "Silenced noisy error_log for absent candle key. Tick-only EA pushes are normal; only logs when candle key is present but malformed.",
-      "files_changed": [
-        "wordpress/smc-superfib-sniper/smc-superfib-sniper.php"
-      ]
+      "files_changed": ["wordpress/smc-superfib-sniper/smc-superfib-sniper.php"]
     }
   ],
   "tests": {
@@ -70,7 +68,17 @@
     "stale_warn_threshold_sec": 120,
     "candle_stale_threshold_sec": 180,
     "actual_ea_payload_contract": {
-      "fields": ["user_id", "symbol", "normalized_symbol", "timeframe", "timestamp", "bid", "ask", "freshness", "session"],
+      "fields": [
+        "user_id",
+        "symbol",
+        "normalized_symbol",
+        "timeframe",
+        "timestamp",
+        "bid",
+        "ask",
+        "freshness",
+        "session"
+      ],
       "optional_candle": "candle (singular object with time/open/high/low/close/volume)",
       "optional_candle_m15": "candle_m15 (singular object with same fields)"
     }

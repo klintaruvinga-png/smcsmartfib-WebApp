@@ -10,56 +10,56 @@
 
 ## Snapshot contract parity
 
-| Metric | Canonical expectation | `/snapshot` result | Match | Accuracy |
-| --- | --- | --- | --- | --- |
-| Symbol alias normalization | Broker alias resolves to canonical symbol key | `USTECH100` persisted as `NAS100` | Yes | 100% |
-| Top-level pricing | `bid` and `ask` accepted without nested `tick` wrapper | Snapshot row written from top-level fields | Yes | 100% |
-| Quote timestamp truth | `quote_time` persists as quote timestamp | `updated_at` stored from `quote_time` | Yes | 100% |
-| Candle array promotion | `candles[0]` promoted into M1 candle when `candle_m1` absent | M1 candle row written | Yes | 100% |
-| Tick volume mapping | `tick_volume` accepted on canonical candle payload | Stored as candle `volume` | Yes | 100% |
-| Freshness wiring | Freshness transient uses canonical symbol key | `smc_sf_freshness_7_NAS100=LIVE` | Yes | 100% |
-| Snapshot parity score | - | - | - | 100% |
+| Metric                     | Canonical expectation                                        | `/snapshot` result                         | Match | Accuracy |
+| -------------------------- | ------------------------------------------------------------ | ------------------------------------------ | ----- | -------- |
+| Symbol alias normalization | Broker alias resolves to canonical symbol key                | `USTECH100` persisted as `NAS100`          | Yes   | 100%     |
+| Top-level pricing          | `bid` and `ask` accepted without nested `tick` wrapper       | Snapshot row written from top-level fields | Yes   | 100%     |
+| Quote timestamp truth      | `quote_time` persists as quote timestamp                     | `updated_at` stored from `quote_time`      | Yes   | 100%     |
+| Candle array promotion     | `candles[0]` promoted into M1 candle when `candle_m1` absent | M1 candle row written                      | Yes   | 100%     |
+| Tick volume mapping        | `tick_volume` accepted on canonical candle payload           | Stored as candle `volume`                  | Yes   | 100%     |
+| Freshness wiring           | Freshness transient uses canonical symbol key                | `smc_sf_freshness_7_NAS100=LIVE`           | Yes   | 100%     |
+| Snapshot parity score      | -                                                            | -                                          | -     | 100%     |
 
 ## Freshness and timestamp parity
 
-| Metric | Expected behavior | Result | Match | Accuracy |
-| --- | --- | --- | --- | --- |
-| Quote-time preservation | Backend stores source quote timestamp, not receipt time | Verified on `/snapshot` and existing `/ea/market-stream` regression suite | Yes | 100% |
-| Stale-data guard | `/ea/market-stream` rejects payloads older than 300 seconds | Existing regression suite passed unchanged | Yes | 100% |
-| Source-of-truth state | Backend remains authoritative for freshness state | No frontend-only overrides introduced | Yes | 100% |
-| Freshness parity score | - | - | - | 100% |
+| Metric                  | Expected behavior                                           | Result                                                                    | Match | Accuracy |
+| ----------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------- | ----- | -------- |
+| Quote-time preservation | Backend stores source quote timestamp, not receipt time     | Verified on `/snapshot` and existing `/ea/market-stream` regression suite | Yes   | 100%     |
+| Stale-data guard        | `/ea/market-stream` rejects payloads older than 300 seconds | Existing regression suite passed unchanged                                | Yes   | 100%     |
+| Source-of-truth state   | Backend remains authoritative for freshness state           | No frontend-only overrides introduced                                     | Yes   | 100%     |
+| Freshness parity score  | -                                                           | -                                                                         | -     | 100%     |
 
 ## Broader migration parity status
 
-| Domain | Current status | Notes |
-| --- | --- | --- |
-| Fib engine | Not rerun today | Last direct parity pass remains 2026-05-21. |
+| Domain        | Current status         | Notes                                                            |
+| ------------- | ---------------------- | ---------------------------------------------------------------- |
+| Fib engine    | Not rerun today        | Last direct parity pass remains 2026-05-21.                      |
 | Regime engine | Indirect coverage only | No logic change in this patch; direct replay suite still absent. |
 | Signal engine | Indirect coverage only | No logic change in this patch; direct replay suite still absent. |
 
 # Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-| --- | --- | --- | --- | --- |
-| Authenticated `/snapshot` silently ignored canonical MT5 fields while returning `ok: true` | HIGH | 1 | Fixed by compatibility normalization before persistence | No |
+| Issue                                                                                      | Severity | Count | Resolution                                              | Blocker |
+| ------------------------------------------------------------------------------------------ | -------- | ----- | ------------------------------------------------------- | ------- |
+| Authenticated `/snapshot` silently ignored canonical MT5 fields while returning `ok: true` | HIGH     | 1     | Fixed by compatibility normalization before persistence | No      |
 
 # Comparison Matrix
 
-| Field | `/ea/market-stream` before run | `/snapshot` before run | `/snapshot` after patch |
-| --- | --- | --- | --- |
-| `bid` / `ask` top-level | Accepted | Ignored | Accepted |
-| `quote_time` | Accepted | Ignored unless manually nested into `tick.timestamp` | Accepted |
-| `candles[]` array | Accepted via `candles[0]` shim | Ignored | Accepted via `candles[0]` shim |
-| `tick_volume` | Accepted via alias mapping | Ignored with `candles[]` shape | Accepted |
-| Broker alias normalization | Applied | Not applied | Applied |
+| Field                      | `/ea/market-stream` before run | `/snapshot` before run                               | `/snapshot` after patch        |
+| -------------------------- | ------------------------------ | ---------------------------------------------------- | ------------------------------ |
+| `bid` / `ask` top-level    | Accepted                       | Ignored                                              | Accepted                       |
+| `quote_time`               | Accepted                       | Ignored unless manually nested into `tick.timestamp` | Accepted                       |
+| `candles[]` array          | Accepted via `candles[0]` shim | Ignored                                              | Accepted via `candles[0]` shim |
+| `tick_volume`              | Accepted via alias mapping     | Ignored with `candles[]` shape                       | Accepted                       |
+| Broker alias normalization | Applied                        | Not applied                                          | Applied                        |
 
 # Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-| --- | --- | --- | --- |
-| Full multi-candle batch persistence | Only `candles[0]` stored | Phase 3 scope by design; no architecture rewrite in this run | Yes |
-| Regime replay coverage | Not rerun | Out of scope for the snapshot contract fix | Yes |
-| Signal replay coverage | Not rerun | Out of scope for the snapshot contract fix | Yes |
+| Item                                | Difference               | Reason                                                       | Accepted |
+| ----------------------------------- | ------------------------ | ------------------------------------------------------------ | -------- |
+| Full multi-candle batch persistence | Only `candles[0]` stored | Phase 3 scope by design; no architecture rewrite in this run | Yes      |
+| Regime replay coverage              | Not rerun                | Out of scope for the snapshot contract fix                   | Yes      |
+| Signal replay coverage              | Not rerun                | Out of scope for the snapshot contract fix                   | Yes      |
 
 # Recommendations
 

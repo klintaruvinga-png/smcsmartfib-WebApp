@@ -3,7 +3,7 @@
 **Event**: Phase 5B (Fundamentals Regime Feed) code implementation complete  
 **Date**: 2026-05-25  
 **Triggered by**: Pre-emptive implementation during Phase 4 live corpus soak  
-**Author**: Claude Code (assisted)  
+**Author**: Claude Code (assisted)
 
 ---
 
@@ -18,6 +18,7 @@ Phase 5 (regime engine) parity is confirmed.
 ## What Was Done
 
 ### Backend (Track B)
+
 - **New tables**:
   - `wp_smc_sf_fundamental_events` — raw scored economic events
   - `wp_smc_sf_fundamental_bias` — composite bias per currency (TTL cache)
@@ -34,26 +35,28 @@ Phase 5 (regime engine) parity is confirmed.
   - Finds all users with valid TD key → pulls calendar → recomputes bias
 
 ### Data Sources Configured
-| Feed | Status |
-|------|--------|
-| Twelve Data `/economic_calendar` | ✅ Ready (existing TD key) |
-| MT5 EA DXYUSD (USD conviction) | ✅ Already streaming |
-| MT5 EA VIX proxy | ✅ Already streaming |
-| FRED API (deep US macro) | ⏳ Pending key registration |
+
+| Feed                             | Status                      |
+| -------------------------------- | --------------------------- |
+| Twelve Data `/economic_calendar` | ✅ Ready (existing TD key)  |
+| MT5 EA DXYUSD (USD conviction)   | ✅ Already streaming        |
+| MT5 EA VIX proxy                 | ✅ Already streaming        |
+| FRED API (deep US macro)         | ⏳ Pending key registration |
 
 ### Readiness Package
+
 - **Created `PHASE5B_IMPLEMENTATION.md`** — full spec, scoring tables, decay logic, checklist
 
 ---
 
 ## Phase 5B Gate Status
 
-| Gate | Status |
-|------|--------|
-| Code implementation | ✅ COMPLETE |
-| DB schemas | ✅ COMPLETE |
-| REST endpoints | ✅ COMPLETE |
-| WP-Cron | ✅ COMPLETE |
-| Phase 5 prerequisite | ⏳ PENDING |
-| FRED API key | ⏳ Pending operator registration |
-| Historical accuracy test | ⏳ PENDING |
+| Gate                     | Status                           |
+| ------------------------ | -------------------------------- |
+| Code implementation      | ✅ COMPLETE                      |
+| DB schemas               | ✅ COMPLETE                      |
+| REST endpoints           | ✅ COMPLETE                      |
+| WP-Cron                  | ✅ COMPLETE                      |
+| Phase 5 prerequisite     | ⏳ PENDING                       |
+| FRED API key             | ⏳ Pending operator registration |
+| Historical accuracy test | ⏳ PENDING                       |

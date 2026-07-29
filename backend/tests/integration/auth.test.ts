@@ -6,22 +6,28 @@ import { dbMock, setDbResult, getDbCalls, resetCalls, setInsertError } from "./d
 // so setting it here (module load) is enough for jose to sign/verify.
 process.env.JWT_SECRET = "test-secret-key-for-unit-tests-must-be-long-enough-32bytes";
 
-vi.mock("../../src/lib/db/index", () => ({ 
+vi.mock("../../src/lib/db/index", () => ({
   db: dbMock,
   supabase: {
     auth: {
       admin: {
         createUser: vi.fn().mockResolvedValue({
           data: { user: { id: "mock-auth-user-id" } },
-          error: null
+          error: null,
         }),
-        deleteUser: vi.fn().mockResolvedValue({ error: null })
-      }
-    }
-  }
+        deleteUser: vi.fn().mockResolvedValue({ error: null }),
+      },
+    },
+  },
 }));
 
-import { loginUser, registerUser, getMeUser, refreshAccessToken, AuthError } from "../../src/lib/auth/handlers";
+import {
+  loginUser,
+  registerUser,
+  getMeUser,
+  refreshAccessToken,
+  AuthError,
+} from "../../src/lib/auth/handlers";
 import { requireAuth, requireEaAuth } from "../../src/lib/auth/middleware";
 import { createAccessToken } from "../../src/lib/auth";
 
@@ -85,16 +91,18 @@ describe("auth handlers", () => {
   });
 
   it("getMeUser success (never leaks passwordHash)", async () => {
-    setDbResult([{
-      id: "u1",
-      email: "a@b.com",
-      role: "user",
-      username: null,
-      fullName: null,
-      avatarUrl: null,
-      createdAt: new Date(),
-      passwordHash: "x",
-    }]);
+    setDbResult([
+      {
+        id: "u1",
+        email: "a@b.com",
+        role: "user",
+        username: null,
+        fullName: null,
+        avatarUrl: null,
+        createdAt: new Date(),
+        passwordHash: "x",
+      },
+    ]);
     const u = await getMeUser("u1");
     expect(u.id).toBe("u1");
     expect(!("passwordHash" in u)).toBe(true);
@@ -108,14 +116,16 @@ describe("auth handlers", () => {
   });
 
   it("refresh success (true rotation)", async () => {
-    setDbResult([{
-      id: "s1",
-      userId: "u1",
-      userAgent: "ua",
-      ipAddress: "1.2.3.4",
-      tokenHash: "h",
-      expiresAt: new Date(Date.now() + 100000),
-    }]);
+    setDbResult([
+      {
+        id: "s1",
+        userId: "u1",
+        userAgent: "ua",
+        ipAddress: "1.2.3.4",
+        tokenHash: "h",
+        expiresAt: new Date(Date.now() + 100000),
+      },
+    ]);
     const r = await refreshAccessToken("sometoken");
     expect(typeof r.accessToken === "string").toBe(true);
     expect(typeof r.refreshToken === "string").toBe(true);

@@ -47,6 +47,7 @@ components:
     rounded: "{rounded.md}"
     padding: "16px 48px"
 ---
+
 # Design System: SuperFIB Dashboard
 
 ## 1. Overview
@@ -56,6 +57,7 @@ components:
 A dark‑mode fintech interface that feels like a steady lighthouse guiding traders through volatile markets. The visual language is built around disciplined contrast, purposeful accents, and smooth, purposeful motion. It avoids overly colorful or cluttered layouts, favoring a calm, professional aura.
 
 **Key Characteristics:**
+
 - High contrast dark background with gold‑amber accent (Golden Ember).
 - Clear hierarchy driven by typography and spacing.
 - Motion that respects reduced‑motion preferences.
@@ -65,15 +67,18 @@ A dark‑mode fintech interface that feels like a steady lighthouse guiding trad
 A focused, restrained palette anchored by a gold‑amber accent.
 
 ### Primary
+
 - **Golden Ember** (#d8a35d): Used for primary actions, highlights, and interactive elements.
 
 ### Background
+
 - **Obsidian Depths** (#07111b): Main page background, provides deep contrast for content.
 - **Midnight Slate 1** (#102033): Secondary surface, cards, panels.
 - **Midnight Slate 2** (#17293f): Tertiary surface, hover states, subtle separation.
 - **Midnight Slate 3** (#20344d): Lightest dark surface, used for inputs and forms.
 
 ### Neutral
+
 - **Foreground** (#ffffff): Primary text.
 - **Dim** (#c4d2e4): Secondary text, placeholders.
 - **Mute** (#9cb0c9): Disabled text, subtle hints.
@@ -81,6 +86,7 @@ A focused, restrained palette anchored by a gold‑amber accent.
 - **Border‑2** (rgba(206,223,243,0.34)): Elevated border for focus.
 
 ### Accent & Status
+
 - **Accent‑2** (#f3d7ab): Lighter variant for hover states.
 - **Buy** (#46d19a): Positive action colour.
 - **Sell** (#ff9a92): Negative action colour.
@@ -102,20 +108,24 @@ Depth is conveyed mainly through colour contrast and subtle shadows on interacti
 ## 5. Components
 
 ### Buttons
+
 - **Primary:** `bg-primary` with `text-primary-foreground`, rounded `{rounded.md}`, padding `16px 48px`.
 - **Destructive:** `bg-destructive` with `text-destructive-foreground`, same shape.
 - **Outline:** Transparent background, `border` colour, foreground text, same rounding.
 - **Secondary / Ghost / Link:** Variants use accent colours and minimal background.
 
 ### Cards
+
 - Background `{colors.background-1}`, rounded `{rounded.lg}`, subtle border `{colors.border}`.
 - Hover lifts background slightly and adds a faint accent glow.
 
 ### Inputs
+
 - Background `{colors.background-2}`, border `{colors.border}`, rounded `{rounded.sm}`.
 - Focus ring uses `var(--info)`.
 
 ### Badges & Indicators
+
 - **Buy badge:** `bg-buy` with white text, small pulse animation.
 - **Sell badge:** `bg-sell` with white text.
 - **Warning badge:** `bg-warn`.
@@ -123,15 +133,16 @@ Depth is conveyed mainly through colour contrast and subtle shadows on interacti
 ## 6. Do's and Don'ts
 
 **Do:**
+
 - Use the **Golden Ember** accent sparingly (≤10 % of screen area) to draw attention to primary actions.
 - Maintain a contrast ratio of ≥4.5:1 for body text against the dark background.
 - Respect reduced‑motion preferences; replace animations with instant state changes.
 - Keep spacing consistent using the `spacing` scale (8 px – 16 px) for padding and margins.
 
 **Don't:**
+
 - Use overly colorful or cluttered layouts.
 - Apply side‑stripe borders greater than 1 px as decorative accents.
 - Employ gradient text or glass‑morphism as default UI elements.
 - Stack identical card grids without hierarchy.
 - Add tiny uppercase tracked eyebrows above every section.
-

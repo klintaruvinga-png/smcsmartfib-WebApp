@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
       maxPerSymbolExposure: Number(limits.maxPerSymbolExposure),
     },
     { openTrades, todaysPnl: ctx.todaysPnl },
-    parsed.data
+    parsed.data,
   );
 
   return { ...evaluation, configured: true };

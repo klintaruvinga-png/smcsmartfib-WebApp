@@ -82,12 +82,8 @@ export const fibLevels = pgTable(
     price: decimal("price", { precision: 20, scale: 8 }).notNull(),
     source: text("source").$type<FibSource>().notNull().default("mt5"),
     trend: text("trend"),
-    calculatedAt: timestamp("calculated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    receivedAt: timestamp("received_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    calculatedAt: timestamp("calculated_at", { withTimezone: true }).notNull().defaultNow(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     lookupIdx: index("idx_fib_levels_lookup").on(
@@ -95,12 +91,12 @@ export const fibLevels = pgTable(
       table.symbol,
       table.timeframe,
       table.family,
-      table.calculatedAt.desc()
+      table.calculatedAt.desc(),
     ),
     symbolTimeIdx: index("idx_fib_levels_symbol_time").on(
       table.userId,
       table.symbol,
-      table.calculatedAt.desc()
+      table.calculatedAt.desc(),
     ),
     // Matches WordPress wp_smc_sf_fib_levels UNIQUE KEY fib_lookup exactly.
     // calculated_at is excluded so the EA ingest endpoint upserts (ON CONFLICT
@@ -111,9 +107,9 @@ export const fibLevels = pgTable(
       table.symbol,
       table.timeframe,
       table.family,
-      table.ratio
+      table.ratio,
     ),
-  })
+  }),
 );
 
 export const eaSessions = pgTable(
@@ -128,15 +124,13 @@ export const eaSessions = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     ipAddress: inet("ip_address"),
     userAgent: text("user_agent"),
-    connectedAt: timestamp("connected_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
     lastPing: timestamp("last_ping", { withTimezone: true }).notNull().defaultNow(),
     status: text("status").$type<EaSessionStatus>().notNull().default("connected"),
   },
   (table) => ({
     eaIdx: index("idx_ea_sessions_ea").on(table.eaApiKey, table.status),
-  })
+  }),
 );
 
 export const refreshSessions = pgTable(
@@ -155,7 +149,7 @@ export const refreshSessions = pgTable(
   (table) => ({
     userIdIdx: index("idx_refresh_sessions_user").on(table.userId),
     expiresIdx: index("idx_refresh_sessions_expires").on(table.expiresAt),
-  })
+  }),
 );
 
 export type User = typeof users.$inferSelect;
@@ -195,26 +189,27 @@ export const trades = pgTable(
     userIdx: index("idx_trades_user").on(table.userId, table.openedAt.desc()),
     symbolIdx: index("idx_trades_symbol").on(table.userId, table.symbol),
     statusIdx: index("idx_trades_status").on(table.userId, table.status),
-  })
+  }),
 );
 
 /**
  * Per-user risk limits for the pre-trade gate (SMC-06 risk workflow).
  * All monetary limits are in account currency.
  */
-export const riskLimits = pgTable(
-  "risk_limits",
-  {
-    userId: uuid("user_id")
-      .primaryKey()
-      .references(() => users.id, { onDelete: "cascade" }),
-    dailyLossLimit: decimal("daily_loss_limit", { precision: 20, scale: 4 }).notNull().default("0"),
-    maxOpenPositions: decimal("max_open_positions", { precision: 6, scale: 0 }).notNull().default("5"),
-    maxPositionSize: decimal("max_position_size", { precision: 12, scale: 4 }).notNull().default("0"),
-    maxPerSymbolExposure: decimal("max_per_symbol_exposure", { precision: 12, scale: 4 }).notNull().default("0"),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  }
-);
+export const riskLimits = pgTable("risk_limits", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  dailyLossLimit: decimal("daily_loss_limit", { precision: 20, scale: 4 }).notNull().default("0"),
+  maxOpenPositions: decimal("max_open_positions", { precision: 6, scale: 0 })
+    .notNull()
+    .default("5"),
+  maxPositionSize: decimal("max_position_size", { precision: 12, scale: 4 }).notNull().default("0"),
+  maxPerSymbolExposure: decimal("max_per_symbol_exposure", { precision: 12, scale: 4 })
+    .notNull()
+    .default("0"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export type Trade = typeof trades.$inferSelect;
 export type NewTrade = typeof trades.$inferInsert;

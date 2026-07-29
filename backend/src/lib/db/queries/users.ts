@@ -20,7 +20,10 @@ import type { User, UserRole, UserSettings } from "../schema";
 import { hashToken, hashPassword, verifyPassword } from "../../auth/index";
 
 export class SettingsError extends Error {
-  constructor(public statusCode: number, message: string) {
+  constructor(
+    public statusCode: number,
+    message: string,
+  ) {
     super(message);
     this.name = "SettingsError";
   }
@@ -39,7 +42,7 @@ export async function createUser(
   role: UserRole = "user",
   eaApiKey?: string,
   username?: string,
-  id?: string
+  id?: string,
 ): Promise<User> {
   // Hash the plaintext password before persistence using edge-compatible PBKDF2.
   const passwordHash = await hashPassword(password);
@@ -75,10 +78,7 @@ export async function createUser(
  * Find a user by their EA API key. Returns null if not found.
  */
 export async function getUserByApiKey(eaApiKey: string): Promise<User | null> {
-  const [row] = await db
-    .select()
-    .from(users)
-    .where(eq(users.eaApiKey, eaApiKey));
+  const [row] = await db.select().from(users).where(eq(users.eaApiKey, eaApiKey));
   return row ?? null;
 }
 
@@ -96,12 +96,9 @@ export async function getUserById(id: string): Promise<User | null> {
  */
 export async function updateUserPasswordHash(
   userId: string,
-  newPasswordHash: string
+  newPasswordHash: string,
 ): Promise<void> {
-  await db
-    .update(users)
-    .set({ passwordHash: newPasswordHash })
-    .where(eq(users.id, userId));
+  await db.update(users).set({ passwordHash: newPasswordHash }).where(eq(users.id, userId));
 }
 
 /**
@@ -109,10 +106,7 @@ export async function updateUserPasswordHash(
  * Supports both PBKDF2 and legacy bcrypt hashes.
  * Returns true if they match, false otherwise.
  */
-export async function verifyUserPassword(
-  plain: string,
-  hash: string
-): Promise<boolean> {
+export async function verifyUserPassword(plain: string, hash: string): Promise<boolean> {
   return verifyPassword(plain, hash);
 }
 
@@ -135,7 +129,10 @@ export async function getUserSettings(userId: string): Promise<UserSettings> {
  * Deep-merge helper: recursively merges `patch` into `base`, preserving nested
  * properties that aren't present in `patch`.
  */
-function deepMerge(base: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
+function deepMerge(
+  base: Record<string, unknown>,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
   const result = { ...base };
   for (const key in patch) {
     const patchValue = patch[key];
@@ -150,7 +147,7 @@ function deepMerge(base: Record<string, unknown>, patch: Record<string, unknown>
     ) {
       result[key] = deepMerge(
         baseValue as Record<string, unknown>,
-        patchValue as Record<string, unknown>
+        patchValue as Record<string, unknown>,
       );
     } else {
       result[key] = patchValue;
@@ -168,7 +165,7 @@ function deepMerge(base: Record<string, unknown>, patch: Record<string, unknown>
  */
 export async function updateUserSettings(
   userId: string,
-  settings: UserSettings
+  settings: UserSettings,
 ): Promise<UserSettings> {
   return await db.transaction(async (tx) => {
     // Read current settings, locking the row so concurrent updates serialize.

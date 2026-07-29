@@ -2,15 +2,15 @@
 
 ## Executive Summary
 
-| Item | Status |
-|---|---|
-| Overall Health | STABLE |
-| Bugs Found | 2 (1 MEDIUM, 1 LOW) |
-| Bugs Fixed | 2 |
-| Remaining Risks | None blocking |
-| Migration Readiness | Phase 0 soak — EA stream fully wired |
-| Snapshot Archive | reports/snapshots/stabilize-ea-2026-05-12/ |
-| Rollback Command | `git reset --hard rollback/stabilize-ea-2026-05-12-before-patches` |
+| Item                | Status                                                             |
+| ------------------- | ------------------------------------------------------------------ |
+| Overall Health      | STABLE                                                             |
+| Bugs Found          | 2 (1 MEDIUM, 1 LOW)                                                |
+| Bugs Fixed          | 2                                                                  |
+| Remaining Risks     | None blocking                                                      |
+| Migration Readiness | Phase 0 soak — EA stream fully wired                               |
+| Snapshot Archive    | reports/snapshots/stabilize-ea-2026-05-12/                         |
+| Rollback Command    | `git reset --hard rollback/stabilize-ea-2026-05-12-before-patches` |
 
 **Context:** Second stabilization workflow run on this codebase. The 2026-05-11 run patched OHLC validation (PATCH-001). This run found and patched two additional hardening gaps: missing `is_finite()` on bid/ask and a noisy log for normal tick-only pushes.
 
@@ -41,6 +41,7 @@
 **File changed:** `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
 
 **Logic hardened:**
+
 ```php
 // Before
 if ($bid > 0 && $ask > 0 && $bid <= $ask) {
@@ -52,6 +53,7 @@ if (is_finite($bid) && is_finite($ask) && $bid > 0 && $ask > 0 && $bid <= $ask) 
 **Regression protection:** Test 7 added to `wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php` — verifies that `INF` bid is rejected and no snapshot is inserted.
 
 **Rollback points:**
+
 - Before: `rollback/stabilize-ea-2026-05-12-before-patches`
 - After: `rollback/stabilize-ea-2026-05-12-after-patch-1`
 
@@ -60,6 +62,7 @@ if (is_finite($bid) && is_finite($ask) && $bid > 0 && $ask > 0 && $bid <= $ask) 
 **File changed:** `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
 
 **Logic hardened:**
+
 ```php
 // Before:
 } else {
@@ -80,39 +83,39 @@ if (is_finite($bid) && is_finite($ask) && $bid > 0 && $ask > 0 && $bid <= $ask) 
 
 ## EA Integration Status
 
-| Item | Status |
-|---|---|
-| Route | `POST /wp-json/sniper/v1/ea/market-stream` |
-| Auth model | Shared-secret API key |
-| Required header | `X-EA-API-Key` (also: `X-API-KEY`, `x_ea_api_key`, `x_api_key`) |
-| Secret env | `SMC_SF_EA_API_KEY` (PHP constant or `getenv()`) |
-| Hash comparison | `hash_equals()` — timing-safe |
-| `user_id` required | YES — validated via `get_userdata()` + `user_can('read')` |
-| `wp_set_current_user()` | YES — called before returning `true` |
-| Missing token | 401 `smc_sf_api_key_missing` |
-| Unconfigured secret | 503 `smc_sf_api_key_unconfigured` |
-| Invalid token | 403 `smc_sf_api_key_invalid` |
-| Missing user_id | 400 `smc_sf_user_required` |
-| Invalid user | 403 `smc_sf_user_invalid` |
-| Payload contract | `user_id`, `symbol`, `normalized_symbol`, `timeframe`, `timestamp`, `bid`, `ask`, `freshness`, `session`, `candle{}` (optional), `candle_m15{}` (optional) |
-| Stale data rejection | Hard reject > 300s, warn 120–300s |
-| Candle stale rejection | > 180s from stream timestamp |
-| OHLC validation | `high >= max(open,close)`, `low <= min(open,close)` |
-| is_finite validation | `is_finite(bid) && is_finite(ask)` — PATCHED 2026-05-12 |
+| Item                    | Status                                                                                                                                                     |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Route                   | `POST /wp-json/sniper/v1/ea/market-stream`                                                                                                                 |
+| Auth model              | Shared-secret API key                                                                                                                                      |
+| Required header         | `X-EA-API-Key` (also: `X-API-KEY`, `x_ea_api_key`, `x_api_key`)                                                                                            |
+| Secret env              | `SMC_SF_EA_API_KEY` (PHP constant or `getenv()`)                                                                                                           |
+| Hash comparison         | `hash_equals()` — timing-safe                                                                                                                              |
+| `user_id` required      | YES — validated via `get_userdata()` + `user_can('read')`                                                                                                  |
+| `wp_set_current_user()` | YES — called before returning `true`                                                                                                                       |
+| Missing token           | 401 `smc_sf_api_key_missing`                                                                                                                               |
+| Unconfigured secret     | 503 `smc_sf_api_key_unconfigured`                                                                                                                          |
+| Invalid token           | 403 `smc_sf_api_key_invalid`                                                                                                                               |
+| Missing user_id         | 400 `smc_sf_user_required`                                                                                                                                 |
+| Invalid user            | 403 `smc_sf_user_invalid`                                                                                                                                  |
+| Payload contract        | `user_id`, `symbol`, `normalized_symbol`, `timeframe`, `timestamp`, `bid`, `ask`, `freshness`, `session`, `candle{}` (optional), `candle_m15{}` (optional) |
+| Stale data rejection    | Hard reject > 300s, warn 120–300s                                                                                                                          |
+| Candle stale rejection  | > 180s from stream timestamp                                                                                                                               |
+| OHLC validation         | `high >= max(open,close)`, `low <= min(open,close)`                                                                                                        |
+| is_finite validation    | `is_finite(bid) && is_finite(ask)` — PATCHED 2026-05-12                                                                                                    |
 
 ---
 
 ## Parity Verification
 
-| Comparison | Status |
-|---|---|
-| Pine/MQL5 vs. backend fib levels | No drift found |
-| Backend signal readiness vs. dashboard | CONFIRMED — dashboard reads backend `backendConfirmed` field |
-| Backend `is_live` vs. dashboard display | CONFIRMED — FreshnessBadge reads `price.state` from backend |
-| MT5 EA payload field names vs. PHP handler | CONFIRMED — all fields matched |
-| Broker timestamp UTC conversion | CONFIRMED — `TimeGMT()` used for correct UTC |
-| Session display vs. market-open detection | DOCUMENTED DIVERGENCE (display: killzone windows; EA: full sessions) — intentional |
-| EA payload field naming vs. workflow spec | DOCUMENTED DIVERGENCE — spec used `quote_time`/`server_time`/`candles[]`; actual uses `timestamp`/`candle{}`/`candle_m15{}` |
+| Comparison                                 | Status                                                                                                                      |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| Pine/MQL5 vs. backend fib levels           | No drift found                                                                                                              |
+| Backend signal readiness vs. dashboard     | CONFIRMED — dashboard reads backend `backendConfirmed` field                                                                |
+| Backend `is_live` vs. dashboard display    | CONFIRMED — FreshnessBadge reads `price.state` from backend                                                                 |
+| MT5 EA payload field names vs. PHP handler | CONFIRMED — all fields matched                                                                                              |
+| Broker timestamp UTC conversion            | CONFIRMED — `TimeGMT()` used for correct UTC                                                                                |
+| Session display vs. market-open detection  | DOCUMENTED DIVERGENCE (display: killzone windows; EA: full sessions) — intentional                                          |
+| EA payload field naming vs. workflow spec  | DOCUMENTED DIVERGENCE — spec used `quote_time`/`server_time`/`candles[]`; actual uses `timestamp`/`candle{}`/`candle_m15{}` |
 
 ---
 
@@ -139,12 +142,12 @@ if (is_finite($bid) && is_finite($ask) && $bid > 0 && $ask > 0 && $bid <= $ask) 
 
 ## Remaining Risks
 
-| Risk | Severity | Mitigation |
-|---|---|---|
-| `npm run lint` 70 prettier errors | Low | Pre-existing, whitespace-only, no logic impact. Can be fixed with `--fix` flag in a dedicated cleanup PR. |
-| Candle freshness threshold 7200s | Low | Intentional buffer for offline/weekend periods. Only affects live-ness classification if EA is disconnected for >2h. |
-| EA uptime gap | Medium | If EA stops streaming for >2h, candles become stale and signals cannot be backend-confirmed. This is correct behavior, not a bug. |
-| `npm test` not available | Low | No npm test runner configured. PHP regression tests run via `php test-*.php` directly. Unit test infrastructure recommended for future sprints. |
+| Risk                              | Severity | Mitigation                                                                                                                                      |
+| --------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run lint` 70 prettier errors | Low      | Pre-existing, whitespace-only, no logic impact. Can be fixed with `--fix` flag in a dedicated cleanup PR.                                       |
+| Candle freshness threshold 7200s  | Low      | Intentional buffer for offline/weekend periods. Only affects live-ness classification if EA is disconnected for >2h.                            |
+| EA uptime gap                     | Medium   | If EA stops streaming for >2h, candles become stale and signals cannot be backend-confirmed. This is correct behavior, not a bug.               |
+| `npm test` not available          | Low      | No npm test runner configured. PHP regression tests run via `php test-*.php` directly. Unit test infrastructure recommended for future sprints. |
 
 ---
 
@@ -174,6 +177,7 @@ git checkout main && git reset --hard origin/main
 ## EA Testing Commands
 
 ### Missing token test (expect 401)
+
 ```bash
 curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
   -H "Content-Type: application/json" \
@@ -181,6 +185,7 @@ curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-st
 ```
 
 ### Invalid token test (expect 403)
+
 ```bash
 curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
   -H "Content-Type: application/json" \
@@ -189,6 +194,7 @@ curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-st
 ```
 
 ### Missing user_id test (expect 400)
+
 ```bash
 curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
   -H "Content-Type: application/json" \
@@ -197,6 +203,7 @@ curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-st
 ```
 
 ### Valid full payload test (expect 200 ok: true)
+
 ```bash
 curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
   -H "Content-Type: application/json" \

@@ -21,10 +21,10 @@
 
 ## Confirmed Problems
 
-| Severity | Category | Issue | Root Cause | Impact | Blocker |
-|---|---|---|---|---|---|
-| HIGH | Dashboard truth / refresh | Live Radar rendered stale/offline MT5 symbols as `awaiting snapshot` placeholders | `src/routes/live.tsx` treated any non-`live` MT5 row as pending instead of preserving backend state | Operators could miss stale or offline backend truth and misread dead data as missing data | No after patch |
-| HIGH | Backend freshness authority | `SMC_MarketData_Service` persisted server receipt time instead of MT5 payload time for ticks/candles | `wordpress/smc-superfib-sniper/class-market-data-service.php` ignored tick timestamp and partially normalized candles | Freshness age could drift from quote time and create fake-live authority reads on service consumers | No after patch |
+| Severity | Category                    | Issue                                                                                                | Root Cause                                                                                                            | Impact                                                                                              | Blocker        |
+| -------- | --------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | -------------- |
+| HIGH     | Dashboard truth / refresh   | Live Radar rendered stale/offline MT5 symbols as `awaiting snapshot` placeholders                    | `src/routes/live.tsx` treated any non-`live` MT5 row as pending instead of preserving backend state                   | Operators could miss stale or offline backend truth and misread dead data as missing data           | No after patch |
+| HIGH     | Backend freshness authority | `SMC_MarketData_Service` persisted server receipt time instead of MT5 payload time for ticks/candles | `wordpress/smc-superfib-sniper/class-market-data-service.php` ignored tick timestamp and partially normalized candles | Freshness age could drift from quote time and create fake-live authority reads on service consumers | No after patch |
 
 ## Root Cause / Analysis
 
@@ -34,13 +34,13 @@
 
 ## Surgical Fixes Applied
 
-| File | Fix |
-|---|---|
-| `src/routes/live.tsx` | Replaced inline pending-card gate with a scoped helper so MT5 stale/offline rows remain visible on Live Radar |
-| `src/routes/live.utils.ts` | Added a focused backend-truth helper for pending-card decisions |
-| `src/routes/-live.test.ts` | Added regression coverage for stale/offline MT5 visibility and true pending fallback |
-| `wordpress/smc-superfib-sniper/class-market-data-service.php` | Normalized MT5 tick/candle timestamps to UTC MySQL format before persistence; snapshot `updated_at` now preserves quote time |
-| `wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php` | Added regression coverage for tick timestamp persistence and canonical M1 candle timestamp normalization |
+| File                                                                                 | Fix                                                                                                                          |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `src/routes/live.tsx`                                                                | Replaced inline pending-card gate with a scoped helper so MT5 stale/offline rows remain visible on Live Radar                |
+| `src/routes/live.utils.ts`                                                           | Added a focused backend-truth helper for pending-card decisions                                                              |
+| `src/routes/-live.test.ts`                                                           | Added regression coverage for stale/offline MT5 visibility and true pending fallback                                         |
+| `wordpress/smc-superfib-sniper/class-market-data-service.php`                        | Normalized MT5 tick/candle timestamps to UTC MySQL format before persistence; snapshot `updated_at` now preserves quote time |
+| `wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php` | Added regression coverage for tick timestamp persistence and canonical M1 candle timestamp normalization                     |
 
 ## Exact Logic Hardened
 

@@ -8,7 +8,7 @@ import { getAuthHeader } from "@/lib/auth";
 
 const JOURNAL_BACKEND_URL =
   (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ??
-  "http://localhost:3000/api";
+  "https://smcsuperfibwebapp.klintaruvinga.workers.dev/api";
 
 export type TradeDirection = "long" | "short";
 export type TradeStatus = "open" | "closed" | "cancelled";
@@ -98,7 +98,7 @@ export const journalClient = {
       pnl: number;
       status: TradeStatus;
       notes: string;
-    }>
+    }>,
   ): Promise<Trade> {
     return journalFetch<Trade>(`/api/journal/${id}`, {
       method: "PUT",

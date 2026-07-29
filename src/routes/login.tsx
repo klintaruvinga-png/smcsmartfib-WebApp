@@ -22,7 +22,8 @@ function LoginPage() {
     setLoading(true);
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+      const apiUrl =
+        import.meta.env.VITE_API_URL || "https://smcsuperfibwebapp.klintaruvinga.workers.dev/api";
       const response = await fetch(`${apiUrl}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -68,7 +69,10 @@ function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="rounded-lg border border-bd bg-bg1/60 p-4 space-y-4">
             <div className="space-y-1.5">
-              <label htmlFor="email" className="block text-[10px] font-mono uppercase tracking-wider text-mute">
+              <label
+                htmlFor="email"
+                className="block text-[10px] font-mono uppercase tracking-wider text-mute"
+              >
                 Email
               </label>
               <input
@@ -83,7 +87,10 @@ function LoginPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="password" className="block text-[10px] font-mono uppercase tracking-wider text-mute">
+              <label
+                htmlFor="password"
+                className="block text-[10px] font-mono uppercase tracking-wider text-mute"
+              >
                 Password
               </label>
               <input

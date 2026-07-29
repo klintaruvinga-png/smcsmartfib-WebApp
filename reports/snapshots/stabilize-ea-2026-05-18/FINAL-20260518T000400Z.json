@@ -40,7 +40,9 @@
     ],
     "passing": true,
     "failures": [],
-    "warnings": ["9 pre-existing ESLint warnings in UI components (react-hooks, react-refresh) — out of scope; carried from prior sprints"]
+    "warnings": [
+      "9 pre-existing ESLint warnings in UI components (react-hooks, react-refresh) — out of scope; carried from prior sprints"
+    ]
   },
   "ea_integration_status": {
     "market_stream_route": "POST /wp-json/sniper/v1/ea/market-stream",

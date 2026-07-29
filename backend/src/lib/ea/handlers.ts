@@ -2,7 +2,9 @@ import { z } from "zod";
 import { createFibLevel, type FibLevelInput } from "../db/queries";
 import type { FibFamily, FibTimeframe } from "../db/schema";
 
-const VALID_RATIOS = [-200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300];
+const VALID_RATIOS = [
+  -200, -162.5, -100, -62.5, -25, 0, 25, 50, 62.5, 75, 100, 125, 162.5, 200, 262.5, 300,
+];
 
 const levelEntrySchema = z.object({ ratio: z.number(), price: z.number() });
 const tfEntrySchema = z.object({
@@ -17,7 +19,11 @@ const fibLevelSchema = z.object({
 });
 
 export class EaEndpointError extends Error {
-  constructor(public statusCode: number, message: string, public data?: unknown) {
+  constructor(
+    public statusCode: number,
+    message: string,
+    public data?: unknown,
+  ) {
     super(message);
     this.name = "EaEndpointError";
   }
@@ -71,7 +77,7 @@ export async function submitEaFibLevels(eaApiKey: string, rawBody: unknown) {
         tfEntry.timeframe as FibTimeframe,
         null,
         batch,
-        calculatedAt ? new Date(calculatedAt) : undefined
+        calculatedAt ? new Date(calculatedAt) : undefined,
       );
       inserted += batch.length;
     } catch {

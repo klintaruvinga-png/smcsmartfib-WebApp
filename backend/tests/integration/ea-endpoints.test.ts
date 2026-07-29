@@ -39,7 +39,9 @@ describe("EA fib-levels endpoint", () => {
   });
 
   it("invalid payload (zod)", async () => {
-    const err = await submitEaFibLevels("key", { symbol: "", levels: [] } as unknown).catch((e) => e);
+    const err = await submitEaFibLevels("key", { symbol: "", levels: [] } as unknown).catch(
+      (e) => e,
+    );
     expect(err).toBeInstanceOf(EaEndpointError);
     expect((err as EaEndpointError).statusCode).toBe(400);
   });

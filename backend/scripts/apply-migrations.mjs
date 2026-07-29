@@ -19,13 +19,10 @@ import { dirname, join } from "node:path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const migrationsDir = join(__dirname, "..", "src", "lib", "db", "migrations");
 
-const connectionString =
-  process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL || "";
+const connectionString = process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL || "";
 
 if (!connectionString) {
-  console.error(
-    "[apply-migrations] DIRECT_DATABASE_URL / DATABASE_URL is not set. Aborting."
-  );
+  console.error("[apply-migrations] DIRECT_DATABASE_URL / DATABASE_URL is not set. Aborting.");
   process.exit(1);
 }
 
@@ -55,19 +52,24 @@ async function main() {
   }
 
   // Verify
-  const REQUIRED_TABLES = ['users', 'fib_levels', 'ea_sessions', 'refresh_sessions', 'trades', 'risk_limits'];
+  const REQUIRED_TABLES = [
+    "users",
+    "fib_levels",
+    "ea_sessions",
+    "refresh_sessions",
+    "trades",
+    "risk_limits",
+  ];
   const tables = await sql.unsafe(
     `SELECT table_name FROM information_schema.tables
      WHERE table_schema = 'public'
        AND table_name IN ('users','fib_levels','ea_sessions','refresh_sessions','trades','risk_limits')
-     ORDER BY table_name`
+     ORDER BY table_name`,
   );
   const foundTables = tables.map((t) => t.table_name);
-  console.log(
-    `[apply-migrations] Present tables: ${foundTables.join(", ") || "(none)"}`
-  );
+  console.log(`[apply-migrations] Present tables: ${foundTables.join(", ") || "(none)"}`);
 
-  const missingTables = REQUIRED_TABLES.filter(t => !foundTables.includes(t));
+  const missingTables = REQUIRED_TABLES.filter((t) => !foundTables.includes(t));
   if (missingTables.length > 0) {
     await sql.end();
     throw new Error(`Missing required tables: ${missingTables.join(", ")}`);

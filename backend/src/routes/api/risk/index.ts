@@ -25,10 +25,14 @@ export default defineEventHandler(async (event) => {
       });
     }
     const patch: Record<string, unknown> = {};
-    if (parsed.data.dailyLossLimit !== undefined) patch.dailyLossLimit = String(parsed.data.dailyLossLimit);
-    if (parsed.data.maxOpenPositions !== undefined) patch.maxOpenPositions = String(parsed.data.maxOpenPositions);
-    if (parsed.data.maxPositionSize !== undefined) patch.maxPositionSize = String(parsed.data.maxPositionSize);
-    if (parsed.data.maxPerSymbolExposure !== undefined) patch.maxPerSymbolExposure = String(parsed.data.maxPerSymbolExposure);
+    if (parsed.data.dailyLossLimit !== undefined)
+      patch.dailyLossLimit = String(parsed.data.dailyLossLimit);
+    if (parsed.data.maxOpenPositions !== undefined)
+      patch.maxOpenPositions = String(parsed.data.maxOpenPositions);
+    if (parsed.data.maxPositionSize !== undefined)
+      patch.maxPositionSize = String(parsed.data.maxPositionSize);
+    if (parsed.data.maxPerSymbolExposure !== undefined)
+      patch.maxPerSymbolExposure = String(parsed.data.maxPerSymbolExposure);
     return await upsertRiskLimits(payload.sub, patch as any);
   }
 

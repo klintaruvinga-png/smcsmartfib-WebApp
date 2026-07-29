@@ -4,8 +4,8 @@ import { registerUser, AuthError } from "../../../lib/auth/handlers";
 export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event);
-    if (!body || typeof body !== 'object') {
-      throw createError({ statusCode: 400, message: 'Request body is required' });
+    if (!body || typeof body !== "object") {
+      throw createError({ statusCode: 400, message: "Request body is required" });
     }
     const { email, password, username } = body;
     return await registerUser(email, password, username, {

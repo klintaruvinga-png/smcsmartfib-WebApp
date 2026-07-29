@@ -11,6 +11,7 @@ model: "Claude Haiku 4.5"
 You are performing a **comprehensive full-stack inspection, validation, hardening, and surgical repair** of the SMC SuperFIB codebase.
 
 Your scope spans:
+
 - **Pine indicator** (TradingView indicator logic)
 - **WordPress/PHP backend** (data layer, sync engine, signal generation)
 - **REST API endpoints** (data contracts, validation, schema)
@@ -88,6 +89,7 @@ Run **all** of these passes in order:
 ### PASS 1 — Runtime & Stability Scan
 
 Search for:
+
 - Runtime exceptions and unhandled errors
 - Silent failures and empty catch blocks
 - Promise chains swallowing errors
@@ -105,6 +107,7 @@ Search for:
 ### PASS 2 — Wiring & Hook Audit
 
 Search for:
+
 - Event listeners attached to missing DOM IDs
 - DOM IDs referenced in JS but absent from templates
 - Buttons with no working handlers
@@ -121,6 +124,7 @@ Search for:
 ### PASS 3 — Data Contract Verification
 
 Verify parity across Pine ↔ Backend ↔ Dashboard:
+
 - Missing fields in any layer
 - Renamed fields across boundaries
 - Type mismatches
@@ -137,6 +141,7 @@ Verify parity across Pine ↔ Backend ↔ Dashboard:
 ### PASS 4 — Refresh & Stale-State Audit
 
 Inspect all refresh loops, polling systems, price fetchers, freshness logic:
+
 - Timestamp handling correctness
 - Stagnation detection
 - Auto-refresh cadence guards
@@ -147,6 +152,7 @@ Inspect all refresh loops, polling systems, price fetchers, freshness logic:
 - Last-updated logic
 
 Specifically detect:
+
 - Fake-live states
 - Fetch-time mistaken for quote-time
 - Frozen prices marked live
@@ -159,6 +165,7 @@ Specifically detect:
 ### PASS 5 — Signal Engine Integrity Audit
 
 Verify:
+
 - Signal readiness conditions
 - Regime gate correctness
 - Chop-block correctness
@@ -173,6 +180,7 @@ Verify:
 - Live signal hydration
 
 Flag any path where:
+
 - Signal engine falsely reports LIVE
 - Signal engine falsely reports STALE
 - Signal eligibility is based on stale prices
@@ -182,6 +190,7 @@ Flag any path where:
 ### PASS 6 — Parity Audit
 
 Verify Pine, backend, and dashboard remain aligned for:
+
 - Fib anchors and levels
 - Swing logic
 - Premium/discount zones
@@ -196,6 +205,7 @@ Verify Pine, backend, and dashboard remain aligned for:
 ### PASS 7 — Cleanup Sweep
 
 Find and flag:
+
 - Dead code
 - Duplicate logic
 - Competing implementations
@@ -209,6 +219,7 @@ Find and flag:
 - Commented-out experimental systems
 
 **Only remove code if:**
+
 - It is provably unused, OR
 - It duplicates active logic, OR
 - It introduces risk/confusion
@@ -254,6 +265,7 @@ Once inspection and patching are complete, you MUST produce a report following t
 ### 1. EXECUTIVE SUMMARY
 
 Provide:
+
 - Overall system health
 - Critical findings
 - Major stale-data risks
@@ -268,6 +280,7 @@ Provide:
 Group by category (refresh/stale-data, wiring, data contracts, dead code, conditional logic, duplicated logic, parity drift, cleanup, stability):
 
 For each issue:
+
 - **File(s)**: Where the issue was found
 - **Layer**: Pine | PHP | REST | JS | HTML | CSS | Config
 - **Severity**: CRITICAL | HIGH | MEDIUM | LOW
@@ -279,6 +292,7 @@ For each issue:
 ### 3. SURGICAL FIXES APPLIED
 
 For every applied fix:
+
 - **Fixes**: What issue(s) this addresses
 - **Files changed**: Exact files modified
 - **Root cause addressed**: Why this fix works
@@ -293,6 +307,7 @@ For every applied fix:
 ### 4. PARITY VERIFICATION RESULTS
 
 State explicitly whether Pine, backend, and dashboard are aligned for:
+
 - Fib calculations
 - Regime logic
 - Gate logic
@@ -303,6 +318,7 @@ State explicitly whether Pine, backend, and dashboard are aligned for:
 - Dashboard rendering
 
 Identify:
+
 - Fully aligned systems
 - Partially drifting systems
 - High-risk parity gaps
@@ -310,6 +326,7 @@ Identify:
 ### 5. REMAINING RISKS
 
 List unresolved or intentionally deferred risks:
+
 - Why it was not changed
 - What future refactor may be needed
 - Risk if left unchanged
@@ -317,6 +334,7 @@ List unresolved or intentionally deferred risks:
 ### 6. REGRESSION TEST CHECKLIST
 
 Provide explicit regression checks for:
+
 - Price refresh
 - Stagnation detection
 - Signal readiness
@@ -356,6 +374,7 @@ Identify risky files/functions/endpoints requiring separate approval before majo
 **Do NOT stop at analysis.**
 
 You MUST:
+
 - Scan,
 - Verify,
 - Patch,

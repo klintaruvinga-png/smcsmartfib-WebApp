@@ -83,7 +83,8 @@ import {
   mockUserProgress,
 } from "@/mocks/sniperData";
 
-const DEFAULT_BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+const DEFAULT_BACKEND_URL =
+  import.meta.env.VITE_API_URL || "https://smcsuperfibwebapp.klintaruvinga.workers.dev/api";
 
 // Default to LIVE backend. Only use mock data when explicitly opted in via
 // VITE_SNIPER_MOCK_MODE=true. Previously this defaulted to mock in dev, which

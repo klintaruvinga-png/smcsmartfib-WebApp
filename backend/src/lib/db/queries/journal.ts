@@ -8,8 +8,7 @@ import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { db } from "../index";
 import { trades, type NewTrade, type Trade } from "../schema";
 
-const startOfToday = () =>
-  sql`date_trunc('day', now() AT TIME ZONE 'UTC')`;
+const startOfToday = () => sql`date_trunc('day', now() AT TIME ZONE 'UTC')`;
 
 export async function insertTrade(input: NewTrade): Promise<Trade> {
   const [row] = await db.insert(trades).values(input).returning();
@@ -18,7 +17,7 @@ export async function insertTrade(input: NewTrade): Promise<Trade> {
 
 export async function listTrades(
   userId: string,
-  opts: { limit?: number; status?: "open" | "closed" | "cancelled" } = {}
+  opts: { limit?: number; status?: "open" | "closed" | "cancelled" } = {},
 ): Promise<Trade[]> {
   const conditions = [eq(trades.userId, userId)];
   if (opts.status) conditions.push(eq(trades.status, opts.status));
@@ -30,10 +29,7 @@ export async function listTrades(
     .limit(opts.limit ?? 100);
 }
 
-export async function getTrade(
-  userId: string,
-  id: number
-): Promise<Trade | undefined> {
+export async function getTrade(userId: string, id: number): Promise<Trade | undefined> {
   const [row] = await db
     .select()
     .from(trades)
@@ -44,7 +40,7 @@ export async function getTrade(
 export async function updateTrade(
   userId: string,
   id: number,
-  patch: Partial<NewTrade>
+  patch: Partial<NewTrade>,
 ): Promise<Trade | undefined> {
   const [row] = await db
     .update(trades)
@@ -82,8 +78,8 @@ export async function getTodaysRealizedPnl(userId: string): Promise<number> {
       and(
         eq(trades.userId, userId),
         eq(trades.status, "closed"),
-        gte(trades.closedAt, startOfToday())
-      )
+        gte(trades.closedAt, startOfToday()),
+      ),
     );
   return Number(row?.total ?? 0);
 }

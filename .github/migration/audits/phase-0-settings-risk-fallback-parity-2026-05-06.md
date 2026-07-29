@@ -22,11 +22,11 @@ This audit covered fallback-authority behavior in backend settings/risk sanitiza
 
 ### Fib Engine (Phase 4)
 
-| Metric | Pine Value | MT5 Value | Match | Accuracy |
-|--------|-----------|----------|-------|----------|
-| Unsupported/missing reference pip-value fallback | Instrument default preserved | Instrument default preserved | YES | 100% |
-| Pip fallback return type | Numeric | Numeric | YES | 100% |
-| **Fib Parity Score** | - | - | - | **100%** |
+| Metric                                           | Pine Value                   | MT5 Value                    | Match | Accuracy |
+| ------------------------------------------------ | ---------------------------- | ---------------------------- | ----- | -------- |
+| Unsupported/missing reference pip-value fallback | Instrument default preserved | Instrument default preserved | YES   | 100%     |
+| Pip fallback return type                         | Numeric                      | Numeric                      | YES   | 100%     |
+| **Fib Parity Score**                             | -                            | -                            | -     | **100%** |
 
 **Observations**: No fib anchor or level formulas changed. The parity correction is strictly on fallback truth when reference mids are unavailable.
 
@@ -34,11 +34,11 @@ This audit covered fallback-authority behavior in backend settings/risk sanitiza
 
 ### Regime Engine (Phase 5)
 
-| Metric | Pine Classification | MT5 Classification | Match | Accuracy |
-|--------|-------------------|------------------|-------|----------|
-| Regime math in touched scope | Unchanged | Unchanged | YES | 100% |
-| Settings/risk fallback preservation | Caller default preserved | Caller default preserved | YES | 100% |
-| **Regime Parity Score** | - | - | - | **100%** |
+| Metric                              | Pine Classification      | MT5 Classification       | Match | Accuracy |
+| ----------------------------------- | ------------------------ | ------------------------ | ----- | -------- |
+| Regime math in touched scope        | Unchanged                | Unchanged                | YES   | 100%     |
+| Settings/risk fallback preservation | Caller default preserved | Caller default preserved | YES   | 100%     |
+| **Regime Parity Score**             | -                        | -                        | -     | **100%** |
 
 **Observations**: No regime formulas changed. This pass protects persisted configuration values from null drift during partial payload updates.
 
@@ -46,12 +46,12 @@ This audit covered fallback-authority behavior in backend settings/risk sanitiza
 
 ### Signal Engine (Phase 6)
 
-| Metric | Pine Signal | MT5 Signal | Match | Accuracy |
-|--------|------------|-----------|-------|----------|
-| Signal generation logic | Unchanged | Unchanged | YES | 100% |
-| Risk-profile overlapping field preservation | Backend default retained when omitted | Dashboard receives preserved values | YES | 100% |
-| Chart empty-state timestamp contract | Nullable when no candles exist | Nullable when no candles exist | YES | 100% |
-| **Signal Parity Score** | - | - | - | **100%** |
+| Metric                                      | Pine Signal                           | MT5 Signal                          | Match | Accuracy |
+| ------------------------------------------- | ------------------------------------- | ----------------------------------- | ----- | -------- |
+| Signal generation logic                     | Unchanged                             | Unchanged                           | YES   | 100%     |
+| Risk-profile overlapping field preservation | Backend default retained when omitted | Dashboard receives preserved values | YES   | 100%     |
+| Chart empty-state timestamp contract        | Nullable when no candles exist        | Nullable when no candles exist      | YES   | 100%     |
+| **Signal Parity Score**                     | -                                     | -                                   | -     | **100%** |
 
 **Observations**: Signal formulas were not modified. The parity improvement is in config and contract correctness, reducing the chance of downstream signal/risk drift from partial saves.
 
@@ -59,20 +59,20 @@ This audit covered fallback-authority behavior in backend settings/risk sanitiza
 
 ## Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-|-------|----------|-------|-----------|---------|
-| Undefined `$fallback_value` in backend fallback helpers | HIGH | 1 | Fixed in backend helper return paths and covered by PHP regression tests | No |
-| Chart `updatedAt` frontend contract remained non-nullable | MEDIUM | 1 | Fixed in TypeScript contract | No |
+| Issue                                                     | Severity | Count | Resolution                                                               | Blocker |
+| --------------------------------------------------------- | -------- | ----- | ------------------------------------------------------------------------ | ------- |
+| Undefined `$fallback_value` in backend fallback helpers   | HIGH     | 1     | Fixed in backend helper return paths and covered by PHP regression tests | No      |
+| Chart `updatedAt` frontend contract remained non-nullable | MEDIUM   | 1     | Fixed in TypeScript contract                                             | No      |
 
 ---
 
 ## Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-|------|-----------|--------|----------|
-| Full replay parity matrix | Not recomputed | This run targeted fallback and contract integrity only | YES |
-| Browser/live manual validation | Not completed | Sandbox run focused on code + regression tests | YES |
-| Bundle build verification | Not completed | Sandbox blocks child-process build validation | YES |
+| Item                           | Difference     | Reason                                                 | Accepted |
+| ------------------------------ | -------------- | ------------------------------------------------------ | -------- |
+| Full replay parity matrix      | Not recomputed | This run targeted fallback and contract integrity only | YES      |
+| Browser/live manual validation | Not completed  | Sandbox run focused on code + regression tests         | YES      |
+| Bundle build verification      | Not completed  | Sandbox blocks child-process build validation          | YES      |
 
 ---
 

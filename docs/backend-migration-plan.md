@@ -3,7 +3,7 @@
 **Status**: APPROVED (With Revisions)  
 **Date**: 2026-07-06  
 **Target Architecture**: Full-Stack TanStack Start / Nitro application running on Cloudflare Workers/Pages  
-**Database**: PostgreSQL (Supabase, Neon, or Managed PostgreSQL)  
+**Database**: PostgreSQL (Supabase, Neon, or Managed PostgreSQL)
 
 > **STRATEGY UPDATE (2026-07-17) — WordPress-Free.**
 > WordPress is **permanently down**, so the WordPress dual-write / shadow-sync / cutover
@@ -19,7 +19,7 @@
 
 ## 1. Overview & Objective
 
-With WordPress **permanently down**, the SMC SuperFib WebApp requires a new backend hosting model. Rather than deploying a separate API service, we will migrate all REST endpoints and ingestion handlers directly into the existing **TanStack Start** codebase. The new WordPress-free plan ([plans/backend-2-restoration-plan.md](../plans/backend-2-restoration-plan.md)) prioritizes restoring frontend functionality via a service-oriented architecture. 
+With WordPress **permanently down**, the SMC SuperFib WebApp requires a new backend hosting model. Rather than deploying a separate API service, we will migrate all REST endpoints and ingestion handlers directly into the existing **TanStack Start** codebase. The new WordPress-free plan ([plans/backend-2-restoration-plan.md](../plans/backend-2-restoration-plan.md)) prioritizes restoring frontend functionality via a service-oriented architecture.
 
 Because TanStack Start compiles to a serverless Nitro server, it runs natively on **Cloudflare Workers** (matching the current wrangler configuration). This creates a single unified repository and deployment pipeline for both frontend and backend.
 
@@ -274,21 +274,21 @@ All REST API paths are implemented as TS endpoints nested inside `src/routes/api
 Path** is the live target, and **Service** shows the owning domain service from the
 BACKEND-2 plan.
 
-| Legacy WP route (down) | Start API Path | Service / Handler |
-|------------------------|----------------|------------------|
-| `GET /health` | `GET /api/health` | `TelemetryService.getEngineHealth` |
-| `GET /admin/soak-report` | `GET /api/admin/soak-report` | Admin/soak service |
-| `GET /snapshot/unified` | `GET /api/snapshot/unified` | `SnapshotService.getUnifiedSnapshot` (BACKEND-2c) |
-| `GET /charts` | `GET /api/charts` | `ChartService.getChartSnapshot` (BACKEND-2c) |
-| `GET /session` | `GET /api/session` | Market session detection (BACKEND-2c) |
-| `GET /live-signals` | `GET /api/signals` | `SignalService.getLiveSignals` (BACKEND-2d) |
-| `GET /ladders` | `GET /api/ladders` | `SignalService.getLadders` (BACKEND-2d) |
-| `GET /account-telemetry` | `GET /api/account-telemetry` | `TelemetryService.getAccountTelemetry` (BACKEND-2d) |
-| `POST /user/settings` | `GET/PUT/POST/PATCH /api/user/settings` | Settings service (BACKEND-1, done) |
-| `POST /ea/market-stream` | `POST /api/ea/market-stream` | `MarketDataService.ingestMarketStream` (BACKEND-2e) |
-| `POST /ea/heartbeat` | `POST /api/ea/heartbeat` | `TelemetryService.recordHeartbeat` (BACKEND-2e) |
-| `POST /ea/account-sync` | `POST /api/ea/account-sync` | `TelemetryService.syncAccount` (BACKEND-2e) |
-| `POST /ea/symbol-sync` | `POST /api/ea/symbol-sync` | `MarketDataService.syncSymbols` (BACKEND-2e) |
+| Legacy WP route (down)   | Start API Path                          | Service / Handler                                   |
+| ------------------------ | --------------------------------------- | --------------------------------------------------- |
+| `GET /health`            | `GET /api/health`                       | `TelemetryService.getEngineHealth`                  |
+| `GET /admin/soak-report` | `GET /api/admin/soak-report`            | Admin/soak service                                  |
+| `GET /snapshot/unified`  | `GET /api/snapshot/unified`             | `SnapshotService.getUnifiedSnapshot` (BACKEND-2c)   |
+| `GET /charts`            | `GET /api/charts`                       | `ChartService.getChartSnapshot` (BACKEND-2c)        |
+| `GET /session`           | `GET /api/session`                      | Market session detection (BACKEND-2c)               |
+| `GET /live-signals`      | `GET /api/signals`                      | `SignalService.getLiveSignals` (BACKEND-2d)         |
+| `GET /ladders`           | `GET /api/ladders`                      | `SignalService.getLadders` (BACKEND-2d)             |
+| `GET /account-telemetry` | `GET /api/account-telemetry`            | `TelemetryService.getAccountTelemetry` (BACKEND-2d) |
+| `POST /user/settings`    | `GET/PUT/POST/PATCH /api/user/settings` | Settings service (BACKEND-1, done)                  |
+| `POST /ea/market-stream` | `POST /api/ea/market-stream`            | `MarketDataService.ingestMarketStream` (BACKEND-2e) |
+| `POST /ea/heartbeat`     | `POST /api/ea/heartbeat`                | `TelemetryService.recordHeartbeat` (BACKEND-2e)     |
+| `POST /ea/account-sync`  | `POST /api/ea/account-sync`             | `TelemetryService.syncAccount` (BACKEND-2e)         |
+| `POST /ea/symbol-sync`   | `POST /api/ea/symbol-sync`              | `MarketDataService.syncSymbols` (BACKEND-2e)        |
 
 ---
 

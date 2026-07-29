@@ -22,13 +22,13 @@ This audit covered the backend truth path that decides whether a symbol is `live
 
 ### Freshness / Authority (Phase 0)
 
-| Metric | Expected Truth | Backend After Patch | Match | Accuracy |
-|--------|----------------|---------------------|-------|----------|
-| EA-owned symbol with stale MT5 quote + stale TD cooldown | `stale` | `stale` | YES | 100% |
-| EA-owned symbol engine blocker with stale MT5 quote + stale TD cooldown | `PRICE_STALE` | `PRICE_STALE` | YES | 100% |
-| All-MT5 watchlist with missing Twelve Data key | Not `blocked` | Not `blocked` | YES | 100% |
-| Non-MT5 symbol with real Twelve Data cooldown | `rate-limited` | `rate-limited` | YES | 100% |
-| **Freshness / Authority Score** | - | - | - | **100%** |
+| Metric                                                                  | Expected Truth | Backend After Patch | Match | Accuracy |
+| ----------------------------------------------------------------------- | -------------- | ------------------- | ----- | -------- |
+| EA-owned symbol with stale MT5 quote + stale TD cooldown                | `stale`        | `stale`             | YES   | 100%     |
+| EA-owned symbol engine blocker with stale MT5 quote + stale TD cooldown | `PRICE_STALE`  | `PRICE_STALE`       | YES   | 100%     |
+| All-MT5 watchlist with missing Twelve Data key                          | Not `blocked`  | Not `blocked`       | YES   | 100%     |
+| Non-MT5 symbol with real Twelve Data cooldown                           | `rate-limited` | `rate-limited`      | YES   | 100%     |
+| **Freshness / Authority Score**                                         | -              | -                   | -     | **100%** |
 
 **Observations**: The core correction is semantic. MT5 authority is now treated as source ownership, not just momentary live tick presence, which prevents stale Twelve Data state from leaking back into EA-owned symbols.
 
@@ -36,12 +36,12 @@ This audit covered the backend truth path that decides whether a symbol is `live
 
 ### Signal / Blocker Truth (Phase 6 dependency)
 
-| Metric | Expected Truth | Backend After Patch | Match | Accuracy |
-|--------|----------------|---------------------|-------|----------|
-| EA-owned stale quote blocker | MT5 stale path | MT5 stale path | YES | 100% |
-| EA-owned stale quote should not emit `RATE_LIMITED` | `RATE_LIMITED` absent | `RATE_LIMITED` absent | YES | 100% |
-| Non-MT5 guard on Twelve Data snapshot | `PRICE_NOT_MT5_FRESH` | `PRICE_NOT_MT5_FRESH` | YES | 100% |
-| **Signal / Blocker Score** | - | - | - | **100%** |
+| Metric                                              | Expected Truth        | Backend After Patch   | Match | Accuracy |
+| --------------------------------------------------- | --------------------- | --------------------- | ----- | -------- |
+| EA-owned stale quote blocker                        | MT5 stale path        | MT5 stale path        | YES   | 100%     |
+| EA-owned stale quote should not emit `RATE_LIMITED` | `RATE_LIMITED` absent | `RATE_LIMITED` absent | YES   | 100%     |
+| Non-MT5 guard on Twelve Data snapshot               | `PRICE_NOT_MT5_FRESH` | `PRICE_NOT_MT5_FRESH` | YES   | 100%     |
+| **Signal / Blocker Score**                          | -                     | -                     | -     | **100%** |
 
 **Observations**: No signal math changed. The parity improvement is exclusively in blocker truth and operator diagnostics.
 
@@ -49,19 +49,19 @@ This audit covered the backend truth path that decides whether a symbol is `live
 
 ## Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-|-------|----------|-------|-----------|---------|
-| EA authority mis-modeled as live-only freshness | HIGH | 1 | Fixed in health, quote, candle, and blocker paths | No |
+| Issue                                           | Severity | Count | Resolution                                        | Blocker |
+| ----------------------------------------------- | -------- | ----- | ------------------------------------------------- | ------- |
+| EA authority mis-modeled as live-only freshness | HIGH     | 1     | Fixed in health, quote, candle, and blocker paths | No      |
 
 ---
 
 ## Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-|------|-----------|--------|----------|
-| 24h/72h live soak | Not completed | Focused patch pass | YES |
-| M1 -> 15min sparse-history validation | Not completed | Separate Phase 0 verification track | YES |
-| Full Pine/backend/dashboard replay parity | Not recomputed | No signal math changed | YES |
+| Item                                      | Difference     | Reason                              | Accepted |
+| ----------------------------------------- | -------------- | ----------------------------------- | -------- |
+| 24h/72h live soak                         | Not completed  | Focused patch pass                  | YES      |
+| M1 -> 15min sparse-history validation     | Not completed  | Separate Phase 0 verification track | YES      |
+| Full Pine/backend/dashboard replay parity | Not recomputed | No signal math changed              | YES      |
 
 ---
 

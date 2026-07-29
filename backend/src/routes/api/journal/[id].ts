@@ -1,10 +1,6 @@
 import { defineEventHandler, readBody, createError, setHeader, getRouterParam } from "h3";
 import { requireAuth } from "../../../lib/auth/middleware";
-import {
-  getTrade,
-  updateTrade,
-  deleteTrade,
-} from "../../../lib/db/queries/journal";
+import { getTrade, updateTrade, deleteTrade } from "../../../lib/db/queries/journal";
 import { updateTradeSchema } from "../../../lib/risk/schemas";
 
 export default defineEventHandler(async (event) => {

@@ -17,12 +17,12 @@ The historical observations below remain intact as evidence of what was running 
 
 ## Operator Actions Completed
 
-| Task | Status | Evidence |
-|------|--------|----------|
-| Deploy `Phase-4-Implementation` EA build to live MT5 terminal | COMPLETE | Operator confirmed deployed live |
-| Start Phase 4 live corpus accumulation | COMPLETE | `FibEngine` collecting live corpus for EURUSD/USDJPY/XAUUSD parity gate |
-| Capture T0 admin soak baseline | COMPLETE | Exported artifact: `.github/migration/phase-updates/phase-4-30-day-2026-05-27.md` |
-| Clear Phase 3 conditional closeout blocker (`RISK-06`) | COMPLETE | Baseline checkpoint present in export; risk register updated |
+| Task                                                          | Status   | Evidence                                                                          |
+| ------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------- |
+| Deploy `Phase-4-Implementation` EA build to live MT5 terminal | COMPLETE | Operator confirmed deployed live                                                  |
+| Start Phase 4 live corpus accumulation                        | COMPLETE | `FibEngine` collecting live corpus for EURUSD/USDJPY/XAUUSD parity gate           |
+| Capture T0 admin soak baseline                                | COMPLETE | Exported artifact: `.github/migration/phase-updates/phase-4-30-day-2026-05-27.md` |
+| Clear Phase 3 conditional closeout blocker (`RISK-06`)        | COMPLETE | Baseline checkpoint present in export; risk register updated                      |
 
 ---
 

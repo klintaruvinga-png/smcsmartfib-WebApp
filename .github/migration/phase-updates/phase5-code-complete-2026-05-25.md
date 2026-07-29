@@ -3,7 +3,7 @@
 **Event**: Phase 5 (Regime & Chop Engine) code implementation complete  
 **Date**: 2026-05-25  
 **Triggered by**: Pre-emptive implementation during Phase 4 live corpus soak  
-**Author**: Claude Code (assisted)  
+**Author**: Claude Code (assisted)
 
 ---
 
@@ -18,6 +18,7 @@ Phase 4 gate clears, Phase 5 deployment can start immediately without a new code
 ## What Was Done
 
 ### MT5 (Track A)
+
 - **Created `mt5/RegimeEngine.mqh`** (Phase 5 MT5 regime engine)
   - EMA-20 on D1 → HTF bias (BULL/BEAR/TRANSITIONAL)
   - Efficiency-ratio chop score on H1 → LTF regime (TRENDING/RANGING/CHOP)
@@ -30,26 +31,28 @@ Phase 4 gate clears, Phase 5 deployment can start immediately without a new code
   - Phase 7 `executionEngine.OnPeriodic()` hooked (no-op until gate cleared)
 
 ### Backend (Track B)
+
 - **New table**: `wp_smc_sf_regime_snapshots` (UNIQUE on user_id, symbol)
 - **New route**: `POST /ea/regime-snapshot` — batch regime ingestion, EA bridge auth
 - **New route**: `GET /market-data/regime` — dashboard regime read
 
 ### Readiness Package
+
 - **Created `PHASE5_IMPLEMENTATION.md`** — full spec, data flow, parity targets, checklist
 
 ---
 
 ## Phase 5 Gate Status
 
-| Gate | Status |
-|------|--------|
-| Code implementation | ✅ COMPLETE |
-| DB schema | ✅ COMPLETE |
-| REST endpoints | ✅ COMPLETE |
-| MT5 integration | ✅ COMPLETE |
-| Phase 4 prerequisite | 🔄 IN-PROGRESS (live soak) |
-| Live regime corpus | ⏳ PENDING (operator, post-Phase-4) |
-| Regime parity validation | ⏳ PENDING |
+| Gate                     | Status                              |
+| ------------------------ | ----------------------------------- |
+| Code implementation      | ✅ COMPLETE                         |
+| DB schema                | ✅ COMPLETE                         |
+| REST endpoints           | ✅ COMPLETE                         |
+| MT5 integration          | ✅ COMPLETE                         |
+| Phase 4 prerequisite     | 🔄 IN-PROGRESS (live soak)          |
+| Live regime corpus       | ⏳ PENDING (operator, post-Phase-4) |
+| Regime parity validation | ⏳ PENDING                          |
 
 ---
 

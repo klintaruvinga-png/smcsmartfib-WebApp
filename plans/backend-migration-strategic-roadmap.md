@@ -19,7 +19,8 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
 
 **Strategic Approach (revised 2026-07-17)**: WordPress is permanently down, so the backend is restored directly via the WordPress-free BACKEND-2 plan — no shadow-mode sync, no cutover. Complete the backend foundation (BACKEND-0/1) and the service-oriented BACKEND-2 restoration in parallel with Phase 4 validation. This prevents debugging two major systems simultaneously while maintaining project momentum.
 
-**Key Dependencies**: 
+**Key Dependencies**:
+
 - BACKEND-2 (WordPress-Free Restoration) is gated only on BACKEND-1 completion, not on Phase 4
 - No WordPress cutover — compatibility is removed outright in BACKEND-2 Phase 1
 - MT5 engine validation (Phase 4) remains a separate track; backend restoration does not wait for it
@@ -29,13 +30,16 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
 ## Phase 4 Context & Migration Coordination
 
 ### Current Phase 4 Status
+
 - **MT5 Fib Engine**: Code complete, deployed live, T0 soak baseline captured (2026-05-27)
 - **Parity Gate**: NOT PASSED - Best attempt 51.04% with 47 critical mismatches (anchor detection issues)
 - **Operational Tests**: Weekend gap and sparse-data scenarios NOT completed
 - **Governance**: No code changes permitted during backend migration
 
 ### Coordination Strategy
+
 **During Phase 4 Testing** (Current):
+
 - ✅ Build backend APIs (auth, endpoints, infrastructure)
 - ✅ Complete dashboard integration work
 - ✅ Prepare deployment infrastructure
@@ -43,12 +47,14 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
 - ❌ Avoid MT5 engine modifications
 
 **BACKEND-2 Execution Track (parallel with Phase 4)**:
+
 - ✅ Execute BACKEND-2 (MT5 integration — read-only ingest)
 - ✅ Execute the core-trading endpoints (signals, ladders, health, account-telemetry)
 - ⌫ ~~Begin shadow-mode sync~~ — RETIRED (WordPress down)
 - ⌫ ~~Plan controlled cutover~~ — RETIRED (no WordPress to cut over from)
 
 **If Phase 4 Uncovers Issues**:
+
 - Pause backend migration at BACKEND-1
 - Focus resources on MT5 engine fixes
 - Resume backend migration once Phase 4 stabilizes
@@ -62,6 +68,7 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
 **Objective**: Finish BACKEND-0 and BACKEND-1 to establish production-ready backend foundation.
 
 #### BACKEND-0 Completion (Days 1-3)
+
 - [x] **Shared Contracts Package** (Priority: HIGH) — **DONE**: `packages/contracts/` already exists with `src/index.ts`, `src/normalizers.ts`, and a built `dist/`. Runtime adoption remains gated on Phase 5/6 per migration-status.md.
   - Create `packages/contracts/` with shared TypeScript interfaces
   - Define API contracts for fib-levels, users, sessions
@@ -83,6 +90,7 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
   - **Evidence**: `npm run typecheck` exits cleanly
 
 #### BACKEND-1 Completion (Days 4-7)
+
 - [x] **Settings Endpoint** (Priority: HIGH) — **DONE** (2026-07-17, PR #430)
   - `GET /api/user/settings` - retrieve user preferences
   - `PUT`/`POST`/`PATCH` `/api/user/settings` - update user preferences (transaction with row-locking `SELECT ... FOR UPDATE` + application deep merge)
@@ -104,6 +112,7 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
   - **Evidence**: `/docs/api` endpoint available
 
 **Success Criteria**:
+
 - All BACKEND-0/BACKEND-1 integration tests passing (47 tests)
 - Shared contracts package consumable by frontend
 - Settings endpoint achieves WordPress API/schema parity
@@ -117,6 +126,7 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
 **Objective**: Execute the WordPress-free BACKEND-2 restoration (service layer + app-boot/core-trading endpoints + MT5 read-only ingest). See [`backend-2-restoration-plan.md`](./backend-2-restoration-plan.md).
 
 #### BACKEND-2: WordPress-Free Restoration (was "MT5 Integration")
+
 **Dependency**: BACKEND-1 complete (Phase 4 NOT required)
 
 - [ ] **MT5 Read-Only Ingestion** (Priority: CRITICAL) — replaces dual-write
@@ -139,6 +149,7 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
   - **Evidence**: Services unit-tested in isolation; routes are thin wrappers
 
 #### BACKEND-3: Signal & Plan Endpoints (folded into BACKEND-2 Phase 4)
+
 **Dependency**: Now part of BACKEND-2 (no separate gate). Per [`backend-2-restoration-plan.md`](./backend-2-restoration-plan.md) these are delivered as `GET /api/signals`, `GET /api/ladders`, etc., backed by `SignalService`.
 
 - [ ] **Signal Processing Endpoints** (Priority: HIGH)
@@ -153,12 +164,14 @@ This roadmap coordinates the WordPress → Node.js/TanStack Start backend migrat
   - **Evidence**: Regime/gate state renders in snapshot
 
 #### Shadow Mode Setup (Week 6) — RETIRED (WordPress permanently down)
+
 No WordPress source exists to sync from or validate against. The WordPress client,
 shadow sync service, scheduler, and `GET /api/admin/shadow-validation` are **removed
 from scope**. Data migration is handled by BACKEND-2 Phase 6 (import a WordPress backup
 if one exists, otherwise seed test data).
 
 **Success Criteria** (revised, WordPress-free):
+
 - MT5 read-only ingestion operational (market-stream, heartbeat, account-sync, symbol-sync)
 - All signal/plan endpoints functional
 - Service layer present; routes are thin wrappers
@@ -172,9 +185,11 @@ if one exists, otherwise seed test data).
 **Objective**: Complete the WordPress-free restoration (BACKEND-2) and harden the service-oriented architecture. The old BACKEND-4 (cutover) and BACKEND-5 (WP decommission) are obsolete — there is no WordPress to cut over from or decommission via migration; WordPress compatibility is removed outright in BACKEND-2 Phase 1.
 
 #### BACKEND-4 / BACKEND-5 — SUPERSEDED (no WordPress cutover or decommission phase)
+
 The previously planned Transition & Cutover and Architecture Refactoring phases assumed a
 live WordPress to migrate away from. With WordPress permanently down, those phases are
 removed. Their useful content is redistributed:
+
 - **Data migration** → BACKEND-2 Phase 6 (import WordPress backup if available, else seed).
 - **Architecture refactoring (service layer, DI)** → BACKEND-2 Phase 2 (service foundation).
 - **Performance optimization / security hardening** → ongoing post-restoration work; HMAC-SHA256 EA auth is deferred (JWT + `X-EA-API-Key` is the model).
@@ -197,6 +212,7 @@ removed. Their useful content is redistributed:
   - **Evidence**: Security audit passes
 
 #### Cleanup & Monitoring (Week 11-12)
+
 **Dependency**: BACKEND-2 complete (post-restoration gate)
 
 - [ ] **Infrastructure Cleanup** (Priority: MEDIUM)
@@ -220,6 +236,7 @@ removed. Their useful content is redistributed:
   - **Evidence**: Documentation complete and reviewed
 
 **Success Criteria**:
+
 - WordPress fully decommissioned
 - All traffic migrated to TanStack backend
 - Performance targets met (p95 <200ms)
@@ -239,24 +256,28 @@ removed. Their useful content is redistributed:
 ### Shadow Mode Architecture (RETIRED)
 
 **Phase 1: Read-Only Shadow** (Week 6-7)
+
 - TanStack backend reads from WordPress via sync service
 - WordPress remains primary write target
 - TanStack validates data parity
 - No production traffic to TanStack
 
 **Phase 2: Dual-Write Shadow** (Week 7)
+
 - MT5 EA writes to both WordPress and TanStack
 - WordPress remains primary for dashboard reads
 - TanStack validates write parity
 - Gradual traffic shift to TanStack reads
 
 **Phase 3: Primary Cutover** (Week 8)
+
 - TanStack becomes primary write target
 - WordPress becomes fallback
 - Dashboard reads from TanStack
 - WordPress kept for rollback capability
 
 **Phase 4: Decommission** (Week 9-10)
+
 - WordPress completely removed
 - TanStack sole backend
 - WordPress infrastructure archived
@@ -264,18 +285,21 @@ removed. Their useful content is redistributed:
 ### Data Verification Strategy
 
 **Real-Time Validation**
+
 - Shadow validation endpoint runs every 5 minutes
 - Compares WordPress vs TanStack data
 - Alerts on any mismatches >0.1%
 - Automated rollback on critical mismatches
 
 **Batch Validation**
+
 - Daily full data comparison
 - Historical data integrity checks
 - Row count validation
 - Schema consistency validation
 
 **Manual Validation**
+
 - Weekly parity reports
 - Spot checks of critical data points
 - User acceptance testing
@@ -284,12 +308,14 @@ removed. Their useful content is redistributed:
 ### Rollback Strategy (RETIRED — no WordPress to roll back to)
 
 **Automatic Rollback Triggers**
+
 - Error rate >5% for 5 minutes
 - Data parity <99% for 10 minutes
 - Response time p95 >1s for 5 minutes
 - Database connection failures
 
 **Manual Rollback Procedure**
+
 1. Switch DNS back to WordPress
 2. Verify WordPress operational
 3. Investigate TanStack failure
@@ -298,6 +324,7 @@ removed. Their useful content is redistributed:
 6. Schedule retry cutover
 
 **Rollback Testing**
+
 - Test rollback procedures weekly during shadow mode
 - Document rollback times and success rates
 - Refine rollback procedures based on testing
@@ -305,6 +332,7 @@ removed. Their useful content is redistributed:
 ### Cutover Checklist (RETIRED)
 
 **Pre-Cutover** (24 hours before)
+
 - [ ] Shadow mode parity 100% for 7+ days
 - [ ] All automated tests passing
 - [ ] Rollback procedures tested and documented
@@ -313,6 +341,7 @@ removed. Their useful content is redistributed:
 - [ ] Monitoring and alerting configured
 
 **During Cutover** (Maintenance window)
+
 - [ ] Execute final WordPress → TanStack sync
 - [ ] Switch DNS to TanStack backend
 - [ ] Monitor error rates and response times
@@ -321,6 +350,7 @@ removed. Their useful content is redistributed:
 - [ ] Confirm rollback not needed
 
 **Post-Cutover** (24 hours after)
+
 - [ ] Monitor system health continuously
 - [ ] Validate data parity
 - [ ] Review error logs and metrics
@@ -331,6 +361,7 @@ removed. Their useful content is redistributed:
 ### Decommission Checklist (RETIRED)
 
 **Pre-Decommission** (1 week before)
+
 - [ ] TanStack backend stable for 14+ days
 - [ ] All traffic migrated to TanStack
 - [ ] No WordPress dependencies remaining
@@ -338,6 +369,7 @@ removed. Their useful content is redistributed:
 - [ ] Stakeholders approve decommission
 
 **During Decommission**
+
 - [ ] Disable WordPress write endpoints
 - [ ] Remove WordPress from load balancer
 - [ ] Stop WordPress services
@@ -345,6 +377,7 @@ removed. Their useful content is redistributed:
 - [ ] Clean up WordPress infrastructure
 
 **Post-Decommission**
+
 - [ ] Verify no WordPress references remain
 - [ ] Confirm cost savings (infrastructure)
 - [ ] Update documentation
@@ -357,17 +390,20 @@ removed. Their useful content is redistributed:
 ### Environments
 
 **Development** (Local)
+
 - Nitro dev server on localhost:3000
 - Local Supabase instance (via Docker)
 - Frontend `VITE_API_URL=http://localhost:3000/api` (no WordPress)
 - Environment: `.env.local`
 
 **Staging** (Cloudflare Workers)
+
 - Nitro build with Cloudflare preset
 - Supabase staging project
 - Environment: `.env.staging`
 
 **Production** (Cloudflare Workers)
+
 - Nitro build with Cloudflare preset
 - Supabase production project
 - Environment: `.env.production`
@@ -375,16 +411,19 @@ removed. Their useful content is redistributed:
 ### Secrets Management
 
 **Supabase**
+
 - `SUPABASE_URL` - Project URL
 - `SUPABASE_ANON_KEY` - Anonymous access key
 - `SUPABASE_SERVICE_ROLE_KEY` - Admin access key
 - `DATABASE_URL` - PostgreSQL connection string
 
 **Authentication**
+
 - `JWT_SECRET` - JWT signing secret
 - `EA_API_KEY` - MT5 EA authentication key (validated as `X-EA-API-Key`)
 
 **Cloudflare**
+
 - `CLOUDFLARE_ACCOUNT_ID` - Cloudflare account ID
 - `CLOUDFLARE_API_TOKEN` - Cloudflare API token
 
@@ -393,6 +432,7 @@ removed. Their useful content is redistributed:
 ### Cloudflare Workers Deployment
 
 **Build Configuration**
+
 ```bash
 # Build for Cloudflare Workers
 NITRO_PRESET=cloudflare-module npm run build
@@ -402,11 +442,13 @@ npx wrangler deploy
 ```
 
 **Configuration**
+
 - `wrangler.jsonc` - Cloudflare Workers configuration
 - `nitro.config.ts` - Nitro preset override
 - Environment variables via Cloudflare secrets
 
 **DNS Configuration**
+
 - API domain: `api.smartfib.com`
 - CNAME to Cloudflare Workers
 - SSL/TLS via Cloudflare
@@ -414,24 +456,28 @@ npx wrangler deploy
 ### Monitoring & Logging
 
 **Application Monitoring**
+
 - Datadog APM for performance monitoring
 - Custom metrics for API endpoints
 - Database query performance tracking
 - Error rate and latency monitoring
 
 **Error Tracking**
+
 - Sentry for error aggregation
 - Stack trace collection
 - User context tracking
 - Alert configuration
 
 **Log Aggregation**
+
 - Cloudflare Workers logs
 - Supabase query logs
 - Application logs via structured JSON
 - Log retention policy (30 days)
 
 **Health Checks**
+
 - `/api/health` endpoint
 - Database connectivity check
 - External service availability (MT5 EA reachability, optional)
@@ -440,6 +486,7 @@ npx wrangler deploy
 ### CI/CD Pipeline
 
 **GitHub Actions Workflow**
+
 ```yaml
 # .github/workflows/backend-deploy.yml
 on:
@@ -478,6 +525,7 @@ jobs:
 ```
 
 **Deployment Safety**
+
 - Automatic tests must pass before deployment
 - Staging deployment required before production
 - Manual approval for production deployments
@@ -490,23 +538,29 @@ jobs:
 ### Critical Risks
 
 **Risk 1: Phase 4 Parity Gate Fails**
+
 - **Impact**: Backend migration blocked, timeline delayed
 - **Mitigation**: Complete BACKEND-0/BACKEND-1 in parallel, pause at BACKEND-2
 - **Contingency**: Focus resources on MT5 engine fixes, resume backend later
 
 **Risk 2: Shadow Mode Parity Issues**
+
 > **RETIRED (2026-07-17):** Shadow mode risk superseded by WordPress-free BACKEND-2 plan. No WordPress source to validate against.
+
 - ~~Impact: Cutover delayed, data inconsistency~~ — RETIRED
 - ~~Mitigation: Extended shadow mode (14+ days), comprehensive validation~~ — RETIRED
 - ~~Contingency: Fix parity issues before cutover, extend shadow mode~~ — RETIRED
 
 **Risk 3: Cutover Failure**
+
 > **RETIRED (2026-07-17):** Cutover risk superseded by WordPress-free BACKEND-2 plan. No WordPress to cut over from or roll back to.
+
 - ~~Impact: Downtime, user impact, data loss~~ — RETIRED
 - ~~Mitigation: Comprehensive rollback procedures, maintenance window~~ — RETIRED
 - ~~Contingency: Immediate rollback to WordPress, investigate failure~~ — RETIRED
 
 **Risk 4: Performance Degradation**
+
 - **Impact**: Poor user experience, system instability
 - **Mitigation**: Load testing, performance monitoring, gradual migration
 - **Contingency**: Scale infrastructure, optimize queries, rollback if needed
@@ -514,16 +568,19 @@ jobs:
 ### Risk Mitigation Timeline
 
 **Immediate Phase** (Week 1-2)
+
 - Complete BACKEND-0/BACKEND-1 to establish foundation
 - No dependency on Phase 4 completion
 - Low risk, high value work
 
 **Medium Phase** (Week 3-6)
+
 - BACKEND-2/BACKEND-3 gated on Phase 4 completion
 - Shadow mode provides safety net
 - Medium risk, medium value work
 
 **Long Term Phase** (Week 7-12)
+
 - Cutover and decommission highest risk
 - Comprehensive rollback procedures
 - High risk, high value work
@@ -535,26 +592,32 @@ jobs:
 ### Technical Metrics
 
 **Backend Foundation** (Week 1-2)
+
 - Integration tests: 39+ passing
 - Type checking: 0 errors
 - API documentation: 100% coverage
 - Health check: 100% uptime
 
 **Shadow Mode** (Week 6)
+
 > **RETIRED (2026-07-17):** Shadow mode metrics superseded by WordPress-free BACKEND-2 plan. No WordPress source to sync or validate against.
+
 - ~~Data parity: 100%~~ — RETIRED
 - ~~Sync frequency: Every 5 minutes~~ — RETIRED
 - ~~Error rate: <0.1%~~ — RETIRED
 - ~~Validation endpoint: Operational~~ — RETIRED
 
 **Cutover** (Week 8)
+
 > **RETIRED (2026-07-17):** Cutover metrics superseded by WordPress-free BACKEND-2 plan. No WordPress to cut over from.
+
 - ~~Downtime: <5 minutes~~ — RETIRED
 - ~~Error rate: <1%~~ — RETIRED
 - ~~Response time p95: <200ms~~ — RETIRED
 - ~~Rollback success: 100%~~ — RETIRED
 
 **Post-Migration** (Week 12)
+
 - Performance: Targets met
 - Security: Audit passes
 - Monitoring: Operational
@@ -563,18 +626,21 @@ jobs:
 ### Business Metrics
 
 **User Impact**
+
 - Zero data loss
 - Minimal downtime (<5 minutes)
 - No feature regression
 - Improved performance
 
 **Operational Impact**
+
 - Reduced infrastructure costs
 - Simplified architecture
 - Improved developer experience
 - Enhanced security posture
 
 **Strategic Impact**
+
 - Platform modernization
 - Scalability improvements
 - Technical debt reduction
@@ -585,6 +651,7 @@ jobs:
 ## Next Actions
 
 ### Immediate (This Week)
+
 1. Complete provider wiring (Supabase client, connection pooling, health check)
 2. Create API documentation for BACKEND-1 endpoints
 3. Prepare staging environment for live-DB validation
@@ -592,7 +659,9 @@ jobs:
 5. Begin BACKEND-2 implementation planning
 
 ### Short Term (Next 2 Weeks)
+
 > **RETIRED (2026-07-17):** Items below referencing WordPress client, shadow mode, cutover, or decommission are superseded by the WordPress-free BACKEND-2 plan. See [`backend-2-restoration-plan.md`](./backend-2-restoration-plan.md) for current next actions.
+
 1. Monitor Phase 4 progress
 2. Prepare BACKEND-2 implementation plan
 3. Set up staging environment
@@ -600,7 +669,9 @@ jobs:
 5. ~~Begin WordPress client implementation~~ — RETIRED (no WordPress to integrate with)
 
 ### Medium Term (Next 4-6 Weeks)
+
 > **RETIRED (2026-07-17):** Items below referencing shadow mode, cutover, rollback, or decommission are superseded by the WordPress-free BACKEND-2 plan. See [`backend-2-restoration-plan.md`](./backend-2-restoration-plan.md) for current next actions.
+
 1. Execute BACKEND-2 (WordPress-Free Restoration; not gated on Phase 4)
 2. ~~Execute BACKEND-3~~ — RETIRED (folded into BACKEND-2 Phase 4)
 3. ~~Implement shadow mode sync~~ — RETIRED (no WordPress source)
@@ -608,7 +679,9 @@ jobs:
 5. ~~Test rollback procedures~~ — RETIRED (no WordPress to roll back to)
 
 ### Long Term (Next 8-12 Weeks)
+
 > **RETIRED (2026-07-17):** Items below referencing cutover or WordPress decommission are superseded by the WordPress-free BACKEND-2 plan. Data migration is BACKEND-2 Phase 6. See [`backend-2-restoration-plan.md`](./backend-2-restoration-plan.md) for current next actions.
+
 1. ~~Execute gradual endpoint migration~~ — RETIRED (endpoints delivered in BACKEND-2)
 2. Perform data migration (BACKEND-2 Phase 6)
 3. ~~Execute cutover~~ — RETIRED (no WordPress to cut over from)
@@ -622,6 +695,7 @@ jobs:
 ### Current Implementation Status
 
 **BACKEND-0**: 90% Complete
+
 - ✅ Database layer (Drizzle ORM, Supabase schema, migrations)
 - ✅ Database queries (fib-levels, users, ea-sessions, refresh-sessions)
 - ✅ Integration tests (47 passing)
@@ -629,6 +703,7 @@ jobs:
 - ⏳ Provider wiring (Supabase client, connection pooling, health check)
 
 **BACKEND-1**: 100% Complete
+
 - ✅ Auth utilities (JWT, password hashing, middleware)
 - ✅ Auth endpoints (login, register, me, refresh)
 - ✅ EA endpoints (fib-levels submission)
@@ -642,10 +717,12 @@ jobs:
 ### Key Dependencies
 
 **External Dependencies**
+
 - Supabase (PostgreSQL database)
 - Cloudflare Workers (serverless platform)
 
 **Internal Dependencies**
+
 - Phase 4 MT5 fib engine (separate validation track; backend restoration does not wait for it)
 - Frontend dashboard (requires backend API contracts via `VITE_API_URL`)
 - MT5 EA (requires backend endpoints; read-only ingest first)
@@ -664,6 +741,7 @@ jobs:
 **Infrastructure Lead**: TBD
 
 **Escalation Path**
+
 1. Technical issues → Backend Migration Lead
 2. Phase 4 coordination → Project Manager
 3. Infrastructure issues → Infrastructure Lead

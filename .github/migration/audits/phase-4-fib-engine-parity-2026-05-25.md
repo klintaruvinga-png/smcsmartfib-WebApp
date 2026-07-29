@@ -18,26 +18,26 @@
 
 ## Component Parity Metrics (PHP Fixture Baseline)
 
-| Symbol | TF | Family | Ratio Count | Delta Max | Status |
-|--------|----|--------|-------------|-----------|--------|
-| EURUSD | 15min | LTF_SF | 16 | 0.00000 | PASS ✅ |
-| EURUSD | 15min | HTF_AF | 16 | 0.00000 | PASS ✅ |
-| EURUSD | 1h | LTF_SF | 16 | 0.00000 | PASS ✅ |
-| EURUSD | 1h | HTF_AF | 16 | 0.00000 | PASS ✅ |
-| EURUSD | 1day | LTF_SF | 16 | 0.00000 | PASS ✅ |
-| EURUSD | 1day | HTF_AF | 16 | 0.00000 | PASS ✅ |
-| USDJPY | 15min | LTF_SF | 16 | 0.00000 | PASS ✅ |
-| USDJPY | 15min | HTF_AF | 16 | 0.00000 | PASS ✅ |
-| USDJPY | 1h | LTF_SF | 16 | 0.00000 | PASS ✅ |
-| USDJPY | 1h | HTF_AF | 16 | 0.00000 | PASS ✅ |
-| USDJPY | 1day | LTF_SF | 16 | 0.00000 | PASS ✅ |
-| USDJPY | 1day | HTF_AF | 16 | 0.00000 | PASS ✅ |
-| XAUUSD | 15min | LTF_SF | 16 | 0.00000 | PASS ✅ |
-| XAUUSD | 15min | HTF_AF | 16 | 0.00000 | PASS ✅ |
-| XAUUSD | 1h | LTF_SF | 16 | 0.00000 | PASS ✅ |
-| XAUUSD | 1h | HTF_AF | 16 | 0.00000 | PASS ✅ |
-| XAUUSD | 1day | LTF_SF | 16 | 0.00000 | PASS ✅ |
-| XAUUSD | 1day | HTF_AF | 16 | 0.00000 | PASS ✅ |
+| Symbol | TF    | Family | Ratio Count | Delta Max | Status  |
+| ------ | ----- | ------ | ----------- | --------- | ------- |
+| EURUSD | 15min | LTF_SF | 16          | 0.00000   | PASS ✅ |
+| EURUSD | 15min | HTF_AF | 16          | 0.00000   | PASS ✅ |
+| EURUSD | 1h    | LTF_SF | 16          | 0.00000   | PASS ✅ |
+| EURUSD | 1h    | HTF_AF | 16          | 0.00000   | PASS ✅ |
+| EURUSD | 1day  | LTF_SF | 16          | 0.00000   | PASS ✅ |
+| EURUSD | 1day  | HTF_AF | 16          | 0.00000   | PASS ✅ |
+| USDJPY | 15min | LTF_SF | 16          | 0.00000   | PASS ✅ |
+| USDJPY | 15min | HTF_AF | 16          | 0.00000   | PASS ✅ |
+| USDJPY | 1h    | LTF_SF | 16          | 0.00000   | PASS ✅ |
+| USDJPY | 1h    | HTF_AF | 16          | 0.00000   | PASS ✅ |
+| USDJPY | 1day  | LTF_SF | 16          | 0.00000   | PASS ✅ |
+| USDJPY | 1day  | HTF_AF | 16          | 0.00000   | PASS ✅ |
+| XAUUSD | 15min | LTF_SF | 16          | 0.00000   | PASS ✅ |
+| XAUUSD | 15min | HTF_AF | 16          | 0.00000   | PASS ✅ |
+| XAUUSD | 1h    | LTF_SF | 16          | 0.00000   | PASS ✅ |
+| XAUUSD | 1h    | HTF_AF | 16          | 0.00000   | PASS ✅ |
+| XAUUSD | 1day  | LTF_SF | 16          | 0.00000   | PASS ✅ |
+| XAUUSD | 1day  | HTF_AF | 16          | 0.00000   | PASS ✅ |
 
 **Parity Validator Self-Test**: 288/288 exact matches — 100% — Gate: PASS
 
@@ -45,23 +45,23 @@
 
 ## Ingestion Contract Tests
 
-| Test | Result |
-|------|--------|
-| POST valid M15 payload (32 levels) | PASS ✅ |
-| POST multi-TF M15+H1+D1 (96 levels) | PASS ✅ |
-| POST missing symbol → 400 | PASS ✅ |
+| Test                                  | Result  |
+| ------------------------------------- | ------- |
+| POST valid M15 payload (32 levels)    | PASS ✅ |
+| POST multi-TF M15+H1+D1 (96 levels)   | PASS ✅ |
+| POST missing symbol → 400             | PASS ✅ |
 | POST unknown ratio → 0 levels written | PASS ✅ |
-| GET grouped by TF/family | PASS ✅ |
-| GET missing symbol → 400 | PASS ✅ |
-| GET price round-trip accuracy | PASS ✅ |
+| GET grouped by TF/family              | PASS ✅ |
+| GET missing symbol → 400              | PASS ✅ |
+| GET price round-trip accuracy         | PASS ✅ |
 
 ---
 
 ## Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-|-------|----------|-------|-----------|---------|
-| Live parity corpus not yet captured | HIGH | 1 | Operator must run MT5 + Pine snapshot capture | Yes — gate cannot close without it |
+| Issue                               | Severity | Count | Resolution                                    | Blocker                            |
+| ----------------------------------- | -------- | ----- | --------------------------------------------- | ---------------------------------- |
+| Live parity corpus not yet captured | HIGH     | 1     | Operator must run MT5 + Pine snapshot capture | Yes — gate cannot close without it |
 
 ---
 

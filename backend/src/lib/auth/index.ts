@@ -63,13 +63,9 @@ export async function hashPassword(password: string): Promise<string> {
   const iterations = PBKDF2_ITERATIONS;
 
   const passwordBuffer = new TextEncoder().encode(password);
-  const importedKey = await crypto.subtle.importKey(
-    "raw",
-    passwordBuffer,
-    "PBKDF2",
-    false,
-    ["deriveBits"]
-  );
+  const importedKey = await crypto.subtle.importKey("raw", passwordBuffer, "PBKDF2", false, [
+    "deriveBits",
+  ]);
 
   const derivedBits = await crypto.subtle.deriveBits(
     {
@@ -79,11 +75,13 @@ export async function hashPassword(password: string): Promise<string> {
       hash: "SHA-256",
     },
     importedKey,
-    256
+    256,
   );
 
-  const saltHex = Array.from(salt, b => b.toString(16).padStart(2, "0")).join("");
-  const hashHex = Array.from(new Uint8Array(derivedBits), b => b.toString(16).padStart(2, "0")).join("");
+  const saltHex = Array.from(salt, (b) => b.toString(16).padStart(2, "0")).join("");
+  const hashHex = Array.from(new Uint8Array(derivedBits), (b) =>
+    b.toString(16).padStart(2, "0"),
+  ).join("");
 
   return `${saltHex}$${iterations}$${hashHex}`;
 }
@@ -121,16 +119,12 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   }
 
   // Convert hex strings back to Uint8Arrays
-  const salt = new Uint8Array(saltHex.match(/.{2}/g)?.map(byte => parseInt(byte, 16)) || []);
+  const salt = new Uint8Array(saltHex.match(/.{2}/g)?.map((byte) => parseInt(byte, 16)) || []);
 
   const passwordBuffer = new TextEncoder().encode(password);
-  const importedKey = await crypto.subtle.importKey(
-    "raw",
-    passwordBuffer,
-    "PBKDF2",
-    false,
-    ["deriveBits"]
-  );
+  const importedKey = await crypto.subtle.importKey("raw", passwordBuffer, "PBKDF2", false, [
+    "deriveBits",
+  ]);
 
   const derivedBits = await crypto.subtle.deriveBits(
     {
@@ -140,12 +134,12 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
       hash: "SHA-256",
     },
     importedKey,
-    256
+    256,
   );
 
   const actualBytes = new Uint8Array(derivedBits);
   const expectedBytes = new Uint8Array(
-    expectedHashHex.match(/.{2}/g)?.map((byte) => parseInt(byte, 16)) || []
+    expectedHashHex.match(/.{2}/g)?.map((byte) => parseInt(byte, 16)) || [],
   );
 
   // Constant-time comparison so rejection timing does not reveal how many

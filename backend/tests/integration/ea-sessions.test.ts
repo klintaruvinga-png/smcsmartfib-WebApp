@@ -18,9 +18,7 @@ beforeEach(() => {
 describe("ea-sessions queries", () => {
   it("createEaSession throws on unknown key", async () => {
     setDbResult([]);
-    await expect(
-      createEaSession("bad", "1.2.3.4", "ua")
-    ).rejects.toThrow(/No user found/);
+    await expect(createEaSession("bad", "1.2.3.4", "ua")).rejects.toThrow(/No user found/);
   });
 
   it("createEaSession resolves and inserts a session", async () => {

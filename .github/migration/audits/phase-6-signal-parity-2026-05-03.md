@@ -22,10 +22,10 @@ Scope note: this audit covers the backend trade-plan pip-value conversion path t
 
 ### Fib Engine (Phase 4)
 
-| Metric | Pine Value | MT5 Value | Match | Accuracy |
-|--------|-----------|----------|-------|----------|
-| No fib code delta in this run | N/A | N/A | N/A | N/A |
-| **Fib Parity Score** | - | - | - | **N/A** |
+| Metric                        | Pine Value | MT5 Value | Match | Accuracy |
+| ----------------------------- | ---------- | --------- | ----- | -------- |
+| No fib code delta in this run | N/A        | N/A       | N/A   | N/A      |
+| **Fib Parity Score**          | -          | -         | -     | **N/A**  |
 
 **Observations**: No fib-path code changed. A dedicated replay audit is still required before Phase 4 governance can advance.
 
@@ -33,10 +33,10 @@ Scope note: this audit covers the backend trade-plan pip-value conversion path t
 
 ### Regime Engine (Phase 5)
 
-| Metric | Pine Classification | MT5 Classification | Match | Accuracy |
-|--------|-------------------|------------------|-------|----------|
-| No regime code delta in this run | N/A | N/A | N/A | N/A |
-| **Regime Parity Score** | - | - | - | **N/A** |
+| Metric                           | Pine Classification | MT5 Classification | Match | Accuracy |
+| -------------------------------- | ------------------- | ------------------ | ----- | -------- |
+| No regime code delta in this run | N/A                 | N/A                | N/A   | N/A      |
+| **Regime Parity Score**          | -                   | -                  | -     | **N/A**  |
 
 **Observations**: No regime-path code changed. A dedicated replay audit is still required before Phase 5 governance can advance.
 
@@ -44,16 +44,16 @@ Scope note: this audit covers the backend trade-plan pip-value conversion path t
 
 ### Signal Engine (Phase 6)
 
-| Metric | Pine Signal | MT5 Signal | Match | Accuracy |
-|--------|------------|-----------|-------|----------|
-| USDJPY pip value / lot | 6.392431 | 6.392431 | Yes | 100% |
-| EURJPY pip value / lot | 6.392431 | 6.392431 | Yes | 100% |
-| EURGBP pip value / lot | 12.675000 | 12.675000 | Yes | 100% |
-| AUDCHF pip value / lot | 11.348162 | 11.348162 | Yes | 100% |
-| USDCAD pip value / lot | 7.314219 | 7.314219 | Yes | 100% |
-| EURCAD pip value / lot | 7.314219 | 7.314219 | Yes | 100% |
-| Missing-reference fallback | 10.000000 | 10.000000 | Yes | 100% |
-| **Signal Parity Score** | - | - | - | **100%** |
+| Metric                     | Pine Signal | MT5 Signal | Match | Accuracy |
+| -------------------------- | ----------- | ---------- | ----- | -------- |
+| USDJPY pip value / lot     | 6.392431    | 6.392431   | Yes   | 100%     |
+| EURJPY pip value / lot     | 6.392431    | 6.392431   | Yes   | 100%     |
+| EURGBP pip value / lot     | 12.675000   | 12.675000  | Yes   | 100%     |
+| AUDCHF pip value / lot     | 11.348162   | 11.348162  | Yes   | 100%     |
+| USDCAD pip value / lot     | 7.314219    | 7.314219   | Yes   | 100%     |
+| EURCAD pip value / lot     | 7.314219    | 7.314219   | Yes   | 100%     |
+| Missing-reference fallback | 10.000000   | 10.000000  | Yes   | 100%     |
+| **Signal Parity Score**    | -           | -          | -     | **100%** |
 
 **Observations**: The backend now converts quote-currency pip value into USD using live/cached reference mids when available, then falls back to the static metadata value only when reference pricing is unavailable.
 
@@ -61,17 +61,17 @@ Scope note: this audit covers the backend trade-plan pip-value conversion path t
 
 ## Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-|-------|----------|-------|-----------|---------|
-| Static `$10/pip` assumption on non-USD quoted forex pairs | HIGH | 1 | Fixed in backend trade-plan sizing helpers | No after patch |
+| Issue                                                     | Severity | Count | Resolution                                 | Blocker        |
+| --------------------------------------------------------- | -------- | ----- | ------------------------------------------ | -------------- |
+| Static `$10/pip` assumption on non-USD quoted forex pairs | HIGH     | 1     | Fixed in backend trade-plan sizing helpers | No after patch |
 
 ---
 
 ## Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-|------|-----------|--------|----------|
-| Fib/regime sections not re-run | N/A | No code delta in this automation run | Yes |
+| Item                           | Difference | Reason                               | Accepted |
+| ------------------------------ | ---------- | ------------------------------------ | -------- |
+| Fib/regime sections not re-run | N/A        | No code delta in this automation run | Yes      |
 
 ---
 

@@ -22,14 +22,14 @@ still outstanding for NAS100, US30, and XAUUSD.
 
 ## Parity matrix
 
-| Surface | Expected truth | Repo truth after reconciliation | Result |
-|---|---|---|---|
-| Phase 0 overall state | Remains blocked until focused post-fix validation passes | Phase 0 remains `BLOCKED` in the board and completion log | pass |
-| NAS100/US30 fix state | Patched in code, not yet live-validated | Board and completion log both say fix merged, validation pending | pass |
-| XAUUSD fix state | Patched in code, not yet live-validated | Board and completion log both say fix merged, restart/accumulation pending | pass |
-| AUDUSD/ETHUSD classification | Observation only; no code change authorized | Board, audit, and next-actions tracker classify chop blocks as correct live behavior | pass |
-| Validation gate artifact | Dedicated checklist defining superseding closeout pass criteria | Added as pending checklist artifact | pass |
-| Phase 0 migration gate | Cannot advance to Phase 1 from repo evidence alone | Still blocked because live soak evidence is missing | fail |
+| Surface                      | Expected truth                                                  | Repo truth after reconciliation                                                      | Result |
+| ---------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------ |
+| Phase 0 overall state        | Remains blocked until focused post-fix validation passes        | Phase 0 remains `BLOCKED` in the board and completion log                            | pass   |
+| NAS100/US30 fix state        | Patched in code, not yet live-validated                         | Board and completion log both say fix merged, validation pending                     | pass   |
+| XAUUSD fix state             | Patched in code, not yet live-validated                         | Board and completion log both say fix merged, restart/accumulation pending           | pass   |
+| AUDUSD/ETHUSD classification | Observation only; no code change authorized                     | Board, audit, and next-actions tracker classify chop blocks as correct live behavior | pass   |
+| Validation gate artifact     | Dedicated checklist defining superseding closeout pass criteria | Added as pending checklist artifact                                                  | pass   |
+| Phase 0 migration gate       | Cannot advance to Phase 1 from repo evidence alone              | Still blocked because live soak evidence is missing                                  | fail   |
 
 ## Findings
 

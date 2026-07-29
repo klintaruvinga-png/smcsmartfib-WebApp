@@ -28,16 +28,16 @@
 
 ### High
 
-| Issue | Component | Root Cause | Impact | Blocker | Corrective Action |
-|-------|-----------|-----------|--------|---------|------------------|
-| Admin soak regression suite inactive | `src/routes/-admin.test.tsx` | DOM-based route tests were executed without a jsdom environment | Admin soak workspace and report-flow regressions could ship without detection | No | Added jsdom environment pragma and reconciled stale test expectations with live component behavior |
-| Repo Vitest command scanned non-project tests | `vite.config.ts`, mixed `node:test` suites | Runner scope drift included `node_modules` and archived tests; two active tests were not registered as Vitest suites | Full regression command returned false failures and obscured real results | No | Scoped Vitest to first-party `src/` and `scripts/` tests, excluded archive/dependency trees, converted active Node-style suites to Vitest |
+| Issue                                         | Component                                  | Root Cause                                                                                                           | Impact                                                                        | Blocker | Corrective Action                                                                                                                         |
+| --------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Admin soak regression suite inactive          | `src/routes/-admin.test.tsx`               | DOM-based route tests were executed without a jsdom environment                                                      | Admin soak workspace and report-flow regressions could ship without detection | No      | Added jsdom environment pragma and reconciled stale test expectations with live component behavior                                        |
+| Repo Vitest command scanned non-project tests | `vite.config.ts`, mixed `node:test` suites | Runner scope drift included `node_modules` and archived tests; two active tests were not registered as Vitest suites | Full regression command returned false failures and obscured real results     | No      | Scoped Vitest to first-party `src/` and `scripts/` tests, excluded archive/dependency trees, converted active Node-style suites to Vitest |
 
 ### Medium
 
-| Issue | Component | Root Cause | Impact | Blocker | Corrective Action |
-|-------|-----------|-----------|--------|---------|------------------|
-| Progress streak PHP fixture violated backend contract | `wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php` | Tests asserted `ACTIVE_DAY_DEFINITION=CALENDAR_DAY_WITH_ANY_COMPLETED_ENGINE_RUN` while seeding heartbeat rows only | False-red backend regression on `/user/progress` streak path; weakened confidence in progress telemetry gates | No | Seeded `complete` engine-run fixtures for streak assertions and preserved backend authority rule |
+| Issue                                                 | Component                                                                 | Root Cause                                                                                                          | Impact                                                                                                        | Blocker | Corrective Action                                                                                |
+| ----------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------ |
+| Progress streak PHP fixture violated backend contract | `wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php` | Tests asserted `ACTIVE_DAY_DEFINITION=CALENDAR_DAY_WITH_ANY_COMPLETED_ENGINE_RUN` while seeding heartbeat rows only | False-red backend regression on `/user/progress` streak path; weakened confidence in progress telemetry gates | No      | Seeded `complete` engine-run fixtures for streak assertions and preserved backend authority rule |
 
 ## Root Cause / Analysis
 
@@ -72,12 +72,12 @@
 
 ## Parity Verification Results
 
-| Domain | Result | Evidence |
-|--------|--------|----------|
-| Fib parity | 100% PASS | `test-fib-parity.php`, `test-superfib-weighting.php`, `test-htf-authority-anchor.php`, `test-session-anchors.php` |
-| Freshness parity | 100% PASS | `test-ea-market-stream.php`, `test-market-data-service-source-filter.php`, `test-mt5-snapshot-contract.php`, admin soak/report Vitest coverage |
-| Signal parity (covered paths) | 100% PASS | First-party Vitest suite PASS, no covered-path drift detected in live/plan/book/orders/admin flows |
-| Regime parity (covered paths) | 100% PASS | Covered assertions passed; no dedicated replay drift surfaced in this run |
+| Domain                        | Result    | Evidence                                                                                                                                       |
+| ----------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fib parity                    | 100% PASS | `test-fib-parity.php`, `test-superfib-weighting.php`, `test-htf-authority-anchor.php`, `test-session-anchors.php`                              |
+| Freshness parity              | 100% PASS | `test-ea-market-stream.php`, `test-market-data-service-source-filter.php`, `test-mt5-snapshot-contract.php`, admin soak/report Vitest coverage |
+| Signal parity (covered paths) | 100% PASS | First-party Vitest suite PASS, no covered-path drift detected in live/plan/book/orders/admin flows                                             |
+| Regime parity (covered paths) | 100% PASS | Covered assertions passed; no dedicated replay drift surfaced in this run                                                                      |
 
 Inference note: Regime/signal percentages above reflect covered regression paths, not a new full historical replay.
 

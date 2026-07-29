@@ -31,55 +31,55 @@
 
 ## Critical Issues (Blocks Phase Transition)
 
-| Issue | Component | Root Cause | Impact | Blocker | Corrective Action |
-|-------|-----------|-----------|--------|---------|-----------------|
-| MT5 snapshot stored with `state='offline'` (DEFAULT) | `smc-superfib-sniper.php` `post_snapshot()` | `state` column omitted from REPLACE INTO — MySQL DEFAULT is 'offline' | All MT5-sourced prices returned as 'offline' by `get_cached_price()`; engine gates stale on all MT5 data | ✓ Patched | Added `'state' => 'live'` to REPLACE in `post_snapshot()` |
-| `SMC_MarketData_Service::store_tick_snapshot()` same state=offline bug | `class-market-data-service.php` | Same omission as above in the service class path | MT5 authority path via service class also silently marks prices offline | ✓ Patched | Added `'state' => 'live'` to service class REPLACE |
-| Twelve Data candles silently overwrite MT5-authoritative candles | `smc-superfib-sniper.php` `fetch_candles()` | `REPLACE INTO` without `source` column: MySQL DEFAULT 'twelve-data' replaces existing `source='mt5'` rows on UNIQUE KEY conflict | MT5 candle history erased on every Twelve Data fetch; signal engine loses MT5 truth | ✓ Patched | Replaced `$wpdb->replace()` with `INSERT … ON DUPLICATE KEY UPDATE … IF(source='mt5', …)` to preserve MT5 authority |
-| MT5 timestamp format breaks PHP strtotime() | `MarketDataEngine.mqh` + `post_snapshot()` PHP | `TimeToString(TIME_DATE\|TIME_SECONDS)` produces `YYYY.MM.DD HH:MM:SS`; PHP `strtotime()` does not reliably parse dot-separated dates; candle_time stored at epoch | All MT5 candles stored at `1970-01-01 00:00:00`, all at same UNIQUE KEY timestamp; engine sees zero usable candle history | ✓ Patched | Added `TimeToIso8601()` helper in MQL5 (ISO 8601 `YYYY-MM-DDTHH:MM:SSZ`); added `parse_mt5_timestamp()` PHP fallback for dot-format |
+| Issue                                                                  | Component                                      | Root Cause                                                                                                                                                         | Impact                                                                                                                    | Blocker   | Corrective Action                                                                                                                   |
+| ---------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| MT5 snapshot stored with `state='offline'` (DEFAULT)                   | `smc-superfib-sniper.php` `post_snapshot()`    | `state` column omitted from REPLACE INTO — MySQL DEFAULT is 'offline'                                                                                              | All MT5-sourced prices returned as 'offline' by `get_cached_price()`; engine gates stale on all MT5 data                  | ✓ Patched | Added `'state' => 'live'` to REPLACE in `post_snapshot()`                                                                           |
+| `SMC_MarketData_Service::store_tick_snapshot()` same state=offline bug | `class-market-data-service.php`                | Same omission as above in the service class path                                                                                                                   | MT5 authority path via service class also silently marks prices offline                                                   | ✓ Patched | Added `'state' => 'live'` to service class REPLACE                                                                                  |
+| Twelve Data candles silently overwrite MT5-authoritative candles       | `smc-superfib-sniper.php` `fetch_candles()`    | `REPLACE INTO` without `source` column: MySQL DEFAULT 'twelve-data' replaces existing `source='mt5'` rows on UNIQUE KEY conflict                                   | MT5 candle history erased on every Twelve Data fetch; signal engine loses MT5 truth                                       | ✓ Patched | Replaced `$wpdb->replace()` with `INSERT … ON DUPLICATE KEY UPDATE … IF(source='mt5', …)` to preserve MT5 authority                 |
+| MT5 timestamp format breaks PHP strtotime()                            | `MarketDataEngine.mqh` + `post_snapshot()` PHP | `TimeToString(TIME_DATE\|TIME_SECONDS)` produces `YYYY.MM.DD HH:MM:SS`; PHP `strtotime()` does not reliably parse dot-separated dates; candle_time stored at epoch | All MT5 candles stored at `1970-01-01 00:00:00`, all at same UNIQUE KEY timestamp; engine sees zero usable candle history | ✓ Patched | Added `TimeToIso8601()` helper in MQL5 (ISO 8601 `YYYY-MM-DDTHH:MM:SSZ`); added `parse_mt5_timestamp()` PHP fallback for dot-format |
 
 ---
 
 ## High Priority Issues (Slows Progress)
 
-| Issue | Component | Root Cause | Impact | Blocker | Corrective Action |
-|-------|-----------|-----------|--------|---------|-----------------|
-| `get_market_data_authority()` returns empty for all-symbols query | `smc-superfib-sniper.php` | Uses `$snapshot['symbols']` — key does not exist in engine snapshot (correct key is `prices`) | `/market-data-authority` endpoint without `?symbol=` always returns `{}` | No after patch | Fixed: `$snapshot['prices']` |
-| CandleBuilder spread uses hardcoded `* 100000` (5-digit assumption) | `CandleBuilder.mqh` | Magic multiplier wrong for JPY (100), metals (10), indices | Spread field in MT5 candles has wrong values for non-5-digit pairs (cosmetic but misleading) | No | Fixed: replaced with `SymbolInfoDouble(symbol, SYMBOL_POINT)` |
-| `FreshnessEngine` never transitions to CLOSED state | `FreshnessEngine.mqh` + `MarketDataEngine.mqh` | `UpdatePeriodic()` had no session awareness — symbols aged to STALE rather than CLOSED on weekends/holidays | Backend receives STALE instead of CLOSED; clients cannot distinguish stale-feed from closed-market | No | Fixed: `UpdatePeriodic(bool is_market_open)` wired from `SessionManager`; `OnPeriodic()` updates session with `TimeCurrent()` |
+| Issue                                                               | Component                                      | Root Cause                                                                                                  | Impact                                                                                             | Blocker        | Corrective Action                                                                                                             |
+| ------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `get_market_data_authority()` returns empty for all-symbols query   | `smc-superfib-sniper.php`                      | Uses `$snapshot['symbols']` — key does not exist in engine snapshot (correct key is `prices`)               | `/market-data-authority` endpoint without `?symbol=` always returns `{}`                           | No after patch | Fixed: `$snapshot['prices']`                                                                                                  |
+| CandleBuilder spread uses hardcoded `* 100000` (5-digit assumption) | `CandleBuilder.mqh`                            | Magic multiplier wrong for JPY (100), metals (10), indices                                                  | Spread field in MT5 candles has wrong values for non-5-digit pairs (cosmetic but misleading)       | No             | Fixed: replaced with `SymbolInfoDouble(symbol, SYMBOL_POINT)`                                                                 |
+| `FreshnessEngine` never transitions to CLOSED state                 | `FreshnessEngine.mqh` + `MarketDataEngine.mqh` | `UpdatePeriodic()` had no session awareness — symbols aged to STALE rather than CLOSED on weekends/holidays | Backend receives STALE instead of CLOSED; clients cannot distinguish stale-feed from closed-market | No             | Fixed: `UpdatePeriodic(bool is_market_open)` wired from `SessionManager`; `OnPeriodic()` updates session with `TimeCurrent()` |
 
 ---
 
 ## Medium Priority Issues
 
-| Issue | Component | Root Cause | Impact | Blocker | Corrective Action |
-|-------|-----------|-----------|--------|---------|-----------------|
-| `get_tp_price_from_zone()` dead placeholder with hardcoded offset 0.002 | `smc-superfib-sniper.php` | Method defined but never called; contains `$offset = 0.002; // Placeholder` | Dead code risk: could be called accidentally in future with wrong TP logic | No | Removed completely |
-| `riskZAR` hardcoded exchange rate 18.5 | `smc-superfib-sniper.php` `build_trade_plan()` | USD/ZAR static constant never updates | ZAR risk display is inaccurate when USD/ZAR deviates from 18.5 | No | Documented as deferred. Requires live ZAR/USD feed integration (out of scope for Phase 0) |
+| Issue                                                                   | Component                                      | Root Cause                                                                  | Impact                                                                     | Blocker | Corrective Action                                                                         |
+| ----------------------------------------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------- |
+| `get_tp_price_from_zone()` dead placeholder with hardcoded offset 0.002 | `smc-superfib-sniper.php`                      | Method defined but never called; contains `$offset = 0.002; // Placeholder` | Dead code risk: could be called accidentally in future with wrong TP logic | No      | Removed completely                                                                        |
+| `riskZAR` hardcoded exchange rate 18.5                                  | `smc-superfib-sniper.php` `build_trade_plan()` | USD/ZAR static constant never updates                                       | ZAR risk display is inaccurate when USD/ZAR deviates from 18.5             | No      | Documented as deferred. Requires live ZAR/USD feed integration (out of scope for Phase 0) |
 
 ---
 
 ## Parity Drift Alerts
 
-| Engine | Previous % | Current % | Trend | Status | Action |
-|--------|-----------|----------|-------|--------|--------|
-| Fib (Phase 4) | N/A | N/A | ↔ Stable | PENDING | No fib delta; replay audit required |
-| Regime (Phase 5) | N/A | N/A | ↔ Stable | PENDING | No regime delta; replay audit required |
-| Signal (Phase 6) | 100% (pip-value path) | 100% (pip-value path) | ↔ Stable | PASS | MT5 data authority fixes restore candle truth; end-to-end replay still needed |
-| Freshness (Phase 0) | Broken (offline) | Fixed (live) | ↑ Improving | PASS after patch | MT5 state='live' now correctly set; 24h soak required |
-| MT5 Candle Authority | Broken (overwritten by TD) | Protected (IF source='mt5') | ↑ Improving | PASS after patch | Run 24h candle persistence soak |
+| Engine               | Previous %                 | Current %                   | Trend       | Status           | Action                                                                        |
+| -------------------- | -------------------------- | --------------------------- | ----------- | ---------------- | ----------------------------------------------------------------------------- |
+| Fib (Phase 4)        | N/A                        | N/A                         | ↔ Stable    | PENDING          | No fib delta; replay audit required                                           |
+| Regime (Phase 5)     | N/A                        | N/A                         | ↔ Stable    | PENDING          | No regime delta; replay audit required                                        |
+| Signal (Phase 6)     | 100% (pip-value path)      | 100% (pip-value path)       | ↔ Stable    | PASS             | MT5 data authority fixes restore candle truth; end-to-end replay still needed |
+| Freshness (Phase 0)  | Broken (offline)           | Fixed (live)                | ↑ Improving | PASS after patch | MT5 state='live' now correctly set; 24h soak required                         |
+| MT5 Candle Authority | Broken (overwritten by TD) | Protected (IF source='mt5') | ↑ Improving | PASS after patch | Run 24h candle persistence soak                                               |
 
 ---
 
 ## Test Failure Summary
 
-| Test | Phase | Status | Error | Frequency |
-|------|-------|--------|-------|-----------|
-| PHP syntax check (`php -l`) — smc-superfib-sniper.php | 0 | ✓ PASS | None | Run |
-| PHP syntax check (`php -l`) — class-market-data-service.php | 0 | ✓ PASS | None | Run |
-| 24h refresh stability | 0 | PENDING | Not executed in this run | Not run |
-| Pine/MT5 signal replay | 6 | PENDING | No active replay harness in workspace | Not run |
-| MT5 candle authority soak | 0 | PENDING | Requires live EA + backend | Not run |
+| Test                                                        | Phase | Status  | Error                                 | Frequency |
+| ----------------------------------------------------------- | ----- | ------- | ------------------------------------- | --------- |
+| PHP syntax check (`php -l`) — smc-superfib-sniper.php       | 0     | ✓ PASS  | None                                  | Run       |
+| PHP syntax check (`php -l`) — class-market-data-service.php | 0     | ✓ PASS  | None                                  | Run       |
+| 24h refresh stability                                       | 0     | PENDING | Not executed in this run              | Not run   |
+| Pine/MT5 signal replay                                      | 6     | PENDING | No active replay harness in workspace | Not run   |
+| MT5 candle authority soak                                   | 0     | PENDING | Requires live EA + backend            | Not run   |
 
 ---
 
@@ -141,18 +141,22 @@ Phase 0 soak evidence (24h/72h refresh stability, MT5 candle persistence) still 
 ## Parity Verification Results
 
 ### Freshness Parity
+
 - Before patch: MT5 snapshots state='offline' (broken)
 - After patch: MT5 snapshots state='live' (correct)
 
 ### MT5 Candle Authority Parity
+
 - Before patch: TwelveData REPLACE overwrites MT5 candles silently
 - After patch: ON DUPLICATE KEY UPDATE preserves source='mt5' rows
 
 ### Timestamp Parity
+
 - Before patch: `YYYY.MM.DD HH:MM:SS` → strtotime() unreliable → candle_time = epoch
 - After patch: ISO 8601 `YYYY-MM-DDTHH:MM:SSZ` → strtotime() reliable → correct candle_time
 
 ### Market Authority Endpoint
+
 - Before patch: all-symbols query returns `{}`
 - After patch: returns authority state for each watched symbol
 
@@ -160,12 +164,12 @@ Phase 0 soak evidence (24h/72h refresh stability, MT5 candle persistence) still 
 
 ## Remaining Risks
 
-| Risk | Severity | Deferral Reason |
-|------|----------|-----------------|
-| `riskZAR` hardcoded rate 18.5 | Medium | Requires ZAR/USD live feed integration; out of Phase 0 scope |
-| No 24h/72h soak evidence | High | Requires live EA+backend uptime; cannot run in CI |
-| FIB/Regime/Signal end-to-end Pine replay | High | No active replay harness in workspace |
-| MT5 unauthenticated POST user_id=0 | Medium | Architectural — AuthToken required on EA config; documented in QUICK_REFERENCE |
+| Risk                                     | Severity | Deferral Reason                                                                |
+| ---------------------------------------- | -------- | ------------------------------------------------------------------------------ |
+| `riskZAR` hardcoded rate 18.5            | Medium   | Requires ZAR/USD live feed integration; out of Phase 0 scope                   |
+| No 24h/72h soak evidence                 | High     | Requires live EA+backend uptime; cannot run in CI                              |
+| FIB/Regime/Signal end-to-end Pine replay | High     | No active replay harness in workspace                                          |
+| MT5 unauthenticated POST user_id=0       | Medium   | Architectural — AuthToken required on EA config; documented in QUICK_REFERENCE |
 
 ---
 
@@ -183,12 +187,12 @@ Phase 0 soak evidence (24h/72h refresh stability, MT5 candle persistence) still 
 
 ## Do Not Touch List
 
-| System | Reason |
-|--------|--------|
-| Pine trading formulas (ratios, fib levels) | No parity corruption proven; replay audit required before any change |
-| `encrypt_secret()` / `decrypt_secret()` | Crypto path; changes require security review |
-| `permission_user()` CORS config | Active CORS configuration; changes risk breaking cross-origin dashboard |
-| Signal engine scoring logic (`verdict()`, `sequence_state()`) | Awaiting Pine replay parity confirmation |
+| System                                                        | Reason                                                                  |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Pine trading formulas (ratios, fib levels)                    | No parity corruption proven; replay audit required before any change    |
+| `encrypt_secret()` / `decrypt_secret()`                       | Crypto path; changes require security review                            |
+| `permission_user()` CORS config                               | Active CORS configuration; changes risk breaking cross-origin dashboard |
+| Signal engine scoring logic (`verdict()`, `sequence_state()`) | Awaiting Pine replay parity confirmation                                |
 
 ---
 

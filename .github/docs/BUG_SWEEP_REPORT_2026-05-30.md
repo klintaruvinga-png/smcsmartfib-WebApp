@@ -8,9 +8,9 @@
 
 ## Confirmed Problems
 
-| Severity | Category | Component | Root cause | Impact | Status |
-|---|---|---|---|---|---|
-| HIGH | Signal freshness truth | `mt5/MarketDataEngine.mqh` | `SendSignalCandidatesToBackend()` evaluated fib/regime inputs before checking per-symbol freshness. | Stale, closed, delayed, or disconnected symbols could emit MT5 signal candidates when historical rates were still available. | Patched |
+| Severity | Category               | Component                  | Root cause                                                                                          | Impact                                                                                                                       | Status  |
+| -------- | ---------------------- | -------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------- |
+| HIGH     | Signal freshness truth | `mt5/MarketDataEngine.mqh` | `SendSignalCandidatesToBackend()` evaluated fib/regime inputs before checking per-symbol freshness. | Stale, closed, delayed, or disconnected symbols could emit MT5 signal candidates when historical rates were still available. | Patched |
 
 ## Surgical Fixes Applied
 
@@ -22,12 +22,12 @@
 
 ## Parity Verification Results
 
-| Area | Result | Evidence |
-|---|---:|---|
-| Fib parity | 100% synthetic gate | `php scripts/parity-validator.php --out reports/phase6-signal-freshness-2026-05-30.json` |
-| Regime parity | No formula drift introduced | MT5 dispatch still uses `regimeEngine.ComputeRegimeState(...)`; guard only blocks non-live sources. |
-| Signal parity | Guarded | `npx vitest run scripts/mt5-signal-dispatch.test.mjs` passed after red-green verification. |
-| Freshness parity | Hardened | MT5 signal dispatch now uses existing `FreshnessEngine` authority before candidate emission. |
+| Area             |                      Result | Evidence                                                                                            |
+| ---------------- | --------------------------: | --------------------------------------------------------------------------------------------------- |
+| Fib parity       |         100% synthetic gate | `php scripts/parity-validator.php --out reports/phase6-signal-freshness-2026-05-30.json`            |
+| Regime parity    | No formula drift introduced | MT5 dispatch still uses `regimeEngine.ComputeRegimeState(...)`; guard only blocks non-live sources. |
+| Signal parity    |                     Guarded | `npx vitest run scripts/mt5-signal-dispatch.test.mjs` passed after red-green verification.          |
+| Freshness parity |                    Hardened | MT5 signal dispatch now uses existing `FreshnessEngine` authority before candidate emission.        |
 
 ## Remaining Risks
 
@@ -57,4 +57,3 @@
 - Backend signal drift thresholds and `pine_match` classification.
 - Stale threshold semantics in WordPress snapshot authority.
 - Phase 7 execution activation gate.
-

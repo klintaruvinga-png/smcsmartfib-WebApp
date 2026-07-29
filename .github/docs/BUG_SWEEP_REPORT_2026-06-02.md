@@ -17,26 +17,26 @@
 
 # Confirmed Problems
 
-| Severity | Category | Component | Root Cause | Impact | Blocker |
-|----------|----------|-----------|------------|--------|---------|
-| MEDIUM | Migration parity regression protection | `scripts/test-parity-validator-regression.php` | Display-schema guard still referenced the deleted `wordpress/smc-superfib-sniper/` path and skipped when only the active `wordpress/smc-superfib-sniper v13.1.0/` plugin tree exists locally. | `backend_confirmed` schema drift could pass unnoticed during the versioned plugin migration. | No |
+| Severity | Category                               | Component                                      | Root Cause                                                                                                                                                                                    | Impact                                                                                       | Blocker |
+| -------- | -------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------- |
+| MEDIUM   | Migration parity regression protection | `scripts/test-parity-validator-regression.php` | Display-schema guard still referenced the deleted `wordpress/smc-superfib-sniper/` path and skipped when only the active `wordpress/smc-superfib-sniper v13.1.0/` plugin tree exists locally. | `backend_confirmed` schema drift could pass unnoticed during the versioned plugin migration. | No      |
 
 # Surgical Fixes Applied
 
-| File | Change | Regression Protection |
-|------|--------|-----------------------|
+| File                                           | Change                                                                               | Regression Protection                                                                                                                                          |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `scripts/test-parity-validator-regression.php` | Added `resolve_plugin_file()` with canonical and active versioned plugin candidates. | Replaced silent schema skip with `Display schema plugin file is available` assertion, then validates `backend_confirmed` in `get_display_signals_table_sql()`. |
 
 # Parity Verification Results
 
-| Area | Result | Evidence |
-|------|--------|----------|
-| Fib parity | PASS | Active plugin PHP tests: `test-fib-parity.php`, `test-fib-ingestion.php`, `test-htf-authority-anchor.php`. |
-| Regime parity | PASS | `scripts/test-parity-validator-regression.php` regime wrapper and missing-counterpart gates passed. |
-| Signal parity | PASS | `scripts/test-parity-validator-regression.php` signal wrapper, NO_PINE, NO_MT5, mismatch, and schema guards passed. |
-| Freshness parity | PASS | Active plugin PHP suite passed EA market-stream stale rejection, snapshot timestamp preservation, watchlist snapshot, telemetry stale-state propagation, and source-filter checks. |
-| MT5 include parity | PASS | `npm run check:mql` passed. |
-| Dashboard parity | PARTIAL | Focused Vitest suite blocked before test load by local `esbuild` `spawn EPERM`. No dashboard code changed. |
+| Area               | Result  | Evidence                                                                                                                                                                           |
+| ------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fib parity         | PASS    | Active plugin PHP tests: `test-fib-parity.php`, `test-fib-ingestion.php`, `test-htf-authority-anchor.php`.                                                                         |
+| Regime parity      | PASS    | `scripts/test-parity-validator-regression.php` regime wrapper and missing-counterpart gates passed.                                                                                |
+| Signal parity      | PASS    | `scripts/test-parity-validator-regression.php` signal wrapper, NO_PINE, NO_MT5, mismatch, and schema guards passed.                                                                |
+| Freshness parity   | PASS    | Active plugin PHP suite passed EA market-stream stale rejection, snapshot timestamp preservation, watchlist snapshot, telemetry stale-state propagation, and source-filter checks. |
+| MT5 include parity | PASS    | `npm run check:mql` passed.                                                                                                                                                        |
+| Dashboard parity   | PARTIAL | Focused Vitest suite blocked before test load by local `esbuild` `spawn EPERM`. No dashboard code changed.                                                                         |
 
 # Remaining Risks
 
@@ -69,12 +69,12 @@
 
 # Verification Commands
 
-| Command | Result |
-|---------|--------|
-| `php scripts/test-parity-validator-regression.php` | PASS, 15 passed / 0 failed. |
-| `php -l "wordpress/smc-superfib-sniper v13.1.0/smc-superfib-sniper.php"` | PASS, no syntax errors. |
-| `Get-ChildItem "wordpress/smc-superfib-sniper v13.1.0/tests/php" -Filter "*.php" ...` | PASS, all active plugin PHP tests completed. |
-| `npm run check:mql` | PASS, MQL include verification passed. |
-| `npm run validate:impl` | PASS, implementation artifacts valid. |
-| `npm run test:focused` | BLOCKED, Vite config load failed before tests with esbuild `spawn EPERM`. |
-| `npm run build` | BLOCKED, local command timed out after 120 seconds. |
+| Command                                                                               | Result                                                                    |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `php scripts/test-parity-validator-regression.php`                                    | PASS, 15 passed / 0 failed.                                               |
+| `php -l "wordpress/smc-superfib-sniper v13.1.0/smc-superfib-sniper.php"`              | PASS, no syntax errors.                                                   |
+| `Get-ChildItem "wordpress/smc-superfib-sniper v13.1.0/tests/php" -Filter "*.php" ...` | PASS, all active plugin PHP tests completed.                              |
+| `npm run check:mql`                                                                   | PASS, MQL include verification passed.                                    |
+| `npm run validate:impl`                                                               | PASS, implementation artifacts valid.                                     |
+| `npm run test:focused`                                                                | BLOCKED, Vite config load failed before tests with esbuild `spawn EPERM`. |
+| `npm run build`                                                                       | BLOCKED, local command timed out after 120 seconds.                       |

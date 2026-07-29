@@ -20,20 +20,20 @@
 
 ## Medium Priority Issues
 
-| Issue | Component | Root Cause | Impact | Blocker | Corrective Action |
-|-------|-----------|-----------|--------|---------|-----------------|
-| Removed watchlist symbols could reappear after mutation success | `src/hooks/useSniperData.ts`, `src/routes/account.tsx` | `["user-settings"]` cache was updated with the mutation result but not invalidated for a confirming background refetch; the account draft sync also read raw cache state while refetch could be in flight | Account watchlist UI could show ghost symbols after removal/remount, breaking dashboard/backend truth | No | Invalidate `["user-settings"]` immediately after `writeCanonicalWatchlist`, keep existing downstream invalidations, and defer account draft sync until `useUserSettings` is settled |
+| Issue                                                           | Component                                              | Root Cause                                                                                                                                                                                                | Impact                                                                                                | Blocker | Corrective Action                                                                                                                                                                   |
+| --------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Removed watchlist symbols could reappear after mutation success | `src/hooks/useSniperData.ts`, `src/routes/account.tsx` | `["user-settings"]` cache was updated with the mutation result but not invalidated for a confirming background refetch; the account draft sync also read raw cache state while refetch could be in flight | Account watchlist UI could show ghost symbols after removal/remount, breaking dashboard/backend truth | No      | Invalidate `["user-settings"]` immediately after `writeCanonicalWatchlist`, keep existing downstream invalidations, and defer account draft sync until `useUserSettings` is settled |
 
 ---
 
 ## Test Failure Summary
 
-| Test | Status | Notes |
-|------|--------|-------|
-| `npx vitest run src/hooks/useSniperData.test.tsx src/hooks/useSniperData.watchlist.test.tsx` | PASS | Confirms `["user-settings"]` invalidation and remount persistence path |
-| `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php` | PASS | Backend watchlist regression unaffected |
-| `npx vitest run` | FAIL | Pre-existing unrelated suite/config failures in `src/routes/-admin.test.tsx` and files with no test suite; not caused by this patch |
-| `npx tsc --noEmit` | FAIL | Pre-existing unrelated errors in `src/components/PlanCard.tsx`, `src/routes/-plan.test.tsx`, and `src/routes/charts.tsx` |
+| Test                                                                                         | Status | Notes                                                                                                                               |
+| -------------------------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `npx vitest run src/hooks/useSniperData.test.tsx src/hooks/useSniperData.watchlist.test.tsx` | PASS   | Confirms `["user-settings"]` invalidation and remount persistence path                                                              |
+| `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`         | PASS   | Backend watchlist regression unaffected                                                                                             |
+| `npx vitest run`                                                                             | FAIL   | Pre-existing unrelated suite/config failures in `src/routes/-admin.test.tsx` and files with no test suite; not caused by this patch |
+| `npx tsc --noEmit`                                                                           | FAIL   | Pre-existing unrelated errors in `src/components/PlanCard.tsx`, `src/routes/-plan.test.tsx`, and `src/routes/charts.tsx`            |
 
 ---
 

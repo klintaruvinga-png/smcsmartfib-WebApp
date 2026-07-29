@@ -9,15 +9,15 @@
 
 ## Executive Summary
 
-| Item | Status |
-|---|---|
-| Overall system health | PARTIAL |
-| Bugs found | 3 governance/integrity defects |
-| Bugs fixed | 3 |
-| Remaining risks | Live post-fix validation still pending |
-| Migration readiness | Phase 0 remains BLOCKED pending focused validation soak |
-| Snapshot archive | `.github/migration/phase-updates/` |
-| Rollback command | `git revert <implementation-commit>` |
+| Item                  | Status                                                  |
+| --------------------- | ------------------------------------------------------- |
+| Overall system health | PARTIAL                                                 |
+| Bugs found            | 3 governance/integrity defects                          |
+| Bugs fixed            | 3                                                       |
+| Remaining risks       | Live post-fix validation still pending                  |
+| Migration readiness   | Phase 0 remains BLOCKED pending focused validation soak |
+| Snapshot archive      | `.github/migration/phase-updates/`                      |
+| Rollback command      | `git revert <implementation-commit>`                    |
 
 This sweep covered the Phase 0 closeout evidence chain after the NAS100/US30 freshness and
 XAUUSD alias fixes were merged. No runtime code defect was introduced in this pass. The defects
@@ -37,6 +37,7 @@ superseding closeout artifact was still missing.
 Phase 0 gate without live verification.
 
 **Files affected:**
+
 - `.github/migration-status.md`
 
 ---
@@ -51,6 +52,7 @@ fixes were merged.
 "live-validated," weakening the repo's source-of-truth chain.
 
 **Files affected:**
+
 - `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-completion-2026-05-14.md`
 
 ---
@@ -65,6 +67,7 @@ before a superseding closeout artifact could be written.
 artifact, creating avoidable ambiguity in the next closeout step.
 
 **Files affected:**
+
 - `.github/migration/archive/phase-0-updates-prior-to-2026-05-15/phase-0-post-fix-validation-checklist-2026-05-14.md`
 
 ---

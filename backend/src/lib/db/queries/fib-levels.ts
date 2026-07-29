@@ -38,10 +38,7 @@ export type MarketDataRow = MarketFibLevel & { timeframe: FibTimeframe };
  * for WordPress parity. Throws if the key is unknown.
  */
 export async function resolveUserIdByApiKey(eaApiKey: string): Promise<string> {
-  const [row] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.eaApiKey, eaApiKey));
+  const [row] = await db.select({ id: users.id }).from(users).where(eq(users.eaApiKey, eaApiKey));
   if (!row) throw new Error(`No user found for EA API key`);
   return row.id;
 }
@@ -58,7 +55,7 @@ export async function createFibLevel(
   timeframe: FibTimeframe,
   trend: string | null,
   levels: FibLevelInput[],
-  calculatedAt?: Date
+  calculatedAt?: Date,
 ): Promise<void> {
   const userId = await resolveUserIdByApiKey(eaApiKey);
 
@@ -111,7 +108,7 @@ export async function getLatestFibLevels(
   eaApiKey: string,
   symbol: string,
   timeframe: FibTimeframe,
-  limit = 50
+  limit = 50,
 ): Promise<MarketFibLevel[]> {
   const userId = await resolveUserIdByApiKey(eaApiKey);
 
@@ -122,8 +119,8 @@ export async function getLatestFibLevels(
       and(
         eq(fibLevels.userId, userId),
         eq(fibLevels.symbol, symbol),
-        eq(fibLevels.timeframe, timeframe)
-      )
+        eq(fibLevels.timeframe, timeframe),
+      ),
     )
     .orderBy(desc(fibLevels.calculatedAt))
     .limit(limit);
@@ -149,7 +146,7 @@ export async function getMarketData(
   eaApiKey: string,
   symbol: string,
   timeframe: FibTimeframe,
-  limit = 50
+  limit = 50,
 ): Promise<MarketFibLevel[]> {
   // Same query shape as getLatestFibLevels; kept as a distinct named entry
   // point for the dashboard per the migration plan.
@@ -172,12 +169,9 @@ export async function getMarketDataByUserId(
   symbol: string,
   timeframe?: FibTimeframe,
   family?: FibFamily,
-  limit = 200
+  limit = 200,
 ): Promise<MarketDataRow[]> {
-  const conditions = [
-    eq(fibLevels.userId, userId),
-    eq(fibLevels.symbol, symbol),
-  ];
+  const conditions = [eq(fibLevels.userId, userId), eq(fibLevels.symbol, symbol)];
   if (timeframe) {
     conditions.push(eq(fibLevels.timeframe, timeframe));
   }

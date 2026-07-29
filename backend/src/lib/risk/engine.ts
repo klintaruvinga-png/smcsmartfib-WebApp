@@ -37,8 +37,11 @@ export interface RiskEvaluation {
 
 export function evaluateTrade(
   limits: RiskLimitValues,
-  ctx: { openTrades: Array<{ symbol: string; lotSize: number; pnl?: number | null }>; todaysPnl: number },
-  proposed: ProposedTrade
+  ctx: {
+    openTrades: Array<{ symbol: string; lotSize: number; pnl?: number | null }>;
+    todaysPnl: number;
+  },
+  proposed: ProposedTrade,
 ): RiskEvaluation {
   const reasons: string[] = [];
 
@@ -51,15 +54,13 @@ export function evaluateTrade(
 
   // 1. Max open positions
   if (openPositions + 1 > limits.maxOpenPositions) {
-    reasons.push(
-      `Open positions ${openPositions + 1} would exceed max ${limits.maxOpenPositions}`
-    );
+    reasons.push(`Open positions ${openPositions + 1} would exceed max ${limits.maxOpenPositions}`);
   }
 
   // 2. Max position size
   if (limits.maxPositionSize > 0 && proposed.lotSize > limits.maxPositionSize) {
     reasons.push(
-      `Lot size ${proposed.lotSize} exceeds max position size ${limits.maxPositionSize}`
+      `Lot size ${proposed.lotSize} exceeds max position size ${limits.maxPositionSize}`,
     );
   }
 
@@ -69,14 +70,14 @@ export function evaluateTrade(
     symbolExposure + proposed.lotSize > limits.maxPerSymbolExposure
   ) {
     reasons.push(
-      `Symbol ${proposed.symbol} exposure ${symbolExposure + proposed.lotSize} would exceed max ${limits.maxPerSymbolExposure}`
+      `Symbol ${proposed.symbol} exposure ${symbolExposure + proposed.lotSize} would exceed max ${limits.maxPerSymbolExposure}`,
     );
   }
 
   // 4. Daily loss limit
   if (limits.dailyLossLimit > 0 && projectedDailyPnl < -limits.dailyLossLimit) {
     reasons.push(
-      `Projected daily PnL ${projectedDailyPnl.toFixed(2)} breaches daily loss limit ${limits.dailyLossLimit}`
+      `Projected daily PnL ${projectedDailyPnl.toFixed(2)} breaches daily loss limit ${limits.dailyLossLimit}`,
     );
   }
 

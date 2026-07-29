@@ -8,9 +8,9 @@
 
 # Confirmed Problems
 
-| Severity | Component | Root cause | Impact | Status |
-| --- | --- | --- | --- | --- |
-| HIGH | Live-signals freshness contract | `/live-signals` returned a cacheable-looking success response, `apiClient.getLiveSignals()` did not opt into the existing `cacheBust` + `no-store` GET path, and `useLiveSignals()` inherited the global 10 second React Query stale window. | The dashboard could show stale backend-authoritative signals after the backend had already produced newer truth, especially across remounts, poll re-enable, browser cache, or intermediary cache layers. | Patched |
+| Severity | Component                       | Root cause                                                                                                                                                                                                                                   | Impact                                                                                                                                                                                                    | Status  |
+| -------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| HIGH     | Live-signals freshness contract | `/live-signals` returned a cacheable-looking success response, `apiClient.getLiveSignals()` did not opt into the existing `cacheBust` + `no-store` GET path, and `useLiveSignals()` inherited the global 10 second React Query stale window. | The dashboard could show stale backend-authoritative signals after the backend had already produced newer truth, especially across remounts, poll re-enable, browser cache, or intermediary cache layers. | Patched |
 
 # Surgical Fixes Applied
 
@@ -28,12 +28,12 @@
 
 # Verification Results
 
-| Check | Result | Notes |
-| --- | --- | --- |
-| `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | PASS | Route-local header patch is syntactically valid. |
-| `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx` | PASS | 2 files passed, 16 tests passed. |
-| `npm run validate:impl` | PASS | Implementation report and workflow metadata validated successfully. |
-| Authenticated live `/live-signals` network inspection | NOT RUN | Still required outside this workspace. |
+| Check                                                                              | Result  | Notes                                                               |
+| ---------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------- |
+| `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`                     | PASS    | Route-local header patch is syntactically valid.                    |
+| `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx` | PASS    | 2 files passed, 16 tests passed.                                    |
+| `npm run validate:impl`                                                            | PASS    | Implementation report and workflow metadata validated successfully. |
+| Authenticated live `/live-signals` network inspection                              | NOT RUN | Still required outside this workspace.                              |
 
 # Remaining Risks
 

@@ -14,9 +14,7 @@
       "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
       "wordpress/smc-superfib-sniper/class-market-data-service.php"
     ],
-    "rest_route_files": [
-      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php"
-    ],
+    "rest_route_files": ["wordpress/smc-superfib-sniper/smc-superfib-sniper.php"],
     "frontend_api_client": "src/lib/api/sniperClient.ts",
     "mt5_ea_files": [
       "mt5/SMC_MarketDataEA.mq5",
@@ -74,47 +72,65 @@
     "migration_phase": "MT5-native migration / Phase 1 bridge infrastructure"
   },
   "rest_routes_confirmed": [
-    {"route": "GET /sniper/v1/health", "auth": "public"},
-    {"route": "GET /sniper/v1/session", "auth": "public"},
-    {"route": "GET /sniper/v1/admin/health", "auth": "manage_options (WordPress admin)"},
-    {"route": "GET /sniper/v1/admin/soak-report", "auth": "manage_options"},
-    {"route": "POST /sniper/v1/admin/soak-evidence", "auth": "manage_options"},
-    {"route": "POST /sniper/v1/admin/soak-checkpoint", "auth": "manage_options"},
-    {"route": "GET /sniper/v1/snapshot", "auth": "WordPress session (permission_user)"},
-    {"route": "POST /sniper/v1/snapshot", "auth": "WordPress session"},
-    {"route": "GET /sniper/v1/charts", "auth": "WordPress session"},
-    {"route": "GET /sniper/v1/regimes", "auth": "WordPress session"},
-    {"route": "POST /sniper/v1/regime", "auth": "WordPress session"},
-    {"route": "GET /sniper/v1/live-signals", "auth": "WordPress session"},
-    {"route": "POST /sniper/v1/signal", "auth": "WordPress session"},
-    {"route": "GET /sniper/v1/ladders", "auth": "WordPress session"},
-    {"route": "POST /sniper/v1/user/engine-batch", "auth": "WordPress session"},
-    {"route": "POST /sniper/v1/user/market-data", "auth": "WordPress session"},
-    {"route": "GET /sniper/v1/user/trades", "auth": "WordPress session"},
-    {"route": "POST /sniper/v1/user/trades", "auth": "WordPress session"},
-    {"route": "GET /sniper/v1/user/account", "auth": "WordPress session"},
-    {"route": "POST /sniper/v1/user/account", "auth": "WordPress session"},
-    {"route": "GET /sniper/v1/user/settings", "auth": "WordPress session"},
-    {"route": "POST /sniper/v1/user/settings", "auth": "WordPress session"},
-    {"route": "GET /sniper/v1/user/risk-profile", "auth": "WordPress session"},
-    {"route": "POST /sniper/v1/user/risk-profile", "auth": "WordPress session"},
-    {"route": "GET /sniper/v1/user/trade-queue", "auth": "WordPress session"},
-    {"route": "POST /sniper/v1/user/trade-queue", "auth": "WordPress session"},
-    {"route": "POST /sniper/v1/user/execute-signals", "auth": "WordPress session"},
-    {"route": "POST /sniper/v1/user/twelve-data-key", "auth": "WordPress session"},
-    {"route": "DELETE /sniper/v1/user/twelve-data-key", "auth": "WordPress session"},
-    {"route": "GET /sniper/v1/user/watchlist", "auth": "WordPress session"},
-    {"route": "POST /sniper/v1/user/watchlist", "auth": "WordPress session"},
-    {"route": "POST /sniper/v1/user/watchlist/add", "auth": "WordPress session"},
-    {"route": "POST /sniper/v1/user/watchlist/remove", "auth": "WordPress session"},
-    {"route": "GET /sniper/v1/instruments", "auth": "WordPress session"},
-    {"route": "GET /sniper/v1/market-data-authority", "auth": "WordPress session"},
-    {"route": "GET /sniper/v1/authority-diagnostics", "auth": "WordPress session (401 for unauthenticated — EXPECTED)"},
-    {"route": "POST /sniper/v1/ea/market-stream", "auth": "X-EA-API-Key header (permission_ea_market_stream → permission_ea_bridge)"},
-    {"route": "POST /sniper/v1/ea/heartbeat", "auth": "X-EA-API-Key header (permission_ea_bridge)"},
-    {"route": "POST /sniper/v1/ea/account-sync", "auth": "X-EA-API-Key header (permission_ea_bridge)"},
-    {"route": "POST /sniper/v1/ea/symbol-sync", "auth": "X-EA-API-Key header (permission_ea_bridge)"},
-    {"route": "GET /sniper/v1/ea/license-check", "auth": "X-EA-API-Key header (permission_ea_bridge)"}
+    { "route": "GET /sniper/v1/health", "auth": "public" },
+    { "route": "GET /sniper/v1/session", "auth": "public" },
+    { "route": "GET /sniper/v1/admin/health", "auth": "manage_options (WordPress admin)" },
+    { "route": "GET /sniper/v1/admin/soak-report", "auth": "manage_options" },
+    { "route": "POST /sniper/v1/admin/soak-evidence", "auth": "manage_options" },
+    { "route": "POST /sniper/v1/admin/soak-checkpoint", "auth": "manage_options" },
+    { "route": "GET /sniper/v1/snapshot", "auth": "WordPress session (permission_user)" },
+    { "route": "POST /sniper/v1/snapshot", "auth": "WordPress session" },
+    { "route": "GET /sniper/v1/charts", "auth": "WordPress session" },
+    { "route": "GET /sniper/v1/regimes", "auth": "WordPress session" },
+    { "route": "POST /sniper/v1/regime", "auth": "WordPress session" },
+    { "route": "GET /sniper/v1/live-signals", "auth": "WordPress session" },
+    { "route": "POST /sniper/v1/signal", "auth": "WordPress session" },
+    { "route": "GET /sniper/v1/ladders", "auth": "WordPress session" },
+    { "route": "POST /sniper/v1/user/engine-batch", "auth": "WordPress session" },
+    { "route": "POST /sniper/v1/user/market-data", "auth": "WordPress session" },
+    { "route": "GET /sniper/v1/user/trades", "auth": "WordPress session" },
+    { "route": "POST /sniper/v1/user/trades", "auth": "WordPress session" },
+    { "route": "GET /sniper/v1/user/account", "auth": "WordPress session" },
+    { "route": "POST /sniper/v1/user/account", "auth": "WordPress session" },
+    { "route": "GET /sniper/v1/user/settings", "auth": "WordPress session" },
+    { "route": "POST /sniper/v1/user/settings", "auth": "WordPress session" },
+    { "route": "GET /sniper/v1/user/risk-profile", "auth": "WordPress session" },
+    { "route": "POST /sniper/v1/user/risk-profile", "auth": "WordPress session" },
+    { "route": "GET /sniper/v1/user/trade-queue", "auth": "WordPress session" },
+    { "route": "POST /sniper/v1/user/trade-queue", "auth": "WordPress session" },
+    { "route": "POST /sniper/v1/user/execute-signals", "auth": "WordPress session" },
+    { "route": "POST /sniper/v1/user/twelve-data-key", "auth": "WordPress session" },
+    { "route": "DELETE /sniper/v1/user/twelve-data-key", "auth": "WordPress session" },
+    { "route": "GET /sniper/v1/user/watchlist", "auth": "WordPress session" },
+    { "route": "POST /sniper/v1/user/watchlist", "auth": "WordPress session" },
+    { "route": "POST /sniper/v1/user/watchlist/add", "auth": "WordPress session" },
+    { "route": "POST /sniper/v1/user/watchlist/remove", "auth": "WordPress session" },
+    { "route": "GET /sniper/v1/instruments", "auth": "WordPress session" },
+    { "route": "GET /sniper/v1/market-data-authority", "auth": "WordPress session" },
+    {
+      "route": "GET /sniper/v1/authority-diagnostics",
+      "auth": "WordPress session (401 for unauthenticated — EXPECTED)"
+    },
+    {
+      "route": "POST /sniper/v1/ea/market-stream",
+      "auth": "X-EA-API-Key header (permission_ea_market_stream → permission_ea_bridge)"
+    },
+    {
+      "route": "POST /sniper/v1/ea/heartbeat",
+      "auth": "X-EA-API-Key header (permission_ea_bridge)"
+    },
+    {
+      "route": "POST /sniper/v1/ea/account-sync",
+      "auth": "X-EA-API-Key header (permission_ea_bridge)"
+    },
+    {
+      "route": "POST /sniper/v1/ea/symbol-sync",
+      "auth": "X-EA-API-Key header (permission_ea_bridge)"
+    },
+    {
+      "route": "GET /sniper/v1/ea/license-check",
+      "auth": "X-EA-API-Key header (permission_ea_bridge)"
+    }
   ],
   "checks_prerun": {
     "php_lint_main_plugin": "PASS",

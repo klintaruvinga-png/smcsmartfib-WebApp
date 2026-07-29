@@ -14,26 +14,26 @@ Phase 3 closed on 2026-05-25 following a successful 72-hour stability soak (2026
 
 ## Phase Status This Week
 
-| Phase | Objective | Status | Change This Week |
-|-------|-----------|--------|-----------------|
-| 0 | Stabilize platform | **COMPLETE** | No change |
-| 1 | MT5 bridge infrastructure | **COMPLETE** | No change |
-| 2 | Read-only trade telemetry | **COMPLETE** | No change |
-| 3 | MT5 market data engine | **COMPLETE** | ✅ 72h soak closed; gate PASS (conditional) |
-| 4 | Fib engine migration | NOT-STARTED | Phase 3 gate now cleared; Phase 4 authorized |
+| Phase | Objective                 | Status       | Change This Week                             |
+| ----- | ------------------------- | ------------ | -------------------------------------------- |
+| 0     | Stabilize platform        | **COMPLETE** | No change                                    |
+| 1     | MT5 bridge infrastructure | **COMPLETE** | No change                                    |
+| 2     | Read-only trade telemetry | **COMPLETE** | No change                                    |
+| 3     | MT5 market data engine    | **COMPLETE** | ✅ 72h soak closed; gate PASS (conditional)  |
+| 4     | Fib engine migration      | NOT-STARTED  | Phase 3 gate now cleared; Phase 4 authorized |
 
 ---
 
 ## Phase 3 Gate Result
 
-| Criterion | Result |
-|-----------|--------|
-| Engine runs ≥200K / 0 errors (72h) | PASS — 97,262 / 0 in final 24h; ~291K estimated 72h |
-| Candle accumulation ≥30 M15 per symbol | PASS — 20,883 total / 13 symbols in final 24h |
-| Weekend FX/equity CLOSED, crypto LIVE | PASS — confirmed 2026-05-24/25 |
-| EA reconnect on Sunday open | PASS — confirmed 2026-05-25 |
-| No false LIVE states during off-session | PASS — offline root cause = broker session, not code |
-| MT5-live symbol freshness | 22/24 live during equity session; NAS100/US30 offline in closeout snapshot (04:17 UTC) = expected pre-market behaviour; present in EA as Deriv names `US Tech 100`/`Wall Street 30`; normalization alias resolves correctly |
+| Criterion                               | Result                                                                                                                                                                                                                      |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Engine runs ≥200K / 0 errors (72h)      | PASS — 97,262 / 0 in final 24h; ~291K estimated 72h                                                                                                                                                                         |
+| Candle accumulation ≥30 M15 per symbol  | PASS — 20,883 total / 13 symbols in final 24h                                                                                                                                                                               |
+| Weekend FX/equity CLOSED, crypto LIVE   | PASS — confirmed 2026-05-24/25                                                                                                                                                                                              |
+| EA reconnect on Sunday open             | PASS — confirmed 2026-05-25                                                                                                                                                                                                 |
+| No false LIVE states during off-session | PASS — offline root cause = broker session, not code                                                                                                                                                                        |
+| MT5-live symbol freshness               | 22/24 live during equity session; NAS100/US30 offline in closeout snapshot (04:17 UTC) = expected pre-market behaviour; present in EA as Deriv names `US Tech 100`/`Wall Street 30`; normalization alias resolves correctly |
 
 **Gate decision**: CONDITIONAL PASS — Phase 4 authorized  
 **Condition**: T0 admin baseline capture (operator action) still pending
@@ -60,12 +60,12 @@ None. Phase 3 closed cleanly. Phase 4 has no active blockers beyond Phase 3 gate
 
 ## Known Open Items (Non-blocking)
 
-| Item | Phase | Disposition |
-|------|-------|-------------|
-| T0 admin baseline capture | 3 | Operator action required — admin soak workspace ready |
-| Track A/B/C lead assignments | 4 | Human decision — all tracks still TBD |
-| Dedicated regime replay suite | 3/4 | GAP-01 — carried to Phase 4 planning |
-| Multi-pair signal replay suite | 3/4 | GAP-02 — carried to Phase 4 planning |
+| Item                           | Phase | Disposition                                           |
+| ------------------------------ | ----- | ----------------------------------------------------- |
+| T0 admin baseline capture      | 3     | Operator action required — admin soak workspace ready |
+| Track A/B/C lead assignments   | 4     | Human decision — all tracks still TBD                 |
+| Dedicated regime replay suite  | 3/4   | GAP-01 — carried to Phase 4 planning                  |
+| Multi-pair signal replay suite | 3/4   | GAP-02 — carried to Phase 4 planning                  |
 
 ---
 

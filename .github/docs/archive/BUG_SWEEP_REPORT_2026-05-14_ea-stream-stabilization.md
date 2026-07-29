@@ -9,15 +9,15 @@
 
 ## Executive Summary
 
-| Item | Status |
-|---|---|
-| Overall system health | STABLE |
-| Bugs found | 3 (0 critical, 0 high, 1 medium, 2 low) |
-| Bugs fixed | 3 |
-| Remaining risks | NONE — all identified issues patched |
-| Migration readiness | Phase 0 soak continues — ready for live EA streaming |
-| Snapshot archive | reports/snapshots/stabilize-ea-2026-05-14/ |
-| Rollback command | `git reset --hard da4720ebac830eb4757ebe04501f75a3c131ee18` |
+| Item                  | Status                                                      |
+| --------------------- | ----------------------------------------------------------- |
+| Overall system health | STABLE                                                      |
+| Bugs found            | 3 (0 critical, 0 high, 1 medium, 2 low)                     |
+| Bugs fixed            | 3                                                           |
+| Remaining risks       | NONE — all identified issues patched                        |
+| Migration readiness   | Phase 0 soak continues — ready for live EA streaming        |
+| Snapshot archive      | reports/snapshots/stabilize-ea-2026-05-14/                  |
+| Rollback command      | `git reset --hard da4720ebac830eb4757ebe04501f75a3c131ee18` |
 
 This workflow run is a hardening pass on the EA market stream ingestion pipeline.
 The system was already in good shape from prior workflow runs (2026-05-11 through 2026-05-13).
@@ -43,6 +43,7 @@ real-world risk is low, but the guard should be unconditional.
 **Impact zones:** EA Market Stream Ingestion, Signal Engine (stale candle data risk), Dashboard.
 
 **Files affected:**
+
 - `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` — M1 candle block (~line 1781)
 - `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` — M15 candle block (~line 1834)
 
@@ -59,6 +60,7 @@ spec explicitly requires 422 for stale quote_time, and tooling or monitoring tha
 error codes could misclassify these errors.
 
 **Files affected:**
+
 - `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` — two `WP_Error('stale_data', ...)` calls
 
 ---
@@ -71,6 +73,7 @@ in the test output, making test output hard to read in CI logs.
 **Impact:** Test output quality only. All assertions were correct.
 
 **Files affected:**
+
 - `wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php`
 
 ---
@@ -82,6 +85,7 @@ in the test output, making test output hard to read in CI logs.
 **Files changed:** `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`
 
 **Change (M1 block):**
+
 ```php
 // Before (bypass when timestamp absent):
 $result = $this->insert_mt5_candle($user_id, $symbol, $timeframe, $candle, $payload['timestamp'] ?? null);
@@ -131,24 +135,24 @@ return new WP_Error('stale_data', 'Rejected market data older than 300 seconds',
 
 ## EA Integration Status
 
-| Item | Status |
-|---|---|
-| Route | `POST /wp-json/sniper/v1/ea/market-stream` |
-| Auth model | Shared secret via `X-EA-API-Key` header (or 3 aliases) |
-| Secret env | `SMC_SF_EA_API_KEY` (constant or `getenv()`) |
-| Hash comparison | `hash_equals()` — timing-safe |
-| Missing token | 401 |
-| Unconfigured secret | 503 + `error_log` |
-| Invalid token | 403 |
-| Missing `user_id` | 400 |
-| Invalid `user_id` | 403 |
-| `wp_set_current_user()` | Called before permission returns true |
-| Stale payload (>300s) | **422** (was 400 — patched) |
-| Unparseable timestamp | **422** (was 400 — patched) |
-| Missing bid/ask | 400 |
-| Invalid OHLC | Candle rejected (audit logged); snapshot still stored |
-| Infinite bid/ask | Snapshot not stored (audit logged) |
-| Negative tick_volume | Clamped to 0 (audit logged) |
+| Item                       | Status                                                                 |
+| -------------------------- | ---------------------------------------------------------------------- |
+| Route                      | `POST /wp-json/sniper/v1/ea/market-stream`                             |
+| Auth model                 | Shared secret via `X-EA-API-Key` header (or 3 aliases)                 |
+| Secret env                 | `SMC_SF_EA_API_KEY` (constant or `getenv()`)                           |
+| Hash comparison            | `hash_equals()` — timing-safe                                          |
+| Missing token              | 401                                                                    |
+| Unconfigured secret        | 503 + `error_log`                                                      |
+| Invalid token              | 403                                                                    |
+| Missing `user_id`          | 400                                                                    |
+| Invalid `user_id`          | 403                                                                    |
+| `wp_set_current_user()`    | Called before permission returns true                                  |
+| Stale payload (>300s)      | **422** (was 400 — patched)                                            |
+| Unparseable timestamp      | **422** (was 400 — patched)                                            |
+| Missing bid/ask            | 400                                                                    |
+| Invalid OHLC               | Candle rejected (audit logged); snapshot still stored                  |
+| Infinite bid/ask           | Snapshot not stored (audit logged)                                     |
+| Negative tick_volume       | Clamped to 0 (audit logged)                                            |
 | Missing timestamp + candle | **Staleness guards now always run** via server-time fallback (patched) |
 
 ### EA Payload Contract (actual, not spec)
@@ -175,8 +179,8 @@ return new WP_Error('stale_data', 'Rejected market data older than 300 seconds',
   "candle_m15": {
     "time": "2026-05-14T12:15:00Z",
     "open": 1.0845,
-    "high": 1.0860,
-    "low": 1.0840,
+    "high": 1.086,
+    "low": 1.084,
     "close": 1.0853,
     "volume": 987
   }
@@ -191,12 +195,12 @@ and `candle_m15{}` (singular M15). Both EA and PHP are aligned to this contract.
 
 ## Parity Verification
 
-| Layer | Status | Notes |
-|---|---|---|
-| Pine vs Backend | Not in scope this run — no Pine formula changes | ✅ No drift introduced |
-| MQL5 EA vs PHP handler | ALIGNED | Field names, timestamp format, candle structure all consistent |
-| Backend vs Dashboard | ALIGNED | FreshnessBadge, VerdictBadge use backend `state`/`verdict` — no frontend override |
-| Backend vs MT5 authority | ALIGNED | Signal engine gates on backend `is_live`, candle count, freshness |
+| Layer                    | Status                                          | Notes                                                                             |
+| ------------------------ | ----------------------------------------------- | --------------------------------------------------------------------------------- |
+| Pine vs Backend          | Not in scope this run — no Pine formula changes | ✅ No drift introduced                                                            |
+| MQL5 EA vs PHP handler   | ALIGNED                                         | Field names, timestamp format, candle structure all consistent                    |
+| Backend vs Dashboard     | ALIGNED                                         | FreshnessBadge, VerdictBadge use backend `state`/`verdict` — no frontend override |
+| Backend vs MT5 authority | ALIGNED                                         | Signal engine gates on backend `is_live`, candle count, freshness                 |
 
 ---
 
@@ -266,6 +270,7 @@ git checkout main && git reset --hard origin/main
 ## EA Test Commands
 
 ### Missing token → 401
+
 ```bash
 curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
   -H "Content-Type: application/json" \
@@ -273,6 +278,7 @@ curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-st
 ```
 
 ### Invalid token → 403
+
 ```bash
 curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
   -H "Content-Type: application/json" \
@@ -281,6 +287,7 @@ curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-st
 ```
 
 ### Missing user_id → 400
+
 ```bash
 curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
   -H "Content-Type: application/json" \
@@ -289,6 +296,7 @@ curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-st
 ```
 
 ### Stale timestamp → 422 (patched from 400)
+
 ```bash
 curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
   -H "Content-Type: application/json" \
@@ -297,6 +305,7 @@ curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-st
 ```
 
 ### Valid full payload → 200 OK
+
 ```bash
 curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
   -H "Content-Type: application/json" \

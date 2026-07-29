@@ -17,13 +17,13 @@
 
 ## Verified parity points
 
-| Surface | Backend authority source | Frontend behavior | Status |
-| --- | --- | --- | --- |
-| Baseline existence state | `soakState.report.baseline_checkpoint` | Warning panel renders only when non-null | PASS |
-| Baseline capture lock | `soakState.report.baseline_checkpoint` | Locked capture button renders only when non-null | PASS |
-| Baseline evidence updates | Existing admin submit path | `Update Baseline Evidence` remains available after baseline capture | PASS |
-| API contract | Existing `/admin/soak-report` payload | No `SoakReport` or client fetch changes | PASS |
-| Live authenticated admin parity | Live `/admin` + `/admin/soak-report` session | Not executed in this workspace | PENDING |
+| Surface                         | Backend authority source                     | Frontend behavior                                                   | Status  |
+| ------------------------------- | -------------------------------------------- | ------------------------------------------------------------------- | ------- |
+| Baseline existence state        | `soakState.report.baseline_checkpoint`       | Warning panel renders only when non-null                            | PASS    |
+| Baseline capture lock           | `soakState.report.baseline_checkpoint`       | Locked capture button renders only when non-null                    | PASS    |
+| Baseline evidence updates       | Existing admin submit path                   | `Update Baseline Evidence` remains available after baseline capture | PASS    |
+| API contract                    | Existing `/admin/soak-report` payload        | No `SoakReport` or client fetch changes                             | PASS    |
+| Live authenticated admin parity | Live `/admin` + `/admin/soak-report` session | Not executed in this workspace                                      | PENDING |
 
 ---
 

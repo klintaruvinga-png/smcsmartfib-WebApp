@@ -18,15 +18,15 @@ This artifact documents the baseline evidence now present in git. It does not cl
 **Baseline report generated**: `2026-05-11T06:57:21+00:00`  
 **Baseline checkpoint**: `2026-05-11 08:57:17 SAST`
 
-| Field | Baseline value | Evidence source |
-| --- | --- | --- |
-| `feedStatus` | `stale` | Exported soak report `Health` section |
-| `backendSync` | `live` | Exported soak report `Health` section |
-| `engineRunState` | `live` | Exported soak report `Health` section |
-| `twelveDataKeyStatus` | `ok` | Exported soak report `Manual Evidence` |
-| `lastBatchAt` | `2026-05-11 08:57:12 SAST` | Exported soak report `Health` section |
-| `lastEngineRunAt` | `2026-05-11 08:57:18 SAST` | Exported soak report `Health` section |
-| `auth` confirmation | `true` | Exported soak report `baseline.auth_confirmed` |
+| Field                                | Baseline value                                             | Evidence source                                         |
+| ------------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------- |
+| `feedStatus`                         | `stale`                                                    | Exported soak report `Health` section                   |
+| `backendSync`                        | `live`                                                     | Exported soak report `Health` section                   |
+| `engineRunState`                     | `live`                                                     | Exported soak report `Health` section                   |
+| `twelveDataKeyStatus`                | `ok`                                                       | Exported soak report `Manual Evidence`                  |
+| `lastBatchAt`                        | `2026-05-11 08:57:12 SAST`                                 | Exported soak report `Health` section                   |
+| `lastEngineRunAt`                    | `2026-05-11 08:57:18 SAST`                                 | Exported soak report `Health` section                   |
+| `auth` confirmation                  | `true`                                                     | Exported soak report `baseline.auth_confirmed`          |
 | Health endpoint recorded at baseline | `https://smcsmartfib.lovable.app/wp-json/sniper/v1/health` | Exported soak report `baseline.backend_health_endpoint` |
 
 ## Backend authority cross-check

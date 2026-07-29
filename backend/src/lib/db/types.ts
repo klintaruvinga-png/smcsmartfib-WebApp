@@ -14,13 +14,7 @@
  * `npm run db:types` and confirm the generated output still matches the schema
  * below.
  */
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[];
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export interface Database {
   public: {

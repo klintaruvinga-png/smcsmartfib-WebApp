@@ -3,7 +3,7 @@
 **Event**: Phase 6 (Signal Engine Dual-Run) code implementation complete  
 **Date**: 2026-05-25  
 **Triggered by**: Pre-emptive implementation during Phase 4 live corpus soak  
-**Author**: Claude Code (assisted)  
+**Author**: Claude Code (assisted)
 
 ---
 
@@ -18,6 +18,7 @@ hard-blocked until Phase 6 parity ≥ 95% is confirmed by the drift analyzer.
 ## What Was Done
 
 ### MT5 (Track A)
+
 - **Created `mt5/SignalEngine.mqh`** (Phase 6 MT5 signal evaluator)
   - 4-gate evaluation: proximity, displacement, HTF alignment, LTF regime clear
   - Status: WATCH / ARMED / READY from gate count
@@ -32,6 +33,7 @@ hard-blocked until Phase 6 parity ≥ 95% is confirmed by the drift analyzer.
   - `SendAck()` → POST `/ea/execution-ack`
 
 ### Backend (Track B)
+
 - **New table**: `wp_smc_sf_mt5_signal_candidates`
 - **New route**: `POST /ea/signal-candidates` — batch signal ingestion with drift classification
 - **New route**: `GET /market-data/signal-drift` — parity report: exact/drift/mismatch counts, parity_pct
@@ -39,6 +41,7 @@ hard-blocked until Phase 6 parity ≥ 95% is confirmed by the drift analyzer.
 - **`is_phase6_gate_cleared()`**: ≥ 50 comparables AND parity_pct ≥ 95% → unlocks Phase 7 queue
 
 ### Readiness Package
+
 - **Created `PHASE6_IMPLEMENTATION.md`** — full spec, drift logic, parity gate, activation checklist
 
 ---
@@ -50,6 +53,7 @@ but will be empty until the Phase 6 activation sprint adds a SharedStateCache th
 passes the live FibEngine fib level array to the SignalEngine.
 
 This does NOT affect:
+
 - Storage infrastructure (ready to receive)
 - Drift analyzer (ready to classify once data arrives)
 - Parity gate logic (correct — just waiting for candidates)
@@ -61,15 +65,15 @@ Phase 6 activation sprint will complete the fib→signal data wiring.
 
 ## Phase 6 Gate Status
 
-| Gate | Status |
-|------|--------|
-| SignalEngine.mqh | ✅ COMPLETE (scaffold — fib wiring pending) |
-| ExecutionEngine.mqh scaffold | ✅ COMPLETE |
-| DB schema | ✅ COMPLETE |
-| REST endpoints | ✅ COMPLETE |
-| Drift analyzer | ✅ COMPLETE |
-| Phase 5B prerequisite | ⏳ PENDING |
-| Fib→Signal state wiring | ⏳ Phase 6 activation sprint |
-| 200+ comparable candidates | ⏳ PENDING |
-| Parity ≥ 95% | ⏳ PENDING |
-| Phase 7 BLOCKED | ✅ CONFIRMED (hard gate) |
+| Gate                         | Status                                      |
+| ---------------------------- | ------------------------------------------- |
+| SignalEngine.mqh             | ✅ COMPLETE (scaffold — fib wiring pending) |
+| ExecutionEngine.mqh scaffold | ✅ COMPLETE                                 |
+| DB schema                    | ✅ COMPLETE                                 |
+| REST endpoints               | ✅ COMPLETE                                 |
+| Drift analyzer               | ✅ COMPLETE                                 |
+| Phase 5B prerequisite        | ⏳ PENDING                                  |
+| Fib→Signal state wiring      | ⏳ Phase 6 activation sprint                |
+| 200+ comparable candidates   | ⏳ PENDING                                  |
+| Parity ≥ 95%                 | ⏳ PENDING                                  |
+| Phase 7 BLOCKED              | ✅ CONFIRMED (hard gate)                    |

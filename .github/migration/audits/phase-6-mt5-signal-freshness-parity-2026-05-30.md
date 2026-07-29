@@ -16,39 +16,39 @@
 
 ### Fib Engine
 
-| Metric | Pine Value | MT5 Value | Match | Accuracy |
-|---|---|---|---|---:|
-| M15/H1/H4/D1 tuples | synthetic baseline | synthetic MT5 | yes | 100% |
-| Tuple coverage | 384 expected | 384 present | yes | 100% |
-| Critical mismatches | 0 | 0 | yes | 100% |
+| Metric              | Pine Value         | MT5 Value     | Match | Accuracy |
+| ------------------- | ------------------ | ------------- | ----- | -------: |
+| M15/H1/H4/D1 tuples | synthetic baseline | synthetic MT5 | yes   |     100% |
+| Tuple coverage      | 384 expected       | 384 present   | yes   |     100% |
+| Critical mismatches | 0                  | 0             | yes   |     100% |
 
 ### Regime Engine
 
-| Metric | Pine Classification | MT5 Classification | Match | Accuracy |
-|---|---|---|---|---:|
-| Phase 6 dispatch source | backend/Pine comparison | `ComputeRegimeState()` | retained | 100% source guard |
-| Stale-symbol evaluation | should not evaluate | skipped unless `IsLive()` | yes | 100% source guard |
+| Metric                  | Pine Classification     | MT5 Classification        | Match    |          Accuracy |
+| ----------------------- | ----------------------- | ------------------------- | -------- | ----------------: |
+| Phase 6 dispatch source | backend/Pine comparison | `ComputeRegimeState()`    | retained | 100% source guard |
+| Stale-symbol evaluation | should not evaluate     | skipped unless `IsLive()` | yes      | 100% source guard |
 
 ### Signal Engine
 
-| Metric | Pine Signal | MT5 Signal | Match | Accuracy |
-|---|---|---|---|---:|
-| Candidate contract | existing backend contract | unchanged | yes | 100% |
-| Candidate freshness gate | fresh data only | `IsLive()` before fib/regime/signal evaluation | yes | 100% source guard |
-| Drift diagnostics | `pine_match` / `drift_pips` | unchanged backend persistence | yes | verified by PHP contract test |
+| Metric                   | Pine Signal                 | MT5 Signal                                     | Match |                      Accuracy |
+| ------------------------ | --------------------------- | ---------------------------------------------- | ----- | ----------------------------: |
+| Candidate contract       | existing backend contract   | unchanged                                      | yes   |                          100% |
+| Candidate freshness gate | fresh data only             | `IsLive()` before fib/regime/signal evaluation | yes   |             100% source guard |
+| Drift diagnostics        | `pine_match` / `drift_pips` | unchanged backend persistence                  | yes   | verified by PHP contract test |
 
 ## Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-|---|---|---:|---|---|
-| MT5 Phase 6 evaluated candidate signals without a per-symbol LIVE freshness precheck. | HIGH | 1 | Guard added before fib/regime/signal evaluation. | No after patch |
+| Issue                                                                                 | Severity | Count | Resolution                                       | Blocker        |
+| ------------------------------------------------------------------------------------- | -------- | ----: | ------------------------------------------------ | -------------- |
+| MT5 Phase 6 evaluated candidate signals without a per-symbol LIVE freshness precheck. | HIGH     |     1 | Guard added before fib/regime/signal evaluation. | No after patch |
 
 ## Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-|---|---|---|---|
-| Live terminal replay absent | Workspace cannot run MetaTrader/MetaEditor. | Requires external MT5 environment. | Yes, tracked as remaining risk |
-| Synthetic parity only | `parity-validator.php` ran self-test mode. | No live replay input files were provided. | Yes, pending live capture |
+| Item                        | Difference                                  | Reason                                    | Accepted                       |
+| --------------------------- | ------------------------------------------- | ----------------------------------------- | ------------------------------ |
+| Live terminal replay absent | Workspace cannot run MetaTrader/MetaEditor. | Requires external MT5 environment.        | Yes, tracked as remaining risk |
+| Synthetic parity only       | `parity-validator.php` ran self-test mode.  | No live replay input files were provided. | Yes, pending live capture      |
 
 ## Recommendations
 
@@ -70,4 +70,3 @@
 - `reports/phase6-signal-freshness-2026-05-30.json`
 - `.github/docs/BUG_SWEEP_REPORT_2026-05-30.md`
 - `scripts/mt5-signal-dispatch.test.mjs`
-

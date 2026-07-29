@@ -15,12 +15,14 @@ This phase covers bridge transport, authentication, heartbeat continuity, accoun
 and the existing market-stream path.
 
 In scope:
+
 - MT5 EA live bridge validation
 - Backend operational validation for `/ea/license-check`, `/ea/heartbeat`, `/ea/account-sync`, `/ea/symbol-sync`
 - Live verification of the existing `/ea/market-stream` path as part of bridge integrity
 - Terminal telemetry and reconnect behavior
 
 Out of scope:
+
 - Dashboard feature work
 - Pine formula changes
 - Signal, fib, regime, or execution-engine migration
@@ -32,25 +34,25 @@ Track C is explicitly deferred until Phase 2. Phase 1 does not authorize dashboa
 
 ## 2. Track Assignments
 
-| Track | Responsibility | Phase 1 role | Status |
-|---|---|---|---|
-| Track A - MT5 EA | EA deployment, terminal operation, live scenario execution | Owns live terminal validation and scenario evidence capture | ACTIVE |
-| Track B - Backend | Route validation, auth gate verification, persistence/log review | Owns backend verification for each EA scenario | ACTIVE |
-| Track C - Dashboard | Dashboard telemetry and UI consumption | Deferred; no Phase 1 action items | DEFERRED |
+| Track               | Responsibility                                                   | Phase 1 role                                                | Status   |
+| ------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- | -------- |
+| Track A - MT5 EA    | EA deployment, terminal operation, live scenario execution       | Owns live terminal validation and scenario evidence capture | ACTIVE   |
+| Track B - Backend   | Route validation, auth gate verification, persistence/log review | Owns backend verification for each EA scenario              | ACTIVE   |
+| Track C - Dashboard | Dashboard telemetry and UI consumption                           | Deferred; no Phase 1 action items                           | DEFERRED |
 
 ---
 
 ## 3. Deliverable Matrix
 
-| Deliverable | Owner track | State | Evidence | Acceptance threshold |
-|---|---|---|---|---|
-| `POST /ea/heartbeat` | Track B | DONE | `reports/phase-1-ea-bridge-implementation-report.md` | Route implemented and regression-covered; live 48h validation still required |
-| `POST /ea/account-sync` | Track B | DONE | `reports/phase-1-ea-bridge-implementation-report.md` | Route implemented and regression-covered; live terminal account sync still required |
-| `POST /ea/symbol-sync` | Track B | DONE | `reports/phase-1-ea-bridge-implementation-report.md` | Route implemented and regression-covered; live terminal symbol sync still required |
-| `GET /ea/license-check` | Track B | DONE | `reports/phase-1-ea-bridge-implementation-report.md` | Route implemented and regression-covered; live operational gate still required |
-| Existing `POST /ea/market-stream` path | Track A + Track B | LIVE VALIDATED | Existing Phase 0 EA route remains in place | Live terminal stream posted successfully during Phase 1 validation; expected stale rejects during closed FX sessions did not invalidate transport/auth |
-| MT5 Bridge EA deployment and terminal telemetry | Track A | LIVE VALIDATED | `mt5/SMC_MarketDataEA.mq5` deployed and running in validation terminal | EA attached to terminal, authenticated, and posting bridge traffic without manual intervention |
-| Phase 1 gate evidence package | Track A + Track B | DONE | This roadmap, tracker, and checklist | All binary gate checks below recorded as PASS |
+| Deliverable                                     | Owner track       | State          | Evidence                                                               | Acceptance threshold                                                                                                                                   |
+| ----------------------------------------------- | ----------------- | -------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST /ea/heartbeat`                            | Track B           | DONE           | `reports/phase-1-ea-bridge-implementation-report.md`                   | Route implemented and regression-covered; live 48h validation still required                                                                           |
+| `POST /ea/account-sync`                         | Track B           | DONE           | `reports/phase-1-ea-bridge-implementation-report.md`                   | Route implemented and regression-covered; live terminal account sync still required                                                                    |
+| `POST /ea/symbol-sync`                          | Track B           | DONE           | `reports/phase-1-ea-bridge-implementation-report.md`                   | Route implemented and regression-covered; live terminal symbol sync still required                                                                     |
+| `GET /ea/license-check`                         | Track B           | DONE           | `reports/phase-1-ea-bridge-implementation-report.md`                   | Route implemented and regression-covered; live operational gate still required                                                                         |
+| Existing `POST /ea/market-stream` path          | Track A + Track B | LIVE VALIDATED | Existing Phase 0 EA route remains in place                             | Live terminal stream posted successfully during Phase 1 validation; expected stale rejects during closed FX sessions did not invalidate transport/auth |
+| MT5 Bridge EA deployment and terminal telemetry | Track A           | LIVE VALIDATED | `mt5/SMC_MarketDataEA.mq5` deployed and running in validation terminal | EA attached to terminal, authenticated, and posting bridge traffic without manual intervention                                                         |
+| Phase 1 gate evidence package                   | Track A + Track B | DONE           | This roadmap, tracker, and checklist                                   | All binary gate checks below recorded as PASS                                                                                                          |
 
 ---
 
@@ -58,18 +60,18 @@ Track C is explicitly deferred until Phase 2. Phase 1 does not authorize dashboa
 
 Phase 1 is PASS only when every criterion below is met with recorded evidence:
 
-| Criterion | PASS threshold |
-|---|---|
-| Heartbeat continuity | `POST /ea/heartbeat` remains stable for 48h+ with zero observed gaps |
-| Session stability | Dropped sessions = `0` during the validation window |
-| Terminal restart reconnect | After terminal restart, reconnect occurs automatically and bridge traffic resumes without forcing false LIVE state |
-| VPS restart reconnect | After VPS restart, reconnect occurs automatically and bridge traffic resumes without forcing false LIVE state |
-| Internet interruption reconnect | After network interruption, reconnect occurs automatically and bridge traffic resumes without forcing false LIVE state |
-| Duplicate heartbeat protection | Duplicate heartbeat scenario does not create duplicate live session truth or corrupt backend bridge state |
-| Invalid license rejection | Invalid or blocked operational access is rejected by the bridge gate; no bypass to LIVE state is allowed |
-| Account-sync verification | Backend receives and persists the expected account payload during live validation |
-| Symbol-sync verification | Backend receives and persists the expected broker symbol payload during live validation |
-| Market-stream verification | Existing market-stream payload reaches the backend during live validation and remains consistent with bridge auth/state |
+| Criterion                       | PASS threshold                                                                                                          |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Heartbeat continuity            | `POST /ea/heartbeat` remains stable for 48h+ with zero observed gaps                                                    |
+| Session stability               | Dropped sessions = `0` during the validation window                                                                     |
+| Terminal restart reconnect      | After terminal restart, reconnect occurs automatically and bridge traffic resumes without forcing false LIVE state      |
+| VPS restart reconnect           | After VPS restart, reconnect occurs automatically and bridge traffic resumes without forcing false LIVE state           |
+| Internet interruption reconnect | After network interruption, reconnect occurs automatically and bridge traffic resumes without forcing false LIVE state  |
+| Duplicate heartbeat protection  | Duplicate heartbeat scenario does not create duplicate live session truth or corrupt backend bridge state               |
+| Invalid license rejection       | Invalid or blocked operational access is rejected by the bridge gate; no bypass to LIVE state is allowed                |
+| Account-sync verification       | Backend receives and persists the expected account payload during live validation                                       |
+| Symbol-sync verification        | Backend receives and persists the expected broker symbol payload during live validation                                 |
+| Market-stream verification      | Existing market-stream payload reaches the backend during live validation and remains consistent with bridge auth/state |
 
 All criteria are binary pass/fail. No partial threshold is authorized for session drops or heartbeat gaps.
 
@@ -79,22 +81,23 @@ All criteria are binary pass/fail. No partial threshold is authorized for sessio
 
 ✅ **All environment prerequisites have been recorded and validated** (2026-05-18):
 
-| Requirement | Status | Recorded Value |
-|---|---|---|
-| Broker | ✅ RECORDED | Deriv.com, Deriv-Demo server |
-| Account ID | ✅ RECORDED | 32206603 (live demo account) |
-| Terminal ID | ✅ RECORDED | FB9A56D617EDDDFE29EE54EBEFFE96C1 |
-| MT5 terminal build | ✅ RECORDED | 5836 |
-| EA deployment target | ✅ DEPLOYED | `mt5/SMC_MarketDataEA.mq5` on branch `fix/gate-heartbeat-debug-log-behind-flag` |
-| WebRequest enabled | ✅ VERIFIED | Yes; confirmed firing 5 routes successfully |
-| Bridge configuration | ✅ CONFIGURED | WebhookURL, ApiKey, UserId set for production backend |
-| Backend access | ✅ AVAILABLE | Track B can inspect route logs, DB persistence, auth outcomes |
-| Infra access | ✅ AVAILABLE | Track A has terminal/VPS access for restart/reconnect scenarios |
+| Requirement          | Status        | Recorded Value                                                                  |
+| -------------------- | ------------- | ------------------------------------------------------------------------------- |
+| Broker               | ✅ RECORDED   | Deriv.com, Deriv-Demo server                                                    |
+| Account ID           | ✅ RECORDED   | 32206603 (live demo account)                                                    |
+| Terminal ID          | ✅ RECORDED   | FB9A56D617EDDDFE29EE54EBEFFE96C1                                                |
+| MT5 terminal build   | ✅ RECORDED   | 5836                                                                            |
+| EA deployment target | ✅ DEPLOYED   | `mt5/SMC_MarketDataEA.mq5` on branch `fix/gate-heartbeat-debug-log-behind-flag` |
+| WebRequest enabled   | ✅ VERIFIED   | Yes; confirmed firing 5 routes successfully                                     |
+| Bridge configuration | ✅ CONFIGURED | WebhookURL, ApiKey, UserId set for production backend                           |
+| Backend access       | ✅ AVAILABLE  | Track B can inspect route logs, DB persistence, auth outcomes                   |
+| Infra access         | ✅ AVAILABLE  | Track A has terminal/VPS access for restart/reconnect scenarios                 |
 
 **Live validation commenced**: 2026-05-18 ~00:07 UTC  
 **Reference**: `.github/migration/phase-updates/phase1-bridge-validation-started-2026-05-18.md`
 
 **Scenario validation status as of 2026-05-18**:
+
 - `terminal restart`: PASS
 - `VPS restart`: PASS via bundled outage-recovery validation on shared hosting (no WHM access for a literal VPS reboot)
 - `internet interruption`: PASS via the same bundled outage-recovery validation while the EA remained running
@@ -107,6 +110,7 @@ All criteria are binary pass/fail. No partial threshold is authorized for sessio
 ## 6. Phase Gate Definition
 
 Phase 1 is PASSED only when:
+
 - Phase 0 remains closed with no reopened blocker
 - All four additive bridge routes remain implemented and operational
 - The existing market-stream path is live-validated alongside the new bridge routes
@@ -121,13 +125,13 @@ Phase 2 may start only after the Phase 1 PASSED declaration is recorded with dat
 
 ## 7. Timeline And Checkpoints
 
-| Checkpoint | Target | Exit condition |
-|---|---|---|
-| Phase 1 baseline verified | 2026-05-15 | Phase 0 closeout confirmed; backend bridge routes confirmed in codebase |
-| Environment readiness | Before first live validation run | Broker, account, MT5 build, auth config, and access prerequisites recorded |
-| Scenario validation window | Before 48h soak sign-off | Terminal restart, VPS restart, internet interruption, duplicate protection, and invalid license rejection all executed and recorded as PASS |
-| 48h continuity window | Before Phase 1 gate review | Heartbeat continuity and zero session drops recorded for 48h+ |
-| Phase 1 gate decision | 2026-06-01 | All PASS criteria complete; Track A and Track B sign-off recorded |
+| Checkpoint                 | Target                           | Exit condition                                                                                                                              |
+| -------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase 1 baseline verified  | 2026-05-15                       | Phase 0 closeout confirmed; backend bridge routes confirmed in codebase                                                                     |
+| Environment readiness      | Before first live validation run | Broker, account, MT5 build, auth config, and access prerequisites recorded                                                                  |
+| Scenario validation window | Before 48h soak sign-off         | Terminal restart, VPS restart, internet interruption, duplicate protection, and invalid license rejection all executed and recorded as PASS |
+| 48h continuity window      | Before Phase 1 gate review       | Heartbeat continuity and zero session drops recorded for 48h+                                                                               |
+| Phase 1 gate decision      | 2026-06-01                       | All PASS criteria complete; Track A and Track B sign-off recorded                                                                           |
 
 ---
 

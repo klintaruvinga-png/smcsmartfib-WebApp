@@ -93,14 +93,14 @@ The WordPress backend (`https://trader.stokvelsociety.co.za/wp-json`) is **perma
 
 **Revised BACKEND phase map:**
 
-| Phase | Old scope | New scope |
-| ----- | --------- | --------- |
-| BACKEND-0 | Foundation setup | IN-PROGRESS (90% - DB layer complete; provider wiring pending) |
-| BACKEND-1 | Core API (auth, settings, market data) | COMPLETE (2026-07-17; 47 tests) |
-| BACKEND-2 | MT5 dual-write + cutover prep | **REDEFINED** → WordPress-Free Restoration (7 sub-phases, 15–23 days) |
-| BACKEND-3 | Signal & plan endpoints | Folded into BACKEND-2 (Phase 4) |
-| BACKEND-4 | Transition & cutover | Obsolete — no WordPress to cut over from |
-| BACKEND-5 | Architecture refactor + WP decommission | Obsolete — WP compatibility removed in BACKEND-2 Phase 1 |
+| Phase     | Old scope                               | New scope                                                             |
+| --------- | --------------------------------------- | --------------------------------------------------------------------- |
+| BACKEND-0 | Foundation setup                        | IN-PROGRESS (90% - DB layer complete; provider wiring pending)        |
+| BACKEND-1 | Core API (auth, settings, market data)  | COMPLETE (2026-07-17; 47 tests)                                       |
+| BACKEND-2 | MT5 dual-write + cutover prep           | **REDEFINED** → WordPress-Free Restoration (7 sub-phases, 15–23 days) |
+| BACKEND-3 | Signal & plan endpoints                 | Folded into BACKEND-2 (Phase 4)                                       |
+| BACKEND-4 | Transition & cutover                    | Obsolete — no WordPress to cut over from                              |
+| BACKEND-5 | Architecture refactor + WP decommission | Obsolete — WP compatibility removed in BACKEND-2 Phase 1              |
 
 BACKEND-3/4/5 as previously defined are **superseded**. Their intent (signal endpoints, architecture hardening) is absorbed into BACKEND-2.
 
@@ -108,37 +108,37 @@ BACKEND-3/4/5 as previously defined are **superseded**. Their intent (signal end
 
 ## Phase Summary
 
-| Phase | Objective                               | Status            | % Complete | Blocker                                                                                    | Target End            |
-| ----- | --------------------------------------- | ----------------- | ---------- | ------------------------------------------------------------------------------------------ | --------------------- |
-| 0     | Stabilize existing platform             | **COMPLETE**      | 100%       | None — gate passed 2026-05-15                                                              | 2026-05-15 ✅         |
-| 1     | MT5 bridge infrastructure               | **COMPLETE**      | 100%       | None — gate passed 2026-05-20                                                              | 2026-06-01 ✅         |
-| 2     | Read-only trade telemetry               | **COMPLETE**      | 100%       | None — gate passed 2026-05-22                                                              | 2026-05-22 ✅         |
-| 3     | MT5 market data engine                  | **COMPLETE**      | 100%       | None — gate cleared; T0 admin baseline captured 2026-05-27                                 | 2026-05-25 ✅         |
-| 4     | Fib engine migration                    | **READ-ONLY TESTING** | 75%        | Paired MT5/Pine exports + weekend/sparse-data evidence (no code changes during backend migration) | 2026-08-15            |
-| 4A    | Production hardening + domain contracts | **READY**         | 0%         | Parallel only; no fib/regime/signal scoring changes during Phase 4 soak                    | Parallel with Phase 4 |
-| 5     | Regime & chop engine                    | **CODE COMPLETE** | 70%        | Phase 4 live gate + operator deployment                                                    | 2026-09-15            |
-| 5B    | Fundamentals regime feed                | **CODE COMPLETE** | 65%        | Phase 5 parity gate                                                                        | 2026-10-01            |
-| 6     | Signal engine dual-run                  | **CODE COMPLETE** | 60%        | Phase 5B gate + fib→signal wiring sprint                                                   | 2026-10-15            |
-| 7     | Controlled manual execution             | **SCAFFOLDED**    | 35%        | Phase 6 parity ≥ 95% (hard gate)                                                           | 2026-11-15            |
-| 8     | Semi-automation layer                   | **SCAFFOLDED**    | 20%        | Phase 7 complete                                                                           | 2026-12-01            |
-| 9     | SaaS & licensing system                 | **SCAFFOLDED**    | 20%        | Phase 8 complete                                                                           | 2026-12-15            |
-| 10    | Pine transition strategy                | NOT-STARTED       | 0%         | Phase 9 complete                                                                           | 2027-01-01            |
-| BACKEND-0 | Foundation setup (contracts, database, project structure) | IN-PROGRESS | 90% | Database layer complete; PostgreSQL provider wiring in progress (non-blocking) | 2026-07-22 |
-| BACKEND-1 | Core API implementation (auth, settings, market data) | COMPLETE | 100% | None — 47 integration tests green | 2026-07-17 ✅ |
-| BACKEND-2 | **WordPress-Free Restoration** (service layer + app-boot/core-trading endpoints + MT5 read-only ingest + data migration) | IN-PROGRESS | 0% | BACKEND-1 complete; WordPress permanently down | 2026-08-09 (15–23 day window) |
-| BACKEND-3 | _Superseded_ — signal/plan endpoints folded into BACKEND-2 Phase 4 | — | — | — | — |
-| BACKEND-4 | _Superseded_ — no WordPress cutover to perform | — | — | — | — |
-| BACKEND-5 | _Superseded_ — WP compatibility removed in BACKEND-2 Phase 1 | — | — | — | — |
+| Phase     | Objective                                                                                                                | Status                | % Complete | Blocker                                                                                           | Target End                    |
+| --------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------- | ---------- | ------------------------------------------------------------------------------------------------- | ----------------------------- |
+| 0         | Stabilize existing platform                                                                                              | **COMPLETE**          | 100%       | None — gate passed 2026-05-15                                                                     | 2026-05-15 ✅                 |
+| 1         | MT5 bridge infrastructure                                                                                                | **COMPLETE**          | 100%       | None — gate passed 2026-05-20                                                                     | 2026-06-01 ✅                 |
+| 2         | Read-only trade telemetry                                                                                                | **COMPLETE**          | 100%       | None — gate passed 2026-05-22                                                                     | 2026-05-22 ✅                 |
+| 3         | MT5 market data engine                                                                                                   | **COMPLETE**          | 100%       | None — gate cleared; T0 admin baseline captured 2026-05-27                                        | 2026-05-25 ✅                 |
+| 4         | Fib engine migration                                                                                                     | **READ-ONLY TESTING** | 75%        | Paired MT5/Pine exports + weekend/sparse-data evidence (no code changes during backend migration) | 2026-08-15                    |
+| 4A        | Production hardening + domain contracts                                                                                  | **READY**             | 0%         | Parallel only; no fib/regime/signal scoring changes during Phase 4 soak                           | Parallel with Phase 4         |
+| 5         | Regime & chop engine                                                                                                     | **CODE COMPLETE**     | 70%        | Phase 4 live gate + operator deployment                                                           | 2026-09-15                    |
+| 5B        | Fundamentals regime feed                                                                                                 | **CODE COMPLETE**     | 65%        | Phase 5 parity gate                                                                               | 2026-10-01                    |
+| 6         | Signal engine dual-run                                                                                                   | **CODE COMPLETE**     | 60%        | Phase 5B gate + fib→signal wiring sprint                                                          | 2026-10-15                    |
+| 7         | Controlled manual execution                                                                                              | **SCAFFOLDED**        | 35%        | Phase 6 parity ≥ 95% (hard gate)                                                                  | 2026-11-15                    |
+| 8         | Semi-automation layer                                                                                                    | **SCAFFOLDED**        | 20%        | Phase 7 complete                                                                                  | 2026-12-01                    |
+| 9         | SaaS & licensing system                                                                                                  | **SCAFFOLDED**        | 20%        | Phase 8 complete                                                                                  | 2026-12-15                    |
+| 10        | Pine transition strategy                                                                                                 | NOT-STARTED           | 0%         | Phase 9 complete                                                                                  | 2027-01-01                    |
+| BACKEND-0 | Foundation setup (contracts, database, project structure)                                                                | IN-PROGRESS           | 90%        | Database layer complete; PostgreSQL provider wiring in progress (non-blocking)                    | 2026-07-22                    |
+| BACKEND-1 | Core API implementation (auth, settings, market data)                                                                    | COMPLETE              | 100%       | None — 47 integration tests green                                                                 | 2026-07-17 ✅                 |
+| BACKEND-2 | **WordPress-Free Restoration** (service layer + app-boot/core-trading endpoints + MT5 read-only ingest + data migration) | IN-PROGRESS           | 0%         | BACKEND-1 complete; WordPress permanently down                                                    | 2026-08-09 (15–23 day window) |
+| BACKEND-3 | _Superseded_ — signal/plan endpoints folded into BACKEND-2 Phase 4                                                       | —                     | —          | —                                                                                                 | —                             |
+| BACKEND-4 | _Superseded_ — no WordPress cutover to perform                                                                           | —                     | —          | —                                                                                                 | —                             |
+| BACKEND-5 | _Superseded_ — WP compatibility removed in BACKEND-2 Phase 1                                                             | —                     | —          | —                                                                                                 | —                             |
 
 ---
 
 ## Track Assignments
 
-| Track                   | Lead  | Phase Focus                                                                   | Status                                                                                     |
-| ----------------------- | ----- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| **Track A — MT5 EA**    | admin | Phases 1–7 (bridge, telemetry, candle engine, fib, regime, signal, execution) | Phase 1 COMPLETE (2026-05-20) — Phase 2 implementation validated by Track A signoff        |
+| Track                   | Lead  | Phase Focus                                                                                  | Status                                                                                                                       |
+| ----------------------- | ----- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Track A — MT5 EA**    | admin | Phases 1–7 (bridge, telemetry, candle engine, fib, regime, signal, execution)                | Phase 1 COMPLETE (2026-05-20) — Phase 2 implementation validated by Track A signoff                                          |
 | **Track B — Backend**   | admin | Phases 1–9 (APIs, freshness, telemetry, licensing) + BACKEND MIGRATION (WordPress → Node.js) | Phase 1 COMPLETE (2026-05-20) — Phase 2 implementation validated by Track B signoff — BACKEND MIGRATION STARTED (2026-07-15) |
-| **Track C — Dashboard** | admin | Phases 2–9 (visualization, execution console, analytics)                      | Phase 0 complete — Phase 2 dashboard read-only implementation validated by Track C signoff |
+| **Track C — Dashboard** | admin | Phases 2–9 (visualization, execution console, analytics)                                     | Phase 0 complete — Phase 2 dashboard read-only implementation validated by Track C signoff                                   |
 
 ---
 
@@ -361,7 +361,7 @@ Market-Stream Auth:
 
 ### Deliverables
 
-- [x] `mt5/FibEngine.mqh` — `LTF*SF` (recency-weighted) + HTF_AF (raw-extreme) fib levels, all 16 ratios, M15/H1/H4/D1 _(corrected 2026-05-28)_
+- [x] `mt5/FibEngine.mqh` — `LTF*SF` (recency-weighted) + HTF*AF (raw-extreme) fib levels, all 16 ratios, M15/H1/H4/D1 *(corrected 2026-05-28)\_
 - [x] `FibEngine` integrated into `MarketDataEngine.mqh` — dispatches `/ea/fib-levels` every ~60s _(2026-05-25)_
 - [x] `wp_smc_sf_fib_levels` DB table — UNIQUE upsert on (`user*id`, symbol, timeframe, family, ratio) _(2026-05-25)_
 - [x] `POST /ea/fib-levels` + ingestion handler — validates against canonical 16-ratio whitelist and accepts H4 _(corrected 2026-05-28)_
@@ -425,6 +425,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 **Status**: IN-PROGRESS (Started 2026-07-15)
 
 **Strategy** (revised 2026-07-17 — WordPress-free):
+
 - WordPress is treated as permanently down; no compatibility, shadow sync, dual-write, or fallback
 - Frontend reconfigured to `VITE_API_URL`; JWT authenticates user-facing routes while `X-EA-API-Key` authenticates EA-ingestion routes
 - Domain services (SnapshotService, SignalService, ChartService, MarketDataService, TelemetryService) own DB access, validation, and business logic; route handlers are thin wrappers
@@ -443,6 +444,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 **Blockers**: PostgreSQL provider wiring
 
 #### BACKEND-0 · Database Layer (2026-07-16) — COMPLETE
+
 - Restructured `backend/src/db/` → `backend/src/lib/db/` (canonical layout); repointed `drizzle.config.ts`.
 - Extended Drizzle schema + `001_init.sql`: `users.password_hash` (TEXT) and `fib_levels.trend` (TEXT) to support the new query functions.
 - Hand-authored `backend/src/lib/db/types.ts` (Supabase `Database` type) — `supabase gen types --local` is unavailable here (no Docker); mirrors the extended migration.
@@ -462,6 +464,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 **Blockers**: None (BACKEND-0 database layer sufficient for current endpoints; provider wiring non-blocking)
 
 #### BACKEND-1 · Auth + Critical Endpoints (2026-07-16) — COMPLETE
+
 - Auth utilities (`src/lib/auth/index.ts`): `jose` HS256 access tokens (15m), random refresh tokens, bcrypt password hashing, SHA-256 token hashing. `JWT_SECRET` read lazily from env.
 - Middleware (`src/lib/auth/middleware.ts`): `requireAuth` (Bearer JWT → `event.context.authUser`), `requireEaAuth` (X-EA-API-Key + role `ea` → `event.context.eaUser`).
 - `refresh_sessions` table added to `schema.ts` + `migrations/002_add_refresh_sessions.sql` (indexes + RLS read/delete policies).
@@ -472,6 +475,7 @@ MT5 Live vs Pine Live:     PENDING (initial 2026-06-02 artifact FAIL 40.89%; cor
 - **Caveat**: Live-DB validation deferred (no Docker/Supabase available locally). `npm run typecheck` and `npm run test:integration` now run green (47 tests) against the in-memory `dbMock`; the earlier `.bin` shim breakage is resolved. Real-DB validation (schema push + JSONB merge) must be confirmed in staging.
 
 #### BACKEND-1 · Settings Endpoint (2026-07-17) — COMPLETE
+
 - `settings JSONB` column added to `users` (`schema.ts` + `migrations/004_add_user_settings.sql`, default `'{}'::jsonb`). Normalizes the WordPress `wp_usermeta` key/value store into one structured object (notifications / theme / watchlist / risk).
 - PATCH semantics via an atomic transaction with a row-locking read (`SELECT ... FOR UPDATE`) and an application-level deep merge — the row lock serializes concurrent updates, and partial nested updates preserve untouched keys.
 - Zod validation (`lib/user/settings-schema.ts`): every field optional; `theme` enum (`light|dark|system`); `risk.maxRiskPercent` validated to 0–100 range.
@@ -809,7 +813,7 @@ Phase 7 GATE: BLOCKED (hard gate in is_phase6_gate_cleared)
 - [x] **`wp_smc_sf_license_tiers` DB table** — Basic/Pro/Elite/Institutional _(2026-05-25)_
 - [x] **`GET /user/license`** — returns current tier; defaults to Basic _(2026-05-25)_
 - [x] **`POST /admin/license/set-tier`** — admin assigns tier + expiry _(2026-05-25)_
-- [x] Tier config: `max*symbols`, max_ea_sessions, execution_enabled, api_access_enabled _(2026-05-25)_
+- [x] Tier config: `max*symbols`, max*ea_sessions, execution_enabled, api_access_enabled *(2026-05-25)\_
 - [ ] Anti-piracy: max_ea_sessions enforcement in heartbeat
 - [ ] License-check integration (tier limits in `/ea/license-check` response)
 - [ ] Subscription/payment integration (Stripe or WooCommerce)
@@ -883,15 +887,15 @@ Phase 7 GATE: BLOCKED (hard gate in is_phase6_gate_cleared)
 
 ## Weekly Status Snapshots
 
-| Week     | Generated  | Phases On-Track                            | Phases At-Risk                           | Phases Blocked | Action Items                                                                                                                  |
-| -------- | ---------- | ------------------------------------------ | ---------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| 2026-W29 | 2026-07-16 | BACKEND-0 Database Layer COMPLETE           | PostgreSQL provider wiring    | None           | DB layer restructured to `src/lib/db`; 8 query fns + types + 14 mocked integration tests passing; `tsc` clean. Shared contracts authored. Live-DB validation deferred (no Docker). |
-| 2026-W29 | 2026-07-16 | BACKEND-1 Auth + critical endpoints COMPLETE | Settings endpoint; live-DB validation    | None           | jose JWT auth + refresh-token rotation; 4 auth + 2 EA/market-data endpoints; refresh_sessions table; 21 new tests (39 total) passing; `tsc` clean. |
-| 2026-W29 | 2026-07-17 | BACKEND-1 Settings endpoint COMPLETE        | Live-DB validation (staging)         | None           | `settings` JSONB column + migration 004; PATCH merge via transaction + row-locked (`FOR UPDATE`) deep merge; Zod validation; GET/PUT/POST/PATCH /api/user/settings; 8 new tests (47 total) passing; `npm run typecheck` + `npm run test:integration` green. |
-| 2026-W22 | 2026-05-27 | Phase 3 COMPLETE; Phase 4 live soak active | Phase 4 live parity gate                 | None           | EA deployed live. T0 baseline captured/exported. Await 30-day corpus, Pine snapshots, and validator run.                      |
-| 2026-W20 | 2026-05-14 | Phase 1 groundwork                         | Phase 0 signal/freshness parity closeout | Phase 0        | Fix NAS100/US30 freshness, XAUUSD candle history, and chop-gate blockers before any phase advance                             |
-| 2026-W21 | 2026-05-25 | Phase 3 COMPLETE — Phase 4 authorized      | Phase 4 Track A lead unassigned          | None           | 72h soak CLOSED. Gate CONDITIONAL PASS. Bug sweep harness repaired. Phase 4 docs created. T0 admin baseline pending operator. |
-| 2026-W20 | 2026-05-15 | Phase 0 COMPLETE — Phase 1 active          | Phase 1 live bridge validation           | None           | NAS100/US30/XAUUSD live validated. Frontend fixed. Watchlist persistence 100%. Phase 0 gate PASSED.                           |
+| Week     | Generated  | Phases On-Track                              | Phases At-Risk                           | Phases Blocked | Action Items                                                                                                                                                                                                                                                |
+| -------- | ---------- | -------------------------------------------- | ---------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-W29 | 2026-07-16 | BACKEND-0 Database Layer COMPLETE            | PostgreSQL provider wiring               | None           | DB layer restructured to `src/lib/db`; 8 query fns + types + 14 mocked integration tests passing; `tsc` clean. Shared contracts authored. Live-DB validation deferred (no Docker).                                                                          |
+| 2026-W29 | 2026-07-16 | BACKEND-1 Auth + critical endpoints COMPLETE | Settings endpoint; live-DB validation    | None           | jose JWT auth + refresh-token rotation; 4 auth + 2 EA/market-data endpoints; refresh_sessions table; 21 new tests (39 total) passing; `tsc` clean.                                                                                                          |
+| 2026-W29 | 2026-07-17 | BACKEND-1 Settings endpoint COMPLETE         | Live-DB validation (staging)             | None           | `settings` JSONB column + migration 004; PATCH merge via transaction + row-locked (`FOR UPDATE`) deep merge; Zod validation; GET/PUT/POST/PATCH /api/user/settings; 8 new tests (47 total) passing; `npm run typecheck` + `npm run test:integration` green. |
+| 2026-W22 | 2026-05-27 | Phase 3 COMPLETE; Phase 4 live soak active   | Phase 4 live parity gate                 | None           | EA deployed live. T0 baseline captured/exported. Await 30-day corpus, Pine snapshots, and validator run.                                                                                                                                                    |
+| 2026-W20 | 2026-05-14 | Phase 1 groundwork                           | Phase 0 signal/freshness parity closeout | Phase 0        | Fix NAS100/US30 freshness, XAUUSD candle history, and chop-gate blockers before any phase advance                                                                                                                                                           |
+| 2026-W21 | 2026-05-25 | Phase 3 COMPLETE — Phase 4 authorized        | Phase 4 Track A lead unassigned          | None           | 72h soak CLOSED. Gate CONDITIONAL PASS. Bug sweep harness repaired. Phase 4 docs created. T0 admin baseline pending operator.                                                                                                                               |
+| 2026-W20 | 2026-05-15 | Phase 0 COMPLETE — Phase 1 active            | Phase 1 live bridge validation           | None           | NAS100/US30/XAUUSD live validated. Frontend fixed. Watchlist persistence 100%. Phase 0 gate PASSED.                                                                                                                                                         |
 
 > **Auto-generated**: Every Sunday by migration project manager agent
 > **Location**: `.github/migration/weekly-status-[YYYY-MM-DD].md`
@@ -921,6 +925,7 @@ Phase 7 GATE: BLOCKED (hard gate in is_phase6_gate_cleared)
 ## Architecture Refactor Summary (2026-06-17)
 
 **Key Findings from Architecture Review**:
+
 - Repository is a trading platform workspace containing React dashboard, WordPress REST backend, MT5 EA, SDK, and operational automation
 - Core problem: authoritative business rules spread across multiple layers with inconsistent ownership
 - Backend truth mixed with transport/persistence logic, MT5 logic mirrors backend instead of publishing canonical facts
@@ -928,6 +933,7 @@ Phase 7 GATE: BLOCKED (hard gate in is_phase6_gate_cleared)
 - Solution: backend must become explicit authority host for every business truth before broader extraction
 
 **Source-of-Truth Matrix**:
+
 - Signal truth: WordPress backend operational authority, Pine parity reference → Phase 6 consolidation
 - Plan truth: WordPress backend authority → Phase 7 consolidation
 - Regime truth: WordPress backend operational authority, Pine parity reference → Phase 5 consolidation
@@ -935,12 +941,14 @@ Phase 7 GATE: BLOCKED (hard gate in is_phase6_gate_cleared)
 - Dashboard truth: Backend owns data truth; frontend owns view-state only → Phase 7 consolidation
 
 **Route-to-Use-Case Mapping**:
+
 - EA Bridge Ingest routes target BridgeIngestService, HeartbeatService, AccountSyncService, etc.
 - Market/Regime/Signal reads target DashboardSnapshotService, SignalBoardQueryService, etc.
 - Plan/Execution routes target TradePlanService, ExecutionRequestService, etc.
 - Admin/Soak/Telemetry routes target AdminHealthService, SoakReportService, etc.
 
 **Projection and Contract Inventory**:
+
 - Key projection surfaces: engine_snapshot cache, display_signals, trade_plans, regime_snapshots, mt5_signal_candidates
 - Contract duplication risks: frontend vs SDK types, client normalization, plan policy, freshness vocabulary
 - All runtime changes to these surfaces must wait for owning migration phase
@@ -950,11 +958,13 @@ Phase 7 GATE: BLOCKED (hard gate in is_phase6_gate_cleared)
 **Objective**: Ensure all authenticated users share the same fresh price/candle/regime inputs per normalized symbol.
 
 **Code Changes Implemented**:
+
 - **PHP Backend**: Wired `CanonicalMarketResolver` into `fetch_shared_market_quote()` and `fetch_candles()` to select freshest feed_key across all users. Added `no_cache_response()` to `get_regimes()` and `get_market_data_authority()` for strict cache control.
 - **TypeScript Frontend**: Added conditional placeholder guard in `useSniperData.ts` - when any price is `state !== 'live'`, force fresh fetch instead of using `keepPreviousData`.
 - **Tests**: Upgraded `test-canonical-market-resolver.php` from stub tests to 6 comprehensive regression test specifications.
 
 **Verification Commands**:
+
 ```bash
 # Cache header smoke test with authenticated users
 export PARITY_USER_A=user_parity_a
@@ -992,6 +1002,7 @@ scripts/collect-parity-validation.sh > reports/post-patch.json
 ```
 
 **Success Criteria After Merge**:
+
 - Two authenticated users on same watchlist get identical `feed_key` per symbol
 - Stale prices marked with `state: 'stale'`, not `'live'`
 - `/regimes` and `/market-data-authority` return cache headers

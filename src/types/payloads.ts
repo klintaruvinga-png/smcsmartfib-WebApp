@@ -6,12 +6,7 @@
  * so the migration work can land incrementally. They depend only on types that
  * `@/types/sniper` already re-exports from the shared contracts package.
  */
-import type {
-  AccountState,
-  DashboardSettings,
-  RiskProfile,
-  Symbol,
-} from "@/types/sniper";
+import type { AccountState, DashboardSettings, RiskProfile, Symbol } from "@/types/sniper";
 
 export interface UserSettingsPayload extends Partial<DashboardSettings> {
   watchlist?: Symbol[];

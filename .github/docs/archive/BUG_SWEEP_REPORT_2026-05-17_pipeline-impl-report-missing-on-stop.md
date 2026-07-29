@@ -18,6 +18,7 @@ making any code changes. However, it also skipped writing `reports/codex-impleme
 which the watcher requires regardless of whether code was changed.
 
 The watcher's `IMPLEMENTATION_FAILED` recovery logic only had two branches:
+
 1. Merged PR → close cycle
 2. Open PR → run `runReportRecovery()` (checkout branch, write report, push)
 
@@ -66,14 +67,16 @@ content) and the exact git commands to stage, commit, and push the report on a s
 
 Added `STOP_BEFORE_PATCH_PATTERNS` — three regexes that match the exact markers Codex
 emits when it stops before patching:
+
 - `no patch applied` / `no files changed`
-- `no branch created`  
+- `no branch created`
 - `no pr opened` / `no pr created`
 
 Added `detectStopBeforePatch(text)` — returns true only when ALL three patterns match the
 Codex last-message output (strict AND logic to prevent false positives on timeout failures).
 
 Added `synthesizeStopReport(state, issueSlug)` — when the stop is detected:
+
 1. Synthesises `reports/codex-implementation.md` from the Codex stop message (all 7 sections)
 2. Archives the cycle artifacts via `archiveCycleArtifacts()`
 3. Clears the failure sentinel
@@ -87,6 +90,7 @@ and, if confirmed, calls `synthesizeStopReport()` to self-heal.
 
 The watcher will detect the `IMPLEMENTATION_FAILED` state on its next poll, find no open PR,
 confirm the stop-before-patch pattern in `codex-last-message.txt`, and automatically:
+
 - Synthesise the implementation report
 - Archive the cycle
 - Reset to IDLE with the stop reason

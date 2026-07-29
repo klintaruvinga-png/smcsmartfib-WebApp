@@ -20,11 +20,11 @@
 
 ### Fib Engine (Phase 4)
 
-| Metric | Pine Value | MT5 Value | Match | Accuracy |
-| --- | --- | --- | --- | --- |
-| Fib anchors | Not replayed in this pass | Not replayed in this pass | N/A | N/A |
-| Fib levels | Not replayed in this pass | Not replayed in this pass | N/A | N/A |
-| **Fib Parity Score** | - | - | - | **Unchanged** |
+| Metric               | Pine Value                | MT5 Value                 | Match | Accuracy      |
+| -------------------- | ------------------------- | ------------------------- | ----- | ------------- |
+| Fib anchors          | Not replayed in this pass | Not replayed in this pass | N/A   | N/A           |
+| Fib levels           | Not replayed in this pass | Not replayed in this pass | N/A   | N/A           |
+| **Fib Parity Score** | -                         | -                         | -     | **Unchanged** |
 
 **Observations**: No fib math or anchor-selection logic changed.
 
@@ -32,11 +32,11 @@
 
 ### Regime Engine (Phase 5)
 
-| Metric | Pine Classification | MT5 Classification | Match | Accuracy |
-| --- | --- | --- | --- | --- |
-| Regime state | Not replayed in this pass | Not replayed in this pass | N/A | N/A |
-| Chop gate | Not replayed in this pass | Not replayed in this pass | N/A | N/A |
-| **Regime Parity Score** | - | - | - | **Unchanged** |
+| Metric                  | Pine Classification       | MT5 Classification        | Match | Accuracy      |
+| ----------------------- | ------------------------- | ------------------------- | ----- | ------------- |
+| Regime state            | Not replayed in this pass | Not replayed in this pass | N/A   | N/A           |
+| Chop gate               | Not replayed in this pass | Not replayed in this pass | N/A   | N/A           |
+| **Regime Parity Score** | -                         | -                         | -     | **Unchanged** |
 
 **Observations**: No regime or chop logic changed.
 
@@ -44,11 +44,11 @@
 
 ### Signal Engine (Phase 6)
 
-| Metric | Pine Signal | MT5 Signal | Match | Accuracy |
-| --- | --- | --- | --- | --- |
-| Signal generation | Not replayed in this pass | Not replayed in this pass | N/A | N/A |
-| Entry / SL / TP | Not replayed in this pass | Not replayed in this pass | N/A | N/A |
-| **Signal Parity Score** | - | - | - | **Unchanged** |
+| Metric                  | Pine Signal               | MT5 Signal                | Match | Accuracy      |
+| ----------------------- | ------------------------- | ------------------------- | ----- | ------------- |
+| Signal generation       | Not replayed in this pass | Not replayed in this pass | N/A   | N/A           |
+| Entry / SL / TP         | Not replayed in this pass | Not replayed in this pass | N/A   | N/A           |
+| **Signal Parity Score** | -                         | -                         | -     | **Unchanged** |
 
 **Observations**: No signal-engine computations changed.
 
@@ -56,12 +56,12 @@
 
 ### Freshness / Authority Path
 
-| Metric | Previous | Current | Match | Accuracy |
-| --- | --- | --- | --- | --- |
-| Settings write authority | Wrong backend possible during URL switch | Current backend writes first, switch after save | Yes | 100% |
-| Stored backend URL normalization | Whitespace and empty-path drift possible | Trimmed and normalized consistently | Yes | 100% |
-| Immediate settings reread after switch | Wrong-authority overwrite possible | Suppressed on backend URL change | Yes | 100% |
-| **Freshness / Authority Score** | - | - | - | **100%** |
+| Metric                                 | Previous                                 | Current                                         | Match | Accuracy |
+| -------------------------------------- | ---------------------------------------- | ----------------------------------------------- | ----- | -------- |
+| Settings write authority               | Wrong backend possible during URL switch | Current backend writes first, switch after save | Yes   | 100%     |
+| Stored backend URL normalization       | Whitespace and empty-path drift possible | Trimmed and normalized consistently             | Yes   | 100%     |
+| Immediate settings reread after switch | Wrong-authority overwrite possible       | Suppressed on backend URL change                | Yes   | 100%     |
+| **Freshness / Authority Score**        | -                                        | -                                               | -     | **100%** |
 
 **Observations**: The audited parity problem was not mathematical drift; it was write/read authority drift during migration. That path is now aligned with backend-authority rules.
 
@@ -69,17 +69,17 @@
 
 ## Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-| --- | --- | --- | --- | --- |
-| Backend URL save switched authority before persistence | HIGH | 1 | Patched in frontend save path | No |
+| Issue                                                  | Severity | Count | Resolution                    | Blocker |
+| ------------------------------------------------------ | -------- | ----- | ----------------------------- | ------- |
+| Backend URL save switched authority before persistence | HIGH     | 1     | Patched in frontend save path | No      |
 
 ---
 
 ## Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-| --- | --- | --- | --- |
-| Fib / regime / signal replay coverage | Not rerun in this pass | Change was limited to frontend backend-switch wiring | Yes |
+| Item                                  | Difference             | Reason                                               | Accepted |
+| ------------------------------------- | ---------------------- | ---------------------------------------------------- | -------- |
+| Fib / regime / signal replay coverage | Not rerun in this pass | Change was limited to frontend backend-switch wiring | Yes      |
 
 ---
 

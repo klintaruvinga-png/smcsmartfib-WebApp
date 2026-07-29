@@ -12,6 +12,7 @@
 Phase 1 bridge infrastructure is now **LIVE and OPERATIONAL**. All five EA bridge routes have been deployed, confirmed communicating with the backend, and persisting data correctly to the database. The EA is running continuously on the MT5 validation terminal and executing all gateway checks and synchronization tasks as designed.
 
 **Route Status Summary**:
+
 - ✅ `GET /ea/license-check` — Hard gate operational (blocks startup if denied)
 - ✅ `POST /ea/account-sync` — Soft gate operational (persisting account metadata)
 - ✅ `POST /ea/symbol-sync` — Soft gate operational (synced 27 broker symbols)
@@ -23,8 +24,10 @@ Phase 1 bridge infrastructure is now **LIVE and OPERATIONAL**. All five EA bridg
 ## Route Validation Summary
 
 ### 1. License-Check Gate (`GET /ea/license-check`)
+
 **Type**: Hard gate (blocks startup if denied)  
 **Evidence**:
+
 - Confirmed firing at EA initialization on 2026-05-18
 - Backend responds with `allowed: true` → EA proceeds to initialization
 - Backend authorization logic verified: `permission_ea_bridge()` checks X-EA-API-Key header and validates user_id
@@ -35,8 +38,10 @@ Phase 1 bridge infrastructure is now **LIVE and OPERATIONAL**. All five EA bridg
 ---
 
 ### 2. Account-Sync (`POST /ea/account-sync`)
+
 **Type**: Soft gate (allow failure, log warning, continue)  
 **Evidence**:
+
 - First fire confirmed 2026-05-17 21:58:11 UTC
 - Backend received and persisted account metadata to `smc_sf_account_snapshots` table
 - Account persisted: `user_id=1, account_id=32206603, terminal_id=FB9A56D617EDDDFE29EE54EBEFFE96C1, broker=Deriv`
@@ -48,8 +53,10 @@ Phase 1 bridge infrastructure is now **LIVE and OPERATIONAL**. All five EA bridg
 ---
 
 ### 3. Symbol-Sync (`POST /ea/symbol-sync`)
+
 **Type**: Soft gate (allow failure, log warning, continue)  
 **Evidence**:
+
 - First fire confirmed 2026-05-17 21:58:11 UTC
 - Backend received and persisted 27 symbols to `smc_sf_symbol_sync` table
 - Upsert behavior verified: unique key = `user_id + account_id + terminal_id + broker_symbol` prevents duplicates
@@ -61,8 +68,10 @@ Phase 1 bridge infrastructure is now **LIVE and OPERATIONAL**. All five EA bridg
 ---
 
 ### 4. Heartbeat (`POST /ea/heartbeat`)
+
 **Type**: Soft gate (allow failure, log warning, continue)  
 **Evidence**:
+
 - **Initial State** (2026-05-17): Heartbeat code present in EA codebase but not executing on terminal (EA binary was stale/outdated)
 - **Root Cause**: Terminal was running old EA build; heartbeat logic not compiled into .ex5 binary
 - **Resolution** (2026-05-18): Switched to branch `fix/gate-heartbeat-debug-log-behind-flag` with heartbeat fix; recompiled and redeployed EA
@@ -78,8 +87,10 @@ Phase 1 bridge infrastructure is now **LIVE and OPERATIONAL**. All five EA bridg
 ---
 
 ### 5. Market-Stream (`POST /ea/market-stream`)
+
 **Type**: Existing route, retained for bridge validation  
 **Evidence**:
+
 - First fire confirmed 2026-05-17 21:58:22 UTC
 - Auth passing: `SMC SuperFIB EA bridge auth success: user_id=1 method=POST route=/sniper/v1/ea/market-stream`
 - HTTP 200 OK responses received for all symbol dispatches
@@ -101,17 +112,20 @@ Phase 1 bridge infrastructure is now **LIVE and OPERATIONAL**. All five EA bridg
 ## Database Persistence Verification
 
 ### smc_sf_engine_runs Table
+
 - **Sample data**: 49 heartbeat rows written between 00:07:13 and 00:07:34 UTC on 2026-05-18
 - **Payload**: `{"source":"ea_push","symbol":"<symbol>"}`
 - **Frequency**: One entry per symbol per heartbeat cycle (27 symbols = 27 rows per cycle)
 - **Evidence of zero data loss**: No gaps or missing rows; all 27 symbols represented
 
 ### smc_sf_account_snapshots Table
+
 - **Persisted state**: `user_id=1, account_id=32206603, terminal_id=FB9A56D617EDDDFE29EE54EBEFFE96C1`
 - **Data structure**: Account metadata stored in `data` JSON blob under `eaBridge` key
 - **Status**: Fresh sync confirmed; not stale
 
 ### smc_sf_symbol_sync Table
+
 - **Persisted state**: 27 symbol rows with full broker metadata
 - **Unique key enforcement**: `user_id + account_id + terminal_id + broker_symbol` prevents duplicates
 - **Status**: All symbols synced without corruption
@@ -120,24 +134,25 @@ Phase 1 bridge infrastructure is now **LIVE and OPERATIONAL**. All five EA bridg
 
 ## Environment Configuration Recorded
 
-| Parameter | Value |
-|-----------|-------|
-| **Broker** | Deriv.com |
-| **Server** | Deriv-Demo |
-| **Account ID** | 32206603 |
-| **Terminal ID** | FB9A56D617EDDDFE29EE54EBEFFE96C1 |
-| **MT5 Build** | 5836 |
-| **EA Branch** | `fix/gate-heartbeat-debug-log-behind-flag` |
-| **WebRequest** | Enabled |
-| **API Auth** | X-EA-API-Key header + user_id validation |
-| **Backend URL** | https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/* |
-| **Validation Start** | 2026-05-18 ~00:07 UTC |
+| Parameter            | Value                                                      |
+| -------------------- | ---------------------------------------------------------- |
+| **Broker**           | Deriv.com                                                  |
+| **Server**           | Deriv-Demo                                                 |
+| **Account ID**       | 32206603                                                   |
+| **Terminal ID**      | FB9A56D617EDDDFE29EE54EBEFFE96C1                           |
+| **MT5 Build**        | 5836                                                       |
+| **EA Branch**        | `fix/gate-heartbeat-debug-log-behind-flag`                 |
+| **WebRequest**       | Enabled                                                    |
+| **API Auth**         | X-EA-API-Key header + user_id validation                   |
+| **Backend URL**      | https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/* |
+| **Validation Start** | 2026-05-18 ~00:07 UTC                                      |
 
 ---
 
 ## Known Issues & Notes
 
 ### 1. Weekend FX Market Data
+
 - **Issue**: FX symbols (EURUSD, GBPUSD, USDJPY, etc.) return 422 STALE during weekend
 - **Root Cause**: Market closure; MT5 broker is not pushing fresh candles after 2026-05-15 20:42 UTC (Friday close)
 - **Impact**: Low — does not block bridge validation; expected behavior
@@ -145,6 +160,7 @@ Phase 1 bridge infrastructure is now **LIVE and OPERATIONAL**. All five EA bridg
 - **Follow-up**: Weekend stale rejects were accepted as correct behavior for Phase 1 transport/auth validation
 
 ### 2. Heartbeat Wiring Delayed Discovery
+
 - **Issue**: Heartbeat not firing during initial validation runs (2026-05-17)
 - **Root Cause**: Terminal was running stale EA binary compiled before heartbeat code was added
 - **Resolution**: Switch to `fix/gate-heartbeat-debug-log-behind-flag` branch and redeploy; heartbeat now operational
@@ -156,34 +172,38 @@ Phase 1 bridge infrastructure is now **LIVE and OPERATIONAL**. All five EA bridg
 
 Phase 1 is 100% complete. Remaining work to reach gate closure:
 
-| Task | Owner | Status | ETA |
-|------|-------|--------|-----|
-| **Scenario 1: Terminal Restart** | Track A | PASS | Completed 2026-05-18 |
-| **Scenario 2: VPS Restart** | Track A + Track B | PASS (bundled outage-recovery validation on shared hosting) | Completed 2026-05-18 |
-| **Scenario 3: Internet Interruption** | Track A | PASS (bundled with shared-hosting outage-recovery validation) | Completed 2026-05-18 |
-| **Scenario 4: Duplicate Heartbeat Protection** | Track B | PASS | Completed 2026-05-18 |
-| **Scenario 5: Invalid License Rejection** | Track B | PASS | Completed 2026-05-18 |
-| **48h Continuity Window** | Track A + Track B | PASS (started ~00:07 UTC 2026-05-18; verified complete 2026-05-20) | Complete before 2026-06-01 |
+| Task                                           | Owner             | Status                                                             | ETA                        |
+| ---------------------------------------------- | ----------------- | ------------------------------------------------------------------ | -------------------------- |
+| **Scenario 1: Terminal Restart**               | Track A           | PASS                                                               | Completed 2026-05-18       |
+| **Scenario 2: VPS Restart**                    | Track A + Track B | PASS (bundled outage-recovery validation on shared hosting)        | Completed 2026-05-18       |
+| **Scenario 3: Internet Interruption**          | Track A           | PASS (bundled with shared-hosting outage-recovery validation)      | Completed 2026-05-18       |
+| **Scenario 4: Duplicate Heartbeat Protection** | Track B           | PASS                                                               | Completed 2026-05-18       |
+| **Scenario 5: Invalid License Rejection**      | Track B           | PASS                                                               | Completed 2026-05-18       |
+| **48h Continuity Window**                      | Track A + Track B | PASS (started ~00:07 UTC 2026-05-18; verified complete 2026-05-20) | Complete before 2026-06-01 |
 
 ---
 
 ## Scenario Validation Update
 
 ### Terminal Restart
+
 - EA reconnected and resumed bridge traffic after terminal restart.
 - Result: PASS
 
 ### Bundled VPS Failure + Internet Interruption Recovery
+
 - Shared-hosting constraints prevented a literal WHM-driven VPS restart test, so VPS failure and client-network interruption were validated together by disabling network access to the client device while the EA remained running.
 - During the outage window, sends failed repeatedly between roughly 03:16 and 03:22 with `httpStatus=1001/1003`, `lastError=5203`, and empty responses.
 - Recovery began at 03:23:12 when `USDJPY` moved from failed attempts to `SUCCESS attempt 3 | httpStatus=200`, followed immediately by broad first-attempt success across multiple symbols.
 - Result: PASS for both the VPS failure recovery objective and the internet interruption recovery objective, with the wording caveat that the VPS portion was validated through bundled outage simulation rather than a literal infrastructure reboot.
 
 ### Duplicate Heartbeat Protection
+
 - Validation result recorded as pass.
 - Result: PASS
 
 ### Invalid License Rejection
+
 - Validation result recorded as pass.
 - Result: PASS
 
@@ -193,35 +213,35 @@ Phase 1 is 100% complete. Remaining work to reach gate closure:
 
 ### Binary Pass/Fail Criteria
 
-| Criterion | Current | Target | Status |
-|-----------|---------|--------|--------|
-| `GET /ea/license-check` fires & allows startup | ✅ Confirmed | ✅ Yes | ✅ PASS |
-| `POST /ea/account-sync` fires & persists | ✅ Confirmed | ✅ Yes | ✅ PASS |
-| `POST /ea/symbol-sync` fires & persists 27 symbols | ✅ Confirmed | ✅ Yes | ✅ PASS |
-| `POST /ea/heartbeat` fires on throttle (480 sec) | ✅ Confirmed | ✅ Yes | ✅ PASS |
-| Heartbeat continuity 48h+ with zero gaps | ✅ Confirmed | ✅ Yes | ✅ PASS |
-| Zero dropped sessions during executed scenario-validation runs | PASS | Yes | PASS |
-| Terminal restart reconnect verified | PASS | Yes | PASS |
-| VPS restart reconnect verified | PASS via bundled outage-recovery validation | Yes | PASS |
-| Network interruption recovery verified | PASS via bundled outage-recovery validation | Yes | PASS |
-| Duplicate heartbeat protection verified | PASS | Yes | PASS |
-| Invalid license rejection verified | PASS | Yes | PASS |
-| Market-stream transport/auth validation | PASS | Yes | PASS |
+| Criterion                                                      | Current                                     | Target | Status  |
+| -------------------------------------------------------------- | ------------------------------------------- | ------ | ------- |
+| `GET /ea/license-check` fires & allows startup                 | ✅ Confirmed                                | ✅ Yes | ✅ PASS |
+| `POST /ea/account-sync` fires & persists                       | ✅ Confirmed                                | ✅ Yes | ✅ PASS |
+| `POST /ea/symbol-sync` fires & persists 27 symbols             | ✅ Confirmed                                | ✅ Yes | ✅ PASS |
+| `POST /ea/heartbeat` fires on throttle (480 sec)               | ✅ Confirmed                                | ✅ Yes | ✅ PASS |
+| Heartbeat continuity 48h+ with zero gaps                       | ✅ Confirmed                                | ✅ Yes | ✅ PASS |
+| Zero dropped sessions during executed scenario-validation runs | PASS                                        | Yes    | PASS    |
+| Terminal restart reconnect verified                            | PASS                                        | Yes    | PASS    |
+| VPS restart reconnect verified                                 | PASS via bundled outage-recovery validation | Yes    | PASS    |
+| Network interruption recovery verified                         | PASS via bundled outage-recovery validation | Yes    | PASS    |
+| Duplicate heartbeat protection verified                        | PASS                                        | Yes    | PASS    |
+| Invalid license rejection verified                             | PASS                                        | Yes    | PASS    |
+| Market-stream transport/auth validation                        | PASS                                        | Yes    | PASS    |
 
 ---
 
 ## Artifacts & Evidence
 
-| Artifact | Location | Status |
-|----------|----------|--------|
-| Phase 1 Tracker | `.github/migration/PHASE1_TRACKER.md` | ✅ Updated 2026-05-18 |
-| Phase 1 Checklist | `.github/migration/PHASE1_CHECKLIST.md` | ✅ Updated 2026-05-18 |
-| Phase 1 Roadmap | `.github/migration/PHASE1_BRIDGE_ROADMAP.md` | ✅ Reference doc |
-| Migration Status Board | `.github/migration-status.md` | ✅ Updated 2026-05-18 |
-| EA Bridge Implementation Report | `reports/phase-1-ea-bridge-implementation-report.md` | ✅ Reference doc |
-| Validation DB Evidence | `wpup_smc_sf_engine_runs` table | ✅ 49 heartbeat rows, 2026-05-18 |
-| Validation Logs | PHP debug logs, EA logs, SQL queries | ✅ Referenced in this document |
-| This Document | `.github/migration/phase-updates/phase1-bridge-validation-started-2026-05-18.md` | ✅ Created 2026-05-18 |
+| Artifact                        | Location                                                                         | Status                           |
+| ------------------------------- | -------------------------------------------------------------------------------- | -------------------------------- |
+| Phase 1 Tracker                 | `.github/migration/PHASE1_TRACKER.md`                                            | ✅ Updated 2026-05-18            |
+| Phase 1 Checklist               | `.github/migration/PHASE1_CHECKLIST.md`                                          | ✅ Updated 2026-05-18            |
+| Phase 1 Roadmap                 | `.github/migration/PHASE1_BRIDGE_ROADMAP.md`                                     | ✅ Reference doc                 |
+| Migration Status Board          | `.github/migration-status.md`                                                    | ✅ Updated 2026-05-18            |
+| EA Bridge Implementation Report | `reports/phase-1-ea-bridge-implementation-report.md`                             | ✅ Reference doc                 |
+| Validation DB Evidence          | `wpup_smc_sf_engine_runs` table                                                  | ✅ 49 heartbeat rows, 2026-05-18 |
+| Validation Logs                 | PHP debug logs, EA logs, SQL queries                                             | ✅ Referenced in this document   |
+| This Document                   | `.github/migration/phase-updates/phase1-bridge-validation-started-2026-05-18.md` | ✅ Created 2026-05-18            |
 
 ---
 

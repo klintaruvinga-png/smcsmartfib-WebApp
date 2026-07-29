@@ -8,9 +8,9 @@
 
 # Confirmed Problems
 
-| Severity | Component | Root cause | Impact | Status |
-| --- | --- | --- | --- | --- |
-| HIGH | Live-signals transport contract | `get_live_signals()` returned cached snapshot signals without any per-response field, so repeated polls could deliver structurally identical objects while `id` remained intentionally candle-anchored. | Frontend consumers could miss repeated poll updates and appear frozen until a hard refresh or another structural change occurred. | Patched |
+| Severity | Component                       | Root cause                                                                                                                                                                                              | Impact                                                                                                                            | Status  |
+| -------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| HIGH     | Live-signals transport contract | `get_live_signals()` returned cached snapshot signals without any per-response field, so repeated polls could deliver structurally identical objects while `id` remained intentionally candle-anchored. | Frontend consumers could miss repeated poll updates and appear frozen until a hard refresh or another structural change occurred. | Patched |
 
 # Surgical Fixes Applied
 
@@ -26,13 +26,13 @@
 
 # Verification Results
 
-| Check | Result | Notes |
-| --- | --- | --- |
-| `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | PASS | Route patch is syntactically valid. |
-| `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` | PASS | Repeated live-signals regression passes and anti-cache headers remain intact. |
-| `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx src/routes/-signals.page.test.tsx src/routes/-plan.test.tsx` | PASS | 4 files passed, 37 tests passed. |
-| `npx tsc --noEmit` | FAIL | Existing unrelated error in `vite.config.ts`: `test` is not a known property of `LovableViteTanstackOptions`. |
-| Authenticated live dashboard verification | NOT RUN | Still required outside this workspace. |
+| Check                                                                                                                                          | Result  | Notes                                                                                                         |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`                                                                                 | PASS    | Route patch is syntactically valid.                                                                           |
+| `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`                                                                   | PASS    | Repeated live-signals regression passes and anti-cache headers remain intact.                                 |
+| `npx vitest run src/lib/api/sniperClient.test.ts src/hooks/useSniperData.test.tsx src/routes/-signals.page.test.tsx src/routes/-plan.test.tsx` | PASS    | 4 files passed, 37 tests passed.                                                                              |
+| `npx tsc --noEmit`                                                                                                                             | FAIL    | Existing unrelated error in `vite.config.ts`: `test` is not a known property of `LovableViteTanstackOptions`. |
+| Authenticated live dashboard verification                                                                                                      | NOT RUN | Still required outside this workspace.                                                                        |
 
 # Remaining Risks
 

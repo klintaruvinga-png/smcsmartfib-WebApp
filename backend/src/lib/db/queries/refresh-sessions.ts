@@ -7,7 +7,7 @@ export async function createRefreshSession(
   userId: string,
   token: string,
   userAgent?: string | null,
-  ipAddress?: string | null
+  ipAddress?: string | null,
 ) {
   const tokenHash = await hashToken(token);
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);

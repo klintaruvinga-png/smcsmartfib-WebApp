@@ -10,15 +10,15 @@
 
 ## High
 
-| Category | Severity | Root Cause | Impact |
-|---|---|---|---|
-| Dashboard route packaging | HIGH | `src/routes/live.tsx` and `src/routes/plan.tsx` exported page components directly from route files, so TanStack Router could not code-split those pages. | Live Radar and Signal Plans were always retained in the shared route bundle, increasing client/server route payload size and weakening route-isolation during the migration phase. |
+| Category                  | Severity | Root Cause                                                                                                                                               | Impact                                                                                                                                                                             |
+| ------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dashboard route packaging | HIGH     | `src/routes/live.tsx` and `src/routes/plan.tsx` exported page components directly from route files, so TanStack Router could not code-split those pages. | Live Radar and Signal Plans were always retained in the shared route bundle, increasing client/server route payload size and weakening route-isolation during the migration phase. |
 
 ## Medium
 
-| Category | Severity | Root Cause | Impact |
-|---|---|---|---|
-| Dashboard rendering fidelity | MEDIUM | Live Radar route metadata, stale/gate warnings, and placeholder glyphs contained mojibake text. | Operators saw corrupted warnings and titles in a backend-authoritative monitoring surface, which degrades trust and can hide actual blocker reasons. |
+| Category                     | Severity | Root Cause                                                                                      | Impact                                                                                                                                               |
+| ---------------------------- | -------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dashboard rendering fidelity | MEDIUM   | Live Radar route metadata, stale/gate warnings, and placeholder glyphs contained mojibake text. | Operators saw corrupted warnings and titles in a backend-authoritative monitoring surface, which degrades trust and can hide actual blocker reasons. |
 
 # Surgical Fixes Applied
 

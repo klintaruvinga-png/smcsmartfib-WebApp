@@ -24,16 +24,16 @@ This run does not newly certify direct regime-engine or live-signal parity.
 
 ## Market Timestamp / Freshness Parity
 
-| Metric | Expected | Actual | Match | Accuracy |
-| --- | --- | --- | --- | --- |
-| Tick ISO timestamp preserved | `2026-05-16 08:15:30` | `2026-05-16 08:15:30` | PASS | 100% |
-| Tick `UTC`-suffix timestamp preserved | `2026-05-16 08:16:30` | `2026-05-16 08:16:30` | PASS | 100% |
-| Candle dot-format timestamp preserved | `2026-05-16 08:15:00` | `2026-05-16 08:15:00` | PASS | 100% |
-| Candle `UTC`-suffix timestamp preserved | `2026-05-16 08:16:00` | `2026-05-16 08:16:00` | PASS | 100% |
-| Snapshot contract preserves broker quote time | PASS expected | PASS observed | PASS | 100% |
-| State-only MT5 updates do not rewrite quote time | PASS expected | PASS observed | PASS | 100% |
-| Freshness hard reject for stale quote_time/timestamp | PASS expected | PASS observed | PASS | 100% |
-| **Freshness Parity Score** | - | - | - | **100%** |
+| Metric                                               | Expected              | Actual                | Match | Accuracy |
+| ---------------------------------------------------- | --------------------- | --------------------- | ----- | -------- |
+| Tick ISO timestamp preserved                         | `2026-05-16 08:15:30` | `2026-05-16 08:15:30` | PASS  | 100%     |
+| Tick `UTC`-suffix timestamp preserved                | `2026-05-16 08:16:30` | `2026-05-16 08:16:30` | PASS  | 100%     |
+| Candle dot-format timestamp preserved                | `2026-05-16 08:15:00` | `2026-05-16 08:15:00` | PASS  | 100%     |
+| Candle `UTC`-suffix timestamp preserved              | `2026-05-16 08:16:00` | `2026-05-16 08:16:00` | PASS  | 100%     |
+| Snapshot contract preserves broker quote time        | PASS expected         | PASS observed         | PASS  | 100%     |
+| State-only MT5 updates do not rewrite quote time     | PASS expected         | PASS observed         | PASS  | 100%     |
+| Freshness hard reject for stale quote_time/timestamp | PASS expected         | PASS observed         | PASS  | 100%     |
+| **Freshness Parity Score**                           | -                     | -                     | -     | **100%** |
 
 Observations:
 
@@ -42,12 +42,12 @@ Observations:
 
 ## Fib Engine Parity
 
-| Metric | Pine / Canonical Expectation | Backend Result | Match | Accuracy |
-| --- | --- | --- | --- | --- |
-| Session anchor extraction | Stable completed-session anchors | PASS | PASS | 100% |
-| HTF authority anchor extraction | Correct prior authority session | PASS | PASS | 100% |
-| Weighted SuperFib anchor composition | Expected weighted highs/lows | PASS | PASS | 100% |
-| **Fib Parity Score** | - | - | - | **100%** |
+| Metric                               | Pine / Canonical Expectation     | Backend Result | Match | Accuracy |
+| ------------------------------------ | -------------------------------- | -------------- | ----- | -------- |
+| Session anchor extraction            | Stable completed-session anchors | PASS           | PASS  | 100%     |
+| HTF authority anchor extraction      | Correct prior authority session  | PASS           | PASS  | 100%     |
+| Weighted SuperFib anchor composition | Expected weighted highs/lows     | PASS           | PASS  | 100%     |
+| **Fib Parity Score**                 | -                                | -              | -     | **100%** |
 
 Observations:
 
@@ -56,9 +56,9 @@ Observations:
 
 ## Regime Engine Parity
 
-| Metric | Status | Notes |
-| --- | --- | --- |
-| Regime classification parity | PENDING | No dedicated regime suite executed in this run. |
+| Metric                          | Status  | Notes                                                    |
+| ------------------------------- | ------- | -------------------------------------------------------- |
+| Regime classification parity    | PENDING | No dedicated regime suite executed in this run.          |
 | Chop / volatility gating parity | PENDING | No direct regime-gating assertions executed in this run. |
 
 Observations:
@@ -68,11 +68,11 @@ Observations:
 
 ## Signal Engine Parity
 
-| Metric | Status | Notes |
-| --- | --- | --- |
-| Signal readiness vs fresh data | PARTIAL | Indirectly exercised by snapshot/health regressions only. |
-| Entry / SL / TP parity | PENDING | No direct signal-generation suite executed in this run. |
-| Signal dedupe / persistence parity | PENDING | Not exercised in this run. |
+| Metric                             | Status  | Notes                                                     |
+| ---------------------------------- | ------- | --------------------------------------------------------- |
+| Signal readiness vs fresh data     | PARTIAL | Indirectly exercised by snapshot/health regressions only. |
+| Entry / SL / TP parity             | PENDING | No direct signal-generation suite executed in this run.   |
+| Signal dedupe / persistence parity | PENDING | Not exercised in this run.                                |
 
 Observations:
 
@@ -81,16 +81,16 @@ Observations:
 
 # Confirmed Drift Fixed
 
-| Issue | Severity | Count | Resolution | Blocker |
-| --- | --- | --- | --- | --- |
-| Market-data service treated `UTC`-suffix timestamps as parse failures and rewrote them to receipt time | HIGH | 1 | Patched parser and added regression coverage | No |
+| Issue                                                                                                  | Severity | Count | Resolution                                   | Blocker |
+| ------------------------------------------------------------------------------------------------------ | -------- | ----- | -------------------------------------------- | ------- |
+| Market-data service treated `UTC`-suffix timestamps as parse failures and rewrote them to receipt time | HIGH     | 1     | Patched parser and added regression coverage | No      |
 
 # Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-| --- | --- | --- | --- |
-| Regime parity not freshly re-run | Not measured in this cycle | No regime code touched; coverage gap remains explicit | No |
-| Signal parity not freshly re-run | Not measured in this cycle | No direct signal suite available in current run set | No |
+| Item                             | Difference                 | Reason                                                | Accepted |
+| -------------------------------- | -------------------------- | ----------------------------------------------------- | -------- |
+| Regime parity not freshly re-run | Not measured in this cycle | No regime code touched; coverage gap remains explicit | No       |
+| Signal parity not freshly re-run | Not measured in this cycle | No direct signal suite available in current run set   | No       |
 
 # Recommendations
 

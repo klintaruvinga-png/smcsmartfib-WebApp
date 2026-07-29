@@ -15,9 +15,7 @@
       "wordpress/smc-superfib-sniper/class-market-data-service.php",
       "wordpress/smc-superfib-sniper/README.md"
     ],
-    "rest_route_files": [
-      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php"
-    ],
+    "rest_route_files": ["wordpress/smc-superfib-sniper/smc-superfib-sniper.php"],
     "test_files": [
       "wordpress/smc-superfib-sniper/tests/php/test-cors-regression.php",
       "wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php",
@@ -63,7 +61,17 @@
       "PATCH-001 (2026-05-11): OHLC consistency guard for M1 and M15 candle ingestion in post_ea_market_stream(). Added validate_ohlc() method and regression test."
     ],
     "actual_ea_payload_contract": {
-      "fields": ["user_id", "symbol", "normalized_symbol", "timeframe", "timestamp", "bid", "ask", "freshness", "session"],
+      "fields": [
+        "user_id",
+        "symbol",
+        "normalized_symbol",
+        "timeframe",
+        "timestamp",
+        "bid",
+        "ask",
+        "freshness",
+        "session"
+      ],
       "optional_candle": "candle (singular OHLC object with time/open/high/low/close/volume)",
       "optional_candle_m15": "candle_m15 (singular OHLC object with same fields)",
       "note": "Contract uses timestamp (singular), candle/candle_m15 (singular objects). Workflow-spec example uses quote_time/server_time/candles-array — documented divergence."

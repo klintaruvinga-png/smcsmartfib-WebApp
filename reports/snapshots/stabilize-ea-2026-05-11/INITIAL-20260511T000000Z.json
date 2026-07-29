@@ -21,9 +21,7 @@
       "wordpress/smc-superfib-sniper/tests/php/test-settings-risk-fallbacks.php",
       "wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php"
     ],
-    "rest_route_files": [
-      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php"
-    ],
+    "rest_route_files": ["wordpress/smc-superfib-sniper/smc-superfib-sniper.php"],
     "frontend_api_client": "src/lib/api/sniperClient.ts",
     "mt5_ea_files": [
       "mt5/SMC_MarketDataEA.mq5",
@@ -46,10 +44,7 @@
   },
   "rest_routes_confirmed": {
     "namespace": "sniper/v1",
-    "public_routes": [
-      "GET /sniper/v1/health",
-      "GET /sniper/v1/session"
-    ],
+    "public_routes": ["GET /sniper/v1/health", "GET /sniper/v1/session"],
     "authenticated_user_routes": [
       "GET /sniper/v1/snapshot",
       "POST /sniper/v1/snapshot",
@@ -88,9 +83,7 @@
       "POST /sniper/v1/admin/soak-evidence",
       "POST /sniper/v1/admin/soak-checkpoint"
     ],
-    "ea_routes": [
-      "POST /sniper/v1/ea/market-stream"
-    ]
+    "ea_routes": ["POST /sniper/v1/ea/market-stream"]
   },
   "known_dev_status": {
     "authority_diagnostics_requires_wp_session": true,
@@ -100,7 +93,19 @@
     "ea_payload_requires_user_id": true,
     "migration_phase": "MT5-native migration / Phase 0 soak",
     "plugin_version": "13.0.2",
-    "actual_ea_payload_fields": ["user_id", "symbol", "normalized_symbol", "timeframe", "timestamp", "bid", "ask", "freshness", "session", "candle", "candle_m15"],
+    "actual_ea_payload_fields": [
+      "user_id",
+      "symbol",
+      "normalized_symbol",
+      "timeframe",
+      "timestamp",
+      "bid",
+      "ask",
+      "freshness",
+      "session",
+      "candle",
+      "candle_m15"
+    ],
     "note_candle_is_singular_object_not_array": true
   }
 }

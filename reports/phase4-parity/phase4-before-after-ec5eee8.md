@@ -9,14 +9,14 @@ Date of comparison: 2026-06-03
 
 This report compares the parity gate results immediately before and after the `ec5eee8` patch was recorded in the repository.
 
-| Metric | Before (reports/phase4-gate.json run_date 2026-06-02) | After (reports/phase4-parity/phase4-gate.json run_date 2026-06-03) |
-|---|---:|---:|
-| overall_parity_pct | 40.89% | 40.89% |
-| gate | FAIL | FAIL |
-| total_tuples | 384 | 384 |
-| exact_matches | 144 | 144 |
-| acceptable_drift | 13 | 13 |
-| critical_mismatches_count | 227 | 227 |
+| Metric                    | Before (reports/phase4-gate.json run_date 2026-06-02) | After (reports/phase4-parity/phase4-gate.json run_date 2026-06-03) |
+| ------------------------- | ----------------------------------------------------: | -----------------------------------------------------------------: |
+| overall_parity_pct        |                                                40.89% |                                                             40.89% |
+| gate                      |                                                  FAIL |                                                               FAIL |
+| total_tuples              |                                                   384 |                                                                384 |
+| exact_matches             |                                                   144 |                                                                144 |
+| acceptable_drift          |                                                    13 |                                                                 13 |
+| critical_mismatches_count |                                                   227 |                                                                227 |
 
 ## Observations
 
@@ -44,4 +44,3 @@ This report compares the parity gate results immediately before and after the `e
 - `reports/phase4-parity/phase4-gate.json` (after)
 - `mt5/FibEngine.mqh` (patched)
 - `reports/phase4-parity/mt5-levels.json` and `reports/phase4-parity/pine-levels.json` (paired exports)
-

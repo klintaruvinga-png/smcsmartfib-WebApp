@@ -26,40 +26,40 @@
 
 ## Critical Issues (Blocks Phase Transition)
 
-| Issue | Component | Root Cause | Impact | Blocker | Corrective Action |
-|-------|-----------|-----------|--------|---------|-----------------|
+| Issue                                                | Component                         | Root Cause                                                                                                                   | Impact                                                                                                                                  | Blocker        | Corrective Action                                                                                   |
+| ---------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------- |
 | MT5 snapshot ingress accepted unauthenticated writes | WordPress REST MT5 snapshot route | `POST /snapshot` was registered public and the handler trusted `get_current_user_id()` without an in-method permission guard | EA posts could succeed while persisting under user `0`, breaking backend authority and making the dashboard silently miss live MT5 data | No after patch | Required authenticated route registration and added a defensive auth check inside `post_snapshot()` |
 
 ---
 
 ## High Priority Issues (Slows Progress)
 
-| Issue | Component | Root Cause | Impact | Blocker | Corrective Action |
-|-------|-----------|-----------|--------|---------|-----------------|
+| Issue                                                  | Component                    | Root Cause                                                                                                                          | Impact                                                                                              | Blocker        | Corrective Action                                                                                                                                            |
+| ------------------------------------------------------ | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | MT5 snapshot rows lost canonical freshness/state truth | Backend snapshot persistence | `post_snapshot()` never wrote the snapshot `state`, and it stored `updated_at` from receipt time instead of the MT5 quote timestamp | Fresh MT5 prices could surface as `offline`, and state-only MT5 updates risked faking quote recency | No after patch | Persisted normalized MT5 freshness into `state`, parsed MT5 timestamps into MySQL time, and preserved the last quote timestamp during state-only transitions |
 
 ---
 
 ## Parity Drift Alerts
 
-| Engine | Previous % | Current % | Trend | Status | Action |
-|--------|-----------|----------|-------|--------|--------|
-| Freshness / ingress (Phase 0) | N/A | 100% on covered MT5 auth/state/timestamp cases | Improving | PASS | Run live staging disconnect/reconnect drill |
-| Fib (Phase 4) | N/A | N/A | Stable | PENDING | No fib code delta in this run |
-| Regime (Phase 5) | N/A | N/A | Stable | PENDING | No regime code delta in this run |
-| Signal (Phase 6) | 100% on covered pip-value conversion cases | 100% on covered pip-value conversion cases | Stable | PASS | Keep existing sizing parity harness in CI rotation |
+| Engine                        | Previous %                                 | Current %                                      | Trend     | Status  | Action                                             |
+| ----------------------------- | ------------------------------------------ | ---------------------------------------------- | --------- | ------- | -------------------------------------------------- |
+| Freshness / ingress (Phase 0) | N/A                                        | 100% on covered MT5 auth/state/timestamp cases | Improving | PASS    | Run live staging disconnect/reconnect drill        |
+| Fib (Phase 4)                 | N/A                                        | N/A                                            | Stable    | PENDING | No fib code delta in this run                      |
+| Regime (Phase 5)              | N/A                                        | N/A                                            | Stable    | PENDING | No regime code delta in this run                   |
+| Signal (Phase 6)              | 100% on covered pip-value conversion cases | 100% on covered pip-value conversion cases     | Stable    | PASS    | Keep existing sizing parity harness in CI rotation |
 
 ---
 
 ## Test Failure Summary
 
-| Test | Phase | Status | Error | Frequency |
-|------|-------|--------|-------|-----------|
-| PHP syntax check (`php -l`) | 0 | PASS | None | Once |
-| MT5 snapshot contract harness | 0 | PASS | None | Once |
-| Pip-value regression harness | 0 / 6 | PASS | None | Once |
-| Live MT5 staging reconnect drill | 0 | PENDING | Not executed in this automation run | Not run |
-| Long-run refresh soak (24h/72h) | 0 | PENDING | Not executed in this automation run | Not run |
+| Test                             | Phase | Status  | Error                               | Frequency |
+| -------------------------------- | ----- | ------- | ----------------------------------- | --------- |
+| PHP syntax check (`php -l`)      | 0     | PASS    | None                                | Once      |
+| MT5 snapshot contract harness    | 0     | PASS    | None                                | Once      |
+| Pip-value regression harness     | 0 / 6 | PASS    | None                                | Once      |
+| Live MT5 staging reconnect drill | 0     | PENDING | Not executed in this automation run | Not run   |
+| Long-run refresh soak (24h/72h)  | 0     | PENDING | Not executed in this automation run | Not run   |
 
 ---
 
