@@ -12,7 +12,15 @@ export default defineNitroConfig({
   serverDir: "src",
   // API routes live under src/routes/**
   routeRules: {
-    "/api/**": { cors: true },
+    "/api/**": {
+      cors: {
+        origin: "https://smcsuperfibwebapp.klintaruvinga.workers.dev",
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        headers: ["Authorization", "Content-Type"],
+        credentials: true,
+        maxAge: 86400,
+      },
+    },
   },
   runtimeConfig: {
     // Private (server-only) runtime config — never exposed to client.
