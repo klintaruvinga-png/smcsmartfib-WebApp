@@ -6,7 +6,7 @@
     "watchPatterns": ["src/**", "package.json", "package-lock.json", "nitro.config.ts"]
   },
   "deploy": {
-    "rootDirectory": "backend",
+    "rootDirectory": ".",
     "startCommand": "node .output/server/index.mjs",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 100,
