@@ -22,7 +22,7 @@
 
 input string WebhookURL = "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream";
 input string ApiKey     = "";   // Must match SMC_SF_EA_API_KEY in wp-config.php
-input int    UserId     = 1;    // WordPress user_id that owns this data stream
+input string UserId     = "";    // UUID of the user row in public.users
 input int    TimerSec              = 10;   // OnPeriodic interval in seconds
 input int    HeartbeatIntervalTicks = 6;   // Send heartbeat every N OnTimer() calls (default 6 × 10 s = 60 s)
 input bool   DebugLog              = false; // Enable verbose per-tick logging (off in production to avoid log noise)
@@ -62,8 +62,8 @@ string BuildConfigIssueSummary()
         issues += "WebhookURL is empty; ";
     if (IsBlankInput(ApiKey))
         issues += "ApiKey is empty; ";
-    if (UserId <= 0)
-        issues += "UserId must be >= 1; ";
+    if (StringLen(UserId) == 0)
+        issues += "UserId must be set; ";
 
     if (StringLen(issues) >= 2)
         issues = StringSubstr(issues, 0, StringLen(issues) - 2);
@@ -153,9 +153,9 @@ int OnInit()
         Print("WARNING: SMC_MarketDataEA ApiKey is empty. EA will attach, but backend sends are disabled until you set ApiKey to match SMC_SF_EA_API_KEY in Inputs and re-attach the EA.");
         g_configValid = false;
     }
-    if (UserId <= 0)
+    if (StringLen(UserId) == 0)
     {
-        Print("WARNING: SMC_MarketDataEA UserId must be a valid WordPress user_id (>= 1). EA will attach, but backend sends are disabled until you correct UserId in Inputs and re-attach the EA.");
+        Print("WARNING: SMC_MarketDataEA UserId must be a valid UUID for public.users.id. EA will attach, but backend sends are disabled until you correct UserId in Inputs and re-attach the EA.");
         g_configValid = false;
     }
 
