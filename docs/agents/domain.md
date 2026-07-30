@@ -26,6 +26,7 @@ Market stream
 
 - The EA-to-backend data feed route for live market updates.
 - Includes symbols, price ticks, and state events.
+- EA identity is now the UUID in `public.users.id`, sent in `user_id`; this no longer maps to a WordPress integer user ID.
 
 Heartbeat
 
