@@ -5,7 +5,7 @@
 //| Setup:                                                           |
 //|  1. Set WebhookURL to your WP REST endpoint.                    |
 //|  2. Set ApiKey to match SMC_SF_EA_API_KEY in wp-config.php.     |
-//|  3. Set UserId to the WordPress user_id that owns the stream.   |
+//|  3. Set UserId to the user's UUID from public.users.id.         |
 //|  4. Allow WebRequest for your domain in                         |
 //|     Tools -> Options -> Expert Advisors.                        |
 //+------------------------------------------------------------------+
@@ -137,10 +137,13 @@ int OnInit()
 
     string webhookUrl = WebhookURL;
     string apiKey     = ApiKey;
+    string userId     = UserId;
     StringTrimLeft(webhookUrl);
     StringTrimRight(webhookUrl);
     StringTrimLeft(apiKey);
     StringTrimRight(apiKey);
+    StringTrimLeft(userId);
+    StringTrimRight(userId);
 
     // Soft-validate user config so the EA can still attach and run its timer.
     if (StringLen(webhookUrl) == 0)
@@ -153,7 +156,7 @@ int OnInit()
         Print("WARNING: SMC_MarketDataEA ApiKey is empty. EA will attach, but backend sends are disabled until you set ApiKey to match SMC_SF_EA_API_KEY in Inputs and re-attach the EA.");
         g_configValid = false;
     }
-    if (StringLen(UserId) == 0)
+    if (StringLen(userId) == 0)
     {
         Print("WARNING: SMC_MarketDataEA UserId must be a valid UUID for public.users.id. EA will attach, but backend sends are disabled until you correct UserId in Inputs and re-attach the EA.");
         g_configValid = false;
@@ -217,7 +220,7 @@ int OnInit()
     if (StringLen(apiKey) > 0)
         auth = "X-EA-API-Key: " + apiKey;
 
-    if (!engine.Initialize(g_symArray, g_symCount, webhookUrl, auth, UserId))
+    if (!engine.Initialize(g_symArray, g_symCount, webhookUrl, auth, userId))
     {
         Print("SMC_MarketDataEA: engine init failed");
         return INIT_FAILED;

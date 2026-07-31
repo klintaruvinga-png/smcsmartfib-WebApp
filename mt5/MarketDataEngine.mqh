@@ -35,7 +35,7 @@ private:
     int      symbolCount;
 
     string   webhookUrl;   // https://yoursite.com/wp-json/sniper/v1/ea/market-stream
-    string   authHeader;   // Full header line: "X-EA-API-Key: ***"
+    string   authHeader;   // Full header line: "X-EA-API-Key: <token>"
     string   wpUserId;     // UUID of the user row in public.users
 
     datetime lastSentCandleM1[100];
@@ -243,7 +243,7 @@ public:
             }
 
             string payload = "{";
-            payload += "\"user_id\":"  + wpUserId + ",";
+            payload += "\"user_id\":\""  + wpUserId + "\",";
             payload += "\"symbol\":\"" + normalized                + "\",";
             payload += "\"levels\":"   + fibJson;
             payload += "}";
@@ -507,8 +507,8 @@ public:
 
         string json = "{";
 
-        if (wpUserId > 0)
-            json += "\"user_id\":"         + wpUserId + ",";
+        if (StringLen(wpUserId) > 0)
+            json += "\"user_id\":\""         + wpUserId + "\",";
 
         json += "\"symbol\":\""            + symbol                                     + "\",";
         json += "\"normalized_symbol\":\"" + norm                                       + "\",";
@@ -769,7 +769,7 @@ public:
         string timestamp    = TimeToIso8601(TimeCurrent());
 
         string json = "{";
-        json += "\"user_id\":"         + wpUserId  + ",";
+        json += "\"user_id\":\""         + wpUserId  + "\",";
         json += "\"account_id\":"      + IntegerToString(accountId) + ",";
         json += "\"terminal_id\":\""   + termId                     + "\",";
         json += "\"broker\":\""        + broker                     + "\",";
@@ -827,7 +827,7 @@ public:
         string timestamp    = TimeToIso8601(TimeCurrent());
 
         string json = "{";
-        json += "\"user_id\":"         + wpUserId    + ",";
+        json += "\"user_id\":\""         + wpUserId    + "\",";
         json += "\"account_id\":"      + IntegerToString(accountId)    + ",";
         json += "\"terminal_id\":\""   + termId                        + "\",";
         json += "\"broker\":\""        + broker                        + "\",";
@@ -884,7 +884,7 @@ public:
         string timestamp    = TimeToIso8601(TimeCurrent());
 
         string json = "{";
-        json += "\"user_id\":"         + wpUserId  + ",";
+        json += "\"user_id\":\""         + wpUserId  + "\",";
         json += "\"account_id\":"      + IntegerToString(accountId) + ",";
         json += "\"terminal_id\":\""   + termId                     + "\",";
         json += "\"broker\":\""        + broker                     + "\",";
