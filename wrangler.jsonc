@@ -3,8 +3,8 @@
   "name": "smcsuperfibwebapp",
   "compatibility_date": "2026-06-22",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "dist/server/server.js",
+  "main": "cloudflare/api-proxy-worker.js",
   "assets": {
-    "directory": "./dist/client"
-  }
+    "directory": "./dist/client",
+  },
 }

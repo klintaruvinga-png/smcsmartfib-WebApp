@@ -10,30 +10,30 @@
 
 ## Refresh And Stale-State
 
-| Severity | Component | Root Cause | Impact | Blocker Status |
-|---|---|---|---|---|
-| MEDIUM | `src/routes/live.tsx` Live Radar | The page locally recomputed staleness from `updatedAt`/browser time and filtered MT5 cards on the client even after the backend had already classified freshness. | Frontend could diverge from backend authority, hide backend-live MT5 cards, or mark cards stale locally when `age_sec` was absent or timestamp parsing drifted. | Does not block current phase, but degrades migration parity confidence. |
+| Severity | Component                        | Root Cause                                                                                                                                                        | Impact                                                                                                                                                          | Blocker Status                                                          |
+| -------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| MEDIUM   | `src/routes/live.tsx` Live Radar | The page locally recomputed staleness from `updatedAt`/browser time and filtered MT5 cards on the client even after the backend had already classified freshness. | Frontend could diverge from backend authority, hide backend-live MT5 cards, or mark cards stale locally when `age_sec` was absent or timestamp parsing drifted. | Does not block current phase, but degrades migration parity confidence. |
 
 ## Runtime / Tooling Observations
 
-| Severity | Component | Root Cause | Impact | Blocker Status |
-|---|---|---|---|---|
-| LOW | Workspace lint surface | Pre-existing CRLF/Prettier drift across multiple frontend files. | Full `npm run lint` remains noisy and unsuitable as a clean regression gate until formatting drift is normalized. | Not caused by this patch. |
+| Severity | Component              | Root Cause                                                       | Impact                                                                                                            | Blocker Status            |
+| -------- | ---------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| LOW      | Workspace lint surface | Pre-existing CRLF/Prettier drift across multiple frontend files. | Full `npm run lint` remains noisy and unsuitable as a clean regression gate until formatting drift is normalized. | Not caused by this patch. |
 
 # Surgical Fixes Applied
 
-| File | Change | Hardening Added |
-|---|---|---|
+| File                  | Change                                                                                                                                                                                                                                          | Hardening Added                                                                                                                                   |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/routes/live.tsx` | Removed `useUserSettings()`-driven stale-threshold math, removed timestamp parsing fallback, removed client-side MT5 card filtering based on browser-calculated age, and reduced inline blocker severity JSX into a single derived `diagLevel`. | Live Radar now trusts backend `price.state` and `regime.state` as the source of truth and cannot silently reclassify cards from local clock math. |
 
 # Parity Verification Results
 
-| Dimension | Scope | Result | Drift |
-|---|---|---|---|
-| Fib parity | Not replayed end-to-end in this run | No new fib logic changes applied | Unchanged / pending broader replay |
-| Regime parity | Live Radar rendering path | Backend regime state is now rendered without extra client stale override | Drift removed on audited path |
-| Signal parity | Live Radar blocker-warning severity path | Engine-blocker severity still passes through backend diagnostics; JSX logic simplified only | No new drift introduced |
-| Freshness parity | Live Radar MT5 card inclusion + stale warning path | 100% backend-authoritative on the audited path after patch | Improved from drifting to aligned |
+| Dimension        | Scope                                              | Result                                                                                      | Drift                              |
+| ---------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------- |
+| Fib parity       | Not replayed end-to-end in this run                | No new fib logic changes applied                                                            | Unchanged / pending broader replay |
+| Regime parity    | Live Radar rendering path                          | Backend regime state is now rendered without extra client stale override                    | Drift removed on audited path      |
+| Signal parity    | Live Radar blocker-warning severity path           | Engine-blocker severity still passes through backend diagnostics; JSX logic simplified only | No new drift introduced            |
+| Freshness parity | Live Radar MT5 card inclusion + stale warning path | 100% backend-authoritative on the audited path after patch                                  | Improved from drifting to aligned  |
 
 # Remaining Risks
 

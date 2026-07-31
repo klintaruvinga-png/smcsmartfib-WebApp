@@ -22,14 +22,14 @@ without advancing any live gate result.
 
 ## Evidence Re-validated
 
-| Surface | Source of truth | Canonical artifact updated | Status |
-|---|---|---|---|
-| Broker / server readiness | `reports/copilot-research.md` | `PHASE1_TRACKER.md` | MATCH |
-| Account type readiness | `reports/copilot-research.md` | `PHASE1_TRACKER.md` | MATCH |
-| MT5 build readiness | `reports/copilot-research.md` | `PHASE1_TRACKER.md` | MATCH |
-| EA deployment readiness | `reports/copilot-research.md` | `PHASE1_TRACKER.md` | MATCH |
-| Bridge auth readiness | `reports/copilot-research.md` | `PHASE1_TRACKER.md` | MATCH |
-| Prerequisite checklist state | `reports/copilot-research.md` | `PHASE1_CHECKLIST.md` | MATCH |
+| Surface                      | Source of truth               | Canonical artifact updated | Status |
+| ---------------------------- | ----------------------------- | -------------------------- | ------ |
+| Broker / server readiness    | `reports/copilot-research.md` | `PHASE1_TRACKER.md`        | MATCH  |
+| Account type readiness       | `reports/copilot-research.md` | `PHASE1_TRACKER.md`        | MATCH  |
+| MT5 build readiness          | `reports/copilot-research.md` | `PHASE1_TRACKER.md`        | MATCH  |
+| EA deployment readiness      | `reports/copilot-research.md` | `PHASE1_TRACKER.md`        | MATCH  |
+| Bridge auth readiness        | `reports/copilot-research.md` | `PHASE1_TRACKER.md`        | MATCH  |
+| Prerequisite checklist state | `reports/copilot-research.md` | `PHASE1_CHECKLIST.md`      | MATCH  |
 
 ---
 
@@ -44,14 +44,14 @@ without advancing any live gate result.
 
 ## Open Parity Items
 
-| Item | Status | Why still open |
-|---|---|---|
-| `heartbeat` continuity parity | PENDING | Requires 48h live MT5 execution and backend log review |
-| `account-sync` persistence parity | PENDING | Requires live payload capture and backend persistence review |
-| `symbol-sync` normalization parity | PENDING | Requires live broker symbol upload and backend table inspection |
-| `market-stream` coexistence parity | PENDING | Requires live run showing route behavior remains consistent |
+| Item                                  | Status  | Why still open                                                  |
+| ------------------------------------- | ------- | --------------------------------------------------------------- |
+| `heartbeat` continuity parity         | PENDING | Requires 48h live MT5 execution and backend log review          |
+| `account-sync` persistence parity     | PENDING | Requires live payload capture and backend persistence review    |
+| `symbol-sync` normalization parity    | PENDING | Requires live broker symbol upload and backend table inspection |
+| `market-stream` coexistence parity    | PENDING | Requires live run showing route behavior remains consistent     |
 | Duplicate heartbeat protection parity | PENDING | Requires live or controlled invalid-duplicate scenario evidence |
-| Invalid license rejection parity | PENDING | Requires live or controlled rejection evidence |
+| Invalid license rejection parity      | PENDING | Requires live or controlled rejection evidence                  |
 
 ---
 

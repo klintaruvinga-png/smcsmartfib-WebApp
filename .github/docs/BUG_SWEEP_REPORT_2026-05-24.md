@@ -24,16 +24,16 @@
 
 ## Confirmed Problems
 
-| Severity | Category | Component | Root Cause | Impact | Blocker |
-|---|---|---|---|---|---|
-| HIGH | Refresh / stale-state truth | `build_symbol_state()` backend diagnostics | Missing-price fallback synthesized `updatedAt = gmdate('c')` instead of preserving quote absence | Admin/engine diagnostics could imply recent quote movement when no authoritative quote existed, weakening stale-data governance during migration triage | No |
+| Severity | Category                    | Component                                  | Root Cause                                                                                       | Impact                                                                                                                                                  | Blocker |
+| -------- | --------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| HIGH     | Refresh / stale-state truth | `build_symbol_state()` backend diagnostics | Missing-price fallback synthesized `updatedAt = gmdate('c')` instead of preserving quote absence | Admin/engine diagnostics could imply recent quote movement when no authoritative quote existed, weakening stale-data governance during migration triage | No      |
 
 ## Surgical Fixes Applied
 
-| File | Change | Hardening / Regression Protection |
-|---|---|---|
-| `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | Missing-price placeholder now keeps `updatedAt => null` instead of fabricating a current timestamp | Prevents fake freshness in `lastPriceAt` diagnostics while preserving stale/blocked state behaviour |
-| `wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` | Seeded candle-only `GBPUSD` case and asserted `QUOTE_UNAVAILABLE` plus explicit `lastPriceAt === null` | Locks the defect path against future regressions |
+| File                                                                     | Change                                                                                                 | Hardening / Regression Protection                                                                   |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`                  | Missing-price placeholder now keeps `updatedAt => null` instead of fabricating a current timestamp     | Prevents fake freshness in `lastPriceAt` diagnostics while preserving stale/blocked state behaviour |
+| `wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` | Seeded candle-only `GBPUSD` case and asserted `QUOTE_UNAVAILABLE` plus explicit `lastPriceAt === null` | Locks the defect path against future regressions                                                    |
 
 ## Parity Verification Results
 
@@ -44,12 +44,12 @@
 
 ## Test Failure Summary
 
-| Test | Status | Result |
-|---|---|---|
-| `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | PASS | No syntax errors |
-| `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` | PASS | Snapshot contract and missing-quote freshness regression passed |
-| `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php` | PASS | Snapshot freshness invalidation still passed |
-| `php wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php` | PASS | MT5 source/timestamp persistence contract still passed |
+| Test                                                                                     | Status | Result                                                          |
+| ---------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------- |
+| `php -l wordpress/smc-superfib-sniper/smc-superfib-sniper.php`                           | PASS   | No syntax errors                                                |
+| `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php`             | PASS   | Snapshot contract and missing-quote freshness regression passed |
+| `php wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php`     | PASS   | Snapshot freshness invalidation still passed                    |
+| `php wordpress/smc-superfib-sniper/tests/php/test-market-data-service-source-filter.php` | PASS   | MT5 source/timestamp persistence contract still passed          |
 
 ## Remaining Risks
 

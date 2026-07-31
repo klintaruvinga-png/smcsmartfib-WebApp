@@ -14,12 +14,12 @@
 
 # Comparison Matrix
 
-| Contract item | MT5 emitter expectation | Backend before patch | Backend after patch | Result |
-| --- | --- | --- | --- | --- |
-| `created_at` | Unix epoch seconds from `SignalToJson()` | Replaced with receipt time | Normalized from MT5 payload and stored as MySQL UTC | PASS |
-| `pine_match` | Drift classifier should compare against latest Pine row | Worked only when live DB query path resolved | Preserved | PASS |
-| `drift_pips` | Numeric drift metric should be stored for diagnostics | Dropped on ingest | Persisted on ingest | PASS |
-| Direction mismatch telemetry | Candidate should still retain measurable price drift | Drift metric unavailable | Drift metric preserved, classification still `MISMATCH` | PASS |
+| Contract item                | MT5 emitter expectation                                 | Backend before patch                         | Backend after patch                                     | Result |
+| ---------------------------- | ------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------- | ------ |
+| `created_at`                 | Unix epoch seconds from `SignalToJson()`                | Replaced with receipt time                   | Normalized from MT5 payload and stored as MySQL UTC     | PASS   |
+| `pine_match`                 | Drift classifier should compare against latest Pine row | Worked only when live DB query path resolved | Preserved                                               | PASS   |
+| `drift_pips`                 | Numeric drift metric should be stored for diagnostics   | Dropped on ingest                            | Persisted on ingest                                     | PASS   |
+| Direction mismatch telemetry | Candidate should still retain measurable price drift    | Drift metric unavailable                     | Drift metric preserved, classification still `MISMATCH` | PASS   |
 
 # Acceptance Criteria
 
@@ -30,12 +30,12 @@
 
 # Verification Results
 
-| Check | Result |
-| --- | --- |
-| `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` | PASS |
-| `php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php` | PASS |
-| `php wordpress/smc-superfib-sniper/tests/php/test-fib-parity.php` | PASS |
-| `npx vitest run scripts/mt5-signal-dispatch.test.mjs` | PASS |
+| Check                                                                        | Result                                               |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` | PASS                                                 |
+| `php wordpress/smc-superfib-sniper/tests/php/test-ea-market-stream.php`      | PASS                                                 |
+| `php wordpress/smc-superfib-sniper/tests/php/test-fib-parity.php`            | PASS                                                 |
+| `npx vitest run scripts/mt5-signal-dispatch.test.mjs`                        | PASS                                                 |
 | `php scripts/parity-validator.php --out reports/phase4-gate-2026-05-29.json` | PASS (`384/384` exact synthetic tuples, gate `PASS`) |
 
 # Drift Analysis

@@ -9,39 +9,39 @@
 
 ## Fib Engine
 
-| Metric | Pine Value | MT5/Backend Value | Match | Accuracy |
-|--------|------------|-------------------|-------|----------|
-| Fib ingestion schema | 16-ratio contract | Active backend PHP tests | Yes | 100% |
-| Fib parity regression | Pine reference tests | Backend fib parity tests | Yes | 100% |
+| Metric                | Pine Value           | MT5/Backend Value        | Match | Accuracy |
+| --------------------- | -------------------- | ------------------------ | ----- | -------- |
+| Fib ingestion schema  | 16-ratio contract    | Active backend PHP tests | Yes   | 100%     |
+| Fib parity regression | Pine reference tests | Backend fib parity tests | Yes   | 100%     |
 
 ## Regime Engine
 
-| Metric | Pine Classification | MT5 Classification | Match | Accuracy |
-|--------|---------------------|--------------------|-------|----------|
-| Keyed `regimes` payload extraction | Present | Present | Yes | 100% |
-| Missing counterpart gate | FAIL expected | FAIL emitted | Yes | 100% |
+| Metric                             | Pine Classification | MT5 Classification | Match | Accuracy |
+| ---------------------------------- | ------------------- | ------------------ | ----- | -------- |
+| Keyed `regimes` payload extraction | Present             | Present            | Yes   | 100%     |
+| Missing counterpart gate           | FAIL expected       | FAIL emitted       | Yes   | 100%     |
 
 ## Signal Engine
 
-| Metric | Pine Signal | MT5/Backend Signal | Match | Accuracy |
-|--------|-------------|--------------------|-------|----------|
-| Keyed `signals` payload extraction | Present | Present | Yes | 100% |
-| EA `candidates` payload extraction | Present | Present | Yes | 100% |
-| Bare-array payload extraction | Present | Present | Yes | 100% |
-| MT5-only counterpart gate | NO_PINE expected | FAIL emitted | Yes | 100% |
-| Pine-only counterpart gate | NO_MT5 expected | FAIL emitted | Yes | 100% |
-| Display schema `backend_confirmed` guard | Required | Present in active plugin SQL | Yes | 100% |
+| Metric                                   | Pine Signal      | MT5/Backend Signal           | Match | Accuracy |
+| ---------------------------------------- | ---------------- | ---------------------------- | ----- | -------- |
+| Keyed `signals` payload extraction       | Present          | Present                      | Yes   | 100%     |
+| EA `candidates` payload extraction       | Present          | Present                      | Yes   | 100%     |
+| Bare-array payload extraction            | Present          | Present                      | Yes   | 100%     |
+| MT5-only counterpart gate                | NO_PINE expected | FAIL emitted                 | Yes   | 100%     |
+| Pine-only counterpart gate               | NO_MT5 expected  | FAIL emitted                 | Yes   | 100%     |
+| Display schema `backend_confirmed` guard | Required         | Present in active plugin SQL | Yes   | 100%     |
 
 # Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-|-------|----------|-------|------------|---------|
-| Display schema guard skipped when active versioned plugin path replaced canonical local path | MEDIUM | 1 | Added plugin file resolver and hard assertion before schema check | No |
+| Issue                                                                                        | Severity | Count | Resolution                                                        | Blocker |
+| -------------------------------------------------------------------------------------------- | -------- | ----- | ----------------------------------------------------------------- | ------- |
+| Display schema guard skipped when active versioned plugin path replaced canonical local path | MEDIUM   | 1     | Added plugin file resolver and hard assertion before schema check | No      |
 
 # Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-|------|------------|--------|----------|
+| Item                          | Difference            | Reason                                                                    | Accepted                                        |
+| ----------------------------- | --------------------- | ------------------------------------------------------------------------- | ----------------------------------------------- |
 | Dashboard Vitest verification | Not run to completion | Local esbuild child-process spawn denied with `EPERM` before tests loaded | Temporarily, pending CI/local environment rerun |
 
 # Recommendations

@@ -11,7 +11,9 @@
       "root_cause": "No min(0) guard or rejection on candle volume before DB insert in insert_mt5_candle(). Volume is display-only but should satisfy data integrity constraints.",
       "impact_zones": ["EA Market Stream", "Candle DB Table"],
       "proposed_fix": "Add max(0, (int) $candle['volume']) guard with an audit event when negative volume is detected. Clamp to 0 rather than reject (volume is display-only and does not affect signal computation).",
-      "files_affected": ["wordpress/smc-superfib-sniper/smc-superfib-sniper.php — insert_mt5_candle()"]
+      "files_affected": [
+        "wordpress/smc-superfib-sniper/smc-superfib-sniper.php — insert_mt5_candle()"
+      ]
     },
     {
       "id": "BUG-002",

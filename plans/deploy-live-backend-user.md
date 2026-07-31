@@ -35,11 +35,11 @@ Browser
 
 ## Sequencing
 
-1. Install deps (root: bun, backend: npm)                       [DONE]
-2. Build backend (node-server preset)                          [DONE — .output/server/index.mjs]
+1. Install deps (root: bun, backend: npm) [DONE]
+2. Build backend (node-server preset) [DONE — .output/server/index.mjs]
 3. Build frontend (Cloudflare-shaped dist; Vercel re-packaged at deploy) [DONE — dist/]
 4. Scaffold backend/.env.local + migration runner + railway.json [DONE — pending secrets]
-5. Apply migrations 001-005 to live Supabase                    [gated on DATABASE_URL]
+5. Apply migrations 001-005 to live Supabase [gated on DATABASE_URL]
 6. Run backend against live Supabase; register ONE user; verify login + /me via curl
 7. Deploy backend to Node host (gated on host account + secrets)
 8. Set VITE_API_URL in Vercel = backend prod URL; deploy frontend (gated on Vercel repo link)
@@ -57,16 +57,16 @@ Browser
 
 ## Verification gates
 
-| Gate | Command | Expected |
-|------|---------|---------|
-| Backend compiles | `cd backend && npm run build` | `.output/server/index.mjs` exists |
-| Frontend compiles | `npm run build` | `dist/server/server.js` + `dist/client` exist |
-| Migrations applied | `cd backend && node scripts/apply-migrations.mjs` (DIRECT_DATABASE_URL set) | all 6 tables present |
-| One live user | `curl -X POST .../api/auth/register` | 200 + accessToken |
-| Login works | `curl -X POST .../api/auth/login` | 200 + accessToken |
-| /me works | `curl .../api/auth/me -H Bearer` | 200 + user view |
-| Health | `curl .../api/health` | `{"status":"ok",...}` |
-| Frontend live | Vercel deploy of this branch | app loads, login reaches backend |
+| Gate               | Command                                                                     | Expected                                      |
+| ------------------ | --------------------------------------------------------------------------- | --------------------------------------------- |
+| Backend compiles   | `cd backend && npm run build`                                               | `.output/server/index.mjs` exists             |
+| Frontend compiles  | `npm run build`                                                             | `dist/server/server.js` + `dist/client` exist |
+| Migrations applied | `cd backend && node scripts/apply-migrations.mjs` (DIRECT_DATABASE_URL set) | all 6 tables present                          |
+| One live user      | `curl -X POST .../api/auth/register`                                        | 200 + accessToken                             |
+| Login works        | `curl -X POST .../api/auth/login`                                           | 200 + accessToken                             |
+| /me works          | `curl .../api/auth/me -H Bearer`                                            | 200 + user view                               |
+| Health             | `curl .../api/health`                                                       | `{"status":"ok",...}`                         |
+| Frontend live      | Vercel deploy of this branch                                                | app loads, login reaches backend              |
 
 ## Notes / risks
 

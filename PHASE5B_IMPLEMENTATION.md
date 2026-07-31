@@ -4,7 +4,7 @@
 **Target Start**: After Phase 5 gate passes  
 **Target End**: 2026-10-01  
 **Owner**: Track B (data ingestion + scoring) + Track C (dashboard)  
-**Branch**: To be created from main once Phase 5 gate clears  
+**Branch**: To be created from main once Phase 5 gate clears
 
 ---
 
@@ -25,6 +25,7 @@ logic — it adds a conviction multiplier based on macro alignment.
 **New DB tables:**
 
 `wp_smc_sf_fundamental_events`
+
 ```
 id, currency, event_type, event_name, event_date,
 actual, forecast, previous, raw_score (-2..+2),
@@ -33,6 +34,7 @@ UNIQUE KEY (currency, event_type, event_date)
 ```
 
 `wp_smc_sf_fundamental_bias`
+
 ```
 id, currency, composite_score (-2.0..+2.0),
 category (BULLISH/NEUTRAL/BEARISH),
@@ -43,30 +45,34 @@ UNIQUE KEY (currency)
 **New REST endpoints:**
 
 `POST /fundamentals/refresh` (user auth)
+
 - Pulls economic calendar from Twelve Data `/economic_calendar` (existing TD key)
 - Scores each event using `score_fundamental_event()`
 - Recomputes composite bias per currency using `recompute_fundamental_bias()`
 - Returns `{ ok, events_ingested, currencies_updated }`
 
 `GET /fundamentals/bias?currency=USD` (user auth)
+
 - Returns composite bias for one currency (or all if no filter)
 - Response: `{ ok, bias: { currency, compositeScore, category, eventCount, computedAt, expiresAt } }`
 
 **New WP-Cron job: `smc_sf_refresh_fundamentals`**
+
 - Runs every 30 min (custom `twicehourly` cron schedule)
 - Calls `cron_refresh_fundamentals()` for all users with a valid TD key
 - Bias recomputed once after all user calendar pulls
 
 **Event scoring logic (`score_fundamental_event`):**
 
-| Event Type | Score Method |
-|------------|-------------|
-| `rate_decision` | actual > previous → +1 (hike); < previous → -1 (cut); same → 0 |
+| Event Type                             | Score Method                                                         |
+| -------------------------------------- | -------------------------------------------------------------------- |
+| `rate_decision`                        | actual > previous → +1 (hike); < previous → -1 (cut); same → 0       |
 | `cpi` / `nfp` / `gdp` / `retail_sales` | Surprise ratio: (actual−forecast)/forecast → mapped to -2/−1/0/+1/+2 |
-| `unemployment` | Inverted polarity (higher unemployment = bearish) |
-| `pmi` / `trade_balance` / `other` | Standard surprise ratio |
+| `unemployment`                         | Inverted polarity (higher unemployment = bearish)                    |
+| `pmi` / `trade_balance` / `other`      | Standard surprise ratio                                              |
 
 **Composite bias decay:**
+
 - Events within 30 days: weight = 1.0×
 - Events 30–90 days old: weight = 0.25×
 - Events older than 90 days: excluded
@@ -100,11 +106,11 @@ They will be built when Phase 5B starts after Phase 5 gate clears.
 
 When Phase 5B is live and Phase 6 signals are evaluated, the conviction multiplier applies:
 
-| Alignment | MT5 vs Fundamental Bias | Conviction Weight |
-|-----------|------------------------|-------------------|
-| Aligned   | Same direction         | 1.0× (full)       |
-| Neutral   | NEUTRAL fundamental    | 0.7×              |
-| Opposed   | Opposite direction     | 0.3× (reduced, not suppressed) |
+| Alignment | MT5 vs Fundamental Bias | Conviction Weight              |
+| --------- | ----------------------- | ------------------------------ |
+| Aligned   | Same direction          | 1.0× (full)                    |
+| Neutral   | NEUTRAL fundamental     | 0.7×                           |
+| Opposed   | Opposite direction      | 0.3× (reduced, not suppressed) |
 
 Opposed signals are not blocked — they are flagged with lower confidence so the operator can decide.
 
@@ -113,6 +119,7 @@ Opposed signals are not blocked — they are flagged with lower confidence so th
 ## Phase 5B Gate Checklist
 
 ### Automated (code-complete)
+
 - [x] `wp_smc_sf_fundamental_events` table schema
 - [x] `wp_smc_sf_fundamental_bias` table schema
 - [x] `POST /fundamentals/refresh` endpoint
@@ -122,6 +129,7 @@ Opposed signals are not blocked — they are flagged with lower confidence so th
 - [x] Composite bias with 30d/90d time decay
 
 ### Manual (operator action — starts after Phase 5 gate)
+
 - [ ] **Register FRED API key** at fred.stlouisfed.org
 - [ ] **Run `/fundamentals/refresh`** and verify events ingested for USD, EUR, GBP, JPY, AUD, CAD
 - [ ] **Historical accuracy test** — verify bias category matches known events (e.g. 2025 rate hikes)

@@ -21,12 +21,8 @@
     }
   ],
   "migration_status_post_patch": {
-    "blockers_addressed": [
-      "MIGRATION-001: Phase 1 section header now correctly shows COMPLETE"
-    ],
-    "remaining_blockers": [
-      "Phase 2 telemetry contract sign-off pending (Track A + Track B)"
-    ],
+    "blockers_addressed": ["MIGRATION-001: Phase 1 section header now correctly shows COMPLETE"],
+    "remaining_blockers": ["Phase 2 telemetry contract sign-off pending (Track A + Track B)"],
     "phase_readiness": "Phase 1 COMPLETE. Phase 2 planning at 10%. Phase 2 gate: Track A / Track B telemetry contract sign-off."
   },
   "tests": {

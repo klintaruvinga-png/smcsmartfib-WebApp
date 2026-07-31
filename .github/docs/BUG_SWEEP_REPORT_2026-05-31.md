@@ -8,9 +8,9 @@
 
 # Confirmed Problems
 
-| Category | Severity | Root Cause | Impact |
-| --- | --- | --- | --- |
-| Refresh/stale-state truth | MEDIUM | Several freshness-critical GET endpoints returned cacheable REST responses, and some client reads did not request `no-store` cache-busting. | Browser/proxy cache could replay stale snapshots, chart candles, ladders, telemetry, or progress state while the dashboard appeared current. |
+| Category                  | Severity | Root Cause                                                                                                                                  | Impact                                                                                                                                       |
+| ------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Refresh/stale-state truth | MEDIUM   | Several freshness-critical GET endpoints returned cacheable REST responses, and some client reads did not request `no-store` cache-busting. | Browser/proxy cache could replay stale snapshots, chart candles, ladders, telemetry, or progress state while the dashboard appeared current. |
 
 # Surgical Fixes Applied
 

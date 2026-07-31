@@ -21,12 +21,12 @@ The fix promotes the symbol array to module-level globals and adds a loop in `On
 
 ## Parity Score
 
-| Symbol Role | Before Patch | After Patch | Status |
-|-------------|-------------|-------------|--------|
-| Chart symbol (e.g. EURUSD) | ✓ LIVE (OnTick fires) | ✓ LIVE | Stable |
-| Non-chart symbol 1 | ✗ DISCONNECTED | ✓ Correct | Fixed |
-| Non-chart symbol 2 | ✗ DISCONNECTED | ✓ Correct | Fixed |
-| Non-chart symbol N | ✗ DISCONNECTED | ✓ Correct | Fixed |
+| Symbol Role                | Before Patch          | After Patch | Status |
+| -------------------------- | --------------------- | ----------- | ------ |
+| Chart symbol (e.g. EURUSD) | ✓ LIVE (OnTick fires) | ✓ LIVE      | Stable |
+| Non-chart symbol 1         | ✗ DISCONNECTED        | ✓ Correct   | Fixed  |
+| Non-chart symbol 2         | ✗ DISCONNECTED        | ✓ Correct   | Fixed  |
+| Non-chart symbol N         | ✗ DISCONNECTED        | ✓ Correct   | Fixed  |
 
 **Multi-Symbol Freshness Parity**: Before 1/N (broken), After N/N (100%)
 
@@ -80,13 +80,13 @@ OnTimer() →
 ### Freshness State by Symbol Role (Default 6-Symbol EA Config)
 
 | Symbol | Chart? | Before Patch (freshness pushed) | After Patch (freshness pushed) |
-|--------|--------|---------------------------------|--------------------------------|
-| EURUSD | Yes | LIVE (correct) | LIVE (unchanged) |
-| GBPUSD | No | DISCONNECTED ✗ | LIVE/DELAYED (correct) ✓ |
-| XAUUSD | No | DISCONNECTED ✗ | LIVE/DELAYED (correct) ✓ |
-| USDJPY | No | DISCONNECTED ✗ | LIVE/DELAYED (correct) ✓ |
-| GBPJPY | No | DISCONNECTED ✗ | LIVE/DELAYED (correct) ✓ |
-| AUDUSD | No | DISCONNECTED ✗ | LIVE/DELAYED (correct) ✓ |
+| ------ | ------ | ------------------------------- | ------------------------------ |
+| EURUSD | Yes    | LIVE (correct)                  | LIVE (unchanged)               |
+| GBPUSD | No     | DISCONNECTED ✗                  | LIVE/DELAYED (correct) ✓       |
+| XAUUSD | No     | DISCONNECTED ✗                  | LIVE/DELAYED (correct) ✓       |
+| USDJPY | No     | DISCONNECTED ✗                  | LIVE/DELAYED (correct) ✓       |
+| GBPJPY | No     | DISCONNECTED ✗                  | LIVE/DELAYED (correct) ✓       |
+| AUDUSD | No     | DISCONNECTED ✗                  | LIVE/DELAYED (correct) ✓       |
 
 **Before: 1/6 correct (17%). After: 6/6 correct (100%).**
 
@@ -95,6 +95,7 @@ OnTimer() →
 ## Timer Cadence Analysis
 
 The fix relies on `SymbolInfoTick()` returning the most recent market tick from the MT5 terminal cache. `SymbolInfoTick()` does NOT make a network call — it reads from the terminal's in-memory tick buffer, which is updated in real time for any symbol that:
+
 1. Is selected in Market Watch (visible)
 2. Has chart subscription or is in the EA symbol list
 
@@ -118,25 +119,25 @@ The fix relies on `SymbolInfoTick()` returning the most recent market tick from 
 
 ## Remaining Edge Cases
 
-| Scenario | Risk | Mitigation |
-|----------|------|-----------|
-| Symbol not in Market Watch | `SymbolInfoTick()` may return stale/zero tick | Add `SymbolSelect(sym, true)` in `OnInit()` |
-| Broker restricts symbol to subscribed clients | tick.time may lag | FreshnessEngine will age to DELAYED then STALE correctly |
-| TimerSec set too high (e.g. 60s) | Non-chart symbols age to DELAYED between timer fires | Keep TimerSec ≤ 30s |
-| MT5 terminal disconnects briefly | All symbols → DISCONNECTED (correct, expected) | FreshnessEngine.UpdatePeriodic() guards DISCONNECTED state |
+| Scenario                                      | Risk                                                 | Mitigation                                                 |
+| --------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------- |
+| Symbol not in Market Watch                    | `SymbolInfoTick()` may return stale/zero tick        | Add `SymbolSelect(sym, true)` in `OnInit()`                |
+| Broker restricts symbol to subscribed clients | tick.time may lag                                    | FreshnessEngine will age to DELAYED then STALE correctly   |
+| TimerSec set too high (e.g. 60s)              | Non-chart symbols age to DELAYED between timer fires | Keep TimerSec ≤ 30s                                        |
+| MT5 terminal disconnects briefly              | All symbols → DISCONNECTED (correct, expected)       | FreshnessEngine.UpdatePeriodic() guards DISCONNECTED state |
 
 ---
 
 ## Migration Readiness
 
-| Dimension | Status |
-|-----------|--------|
-| Chart symbol freshness | ✓ PASS (unchanged) |
-| Non-chart symbol freshness | ✓ PASS (patched) |
-| Freshness state machine | ✓ PASS (LIVE/DELAYED/STALE/CLOSED/DISCONNECTED correct) |
-| PHP freshness → state mapping | ✓ PASS (mt5_freshness_to_snapshot_state correct) |
-| Dashboard rendering | ✓ PASS (FreshnessBadge receives correct state) |
-| SymbolSelect subscription | ⚠ RECOMMENDED (follow-up in Phase 1) |
+| Dimension                     | Status                                                  |
+| ----------------------------- | ------------------------------------------------------- |
+| Chart symbol freshness        | ✓ PASS (unchanged)                                      |
+| Non-chart symbol freshness    | ✓ PASS (patched)                                        |
+| Freshness state machine       | ✓ PASS (LIVE/DELAYED/STALE/CLOSED/DISCONNECTED correct) |
+| PHP freshness → state mapping | ✓ PASS (mt5_freshness_to_snapshot_state correct)        |
+| Dashboard rendering           | ✓ PASS (FreshnessBadge receives correct state)          |
+| SymbolSelect subscription     | ⚠ RECOMMENDED (follow-up in Phase 1)                    |
 
 **Migration readiness for MT5 multi-symbol freshness**: CONDITIONAL PASS
 (Patch applied; live soak + SymbolSelect follow-up required for full confidence)

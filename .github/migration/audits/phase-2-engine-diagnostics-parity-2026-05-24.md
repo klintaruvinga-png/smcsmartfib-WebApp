@@ -22,46 +22,46 @@
 
 ### Fib Engine
 
-| Metric | Backend / Dashboard Value | Expected Authority | Match | Accuracy |
-|---|---|---|---|---|
-| Chart snapshot `updatedAt` | last candle time | last candle time | Yes | 100% |
-| Non-MT5 quote guard | blocked before fib-driven engine analysis | blocked before fib-driven engine analysis | Yes | 100% |
-| **Fib Parity Score** | - | - | - | **100% (covered cases)** |
+| Metric                     | Backend / Dashboard Value                 | Expected Authority                        | Match | Accuracy                 |
+| -------------------------- | ----------------------------------------- | ----------------------------------------- | ----- | ------------------------ |
+| Chart snapshot `updatedAt` | last candle time                          | last candle time                          | Yes   | 100%                     |
+| Non-MT5 quote guard        | blocked before fib-driven engine analysis | blocked before fib-driven engine analysis | Yes   | 100%                     |
+| **Fib Parity Score**       | -                                         | -                                         | -     | **100% (covered cases)** |
 
 Observations: No fib anchor or level drift was introduced by the diagnostic timestamp patch. The covered check stayed limited to chart timestamp authority and non-MT5 engine guarding.
 
 ### Regime Engine
 
-| Metric | Backend Classification | Expected Classification | Match | Accuracy |
-|---|---|---|---|---|
-| Missing quote with candle history | `QUOTE_UNAVAILABLE` / stale-blocked | `QUOTE_UNAVAILABLE` / stale-blocked | Yes | 100% |
-| Missing quote `lastPriceAt` | `null` | `null` | Yes | 100% |
-| **Regime Parity Score** | - | - | - | **100% (covered cases)** |
+| Metric                            | Backend Classification              | Expected Classification             | Match | Accuracy                 |
+| --------------------------------- | ----------------------------------- | ----------------------------------- | ----- | ------------------------ |
+| Missing quote with candle history | `QUOTE_UNAVAILABLE` / stale-blocked | `QUOTE_UNAVAILABLE` / stale-blocked | Yes   | 100%                     |
+| Missing quote `lastPriceAt`       | `null`                              | `null`                              | Yes   | 100%                     |
+| **Regime Parity Score**           | -                                   | -                                   | -     | **100% (covered cases)** |
 
 Observations: The patch removes fake freshness from regime diagnostics without altering the stale/blocking state machine.
 
 ### Signal Engine
 
-| Metric | Backend Signal Result | Expected Result | Match | Accuracy |
-|---|---|---|---|---|
-| Missing quote readiness | no backend-confirmed signal path | no backend-confirmed signal path | Yes | 100% |
-| Engine blocker propagation | `QUOTE_UNAVAILABLE` | `QUOTE_UNAVAILABLE` | Yes | 100% |
-| **Signal Parity Score** | - | - | - | **100% (covered cases)** |
+| Metric                     | Backend Signal Result            | Expected Result                  | Match | Accuracy                 |
+| -------------------------- | -------------------------------- | -------------------------------- | ----- | ------------------------ |
+| Missing quote readiness    | no backend-confirmed signal path | no backend-confirmed signal path | Yes   | 100%                     |
+| Engine blocker propagation | `QUOTE_UNAVAILABLE`              | `QUOTE_UNAVAILABLE`              | Yes   | 100%                     |
+| **Signal Parity Score**    | -                                | -                                | -     | **100% (covered cases)** |
 
 Observations: Covered signal parity stayed intact because the missing-quote path remains non-executable and no frontend-only truth was introduced.
 
 ## Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-|---|---|---|---|---|
-| Synthetic quote timestamp in missing-price diagnostics | HIGH | 1 | Patched in backend and locked with regression | No |
+| Issue                                                  | Severity | Count | Resolution                                    | Blocker |
+| ------------------------------------------------------ | -------- | ----- | --------------------------------------------- | ------- |
+| Synthetic quote timestamp in missing-price diagnostics | HIGH     | 1     | Patched in backend and locked with regression | No      |
 
 ## Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-|---|---|---|---|
-| Daily regime replay matrix | Not re-run in this focused pass | This audit targeted freshness-truth diagnostics only | Yes |
-| Multi-case signal replay suite | Not re-run in this focused pass | Existing known gap from prior automation memory | Yes |
+| Item                           | Difference                      | Reason                                               | Accepted |
+| ------------------------------ | ------------------------------- | ---------------------------------------------------- | -------- |
+| Daily regime replay matrix     | Not re-run in this focused pass | This audit targeted freshness-truth diagnostics only | Yes      |
+| Multi-case signal replay suite | Not re-run in this focused pass | Existing known gap from prior automation memory      | Yes      |
 
 ## Recommendations
 

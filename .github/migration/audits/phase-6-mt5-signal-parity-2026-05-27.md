@@ -16,45 +16,45 @@ Scope: MT5 Phase 6 signal-dispatch input parity and candidate-emission readiness
 
 ### Fib Engine
 
-| Metric | Pine/PHP Authority | MT5 Value | Match | Accuracy |
-|--------|--------------------|-----------|-------|----------|
-| Signal fib source | Session-anchor fib engine | `FibEngine.BuildSignalFibLevels()` | Yes | 100% |
-| Signal timeframe input | M15 signal path | M15 structured levels | Yes | 100% |
-| Fib family coverage | `LTF_SF` and `HTF_AF` available to callers | `LTF_SF` and `HTF_AF` emitted into `FibLevelOut[]` | Yes | 100% |
-| Broker-time session alignment | Broker offset required before anchor grouping | `RefreshBrokerOffset()` called before signal dispatch | Yes | 100% |
+| Metric                        | Pine/PHP Authority                            | MT5 Value                                             | Match | Accuracy |
+| ----------------------------- | --------------------------------------------- | ----------------------------------------------------- | ----- | -------- |
+| Signal fib source             | Session-anchor fib engine                     | `FibEngine.BuildSignalFibLevels()`                    | Yes   | 100%     |
+| Signal timeframe input        | M15 signal path                               | M15 structured levels                                 | Yes   | 100%     |
+| Fib family coverage           | `LTF_SF` and `HTF_AF` available to callers    | `LTF_SF` and `HTF_AF` emitted into `FibLevelOut[]`    | Yes   | 100%     |
+| Broker-time session alignment | Broker offset required before anchor grouping | `RefreshBrokerOffset()` called before signal dispatch | Yes   | 100%     |
 
 Observations: this audit verified source-of-truth usage in code, not live replay against MT5 terminal output.
 
 ### Regime Engine
 
-| Metric | Pine/PHP Authority | MT5 Value | Match | Accuracy |
-|--------|--------------------|-----------|-------|----------|
-| HTF bias source | Regime engine output | `RegimeEngine.ComputeRegimeState().htfBias` | Yes | 100% |
-| LTF regime source | Regime engine output | `RegimeEngine.ComputeRegimeState().ltfRegime` | Yes | 100% |
-| Chop gate source | Regime engine output | `RegimeEngine.ComputeRegimeState().chopScore` | Yes | 100% |
+| Metric            | Pine/PHP Authority   | MT5 Value                                     | Match | Accuracy |
+| ----------------- | -------------------- | --------------------------------------------- | ----- | -------- |
+| HTF bias source   | Regime engine output | `RegimeEngine.ComputeRegimeState().htfBias`   | Yes   | 100%     |
+| LTF regime source | Regime engine output | `RegimeEngine.ComputeRegimeState().ltfRegime` | Yes   | 100%     |
+| Chop gate source  | Regime engine output | `RegimeEngine.ComputeRegimeState().chopScore` | Yes   | 100%     |
 
 Observations: the previous placeholder defaults (`TRANSITIONAL`, `RANGING`, `0.5`) have been removed from the signal-dispatch path.
 
 ### Signal Engine
 
-| Metric | Previous State | Current State | Match | Accuracy |
-|--------|----------------|---------------|-------|----------|
-| Candidate emission readiness | Blocked by `fibCount = 0` scaffold | Enabled when authoritative fib/regime inputs exist | Yes | 100% blocker closure |
-| Backend contract shape | Existing `/ea/signal-candidates` payload | Unchanged | Yes | 100% |
-| Runtime replay parity | Not verifiable in this workspace | Pending | Pending | Pending |
+| Metric                       | Previous State                           | Current State                                      | Match   | Accuracy             |
+| ---------------------------- | ---------------------------------------- | -------------------------------------------------- | ------- | -------------------- |
+| Candidate emission readiness | Blocked by `fibCount = 0` scaffold       | Enabled when authoritative fib/regime inputs exist | Yes     | 100% blocker closure |
+| Backend contract shape       | Existing `/ea/signal-candidates` payload | Unchanged                                          | Yes     | 100%                 |
+| Runtime replay parity        | Not verifiable in this workspace         | Pending                                            | Pending | Pending              |
 
 Observations: this run removed the code-path blocker but did not observe a live MT5 candidate cycle.
 
 ## Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-|-------|----------|-------|-----------|---------|
-| MT5 signal dispatch used scaffold inputs and could not emit candidates | HIGH | 1 | Fixed in `mt5/MarketDataEngine.mqh`, `mt5/FibEngine.mqh`, `mt5/RegimeEngine.mqh` | Cleared in code |
+| Issue                                                                  | Severity | Count | Resolution                                                                       | Blocker         |
+| ---------------------------------------------------------------------- | -------- | ----- | -------------------------------------------------------------------------------- | --------------- |
+| MT5 signal dispatch used scaffold inputs and could not emit candidates | HIGH     | 1     | Fixed in `mt5/MarketDataEngine.mqh`, `mt5/FibEngine.mqh`, `mt5/RegimeEngine.mqh` | Cleared in code |
 
 ## Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-|------|-----------|--------|----------|
+| Item                 | Difference   | Reason                                                        | Accepted         |
+| -------------------- | ------------ | ------------------------------------------------------------- | ---------------- |
 | Runtime replay score | Not captured | No MetaEditor compile log or MT5 terminal replay in workspace | Yes, temporarily |
 
 ## Recommendations

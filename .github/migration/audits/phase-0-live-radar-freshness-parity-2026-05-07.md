@@ -10,21 +10,21 @@
 
 # Comparison Matrix
 
-| Concern | Backend Contract | Pre-Patch Dashboard Behavior | Post-Patch Dashboard Behavior | Match |
-|---|---|---|---|---|
-| MT5 live card inclusion | Include cards when `price.source === "mt5"` and `price.state === "live"` | Could exclude cards when client timestamp math exceeded `staleThresholdSec` or `age_sec` was absent/invalid | Includes cards strictly from backend state | YES |
-| Stale classification | Backend owns freshness classification via `price.state` and `regime.state` | Dashboard recomputed a local stale flag from browser time | Dashboard uses backend `price.state`/`regime.state` only | YES |
-| Engine blocker severity | Display warning severity from backend blocker category | Correct, but embedded in inline JSX branch | Correct and simplified through derived `diagLevel` | YES |
-| Last-update warning timestamp | Use backend-provided `diagnostic.lastPriceAt` / `price.updatedAt` for display only | Displayed backend timestamp but also mixed it into classification logic | Display-only; no classification side effects | YES |
+| Concern                       | Backend Contract                                                                   | Pre-Patch Dashboard Behavior                                                                                | Post-Patch Dashboard Behavior                            | Match |
+| ----------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ----- |
+| MT5 live card inclusion       | Include cards when `price.source === "mt5"` and `price.state === "live"`           | Could exclude cards when client timestamp math exceeded `staleThresholdSec` or `age_sec` was absent/invalid | Includes cards strictly from backend state               | YES   |
+| Stale classification          | Backend owns freshness classification via `price.state` and `regime.state`         | Dashboard recomputed a local stale flag from browser time                                                   | Dashboard uses backend `price.state`/`regime.state` only | YES   |
+| Engine blocker severity       | Display warning severity from backend blocker category                             | Correct, but embedded in inline JSX branch                                                                  | Correct and simplified through derived `diagLevel`       | YES   |
+| Last-update warning timestamp | Use backend-provided `diagnostic.lastPriceAt` / `price.updatedAt` for display only | Displayed backend timestamp but also mixed it into classification logic                                     | Display-only; no classification side effects             | YES   |
 
 # Parity Metrics
 
-| Metric | Scope | Score | Notes |
-|---|---|---|---|
-| Freshness authority parity | Live Radar card visibility and stale status | 100% | No remaining frontend freshness override on this path |
-| Regime display parity | Live Radar regime-state contribution to stale styling | 100% | Regime state still influences styling, but only from backend payload |
-| Signal blocker parity | Live Radar diagnostic severity rendering | 100% | Simplification only; backend blocker semantics unchanged |
-| Fib parity | Out of scope for this pass | N/A | No fib-calculation or rendering contract changed |
+| Metric                     | Scope                                                 | Score | Notes                                                                |
+| -------------------------- | ----------------------------------------------------- | ----- | -------------------------------------------------------------------- |
+| Freshness authority parity | Live Radar card visibility and stale status           | 100%  | No remaining frontend freshness override on this path                |
+| Regime display parity      | Live Radar regime-state contribution to stale styling | 100%  | Regime state still influences styling, but only from backend payload |
+| Signal blocker parity      | Live Radar diagnostic severity rendering              | 100%  | Simplification only; backend blocker semantics unchanged             |
+| Fib parity                 | Out of scope for this pass                            | N/A   | No fib-calculation or rendering contract changed                     |
 
 # Drift Analysis
 

@@ -14,9 +14,7 @@
       "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
       "wordpress/smc-superfib-sniper/class-market-data-service.php"
     ],
-    "rest_route_files": [
-      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php"
-    ],
+    "rest_route_files": ["wordpress/smc-superfib-sniper/smc-superfib-sniper.php"],
     "frontend_api_client": "src/lib/api/sniperClient.ts",
     "mt5_ea_files": [
       "mt5/SMC_MarketDataEA.mq5",
@@ -38,10 +36,7 @@
   },
   "rest_routes": {
     "namespace": "sniper/v1",
-    "public": [
-      "GET /health",
-      "GET /session"
-    ],
+    "public": ["GET /health", "GET /session"],
     "permission_user": [
       "GET /snapshot",
       "POST /snapshot",
@@ -95,9 +90,7 @@
       "current_phase": "1 (MT5 Bridge Infrastructure)",
       "overall_progress": "57%",
       "status": "Phase 0 COMPLETE — Phase 1 IN-PROGRESS (90%)",
-      "blockers": [
-        "48h continuity window pending (heartbeat must run stably for 48h+)"
-      ]
+      "blockers": ["48h continuity window pending (heartbeat must run stably for 48h+)"]
     }
   },
   "known_dev_status": {

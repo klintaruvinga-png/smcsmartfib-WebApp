@@ -13,6 +13,7 @@ Issue: PHP backend fib levels were derived from raw candle-window max/min instea
 ## Defects addressed
 
 1. Session-anchor truth drift
+
 - Old behavior used raw-window `max(high)` / `min(low)`.
 - New behavior resolves completed-session F1/F2/F3 anchors from candle open timestamps using the Pine ladder:
   - `<= 1800s -> Daily`
@@ -22,6 +23,7 @@ Issue: PHP backend fib levels were derived from raw candle-window max/min instea
   - `else -> Yearly`
 
 2. Missing SuperFib weighting
+
 - Old behavior had no recency weighting.
 - New behavior applies Pine recency weights:
   - `0.40 / 0.35 / 0.25` for three valid anchors
@@ -29,10 +31,12 @@ Issue: PHP backend fib levels were derived from raw candle-window max/min instea
   - `1.00` for a single valid anchor
 
 3. Missing HTF authority output
+
 - Old behavior returned only LTF levels.
 - New behavior adds additive `HTF_AF` output sourced from the third most recent completed higher-session anchor.
 
 4. Compression guard omission
+
 - Old behavior served levels for compressed ranges.
 - New behavior invalidates compressed anchors before weighting and suppresses LTF output if the composite range is below the Pine compression threshold.
 

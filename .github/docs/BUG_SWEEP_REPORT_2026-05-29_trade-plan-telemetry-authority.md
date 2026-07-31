@@ -10,9 +10,9 @@
 
 ## Backend sizing authority
 
-| Severity | Component | Root cause | Impact | Status |
-| --- | --- | --- | --- | --- |
-| HIGH | Trade-plan sizing | `build_trade_plan()` sized risk from `/user/account` blob `equityUSC` and then masked empty/stale data with `max(..., 1)`, even though live wallet truth comes from `/account-telemetry`. | Backend could emit tiny executable-looking plans or `Below 0.01 lot` ladders while the app showed a healthy live balance, creating backend/dashboard truth drift and order-viability risk. | Patched |
+| Severity | Component         | Root cause                                                                                                                                                                                | Impact                                                                                                                                                                                     | Status  |
+| -------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| HIGH     | Trade-plan sizing | `build_trade_plan()` sized risk from `/user/account` blob `equityUSC` and then masked empty/stale data with `max(..., 1)`, even though live wallet truth comes from `/account-telemetry`. | Backend could emit tiny executable-looking plans or `Below 0.01 lot` ladders while the app showed a healthy live balance, creating backend/dashboard truth drift and order-viability risk. | Patched |
 
 # Surgical Fixes Applied
 
@@ -28,12 +28,12 @@
 
 # Verification Results
 
-| Check | Result | Notes |
-| --- | --- | --- |
-| `php wordpress/smc-superfib-sniper/tests/php/test-progressive-lot-sizing.php` | PASS | New telemetry-authority and invalid-plan regressions passed. |
-| `php wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php` | PASS | Telemetry freshness contract remained intact. |
-| `npx vitest run src/routes/-plan.test.tsx` | PASS | Existing dashboard execution-gating and `Below 0.01 lot` UI behavior stayed unchanged. |
-| Local payload sample: `/account-telemetry` vs `/ladders` | PASS | Sampled `riskUSC = 500` for `equity = 50000` and `perTradePct = 1.0`; sampled stale telemetry plan returned `state = INVALID` with zero lots. |
+| Check                                                                         | Result | Notes                                                                                                                                         |
+| ----------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `php wordpress/smc-superfib-sniper/tests/php/test-progressive-lot-sizing.php` | PASS   | New telemetry-authority and invalid-plan regressions passed.                                                                                  |
+| `php wordpress/smc-superfib-sniper/tests/php/test-phase2-trade-telemetry.php` | PASS   | Telemetry freshness contract remained intact.                                                                                                 |
+| `npx vitest run src/routes/-plan.test.tsx`                                    | PASS   | Existing dashboard execution-gating and `Below 0.01 lot` UI behavior stayed unchanged.                                                        |
+| Local payload sample: `/account-telemetry` vs `/ladders`                      | PASS   | Sampled `riskUSC = 500` for `equity = 50000` and `perTradePct = 1.0`; sampled stale telemetry plan returned `state = INVALID` with zero lots. |
 
 # Remaining Risks
 

@@ -22,12 +22,12 @@ This patch does not change Pine formulas, MT5 logic, fib math, regime classifica
 
 ### Dashboard Source -> Backend Whitelist
 
-| Metric | Before Patch | After Patch | Match | Accuracy |
-|---|---|---|---|---|
-| `SoakEvidenceType` union vs PHP whitelist | Same five values | Same five values | Yes | 100% |
-| `buildBaselineEvidenceEntries()` baseline type literal | `baseline_metadata` | `baseline_metadata` | Yes | 100% |
-| Manual evidence select options vs PHP whitelist | Same four manual values plus baseline type in TS source | Same | Yes | 100% |
-| **Source Contract Score** | - | - | - | **100%** |
+| Metric                                                 | Before Patch                                            | After Patch         | Match | Accuracy |
+| ------------------------------------------------------ | ------------------------------------------------------- | ------------------- | ----- | -------- |
+| `SoakEvidenceType` union vs PHP whitelist              | Same five values                                        | Same five values    | Yes   | 100%     |
+| `buildBaselineEvidenceEntries()` baseline type literal | `baseline_metadata`                                     | `baseline_metadata` | Yes   | 100%     |
+| Manual evidence select options vs PHP whitelist        | Same four manual values plus baseline type in TS source | Same                | Yes   | 100%     |
+| **Source Contract Score**                              | -                                                       | -                   | -     | **100%** |
 
 **Observations**: No source-visible contract drift exists between `src/types/sniper.ts`, `src/routes/admin.tsx`, and `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`.
 
@@ -35,12 +35,12 @@ This patch does not change Pine formulas, MT5 logic, fib math, regime classifica
 
 ### Runtime Capture Instrumentation
 
-| Metric | Previous Behavior | Current Behavior | Match | Accuracy |
-|---|---|---|---|---|
-| Client invalid `evidence_type` handling | Bad value reached backend and failed there | Bad value throws at client boundary and logs full payload | Yes | 100% |
-| Baseline payload observability | No explicit baseline payload log | `console.debug` prints full baseline evidence array before save | Yes | 100% |
-| Backend payload observability | Rejection returned 400 without request-body evidence | `error_log()` records sanitized payload before whitelist check | Yes | 100% |
-| **Diagnostics Score** | - | - | - | **100%** |
+| Metric                                  | Previous Behavior                                    | Current Behavior                                                | Match | Accuracy |
+| --------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------- | ----- | -------- |
+| Client invalid `evidence_type` handling | Bad value reached backend and failed there           | Bad value throws at client boundary and logs full payload       | Yes   | 100%     |
+| Baseline payload observability          | No explicit baseline payload log                     | `console.debug` prints full baseline evidence array before save | Yes   | 100%     |
+| Backend payload observability           | Rejection returned 400 without request-body evidence | `error_log()` records sanitized payload before whitelist check  | Yes   | 100%     |
+| **Diagnostics Score**                   | -                                                    | -                                                               | -     | **100%** |
 
 **Observations**: The new diagnostics preserve backend authority and make the next live reproduction conclusive.
 
@@ -48,18 +48,18 @@ This patch does not change Pine formulas, MT5 logic, fib math, regime classifica
 
 ## Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-|---|---|---|---|---|
-| Live failing `evidence_type` value not captured in repository evidence | HIGH | 1 | Mitigated with client/server diagnostics; still needs live replay | Yes |
+| Issue                                                                  | Severity | Count | Resolution                                                        | Blocker |
+| ---------------------------------------------------------------------- | -------- | ----- | ----------------------------------------------------------------- | ------- |
+| Live failing `evidence_type` value not captured in repository evidence | HIGH     | 1     | Mitigated with client/server diagnostics; still needs live replay | Yes     |
 
 ---
 
 ## Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-|---|---|---|---|
-| Live deployment/runtime state | Not directly reproducible from this workspace | Admin save requires live authenticated runtime evidence that is not available in the repo alone | Yes |
-| Generated `dist` assets on local disk | Observed out of sync during investigation | Build artifacts are deployment outputs, not authority over source truth | Yes |
+| Item                                  | Difference                                    | Reason                                                                                          | Accepted |
+| ------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------- | -------- |
+| Live deployment/runtime state         | Not directly reproducible from this workspace | Admin save requires live authenticated runtime evidence that is not available in the repo alone | Yes      |
+| Generated `dist` assets on local disk | Observed out of sync during investigation     | Build artifacts are deployment outputs, not authority over source truth                         | Yes      |
 
 ---
 

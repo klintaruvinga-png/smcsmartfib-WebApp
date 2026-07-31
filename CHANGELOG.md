@@ -11,5 +11,6 @@
 - Documentation: `README-canonical-feed-stabilization.md` and `IMPLEMENTATION-COMPLETE.md` added.
 
 Notes:
+
 - See `README-canonical-feed-stabilization.md` for verification commands (cache header checks, parity scripts).
 - CI parity requires configured secrets: `SMC_BACKEND_URL`, `PARITY_USER_A`, `PARITY_USER_B`, `PARITY_PASSWORD`.

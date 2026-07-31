@@ -44,11 +44,11 @@
 
 ## Rollback Points
 
-| Name | Tag | Commit |
-|------|-----|--------|
-| Initial state | `snapshot/stabilize-ea-2026-05-15-start-20260515T040000Z` | a237db7 |
-| Before patches | `rollback/stabilize-ea-2026-05-15-before-patches` | a237db7 |
-| After Patch 1 | `rollback/stabilize-ea-2026-05-15-after-patch-1` | 696d9a7 |
+| Name           | Tag                                                       | Commit  |
+| -------------- | --------------------------------------------------------- | ------- |
+| Initial state  | `snapshot/stabilize-ea-2026-05-15-start-20260515T040000Z` | a237db7 |
+| Before patches | `rollback/stabilize-ea-2026-05-15-before-patches`         | a237db7 |
+| After Patch 1  | `rollback/stabilize-ea-2026-05-15-after-patch-1`          | 696d9a7 |
 
 ---
 

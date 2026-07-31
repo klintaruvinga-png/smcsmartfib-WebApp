@@ -9,7 +9,11 @@
       "system": "EA Market Stream Payload Contract",
       "description": "The published EA payload contract (task specification, CLAUDE.md) uses 'quote_time' for the tick timestamp and 'candles' (array) for candle data. The current handler reads only 'timestamp' and 'candle'/'candle_m15' (single objects). The MQL5 EA itself sends 'timestamp', so EA→backend works. However, external callers or future EA updates using the documented contract will receive silent failures: quote_time is ignored (staleness check skipped), and a candles array is not processed.",
       "root_cause": "The documented public REST contract diverged from the internal field names during Phase 0 development. No alias mapping was added.",
-      "impact_zones": ["EA Market Stream ingestion", "External REST API callers", "Documentation fidelity"],
+      "impact_zones": [
+        "EA Market Stream ingestion",
+        "External REST API callers",
+        "Documentation fidelity"
+      ],
       "proposed_fix": "Add 'quote_time' as a fallback alias for 'timestamp' in the post_ea_market_stream handler. Add 'candles' array shim: if candles[] is present and candle is absent, use candles[0] as the M1 candle object. Update the docblock to reflect both formats. Add regression tests."
     },
     {

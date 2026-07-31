@@ -10,21 +10,21 @@
 
 # Comparison Matrix
 
-| Concern | Backend Contract | Pre-Patch Dashboard Behavior | Post-Patch Dashboard Behavior | Match |
-|---|---|---|---|---|
-| Chart request readiness | Do not call backend-dependent chart endpoints until the configured backend URL exists | Chart polling could start once settings loaded even if `backendUrl` was blank, falling back to the default backend URL | Chart query remains disabled until `useBackendReady()` is true | YES |
-| Candle-series authority | Render backend-provided candle closes only | Rendered backend candles, but route failed to build in production because the local workspace lacked a resolvable `lightweight-charts` install state | Renders the same backend candle closes through the restored `lightweight-charts` path | YES |
-| Fib overlay authority | Render backend-provided fib levels without client recalculation | Fibs were rendered, but the route could not ship in production | Backend fibs render unchanged as lightweight-chart price lines plus overlay labels | YES |
-| Empty-data behavior | Degrade safely when no candles are returned | Route could not be production-verified because the chart dependency was unresolved | Route now mounts and accepts empty series data without changing backend authority semantics | YES |
+| Concern                 | Backend Contract                                                                      | Pre-Patch Dashboard Behavior                                                                                                                         | Post-Patch Dashboard Behavior                                                               | Match |
+| ----------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ----- |
+| Chart request readiness | Do not call backend-dependent chart endpoints until the configured backend URL exists | Chart polling could start once settings loaded even if `backendUrl` was blank, falling back to the default backend URL                               | Chart query remains disabled until `useBackendReady()` is true                              | YES   |
+| Candle-series authority | Render backend-provided candle closes only                                            | Rendered backend candles, but route failed to build in production because the local workspace lacked a resolvable `lightweight-charts` install state | Renders the same backend candle closes through the restored `lightweight-charts` path       | YES   |
+| Fib overlay authority   | Render backend-provided fib levels without client recalculation                       | Fibs were rendered, but the route could not ship in production                                                                                       | Backend fibs render unchanged as lightweight-chart price lines plus overlay labels          | YES   |
+| Empty-data behavior     | Degrade safely when no candles are returned                                           | Route could not be production-verified because the chart dependency was unresolved                                                                   | Route now mounts and accepts empty series data without changing backend authority semantics | YES   |
 
 # Parity Metrics
 
-| Metric | Scope | Score | Notes |
-|---|---|---|---|
-| Backend readiness parity | Chart request gating | 100% | Chart fetch now follows shared backend-authority gating |
-| Candle render parity | Close-series visualization | 100% | No client-side recalculation added |
-| Fib overlay parity | Dashboard overlay labels and prices | 100% | Backend values pass through unchanged |
-| Build/deployment parity | Frontend packaging readiness | 100% | Production build passes on the audited route |
+| Metric                   | Scope                               | Score | Notes                                                   |
+| ------------------------ | ----------------------------------- | ----- | ------------------------------------------------------- |
+| Backend readiness parity | Chart request gating                | 100%  | Chart fetch now follows shared backend-authority gating |
+| Candle render parity     | Close-series visualization          | 100%  | No client-side recalculation added                      |
+| Fib overlay parity       | Dashboard overlay labels and prices | 100%  | Backend values pass through unchanged                   |
+| Build/deployment parity  | Frontend packaging readiness        | 100%  | Production build passes on the audited route            |
 
 # Drift Analysis
 

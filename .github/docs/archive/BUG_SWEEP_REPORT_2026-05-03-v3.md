@@ -32,57 +32,57 @@
 
 ## Critical Issues (Blocks Phase Transition)
 
-| Issue | Component | Root Cause | Impact | Blocker | Corrective Action |
-|-------|-----------|-----------|--------|---------|-----------------|
-| Gate chop-blocking missing in live backend | `smc-superfib-sniper.php` `build_symbol_state()` | Gate always set to BUY/SELL based on direction; `$chop >= 0.7` F3 caution condition never blocked the gate. Mock data showed BLOCKED for EURUSD (chop=0.71) but live backend did not implement the block. | SMC methodology violated: high-chop symbols eligible for entry when they must be blocked. Signal engine verdict downgraded by F3-caution flag but gate left open — contradictory. Users exposed to entries in equilibrium chop zones. | ✓ Patched | Added `if ($chop >= 0.7)` branch in `build_symbol_state()` setting gate to `BLOCKED` with reason `'chop > 0.7 — F3 caution zone'`. |
-| MT5 EA `OnTick()` only processes chart symbol — all other symbols stay DISCONNECTED | `mt5/SMC_MarketDataEA.mq5` | `OnTick()` calls `engine.OnTick(Symbol(), ...)` where `Symbol()` is only the attached chart symbol. `FreshnessEngine.lastTickTimes` for all other symbols remains 0 (epoch). On every `UpdatePeriodic()` call, `secondsSinceTick` for non-chart symbols is computed as `now - 0` (huge), instantly aging them to FRESHNESS_STALE then FRESHNESS_DISCONNECTED. MT5 webhook then pushes `"freshness":"DISCONNECTED"` for all non-chart symbols. PHP maps DISCONNECTED → `state='offline'`. Dashboard shows all non-chart symbols offline. | Only the chart symbol shows LIVE state; all other watched symbols show offline even when MT5 EA is running and markets are open. Freshness pipeline fundamentally broken for multi-symbol deployments. | ✓ Patched | Promoted parsed symbol array to module-level `g_symArray[]` / `g_symCount`. Added loop in `OnTimer()` that calls `SymbolInfoTick(g_symArray[i], tick)` for all non-chart symbols and forwards results to `engine.OnTick()`, giving all symbols real tick-driven freshness updates on each timer interval. |
+| Issue                                                                               | Component                                        | Root Cause                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Impact                                                                                                                                                                                                                                | Blocker   | Corrective Action                                                                                                                                                                                                                                                                                         |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gate chop-blocking missing in live backend                                          | `smc-superfib-sniper.php` `build_symbol_state()` | Gate always set to BUY/SELL based on direction; `$chop >= 0.7` F3 caution condition never blocked the gate. Mock data showed BLOCKED for EURUSD (chop=0.71) but live backend did not implement the block.                                                                                                                                                                                                                                                                                                                               | SMC methodology violated: high-chop symbols eligible for entry when they must be blocked. Signal engine verdict downgraded by F3-caution flag but gate left open — contradictory. Users exposed to entries in equilibrium chop zones. | ✓ Patched | Added `if ($chop >= 0.7)` branch in `build_symbol_state()` setting gate to `BLOCKED` with reason `'chop > 0.7 — F3 caution zone'`.                                                                                                                                                                        |
+| MT5 EA `OnTick()` only processes chart symbol — all other symbols stay DISCONNECTED | `mt5/SMC_MarketDataEA.mq5`                       | `OnTick()` calls `engine.OnTick(Symbol(), ...)` where `Symbol()` is only the attached chart symbol. `FreshnessEngine.lastTickTimes` for all other symbols remains 0 (epoch). On every `UpdatePeriodic()` call, `secondsSinceTick` for non-chart symbols is computed as `now - 0` (huge), instantly aging them to FRESHNESS_STALE then FRESHNESS_DISCONNECTED. MT5 webhook then pushes `"freshness":"DISCONNECTED"` for all non-chart symbols. PHP maps DISCONNECTED → `state='offline'`. Dashboard shows all non-chart symbols offline. | Only the chart symbol shows LIVE state; all other watched symbols show offline even when MT5 EA is running and markets are open. Freshness pipeline fundamentally broken for multi-symbol deployments.                                | ✓ Patched | Promoted parsed symbol array to module-level `g_symArray[]` / `g_symCount`. Added loop in `OnTimer()` that calls `SymbolInfoTick(g_symArray[i], tick)` for all non-chart symbols and forwards results to `engine.OnTick()`, giving all symbols real tick-driven freshness updates on each timer interval. |
 
 ---
 
 ## High Priority Issues (Slows Progress)
 
-| Issue | Component | Root Cause | Impact | Blocker | Corrective Action |
-|-------|-----------|-----------|--------|---------|-----------------|
+| Issue                                                | Component                                            | Root Cause                                                                                                                                                                                                                                                                                                                                                                   | Impact                                                                                                                                                                           | Blocker          | Corrective Action                                                                                                                                                          |
+| ---------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Force-refresh may return 5s-old cached engine result | `smc-superfib-sniper.php` `run_engine_for_symbols()` | `post_engine_batch()` cleared quote/candle transients then called `ensure_engine_snapshot($force=true)`. But `run_engine_for_symbols()` has a 5s transient keyed on price fingerprint. If prices had not changed, the fingerprint was identical and the cached engine result was returned even after a forced refresh. User sees "Refreshing…" but gets stale engine output. | Fake-live condition: forced refresh appears to complete but produces a cached pre-force result. Gate/signal state may lag reality even when user explicitly requests fresh data. | No (after patch) | Added `$force` parameter to `run_engine_for_symbols()`. When `$force=true`, transient cache is bypassed. `ensure_engine_snapshot()` and its callers wire the flag through. |
-| `FreshnessBadge` crashes on unknown state | `src/components/sniper/FreshnessBadge.tsx` | `STYLES[state]` lookup with no fallback. If `state` is any string not in `FreshnessState` (e.g. `'delayed'` from MT5, or a future backend enum value), `s.cls` is `undefined` and the `.label` / `.cls` access throws a runtime exception, crashing the component subtree. | Dashboard component crash on unexpected freshness value; entire Live Radar page becomes unrenderable. | No (after patch) | Added `?? STYLES["stale"]` fallback: `const s = STYLES[state] ?? STYLES["stale"]`. Unknown states render as STALE (amber) rather than crashing. |
+| `FreshnessBadge` crashes on unknown state            | `src/components/sniper/FreshnessBadge.tsx`           | `STYLES[state]` lookup with no fallback. If `state` is any string not in `FreshnessState` (e.g. `'delayed'` from MT5, or a future backend enum value), `s.cls` is `undefined` and the `.label` / `.cls` access throws a runtime exception, crashing the component subtree.                                                                                                   | Dashboard component crash on unexpected freshness value; entire Live Radar page becomes unrenderable.                                                                            | No (after patch) | Added `?? STYLES["stale"]` fallback: `const s = STYLES[state] ?? STYLES["stale"]`. Unknown states render as STALE (amber) rather than crashing.                            |
 
 ---
 
 ## Medium Priority Issues
 
-| Issue | Component | Root Cause | Impact | Blocker | Corrective Action |
-|-------|-----------|-----------|--------|---------|-----------------|
-| `AddSymbol()` returns -1 on capacity overflow — callers use OOB index | `mt5/FreshnessEngine.mqh`, `mt5/CandleBuilder.mqh`, `mt5/TickProcessor.mqh` | All three MT5 classes have a 100-symbol capacity. When the limit is reached, `AddSymbol()` returns -1. Callers in `UpdateOnTick()` / `BuildCandleM1()` / `ProcessTick()` used the -1 return directly as an array index — an out-of-bounds access that MQL5 handles as undefined behavior (may silently corrupt adjacent memory or produce garbage data for the 100th slot). | Silent OOB access for any deployment with 100+ symbols. In practice the EA default uses 6 symbols; risk is low but latent. | No | Added guard after `AddSymbol()` in all three callers: `if (index == -1) { Print(...); return; }`. Capacity-full symbols are skipped gracefully and logged. |
+| Issue                                                                 | Component                                                                   | Root Cause                                                                                                                                                                                                                                                                                                                                                                  | Impact                                                                                                                     | Blocker | Corrective Action                                                                                                                                          |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AddSymbol()` returns -1 on capacity overflow — callers use OOB index | `mt5/FreshnessEngine.mqh`, `mt5/CandleBuilder.mqh`, `mt5/TickProcessor.mqh` | All three MT5 classes have a 100-symbol capacity. When the limit is reached, `AddSymbol()` returns -1. Callers in `UpdateOnTick()` / `BuildCandleM1()` / `ProcessTick()` used the -1 return directly as an array index — an out-of-bounds access that MQL5 handles as undefined behavior (may silently corrupt adjacent memory or produce garbage data for the 100th slot). | Silent OOB access for any deployment with 100+ symbols. In practice the EA default uses 6 symbols; risk is low but latent. | No      | Added guard after `AddSymbol()` in all three callers: `if (index == -1) { Print(...); return; }`. Capacity-full symbols are skipped gracefully and logged. |
 
 ---
 
 ## Parity Drift Alerts
 
-| Engine | Previous % | Current % | Trend | Status | Action |
-|--------|-----------|----------|-------|--------|--------|
-| Gate/Chop contract | FAIL (chop never blocked) | PASS (chop >= 0.7 blocked) | ↑ Fixed | PASS | Validated against mock data spec; live gate now matches |
-| MT5 Freshness (non-chart) | FAIL (all non-chart offline) | PASS (all symbols tick-driven) | ↑ Fixed | PASS | Requires 24h soak with live EA to confirm |
-| Fib (Phase 4) | N/A | N/A | ↔ Stable | PENDING | Replay audit still required |
-| Regime (Phase 5) | N/A | N/A | ↔ Stable | PENDING | Replay audit still required |
-| Signal (Phase 6) | 100% (pip-value path) | 100% | ↔ Stable | PASS | No changes to signal computation in this run |
-| Freshness (Phase 0) | PASS (v2) | PASS | ↔ Stable | PASS | `state='live'` for MT5 ticks — no regression |
-| MT5 Candle Authority | PASS (v2) | PASS | ↔ Stable | PASS | ON DUPLICATE KEY guard intact |
-| Force-refresh engine | FAIL (stale cached result) | PASS | ↑ Fixed | PASS | Engine transient bypassed on force |
+| Engine                    | Previous %                   | Current %                      | Trend    | Status  | Action                                                  |
+| ------------------------- | ---------------------------- | ------------------------------ | -------- | ------- | ------------------------------------------------------- |
+| Gate/Chop contract        | FAIL (chop never blocked)    | PASS (chop >= 0.7 blocked)     | ↑ Fixed  | PASS    | Validated against mock data spec; live gate now matches |
+| MT5 Freshness (non-chart) | FAIL (all non-chart offline) | PASS (all symbols tick-driven) | ↑ Fixed  | PASS    | Requires 24h soak with live EA to confirm               |
+| Fib (Phase 4)             | N/A                          | N/A                            | ↔ Stable | PENDING | Replay audit still required                             |
+| Regime (Phase 5)          | N/A                          | N/A                            | ↔ Stable | PENDING | Replay audit still required                             |
+| Signal (Phase 6)          | 100% (pip-value path)        | 100%                           | ↔ Stable | PASS    | No changes to signal computation in this run            |
+| Freshness (Phase 0)       | PASS (v2)                    | PASS                           | ↔ Stable | PASS    | `state='live'` for MT5 ticks — no regression            |
+| MT5 Candle Authority      | PASS (v2)                    | PASS                           | ↔ Stable | PASS    | ON DUPLICATE KEY guard intact                           |
+| Force-refresh engine      | FAIL (stale cached result)   | PASS                           | ↑ Fixed  | PASS    | Engine transient bypassed on force                      |
 
 ---
 
 ## Test Failure Summary
 
-| Test | Phase | Status | Error | Frequency |
-|------|-------|--------|-------|-----------|
-| PHP syntax check (`php -l`) — smc-superfib-sniper.php | 0 | ✓ PASS | None | Run |
-| PHP syntax check (`php -l`) — class-market-data-service.php | 0 | ✓ PASS | None | Run |
-| Gate blocked at chop >= 0.7 | 0 | ✓ PASS (patch verified in code) | None | Manual review |
-| MT5 multi-symbol freshness via SymbolInfoTick | 0 | PENDING | Requires live EA environment | Not run |
-| Force-refresh bypass transient | 0 | ✓ PASS (code verified) | None | Manual review |
-| FreshnessBadge unknown state | 0 | ✓ PASS (code verified) | None | Manual review |
-| 24h refresh stability soak | 0 | PENDING | Not executed | Not run |
-| Pine/MT5 signal replay | 6 | PENDING | No active replay harness | Not run |
+| Test                                                        | Phase | Status                          | Error                        | Frequency     |
+| ----------------------------------------------------------- | ----- | ------------------------------- | ---------------------------- | ------------- |
+| PHP syntax check (`php -l`) — smc-superfib-sniper.php       | 0     | ✓ PASS                          | None                         | Run           |
+| PHP syntax check (`php -l`) — class-market-data-service.php | 0     | ✓ PASS                          | None                         | Run           |
+| Gate blocked at chop >= 0.7                                 | 0     | ✓ PASS (patch verified in code) | None                         | Manual review |
+| MT5 multi-symbol freshness via SymbolInfoTick               | 0     | PENDING                         | Requires live EA environment | Not run       |
+| Force-refresh bypass transient                              | 0     | ✓ PASS (code verified)          | None                         | Manual review |
+| FreshnessBadge unknown state                                | 0     | ✓ PASS (code verified)          | None                         | Manual review |
+| 24h refresh stability soak                                  | 0     | PENDING                         | Not executed                 | Not run       |
+| Pine/MT5 signal replay                                      | 6     | PENDING                         | No active replay harness     | Not run       |
 
 ---
 
@@ -143,18 +143,22 @@
 ## Parity Verification Results
 
 ### Gate/Chop Parity
+
 - **Before patch**: Gate always BUY/SELL regardless of chop; mock data showed BLOCKED — contract violated
 - **After patch**: Gate BLOCKED when chop >= 0.7; matches mock data spec and SMC methodology ✓
 
 ### MT5 Freshness Parity (multi-symbol)
+
 - **Before patch**: Non-chart symbols always DISCONNECTED → state='offline' in DB
 - **After patch**: All symbols get SymbolInfoTick() refresh on each OnTimer() call → correct freshness states
 
 ### Force-Refresh Engine Parity
+
 - **Before patch**: Force refresh could return 5s-old cached engine result (fingerprint collision)
 - **After patch**: $force=true bypasses transient — always fresh compute ✓
 
 ### FreshnessBadge Defensive Parity
+
 - **Before patch**: Unknown state → runtime crash
 - **After patch**: Unknown state → renders as STALE (graceful degradation) ✓
 
@@ -195,11 +199,11 @@
 
 ## Cumulative Phase 0 Status
 
-| Patch Run | Issues | Patched | Status |
-|-----------|--------|---------|--------|
-| v1 (2026-05-03) | 9 | 9 | Completed |
-| v2 (2026-05-03) | 9 | 9 | Completed |
-| v3 (2026-05-03) | 5 | 5 | Completed |
-| **Total** | **23** | **23** | **All patched** |
+| Patch Run       | Issues | Patched | Status          |
+| --------------- | ------ | ------- | --------------- |
+| v1 (2026-05-03) | 9      | 9       | Completed       |
+| v2 (2026-05-03) | 9      | 9       | Completed       |
+| v3 (2026-05-03) | 5      | 5       | Completed       |
+| **Total**       | **23** | **23**  | **All patched** |
 
 Phase 0 critical and high issues: 0 open. Remaining work: 24h soak and replay audits.

@@ -13,15 +13,15 @@ This audit re-validates the `GET /wp-json/sniper/v1/ea/license-check` bridge con
 
 ## Contract surfaces checked
 
-| Surface | MT5 EA | Backend | Result |
-|---|---|---|---|
-| Route | `GET /wp-json/sniper/v1/ea/license-check` | Registered under `sniper/v1` | MATCH |
-| Auth header | `X-EA-API-Key` in `cachedHeaders` | `permission_ea_bridge()` reads supported aliases | MATCH |
-| `user_id` transport | Query string `?user_id=<wpUserId>` | `ea_request_value()` falls back to `$request->get_param('user_id')` | MATCH |
-| Missing `user_id` behavior | Sender defect should fail safe | Returns `smc_sf_user_required` / 400 | MATCH |
-| Invalid `user_id` behavior | No sender-side bypass | Returns `smc_sf_user_invalid` / 403 | MATCH |
-| User binding | Sends authenticated user id | `wp_set_current_user($ea_user_id)` on success | MATCH |
-| License decision layer | No change | Existing allowed/blocked logic unchanged | MATCH |
+| Surface                    | MT5 EA                                    | Backend                                                             | Result |
+| -------------------------- | ----------------------------------------- | ------------------------------------------------------------------- | ------ |
+| Route                      | `GET /wp-json/sniper/v1/ea/license-check` | Registered under `sniper/v1`                                        | MATCH  |
+| Auth header                | `X-EA-API-Key` in `cachedHeaders`         | `permission_ea_bridge()` reads supported aliases                    | MATCH  |
+| `user_id` transport        | Query string `?user_id=<wpUserId>`        | `ea_request_value()` falls back to `$request->get_param('user_id')` | MATCH  |
+| Missing `user_id` behavior | Sender defect should fail safe            | Returns `smc_sf_user_required` / 400                                | MATCH  |
+| Invalid `user_id` behavior | No sender-side bypass                     | Returns `smc_sf_user_invalid` / 403                                 | MATCH  |
+| User binding               | Sends authenticated user id               | `wp_set_current_user($ea_user_id)` on success                       | MATCH  |
+| License decision layer     | No change                                 | Existing allowed/blocked logic unchanged                            | MATCH  |
 
 ## Evidence re-validated
 

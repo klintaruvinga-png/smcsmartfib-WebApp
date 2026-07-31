@@ -20,38 +20,38 @@
 
 ## Critical Issues (Blocks Phase Transition)
 
-| Issue | Component | Root Cause | Impact | Blocker | Corrective Action |
-|-------|-----------|-----------|--------|---------|-----------------|
-| Stale-loop deadlock detected | Backend freshness engine | [description] | Refresh freezes; frozen live state | ✓ Yes | [action + ETA] |
-| [Issue 2] | [component] | [root cause] | [impact] | Yes/No | [action] |
+| Issue                        | Component                | Root Cause    | Impact                             | Blocker | Corrective Action |
+| ---------------------------- | ------------------------ | ------------- | ---------------------------------- | ------- | ----------------- |
+| Stale-loop deadlock detected | Backend freshness engine | [description] | Refresh freezes; frozen live state | ✓ Yes   | [action + ETA]    |
+| [Issue 2]                    | [component]              | [root cause]  | [impact]                           | Yes/No  | [action]          |
 
 ---
 
 ## High Priority Issues (Slows Progress)
 
-| Issue | Component | Root Cause | Impact | Blocker | Corrective Action |
-|-------|-----------|-----------|--------|---------|-----------------|
-| Timestamp corruption on market-open | Pine webhook handler | [description] | False LIVE states sporadically | No | [action] |
-| [Issue 2] | [component] | [root cause] | [impact] | Yes/No | [action] |
+| Issue                               | Component            | Root Cause    | Impact                         | Blocker | Corrective Action |
+| ----------------------------------- | -------------------- | ------------- | ------------------------------ | ------- | ----------------- |
+| Timestamp corruption on market-open | Pine webhook handler | [description] | False LIVE states sporadically | No      | [action]          |
+| [Issue 2]                           | [component]          | [root cause]  | [impact]                       | Yes/No  | [action]          |
 
 ---
 
 ## Parity Drift Alerts
 
-| Engine | Previous % | Current % | Trend | Status | Action |
-|--------|-----------|----------|-------|--------|--------|
-| Fib (Phase 4) | [X]% | [Y]% | ↑ ↔ ↓ | [PASS/FAIL] | [if drift, action needed] |
-| Regime (Phase 5) | [X]% | [Y]% | ↑ ↔ ↓ | [PASS/FAIL] | [if drift, action needed] |
-| Signal (Phase 6) | [X]% | [Y]% | ↑ ↔ ↓ | [PASS/FAIL] | [if drift, action needed] |
+| Engine           | Previous % | Current % | Trend | Status      | Action                    |
+| ---------------- | ---------- | --------- | ----- | ----------- | ------------------------- |
+| Fib (Phase 4)    | [X]%       | [Y]%      | ↑ ↔ ↓ | [PASS/FAIL] | [if drift, action needed] |
+| Regime (Phase 5) | [X]%       | [Y]%      | ↑ ↔ ↓ | [PASS/FAIL] | [if drift, action needed] |
+| Signal (Phase 6) | [X]%       | [Y]%      | ↑ ↔ ↓ | [PASS/FAIL] | [if drift, action needed] |
 
 ---
 
 ## Test Failure Summary
 
-| Test | Phase | Status | Error | Frequency |
-|------|-------|--------|-------|-----------|
-| 72h refresh stability | 0 | ✗ FAIL | Stale loop after 48h | Intermittent |
-| Market-open session | 0 | ✗ FAIL | Timestamp off by ±2s | Consistent |
+| Test                  | Phase | Status | Error                | Frequency    |
+| --------------------- | ----- | ------ | -------------------- | ------------ |
+| 72h refresh stability | 0     | ✗ FAIL | Stale loop after 48h | Intermittent |
+| Market-open session   | 0     | ✗ FAIL | Timestamp off by ±2s | Consistent   |
 
 ---
 
@@ -75,6 +75,7 @@
 ## Verification Criteria for Fix
 
 For each issue above:
+
 - [ ] Code change deployed
 - [ ] Test re-run passed
 - [ ] No regression introduced

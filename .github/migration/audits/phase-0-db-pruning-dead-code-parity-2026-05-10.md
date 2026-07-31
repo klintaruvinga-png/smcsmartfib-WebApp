@@ -15,6 +15,7 @@
 - **Trend**: ↔ Stable
 
 This audit covers the three patches applied on 2026-05-10:
+
 1. WP-Cron daily pruning job for `engine_runs` and `audit_events` tables.
 2. Removal of dead `verify_ea_api_key()` instance method.
 3. Removal of dead `send_cors_headers()` instance method.
@@ -27,13 +28,13 @@ No engine logic, fib calculation, regime classification, signal generation, or M
 
 ### Fib Engine
 
-| Metric | Before Patch | After Patch | Match | Accuracy |
-|--------|-------------|-------------|-------|----------|
-| Fib ratio set (16 ratios) | Unchanged | Unchanged | ✓ | 100% |
-| LTF_SF / HTA_SF / F3 families | Unchanged | Unchanged | ✓ | 100% |
-| Anchor computation | Unchanged | Unchanged | ✓ | 100% |
-| Level prices | Unchanged | Unchanged | ✓ | 100% |
-| **Fib Parity Score** | — | — | — | **100%** |
+| Metric                        | Before Patch | After Patch | Match | Accuracy |
+| ----------------------------- | ------------ | ----------- | ----- | -------- |
+| Fib ratio set (16 ratios)     | Unchanged    | Unchanged   | ✓     | 100%     |
+| LTF_SF / HTA_SF / F3 families | Unchanged    | Unchanged   | ✓     | 100%     |
+| Anchor computation            | Unchanged    | Unchanged   | ✓     | 100%     |
+| Level prices                  | Unchanged    | Unchanged   | ✓     | 100%     |
+| **Fib Parity Score**          | —            | —           | —     | **100%** |
 
 **Observations**: No fib logic touched. `build_symbol_state()` and `fetch_candles()` paths untouched.
 
@@ -41,13 +42,13 @@ No engine logic, fib calculation, regime classification, signal generation, or M
 
 ### Regime Engine
 
-| Metric | Before Patch | After Patch | Match | Accuracy |
-|--------|-------------|-------------|-------|----------|
-| Chop gate threshold (≥0.7) | Unchanged | Unchanged | ✓ | 100% |
-| Bias classification (BULL/BEAR/RANGING) | Unchanged | Unchanged | ✓ | 100% |
-| `run_engine_for_symbols()` gate | Unchanged | Unchanged | ✓ | 100% |
-| MT5 freshness gate (source=mt5 && state=live) | Unchanged | Unchanged | ✓ | 100% |
-| **Regime Parity Score** | — | — | — | **100%** |
+| Metric                                        | Before Patch | After Patch | Match | Accuracy |
+| --------------------------------------------- | ------------ | ----------- | ----- | -------- |
+| Chop gate threshold (≥0.7)                    | Unchanged    | Unchanged   | ✓     | 100%     |
+| Bias classification (BULL/BEAR/RANGING)       | Unchanged    | Unchanged   | ✓     | 100%     |
+| `run_engine_for_symbols()` gate               | Unchanged    | Unchanged   | ✓     | 100%     |
+| MT5 freshness gate (source=mt5 && state=live) | Unchanged    | Unchanged   | ✓     | 100%     |
+| **Regime Parity Score**                       | —            | —           | —     | **100%** |
 
 **Observations**: No regime logic touched.
 
@@ -55,13 +56,13 @@ No engine logic, fib calculation, regime classification, signal generation, or M
 
 ### Signal Engine
 
-| Metric | Before Patch | After Patch | Match | Accuracy |
-|--------|-------------|-------------|-------|----------|
-| `backendConfirmed` = READY && data_live | Unchanged | Unchanged | ✓ | 100% |
-| ARMED status when chop-gated | Unchanged | Unchanged | ✓ | 100% |
-| Confluence detection | Unchanged | Unchanged | ✓ | 100% |
-| Entry / SL / TP ladder computation | Unchanged | Unchanged | ✓ | 100% |
-| **Signal Parity Score** | — | — | — | **100%** |
+| Metric                                  | Before Patch | After Patch | Match | Accuracy |
+| --------------------------------------- | ------------ | ----------- | ----- | -------- |
+| `backendConfirmed` = READY && data_live | Unchanged    | Unchanged   | ✓     | 100%     |
+| ARMED status when chop-gated            | Unchanged    | Unchanged   | ✓     | 100%     |
+| Confluence detection                    | Unchanged    | Unchanged   | ✓     | 100%     |
+| Entry / SL / TP ladder computation      | Unchanged    | Unchanged   | ✓     | 100%     |
+| **Signal Parity Score**                 | —            | —           | —     | **100%** |
 
 **Observations**: No signal logic touched.
 
@@ -69,41 +70,41 @@ No engine logic, fib calculation, regime classification, signal generation, or M
 
 ### EA Auth & CORS
 
-| Metric | Before Patch | After Patch | Match | Notes |
-|--------|-------------|-------------|-------|-------|
-| `permission_ea_market_stream()` path | Active, registered | Active, registered | ✓ | Dead `verify_ea_api_key()` removed; live path untouched |
-| `send_cors_headers_for_origin()` static | Active, registered via filters | Active, registered via filters | ✓ | Dead `send_cors_headers()` instance removed; live path untouched |
-| CORS headers emitted | Correct | Correct | ✓ | Only the live static method emits headers |
+| Metric                                  | Before Patch                   | After Patch                    | Match | Notes                                                            |
+| --------------------------------------- | ------------------------------ | ------------------------------ | ----- | ---------------------------------------------------------------- |
+| `permission_ea_market_stream()` path    | Active, registered             | Active, registered             | ✓     | Dead `verify_ea_api_key()` removed; live path untouched          |
+| `send_cors_headers_for_origin()` static | Active, registered via filters | Active, registered via filters | ✓     | Dead `send_cors_headers()` instance removed; live path untouched |
+| CORS headers emitted                    | Correct                        | Correct                        | ✓     | Only the live static method emits headers                        |
 
 ---
 
 ### DB Pruning (New)
 
-| Metric | Before Patch | After Patch | Notes |
-|--------|-------------|-------------|-------|
-| `engine_runs` table pruning | None | Daily, rows >7 days deleted | New capability — no parity dimension; retention policy chosen conservatively |
-| `audit_events` table pruning | None | Daily, rows >14 days deleted | New capability — longer retention to preserve diagnostic traces |
-| WP-Cron event | Not scheduled | `smc_sf_prune_tables` scheduled daily | Guard on `wp_next_scheduled()` prevents duplicate scheduling |
-| Log output | None | `[PHASE0_SOAK]` tag on each prune run | Observable via `error_log` / WP debug log |
+| Metric                       | Before Patch  | After Patch                           | Notes                                                                        |
+| ---------------------------- | ------------- | ------------------------------------- | ---------------------------------------------------------------------------- |
+| `engine_runs` table pruning  | None          | Daily, rows >7 days deleted           | New capability — no parity dimension; retention policy chosen conservatively |
+| `audit_events` table pruning | None          | Daily, rows >14 days deleted          | New capability — longer retention to preserve diagnostic traces              |
+| WP-Cron event                | Not scheduled | `smc_sf_prune_tables` scheduled daily | Guard on `wp_next_scheduled()` prevents duplicate scheduling                 |
+| Log output                   | None          | `[PHASE0_SOAK]` tag on each prune run | Observable via `error_log` / WP debug log                                    |
 
 ---
 
 ## Critical Issues Found
 
-| Issue | Severity | Resolution | Blocker |
-|-------|----------|-----------|---------|
-| `engine_runs` + `audit_events` unbounded growth | HIGH | WP-Cron pruning job added | No (patched) |
-| Dead `verify_ea_api_key()` — misleading public surface | LOW | Removed | No (patched) |
-| Dead `send_cors_headers()` — shadow CORS implementation | LOW | Removed | No (patched) |
+| Issue                                                   | Severity | Resolution                | Blocker      |
+| ------------------------------------------------------- | -------- | ------------------------- | ------------ |
+| `engine_runs` + `audit_events` unbounded growth         | HIGH     | WP-Cron pruning job added | No (patched) |
+| Dead `verify_ea_api_key()` — misleading public surface  | LOW      | Removed                   | No (patched) |
+| Dead `send_cors_headers()` — shadow CORS implementation | LOW      | Removed                   | No (patched) |
 
 ---
 
 ## Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-|------|-----------|--------|----------|
-| Session killzone windows (07-11 / 12-16) vs MT5 full sessions (07-15 / 12-20) | Display-only | Killzones are for signal-entry display timing only; MT5 SessionManager uses full sessions for freshness state | ✓ Known/pre-existing |
-| `post_snapshot` checks `candle_m1` key but EA sends `candle` | Very low risk | Legacy endpoint; EA uses `post_ea_market_stream()` not `post_snapshot` for live data | ✓ Pre-existing, tracked |
+| Item                                                                          | Difference    | Reason                                                                                                        | Accepted                |
+| ----------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| Session killzone windows (07-11 / 12-16) vs MT5 full sessions (07-15 / 12-20) | Display-only  | Killzones are for signal-entry display timing only; MT5 SessionManager uses full sessions for freshness state | ✓ Known/pre-existing    |
+| `post_snapshot` checks `candle_m1` key but EA sends `candle`                  | Very low risk | Legacy endpoint; EA uses `post_ea_market_stream()` not `post_snapshot` for live data                          | ✓ Pre-existing, tracked |
 
 ---
 

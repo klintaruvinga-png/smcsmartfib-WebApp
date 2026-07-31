@@ -18,55 +18,55 @@ This audit did not uncover new production parity drift. The confirmed defects we
 
 ## Comparison Matrix
 
-| Surface | Expected Contract | Before Patch | After Patch | Parity |
-|---------|-------------------|--------------|-------------|--------|
-| Admin soak workspace tests | DOM-backed route assertions | `document is not defined`; suite inactive | 18/18 assertions pass under jsdom | 100% |
-| Repo Vitest scope | First-party tests only | Included `node_modules/**` and archive suites | Scoped to `src/**/*.test.*` and `scripts/**/*.test.*` | 100% |
-| Active runner syntax | Vitest-registered suites | Two active suites used Node runner syntax | Both suites register and pass under Vitest | 100% |
-| Progress streak regression | Completed engine runs define active day | Heartbeat-only fixtures contradicted backend rule | Fixtures now seed `status=complete` rows | 100% |
+| Surface                    | Expected Contract                       | Before Patch                                      | After Patch                                           | Parity |
+| -------------------------- | --------------------------------------- | ------------------------------------------------- | ----------------------------------------------------- | ------ |
+| Admin soak workspace tests | DOM-backed route assertions             | `document is not defined`; suite inactive         | 18/18 assertions pass under jsdom                     | 100%   |
+| Repo Vitest scope          | First-party tests only                  | Included `node_modules/**` and archive suites     | Scoped to `src/**/*.test.*` and `scripts/**/*.test.*` | 100%   |
+| Active runner syntax       | Vitest-registered suites                | Two active suites used Node runner syntax         | Both suites register and pass under Vitest            | 100%   |
+| Progress streak regression | Completed engine runs define active day | Heartbeat-only fixtures contradicted backend rule | Fixtures now seed `status=complete` rows              | 100%   |
 
 ## Component Parity Metrics
 
 ### Freshness / Diagnostics Surface
 
-| Metric | Expected | Actual | Match | Accuracy |
-|--------|----------|--------|-------|----------|
-| Admin soak report error-state coverage | Retry/error panel protected | PASS | PASS | 100% |
-| Baseline/checkpoint render parity | Distinct baseline vs checkpoint surfaces | PASS | PASS | 100% |
-| Manual soak-template persistence across refresh | Manual selection preserved | PASS | PASS | 100% |
-| Repo regression command authority | First-party suites only | PASS | PASS | 100% |
+| Metric                                          | Expected                                 | Actual | Match | Accuracy |
+| ----------------------------------------------- | ---------------------------------------- | ------ | ----- | -------- |
+| Admin soak report error-state coverage          | Retry/error panel protected              | PASS   | PASS  | 100%     |
+| Baseline/checkpoint render parity               | Distinct baseline vs checkpoint surfaces | PASS   | PASS  | 100%     |
+| Manual soak-template persistence across refresh | Manual selection preserved               | PASS   | PASS  | 100%     |
+| Repo regression command authority               | First-party suites only                  | PASS   | PASS  | 100%     |
 
 **Observations**: The meaningful drift was in the test harness, not the diagnostics UI logic itself.
 
 ### Progress Telemetry Surface
 
-| Metric | Expected | Actual | Match | Accuracy |
-|--------|----------|--------|-------|----------|
-| Streak active-day definition | Completed engine run on calendar day | PASS | PASS | 100% |
-| Same-day streak | 1 day when one completed run exists today | PASS | PASS | 100% |
-| Consecutive streak fixture | 3 days for 3 completed-run days | PASS | PASS | 100% |
-| No-run state | `UNAVAILABLE` with streak 0 | PASS | PASS | 100% |
+| Metric                       | Expected                                  | Actual | Match | Accuracy |
+| ---------------------------- | ----------------------------------------- | ------ | ----- | -------- |
+| Streak active-day definition | Completed engine run on calendar day      | PASS   | PASS  | 100%     |
+| Same-day streak              | 1 day when one completed run exists today | PASS   | PASS  | 100%     |
+| Consecutive streak fixture   | 3 days for 3 completed-run days           | PASS   | PASS  | 100%     |
+| No-run state                 | `UNAVAILABLE` with streak 0               | PASS   | PASS  | 100%     |
 
 **Observations**: Backend authority remained correct; only the test fixtures had drifted away from the approved contract.
 
 ### Covered Fib / Signal / Regime Paths
 
-| Metric | Result |
-|--------|--------|
-| Fib parity | PASS - `test-fib-parity.php`, `test-superfib-weighting.php`, `test-htf-authority-anchor.php`, `test-session-anchors.php` |
-| Freshness parity | PASS - `test-ea-market-stream.php`, `test-market-data-service-source-filter.php`, `test-mt5-snapshot-contract.php` |
-| Signal covered-path parity | PASS - first-party Vitest 86/86 assertions |
-| Regime covered-path parity | PASS - no covered-path drift surfaced |
+| Metric                     | Result                                                                                                                   |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Fib parity                 | PASS - `test-fib-parity.php`, `test-superfib-weighting.php`, `test-htf-authority-anchor.php`, `test-session-anchors.php` |
+| Freshness parity           | PASS - `test-ea-market-stream.php`, `test-market-data-service-source-filter.php`, `test-mt5-snapshot-contract.php`       |
+| Signal covered-path parity | PASS - first-party Vitest 86/86 assertions                                                                               |
+| Regime covered-path parity | PASS - no covered-path drift surfaced                                                                                    |
 
 Inference note: Signal/regime parity here reflects covered assertions, not a new historical replay corpus.
 
 ## Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-|-------|----------|-------|------------|---------|
-| Admin soak DOM suite inactive | HIGH | 1 | Fixed in `src/routes/-admin.test.tsx` | No |
-| Repo Vitest scope drift | HIGH | 1 | Fixed in `vite.config.ts` plus test conversions | No |
-| Streak fixture contract drift | MEDIUM | 1 | Fixed in `test-phase2-trade-telemetry.php` | No |
+| Issue                         | Severity | Count | Resolution                                      | Blocker |
+| ----------------------------- | -------- | ----- | ----------------------------------------------- | ------- |
+| Admin soak DOM suite inactive | HIGH     | 1     | Fixed in `src/routes/-admin.test.tsx`           | No      |
+| Repo Vitest scope drift       | HIGH     | 1     | Fixed in `vite.config.ts` plus test conversions | No      |
+| Streak fixture contract drift | MEDIUM   | 1     | Fixed in `test-phase2-trade-telemetry.php`      | No      |
 
 ## Drift Analysis
 

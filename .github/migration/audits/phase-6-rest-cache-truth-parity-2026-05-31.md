@@ -7,23 +7,23 @@
 
 # Component Parity Metrics
 
-| Engine | Result | Evidence |
-| --- | --- | --- |
-| Fib Engine | 100% | `php wordpress/smc-superfib-sniper/tests/php/test-fib-parity.php`; `reports/phase6-cache-truth-2026-05-31.json` |
-| Regime Engine | No drift detected | Backend regime read shape unchanged; anti-cache header added only. |
-| Signal Engine | No drift detected | `npx vitest run scripts/mt5-signal-dispatch.test.mjs` passed. |
-| Freshness/REST Truth | Improved | Volatile backend reads now return `Cache-Control: no-store, no-cache, must-revalidate` and `Pragma: no-cache`; dashboard chart/ladders/health/settings/account/risk reads use `cache: "no-store"` with cache-bust tokens. |
+| Engine               | Result            | Evidence                                                                                                                                                                                                                  |
+| -------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fib Engine           | 100%              | `php wordpress/smc-superfib-sniper/tests/php/test-fib-parity.php`; `reports/phase6-cache-truth-2026-05-31.json`                                                                                                           |
+| Regime Engine        | No drift detected | Backend regime read shape unchanged; anti-cache header added only.                                                                                                                                                        |
+| Signal Engine        | No drift detected | `npx vitest run scripts/mt5-signal-dispatch.test.mjs` passed.                                                                                                                                                             |
+| Freshness/REST Truth | Improved          | Volatile backend reads now return `Cache-Control: no-store, no-cache, must-revalidate` and `Pragma: no-cache`; dashboard chart/ladders/health/settings/account/risk reads use `cache: "no-store"` with cache-bust tokens. |
 
 # Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-| --- | --- | ---: | --- | --- |
-| Cacheable volatile REST read models | MEDIUM | 1 | Patched backend anti-cache helper and frontend cache-busting gaps. | No |
+| Issue                               | Severity | Count | Resolution                                                         | Blocker |
+| ----------------------------------- | -------- | ----: | ------------------------------------------------------------------ | ------- |
+| Cacheable volatile REST read models | MEDIUM   |     1 | Patched backend anti-cache helper and frontend cache-busting gaps. | No      |
 
 # Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-| --- | --- | --- | --- |
+| Item                       | Difference                  | Reason                                       | Accepted                        |
+| -------------------------- | --------------------------- | -------------------------------------------- | ------------------------------- |
 | Synthetic parity gate only | No live MT5 terminal replay | Workspace lacks MetaEditor/terminal runtime. | Yes, pending operational replay |
 
 # Recommendations

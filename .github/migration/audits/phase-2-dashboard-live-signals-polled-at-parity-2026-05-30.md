@@ -11,19 +11,19 @@
 
 ## Live-signals repeated-poll contract
 
-| Metric | Expected behavior | Result | Status |
-| --- | --- | --- | --- |
-| Stable signal identity | Repeated `/live-signals` responses over an unchanged snapshot must keep `id`, `createdAt`, and `backendConfirmed` unchanged. | Verified by the new PHP route regression. | PASS |
-| Response-time metadata | Repeated `/live-signals` responses must include `polledAt` and change it per response without persisting it into snapshot truth. | Verified by the new PHP route regression and route-local code inspection. | PASS |
-| Anti-cache headers | `/live-signals` must still return `Cache-Control: no-store, no-cache, must-revalidate` and `Pragma: no-cache`. | Verified by the new PHP route regression. | PASS |
+| Metric                 | Expected behavior                                                                                                                | Result                                                                    | Status |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------ |
+| Stable signal identity | Repeated `/live-signals` responses over an unchanged snapshot must keep `id`, `createdAt`, and `backendConfirmed` unchanged.     | Verified by the new PHP route regression.                                 | PASS   |
+| Response-time metadata | Repeated `/live-signals` responses must include `polledAt` and change it per response without persisting it into snapshot truth. | Verified by the new PHP route regression and route-local code inspection. | PASS   |
+| Anti-cache headers     | `/live-signals` must still return `Cache-Control: no-store, no-cache, must-revalidate` and `Pragma: no-cache`.                   | Verified by the new PHP route regression.                                 | PASS   |
 
 ## Contract parity across layers
 
-| Metric | Suite / evidence | Result | Status |
-| --- | --- | --- | --- |
-| Backend authority preserved | `get_live_signals()` still reads from `ensure_engine_snapshot($user_id)` and does not mutate cached snapshot storage. | Verified by targeted code inspection. | PASS |
-| Dashboard type contract updated | `src/types/sniper.ts` accepts optional `polledAt?: string`. | Verified by code inspection and Vitest suites staying green. | PASS |
-| SDK contract updated | `sdk/src/types/index.ts` mirrors optional `polledAt?: string`. | Verified by code inspection. | PASS |
+| Metric                          | Suite / evidence                                                                                                      | Result                                                       | Status |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ------ |
+| Backend authority preserved     | `get_live_signals()` still reads from `ensure_engine_snapshot($user_id)` and does not mutate cached snapshot storage. | Verified by targeted code inspection.                        | PASS   |
+| Dashboard type contract updated | `src/types/sniper.ts` accepts optional `polledAt?: string`.                                                           | Verified by code inspection and Vitest suites staying green. | PASS   |
+| SDK contract updated            | `sdk/src/types/index.ts` mirrors optional `polledAt?: string`.                                                        | Verified by code inspection.                                 | PASS   |
 
 # Drift Analysis
 
@@ -33,12 +33,12 @@
 
 # Comparison Matrix
 
-| Layer | Before patch | After patch | Notes |
-| --- | --- | --- | --- |
-| WordPress `/live-signals` response body | Stable signal fields only. | Stable signal fields plus response-only `polledAt`. | `polledAt` is not persisted. |
-| Engine snapshot storage | Cached truth in user meta with `meta.computedAt`. | Unchanged. | Source of truth preserved. |
-| Dashboard signal type | No explicit response-time field. | Optional `polledAt?: string`. | Backward compatible. |
-| SDK signal type | No explicit response-time field. | Optional `polledAt?: string`. | Backward compatible. |
+| Layer                                   | Before patch                                      | After patch                                         | Notes                        |
+| --------------------------------------- | ------------------------------------------------- | --------------------------------------------------- | ---------------------------- |
+| WordPress `/live-signals` response body | Stable signal fields only.                        | Stable signal fields plus response-only `polledAt`. | `polledAt` is not persisted. |
+| Engine snapshot storage                 | Cached truth in user meta with `meta.computedAt`. | Unchanged.                                          | Source of truth preserved.   |
+| Dashboard signal type                   | No explicit response-time field.                  | Optional `polledAt?: string`.                       | Backward compatible.         |
+| SDK signal type                         | No explicit response-time field.                  | Optional `polledAt?: string`.                       | Backward compatible.         |
 
 # Acceptance Criteria
 

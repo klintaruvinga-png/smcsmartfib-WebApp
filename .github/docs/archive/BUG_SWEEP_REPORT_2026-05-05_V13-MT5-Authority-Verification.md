@@ -21,13 +21,13 @@ The report's residual items are valid, but they are maintenance concerns rather 
 
 ## Completed Actions
 
-| Patch | Area | Verified Result |
-|---|---|---|
-| A | `refresh_prices()` | MT5-live symbols return cached MT5 prices before any Twelve Data call. |
-| B | `upsert_mt5_snapshot()` | `change_pct_1d` is derived by `mt5_change_pct_1d()` from the first MT5 M1 candle of the UTC day. |
-| C | EA market stream ingest | Successful MT5 snapshot writes clear per-symbol TD quote-TTL and rate-limit transients. |
-| D | EA market stream ingest | Successful MT5 snapshot writes insert an `engine_runs` heartbeat row for `backendSync`. |
-| E | `fetch_quote()` | Direct callers, including `reference_mid()`, return cached MT5 data before TD key/rate-limit/network logic. |
+| Patch | Area                    | Verified Result                                                                                             |
+| ----- | ----------------------- | ----------------------------------------------------------------------------------------------------------- |
+| A     | `refresh_prices()`      | MT5-live symbols return cached MT5 prices before any Twelve Data call.                                      |
+| B     | `upsert_mt5_snapshot()` | `change_pct_1d` is derived by `mt5_change_pct_1d()` from the first MT5 M1 candle of the UTC day.            |
+| C     | EA market stream ingest | Successful MT5 snapshot writes clear per-symbol TD quote-TTL and rate-limit transients.                     |
+| D     | EA market stream ingest | Successful MT5 snapshot writes insert an `engine_runs` heartbeat row for `backendSync`.                     |
+| E     | `fetch_quote()`         | Direct callers, including `reference_mid()`, return cached MT5 data before TD key/rate-limit/network logic. |
 
 Additional completed version-cycle actions:
 
@@ -50,13 +50,13 @@ Additional completed version-cycle actions:
 
 ### Residual Non-Blockers
 
-| ID | Risk | Status | Action |
-|---|---|---|---|
-| R1 | `engine_runs` heartbeat rows can accumulate quickly during multi-symbol EA pushes. | Deferred maintenance | Add WP-Cron pruning for old heartbeat/engine rows after the live soak proves desired retention. |
-| R2 | Non-EA watchlist symbols do not get rate-limit transients cleared by EA pushes. | Accepted behavior | No code change. Non-EA symbols still depend on Twelve Data, so a live TD 429 should surface as `rate-limited`. |
-| R3 | `/health` can remain `rate-limited` when any non-EA watchlist symbol is actively TD-rate-limited. | Accepted behavior | No code change. Resolves after the 60s TTL only if TD calls stop or recover. |
-| R4 | MT5 day-change is `0` until the first UTC-day M1 candle is written. | Expected cold start | No code change. First live M1 candle supplies the day-open baseline. |
-| R5 | `reference_mid()` uses cached MT5 data for tracked pairs. | Intended | No code change. MT5 is the authority for tracked pairs. |
+| ID  | Risk                                                                                              | Status               | Action                                                                                                         |
+| --- | ------------------------------------------------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------- |
+| R1  | `engine_runs` heartbeat rows can accumulate quickly during multi-symbol EA pushes.                | Deferred maintenance | Add WP-Cron pruning for old heartbeat/engine rows after the live soak proves desired retention.                |
+| R2  | Non-EA watchlist symbols do not get rate-limit transients cleared by EA pushes.                   | Accepted behavior    | No code change. Non-EA symbols still depend on Twelve Data, so a live TD 429 should surface as `rate-limited`. |
+| R3  | `/health` can remain `rate-limited` when any non-EA watchlist symbol is actively TD-rate-limited. | Accepted behavior    | No code change. Resolves after the 60s TTL only if TD calls stop or recover.                                   |
+| R4  | MT5 day-change is `0` until the first UTC-day M1 candle is written.                               | Expected cold start  | No code change. First live M1 candle supplies the day-open baseline.                                           |
+| R5  | `reference_mid()` uses cached MT5 data for tracked pairs.                                         | Intended             | No code change. MT5 is the authority for tracked pairs.                                                        |
 
 ---
 

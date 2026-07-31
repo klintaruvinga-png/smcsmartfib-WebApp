@@ -10,38 +10,38 @@
 
 ## Runtime And Stability
 
-| Severity | Component | Root Cause | Impact | Blocker Status |
-|---|---|---|---|---|
-| HIGH | `src/routes/charts.tsx` production chart route | The merge-resolved route depended on `lightweight-charts`, but the local workspace lockfile/install state did not contain a resolvable package entry, causing `vite build` to fail. | Production build blocked; migration packaging could not complete. | Blocks deployment until patched. |
+| Severity | Component                                      | Root Cause                                                                                                                                                                          | Impact                                                            | Blocker Status                   |
+| -------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------- |
+| HIGH     | `src/routes/charts.tsx` production chart route | The merge-resolved route depended on `lightweight-charts`, but the local workspace lockfile/install state did not contain a resolvable package entry, causing `vite build` to fail. | Production build blocked; migration packaging could not complete. | Blocks deployment until patched. |
 
 ## Wiring And Freshness Authority
 
-| Severity | Component | Root Cause | Impact | Blocker Status |
-|---|---|---|---|---|
-| MEDIUM | `src/routes/charts.tsx` chart query wiring | The chart query used `pollMs !== null` as its only gate and bypassed shared `backendReady` authority checks. | Charts could call the default backend before the user-configured backend was ready, creating backend-authority drift and misleading refresh behavior. | Does not block phase transition after patch, but undermines migration trust if left unpatched. |
+| Severity | Component                                  | Root Cause                                                                                                   | Impact                                                                                                                                                | Blocker Status                                                                                 |
+| -------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| MEDIUM   | `src/routes/charts.tsx` chart query wiring | The chart query used `pollMs !== null` as its only gate and bypassed shared `backendReady` authority checks. | Charts could call the default backend before the user-configured backend was ready, creating backend-authority drift and misleading refresh behavior. | Does not block phase transition after patch, but undermines migration trust if left unpatched. |
 
 ## Runtime / Tooling Observations
 
-| Severity | Component | Root Cause | Impact | Blocker Status |
-|---|---|---|---|---|
-| LOW | Workspace lint surface | Pre-existing mixed line endings and formatting drift across unrelated files. | `npm run lint` remains noisy and is not yet a reliable global regression gate. | Not caused by this patch. |
+| Severity | Component              | Root Cause                                                                   | Impact                                                                         | Blocker Status            |
+| -------- | ---------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------- |
+| LOW      | Workspace lint surface | Pre-existing mixed line endings and formatting drift across unrelated files. | `npm run lint` remains noisy and is not yet a reliable global regression gate. | Not caused by this patch. |
 
 # Surgical Fixes Applied
 
-| File | Change | Hardening Added |
-|---|---|---|
-| `src/routes/charts.tsx` | Resolved the merge back onto the `lightweight-charts` render path while preserving backend-readiness gating and the backend-provided fib overlay behavior. | Keeps the shipping chart implementation, restores pan/zoom/axis-scale behavior, and avoids frontend fib recalculation drift. |
-| `src/routes/charts.tsx` | Added a backend-readiness gate and disabled polling until the configured backend URL exists. | Prevents early requests against the default backend and keeps chart refresh behavior aligned with shared backend-authority rules. |
-| `package-lock.json` | Synced the lockfile to include the already-declared `lightweight-charts` dependency and its transitive `fancy-canvas` package. | Makes the resolved chart route installable/buildable in a clean workspace instead of relying on undeclared local state. |
+| File                    | Change                                                                                                                                                     | Hardening Added                                                                                                                   |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `src/routes/charts.tsx` | Resolved the merge back onto the `lightweight-charts` render path while preserving backend-readiness gating and the backend-provided fib overlay behavior. | Keeps the shipping chart implementation, restores pan/zoom/axis-scale behavior, and avoids frontend fib recalculation drift.      |
+| `src/routes/charts.tsx` | Added a backend-readiness gate and disabled polling until the configured backend URL exists.                                                               | Prevents early requests against the default backend and keeps chart refresh behavior aligned with shared backend-authority rules. |
+| `package-lock.json`     | Synced the lockfile to include the already-declared `lightweight-charts` dependency and its transitive `fancy-canvas` package.                             | Makes the resolved chart route installable/buildable in a clean workspace instead of relying on undeclared local state.           |
 
 # Parity Verification Results
 
-| Dimension | Scope | Result | Drift |
-|---|---|---|---|
-| Fib parity | Dashboard chart fib overlay rendering | Backend fib levels render unchanged; no fib-calculation logic changed | No new drift introduced |
-| Regime parity | Out of scope for this pass | No regime logic change | Unchanged / pending broader replay |
-| Signal parity | Out of scope for this pass | No signal logic change | Unchanged / pending broader replay |
-| Freshness parity | Chart polling/readiness path | 100% backend-authoritative on the audited path after patch | Improved from drifting to aligned |
+| Dimension        | Scope                                 | Result                                                                | Drift                              |
+| ---------------- | ------------------------------------- | --------------------------------------------------------------------- | ---------------------------------- |
+| Fib parity       | Dashboard chart fib overlay rendering | Backend fib levels render unchanged; no fib-calculation logic changed | No new drift introduced            |
+| Regime parity    | Out of scope for this pass            | No regime logic change                                                | Unchanged / pending broader replay |
+| Signal parity    | Out of scope for this pass            | No signal logic change                                                | Unchanged / pending broader replay |
+| Freshness parity | Chart polling/readiness path          | 100% backend-authoritative on the audited path after patch            | Improved from drifting to aligned  |
 
 # Remaining Risks
 

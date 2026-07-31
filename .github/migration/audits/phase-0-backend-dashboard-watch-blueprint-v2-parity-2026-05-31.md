@@ -18,13 +18,13 @@
 
 ## Scoped Parity Checks
 
-| Scenario | Backend Expected | Dashboard Contract | Result |
-|----------|------------------|--------------------|--------|
-| WATCH without sweep, live OK | `watch-blueprint` | Existing watch rendering/ranking coverage | PASS |
-| ARMED/READY with sweep and weak/absent structure, live OK | `pending-blueprint` | Backend payload source remains authoritative | PASS |
-| READY with backend confirmation | Confirmed backend plan path | Existing confirmed plan ranking remains ahead of blueprints | PASS |
-| `engine_blocker !== 'OK'` | `null` | No frontend-only signal truth introduced | PASS |
-| Pending/watch persistence | No executable `smc_sf_trade_plans` row | Dashboard consumes read-only backend payload | PASS |
+| Scenario                                                  | Backend Expected                       | Dashboard Contract                                          | Result |
+| --------------------------------------------------------- | -------------------------------------- | ----------------------------------------------------------- | ------ |
+| WATCH without sweep, live OK                              | `watch-blueprint`                      | Existing watch rendering/ranking coverage                   | PASS   |
+| ARMED/READY with sweep and weak/absent structure, live OK | `pending-blueprint`                    | Backend payload source remains authoritative                | PASS   |
+| READY with backend confirmation                           | Confirmed backend plan path            | Existing confirmed plan ranking remains ahead of blueprints | PASS   |
+| `engine_blocker !== 'OK'`                                 | `null`                                 | No frontend-only signal truth introduced                    | PASS   |
+| Pending/watch persistence                                 | No executable `smc_sf_trade_plans` row | Dashboard consumes read-only backend payload                | PASS   |
 
 ---
 

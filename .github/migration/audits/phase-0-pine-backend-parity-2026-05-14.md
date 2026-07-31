@@ -31,17 +31,17 @@ Scope: PHP backend parity with `SMC_SuperFib_v13.1.3.pine`
 
 ## Deterministic parity results
 
-| Symbol | TF | Expected LTF composite | Expected HTF_AF anchor | Result |
-| --- | --- | --- | --- | --- |
-| EURUSD | 15min | H=61.5 L=6.15 | H=20 L=2 | pass |
-| EURUSD | 1h | H=61.5 L=6.15 | H=20 L=2 | pass |
-| EURUSD | 1day | H=61.5 L=6.15 | H=30 L=3 | pass |
-| USDJPY | 15min | H=61.5 L=6.15 | H=20 L=2 | pass |
-| USDJPY | 1h | H=61.5 L=6.15 | H=20 L=2 | pass |
-| USDJPY | 1day | H=61.5 L=6.15 | H=30 L=3 | pass |
-| XAUUSD | 15min | H=61.5 L=6.15 | H=20 L=2 | pass |
-| XAUUSD | 1h | H=61.5 L=6.15 | H=20 L=2 | pass |
-| XAUUSD | 1day | H=61.5 L=6.15 | H=30 L=3 | pass |
+| Symbol | TF    | Expected LTF composite | Expected HTF_AF anchor | Result |
+| ------ | ----- | ---------------------- | ---------------------- | ------ |
+| EURUSD | 15min | H=61.5 L=6.15          | H=20 L=2               | pass   |
+| EURUSD | 1h    | H=61.5 L=6.15          | H=20 L=2               | pass   |
+| EURUSD | 1day  | H=61.5 L=6.15          | H=30 L=3               | pass   |
+| USDJPY | 15min | H=61.5 L=6.15          | H=20 L=2               | pass   |
+| USDJPY | 1h    | H=61.5 L=6.15          | H=20 L=2               | pass   |
+| USDJPY | 1day  | H=61.5 L=6.15          | H=30 L=3               | pass   |
+| XAUUSD | 15min | H=61.5 L=6.15          | H=20 L=2               | pass   |
+| XAUUSD | 1h    | H=61.5 L=6.15          | H=20 L=2               | pass   |
+| XAUUSD | 1day  | H=61.5 L=6.15          | H=30 L=3               | pass   |
 
 All deterministic parity assertions were validated in `wordpress/smc-superfib-sniper/tests/php/test-fib-parity.php` to `<= 0.00001` tolerance across the full 16-ratio set for both `LTF_SF` and `HTF_AF`.
 

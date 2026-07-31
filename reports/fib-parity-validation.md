@@ -6,20 +6,20 @@ Contract correction addendum: `.github/migration/phase-updates/phase4-timeframe-
 
 ## Fixture comparison table
 
-| Symbol | TF | LTF delta max | HTF_AF delta max | Status |
-| --- | --- | --- | --- | --- |
-| EURUSD | 15min | 0.00000 | 0.00000 | pass |
-| EURUSD | 1h | 0.00000 | 0.00000 | pass |
-| EURUSD | 4h | 0.00000 | 0.00000 | pass |
-| EURUSD | 1day | 0.00000 | 0.00000 | pass |
-| USDJPY | 15min | 0.00000 | 0.00000 | pass |
-| USDJPY | 1h | 0.00000 | 0.00000 | pass |
-| USDJPY | 4h | 0.00000 | 0.00000 | pass |
-| USDJPY | 1day | 0.00000 | 0.00000 | pass |
-| XAUUSD | 15min | 0.00000 | 0.00000 | pass |
-| XAUUSD | 1h | 0.00000 | 0.00000 | pass |
-| XAUUSD | 4h | 0.00000 | 0.00000 | pass |
-| XAUUSD | 1day | 0.00000 | 0.00000 | pass |
+| Symbol | TF    | LTF delta max | HTF_AF delta max | Status |
+| ------ | ----- | ------------- | ---------------- | ------ |
+| EURUSD | 15min | 0.00000       | 0.00000          | pass   |
+| EURUSD | 1h    | 0.00000       | 0.00000          | pass   |
+| EURUSD | 4h    | 0.00000       | 0.00000          | pass   |
+| EURUSD | 1day  | 0.00000       | 0.00000          | pass   |
+| USDJPY | 15min | 0.00000       | 0.00000          | pass   |
+| USDJPY | 1h    | 0.00000       | 0.00000          | pass   |
+| USDJPY | 4h    | 0.00000       | 0.00000          | pass   |
+| USDJPY | 1day  | 0.00000       | 0.00000          | pass   |
+| XAUUSD | 15min | 0.00000       | 0.00000          | pass   |
+| XAUUSD | 1h    | 0.00000       | 0.00000          | pass   |
+| XAUUSD | 4h    | 0.00000       | 0.00000          | pass   |
+| XAUUSD | 1day  | 0.00000       | 0.00000          | pass   |
 
 ## Validation source
 
@@ -64,32 +64,36 @@ The validator confirms the live paired MT5 vs Pine corpus is not aligned. Large 
 - Confirm the Pine reference capture timestamp matches the MT5 export snapshot
 - Re-run the validator after fixing the drift source
 
-
 ## Run: 2026-06-04_112056
+
 - Gate: **FAIL** (13.54%)
 - MT5: 96 rows (mt5-levels.json)
 - Pine: 96 rows (pine-levels.json)
 - Report: phase4-gate-2026-06-04_112056.json
 
 ## Run: 2026-06-04_114528
+
 - Gate: **FAIL** (54.17%)
 - MT5: 96 rows (mt5-levels.json)
 - Pine: 96 rows (pine-levels.json)
 - Report: phase4-gate-2026-06-04_114528.json
 
 ## Run: 2026-06-04_134931
+
 - Gate: **FAIL** (71.88%)
 - MT5: 96 rows (mt5-levels.json)
 - Pine: 96 rows (pine-levels.json)
 - Report: phase4-gate-2026-06-04_134931.json
 
 ## Run: 2026-06-04_143044
+
 - Gate: **FAIL** (66.67%)
 - MT5: 96 rows (mt5-levels.json)
 - Pine: 96 rows (pine-levels.json)
 - Report: phase4-gate-2026-06-04_143044.json
 
 ## Run: 2026-06-04_173401
+
 - Gate: **FAIL** (51.04%)
 - MT5: 96 rows (mt5-levels.json)
 - Pine: 96 rows (pine-levels.json)

@@ -60,12 +60,17 @@
     "stale_rejection": true,
     "stale_threshold_hard_reject_sec": 300,
     "stale_threshold_warn_sec": 120,
-    "candle_validation": ["epoch_guard (>2000-01-01)", "future_candle_guard", "ohlc_validate", "age_gate (M1: 180s, M15: 1800s)"],
-    "missing_token_response": {"code": "smc_sf_api_key_missing", "status": 401},
-    "unconfigured_secret_response": {"code": "smc_sf_api_key_unconfigured", "status": 503},
-    "invalid_token_response": {"code": "smc_sf_api_key_invalid", "status": 403},
-    "missing_user_id_response": {"code": "smc_sf_user_required", "status": 400},
-    "stale_payload_response": {"code": "stale_data", "status": 422}
+    "candle_validation": [
+      "epoch_guard (>2000-01-01)",
+      "future_candle_guard",
+      "ohlc_validate",
+      "age_gate (M1: 180s, M15: 1800s)"
+    ],
+    "missing_token_response": { "code": "smc_sf_api_key_missing", "status": 401 },
+    "unconfigured_secret_response": { "code": "smc_sf_api_key_unconfigured", "status": 503 },
+    "invalid_token_response": { "code": "smc_sf_api_key_invalid", "status": 403 },
+    "missing_user_id_response": { "code": "smc_sf_user_required", "status": 400 },
+    "stale_payload_response": { "code": "stale_data", "status": 422 }
   },
   "rollback": {
     "manifest": "ROLLBACK-MANIFEST.json",

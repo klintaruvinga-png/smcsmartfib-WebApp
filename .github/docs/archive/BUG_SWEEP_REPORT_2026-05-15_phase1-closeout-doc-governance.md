@@ -8,14 +8,14 @@
 
 ## Executive Summary
 
-| Item | Status |
-|---|---|
-| Overall system health | STABLE |
-| Runtime code defects found | 0 |
-| Governance / evidence defects found | 4 |
-| Runtime bridge readiness | PARTIAL |
-| Phase 0 gate | VERIFIED CLOSED |
-| Phase 1 gate | NOT READY - live terminal validation pending |
+| Item                                | Status                                       |
+| ----------------------------------- | -------------------------------------------- |
+| Overall system health               | STABLE                                       |
+| Runtime code defects found          | 0                                            |
+| Governance / evidence defects found | 4                                            |
+| Runtime bridge readiness            | PARTIAL                                      |
+| Phase 0 gate                        | VERIFIED CLOSED                              |
+| Phase 1 gate                        | NOT READY - live terminal validation pending |
 
 This sweep verified the program state for the Phase 0 closeout and Phase 1 kickoff docs task.
 No runtime code defect was identified in this pass. The confirmed problems were governance and

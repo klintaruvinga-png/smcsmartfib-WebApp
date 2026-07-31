@@ -52,30 +52,30 @@
 
 ## Rollback Points
 
-| Tag | When | Notes |
-|---|---|---|
-| `snapshot/stabilize-ea-2026-05-20-start-20260520T000000Z` | Before any work | Initial HEAD |
-| `rollback/stabilize-ea-2026-05-20-before-patches` | Before PATCH-001 | Safe point |
-| `rollback/stabilize-ea-2026-05-20-after-patch-1` | After PATCH-001 | Final state |
+| Tag                                                       | When             | Notes        |
+| --------------------------------------------------------- | ---------------- | ------------ |
+| `snapshot/stabilize-ea-2026-05-20-start-20260520T000000Z` | Before any work  | Initial HEAD |
+| `rollback/stabilize-ea-2026-05-20-before-patches`         | Before PATCH-001 | Safe point   |
+| `rollback/stabilize-ea-2026-05-20-after-patch-1`          | After PATCH-001  | Final state  |
 
 ---
 
 ## Tests Run
 
-| Test | Result |
-|---|---|
-| `php -l smc-superfib-sniper.php` | ✅ PASS |
-| `php -l class-market-data-service.php` | ✅ PASS |
-| `npm run check:mql` | ✅ PASS |
-| `npm run lint` | ⏭ SKIPPED (node_modules not installed in CI) |
-| `npm run build` | ⏭ SKIPPED (vite not installed in CI) |
+| Test                                   | Result                                        |
+| -------------------------------------- | --------------------------------------------- |
+| `php -l smc-superfib-sniper.php`       | ✅ PASS                                       |
+| `php -l class-market-data-service.php` | ✅ PASS                                       |
+| `npm run check:mql`                    | ✅ PASS                                       |
+| `npm run lint`                         | ⏭ SKIPPED (node_modules not installed in CI) |
+| `npm run build`                        | ⏭ SKIPPED (vite not installed in CI)         |
 
 ---
 
 ## Reports Generated
 
-| Report | Location |
-|---|---|
-| Bug Sweep Report | `.github/docs/BUG_SWEEP_REPORT_2026-05-20.md` |
-| Parity Audit | `.github/migration/audits/phase-0-mt5-ea-market-stream-parity-2026-05-20.md` |
-| Rollback Manifest | `reports/snapshots/stabilize-ea-2026-05-20/ROLLBACK-MANIFEST.json` |
+| Report            | Location                                                                     |
+| ----------------- | ---------------------------------------------------------------------------- |
+| Bug Sweep Report  | `.github/docs/BUG_SWEEP_REPORT_2026-05-20.md`                                |
+| Parity Audit      | `.github/migration/audits/phase-0-mt5-ea-market-stream-parity-2026-05-20.md` |
+| Rollback Manifest | `reports/snapshots/stabilize-ea-2026-05-20/ROLLBACK-MANIFEST.json`           |

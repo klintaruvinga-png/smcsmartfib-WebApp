@@ -19,6 +19,7 @@ services rather than endpoint-first logic.
 ## Current State
 
 **Working:**
+
 - TanStack Start backend with auth (login, register, me, refresh)
 - Settings endpoint (GET/PUT/PATCH user settings)
 - Basic fib-levels ingestion and retrieval
@@ -26,6 +27,7 @@ services rather than endpoint-first logic.
 - 47 integration tests passing
 
 **Broken:**
+
 - WordPress backend at `https://trader.stokvelsociety.co.za/wp-json` is down
 - Frontend points to WordPress via `VITE_SNIPER_BACKEND_URL`
 - ~20+ critical endpoints missing (snapshot, charts, signals, ladders, positions, orders, telemetry, etc.)
@@ -38,6 +40,7 @@ services rather than endpoint-first logic.
 WordPress dependencies.
 
 **Deliverables:**
+
 1. Remove all WordPress references from codebase and configuration
 2. Implement Phase 1 endpoints (app boot: auth, settings, snapshot, market-data, charts)
 3. Implement Phase 2 endpoints (core trading: signals, ladders, fib-levels, regime, telemetry)
@@ -54,6 +57,7 @@ WordPress dependencies.
 **Objective:** Remove WordPress dependencies and configure frontend for new backend.
 
 **Tasks:**
+
 1. Update frontend configuration:
    - Rename `VITE_SNIPER_BACKEND_URL` to `VITE_API_URL` in `.env.example`
    - Update `sniperClient.ts` to use `VITE_API_URL`
@@ -73,6 +77,7 @@ WordPress dependencies.
    - Update Drizzle schema accordingly
 
 **Acceptance Criteria:**
+
 - Frontend builds and runs with `VITE_API_URL` configuration
 - No runtime or configuration dependency on WordPress remains in the codebase
 - Database schema supports Phase 1/2 data models
@@ -83,6 +88,7 @@ WordPress dependencies.
 **Objective:** Establish domain service architecture before implementing endpoints.
 
 **Tasks:**
+
 1. Create service structure:
 
    ```text
@@ -122,6 +128,7 @@ WordPress dependencies.
    - Update route handlers to be thin wrappers around services
 
 **Acceptance Criteria:**
+
 - Service layer structure created
 - Base service pattern established
 - Existing handlers refactored to use services
@@ -206,6 +213,7 @@ CREATE TABLE candles (
 ```
 
 **Acceptance Criteria:**
+
 - All Phase 1 endpoints implemented and tested
 - Frontend can boot and load initial data
 - Integration tests pass for all endpoints
@@ -300,6 +308,7 @@ CREATE TABLE account_telemetry (
 ```
 
 **Acceptance Criteria:**
+
 - All Phase 4 (core-trading) endpoints implemented and tested
 - Frontend can display signals, ladders, and engine health
 - Integration tests pass for all endpoints
@@ -351,12 +360,14 @@ CREATE TABLE broker_symbols (
    - Database: Upsert into `broker_symbols` (per user, by symbol)
 
 **MT5 EA Configuration:**
+
 - Update MT5 EA to point to new backend URL
 - Keep execution paused (no order endpoints yet)
 - Verify data flow: MT5 → API → Database → Frontend
 - Monitor for data consistency and errors
 
 **Acceptance Criteria:**
+
 - MT5 can successfully write market data to new backend
 - Heartbeat and account sync working
 - Frontend displays real-time MT5 data
@@ -367,6 +378,7 @@ CREATE TABLE broker_symbols (
 **Objective:** Handle production data migration or seed test data.
 
 **Option A: WordPress Database Backup Exists**
+
 1. Create migration script:
    - Export WordPress database tables
    - Transform schema to match new PostgreSQL structure
@@ -381,6 +393,7 @@ CREATE TABLE broker_symbols (
    - Custom WordPress tables → corresponding new schema
 
 **Option B: No WordPress Backup (Seed Data)**
+
 1. Create seed script:
    - Generate test users with realistic settings
    - Generate sample watchlists
@@ -396,11 +409,13 @@ CREATE TABLE broker_symbols (
    - Account telemetry
 
 **Acceptance Criteria:**
+
 - Data validation scripts pass
 - Frontend can display migrated/seeded data
 - Rollback procedure documented (if migration)
 
 **Validation vs production readiness:**
+
 - Seeded test data satisfies **development/staging-only validation** — it does NOT count as production restoration.
 - **Production readiness gate**: production acceptance requires restored production data (import the WordPress backup if one exists; if no backup exists, obtain explicit sign-off that there is no production data to restore). Seeding alone is never sufficient for production acceptance.
 
@@ -409,6 +424,7 @@ CREATE TABLE broker_symbols (
 **Objective:** Comprehensive testing of restored functionality.
 
 **Testing Tasks:**
+
 1. Integration tests:
    - Test all Phase 1 endpoints
    - Test all Phase 2 endpoints
@@ -437,6 +453,7 @@ CREATE TABLE broker_symbols (
    - CORS configuration
 
 **Acceptance Criteria:**
+
 - All integration tests passing
 - E2E tests cover critical user flows
 - Performance meets requirements (<500ms for most endpoints)
@@ -446,6 +463,7 @@ CREATE TABLE broker_symbols (
 ## Database Schema Summary
 
 **New Tables Required:**
+
 - `market_snapshots` - Current market state
 - `market_regimes` - Regime analysis
 - `signal_gates` - Signal gate states
@@ -456,6 +474,7 @@ CREATE TABLE broker_symbols (
 - `account_telemetry` - Account metrics
 
 **Existing Tables (Already Implemented):**
+
 - `users` - User profiles and settings
 - `fib_levels` - Fib level data
 - `ea_sessions` - EA connection tracking
@@ -464,6 +483,7 @@ CREATE TABLE broker_symbols (
 ## Service Layer Architecture
 
 **Service Responsibilities:**
+
 - **SnapshotService**: Unified market state (prices, regimes, gates)
 - **SignalService**: Signal generation, ladders, trade plans
 - **ChartService**: Candle data, fib levels for charts
@@ -504,6 +524,7 @@ VITE_SNIPER_MOCK_MODE=false
 ```
 
 **Client Updates:**
+
 - Remove WordPress-specific logic
 - Update API base URL handling
 - Ensure JWT token management
@@ -513,6 +534,7 @@ VITE_SNIPER_MOCK_MODE=false
 
 **Files to Update:**
 Update `.github/migration-status.md`:
+
 - Mark BACKEND-1 as complete
 - Redefine BACKEND-2 scope (this plan)
 - Remove WordPress shadow sync references
@@ -520,12 +542,14 @@ Update `.github/migration-status.md`:
 - Add service architecture notes
 
 Update `docs/backend-migration-plan.md`:
+
 - Remove WordPress dual-write strategy
 - Update architecture diagrams
 - Add service layer documentation
 - Update endpoint mapping table
 
 Update `docs/architecture/BACKEND_MIGRATION_IMPLEMENTATION_PLAN.md`:
+
 - Remove shadow sync phases
 - Update to match new phased approach
 - Add service layer implementation details
@@ -533,18 +557,21 @@ Update `docs/architecture/BACKEND_MIGRATION_IMPLEMENTATION_PLAN.md`:
 ## Success Criteria
 
 **Phase 1 Complete:**
+
 - Frontend boots without errors
 - User can login
 - Settings load and persist
 - Basic market data displays
 
 **Phase 2 Complete:**
+
 - Signals display correctly
 - Ladders load and render
 - Engine health visible
 - MT5 data flowing to frontend
 
 **Overall BACKEND-2 Complete:**
+
 - App fully functional for core trading workflows
 - Zero WordPress dependencies
 - Service layer architecture established
@@ -568,18 +595,22 @@ Update `docs/architecture/BACKEND_MIGRATION_IMPLEMENTATION_PLAN.md`:
 ## Risks & Mitigations
 
 **Risk 1: MT5 EA Configuration Complexity**
+
 - Mitigation: Start with read-only pipeline, defer execution
 - Fallback: Manual data entry if MT5 integration fails
 
 **Risk 2: Data Migration Issues**
+
 - Mitigation: Create comprehensive migration scripts with rollback
 - Fallback: Seed test data and rebuild from scratch
 
 **Risk 3: Service Layer Over-Engineering**
+
 - Mitigation: Keep services simple, evolve as needed
 - Fallback: Direct database access if services add complexity
 
 **Risk 4: Frontend Integration Breaking Changes**
+
 - Mitigation: Maintain API compatibility where possible
 - Fallback: Update frontend to match new API contracts
 

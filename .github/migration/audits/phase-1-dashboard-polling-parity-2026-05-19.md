@@ -15,6 +15,7 @@
 - **Trend**: Improving
 
 Scope:
+
 - Dashboard route rendering parity against the canonical polling gate in [`src/hooks/useSniperData.ts`](C:/Users/LEONNA/OneDrive/All%20Final%20Softwares/SMC%20SuperFib%20Dashboard/smcsmartfib-WebApp/src/hooks/useSniperData.ts)
 - Freshness-authority preservation while settings are unresolved or backend configuration is absent
 - Carry-forward verification that fib/regime/signal engines were not changed by this patch
@@ -25,13 +26,13 @@ Scope:
 
 ### Dashboard Polling / Freshness Authority
 
-| Metric | Expected Authority | Dashboard Value | Match | Accuracy |
-|--------|--------------------|----------------|-------|----------|
-| Settings unresolved | Polling disabled, loading UI only | Loading UI only | PASS | 100% |
-| Backend URL missing | Polling disabled, configuration message | Configuration message | PASS | 100% |
-| Backend ready + no first payload yet | Await first backend payload | Await-first-payload message | PASS | 100% |
-| Backend ready + active polling | Existing live route behavior preserved | Preserved | PASS | 100% |
-| **Freshness Authority Score** | - | - | - | **100%** |
+| Metric                               | Expected Authority                      | Dashboard Value             | Match | Accuracy |
+| ------------------------------------ | --------------------------------------- | --------------------------- | ----- | -------- |
+| Settings unresolved                  | Polling disabled, loading UI only       | Loading UI only             | PASS  | 100%     |
+| Backend URL missing                  | Polling disabled, configuration message | Configuration message       | PASS  | 100%     |
+| Backend ready + no first payload yet | Await first backend payload             | Await-first-payload message | PASS  | 100%     |
+| Backend ready + active polling       | Existing live route behavior preserved  | Preserved                   | PASS  | 100%     |
+| **Freshness Authority Score**        | -                                       | -                           | -     | **100%** |
 
 **Observations**: The route layer now mirrors the same disabled-query contract already enforced by the polling hooks. No browser-clock or frontend-only freshness inference was added.
 
@@ -39,12 +40,12 @@ Scope:
 
 ### Fib Engine (Carry-Forward)
 
-| Metric | Pine Value | MT5/Backend Value | Match | Accuracy |
-|--------|-----------|------------------|-------|----------|
-| Fib anchors | unchanged | unchanged | PASS | 100% |
-| Fib levels | unchanged | unchanged | PASS | 100% |
-| Premium/discount zoning | unchanged | unchanged | PASS | 100% |
-| **Fib Parity Score** | - | - | - | **100%** |
+| Metric                  | Pine Value | MT5/Backend Value | Match | Accuracy |
+| ----------------------- | ---------- | ----------------- | ----- | -------- |
+| Fib anchors             | unchanged  | unchanged         | PASS  | 100%     |
+| Fib levels              | unchanged  | unchanged         | PASS  | 100%     |
+| Premium/discount zoning | unchanged  | unchanged         | PASS  | 100%     |
+| **Fib Parity Score**    | -          | -                 | -     | **100%** |
 
 **Observations**: No fib logic or rendering contracts were changed in this run; score is carried forward from unchanged code paths.
 
@@ -52,12 +53,12 @@ Scope:
 
 ### Regime Engine (Carry-Forward)
 
-| Metric | Pine Classification | MT5/Backend Classification | Match | Accuracy |
-|--------|-------------------|---------------------------|-------|----------|
-| Trend/range classification | unchanged | unchanged | PASS | 100% |
-| Chop blocking | unchanged | unchanged | PASS | 100% |
-| Volatility/gate handling | unchanged | unchanged | PASS | 100% |
-| **Regime Parity Score** | - | - | - | **100%** |
+| Metric                     | Pine Classification | MT5/Backend Classification | Match | Accuracy |
+| -------------------------- | ------------------- | -------------------------- | ----- | -------- |
+| Trend/range classification | unchanged           | unchanged                  | PASS  | 100%     |
+| Chop blocking              | unchanged           | unchanged                  | PASS  | 100%     |
+| Volatility/gate handling   | unchanged           | unchanged                  | PASS  | 100%     |
+| **Regime Parity Score**    | -                   | -                          | -     | **100%** |
 
 **Observations**: No regime, chop, or gate formulas were altered.
 
@@ -65,12 +66,12 @@ Scope:
 
 ### Signal Engine (Carry-Forward)
 
-| Metric | Pine/Backend Signal | MT5/Dashboard Signal | Match | Accuracy |
-|--------|---------------------|----------------------|-------|----------|
-| Backend confirmation rule | unchanged | unchanged | PASS | 100% |
-| Entry/SL/TP derivation | unchanged | unchanged | PASS | 100% |
-| Signal readiness gating | unchanged | unchanged | PASS | 100% |
-| **Signal Parity Score** | - | - | - | **100%** |
+| Metric                    | Pine/Backend Signal | MT5/Dashboard Signal | Match | Accuracy |
+| ------------------------- | ------------------- | -------------------- | ----- | -------- |
+| Backend confirmation rule | unchanged           | unchanged            | PASS  | 100%     |
+| Entry/SL/TP derivation    | unchanged           | unchanged            | PASS  | 100%     |
+| Signal readiness gating   | unchanged           | unchanged            | PASS  | 100%     |
+| **Signal Parity Score**   | -                   | -                    | -     | **100%** |
 
 **Observations**: The patch affects route gating only. Signal generation and execution payloads were not touched.
 
@@ -78,18 +79,18 @@ Scope:
 
 ## Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-|-------|----------|-------|-----------|---------|
-| Disabled-query routes could misrepresent backend-unready state as loading/empty | HIGH | 1 | Fixed in route guards + regression tests | No |
+| Issue                                                                           | Severity | Count | Resolution                               | Blocker |
+| ------------------------------------------------------------------------------- | -------- | ----- | ---------------------------------------- | ------- |
+| Disabled-query routes could misrepresent backend-unready state as loading/empty | HIGH     | 1     | Fixed in route guards + regression tests | No      |
 
 ---
 
 ## Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-|------|-----------|--------|----------|
-| Test-time route export warning for `LivePage` / `PlanPage` | none in production output | Test harness imports route components directly for regression coverage | YES |
-| Lint warnings in shared UI files | warning-only | Pre-existing non-blocking debt outside audited freshness path | YES |
+| Item                                                       | Difference                | Reason                                                                 | Accepted |
+| ---------------------------------------------------------- | ------------------------- | ---------------------------------------------------------------------- | -------- |
+| Test-time route export warning for `LivePage` / `PlanPage` | none in production output | Test harness imports route components directly for regression coverage | YES      |
+| Lint warnings in shared UI files                           | warning-only              | Pre-existing non-blocking debt outside audited freshness path          | YES      |
 
 ---
 

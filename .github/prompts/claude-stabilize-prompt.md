@@ -17,12 +17,12 @@ Preserve the current architecture and plugin structure.
 
 ## Architecture at a Glance
 
-| Layer | Location | Deployment |
-|---|---|---|
-| WordPress plugin | `wordpress/smc-superfib-sniper/` | trader.stokvelsociety.co.za |
-| Frontend dashboard | `src/` (React + TanStack Start) | Cloudflare Workers/Pages |
-| MT5 EA | `mt5/` (MQL5 `.mq5` / `.mqh`) | MT5 terminal |
-| Scripts | `scripts/` | local / CI |
+| Layer              | Location                         | Deployment                  |
+| ------------------ | -------------------------------- | --------------------------- |
+| WordPress plugin   | `wordpress/smc-superfib-sniper/` | trader.stokvelsociety.co.za |
+| Frontend dashboard | `src/` (React + TanStack Start)  | Cloudflare Workers/Pages    |
+| MT5 EA             | `mt5/` (MQL5 `.mq5` / `.mqh`)    | MT5 terminal                |
+| Scripts            | `scripts/`                       | local / CI                  |
 
 **REST namespace**: `sniper/v1`
 **Backend base URL**: `https://trader.stokvelsociety.co.za/wp-json`
@@ -62,8 +62,8 @@ The route `POST /wp-json/sniper/v1/ea/market-stream` **exists** and uses the
 
 **Authentication model (actual)**
 
-| Header | Value |
-|---|---|
+| Header         | Value                                                                 |
+| -------------- | --------------------------------------------------------------------- |
 | `X-EA-API-Key` | Shared secret — checked via `hash_equals` against `SMC_SF_EA_API_KEY` |
 
 `SMC_SF_EA_API_KEY` is read from the PHP constant or `getenv()` fallback.
@@ -719,29 +719,35 @@ Include:
 # Snapshot Archive for [WORKFLOW_ID]
 
 ## Initial State
+
 - File: INITIAL-[timestamp].json
 - Timestamp:
 - Branch:
 - Commit:
 
 ## Findings
+
 - File: FINDINGS-[timestamp].json
 - Issues found:
 
 ## Pre-Patch
+
 - File: PRE-PATCH-[timestamp].json
 - Rollback tag:
 
 ## Patch Snapshots
+
 - Files:
 - Tags:
 
 ## Final State
+
 - File: FINAL-[timestamp].json
 - Commit:
 - Ready for deployment:
 
 ## Rollback Points
+
 - snapshot/[WORKFLOW_ID]-start-[timestamp]
 - rollback/[WORKFLOW_ID]-before-patches
 - rollback/[WORKFLOW_ID]-after-patch-[N]

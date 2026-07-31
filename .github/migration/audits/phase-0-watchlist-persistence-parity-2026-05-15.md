@@ -22,12 +22,12 @@ This audit covers a watchlist contract hardening patch only. No Pine formulas, M
 
 ### Fib Engine
 
-| Metric | Before Patch | After Patch | Match | Accuracy |
-|---|---|---|---|---|
-| Anchor calculation | Unchanged | Unchanged | Yes | 100% |
-| Fib level derivation | Unchanged | Unchanged | Yes | 100% |
-| Premium/discount classification | Unchanged | Unchanged | Yes | 100% |
-| **Fib Parity Score** | - | - | - | **100%** |
+| Metric                          | Before Patch | After Patch | Match | Accuracy |
+| ------------------------------- | ------------ | ----------- | ----- | -------- |
+| Anchor calculation              | Unchanged    | Unchanged   | Yes   | 100%     |
+| Fib level derivation            | Unchanged    | Unchanged   | Yes   | 100%     |
+| Premium/discount classification | Unchanged    | Unchanged   | Yes   | 100%     |
+| **Fib Parity Score**            | -            | -           | -     | **100%** |
 
 **Observations**: No fib logic was touched.
 
@@ -35,12 +35,12 @@ This audit covers a watchlist contract hardening patch only. No Pine formulas, M
 
 ### Regime Engine
 
-| Metric | Before Patch | After Patch | Match | Accuracy |
-|---|---|---|---|---|
-| Bias classification | Unchanged | Unchanged | Yes | 100% |
-| Chop gating | Unchanged | Unchanged | Yes | 100% |
-| Freshness gating | Unchanged | Unchanged | Yes | 100% |
-| **Regime Parity Score** | - | - | - | **100%** |
+| Metric                  | Before Patch | After Patch | Match | Accuracy |
+| ----------------------- | ------------ | ----------- | ----- | -------- |
+| Bias classification     | Unchanged    | Unchanged   | Yes   | 100%     |
+| Chop gating             | Unchanged    | Unchanged   | Yes   | 100%     |
+| Freshness gating        | Unchanged    | Unchanged   | Yes   | 100%     |
+| **Regime Parity Score** | -            | -           | -     | **100%** |
 
 **Observations**: No regime logic was touched.
 
@@ -48,12 +48,12 @@ This audit covers a watchlist contract hardening patch only. No Pine formulas, M
 
 ### Signal Engine
 
-| Metric | Before Patch | After Patch | Match | Accuracy |
-|---|---|---|---|---|
-| READY confirmation | Unchanged | Unchanged | Yes | 100% |
-| Entry / SL / TP derivation | Unchanged | Unchanged | Yes | 100% |
-| Backend confirmation discipline | Unchanged | Unchanged | Yes | 100% |
-| **Signal Parity Score** | - | - | - | **100%** |
+| Metric                          | Before Patch | After Patch | Match | Accuracy |
+| ------------------------------- | ------------ | ----------- | ----- | -------- |
+| READY confirmation              | Unchanged    | Unchanged   | Yes   | 100%     |
+| Entry / SL / TP derivation      | Unchanged    | Unchanged   | Yes   | 100%     |
+| Backend confirmation discipline | Unchanged    | Unchanged   | Yes   | 100%     |
+| **Signal Parity Score**         | -            | -           | -     | **100%** |
 
 **Observations**: No signal logic was touched.
 
@@ -61,16 +61,16 @@ This audit covers a watchlist contract hardening patch only. No Pine formulas, M
 
 ### Watchlist Authority
 
-| Metric | Before Patch | After Patch | Match | Accuracy |
-|---|---|---|---|---|
-| `post_user_settings()` mutation response | `ok` only | `ok` + canonical `watchlist` | Yes | 100% |
-| `post_user_watchlist()` response authority | Canonical array | Canonical post-persist array | Yes | 100% |
-| `post_watchlist_add()` response authority | Local mutation array | Canonical post-persist array | Yes | 100% |
-| `post_watchlist_remove()` response authority | Local mutation array | Canonical post-persist array | Yes | 100% |
-| Dashboard watchlist cache after add/remove | Vulnerable to stale `user-settings` overwrite | Mutation response remains canonical | Yes | 100% |
-| Engine snapshot invalidation | Change-based but inconsistent diagnostics | Change-based with explicit no-op warnings | Yes | 100% |
-| `AUDCAD` support | Supported | Supported | Yes | 100% |
-| **Watchlist Parity Score** | - | - | - | **100%** |
+| Metric                                       | Before Patch                                  | After Patch                               | Match | Accuracy |
+| -------------------------------------------- | --------------------------------------------- | ----------------------------------------- | ----- | -------- |
+| `post_user_settings()` mutation response     | `ok` only                                     | `ok` + canonical `watchlist`              | Yes   | 100%     |
+| `post_user_watchlist()` response authority   | Canonical array                               | Canonical post-persist array              | Yes   | 100%     |
+| `post_watchlist_add()` response authority    | Local mutation array                          | Canonical post-persist array              | Yes   | 100%     |
+| `post_watchlist_remove()` response authority | Local mutation array                          | Canonical post-persist array              | Yes   | 100%     |
+| Dashboard watchlist cache after add/remove   | Vulnerable to stale `user-settings` overwrite | Mutation response remains canonical       | Yes   | 100%     |
+| Engine snapshot invalidation                 | Change-based but inconsistent diagnostics     | Change-based with explicit no-op warnings | Yes   | 100%     |
+| `AUDCAD` support                             | Supported                                     | Supported                                 | Yes   | 100%     |
+| **Watchlist Parity Score**                   | -                                             | -                                         | -     | **100%** |
 
 **Observations**: Backend persisted watchlists, mutation response bodies, and the dashboard canonical cache now stay aligned on the audited add/remove/settings paths. `AUDCAD` remained in the supported instrument registry throughout; the defect was contract drift, not symbol normalization.
 
@@ -78,18 +78,18 @@ This audit covers a watchlist contract hardening patch only. No Pine formulas, M
 
 ## Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-|---|---|---|---|---|
-| `post_user_settings()` omitted the canonical watchlist response | HIGH | 1 | Patched and PHP-regression-covered | No |
-| Watchlist hooks refetched `user-settings` after canonical mutation success | HIGH | 1 | Patched and Vitest-covered | No |
+| Issue                                                                      | Severity | Count | Resolution                         | Blocker |
+| -------------------------------------------------------------------------- | -------- | ----- | ---------------------------------- | ------- |
+| `post_user_settings()` omitted the canonical watchlist response            | HIGH     | 1     | Patched and PHP-regression-covered | No      |
+| Watchlist hooks refetched `user-settings` after canonical mutation success | HIGH     | 1     | Patched and Vitest-covered         | No      |
 
 ---
 
 ## Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-|---|---|---|---|
-| Manual staging add/remove verification | Not executed in this run | No live WordPress/dashboard staging environment was exercised from the repo harness | Yes |
+| Item                                   | Difference               | Reason                                                                              | Accepted |
+| -------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------- | -------- |
+| Manual staging add/remove verification | Not executed in this run | No live WordPress/dashboard staging environment was exercised from the repo harness | Yes      |
 
 ---
 

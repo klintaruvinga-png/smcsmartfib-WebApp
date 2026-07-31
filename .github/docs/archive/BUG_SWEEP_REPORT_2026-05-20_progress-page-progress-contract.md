@@ -3,8 +3,8 @@
 - Overall health: Improved. The Progress page now reads backend-owned progress state instead of hardcoded unavailable placeholders.
 - Bugs found: 2 confirmed contract gaps resolved in this patch.
 - Fixes applied: Added `GET /user/progress`, wired the frontend client/hook/page to it, and preserved the existing equity/drawdown authority boundaries.
--- Remaining risks: Active-day definition approved 2026-05-22; streak truth is live and `/user/progress` now returns `streak.state = "LIVE"` for accounts with engine run history. Manual staging verification is still recommended before production deploy.
--- Migration readiness: Phase 2 blocker removed for `/user/progress` wiring; manual staging verification is still recommended before production deploy.
+  -- Remaining risks: Active-day definition approved 2026-05-22; streak truth is live and `/user/progress` now returns `streak.state = "LIVE"` for accounts with engine run history. Manual staging verification is still recommended before production deploy.
+  -- Migration readiness: Phase 2 blocker removed for `/user/progress` wiring; manual staging verification is still recommended before production deploy.
 
 **Report Date**: 2026-05-20  
 **Phase**: 2 (Progress contract / backend-dashboard wiring)  
@@ -25,10 +25,10 @@
 
 ## Confirmed Issues
 
-| Issue | Component | Root Cause | Impact | Corrective Action |
-|-------|-----------|-----------|--------|-------------------|
-| Missing authenticated progress read contract | `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` | `/user/progress` route and handler never existed after Phase 2 telemetry work | Progress page streak and milestone panels had no backend-owned source of truth | Registered `GET /user/progress`, returned backend-owned equity pulse + milestone state, and degraded streak to `UNAVAILABLE` until the business rule is signed off |
-| Frontend progress panels were hard-gated | `src/routes/progress.tsx`, `src/lib/api/sniperClient.ts`, `src/hooks/useSniperData.ts` | No typed client/hook existed, so the page stayed on `PROGRESS_NOT_IMPLEMENTED` placeholders | Users could not see backend milestone state even after telemetry persistence existed | Added typed `UserProgress` contract, API normalizer, React Query hook, and loading/error/unavailable/live rendering states |
+| Issue                                        | Component                                                                              | Root Cause                                                                                  | Impact                                                                               | Corrective Action                                                                                                                                                  |
+| -------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Missing authenticated progress read contract | `wordpress/smc-superfib-sniper/smc-superfib-sniper.php`                                | `/user/progress` route and handler never existed after Phase 2 telemetry work               | Progress page streak and milestone panels had no backend-owned source of truth       | Registered `GET /user/progress`, returned backend-owned equity pulse + milestone state, and degraded streak to `UNAVAILABLE` until the business rule is signed off |
+| Frontend progress panels were hard-gated     | `src/routes/progress.tsx`, `src/lib/api/sniperClient.ts`, `src/hooks/useSniperData.ts` | No typed client/hook existed, so the page stayed on `PROGRESS_NOT_IMPLEMENTED` placeholders | Users could not see backend milestone state even after telemetry persistence existed | Added typed `UserProgress` contract, API normalizer, React Query hook, and loading/error/unavailable/live rendering states                                         |
 
 ---
 

@@ -14,9 +14,7 @@
       "wordpress/smc-superfib-sniper/smc-superfib-sniper.php",
       "wordpress/smc-superfib-sniper/class-market-data-service.php"
     ],
-    "rest_route_files": [
-      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php"
-    ],
+    "rest_route_files": ["wordpress/smc-superfib-sniper/smc-superfib-sniper.php"],
     "frontend_api_client": "src/lib/api/sniperClient.ts",
     "mt5_ea_files": [
       "mt5/SMC_MarketDataEA.mq5",

@@ -25,7 +25,14 @@
       "id": "PATCH-3",
       "addresses": "BUG-002 pre-existing lint",
       "description": "Ran npx prettier --write src/ scripts/ to auto-fix 77 pre-existing Prettier formatting errors. Zero logic changes. npm run lint now shows 0 errors (8 pre-existing react-hooks warnings remain — intentional, not fixable without logic changes).",
-      "files": ["src/routes/plan.tsx", "src/routes/index.tsx", "src/styles.css", "src/lib/api/sniperClient.ts", "src/hooks/useStreamingTicks.ts", "scripts/pipeline-watcher.js"]
+      "files": [
+        "src/routes/plan.tsx",
+        "src/routes/index.tsx",
+        "src/styles.css",
+        "src/lib/api/sniperClient.ts",
+        "src/hooks/useStreamingTicks.ts",
+        "scripts/pipeline-watcher.js"
+      ]
     }
   ],
   "test_results": {

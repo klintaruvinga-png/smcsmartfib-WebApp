@@ -1,0 +1,862 @@
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/auth", () => ({
+  clearCredentials: vi.fn(),
+  getAuthHeader: vi.fn(() => null),
+  getWordPressNonce: vi.fn(() => "test-nonce"),
+}));
+
+import {
+  apiClient,
+  fetchSoakReport,
+  resolveDefaultBackendUrl,
+  setBackendUrl,
+} from "./sniperClient";
+
+describe("default backend URL resolution", () => {
+  it("uses the configured build-time backend URL when present", () => {
+    expect(
+      resolveDefaultBackendUrl(
+        " https://custom.example/wp-json ",
+        "https://smcsuperfibwebapp.klintaruvinga.workers.dev",
+      ),
+    ).toBe("https://custom.example/wp-json");
+  });
+
+  it("uses the canonical WordPress backend on external frontend hosts", () => {
+    expect(
+      resolveDefaultBackendUrl(null, "https://smcsuperfibwebapp.klintaruvinga.workers.dev"),
+    ).toBe("https://trader.stokvelsociety.co.za/wp-json");
+
+    expect(resolveDefaultBackendUrl(undefined, "https://smcsmartfib.lovable.app")).toBe(
+      "https://trader.stokvelsociety.co.za/wp-json",
+    );
+  });
+
+  it("keeps same-origin REST calls when served from the WordPress backend host", () => {
+    expect(resolveDefaultBackendUrl(undefined, "http://trader.stokvelsociety.co.za:8080")).toBe(
+      "http://trader.stokvelsociety.co.za:8080/wp-json",
+    );
+  });
+});
+
+describe("fetchSoakReport", () => {
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("resolves the full soak report payload on HTTP 200", async () => {
+    const payload = {
+      health: {
+        backendSync: "offline",
+        priceFeed: "stale",
+        feedStatus: "stale",
+        engineRunState: "failed",
+        twelveDataKey: "missing",
+        twelveDataKeyStatus: "missing",
+        lastBatchAt: null,
+        lastEngineRunAt: null,
+        perSymbolDiagnostics: [],
+      },
+      watchlist_count: 0,
+      snapshots_24h: 0,
+      candles_24h: 0,
+      engine_runs_summary: {
+        total_24h: 0,
+        success_24h: 0,
+        error_24h: 0,
+        last_run_at: null,
+      },
+      audit_events_summary: {
+        total_24h: 0,
+        error_count_24h: 0,
+        warning_count_24h: 0,
+      },
+      manual_evidence: [],
+      baseline_checkpoint: {
+        id: 3,
+        checkpoint_type: "baseline",
+        snapshot_data: {},
+        operator_notes: null,
+        created_at: "2026-05-11T08:00:00Z",
+      },
+      checkpoints: [],
+      generated_at: "2026-05-11T08:05:00Z",
+      seeded: true,
+    };
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify(payload), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+      ),
+    );
+
+    await expect(fetchSoakReport()).resolves.toMatchObject({
+      baseline_checkpoint: {
+        id: 3,
+        checkpoint_type: "baseline",
+      },
+      seeded: true,
+    });
+  });
+
+  it("rejects with a surfaced backend error on HTTP 500", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ error: "table_init_failed", detail: "dbDelta unavailable" }),
+            {
+              status: 500,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+      ),
+    );
+
+    await expect(fetchSoakReport()).rejects.toThrow(
+      /API \/admin\/soak-report failed: 500 - {"error":"table_init_failed","detail":"dbDelta unavailable"}/,
+    );
+  });
+});
+
+describe("user settings contract", () => {
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("posts the shared settings payload to the backend settings endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      apiClient.postUserSettings(
+        {
+          backendUrl: "https://example.com/wp-json",
+          watchlist: ["EURUSD", "XAUUSD"],
+        },
+        false,
+      ),
+    ).resolves.toEqual({ ok: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/user/settings"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          backendUrl: "https://example.com/wp-json",
+          watchlist: ["EURUSD", "XAUUSD"],
+        }),
+      }),
+    );
+  });
+});
+
+describe("user risk profile contract", () => {
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("posts the shared risk-profile payload to the backend risk-profile endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      apiClient.postUserRiskProfile(
+        {
+          tier: "balanced",
+          maxConcurrentTrades: 2,
+          perTradePct: 1.5,
+          dailyMaxPct: 4,
+          ddCapPct: 8,
+          cooldownMin: 15,
+        },
+        false,
+      ),
+    ).resolves.toEqual({ ok: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/user/risk-profile"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          tier: "balanced",
+          maxConcurrentTrades: 2,
+          perTradePct: 1.5,
+          dailyMaxPct: 4,
+          ddCapPct: 8,
+          cooldownMin: 15,
+        }),
+      }),
+    );
+  });
+});
+
+describe("user account and related backend contract endpoints", () => {
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("posts the shared account payload to the backend account endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      apiClient.postUserAccount(
+        {
+          balanceUSC: 10000,
+          equityUSC: 9950,
+          marginUsedPct: 20,
+          drawdownPct: 1,
+          openPositions: 1,
+          pendingOrders: 0,
+          todayPnlUSC: -50,
+          todayPnlPct: -0.5,
+          state: "live",
+        },
+        false,
+      ),
+    ).resolves.toEqual({ ok: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/user/account"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          balanceUSC: 10000,
+          equityUSC: 9950,
+          marginUsedPct: 20,
+          drawdownPct: 1,
+          openPositions: 1,
+          pendingOrders: 0,
+          todayPnlUSC: -50,
+          todayPnlPct: -0.5,
+          state: "live",
+        }),
+      }),
+    );
+  });
+
+  it("posts the shared twelve-data-key payload to the backend endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true, status: "ok" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      apiClient.postTwelveDataKey({ apiKey: "test-key", testOnly: true }, false),
+    ).resolves.toEqual({ ok: true, status: "ok" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/user/twelve-data-key"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ apiKey: "test-key", testOnly: true }),
+      }),
+    );
+  });
+
+  it("posts the shared execute signals payload to the backend endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true, queued: 2 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiClient.postExecuteSignals({ signalIds: ["s1", "s2"] }, false)).resolves.toEqual(
+      { ok: true, queued: 2 },
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/user/execute-signals"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ signalIds: ["s1", "s2"] }),
+      }),
+    );
+  });
+
+  it("posts the shared engine batch payload to the backend endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true, diagnostics: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      apiClient.postEngineBatch({ symbols: ["EURUSD", "XAUUSD"] }, false),
+    ).resolves.toEqual({
+      ok: true,
+      diagnostics: [],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/user/engine-batch"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ symbols: ["EURUSD", "XAUUSD"] }),
+      }),
+    );
+  });
+
+  it("posts the shared watchlist add payload to the backend endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true, watchlist: ["EURUSD"] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiClient.postWatchlistAdd("EURUSD", false)).resolves.toEqual({
+      ok: true,
+      watchlist: ["EURUSD"],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/user/watchlist/add"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ symbol: "EURUSD" }),
+      }),
+    );
+  });
+
+  it("posts the shared watchlist remove payload to the backend endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true, watchlist: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiClient.postWatchlistRemove("EURUSD", false)).resolves.toEqual({
+      ok: true,
+      watchlist: [],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/user/watchlist/remove"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ symbol: "EURUSD" }),
+      }),
+    );
+  });
+});
+
+describe("Phase 2 telemetry client reads", () => {
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("reads positions and orders from the new read-only endpoints without POSTing trade state", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              position_id: "1001",
+              symbol: "EURUSD",
+              direction: "LONG",
+              entry_price: 1.08,
+              current_price: 1.081,
+              volume: 0.5,
+              profit: 125,
+              opened_at: "2026-05-20T10:00:00Z",
+              freshness: "live",
+            },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              order_id: "2001",
+              symbol: "EURUSD",
+              direction: "SHORT",
+              order_type: "SELL_LIMIT",
+              entry_price: 1.09,
+              volume: 0.25,
+              sl: 1.095,
+              tp: 1.08,
+              placed_at: "2026-05-20T10:05:00Z",
+              freshness: "live",
+            },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await apiClient.getUserTrades(false);
+
+    expect(result.positions).toHaveLength(1);
+    expect(result.orders).toHaveLength(1);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("/sniper/v1/positions"),
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("/sniper/v1/orders"),
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+  });
+
+  it("reads account telemetry from the backend-owned account endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            account_id: "32206603",
+            terminal_id: "terminal-1",
+            balance: 10000,
+            equity: 10125,
+            margin: 1000,
+            free_margin: 9125,
+            margin_level: 1012.5,
+            floating_pl: 125,
+            currency: "USC",
+            leverage: 500,
+            ea_version: "1.00",
+            last_seen_at: "2026-05-20T10:15:00Z",
+            updated_at: "2026-05-20T10:15:00Z",
+            freshness: "live",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const telemetry = await apiClient.getAccountTelemetry(false);
+
+    expect(telemetry).toMatchObject({
+      accountId: "32206603",
+      floatingPl: 125,
+      state: "live",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/account-telemetry"),
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
+  it("normalizes the /user/progress contract from snake_case to camelCase", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            equity_pulse: {
+              equity_usc: 10125,
+              today_pnl_usc: 48.5,
+              state: "LIVE",
+            },
+            streak: {
+              current_streak_days: 0,
+              last_active_date: "2026-05-20",
+              state: "UNAVAILABLE",
+            },
+            milestones: {
+              first_heartbeat: true,
+              first_market_stream: true,
+              first_trade_telemetry: true,
+              state: "LIVE",
+            },
+            generated_at: "2026-05-20T10:15:00Z",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const progress = await apiClient.getUserProgress(false);
+
+    expect(progress).toMatchObject({
+      equityPulse: {
+        equityUSC: 10125,
+        todayPnlUSC: 48.5,
+        state: "LIVE",
+      },
+      streak: {
+        currentStreakDays: 0,
+        lastActiveDate: "2026-05-20",
+        state: "UNAVAILABLE",
+      },
+      milestones: {
+        firstHeartbeat: true,
+        firstMarketStream: true,
+        firstTradeTelemetry: true,
+        state: "LIVE",
+      },
+      generatedAt: "2026-05-20T10:15:00Z",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/sniper/v1/user/progress"),
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
+  it("returns the typed mock user-progress payload in mock mode", async () => {
+    await expect(apiClient.getUserProgress(true)).resolves.toMatchObject({
+      equityPulse: {
+        state: "LIVE",
+      },
+      streak: {
+        state: "LIVE",
+      },
+      milestones: {
+        state: "LIVE",
+      },
+    });
+  });
+
+  it("requests live signals with a cache-bust token and no-store fetch cache", async () => {
+    const signals = [{ id: "EURUSD-LONG" }];
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ signals, polledAt: "2026-05-30T00:00:00+00:00" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiClient.getLiveSignals(false)).resolves.toEqual(signals);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/sniper\/v1\/live-signals\?_=\d+$/),
+      expect.objectContaining({
+        method: "GET",
+        cache: "no-store",
+      }),
+    );
+  });
+
+  it("requests chart snapshots with a cache-bust token and no-store fetch cache", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            symbol: "EURUSD",
+            timeframe: "15min",
+            candles: [],
+            fibLevels: [],
+            updatedAt: null,
+            state: "stale",
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiClient.getChartSnapshot("EURUSD", "15min", false)).resolves.toMatchObject({
+      symbol: "EURUSD",
+      state: "stale",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/sniper\/v1\/charts\?symbol=EURUSD&timeframe=15min&_=\d+$/),
+      expect.objectContaining({
+        method: "GET",
+        cache: "no-store",
+      }),
+    );
+  });
+});
+
+describe("ladders client contract", () => {
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("rejects malformed /ladders payloads instead of returning a non-array plan set", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ plans: [] }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+      ),
+    );
+
+    await expect(apiClient.getLadders(undefined, false)).rejects.toThrow(
+      "/ladders: backend response missing ladder array",
+    );
+  });
+});
+
+describe("unified snapshot client contract", () => {
+  beforeEach(() => {
+    setBackendUrl("https://example.com/wp-json");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("getUnifiedSnapshot calls /snapshot/unified with a cache-bust token", async () => {
+    const payload = {
+      prices: [
+        {
+          symbol: "EURUSD",
+          bid: 1.1,
+          ask: 1.10012,
+          mid: 1.10006,
+          changePct1d: 0,
+          state: "live",
+        },
+      ],
+      regimes: [],
+      gates: [],
+      diagnostics: [],
+    };
+
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await apiClient.getUnifiedSnapshot(false);
+
+    expect(result.prices).toHaveLength(1);
+    expect(result.prices[0].symbol).toBe("EURUSD");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/sniper\/v1\/snapshot\/unified\?_=\d+$/),
+      expect.objectContaining({
+        method: "GET",
+        cache: "no-store",
+      }),
+    );
+  });
+
+  it("preserves shared market provenance metadata in normalized snapshot prices", async () => {
+    const payload = {
+      prices: [
+        {
+          symbol: "EURUSD",
+          bid: 1.1,
+          ask: 1.10012,
+          mid: 1.10006,
+          changePct1d: 0,
+          state: "live",
+          source: "mt5",
+          sourceDetail: "shared_market_quote",
+          feed_key: "ICMARKETS_SV",
+          source_count: 2,
+        },
+      ],
+      regimes: [],
+      gates: [],
+      diagnostics: [],
+    };
+
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await apiClient.getUnifiedSnapshot(false);
+
+    expect(result.prices[0]).toMatchObject({
+      sourceDetail: "shared_market_quote",
+      feed_key: "ICMARKETS_SV",
+      source_count: 2,
+    });
+  });
+
+  it("preserves null source_count as undefined instead of coercing to 0", async () => {
+    const payload = {
+      prices: [
+        {
+          symbol: "EURUSD",
+          bid: 1.1,
+          ask: 1.10012,
+          mid: 1.10006,
+          changePct1d: 0,
+          state: "live",
+          source: "mt5",
+          source_count: null,
+        },
+      ],
+      regimes: [],
+      gates: [],
+      diagnostics: [],
+    };
+
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await apiClient.getUnifiedSnapshot(false);
+
+    expect(result.prices[0].source_count).toBeUndefined();
+  });
+
+  it("preserves backend-owned top-level snapshot fields through normalization", async () => {
+    const payload = {
+      prices: [],
+      regimes: [],
+      gates: [],
+      diagnostics: [],
+      todayOiImpacts: [
+        {
+          symbol: "EURUSD",
+          todayOiPnlImpactUSC: 42.5,
+          todayOiEquityImpactPct: 0.12,
+          todayBaselineQuality: "day_start",
+        },
+      ],
+    };
+
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await apiClient.getUnifiedSnapshot(false);
+
+    expect(result.todayOiImpacts).toEqual(payload.todayOiImpacts);
+  });
+});
+
+
+  it("getSnapshot is a compatibility alias that calls /snapshot/unified", async () => {
+    const payload = {
+      prices: [],
+      regimes: [],
+      gates: [],
+      diagnostics: [],
+    };
+
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiClient.getSnapshot(false);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/sniper\/v1\/snapshot\/unified\?_=\d+$/),
+      expect.anything(),
+    );
+  });
+});

@@ -10,15 +10,15 @@
 
 ## HIGH
 
-| Category | Component | Root Cause | Impact | Blocker | Status |
-| --- | --- | --- | --- | --- | --- |
-| Data contract / parity | `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` `/ea/signal-candidates` | Candidate ingest regressed to server receipt time and stopped persisting `drift_pips`; `normalize_market_timestamp()` also did not accept Unix epoch timestamps used by `mt5/SignalEngine.mqh` | Phase 6 parity evidence degraded, drift telemetry became false-null, and MT5 candidate chronology could not be trusted during replay/audit | No | Fixed |
+| Category               | Component                                                                       | Root Cause                                                                                                                                                                                     | Impact                                                                                                                                     | Blocker | Status |
+| ---------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------- | ------ |
+| Data contract / parity | `wordpress/smc-superfib-sniper/smc-superfib-sniper.php` `/ea/signal-candidates` | Candidate ingest regressed to server receipt time and stopped persisting `drift_pips`; `normalize_market_timestamp()` also did not accept Unix epoch timestamps used by `mt5/SignalEngine.mqh` | Phase 6 parity evidence degraded, drift telemetry became false-null, and MT5 candidate chronology could not be trusted during replay/audit | No      | Fixed  |
 
 ## MEDIUM
 
-| Category | Component | Root Cause | Impact | Blocker | Status |
-| --- | --- | --- | --- | --- | --- |
-| Regression coverage gap | `wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` harness | The local test DB stub did not resolve the Pine-signal lookup query used by drift classification | The regression could slip back in while tests still passed with `NO_PINE` fallback behavior | No | Fixed |
+| Category                | Component                                                                        | Root Cause                                                                                       | Impact                                                                                      | Blocker | Status |
+| ----------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- | ------- | ------ |
+| Regression coverage gap | `wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` harness | The local test DB stub did not resolve the Pine-signal lookup query used by drift classification | The regression could slip back in while tests still passed with `NO_PINE` fallback behavior | No      | Fixed  |
 
 # Surgical Fixes Applied
 
@@ -34,12 +34,12 @@
 
 # Parity Verification Results
 
-| Area | Result | Evidence |
-| --- | --- | --- |
-| Fib parity | 100% PASS | `php scripts/parity-validator.php --out reports/phase4-gate-2026-05-29.json` -> `384/384` exact synthetic matches |
-| Regime parity | No code-path regression observed in this run | `npx vitest run scripts/mt5-signal-dispatch.test.mjs` retained authoritative regime input guards |
-| Signal parity | Contract repaired | `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` now proves Phase 6 candidate timestamp + drift persistence |
-| Freshness parity | Preserved | Existing MT5 snapshot and EA market-stream contract suites remained green after timestamp hardening |
+| Area             | Result                                       | Evidence                                                                                                                                |
+| ---------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Fib parity       | 100% PASS                                    | `php scripts/parity-validator.php --out reports/phase4-gate-2026-05-29.json` -> `384/384` exact synthetic matches                       |
+| Regime parity    | No code-path regression observed in this run | `npx vitest run scripts/mt5-signal-dispatch.test.mjs` retained authoritative regime input guards                                        |
+| Signal parity    | Contract repaired                            | `php wordpress/smc-superfib-sniper/tests/php/test-mt5-snapshot-contract.php` now proves Phase 6 candidate timestamp + drift persistence |
+| Freshness parity | Preserved                                    | Existing MT5 snapshot and EA market-stream contract suites remained green after timestamp hardening                                     |
 
 # Regression Checklist
 

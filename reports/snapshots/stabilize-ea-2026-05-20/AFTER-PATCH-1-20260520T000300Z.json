@@ -4,9 +4,7 @@
   "timestamp": "2026-05-20T00:03:00Z",
   "patch_id": "PATCH-001",
   "patch_description": "Updated migration-status.md: Phase 1 section status IN-PROGRESS→COMPLETE, 48h continuity gate item checked, checklist header updated, blockers section updated, Phase Summary table Target End updated, Track Assignments updated, Key Contacts updated, Current Phase line updated to Phase 2.",
-  "files_changed": [
-    ".github/migration-status.md"
-  ],
+  "files_changed": [".github/migration-status.md"],
   "git": {
     "rollback_tag": "rollback/stabilize-ea-2026-05-20-after-patch-1"
   },

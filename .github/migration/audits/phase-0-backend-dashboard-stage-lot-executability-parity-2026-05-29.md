@@ -20,31 +20,31 @@ The backend remains the only source of truth for staged lot sizing and execution
 
 ## Component Parity Metrics
 
-| Surface | Backend Source | Consumer | Result |
-|---------|----------------|----------|--------|
-| Stage lot authority | Stored `plan.lotSize.e1/e2/e3` | `PlanCandidateCard` lot display | PASS |
-| Sub-minimum threshold | `post_execute_signals()` skip when stage lot `< 0.01` | Frontend non-executable stage state | PASS |
-| TP/RR completeness gate | Stored `plan.tps` and `plan.rr` | `isTradePlanComplete()` | PASS |
-| Execution readiness | Backend confirmation + complete plan + executable stage lots | `Send to execution` CTA state | PASS |
-| Execution request payload | `signal.id` only | `apiClient.postExecuteSignals({ signalIds })` | PASS |
-| Backend queue behavior | Existing staged-lot threshold and deterministic IDs | PHP execution regression harness | PASS |
+| Surface                   | Backend Source                                               | Consumer                                      | Result |
+| ------------------------- | ------------------------------------------------------------ | --------------------------------------------- | ------ |
+| Stage lot authority       | Stored `plan.lotSize.e1/e2/e3`                               | `PlanCandidateCard` lot display               | PASS   |
+| Sub-minimum threshold     | `post_execute_signals()` skip when stage lot `< 0.01`        | Frontend non-executable stage state           | PASS   |
+| TP/RR completeness gate   | Stored `plan.tps` and `plan.rr`                              | `isTradePlanComplete()`                       | PASS   |
+| Execution readiness       | Backend confirmation + complete plan + executable stage lots | `Send to execution` CTA state                 | PASS   |
+| Execution request payload | `signal.id` only                                             | `apiClient.postExecuteSignals({ signalIds })` | PASS   |
+| Backend queue behavior    | Existing staged-lot threshold and deterministic IDs          | PHP execution regression harness              | PASS   |
 
 ---
 
 ## Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-|-------|----------|-------|-----------|---------|
-| Frontend displayed non-executable backend lots as executable-looking labels | HIGH | 1 | Fixed in this patch | No |
+| Issue                                                                       | Severity | Count | Resolution          | Blocker |
+| --------------------------------------------------------------------------- | -------- | ----- | ------------------- | ------- |
+| Frontend displayed non-executable backend lots as executable-looking labels | HIGH     | 1     | Fixed in this patch | No      |
 
 ---
 
 ## Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-|------|-----------|--------|----------|
-| Live browser screenshot | DOM capture used instead | Repo-local contract required frontend evidence but did not require a running local app target | Yes |
-| Live MT5 queue proof | Not captured in this repo-only run | Contract validation scope was frontend plan page parity against the existing backend threshold harness | Yes |
+| Item                    | Difference                         | Reason                                                                                                 | Accepted |
+| ----------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------ | -------- |
+| Live browser screenshot | DOM capture used instead           | Repo-local contract required frontend evidence but did not require a running local app target          | Yes      |
+| Live MT5 queue proof    | Not captured in this repo-only run | Contract validation scope was frontend plan page parity against the existing backend threshold harness | Yes      |
 
 ---
 

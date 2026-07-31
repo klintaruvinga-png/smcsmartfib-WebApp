@@ -2,15 +2,15 @@
 
 ## Executive Summary
 
-| Item | Status |
-|---|---|
-| Overall Health | STABLE |
-| Bugs Found | 4 (0 critical, 0 high, 2 medium, 1 low, 1 info) |
-| Fixes Applied | 3 patches (PATCH-1: volume guard, PATCH-2: regression test, PATCH-3: prettier) |
-| Remaining Risks | None critical. 8 pre-existing react-hooks ESLint warnings (intentional). |
-| Migration Readiness | Phase 0 soak continues — EA ingest pipeline verified end-to-end |
-| Snapshot Archive | `reports/snapshots/stabilize-ea-2026-05-13/` |
-| Rollback Command | `git reset --hard rollback/stabilize-ea-2026-05-13-before-patches` |
+| Item                | Status                                                                         |
+| ------------------- | ------------------------------------------------------------------------------ |
+| Overall Health      | STABLE                                                                         |
+| Bugs Found          | 4 (0 critical, 0 high, 2 medium, 1 low, 1 info)                                |
+| Fixes Applied       | 3 patches (PATCH-1: volume guard, PATCH-2: regression test, PATCH-3: prettier) |
+| Remaining Risks     | None critical. 8 pre-existing react-hooks ESLint warnings (intentional).       |
+| Migration Readiness | Phase 0 soak continues — EA ingest pipeline verified end-to-end                |
+| Snapshot Archive    | `reports/snapshots/stabilize-ea-2026-05-13/`                                   |
+| Rollback Command    | `git reset --hard rollback/stabilize-ea-2026-05-13-before-patches`             |
 
 ---
 
@@ -74,20 +74,21 @@
 
 ## EA Integration Status
 
-| Item | Value |
-|---|---|
-| Route | `POST /wp-json/sniper/v1/ea/market-stream` |
-| Auth Model | Shared-secret API key |
-| Auth Header | `X-EA-API-Key` (also `X-API-KEY`, `x_ea_api_key`, `x_api_key`) |
-| Secret Env | `SMC_SF_EA_API_KEY` (constant or `getenv()`) |
-| user_id Required | YES — checked in `permission_ea_market_stream()` before handler runs |
-| Payload Validation | symbol required, timestamp 300s hard reject, bid/ask isfinite+positive+bid≤ask, OHLC high≥max(open,close)+low≤min(open,close), candle epoch guard, tick_volume non-negative clamp |
-| Stale Data Rejection | YES — >300s hard reject (400), 120–300s warning, candle staleness 180s M1 / 1800s M15 |
-| Actual EA Payload Contract | `timestamp` (not `quote_time`), `candle{}` (not `candles[]`), `candle_m15{}` |
+| Item                       | Value                                                                                                                                                                             |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Route                      | `POST /wp-json/sniper/v1/ea/market-stream`                                                                                                                                        |
+| Auth Model                 | Shared-secret API key                                                                                                                                                             |
+| Auth Header                | `X-EA-API-Key` (also `X-API-KEY`, `x_ea_api_key`, `x_api_key`)                                                                                                                    |
+| Secret Env                 | `SMC_SF_EA_API_KEY` (constant or `getenv()`)                                                                                                                                      |
+| user_id Required           | YES — checked in `permission_ea_market_stream()` before handler runs                                                                                                              |
+| Payload Validation         | symbol required, timestamp 300s hard reject, bid/ask isfinite+positive+bid≤ask, OHLC high≥max(open,close)+low≤min(open,close), candle epoch guard, tick_volume non-negative clamp |
+| Stale Data Rejection       | YES — >300s hard reject (400), 120–300s warning, candle staleness 180s M1 / 1800s M15                                                                                             |
+| Actual EA Payload Contract | `timestamp` (not `quote_time`), `candle{}` (not `candles[]`), `candle_m15{}`                                                                                                      |
 
 ### curl Testing Commands
 
 **Missing token (expect 401):**
+
 ```bash
 curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
   -H "Content-Type: application/json" \
@@ -95,6 +96,7 @@ curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-st
 ```
 
 **Invalid token (expect 403):**
+
 ```bash
 curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
   -H "Content-Type: application/json" \
@@ -103,6 +105,7 @@ curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-st
 ```
 
 **Missing user_id (expect 400):**
+
 ```bash
 curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
   -H "Content-Type: application/json" \
@@ -111,6 +114,7 @@ curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-st
 ```
 
 **Valid full payload (expect 200 with ok:true):**
+
 ```bash
 curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-stream" \
   -H "Content-Type: application/json" \
@@ -140,15 +144,15 @@ curl -X POST "https://trader.stokvelsociety.co.za/wp-json/sniper/v1/ea/market-st
 
 ## Parity Verification
 
-| Parity | Status |
-|---|---|
-| MQL5 EA payload fields vs PHP handler fields | CONFIRMED — all fields match (see 2026-05-12 parity audit) |
-| Timestamp UTC handling MQL5 vs PHP | CONFIRMED — EA sends ISO8601 Z-suffix; PHP uses strtotime() |
-| OHLC validation MQL5 vs PHP | CONFIRMED — broker guarantees + PHP validate_ohlc() guard |
-| Fib levels — backend authoritative | CONFIRMED — MQL5 EA does not compute fibs; backend is single source |
-| Signal readiness gating | CONFIRMED — source=mt5, state=live, age<staleThresholdSec required |
-| Chop blocking | CONFIRMED — chop≥0.7 blocks gate (F3 caution zone) |
-| Known spec divergence | DOCUMENTED — spec uses quote_time/candles[], live uses timestamp/candle |
+| Parity                                       | Status                                                                  |
+| -------------------------------------------- | ----------------------------------------------------------------------- |
+| MQL5 EA payload fields vs PHP handler fields | CONFIRMED — all fields match (see 2026-05-12 parity audit)              |
+| Timestamp UTC handling MQL5 vs PHP           | CONFIRMED — EA sends ISO8601 Z-suffix; PHP uses strtotime()             |
+| OHLC validation MQL5 vs PHP                  | CONFIRMED — broker guarantees + PHP validate_ohlc() guard               |
+| Fib levels — backend authoritative           | CONFIRMED — MQL5 EA does not compute fibs; backend is single source     |
+| Signal readiness gating                      | CONFIRMED — source=mt5, state=live, age<staleThresholdSec required      |
+| Chop blocking                                | CONFIRMED — chop≥0.7 blocks gate (F3 caution zone)                      |
+| Known spec divergence                        | DOCUMENTED — spec uses quote_time/candles[], live uses timestamp/candle |
 
 ---
 

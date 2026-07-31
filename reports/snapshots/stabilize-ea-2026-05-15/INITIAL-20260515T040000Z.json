@@ -33,9 +33,7 @@
       "wordpress/smc-superfib-sniper/tests/php/test-watchlist-snapshot-regression.php",
       "wordpress/smc-superfib-sniper/tests/php/fib-test-helpers.php"
     ],
-    "rest_route_files": [
-      "wordpress/smc-superfib-sniper/smc-superfib-sniper.php"
-    ],
+    "rest_route_files": ["wordpress/smc-superfib-sniper/smc-superfib-sniper.php"],
     "frontend_api_client": "src/lib/api/sniperClient.ts",
     "mt5_ea_files": [
       "mt5/SMC_MarketDataEA.mq5",
@@ -68,47 +66,83 @@
   "rest_routes_found": {
     "namespace": "sniper/v1",
     "routes": [
-      {"path": "/health", "method": "GET", "auth": "public"},
-      {"path": "/admin/health", "method": "GET", "auth": "permission_admin (manage_options)"},
-      {"path": "/admin/soak-report", "method": "GET", "auth": "permission_admin (manage_options)"},
-      {"path": "/admin/soak-evidence", "method": "POST", "auth": "permission_admin (manage_options)"},
-      {"path": "/admin/soak-checkpoint", "method": "POST", "auth": "permission_admin (manage_options)"},
-      {"path": "/session", "method": "GET", "auth": "public"},
-      {"path": "/snapshot", "method": "GET", "auth": "permission_user (is_user_logged_in + can_read)"},
-      {"path": "/snapshot", "method": "POST", "auth": "permission_user"},
-      {"path": "/charts", "method": "GET", "auth": "permission_user"},
-      {"path": "/regimes", "method": "GET", "auth": "permission_user"},
-      {"path": "/regime", "method": "POST", "auth": "permission_user"},
-      {"path": "/live-signals", "method": "GET", "auth": "permission_user"},
-      {"path": "/signal", "method": "POST", "auth": "permission_user"},
-      {"path": "/ladders", "method": "GET", "auth": "permission_user"},
-      {"path": "/user/engine-batch", "method": "POST", "auth": "permission_user"},
-      {"path": "/user/market-data", "method": "POST", "auth": "permission_user"},
-      {"path": "/user/trades", "method": "GET", "auth": "permission_user"},
-      {"path": "/user/trades", "method": "POST", "auth": "permission_user"},
-      {"path": "/user/account", "method": "GET", "auth": "permission_user"},
-      {"path": "/user/account", "method": "POST", "auth": "permission_user"},
-      {"path": "/user/settings", "method": "GET", "auth": "permission_user"},
-      {"path": "/user/settings", "method": "POST", "auth": "permission_user"},
-      {"path": "/user/risk-profile", "method": "GET", "auth": "permission_user"},
-      {"path": "/user/risk-profile", "method": "POST", "auth": "permission_user"},
-      {"path": "/user/trade-queue", "method": "GET", "auth": "permission_user"},
-      {"path": "/user/trade-queue", "method": "POST", "auth": "permission_user"},
-      {"path": "/user/execute-signals", "method": "POST", "auth": "permission_user"},
-      {"path": "/user/twelve-data-key", "method": "POST", "auth": "permission_user"},
-      {"path": "/user/twelve-data-key", "method": "DELETE", "auth": "permission_user"},
-      {"path": "/user/watchlist", "method": "GET", "auth": "permission_user"},
-      {"path": "/user/watchlist", "method": "POST", "auth": "permission_user"},
-      {"path": "/user/watchlist/add", "method": "POST", "auth": "permission_user"},
-      {"path": "/user/watchlist/remove", "method": "POST", "auth": "permission_user"},
-      {"path": "/instruments", "method": "GET", "auth": "permission_user"},
-      {"path": "/market-data-authority", "method": "GET", "auth": "permission_user"},
-      {"path": "/authority-diagnostics", "method": "GET", "auth": "permission_user (401 for unauthenticated - expected)"},
-      {"path": "/ea/market-stream", "method": "POST", "auth": "permission_ea_market_stream (X-EA-API-Key header + user_id)"},
-      {"path": "/ea/heartbeat", "method": "POST", "auth": "permission_ea_bridge (X-EA-API-Key)"},
-      {"path": "/ea/account-sync", "method": "POST", "auth": "permission_ea_bridge (X-EA-API-Key)"},
-      {"path": "/ea/symbol-sync", "method": "POST", "auth": "permission_ea_bridge (X-EA-API-Key)"},
-      {"path": "/ea/license-check", "method": "GET", "auth": "permission_ea_bridge (X-EA-API-Key)"}
+      { "path": "/health", "method": "GET", "auth": "public" },
+      { "path": "/admin/health", "method": "GET", "auth": "permission_admin (manage_options)" },
+      {
+        "path": "/admin/soak-report",
+        "method": "GET",
+        "auth": "permission_admin (manage_options)"
+      },
+      {
+        "path": "/admin/soak-evidence",
+        "method": "POST",
+        "auth": "permission_admin (manage_options)"
+      },
+      {
+        "path": "/admin/soak-checkpoint",
+        "method": "POST",
+        "auth": "permission_admin (manage_options)"
+      },
+      { "path": "/session", "method": "GET", "auth": "public" },
+      {
+        "path": "/snapshot",
+        "method": "GET",
+        "auth": "permission_user (is_user_logged_in + can_read)"
+      },
+      { "path": "/snapshot", "method": "POST", "auth": "permission_user" },
+      { "path": "/charts", "method": "GET", "auth": "permission_user" },
+      { "path": "/regimes", "method": "GET", "auth": "permission_user" },
+      { "path": "/regime", "method": "POST", "auth": "permission_user" },
+      { "path": "/live-signals", "method": "GET", "auth": "permission_user" },
+      { "path": "/signal", "method": "POST", "auth": "permission_user" },
+      { "path": "/ladders", "method": "GET", "auth": "permission_user" },
+      { "path": "/user/engine-batch", "method": "POST", "auth": "permission_user" },
+      { "path": "/user/market-data", "method": "POST", "auth": "permission_user" },
+      { "path": "/user/trades", "method": "GET", "auth": "permission_user" },
+      { "path": "/user/trades", "method": "POST", "auth": "permission_user" },
+      { "path": "/user/account", "method": "GET", "auth": "permission_user" },
+      { "path": "/user/account", "method": "POST", "auth": "permission_user" },
+      { "path": "/user/settings", "method": "GET", "auth": "permission_user" },
+      { "path": "/user/settings", "method": "POST", "auth": "permission_user" },
+      { "path": "/user/risk-profile", "method": "GET", "auth": "permission_user" },
+      { "path": "/user/risk-profile", "method": "POST", "auth": "permission_user" },
+      { "path": "/user/trade-queue", "method": "GET", "auth": "permission_user" },
+      { "path": "/user/trade-queue", "method": "POST", "auth": "permission_user" },
+      { "path": "/user/execute-signals", "method": "POST", "auth": "permission_user" },
+      { "path": "/user/twelve-data-key", "method": "POST", "auth": "permission_user" },
+      { "path": "/user/twelve-data-key", "method": "DELETE", "auth": "permission_user" },
+      { "path": "/user/watchlist", "method": "GET", "auth": "permission_user" },
+      { "path": "/user/watchlist", "method": "POST", "auth": "permission_user" },
+      { "path": "/user/watchlist/add", "method": "POST", "auth": "permission_user" },
+      { "path": "/user/watchlist/remove", "method": "POST", "auth": "permission_user" },
+      { "path": "/instruments", "method": "GET", "auth": "permission_user" },
+      { "path": "/market-data-authority", "method": "GET", "auth": "permission_user" },
+      {
+        "path": "/authority-diagnostics",
+        "method": "GET",
+        "auth": "permission_user (401 for unauthenticated - expected)"
+      },
+      {
+        "path": "/ea/market-stream",
+        "method": "POST",
+        "auth": "permission_ea_market_stream (X-EA-API-Key header + user_id)"
+      },
+      { "path": "/ea/heartbeat", "method": "POST", "auth": "permission_ea_bridge (X-EA-API-Key)" },
+      {
+        "path": "/ea/account-sync",
+        "method": "POST",
+        "auth": "permission_ea_bridge (X-EA-API-Key)"
+      },
+      {
+        "path": "/ea/symbol-sync",
+        "method": "POST",
+        "auth": "permission_ea_bridge (X-EA-API-Key)"
+      },
+      {
+        "path": "/ea/license-check",
+        "method": "GET",
+        "auth": "permission_ea_bridge (X-EA-API-Key)"
+      }
     ]
   },
   "known_dev_status": {

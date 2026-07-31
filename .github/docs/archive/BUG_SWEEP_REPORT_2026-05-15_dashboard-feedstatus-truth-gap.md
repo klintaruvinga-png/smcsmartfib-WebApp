@@ -9,14 +9,14 @@
 
 ## Executive Summary
 
-| Item | Status |
-|---|---|
-| Overall system health | PARTIAL |
-| Bugs found | 1 confirmed frontend cache-integrity defect |
-| Bugs fixed | 1 |
-| Remaining risks | Live soak confirmation still pending |
-| Migration readiness | Phase 0 remains BLOCKED pending live UI/backend convergence evidence |
-| Rollback command | `git revert <implementation-commit>` |
+| Item                  | Status                                                               |
+| --------------------- | -------------------------------------------------------------------- |
+| Overall system health | PARTIAL                                                              |
+| Bugs found            | 1 confirmed frontend cache-integrity defect                          |
+| Bugs fixed            | 1                                                                    |
+| Remaining risks       | Live soak confirmation still pending                                 |
+| Migration readiness   | Phase 0 remains BLOCKED pending live UI/backend convergence evidence |
+| Rollback command      | `git revert <implementation-commit>`                                 |
 
 This sweep covered the documented frontend/backend truth gap where backend health could report
 `feedStatus=live` while the dashboard continued to render a stale chip. The backend remained
@@ -40,6 +40,7 @@ the backend had already moved to `live`, creating a frontend/backend truth gap o
 gate item.
 
 **Files affected:**
+
 - `src/hooks/useSniperData.ts`
 
 ---

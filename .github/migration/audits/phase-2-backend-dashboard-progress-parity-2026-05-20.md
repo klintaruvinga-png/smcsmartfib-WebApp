@@ -20,31 +20,31 @@ The new `/user/progress` read contract preserves backend authority and keeps the
 
 ## Component Parity Metrics
 
-| Surface | Backend Source | Dashboard Consumer | Result |
-|---------|----------------|--------------------|--------|
-| Equity pulse `equity_usc` | `smc_sf_account_telemetry` via `read_account_telemetry()` | `apiClient.getUserProgress()` normalizer | PASS |
-| Equity pulse state | `telemetry_freshness_state(last_seen_at)` mapped to `LIVE/STALE/UNAVAILABLE` | Progress contract consumer only | PASS |
-| First heartbeat milestone | `smc_sf_engine_runs` `summary.source=explicit_heartbeat` | Progress page milestone row | PASS |
-| First market stream milestone | `smc_sf_engine_runs` `summary.source=ea_push` | Progress page milestone row | PASS |
-| First trade telemetry milestone | persisted `smc_sf_account_telemetry` existence | Progress page milestone row | PASS |
-| Streak truth | unresolved business rule | UI unavailable state | PASS (conservative degradation) |
+| Surface                         | Backend Source                                                               | Dashboard Consumer                       | Result                          |
+| ------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------- |
+| Equity pulse `equity_usc`       | `smc_sf_account_telemetry` via `read_account_telemetry()`                    | `apiClient.getUserProgress()` normalizer | PASS                            |
+| Equity pulse state              | `telemetry_freshness_state(last_seen_at)` mapped to `LIVE/STALE/UNAVAILABLE` | Progress contract consumer only          | PASS                            |
+| First heartbeat milestone       | `smc_sf_engine_runs` `summary.source=explicit_heartbeat`                     | Progress page milestone row              | PASS                            |
+| First market stream milestone   | `smc_sf_engine_runs` `summary.source=ea_push`                                | Progress page milestone row              | PASS                            |
+| First trade telemetry milestone | persisted `smc_sf_account_telemetry` existence                               | Progress page milestone row              | PASS                            |
+| Streak truth                    | unresolved business rule                                                     | UI unavailable state                     | PASS (conservative degradation) |
 
 ---
 
 ## Critical Issues Found
 
-| Issue | Severity | Count | Resolution | Blocker |
-|-------|----------|-------|-----------|---------|
-| None in implemented parity surface | LOW | 0 | N/A | No |
+| Issue                              | Severity | Count | Resolution | Blocker |
+| ---------------------------------- | -------- | ----- | ---------- | ------- |
+| None in implemented parity surface | LOW      | 0     | N/A        | No      |
 
 ---
 
 ## Acceptable Drift Items
 
-| Item | Difference | Reason | Accepted |
-|------|-----------|--------|----------|
-| `streak.current_streak_days` | forced `0` | active-day definition is not signed off, so non-zero streak values would be speculative | Yes |
-| `equity_pulse.today_pnl_usc` source | account snapshot fallback | Phase 2 telemetry schema does not persist daily P/L directly | Yes |
+| Item                                | Difference                | Reason                                                                                  | Accepted |
+| ----------------------------------- | ------------------------- | --------------------------------------------------------------------------------------- | -------- |
+| `streak.current_streak_days`        | forced `0`                | active-day definition is not signed off, so non-zero streak values would be speculative | Yes      |
+| `equity_pulse.today_pnl_usc` source | account snapshot fallback | Phase 2 telemetry schema does not persist daily P/L directly                            | Yes      |
 
 ---
 
