@@ -31,15 +31,19 @@ curl localhost:3000/api/health
 
 ## Endpoints
 
-| Method    | Route                         | Auth                     | Purpose                                  |
-| --------- | ----------------------------- | ------------------------ | ---------------------------------------- |
-| POST      | `/api/auth/login`             | —                        | Email + password → access/refresh tokens |
-| POST      | `/api/auth/register`          | —                        | Create user (Supabase auth + profile)    |
-| GET       | `/api/auth/me`                | Bearer                   | Current user view                        |
-| POST      | `/api/auth/refresh`           | Refresh token            | Rotate to a new token pair               |
-| POST      | `/api/ea/fib-levels`          | X-EA-API-Key (role `ea`) | EA ingest (zod-validated)                |
-| GET       | `/api/market-data/fib-levels` | Bearer                   | Fib levels grouped by timeframe → family |
-| GET / PUT | `/api/user/settings`          | Bearer                   | Read / PATCH user preferences (JSONB)    |
+| Method | Route | Auth | Purpose |
+|--------|-------|------|---------|
+| POST | `/api/auth/login` | — | Email + password → access/refresh tokens |
+| POST | `/api/auth/register` | — | Create user (Supabase auth + profile) |
+| GET | `/api/auth/me` | Bearer | Current user view |
+| POST | `/api/auth/refresh` | Refresh token | Rotate to a new token pair |
+| POST | `/api/ea/fib-levels` | X-EA-API-Key (role `ea`) | EA ingest: fib levels |
+| POST | `/api/ea/heartbeat` | X-EA-API-Key (role `ea`) | EA session heartbeat |
+| GET | `/api/ea/license-check` | X-EA-API-Key (role `ea`) | EA license/terminal allowlist check |
+| GET | `/api/market-data/fib-levels` | Bearer | Fib levels grouped by timeframe → family |
+| GET / PUT | `/api/user/settings` | Bearer | Read / PATCH user preferences (JSONB) |
+
+> `user_id` passed from the EA is now the UUID from `public.users.id`, not an integer WordPress user ID.
 
 ## Scripts
 

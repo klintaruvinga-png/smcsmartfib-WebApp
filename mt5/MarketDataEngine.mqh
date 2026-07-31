@@ -36,7 +36,7 @@ private:
 
     string   webhookUrl;   // https://yoursite.com/wp-json/sniper/v1/ea/market-stream
     string   authHeader;   // Full header line: "X-EA-API-Key: <token>"
-    int      wpUserId;     // WordPress user_id that owns this stream
+    string   wpUserId;     // UUID of the user row in public.users
 
     datetime lastSentCandleM1[100];
 
@@ -116,9 +116,9 @@ public:
     // url  = full webhook endpoint URL
     // auth = complete header line e.g. "X-EA-API-Key: mykey"
     //        (caller is responsible for the header name prefix)
-    // userId = WordPress user_id that owns this data stream
+    // userId = UUID of the user row in public.users
     bool Initialize(string& activeSymbols[], int count,
-                    string url = "", string auth = "", int userId = 0)
+                    string url = "", string auth = "", string userId = "")
     {
         symbolCount = MathMin(count, 100);
         for (int i = 0; i < symbolCount; i++)
@@ -243,7 +243,7 @@ public:
             }
 
             string payload = "{";
-            payload += "\"user_id\":"  + IntegerToString(wpUserId) + ",";
+            payload += "\"user_id\":\""  + wpUserId + "\",";
             payload += "\"symbol\":\"" + normalized                + "\",";
             payload += "\"levels\":"   + fibJson;
             payload += "}";
@@ -507,8 +507,8 @@ public:
 
         string json = "{";
 
-        if (wpUserId > 0)
-            json += "\"user_id\":"         + IntegerToString(wpUserId) + ",";
+        if (StringLen(wpUserId) > 0)
+            json += "\"user_id\":\""         + wpUserId + "\",";
 
         json += "\"symbol\":\""            + symbol                                     + "\",";
         json += "\"normalized_symbol\":\"" + norm                                       + "\",";
@@ -716,7 +716,7 @@ public:
         string termId    = GetTerminalId();
         long   accountId = AccountInfoInteger(ACCOUNT_LOGIN);
         string url       = baseUrl + "/ea/license-check"
-                         + "?user_id="    + IntegerToString(wpUserId)
+                         + "?user_id="    + wpUserId
                          + "&account_id=" + IntegerToString(accountId)
                          + "&terminal_id=" + termId
                          + "&ea_version="  + eaVersion;
@@ -769,7 +769,7 @@ public:
         string timestamp    = TimeToIso8601(TimeCurrent());
 
         string json = "{";
-        json += "\"user_id\":"         + IntegerToString(wpUserId)  + ",";
+        json += "\"user_id\":\""         + wpUserId  + "\",";
         json += "\"account_id\":"      + IntegerToString(accountId) + ",";
         json += "\"terminal_id\":\""   + termId                     + "\",";
         json += "\"broker\":\""        + broker                     + "\",";
@@ -827,7 +827,7 @@ public:
         string timestamp    = TimeToIso8601(TimeCurrent());
 
         string json = "{";
-        json += "\"user_id\":"         + IntegerToString(wpUserId)    + ",";
+        json += "\"user_id\":\""         + wpUserId    + "\",";
         json += "\"account_id\":"      + IntegerToString(accountId)    + ",";
         json += "\"terminal_id\":\""   + termId                        + "\",";
         json += "\"broker\":\""        + broker                        + "\",";
@@ -884,7 +884,7 @@ public:
         string timestamp    = TimeToIso8601(TimeCurrent());
 
         string json = "{";
-        json += "\"user_id\":"         + IntegerToString(wpUserId)  + ",";
+        json += "\"user_id\":\""         + wpUserId  + "\",";
         json += "\"account_id\":"      + IntegerToString(accountId) + ",";
         json += "\"terminal_id\":\""   + termId                     + "\",";
         json += "\"broker\":\""        + broker                     + "\",";
