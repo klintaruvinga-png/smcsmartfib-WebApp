@@ -1,0 +1,197 @@
+/**
+ * User query helpers for the SMC SuperFIB backend.
+ *
+ * Thin Drizzle wrappers around the `users` table. Passwords are stored as
+ * PBKDF2 hashes in the `password_hash` column; this layer is used by the
+ * custom-password auth path (distinct from Supabase auth.users). DB errors are
+ * intentionally allowed to propagate to the caller.
+ *
+ * NOTE: `users.id` is a standalone UUID. The historical foreign key to
+ * Supabase `auth.users(id)` was removed (see 003_drop_users_auth_fk.sql)
+ * because this is a fully custom auth flow: passwords live in
+ * `public.users.password_hash` and sessions are custom jose JWTs, so no
+ * `auth.users` row is ever created or required.
+ */
+import { eq } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { db } from "../index";
+import { users } from "../schema";
+import type { User, UserRole, UserSettings } from "../schema";
+import { hashToken, hashPassword, verifyPassword } from "../../auth/index";
+
+export class SettingsError extends Error {
+  constructor(
+    public statusCode: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "SettingsError";
+  }
+}
+
+/**
+ * Create a user profile row with a PBKDF2-hashed password.
+ * If an id is provided, uses it (for Supabase auth FK compatibility).
+ * Otherwise generates a UUID for `id` (the column has no DB default).
+ * If an eaApiKey is provided, it is hashed before storage.
+ * Returns the inserted row.
+ */
+export async function createUser(
+  email: string,
+  password: string,
+  role: UserRole = "user",
+  eaApiKey?: string,
+  username?: string,
+  id?: string,
+): Promise<User> {
+  // Hash the plaintext password before persistence using edge-compatible PBKDF2.
+  const passwordHash = await hashPassword(password);
+
+  // Use provided id or generate one. Omit `eaApiKey` / `username` when
+  // undefined so we don't insert a literal `undefined` (which Drizzle rejects).
+  const values: {
+    id: string;
+    email: string;
+    role: UserRole;
+    passwordHash: string;
+    eaApiKey?: string;
+    username?: string;
+  } = {
+    id: id ?? randomUUID(),
+    email,
+    role,
+    passwordHash,
+  };
+  if (eaApiKey !== undefined) {
+    // Hash the API key before storing it
+    values.eaApiKey = await hashToken(eaApiKey);
+  }
+  if (username !== undefined) {
+    values.username = username;
+  }
+
+  const [row] = await db.insert(users).values(values).returning();
+  return row;
+}
+
+/**
+ * Find a user by their EA API key. Returns null if not found.
+ */
+export async function getUserByApiKey(eaApiKey: string): Promise<User | null> {
+  const [row] = await db.select().from(users).where(eq(users.eaApiKey, eaApiKey));
+  return row ?? null;
+}
+
+/**
+ * Find a user by UUID. Returns null if not found.
+ */
+export async function getUserById(id: string): Promise<User | null> {
+  const [row] = await db.select().from(users).where(eq(users.id, id));
+  return row ?? null;
+}
+
+/**
+ * Update a user's password hash by user ID.
+ * Used to upgrade legacy bcrypt hashes to PBKDF2 after successful authentication.
+ */
+export async function updateUserPasswordHash(
+  userId: string,
+  newPasswordHash: string,
+): Promise<void> {
+  await db.update(users).set({ passwordHash: newPasswordHash }).where(eq(users.id, userId));
+}
+
+/**
+ * Verify a plaintext password against a stored hash.
+ * Supports both PBKDF2 and legacy bcrypt hashes.
+ * Returns true if they match, false otherwise.
+ */
+export async function verifyUserPassword(plain: string, hash: string): Promise<boolean> {
+  return verifyPassword(plain, hash);
+}
+
+/**
+ * Retrieve a user's structured settings (JSONB column).
+ * Throws SettingsError(404) if the user row does not exist; otherwise returns
+ * the settings object (defaulting to `{}` when the column is empty).
+ */
+export async function getUserSettings(userId: string): Promise<UserSettings> {
+  const [row] = await db
+    .select({ settings: users.settings })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!row) throw new SettingsError(404, "User not found");
+  return (row.settings ?? {}) as UserSettings;
+}
+
+/**
+ * Deep-merge helper: recursively merges `patch` into `base`, preserving nested
+ * properties that aren't present in `patch`.
+ */
+function deepMerge(
+  base: Record<string, unknown>,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  const result = { ...base };
+  for (const key in patch) {
+    const patchValue = patch[key];
+    const baseValue = result[key];
+    if (
+      patchValue !== null &&
+      typeof patchValue === "object" &&
+      !Array.isArray(patchValue) &&
+      baseValue !== null &&
+      typeof baseValue === "object" &&
+      !Array.isArray(baseValue)
+    ) {
+      result[key] = deepMerge(
+        baseValue as Record<string, unknown>,
+        patchValue as Record<string, unknown>,
+      );
+    } else {
+      result[key] = patchValue;
+    }
+  }
+  return result;
+}
+
+/**
+ * Patch a user's settings using a transaction-based read-modify-write with deep
+ * merge. The read takes a row lock (`SELECT ... FOR UPDATE`) so concurrent updates
+ * are serialized; nested properties are preserved (e.g., updating
+ * `notifications.email` won't clobber `notifications.push`). Returns the full
+ * merged settings object. Throws SettingsError(404) if the user row does not exist.
+ */
+export async function updateUserSettings(
+  userId: string,
+  settings: UserSettings,
+): Promise<UserSettings> {
+  return await db.transaction(async (tx) => {
+    // Read current settings, locking the row so concurrent updates serialize.
+    const [current] = await tx
+      .select({ settings: users.settings })
+      .from(users)
+      .where(eq(users.id, userId))
+      .for("update");
+
+    if (!current) throw new SettingsError(404, "User not found");
+
+    // Deep-merge in application code
+    const currentSettings = (current.settings ?? {}) as Record<string, unknown>;
+    const merged = deepMerge(currentSettings, settings as Record<string, unknown>);
+
+    // Write back the merged result
+    const [row] = await tx
+      .update(users)
+      .set({
+        settings: merged,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning({ settings: users.settings });
+
+    if (!row) throw new SettingsError(404, "User not found");
+    return row.settings as UserSettings;
+  });
+}

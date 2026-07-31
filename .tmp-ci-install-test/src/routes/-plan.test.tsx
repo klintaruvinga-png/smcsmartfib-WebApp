@@ -1,0 +1,1002 @@
+/* @vitest-environment jsdom */
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
+import type { SignalCandidate, Symbol, TradePlan } from "@/types/sniper";
+import { mockPlan } from "@/mocks/sniperData";
+
+const hookMocks = vi.hoisted(() => ({
+  useLiveSignals: vi.fn(),
+  useDisplaySignals: vi.fn(),
+  useLadders: vi.fn(),
+  useSnapshot: vi.fn(),
+  useCanonicalWatchlist: vi.fn(),
+  usePollingUiState: vi.fn(),
+  useAccountTelemetry: vi.fn(),
+}));
+
+vi.mock("@tanstack/react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-router")>();
+  return {
+    ...actual,
+    createFileRoute: () => (config: unknown) => config,
+  };
+});
+
+vi.mock("@/hooks/useSniperData", () => ({
+  useLiveSignals: hookMocks.useLiveSignals,
+  useDisplaySignals: hookMocks.useDisplaySignals,
+  useLadders: hookMocks.useLadders,
+  useSnapshot: hookMocks.useSnapshot,
+  useCanonicalWatchlist: hookMocks.useCanonicalWatchlist,
+  usePollingUiState: hookMocks.usePollingUiState,
+  useAccountTelemetry: hookMocks.useAccountTelemetry,
+  normalizeSymbolForWatchlistComparison: (symbol: string) => symbol,
+}));
+
+vi.mock("@/hooks/useAnimatedNumber", () => ({
+  useAnimatedNumber: (value: number | undefined) => ({
+    value,
+    direction: null,
+    heldDirection: null,
+    motionKey: "test",
+    motionImpulse: 0,
+  }),
+}));
+
+vi.mock("@/lib/tickMotion", () => ({
+  tickMotionHoldMs: () => 0,
+  tickMotionStyle: () => ({}),
+}));
+
+vi.mock("@/components/sniper/FreshnessBadge", () => ({
+  FreshnessBadge: ({ state }: { state: string }) => <div>{state}</div>,
+}));
+
+vi.mock("@/components/sniper/VerdictBadge", () => ({
+  VerdictBadge: ({ verdict }: { verdict: string }) => <div>{verdict}</div>,
+}));
+
+vi.mock("@/components/sniper/Warnings", () => ({
+  WarningLine: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DivergenceBanner: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
+
+vi.mock("@/components/sniper/WalletOverview", () => ({
+  WalletOverview: () => <div>Wallet overview</div>,
+}));
+
+vi.mock("@/components/sniper/TradingLoadingScreen", async () => {
+  const React = await import("react");
+
+  return {
+    TradingLoadingScreen: ({
+      backendReady,
+      onReady,
+    }: {
+      backendReady: boolean;
+      onReady: () => void;
+    }) => {
+      React.useEffect(() => {
+        if (backendReady) {
+          onReady();
+        }
+      }, [backendReady, onReady]);
+
+      return <div>Checking backend readiness...</div>;
+    },
+  };
+});
+
+vi.mock("@/components/sniper/PlanBoardSkeleton", () => ({
+  PlanBoardSkeleton: () => <div>Readiness Status</div>,
+}));
+
+vi.mock("@/lib/api/sniperClient", () => ({
+  apiClient: {
+    postExecuteSignals: vi.fn(),
+  },
+}));
+
+vi.mock("sonner", () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+import { PlanPage } from "./-plan.page";
+import {
+  getMinExecutableStageLot,
+  hasExecutableStageLots,
+  isExecutableStageLotValue,
+  isTradePlanComplete,
+} from "./-plan.utils";
+
+function buildSignal(overrides: Partial<SignalCandidate> = {}): SignalCandidate {
+  return {
+    id: "sig-001",
+    symbol: "GBPUSD",
+    direction: "LONG",
+    status: "READY",
+    confluence: ["sweep", "MSS"],
+    verdict: "A+",
+    computedBy: "backend",
+    backendConfirmed: true,
+    createdAt: "2026-05-14T08:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function buildPlan(overrides: Partial<TradePlan> = {}): TradePlan {
+  const baseStops = mockPlan.stops ?? { e1: 0, e2: 0, e3: 0 };
+  const overrideStops = overrides.stops ?? {};
+  return {
+    ...mockPlan,
+    ...overrides,
+    entries: { ...mockPlan.entries, ...overrides.entries },
+    tps: { ...mockPlan.tps, ...overrides.tps },
+    rr: { ...mockPlan.rr, ...overrides.rr },
+    lotSize: { ...mockPlan.lotSize, ...overrides.lotSize },
+    stops: { ...baseStops, ...overrideStops },
+  };
+}
+
+function mockWatchlist(symbols: Symbol[]) {
+  hookMocks.useCanonicalWatchlist.mockReturnValue({
+    watchlist: symbols,
+    watchlistSet: new Set(symbols),
+  });
+}
+
+function renderPlanPage({
+  signals,
+  ladders,
+  watchlist,
+  globalSignals,
+}: {
+  signals: SignalCandidate[];
+  ladders: TradePlan[];
+  watchlist?: Symbol[];
+  globalSignals?: SignalCandidate[];
+}) {
+  hookMocks.useLiveSignals.mockReturnValue({
+    data: signals,
+    isLoading: false,
+  });
+  hookMocks.useDisplaySignals
+    .mockReturnValueOnce({
+      data: {
+        signals,
+        polledAt: "2026-05-14T08:00:00.000Z",
+        meta: { boardSize: 3, totalActive: signals.length },
+      },
+      isLoading: false,
+    })
+    .mockReturnValue({
+      data: {
+        signals: globalSignals ?? signals,
+        polledAt: "2026-05-14T08:00:00.000Z",
+        meta: { boardSize: 3, totalActive: (globalSignals ?? signals).length },
+      },
+      isLoading: false,
+    });
+  hookMocks.useLadders.mockReturnValue({
+    data: ladders,
+    isLoading: false,
+  });
+  mockWatchlist(watchlist ?? (signals.map((signal) => signal.symbol) as Symbol[]));
+
+  render(<PlanPage />);
+}
+
+function getRenderedCards() {
+  return screen.queryAllByTestId("plan-candidate-card");
+}
+
+function getRenderedSymbols() {
+  return getRenderedCards().map((card) => card.textContent ?? "");
+}
+
+describe("isTradePlanComplete", () => {
+  it("returns true for a full three-stage ladder plan", () => {
+    expect(isTradePlanComplete(mockPlan)).toBe(true);
+  });
+
+  it("returns false when TP2 and TP3 R:R values are missing", () => {
+    expect(
+      isTradePlanComplete(
+        buildPlan({
+          rr: { tp1: 1.2, tp2: 0, tp3: 0 },
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("returns false when TP2 and TP3 prices are missing", () => {
+    expect(
+      isTradePlanComplete(
+        buildPlan({
+          tps: { tp1: 1.2705, tp2: 0, tp3: 0 },
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("returns false when all R:R values are missing", () => {
+    expect(
+      isTradePlanComplete(
+        buildPlan({
+          rr: { tp1: 0, tp2: 0, tp3: 0 },
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("returns false when TP/RR keys are absent from the backend payload", () => {
+    expect(
+      isTradePlanComplete({
+        ...buildPlan(),
+        tps: { tp1: 1.2705 } as TradePlan["tps"],
+        rr: { tp1: 1.2 } as TradePlan["rr"],
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("hasExecutableStageLots", () => {
+  it("returns true when all backend-authored stage lots meet the execution minimum", () => {
+    expect(hasExecutableStageLots(mockPlan)).toBe(true);
+  });
+
+  it("returns true when at least one backend-authored stage lot meets the execution minimum", () => {
+    expect(
+      hasExecutableStageLots(
+        buildPlan({
+          lotSize: { e1: 0, e2: 0.12, e3: 0.009 },
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("returns false when no backend-authored stage lots meet the execution minimum", () => {
+    expect(
+      hasExecutableStageLots(
+        buildPlan({
+          lotSize: { e1: 0, e2: 0.009, e3: 0 },
+        }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("getMinExecutableStageLot", () => {
+  const cases: Array<[string | undefined, number]> = [
+    ["EURUSD", 0.01],
+    ["GBPJPY", 0.01],
+    ["AUDUSD", 0.01],
+    ["EURGBP", 0.01],
+    ["GBPAUD", 0.01],
+    ["AUDCAD", 0.01],
+    ["CADJPY", 0.01],
+    ["CHFJPY", 0.01],
+    ["EURGBP.micro", 0.01],
+    ["EURGBP.cent", 0.01],
+    [undefined, 0.01],
+    ["XAUUSD", 0.1],
+    ["XAUUSDm", 0.1],
+    ["XAUUSD.a", 0.1],
+    ["XAUUSD+", 0.1],
+    ["GOLD", 0.1],
+    ["GOLDm", 0.1],
+    ["BTCUSD", 0.1],
+    ["BTCUSD.pro", 0.1],
+    ["BTCUSD.b", 0.1],
+    ["BTCUSDmicro", 0.1],
+    ["ETHUSD", 0.1],
+    ["SOLUSD", 0.1],
+    ["US30", 0.1],
+    ["Wall Street 30", 0.1],
+    ["NAS100", 0.1],
+    ["NAS100.r", 0.1],
+    ["US Tech 100", 0.1],
+    ["US SP 500", 0.1],
+    ["SPX500", 0.1],
+    ["GER40", 0.1],
+    ["DAX40", 0.1],
+    ["USDZAR", 0.1],
+    ["USDZAR.pro", 0.1],
+    ["USDZAR.micro", 0.01],
+    ["USDZAR.cent", 0.01],
+    ["USDZAR.m", 0.01],
+    ["USDZAR.c", 0.01],
+  ];
+
+  it.each(cases)("resolves executable minimum for %s", (symbol, expected) => {
+    expect(getMinExecutableStageLot(symbol)).toBe(expected);
+  });
+});
+
+describe("isExecutableStageLotValue symbol-aware boundaries", () => {
+  const cases: Array<[number, string, boolean]> = [
+    [0.01, "BTCUSD", false],
+    [0.099, "BTCUSD", false],
+    [0.1, "BTCUSD", true],
+    [0.11, "BTCUSD", true],
+    [0.01, "BTCUSD.pro", false],
+    [0.1, "BTCUSD.pro", true],
+    [0.01, "BTCUSD.b", false],
+    [0.1, "BTCUSD.b", true],
+    [0.01, "XAUUSD", false],
+    [0.1, "XAUUSD", true],
+    [0.01, "XAUUSDm", false],
+    [0.01, "XAUUSD.a", false],
+    [0.1, "NAS100.r", true],
+    [0.01, "USDZAR", false],
+    [0.099, "USDZAR", false],
+    [0.1, "USDZAR", true],
+    [0.01, "USDZAR.micro", true],
+    [0.01, "USDZAR.cent", true],
+    [0.01, "USDZAR.m", true],
+    [0.01, "USDZAR.c", true],
+    [0.009, "EURUSD", false],
+    [0.01, "EURUSD", true],
+    [0.009, "EURGBP.micro", false],
+    [0.01, "EURGBP.micro", true],
+  ];
+
+  it.each(cases)("classifies lot %s for %s as executable=%s", (lot, symbol, expected) => {
+    expect(isExecutableStageLotValue(lot, symbol)).toBe(expected);
+  });
+
+  it("uses the plan symbol when checking executable stage lots", () => {
+    expect(
+      hasExecutableStageLots(
+        buildPlan({
+          symbol: "BTCUSD",
+          lotSize: { e1: 0.01, e2: 0.09, e3: 0.1 },
+        }),
+      ),
+    ).toBe(true);
+
+    expect(
+      hasExecutableStageLots(
+        buildPlan({
+          symbol: "BTCUSD",
+          lotSize: { e1: 0.01, e2: 0.09, e3: 0 },
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("uses backend-published plan minimums when checking executable stage lots", () => {
+    expect(
+      hasExecutableStageLots(
+        buildPlan({
+          symbol: "EURUSD",
+          minExecutableLot: 0.1,
+          lotSize: { e1: 0.01, e2: 0.09, e3: 0.1 },
+        }),
+      ),
+    ).toBe(true);
+
+    expect(
+      hasExecutableStageLots(
+        buildPlan({
+          symbol: "EURUSD",
+          minExecutableLot: 0.1,
+          lotSize: { e1: 0.01, e2: 0.09, e3: 0 },
+        }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("PlanPage ranking and execution guards", () => {
+  beforeEach(() => {
+    hookMocks.useSnapshot.mockReturnValue({
+      data: { prices: [], diagnostics: [] },
+      isLoading: false,
+    });
+    hookMocks.usePollingUiState.mockReturnValue({
+      backendReady: true,
+      pendingSettingsLoad: false,
+      missingBackendUrl: false,
+      settingsLoadFailed: false,
+      settingsLoadError: null,
+      pollMs: 5_000,
+      retrySettingsLoad: vi.fn(),
+    });
+    hookMocks.useAccountTelemetry.mockReturnValue({
+      data: { currency: "USD" },
+    });
+    mockWatchlist(["GBPUSD", "USDJPY", "AUDUSD", "EURUSD", "XAUUSD"]);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("shows the incomplete-plan warning and disables execution when backend data is partial", () => {
+    renderPlanPage({
+      signals: [buildSignal()],
+      ladders: [
+        buildPlan({
+          rr: { tp1: 1.2, tp2: 0, tp3: 3.6 },
+          tps: { tp1: 1.2705, tp2: 1.2738, tp3: 0 },
+        }),
+      ],
+    });
+
+    expect(
+      screen.getByText(
+        /Backend plan is missing TP2\/TP3 or R:R values\. Full 3-stage ladder is not confirmed\./,
+      ),
+    ).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("treats absent TP/RR keys as incomplete and keeps the page rendered", () => {
+    renderPlanPage({
+      signals: [buildSignal()],
+      ladders: [
+        {
+          ...buildPlan(),
+          tps: { tp1: 1.2705 } as TradePlan["tps"],
+          rr: { tp1: 1.2 } as TradePlan["rr"],
+        },
+      ],
+    });
+
+    expect(
+      screen.getByText(
+        /Backend plan is missing TP2\/TP3 or R:R values\. Full 3-stage ladder is not confirmed\./,
+      ),
+    ).toBeTruthy();
+    expect(screen.getAllByText("--").length).toBeGreaterThanOrEqual(3);
+    expect(
+      (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("keeps execution available for a complete backend-confirmed plan", () => {
+    renderPlanPage({
+      signals: [buildSignal()],
+      ladders: [buildPlan()],
+    });
+
+    expect(screen.queryByText(/Backend plan is missing TP2\/TP3 or R:R values\./)).toBeNull();
+    expect(
+      (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
+    ).toBe(false);
+  });
+
+  it("renders pending blueprints without enabling execution", () => {
+    renderPlanPage({
+      signals: [
+        buildSignal({
+          status: "ARMED",
+          backendConfirmed: false,
+        }),
+      ],
+      ladders: [
+        buildPlan({
+          source: "pending-blueprint",
+        }),
+      ],
+    });
+
+    const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
+    expect(screen.getByText("PENDING BLUEPRINT")).toBeTruthy();
+    expect(cardText).toContain("1.26750");
+    expect(cardText).toContain("1.27050");
+    expect(cardText).toContain("$124.00");
+    expect(
+      screen.getByText(/Execution remains disabled until backend confirmation\./),
+    ).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("renders watch blueprints as read-only and keeps execution disabled", () => {
+    renderPlanPage({
+      signals: [
+        buildSignal({
+          status: "WATCH",
+          backendConfirmed: false,
+        }),
+      ],
+      ladders: [
+        buildPlan({
+          source: "watch-blueprint",
+        }),
+      ],
+    });
+
+    const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
+    expect(screen.getByText("WATCH BLUEPRINT")).toBeTruthy();
+    expect(cardText).toContain("1.26750");
+    expect(
+      screen.getByText(
+        /Watch blueprint is indicative and read-only\. It will be replaced when a higher-quality ARMED\/READY or backend-confirmed blueprint is available\./,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText("UNCONFIRMED")).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("mirrors backend-authored stage lot sizes without recomputing or flattening them", () => {
+    renderPlanPage({
+      signals: [buildSignal()],
+      ladders: [
+        buildPlan({
+          lotSize: { e1: 0.13, e2: 0.29, e3: 0.47 },
+        }),
+      ],
+    });
+
+    const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
+    expect(cardText).toContain("0.13 lot");
+    expect(cardText).toContain("0.29 lot");
+    expect(cardText).toContain("0.47 lot");
+  });
+
+  it("keeps execution available and warns when a mixed backend plan has executable stage lots", () => {
+    renderPlanPage({
+      signals: [buildSignal()],
+      ladders: [
+        buildPlan({
+          lotSize: { e1: 0, e2: 0.12, e3: 0.009 },
+        }),
+      ],
+    });
+
+    const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
+    expect(screen.queryByText("0.00 lot")).toBeNull();
+    expect(screen.queryByText("0.01 lot")).toBeNull();
+    expect(cardText).toContain("0.12 lot");
+    expect(cardText).toContain("0.009 lot");
+    expect(cardText).toContain("Below min 0.01");
+    expect(
+      screen.getByText(
+        /Some stages are below the 0\.01 minimum lot for GBPUSD\. The backend will skip those stages and queue any remaining executable legs\./,
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(/No backend stage lots meet the 0\.01 minimum lot for GBPUSD\./),
+    ).toBeNull();
+    expect(
+      (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
+    ).toBe(false);
+  });
+
+  it("blocks execution when no backend stage lot meets the execution minimum", () => {
+    renderPlanPage({
+      signals: [buildSignal()],
+      ladders: [
+        buildPlan({
+          lotSize: { e1: 0, e2: 0.009, e3: 0 },
+        }),
+      ],
+    });
+
+    expect(
+      screen.getByText(/No backend stage lots meet the 0\.01 minimum lot for GBPUSD\./),
+    ).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("uses the symbol-specific minimum in lot labels and execution warnings", () => {
+    renderPlanPage({
+      signals: [buildSignal({ symbol: "BTCUSD" })],
+      ladders: [
+        buildPlan({
+          symbol: "BTCUSD",
+          lotSize: { e1: 0.01, e2: 0.09, e3: 0 },
+        }),
+      ],
+      watchlist: ["BTCUSD"],
+    });
+
+    const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
+    expect(cardText).toContain("Below min 0.10");
+    expect(
+      screen.getByText(/No backend stage lots meet the 0\.10 minimum lot for BTCUSD\./),
+    ).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "Send to execution" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("shows a retryable settings error instead of the backend URL guard when settings fail", () => {
+    hookMocks.usePollingUiState.mockReturnValue({
+      backendReady: false,
+      pendingSettingsLoad: false,
+      missingBackendUrl: false,
+      settingsLoadFailed: true,
+      settingsLoadError: "settings fetch failed",
+      pollMs: null,
+      retrySettingsLoad: vi.fn(),
+    });
+
+    renderPlanPage({
+      signals: [],
+      ladders: [],
+      watchlist: [],
+    });
+
+    expect(
+      screen.getByText("Unable to load Account settings. Retry before loading signal plans."),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText("Configure a backend URL in Account before loading signal plans."),
+    ).toBeNull();
+  });
+
+  it("shows settings errors before any loading screen when queries are still pending", () => {
+    hookMocks.usePollingUiState.mockReturnValue({
+      backendReady: false,
+      pendingSettingsLoad: false,
+      missingBackendUrl: false,
+      settingsLoadFailed: true,
+      settingsLoadError: "settings fetch failed",
+      pollMs: null,
+      retrySettingsLoad: vi.fn(),
+    });
+    hookMocks.useDisplaySignals.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    });
+    hookMocks.useLadders.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    });
+    mockWatchlist([]);
+
+    render(<PlanPage />);
+
+    expect(
+      screen.getByText("Unable to load Account settings. Retry before loading signal plans."),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Loading signal data and blueprints/i)).toBeNull();
+  });
+
+  it("shows the phase 1 readiness screen while backend readiness is not confirmed", () => {
+    hookMocks.usePollingUiState.mockReturnValue({
+      backendReady: false,
+      pendingSettingsLoad: true,
+      missingBackendUrl: false,
+      settingsLoadFailed: false,
+      settingsLoadError: null,
+      pollMs: null,
+      retrySettingsLoad: vi.fn(),
+    });
+    hookMocks.useDisplaySignals.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    });
+    hookMocks.useLadders.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    });
+    mockWatchlist([]);
+
+    render(<PlanPage />);
+
+    expect(screen.getByText("Checking backend readiness...")).toBeTruthy();
+    expect(screen.queryByText("Readiness Status")).toBeNull();
+  });
+
+  it("matches broker-suffixed signal symbols against the canonical watchlist", () => {
+    renderPlanPage({
+      signals: [buildSignal({ id: "sig-001", symbol: "GBPUSD.pro" as Symbol, verdict: "A+" })],
+      ladders: [buildPlan({ signalId: "sig-001", symbol: "GBPUSD" })],
+      watchlist: ["GBPUSD"],
+    });
+
+    const cards = getRenderedCards();
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.textContent).toContain("GBPUSD.pro");
+    expect(screen.queryByText("No active watchlist candidates found.")).toBeNull();
+  });
+
+  it("scopes rendered cards to the canonical watchlist", () => {
+    renderPlanPage({
+      signals: [
+        buildSignal({ id: "sig-001", symbol: "GBPUSD", verdict: "A+" }),
+        buildSignal({
+          id: "sig-002",
+          symbol: "NZDUSD",
+          verdict: "A",
+          createdAt: "2026-05-14T08:01:00.000Z",
+        }),
+      ],
+      ladders: [
+        buildPlan({ signalId: "sig-001", symbol: "GBPUSD" }),
+        buildPlan({ signalId: "sig-002", symbol: "NZDUSD" }),
+      ],
+      watchlist: ["GBPUSD"],
+    });
+
+    const cards = getRenderedCards();
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.textContent).toContain("GBPUSD");
+    expect(screen.queryByText("NZDUSD")).toBeNull();
+  });
+
+  it("limits rendering to the top 3 eligible watchlist candidates", () => {
+    renderPlanPage({
+      signals: [
+        buildSignal({ id: "sig-001", symbol: "GBPUSD", verdict: "A+" }),
+        buildSignal({
+          id: "sig-002",
+          symbol: "USDJPY",
+          verdict: "A",
+          createdAt: "2026-05-14T08:01:00.000Z",
+        }),
+        buildSignal({
+          id: "sig-003",
+          symbol: "AUDUSD",
+          verdict: "B",
+          createdAt: "2026-05-14T08:02:00.000Z",
+        }),
+        buildSignal({
+          id: "sig-004",
+          symbol: "EURUSD",
+          verdict: "C",
+          createdAt: "2026-05-14T08:03:00.000Z",
+        }),
+        buildSignal({
+          id: "sig-005",
+          symbol: "XAUUSD",
+          verdict: "B",
+          createdAt: "2026-05-14T08:04:00.000Z",
+        }),
+      ],
+      ladders: [
+        buildPlan({ signalId: "sig-001", symbol: "GBPUSD" }),
+        buildPlan({ signalId: "sig-002", symbol: "USDJPY" }),
+        buildPlan({ signalId: "sig-003", symbol: "AUDUSD" }),
+        buildPlan({ signalId: "sig-004", symbol: "EURUSD" }),
+        buildPlan({ signalId: "sig-005", symbol: "XAUUSD" }),
+      ],
+      watchlist: ["GBPUSD", "USDJPY", "AUDUSD", "EURUSD", "XAUUSD"],
+    });
+
+    expect(getRenderedCards()).toHaveLength(3);
+  });
+
+  it("renders fewer than 3 cards when only 2 watchlist candidates have plans", () => {
+    renderPlanPage({
+      signals: [
+        buildSignal({ id: "sig-001", symbol: "GBPUSD", verdict: "A+" }),
+        buildSignal({
+          id: "sig-002",
+          symbol: "USDJPY",
+          verdict: "A",
+          createdAt: "2026-05-14T08:01:00.000Z",
+        }),
+      ],
+      ladders: [
+        buildPlan({ signalId: "sig-001", symbol: "GBPUSD" }),
+        buildPlan({ signalId: "sig-002", symbol: "USDJPY" }),
+      ],
+      watchlist: ["GBPUSD", "USDJPY"],
+    });
+
+    expect(getRenderedCards()).toHaveLength(2);
+  });
+
+  it("uses verdict-led full-array ranking instead of first-match ladder selection", () => {
+    renderPlanPage({
+      signals: [
+        buildSignal({
+          id: "sig-001",
+          symbol: "GBPUSD",
+          verdict: "A+",
+          backendConfirmed: true,
+          createdAt: "2026-05-14T08:00:00.000Z",
+        }),
+        buildSignal({
+          id: "sig-002",
+          symbol: "USDJPY",
+          verdict: "A",
+          backendConfirmed: true,
+          createdAt: "2026-05-14T08:01:00.000Z",
+        }),
+        buildSignal({
+          id: "sig-003",
+          symbol: "AUDUSD",
+          verdict: "B",
+          backendConfirmed: true,
+          createdAt: "2026-05-14T08:02:00.000Z",
+        }),
+      ],
+      ladders: [
+        buildPlan({
+          signalId: "sig-001",
+          symbol: "GBPUSD",
+          rr: { tp1: 1.2, tp2: 0, tp3: 3.6 },
+        }),
+        buildPlan({ signalId: "sig-002", symbol: "USDJPY" }),
+        buildPlan({ signalId: "sig-003", symbol: "AUDUSD" }),
+      ],
+      watchlist: ["GBPUSD", "USDJPY", "AUDUSD"],
+    });
+
+    const renderedSymbols = getRenderedSymbols();
+    expect(renderedSymbols[0]).toContain("GBPUSD");
+    expect(renderedSymbols[1]).toContain("USDJPY");
+    expect(renderedSymbols[2]).toContain("AUDUSD");
+    expect(
+      screen.getByText(
+        /Backend plan is missing TP2\/TP3 or R:R values\. Full 3-stage ladder is not confirmed\./,
+      ),
+    ).toBeTruthy();
+  });
+
+  it("orders same-verdict candidates by backend, pending, watch, then no-plan quality", () => {
+    renderPlanPage({
+      signals: [
+        buildSignal({
+          id: "sig-001",
+          symbol: "GBPUSD",
+          status: "WATCH",
+          verdict: "A",
+          backendConfirmed: false,
+          createdAt: "2026-05-14T08:00:00.000Z",
+        }),
+        buildSignal({
+          id: "sig-002",
+          symbol: "USDJPY",
+          status: "WATCH",
+          verdict: "A",
+          backendConfirmed: false,
+          createdAt: "2026-05-14T08:01:00.000Z",
+        }),
+        buildSignal({
+          id: "sig-003",
+          symbol: "AUDUSD",
+          status: "WATCH",
+          verdict: "A",
+          backendConfirmed: false,
+          createdAt: "2026-05-14T08:02:00.000Z",
+        }),
+        buildSignal({
+          id: "sig-004",
+          symbol: "EURUSD",
+          status: "WATCH",
+          verdict: "A",
+          backendConfirmed: false,
+          createdAt: "2026-05-14T08:03:00.000Z",
+        }),
+      ],
+      ladders: [
+        buildPlan({ signalId: "sig-003", symbol: "AUDUSD", source: "watch-blueprint" }),
+        buildPlan({ signalId: "sig-001", symbol: "GBPUSD", source: "backend-blueprint" }),
+        buildPlan({ signalId: "sig-002", symbol: "USDJPY", source: "pending-blueprint" }),
+      ],
+      watchlist: ["GBPUSD", "USDJPY", "AUDUSD", "EURUSD"],
+    });
+
+    const renderedSymbols = getRenderedSymbols();
+    expect(getRenderedCards()).toHaveLength(3);
+    expect(renderedSymbols[0]).toContain("GBPUSD");
+    expect(renderedSymbols[1]).toContain("USDJPY");
+    expect(renderedSymbols[2]).toContain("AUDUSD");
+    expect(screen.queryByText("EURUSD")).toBeNull();
+  });
+
+  it("renders watchlist candidates without plan objects in awaiting-blueprint state", () => {
+    renderPlanPage({
+      signals: [
+        buildSignal({ id: "sig-001", symbol: "GBPUSD", verdict: "A+" }),
+        buildSignal({
+          id: "sig-002",
+          symbol: "USDJPY",
+          verdict: "A",
+          createdAt: "2026-05-14T08:01:00.000Z",
+        }),
+        buildSignal({
+          id: "sig-003",
+          symbol: "AUDUSD",
+          verdict: "B",
+          createdAt: "2026-05-14T08:02:00.000Z",
+        }),
+      ],
+      ladders: [
+        buildPlan({ signalId: "sig-001", symbol: "GBPUSD" }),
+        buildPlan({ signalId: "sig-003", symbol: "AUDUSD" }),
+      ],
+      watchlist: ["GBPUSD", "USDJPY", "AUDUSD"],
+    });
+
+    const renderedSymbols = getRenderedSymbols();
+    expect(getRenderedCards()).toHaveLength(3);
+    expect(renderedSymbols[0]).toContain("GBPUSD");
+    expect(renderedSymbols[1]).toContain("USDJPY");
+    expect(renderedSymbols[1]).toContain("NO BLUEPRINT");
+    expect(renderedSymbols[2]).toContain("AUDUSD");
+  });
+
+  it("renders awaiting-blueprint cards when ladders exist but no watchlist candidate has a matching plan", () => {
+    renderPlanPage({
+      signals: [buildSignal({ id: "sig-001", symbol: "GBPUSD", verdict: "A+" })],
+      ladders: [buildPlan({ signalId: "sig-other", symbol: "GBPUSD" })],
+      watchlist: ["GBPUSD"],
+    });
+
+    expect(getRenderedCards()).toHaveLength(1);
+    const cardText = screen.getByTestId("plan-candidate-card").textContent ?? "";
+    expect(cardText).toContain("GBPUSD");
+    expect(cardText).toContain("NO BLUEPRINT");
+    expect(
+      screen.queryByText("No matching blueprint for current watchlist candidates."),
+    ).toBeNull();
+  });
+
+  it("falls back to global board when watchlist returns zero candidates", () => {
+    const globalSig = buildSignal({
+      id: "sig-global-001",
+      symbol: "AUDJPY" as Symbol,
+      backendConfirmed: true,
+    });
+    renderPlanPage({
+      signals: [],
+      ladders: [],
+      watchlist: ["GBPUSD"],
+      globalSignals: [globalSig],
+    });
+
+    expect(
+      screen.getByText(/No watchlist candidates — showing global board fallback/),
+    ).toBeTruthy();
+    expect(getRenderedCards()).toHaveLength(1);
+    expect(getRenderedCards()[0]?.textContent).toContain("AUDJPY");
+    expect(screen.queryByText("No active watchlist candidates found.")).toBeNull();
+  });
+
+  it("never marks global fallback rows as backendConfirmed", () => {
+    const globalSig = buildSignal({
+      id: "sig-global-002",
+      symbol: "AUDJPY" as Symbol,
+      backendConfirmed: true,
+    });
+    renderPlanPage({
+      signals: [],
+      ladders: [],
+      watchlist: ["GBPUSD"],
+      globalSignals: [globalSig],
+    });
+
+    expect(
+      screen.getByText(/No watchlist candidates — showing global board fallback/),
+    ).toBeTruthy();
+    const card = getRenderedCards()[0];
+    expect(card).toBeTruthy();
+    expect(card?.textContent).not.toContain("backend-confirmed");
+  });
+
+  it("shows the empty-state when both watchlist and global scopes return no candidates", () => {
+    renderPlanPage({
+      signals: [],
+      ladders: [],
+      watchlist: ["GBPUSD"],
+      globalSignals: [],
+    });
+
+    expect(screen.getByText("No active watchlist candidates found.")).toBeTruthy();
+    expect(
+      screen.queryByText(/No watchlist candidates — showing global board fallback/),
+    ).toBeNull();
+  });
+});
