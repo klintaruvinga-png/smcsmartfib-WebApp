@@ -66,9 +66,7 @@ describe("EA bridge contract: fib-levels ingest (submitEaFibLevels)", () => {
     setDbResult([{ id: "u1" }]);
     const body = {
       symbol: "eurusd",
-      levels: [
-        { timeframe: "H1", ltf_sf: [{ ratio: 999, price: 1.1 }], htf_af: [] },
-      ],
+      levels: [{ timeframe: "H1", ltf_sf: [{ ratio: 999, price: 1.1 }], htf_af: [] }],
     };
     const r = await submitEaFibLevels("key", body);
     expect(r.levels_written).toBe(0);
