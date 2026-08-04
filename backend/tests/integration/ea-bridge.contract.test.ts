@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { dbMock, setDbResult, getDbCalls, resetCalls, setInsertError } from "./dbMock";
+import type { H3Event } from "h3";
+import type { User } from "../../src/lib/db/schema";
 
 // Lazy JWT secret: auth/index.ts reads process.env.JWT_SECRET at call time.
 process.env.JWT_SECRET = "test-secret-key-for-unit-tests-must-be-long-enough-32bytes";
@@ -19,7 +21,9 @@ beforeEach(() => {
 
 describe("EA bridge contract: auth gate (requireEaAuth)", () => {
   it("rejects when X-EA-API-Key header is missing", async () => {
-    const event = { context: {}, node: { req: { headers: {} } } } as any;
+    const event = { context: {}, node: { req: { headers: {} } } } as H3Event;
+    const err = await requireEaAuth(event).catch((e) => e);
+    expect(err.statusCode).toBe(401);
     await expect(requireEaAuth(event)).rejects.toThrow();
   });
 
@@ -28,7 +32,9 @@ describe("EA bridge contract: auth gate (requireEaAuth)", () => {
     const event = {
       context: {},
       node: { req: { headers: { "x-ea-api-key": "missing-key" } } },
-    } as any;
+    } as H3Event;
+    const err = await requireEaAuth(event).catch((e) => e);
+    expect(err.statusCode).toBe(401);
     await expect(requireEaAuth(event)).rejects.toThrow();
   });
 
@@ -37,7 +43,9 @@ describe("EA bridge contract: auth gate (requireEaAuth)", () => {
     const event = {
       context: {},
       node: { req: { headers: { "x-ea-api-key": "key" } } },
-    } as any;
+    } as H3Event;
+    const err = await requireEaAuth(event).catch((e) => e);
+    expect(err.statusCode).toBe(401);
     await expect(requireEaAuth(event)).rejects.toThrow();
   });
 
@@ -46,10 +54,10 @@ describe("EA bridge contract: auth gate (requireEaAuth)", () => {
     const event = {
       context: {},
       node: { req: { headers: { "x-ea-api-key": "key" } } },
-    } as any;
+    } as H3Event;
     const u = await requireEaAuth(event);
     expect(u.role).toBe("ea");
-    expect((event.context as any).eaUser).toBeDefined();
+    expect((event.context as { eaUser?: User }).eaUser).toBeDefined();
   });
 });
 
@@ -104,6 +112,29 @@ describe("EA bridge contract: fib-levels ingest (submitEaFibLevels)", () => {
     const r = await submitEaFibLevels("key", body);
     expect(r.symbol).toBe("EURUSD");
     expect(r.levels_written).toBe(1);
+  });
+
+  it("deduplicates duplicate (family, ratio) pairs and counts one persisted row", async () => {
+    setDbResult([{ id: "u1" }]);
+    const body = {
+      symbol: "eurusd",
+      levels: [
+        {
+          timeframe: "H1",
+          ltf_sf: [
+            { ratio: 50, price: 1.1 },
+            { ratio: 50, price: 1.15 },
+          ],
+          htf_af: [],
+        },
+      ],
+    };
+    const r = await submitEaFibLevels("key", body);
+    expect(r.levels_written).toBe(1);
+    expect(r.levels_failed).toBe(0);
+    expect(r.ok).toBe(true);
+    const insertCalls = getDbCalls().filter((c) => c.method === "insert");
+    expect(insertCalls.length).toBe(1);
   });
 
   it("resolves the owning user from the EA key before writing", async () => {

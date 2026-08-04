@@ -63,7 +63,18 @@ infrastructure. Run it once the backend is deployed to a Node host
   (no write), writes valid levels, normalizes symbol to uppercase, and resolves
   the owning user from the EA key before insert (tested in
   `tests/integration/ea-bridge.contract.test.ts`).
-- Backend typecheck + integration suite green: 34 tests passing.
+- Backend typecheck + integration suite green:
+  - **Typecheck**: `npm run typecheck` — passes with no errors
+  - **Integration tests**: `npm run test:integration` — 63 tests passing across 9 files
+    - tests/integration/risk-engine.test.ts (6 tests)
+    - tests/integration/fib-levels.test.ts (4 tests)
+    - tests/integration/market-data.test.ts (4 tests)
+    - tests/integration/settings.test.ts (8 tests)
+    - tests/integration/ea-bridge.contract.test.ts (10 tests)
+    - tests/integration/ea-endpoints.test.ts (3 tests)
+    - tests/integration/users.test.ts (6 tests)
+    - tests/integration/ea-sessions.test.ts (4 tests)
+    - tests/integration/auth.test.ts (18 tests)
 
 ## Deferred (separate follow-up tasks)
 
