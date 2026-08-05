@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import type { H3Event } from "h3";
 import bcrypt from "bcryptjs";
 import { dbMock, setDbResult, getDbCalls, resetCalls, setInsertError } from "./dbMock";
 
@@ -153,22 +154,22 @@ describe("auth middleware", () => {
     const event = {
       context: {},
       node: { req: { headers: { authorization: "Bearer " + token } } },
-    } as any;
+    } as unknown as H3Event;
     const p = await requireAuth(event);
     expect(p.sub).toBe("u1");
-    expect((event.context as any).authUser.sub).toBe("u1");
+    expect((event.context as unknown as { authUser: { sub: string } }).authUser.sub).toBe("u1");
   });
 
   it("requireAuth invalid token", async () => {
     const event = {
       context: {},
       node: { req: { headers: { authorization: "Bearer notajwt" } } },
-    } as any;
+    } as unknown as H3Event;
     await expect(requireAuth(event)).rejects.toThrow();
   });
 
   it("requireAuth missing header", async () => {
-    const event = { context: {}, node: { req: { headers: {} } } } as any;
+    const event = { context: {}, node: { req: { headers: {} } } } as unknown as H3Event;
     await expect(requireAuth(event)).rejects.toThrow();
   });
 
@@ -177,10 +178,10 @@ describe("auth middleware", () => {
     const event = {
       context: {},
       node: { req: { headers: { "x-ea-api-key": "key" } } },
-    } as any;
+    } as unknown as H3Event;
     const u = await requireEaAuth(event);
     expect(u.role).toBe("ea");
-    expect((event.context as any).eaUser).toBeDefined();
+    expect((event.context as unknown as { eaUser: unknown }).eaUser).toBeDefined();
   });
 
   it("requireEaAuth wrong role", async () => {
@@ -188,12 +189,12 @@ describe("auth middleware", () => {
     const event = {
       context: {},
       node: { req: { headers: { "x-ea-api-key": "key" } } },
-    } as any;
+    } as unknown as H3Event;
     await expect(requireEaAuth(event)).rejects.toThrow();
   });
 
   it("requireEaAuth missing key", async () => {
-    const event = { context: {}, node: { req: { headers: {} } } } as any;
+    const event = { context: {}, node: { req: { headers: {} } } } as unknown as H3Event;
     await expect(requireEaAuth(event)).rejects.toThrow();
   });
 });

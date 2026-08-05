@@ -16,7 +16,7 @@ export interface RiskProfilePayload extends Partial<RiskProfile> {
   updatedAt?: string;
 }
 
-export interface UserAccountPayload extends Partial<AccountState> {}
+export type UserAccountPayload = Partial<AccountState>;
 
 export interface TwelveDataKeyPayload {
   apiKey: string;

@@ -544,7 +544,10 @@ export const apiClient = {
     if (mock) return { ok: true };
     return call<{ ok: true }>("/ea/heartbeat", { method: "POST", authenticated: false });
   },
-  async postEaFibLevels(mock = MOCK_MODE, payload: unknown): Promise<{ ok: boolean; symbol: string; levels_written: number; levels_failed: number }> {
+  async postEaFibLevels(
+    mock = MOCK_MODE,
+    payload: unknown,
+  ): Promise<{ ok: boolean; symbol: string; levels_written: number; levels_failed: number }> {
     if (mock) return { ok: true, symbol: "", levels_written: 0, levels_failed: 0 };
     return call("/ea/fib-levels", { method: "POST", body: payload });
   },

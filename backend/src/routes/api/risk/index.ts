@@ -2,6 +2,7 @@ import { defineEventHandler, readBody, createError, setHeader } from "h3";
 import { requireAuth } from "../../../lib/auth/middleware";
 import { getRiskLimits, upsertRiskLimits } from "../../../lib/db/queries/risk";
 import { riskLimitsSchema } from "../../../lib/risk/schemas";
+import { type NewRiskLimits } from "../../../lib/db/schema";
 
 export default defineEventHandler(async (event) => {
   const payload = await requireAuth(event);
@@ -24,7 +25,7 @@ export default defineEventHandler(async (event) => {
         data: parsed.error.flatten(),
       });
     }
-    const patch: Record<string, unknown> = {};
+    const patch: Partial<NewRiskLimits> = {};
     if (parsed.data.dailyLossLimit !== undefined)
       patch.dailyLossLimit = String(parsed.data.dailyLossLimit);
     if (parsed.data.maxOpenPositions !== undefined)
@@ -33,7 +34,7 @@ export default defineEventHandler(async (event) => {
       patch.maxPositionSize = String(parsed.data.maxPositionSize);
     if (parsed.data.maxPerSymbolExposure !== undefined)
       patch.maxPerSymbolExposure = String(parsed.data.maxPerSymbolExposure);
-    return await upsertRiskLimits(payload.sub, patch as any);
+    return await upsertRiskLimits(payload.sub, patch);
   }
 
   throw createError({ statusCode: 405, message: "Method not allowed" });

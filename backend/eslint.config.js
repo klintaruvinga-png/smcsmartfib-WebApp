@@ -7,13 +7,7 @@ import tseslint from "typescript-eslint";
 // does not need.
 export default tseslint.config(
   {
-    ignores: [
-      "dist",
-      ".output",
-      "node_modules",
-      "supabase",
-      "scripts/benchmark-pbkdf2.ts",
-    ],
+    ignores: ["dist", ".output", "node_modules", "supabase", "scripts/benchmark-pbkdf2.ts"],
   },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
