@@ -18,12 +18,26 @@ infrastructure. Run it once the backend is deployed to a Node host
 
 ## EA configuration (MT4/5 inputs)
 
-- [ ] `WebhookURL` = the Worker origin, e.g.
-      `https://smcsuperfibwebapp.klintaruvinga.workers.dev`
+- [ ] `WebhookURL` = the Worker origin **with the `/api/ea/` prefix path**, e.g.
+      `https://smcsuperfibwebapp.klintaruvinga.workers.dev/api/ea/market-stream`
+      (The EA strips everything from `/ea/` onward and re-appends `/ea/fib-levels`,
+      so the bare origin would POST to `/ea/fib-levels` and 404. The `/api` segment
+      must be present in WebhookURL for the final URL to resolve to
+      `/api/ea/fib-levels`.)
 - [ ] `ApiKey` = the Railway `EA_API_KEY` plaintext (matches `users.ea_api_key` hash).
-- [ ] `UserId` = the UUID from `public.users.id` (must be `input string`, NOT `int`).
-- [ ] EA recompiled after the `input string UserId` change in
-      `mt5/SMC_MarketDataEA.mq5` + `mt5/MarketDataEngine.mqh`.
+- [ ] `UserId` = the UUID from `public.users.id`. The EA already carries this as the
+      `wpUserId` string (set via the `userId` input); no EA-input type change is
+      required. The fib-levels route resolves the owning user from the API key, so
+      `user_id` in the payload is currently unused by that route.
+- [ ] EA recompiled after the `FibEngine.mqh` fix: `BuildFibPayload` and
+      `ComputeFibJson` now take `string userId` (was `int`), which unblocks
+      MetaEditor compilation when called with the `wpUserId` string. Note that
+      `BuildLevelsJson` retains its original signature (`bool valid, double high,
+      double low`) and does not take a userId parameter.
+- [ ] Before marking the EA recompilation step complete, run `node mt5/check-mql-includes.mjs`
+      and save its exact output to a file under `reports/` (e.g.,
+      `reports/mql-includes-verification.txt`) to verify that all MQL includes and
+      function signatures are correct.
 
 ## Verification steps (run in order)
 
