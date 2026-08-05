@@ -13,13 +13,18 @@ export default defineNitroConfig({
   // API routes live under src/routes/**
   routeRules: {
     "/api/**": {
+      // Nitro's installed RouteRules type (nitro 3 beta, index.d.mts:899) narrows
+      // `cors` to `boolean`, but h3 accepts an H3CorsOptions object at runtime and
+      // that object is what pins the Cloudflare Worker origin (commit 2e89677).
+      // The double cast preserves the runtime object while satisfying the lagging
+      // type. Do NOT replace with `cors: true` (drops the origin pin).
       cors: {
         origin: "https://smcsuperfibwebapp.klintaruvinga.workers.dev",
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         headers: ["Authorization", "Content-Type"],
         credentials: true,
         maxAge: 86400,
-      },
+      } as unknown as boolean,
     },
   },
   runtimeConfig: {

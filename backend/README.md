@@ -54,6 +54,28 @@ curl localhost:3000/api/health
 | `npm run typecheck` | `tsc --noEmit`                                           |
 | `npm run db:push`   | Deploy SQL migration to Supabase                         |
 
+## EA Bridge Status
+
+The EA (MetaTrader 4/5 Expert Advisor) talks to the backend over HTTPS using a
+shared secret in the `X-EA-API-Key` header (not a JWT). Every EA route is
+authenticated by `requireEaAuth`, which SHA-256-hashes the incoming key and
+matches it against `users.ea_api_key` with `role = 'ea'`.
+
+| Route | Auth | Status | Notes |
+|-------|------|--------|-------|
+| `POST /api/ea/fib-levels` | X-EA-API-Key (role `ea`) | **Implemented** | zod-validated payload, partial-write resilient, dedup by (family, ratio). Tested in `tests/integration/ea-bridge.contract.test.ts`. |
+| `POST /api/ea/heartbeat` | X-EA-API-Key | **Not yet built** | DB queries (`ea-sessions.createEaSession` / `updateEaSessionPing`) exist and are orphaned. Follow-up task. |
+| `POST /api/ea/license-check` | X-EA-API-Key | **Not yet built** | Contract documented in `CONTEXT.md` / EA config migration checklist. Follow-up task. |
+| `POST /api/ea/market-stream`, `account-sync`, `symbol-sync` | X-EA-API-Key | **Roadmap** | Per `docs/backend-migration-plan.md` (BACKEND-2e). Not started. |
+
+SMC-03 (EA/backend bridge) audited the implemented `fib-levels` route, locked
+its contract with offline integration tests, and documented the gaps above. The
+missing routes are deferred to separate follow-up tasks (see `projects.json`).
+
+See `reports/ea-live-e2e-checklist.md` for the manual live-EA verification
+steps (the agent shell cannot drive the MT4/5 EA, so end-to-end proof is a
+human-run checklist, not an automated test).
+
 ## Environment (`.env.local`, gitignored)
 
 See `.env.local` for the full list. Minimum required for Phase 0:
