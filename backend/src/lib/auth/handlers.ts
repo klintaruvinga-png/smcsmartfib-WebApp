@@ -134,9 +134,11 @@ export async function registerUser(
       // Parse constraint name from error detail to return specific message
       // postgres.js format: Key (email)=(x) already exists.
       // Standard format: Key (email)=(x) violates constraint "users_email_key"
-      const detail = (err as { detail?: string }).detail;
+      const detail = (err as { detail?: unknown }).detail;
       const constraint =
-        detail?.match(/constraint "([^"]+)"/)?.[1] || detail?.match(/Key \(([^)]+)\)=/)?.[1];
+        typeof detail === "string"
+          ? detail.match(/constraint "([^"]+)"/)?.[1] || detail.match(/Key \(([^)]+)\)=/)?.[1]
+          : undefined;
 
       if (constraint === "users_email_key" || constraint === "email") {
         throw new AuthError(409, "Email already exists");

@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
         data: parsed.error.flatten(),
       });
     }
-    const patch: Record<string, unknown> = {};
+    const patch: Partial<NewTrade> = {};
     if (parsed.data.symbol !== undefined) patch.symbol = parsed.data.symbol;
     if (parsed.data.direction !== undefined) patch.direction = parsed.data.direction;
     if (parsed.data.entryPrice !== undefined) patch.entryPrice = String(parsed.data.entryPrice);
@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
     if (parsed.data.status !== undefined) patch.status = parsed.data.status;
     if (parsed.data.notes !== undefined) patch.notes = parsed.data.notes;
     if (parsed.data.closedAt !== undefined) patch.closedAt = new Date(parsed.data.closedAt);
-    const updated = await updateTrade(payload.sub, id, patch as Partial<NewTrade>);
+    const updated = await updateTrade(payload.sub, id, patch);
     if (!updated) throw createError({ statusCode: 404, message: "Trade not found" });
     return updated;
   }
