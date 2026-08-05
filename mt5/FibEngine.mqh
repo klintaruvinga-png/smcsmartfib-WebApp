@@ -79,7 +79,7 @@ public:
     // symbol           — raw broker symbol (will be normalized by caller)
     // normalizedSymbol — canonical symbol (e.g. "EURUSD")
     // userId           — WordPress user_id to include in payload
-    string BuildFibPayload(string symbol, string normalizedSymbol, int userId)
+    string BuildFibPayload(string symbol, string normalizedSymbol, string userId)
     {
         string json = "";
 
@@ -217,7 +217,7 @@ public:
     }
 
     // Compute fib levels for a single timeframe and return as a JSON object.
-    string ComputeFibJson(string symbol, string normSymbol, int userId,
+    string ComputeFibJson(string symbol, string normSymbol, string userId,
                           ENUM_TIMEFRAMES mql_tf, int chart_tf_seconds, string tfName)
     {
         // Determine lookback size: matches PHP fib_history_window_size()
@@ -286,13 +286,13 @@ public:
         dbg += "}";
 
         string json = "{";
-        json += "\"user_id\":" + IntegerToString(userId) + ",";
+        json += "\"user_id\":\"" + userId + "\",";
         json += "\"symbol\":\"" + normSymbol + "\",";
         json += "\"timeframe\":\"" + tfName + "\",";
         json += "\"chart_tf_seconds\":" + IntegerToString(chart_tf_seconds) + ",";
         json += "\"anchor_debug\":" + dbg + ",";
-        json += "\"ltf_sf\":" + BuildLevelsJson(ltf_valid, ltf_high, ltf_low, "LTF_SF") + ",";
-        json += "\"htf_af\":" + BuildLevelsJson(htf_valid, htf_high, htf_low, "HTF_AF");
+        json += "\"ltf_sf\":" + BuildLevelsJson(ltf_valid, ltf_high, ltf_low) + ",";
+        json += "\"htf_af\":" + BuildLevelsJson(htf_valid, htf_high, htf_low);
         json += "}";
 
         return json;
@@ -688,7 +688,7 @@ public:
     }
 
     // ---- Build JSON levels array ----
-    string BuildLevelsJson(bool valid, double high, double low, string family)
+    string BuildLevelsJson(bool valid, double high, double low)
     {
         if (!valid)
             return "[]";
@@ -699,7 +699,6 @@ public:
             if (i > 0) json += ",";
             double price = PriceForRatio(high, low, ratios[i]);
             json += "{";
-            json += "\"family\":\"" + family + "\",";
             json += "\"ratio\":"    + DoubleToString(ratios[i], 4) + ",";
             json += "\"price\":"    + DoubleToString(price, 8);
             json += "}";
