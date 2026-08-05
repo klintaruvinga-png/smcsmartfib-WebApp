@@ -2,6 +2,7 @@ import { defineEventHandler, readBody, createError, setHeader, getRouterParam } 
 import { requireAuth } from "../../../lib/auth/middleware";
 import { getTrade, updateTrade, deleteTrade } from "../../../lib/db/queries/journal";
 import { updateTradeSchema } from "../../../lib/risk/schemas";
+import { type NewTrade } from "../../../lib/db/schema";
 
 export default defineEventHandler(async (event) => {
   const payload = await requireAuth(event);
@@ -41,7 +42,7 @@ export default defineEventHandler(async (event) => {
     if (parsed.data.status !== undefined) patch.status = parsed.data.status;
     if (parsed.data.notes !== undefined) patch.notes = parsed.data.notes;
     if (parsed.data.closedAt !== undefined) patch.closedAt = new Date(parsed.data.closedAt);
-    const updated = await updateTrade(payload.sub, id, patch as any);
+    const updated = await updateTrade(payload.sub, id, patch as Partial<NewTrade>);
     if (!updated) throw createError({ statusCode: 404, message: "Trade not found" });
     return updated;
   }

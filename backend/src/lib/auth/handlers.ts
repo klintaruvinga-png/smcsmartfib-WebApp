@@ -123,15 +123,20 @@ export async function registerUser(
       meta?.ipAddress ?? null,
     );
     return { accessToken, refreshToken, user: toUserView(user) };
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (err instanceof AuthError) throw err;
-    if (err && err.code === "23505") {
+    if (
+      err &&
+      typeof err === "object" &&
+      "code" in err &&
+      (err as { code?: unknown }).code === "23505"
+    ) {
       // Parse constraint name from error detail to return specific message
       // postgres.js format: Key (email)=(x) already exists.
       // Standard format: Key (email)=(x) violates constraint "users_email_key"
+      const detail = (err as { detail?: string }).detail;
       const constraint =
-        err.detail?.match(/constraint "([^"]+)"/)?.[1] ||
-        err.detail?.match(/Key \(([^)]+)\)=/)?.[1];
+        detail?.match(/constraint "([^"]+)"/)?.[1] || detail?.match(/Key \(([^)]+)\)=/)?.[1];
 
       if (constraint === "users_email_key" || constraint === "email") {
         throw new AuthError(409, "Email already exists");

@@ -34,7 +34,10 @@ describe("fib-levels queries", () => {
     ]);
 
     // transaction callback ran
-    expect((dbMock as any).transaction.mock.calls.length).toBeGreaterThan(0);
+    expect(
+      (dbMock as unknown as { transaction: { mock: { calls: unknown[] } } }).transaction.mock.calls
+        .length,
+    ).toBeGreaterThan(0);
 
     const insertCall = getDbCalls().find((c) => c.method === "insert");
     expect(insertCall).toBeDefined();

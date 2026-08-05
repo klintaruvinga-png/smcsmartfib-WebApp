@@ -7,7 +7,11 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
-    if (body && typeof body === "object" && typeof (body as Record<string, unknown>).status === "string") {
+    if (
+      body &&
+      typeof body === "object" &&
+      typeof (body as Record<string, unknown>).status === "string"
+    ) {
       const status = (body as Record<string, unknown>).status as string;
       if (!["connected", "disconnected", "error"].includes(status)) {
         throw createError({ statusCode: 400, message: "Invalid status" });
