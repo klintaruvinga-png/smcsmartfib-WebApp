@@ -39,8 +39,8 @@ supabase db diff --use-migrations --schema public
 ```
 
 **Expected migrations to apply:**
-- `001_init.sql` - users, fib_levels, ea_sessions, refresh_sessions
-- `002_add_refresh_sessions.sql`
+- `001_init.sql` - users, fib_levels, ea_sessions
+- `002_add_refresh_sessions.sql` - refresh_sessions
 - `003_drop_users_auth_fk.sql`
 - `004_add_user_settings.sql`
 - `005_add_trades_risk.sql` - trades, risk_limits
@@ -53,24 +53,25 @@ supabase db push
 #### 1.4 Create EA User
 Execute in Supabase SQL Editor:
 ```sql
--- Generate a secure EA API key (you'll need this for Railway env)
--- Replace 'your-secure-plaintext-key' with your actual key
+-- Create EA user with secure API key
+-- Generate your EA_API_KEY externally (e.g., openssl rand -hex 32) and store it
+-- in your secret manager (Railway secrets, 1Password, etc.) before running this.
 INSERT INTO public.users (id, email, username, role, ea_api_key, password_hash)
 VALUES (
   gen_random_uuid(),
   'ea@smcsuperfib.local',
   'ea_system',
   'ea',
-  'your-secure-plaintext-key',  -- Store plaintext here temporarily
-  crypt('your-secure-plaintext-key', gen_salt('bf'))
+  '[your-secure-api-key-from-secret-manager]',  -- Reference only; never log plaintext
+  crypt('[your-secure-api-key-from-secret-manager]', gen_salt('bf'))
 ) ON CONFLICT (email) DO NOTHING;
 
--- Capture the generated UUID for the UserId field
-SELECT id, email, ea_api_key FROM public.users WHERE role = 'ea';
+-- Capture only the generated UUID
+SELECT id FROM public.users WHERE role = 'ea';
 ```
 
 **Save these values:**
-- `EA_API_KEY` (plaintext) - for Railway env var
+- `EA_API_KEY` - store securely in Railway environment variables (source from secret manager)
 - `id` (UUID) - for EA UserId configuration
 
 ---
@@ -89,21 +90,16 @@ cd backend
 railway init
 ```
 
-#### 2.3 Add PostgreSQL Database
-```bash
-railway add postgresql
-```
-
-#### 2.4 Set Environment Variables
+#### 2.3 Set Environment Variables
 In Railway dashboard, set these variables:
 
 | Variable | Value | Source |
 |----------|-------|--------|
 | `DATABASE_URL` | `postgresql://postgres:[PASSWORD]@db.yfodcdqpkgpbrzdpeqtb.supabase.co:6543/postgres` | Supabase pooler URL |
 | `SUPABASE_URL` | `https://yfodcdqpkgpbrzdpeqtb.supabase.co` | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...` | Supabase dashboard → Settings → API |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJhbG...` (JWT format) | Supabase dashboard → Settings → API → service_role (JWT). Backend uses @supabase/supabase-js v2.45.0 which requires the legacy JWT service-role key, not the newer sb_secret_ format. Rotate via Supabase dashboard if compromised. |
 | `JWT_SECRET` | `[≥32-char random string]` | Generate secure secret |
-| `EA_API_KEY` | `[plaintext key from Phase 1.4]` | Must match users.ea_api_key |
+| `EA_API_KEY` | `[from secret manager]` | Must match users.ea_api_key; never log plaintext |
 
 #### 2.5 Deploy Backend
 ```bash
@@ -203,7 +199,7 @@ SELECT * FROM public.ea_sessions WHERE status = 'connected';
 ## Troubleshooting
 
 ### Backend Build Issues
-- **Error**: `Cannot find module 'C:\Users\Kudzie\Projects\nitro\dist\cli\index.mjs'`
+- **Error**: `Cannot find module '<repo-root>\nitro\dist\cli\index.mjs'`
 - **Fix**: Use `node node_modules/nitro/dist/cli/index.mjs build` instead of `npm run build`
 
 ### EA Compile Errors
@@ -247,26 +243,30 @@ Supabase PostgreSQL (yfodcdqpkgpbrzdpeqtb)
 
 ## What I Still Need From You
 
-### Critical Information:
-1. **Supabase Service Role Key** - for Railway `SUPABASE_SERVICE_ROLE_KEY`
-2. **Supabase Pooler Connection String** - for Railway `DATABASE_URL`
-3. **JWT Secret** - generate a secure ≥32-char string
-4. **EA API Key** - the plaintext key you want to use for EA authentication
+### Critical Configuration (Non-Secret):
+The deployment requires the following environment variables. Configure them directly in Railway's dashboard or secret manager. **Do not share credential values in chat or commit them to the repository.**
+
+| Variable | Description | How to Generate |
+|----------|-------------|-----------------|
+| `SUPABASE_SERVICE_ROLE_KEY` | JWT service-role key | Supabase dashboard → Settings → API (copy service_role key) |
+| `DATABASE_URL` | Pooler connection string | Supabase dashboard → Settings → Database → Connection pooling (port 6543) |
+| `JWT_SECRET` | Backend auth secret | Generate: `openssl rand -hex 32` |
+| `EA_API_KEY` | EA authentication key | Generate: `openssl rand -hex 32`, store in secret manager |
+
+**Security Notice**: If any credentials were previously shared in this conversation or committed to the repository, rotate them immediately via the Supabase dashboard and Railway environment settings.
 
 ### Confirmation Points:
-1. **Duplicate Repo Removal** - Should I delete `C:\Users\Kudzie\Documents\GitHub\SMC-SuperFib-Dashboard`? (This is the old WordPress version)
-2. **Railway Account** - Do you have a Railway account, or should we use an alternative like Render?
-3. **Stashed Changes** - I stashed your local changes during the git pull. Should I restore them?
+1. **Railway Account** - Confirm you have a Railway account, or indicate if an alternative like Render is preferred
 
 ---
 
 ## Next Steps
 
-Once you provide the credentials above:
-1. I can help you set the Railway environment variables
-2. I can generate the exact EA user SQL with your specific keys
-3. I can help troubleshoot any deployment issues
-4. I can update the migration status tracker
+After configuring the environment variables in Railway:
+1. Deploy the backend via `railway up`
+2. Verify the health endpoint returns `{"status":"ok"}`
+3. Complete Phase 3 (Cloudflare Worker) and Phase 4 (MT5 EA) as documented above
+4. Run end-to-end validation to confirm data flow from EA → Railway → Supabase
 
 ---
 

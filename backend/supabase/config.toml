@@ -25,12 +25,12 @@ anon_key = "your-anon-key-here"
 [db]
 # Database connection string for local development
 # For production, use the pooler URL: postgres://postgres:[PASSWORD]@db.yfodcdqpkgpbrzdpeqtb.supabase.co:6543/postgres
-port = 54321
+port = 54322
 shadow_port = 54320
 
 [studio]
 enabled = true
-port = 54324
+port = 54323
 
 [functions]
 # Edge functions configuration (if needed)
