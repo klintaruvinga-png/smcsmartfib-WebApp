@@ -25,17 +25,10 @@ export const riskSettingsSchema = z
 export const userSettingsSchema = z
   .object({
     backendUrl: z.string(),
-    apiKeyStatus: z.enum([
-      "missing",
-      "ok",
-      "invalid",
-      "rate-limited",
-      "blocked",
-      "testing",
-    ]),
+    apiKeyStatus: z.enum(["missing", "ok", "invalid", "rate-limited", "blocked", "testing"]),
     refreshIntervalSec: z.number().min(0),
     staleThresholdSec: z.number().min(0),
-    signalBoardSize: z.enum([3, 5, 10]),
+    signalBoardSize: z.union([z.literal(3), z.literal(5), z.literal(10)]),
     watchlist: z.array(z.string()),
     theme: z.enum(["light", "dark", "system"]),
     notifications: notificationSettingsSchema,

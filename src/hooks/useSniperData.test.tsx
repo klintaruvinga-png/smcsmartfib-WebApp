@@ -59,6 +59,7 @@ import {
   useLiveSignals,
   usePollingUiState,
   useUserProgress,
+  useUserRiskProfile,
   useWatchlistAdd,
   useWatchlistRemove,
 } from "./useSniperData";
@@ -264,6 +265,70 @@ describe("normalizeDashboardSettings", () => {
     expect(actual.watchlist).toEqual([]);
     expect(actual.refreshIntervalSec).toBe(2);
     expect(actual.staleThresholdSec).toBe(10);
+  });
+});
+
+describe("useUserRiskProfile", () => {
+  beforeEach(() => {
+    reactQueryMocks.useQuery.mockReset();
+  });
+
+  it("enables the user-risk query when settings are loaded with a blank backendUrl", () => {
+    let userRiskOptions: Record<string, unknown> | undefined;
+
+    reactQueryMocks.useQuery.mockImplementation((options: { queryKey: string[] }) => {
+      if (options.queryKey[0] === "user-settings") {
+        return {
+          data: {
+            backendUrl: "",
+            refreshIntervalSec: 5,
+            watchlist: [],
+          },
+        };
+      }
+
+      if (options.queryKey[0] === "user-risk") {
+        userRiskOptions = options;
+        return { data: undefined };
+      }
+
+      return { data: undefined };
+    });
+
+    renderHook(() => useUserRiskProfile());
+
+    expect(userRiskOptions).toMatchObject({
+      queryKey: ["user-risk"],
+      enabled: true,
+    });
+  });
+
+  it("keeps the user-risk query disabled while settings are undefined (not yet loaded)", () => {
+    let userRiskOptions: Record<string, unknown> | undefined;
+
+    reactQueryMocks.useQuery.mockImplementation((options: { queryKey: string[] }) => {
+      if (options.queryKey[0] === "user-settings") {
+        return {
+          data: undefined,
+          fetchStatus: "fetching",
+          isPending: true,
+        };
+      }
+
+      if (options.queryKey[0] === "user-risk") {
+        userRiskOptions = options;
+        return { data: undefined };
+      }
+
+      return { data: undefined };
+    });
+
+    renderHook(() => useUserRiskProfile());
+
+    expect(userRiskOptions).toMatchObject({
+      queryKey: ["user-risk"],
+      enabled: false,
+    });
   });
 });
 
