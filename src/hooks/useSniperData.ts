@@ -11,10 +11,19 @@ function normalizeBackendUrlString(url: string | null | undefined): string {
   return normalizeBackendUrl(url);
 }
 import { reconcileUserTrades, type TradeContinuityState } from "@/lib/tradeContinuity";
+import { getBackendUrl } from "@/lib/api/sniperClient";
 import type { DashboardSettings, Symbol, SymbolDiagnostic, TradePlan } from "@/types/sniper";
 
 const DEFAULT_POLL_MS = 2_000;
 const WATCHLIST_LIMIT = 24;
+const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
+  backendUrl: getBackendUrl(),
+  apiKeyStatus: "missing",
+  refreshIntervalSec: 2,
+  staleThresholdSec: 10,
+  watchlist: [],
+  riskAllocation: { perTradePct: 0.5, dailyMaxPct: 2.0, ddCapPct: 6.0 },
+};
 
 export type PollingUiState = {
   backendReady: boolean;
@@ -322,11 +331,19 @@ export function normalizeSymbolForWatchlistComparison(symbol: string | null | un
   return normalized;
 }
 
-function normalizeDashboardSettings(settings: DashboardSettings): DashboardSettings {
+export function normalizeDashboardSettings(
+  settings: Partial<DashboardSettings>,
+): DashboardSettings {
+  const backendUrl = normalizeBackendUrlString(settings.backendUrl) || getBackendUrl();
   return {
+    ...DEFAULT_DASHBOARD_SETTINGS,
     ...settings,
-    backendUrl: normalizeBackendUrlString(settings.backendUrl),
+    backendUrl,
     watchlist: normalizeWatchlist(settings.watchlist),
+    riskAllocation: {
+      ...DEFAULT_DASHBOARD_SETTINGS.riskAllocation,
+      ...(settings.riskAllocation ?? {}),
+    },
   };
 }
 
@@ -519,11 +536,18 @@ export function useEngineHealth() {
 }
 
 export function useUserRiskProfile() {
-  const backendReady = useBackendReady();
+  // The risk profile is user config and must remain reachable even before a
+  // backend URL is configured — the Settings tab is where the backend URL is
+  // set. Gating on `backendReady` (derived from settings.backendUrl) left the
+  // query permanently disabled when no backend URL existed, which made the
+  // Account page hang on "Loading settings..." forever. Gate on settings
+  // presence instead so the profile loads from the same backend that served
+  // settings (setBackendUrl runs inside the settings queryFn).
+  const { data: settings } = useUserSettings();
   return useQuery({
     queryKey: ["user-risk"],
     queryFn: () => apiClient.getUserRiskProfile(),
-    enabled: backendReady,
+    enabled: Boolean(settings),
   });
 }
 

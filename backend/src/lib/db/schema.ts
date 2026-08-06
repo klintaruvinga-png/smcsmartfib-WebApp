@@ -45,6 +45,22 @@ export type UserSettings = {
     defaultLotSize?: number;
     riskRewardRatio?: number;
   };
+  riskAllocation?: {
+    perTradePct?: number;
+    dailyMaxPct?: number;
+    ddCapPct?: number;
+  };
+  backendUrl?: string;
+  apiKeyStatus?:
+    | "missing"
+    | "ok"
+    | "invalid"
+    | "rate-limited"
+    | "blocked"
+    | "testing";
+  refreshIntervalSec?: number;
+  staleThresholdSec?: number;
+  signalBoardSize?: 3 | 5 | 10;
 };
 
 export const users = pgTable("users", {

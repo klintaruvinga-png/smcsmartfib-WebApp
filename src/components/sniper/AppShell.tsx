@@ -1,5 +1,5 @@
 import { Link, Outlet, useRouterState, useRouter } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useSnapshot,
   useLiveSignals,
@@ -361,7 +361,14 @@ function Header() {
 
 export function AppShell() {
   useUserSettings();
-  const isNavigating = useRouterState({ select: (state) => state.status === "pending" });
+  const navStatus = useRouterState({ select: (state) => state.status === "pending" });
+  // Hydration fix: the router status differs between the SSR pass and the
+  // client's first paint, so deriving a class from it caused a #418 mismatch.
+  // Gate the navigation state behind a mount flag so server and first client
+  // render both emit the same DOM, then track transitions after mount.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const isNavigating = mounted && navStatus;
   const showLoader = isNavigating;
 
   return (

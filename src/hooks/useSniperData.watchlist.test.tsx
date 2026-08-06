@@ -8,6 +8,7 @@ import type { DashboardSettings } from "@/types/sniper";
 
 const apiMocks = vi.hoisted(() => ({
   getUserSettings: vi.fn(),
+  getBackendUrl: vi.fn(() => "https://smcsuperfibwebapp.klintaruvinga.workers.dev/api"),
   normalizeBackendUrl: vi.fn((value?: string) => (typeof value === "string" ? value.trim() : "")),
   postWatchlistAdd: vi.fn(),
   postWatchlistRemove: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock("@/lib/api/sniperClient", () => ({
     postWatchlistAdd: apiMocks.postWatchlistAdd,
     postWatchlistRemove: apiMocks.postWatchlistRemove,
   },
+  getBackendUrl: apiMocks.getBackendUrl,
   normalizeBackendUrl: apiMocks.normalizeBackendUrl,
   setBackendUrl: apiMocks.setBackendUrl,
 }));

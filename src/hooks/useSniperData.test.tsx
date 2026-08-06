@@ -18,6 +18,7 @@ const apiMocks = vi.hoisted(() => ({
   getLiveSignals: vi.fn(),
   getUserProgress: vi.fn(),
   getUserSettings: vi.fn(),
+  getBackendUrl: vi.fn(() => "https://smcsuperfibwebapp.klintaruvinga.workers.dev/api"),
   normalizeBackendUrl: vi.fn((value?: string) => (typeof value === "string" ? value.trim() : "")),
   postWatchlistAdd: vi.fn(),
   postWatchlistRemove: vi.fn(),
@@ -43,6 +44,7 @@ vi.mock("@/lib/api/sniperClient", () => ({
     postWatchlistAdd: apiMocks.postWatchlistAdd,
     postWatchlistRemove: apiMocks.postWatchlistRemove,
   },
+  getBackendUrl: apiMocks.getBackendUrl,
   normalizeBackendUrl: apiMocks.normalizeBackendUrl,
   setBackendUrl: apiMocks.setBackendUrl,
 }));
@@ -51,11 +53,13 @@ import { keepPreviousData } from "@tanstack/react-query";
 
 import {
   createLaddersQueryOptions,
+  normalizeDashboardSettings,
   useAccountTelemetry,
   useEngineHealth,
   useLiveSignals,
   usePollingUiState,
   useUserProgress,
+  useUserRiskProfile,
   useWatchlistAdd,
   useWatchlistRemove,
 } from "./useSniperData";
@@ -232,6 +236,98 @@ describe("useLadders", () => {
       enabled: true,
       placeholderData: keepPreviousData,
       refetchInterval: 5_000,
+    });
+  });
+});
+
+describe("normalizeDashboardSettings", () => {
+  it("fills missing riskAllocation with defaults and normalizes watchlist", () => {
+    const actual = normalizeDashboardSettings({
+      backendUrl: " https://backend.example/wp-json ",
+      refreshIntervalSec: 5,
+      staleThresholdSec: 30,
+      watchlist: ["eurusd", "EURUSD", "audcad"],
+      riskAllocation: { dailyMaxPct: 3.5 },
+    });
+
+    expect(actual).toMatchObject({
+      backendUrl: "https://backend.example/wp-json",
+      refreshIntervalSec: 5,
+      staleThresholdSec: 30,
+      watchlist: ["EURUSD", "AUDCAD"],
+      riskAllocation: { perTradePct: 0.5, dailyMaxPct: 3.5, ddCapPct: 6.0 },
+    });
+  });
+
+  it("returns defaults for missing optional settings", () => {
+    const actual = normalizeDashboardSettings({});
+    expect(actual.riskAllocation).toEqual({ perTradePct: 0.5, dailyMaxPct: 2.0, ddCapPct: 6.0 });
+    expect(actual.watchlist).toEqual([]);
+    expect(actual.refreshIntervalSec).toBe(2);
+    expect(actual.staleThresholdSec).toBe(10);
+  });
+});
+
+describe("useUserRiskProfile", () => {
+  beforeEach(() => {
+    reactQueryMocks.useQuery.mockReset();
+  });
+
+  it("enables the user-risk query when settings are loaded with a blank backendUrl", () => {
+    let userRiskOptions: Record<string, unknown> | undefined;
+
+    reactQueryMocks.useQuery.mockImplementation((options: { queryKey: string[] }) => {
+      if (options.queryKey[0] === "user-settings") {
+        return {
+          data: {
+            backendUrl: "",
+            refreshIntervalSec: 5,
+            watchlist: [],
+          },
+        };
+      }
+
+      if (options.queryKey[0] === "user-risk") {
+        userRiskOptions = options;
+        return { data: undefined };
+      }
+
+      return { data: undefined };
+    });
+
+    renderHook(() => useUserRiskProfile());
+
+    expect(userRiskOptions).toMatchObject({
+      queryKey: ["user-risk"],
+      enabled: true,
+    });
+  });
+
+  it("keeps the user-risk query disabled while settings are undefined (not yet loaded)", () => {
+    let userRiskOptions: Record<string, unknown> | undefined;
+
+    reactQueryMocks.useQuery.mockImplementation((options: { queryKey: string[] }) => {
+      if (options.queryKey[0] === "user-settings") {
+        return {
+          data: undefined,
+          fetchStatus: "fetching",
+          isPending: true,
+        };
+      }
+
+      if (options.queryKey[0] === "user-risk") {
+        userRiskOptions = options;
+        return { data: undefined };
+      }
+
+      return { data: undefined };
+    });
+
+    renderHook(() => useUserRiskProfile());
+
+    expect(userRiskOptions).toMatchObject({
+      queryKey: ["user-risk"],
+      enabled: false,
     });
   });
 });

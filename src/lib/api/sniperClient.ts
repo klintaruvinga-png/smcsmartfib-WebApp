@@ -97,6 +97,10 @@ export function normalizeBackendUrl(url: string | null | undefined): string {
 }
 
 let backendUrl = DEFAULT_BACKEND_URL;
+export function getBackendUrl() {
+  return backendUrl;
+}
+
 export function setBackendUrl(url: string | null | undefined) {
   backendUrl = normalizeBackendUrl(url) || DEFAULT_BACKEND_URL;
 }
