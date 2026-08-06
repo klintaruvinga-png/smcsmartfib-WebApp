@@ -65,7 +65,12 @@ function normalizeWatchlistDraft(watchlist: readonly Symbol[] | undefined | null
 
 function AccountPage() {
   const [tab, setTab] = useState<Tab>("settings");
-  const { data: settings, isError: settingsError, error: settingsErrorObj, refetch: refetchSettings } = useUserSettings();
+  const {
+    data: settings,
+    isError: settingsError,
+    error: settingsErrorObj,
+    refetch: refetchSettings,
+  } = useUserSettings();
   const { data: risk, isError: riskError, refetch: refetchRisk } = useUserRiskProfile();
 
   // The Settings tab (which holds the backend URL) must be usable even while
