@@ -11,6 +11,7 @@ import {
 } from "@/hooks/useSniperData";
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { WarningLine } from "@/components/sniper/Warnings";
+import { SettingsQueryErrorState } from "@/components/sniper/SettingsQueryErrorState";
 import { cn } from "@/lib/utils";
 import {
   Settings as SettingsIcon,
@@ -64,7 +65,7 @@ function normalizeWatchlistDraft(watchlist: readonly Symbol[] | undefined | null
 
 function AccountPage() {
   const [tab, setTab] = useState<Tab>("settings");
-  const { data: settings, isError: settingsError, refetch: refetchSettings } = useUserSettings();
+  const { data: settings, isError: settingsError, error: settingsErrorObj, refetch: refetchSettings } = useUserSettings();
   const { data: risk, isError: riskError, refetch: refetchRisk } = useUserRiskProfile();
 
   // The Settings tab (which holds the backend URL) must be usable even while
@@ -76,7 +77,7 @@ function AccountPage() {
       return (
         <SettingsQueryErrorState
           resourceLabel="Account settings"
-          errorDetail={settingsError instanceof Error ? settingsError.message : null}
+          errorDetail={settingsErrorObj instanceof Error ? settingsErrorObj.message : null}
           onRetry={() => void refetchSettings()}
         />
       );
@@ -250,6 +251,10 @@ function SettingsTab({ settings }: { settings: DashboardSettings }) {
       setBackendUrl(settingsToSave.backendUrl);
       if (!backendUrlChanged) {
         await qc.refetchQueries({ queryKey: ["user-settings"], type: "active" });
+      } else {
+        // Backend URL changed: invalidate risk profile to prevent data from one backend
+        // being reused or saved against another
+        await qc.invalidateQueries({ queryKey: ["user-risk"] });
       }
       await Promise.all([
         qc.refetchQueries({ queryKey: ["engine-health"], type: "active" }),
