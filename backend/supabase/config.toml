@@ -1,0 +1,37 @@
+# Supabase Configuration Template
+# Project: SMC SmartFib App Dev (yfodcdqpkgpbrzdpeqtb)
+# 
+# To link this project, run:
+#   cd backend
+#   supabase link --project-ref yfodcdqpkgpbrzdpeqtb
+#
+# To compare local migrations with live schema:
+#   supabase db diff --use-migrations --schema public
+
+[project]
+ref = "yfodcdqpkgpbrzdpeqtb"
+name = "SMC SmartFib App Dev"
+organization_id = "hwrjislmnarchfmfergl"
+
+[api]
+enabled = true
+port = 54321
+# The service role key has full admin access to your database
+# Use this in your backend code (Nitro) for server-side operations
+service_role_key = "your-service-role-key-here"
+# The anon key has limited access - use for client-side operations
+anon_key = "your-anon-key-here"
+
+[db]
+# Database connection string for local development
+# For production, use the pooler URL: postgres://postgres:[PASSWORD]@db.yfodcdqpkgpbrzdpeqtb.supabase.co:6543/postgres
+port = 54321
+shadow_port = 54320
+
+[studio]
+enabled = true
+port = 54324
+
+[functions]
+# Edge functions configuration (if needed)
+# Currently this project uses Nitro backend instead of Supabase Edge Functions
