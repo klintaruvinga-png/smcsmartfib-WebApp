@@ -331,8 +331,9 @@ export function normalizeSymbolForWatchlistComparison(symbol: string | null | un
   return normalized;
 }
 
-<<<<<<< HEAD
-export function normalizeDashboardSettings(settings: Partial<DashboardSettings>): DashboardSettings {
+export function normalizeDashboardSettings(
+  settings: Partial<DashboardSettings>,
+): DashboardSettings {
   const backendUrl =
     settings.backendUrl == null ? getBackendUrl() : normalizeBackendUrlString(settings.backendUrl);
   return {
