@@ -519,11 +519,18 @@ export function useEngineHealth() {
 }
 
 export function useUserRiskProfile() {
-  const backendReady = useBackendReady();
+  // The risk profile is user config and must remain reachable even before a
+  // backend URL is configured — the Settings tab is where the backend URL is
+  // set. Gating on `backendReady` (derived from settings.backendUrl) left the
+  // query permanently disabled when no backend URL existed, which made the
+  // Account page hang on "Loading settings..." forever. Gate on settings
+  // presence instead so the profile loads from the same backend that served
+  // settings (setBackendUrl runs inside the settings queryFn).
+  const { data: settings } = useUserSettings();
   return useQuery({
     queryKey: ["user-risk"],
     queryFn: () => apiClient.getUserRiskProfile(),
-    enabled: backendReady,
+    enabled: Boolean(settings),
   });
 }
 

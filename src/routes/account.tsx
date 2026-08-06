@@ -12,7 +12,15 @@ import {
 import { FreshnessBadge } from "@/components/sniper/FreshnessBadge";
 import { WarningLine } from "@/components/sniper/Warnings";
 import { cn } from "@/lib/utils";
-import { Settings as SettingsIcon, Shield, KeyRound, Trash2, X } from "lucide-react";
+import {
+  Settings as SettingsIcon,
+  Shield,
+  KeyRound,
+  Trash2,
+  X,
+  AlertTriangle,
+  RefreshCw,
+} from "lucide-react";
 import { apiClient, MOCK_MODE, normalizeBackendUrl, setBackendUrl } from "@/lib/api/sniperClient";
 import { toast } from "sonner";
 import type {
@@ -56,10 +64,25 @@ function normalizeWatchlistDraft(watchlist: readonly Symbol[] | undefined | null
 
 function AccountPage() {
   const [tab, setTab] = useState<Tab>("settings");
-  const { data: settings } = useUserSettings();
-  const { data: risk } = useUserRiskProfile();
+  const { data: settings, isError: settingsError, refetch: refetchSettings } = useUserSettings();
+  const { data: risk, isError: riskError, refetch: refetchRisk } = useUserRiskProfile();
 
-  if (!settings || !risk) return <div className="text-mute text-sm">Loading settings...</div>;
+  // The Settings tab (which holds the backend URL) must be usable even while
+  // the risk profile is still loading or fails — gating the whole page on
+  // `risk` left it stuck on "Loading settings..." whenever the risk query was
+  // disabled or errored. Only the Settings-tab data blocks the shell.
+  if (!settings) {
+    if (settingsError) {
+      return (
+        <SettingsQueryErrorState
+          resourceLabel="Account settings"
+          errorDetail={settingsError instanceof Error ? settingsError.message : null}
+          onRetry={() => void refetchSettings()}
+        />
+      );
+    }
+    return <div className="text-mute text-sm">Loading settings...</div>;
+  }
 
   return (
     <div className="space-y-4">
@@ -91,7 +114,28 @@ function AccountPage() {
         </TabButton>
       </div>
 
-      {tab === "settings" ? <SettingsTab settings={settings} /> : <RiskTab risk={risk} />}
+      {tab === "settings" ? (
+        <SettingsTab settings={settings} />
+      ) : risk ? (
+        <RiskTab risk={risk} />
+      ) : riskError ? (
+        <div className="space-y-3 rounded-lg border border-warn/30 bg-warn/5 p-4 text-sm">
+          <div className="flex items-start gap-2 text-warn">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>Unable to load risk profile. Retry to continue.</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => void refetchRisk()}
+            className="inline-flex items-center gap-1.5 rounded border border-bd bg-bg2/60 px-3 py-1.5 text-[11px] font-mono text-dim transition-colors hover:border-info/40 hover:text-fg"
+          >
+            <RefreshCw className="h-3 w-3" />
+            Retry risk profile
+          </button>
+        </div>
+      ) : (
+        <div className="text-mute text-sm">Loading risk profile...</div>
+      )}
     </div>
   );
 }
