@@ -101,4 +101,16 @@ describe("user settings zod schema", () => {
     });
     expect(parsed.success).toBe(true);
   });
+
+  it("accepts risk allocation and backend dashboard settings", () => {
+    const parsed = userSettingsSchema.safeParse({
+      backendUrl: "https://backend.example/wp-json",
+      apiKeyStatus: "ok",
+      refreshIntervalSec: 10,
+      staleThresholdSec: 30,
+      watchlist: ["EURUSD"],
+      riskAllocation: { perTradePct: 1, dailyMaxPct: 2, ddCapPct: 5 },
+    });
+    expect(parsed.success).toBe(true);
+  });
 });

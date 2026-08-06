@@ -11,10 +11,19 @@ function normalizeBackendUrlString(url: string | null | undefined): string {
   return normalizeBackendUrl(url);
 }
 import { reconcileUserTrades, type TradeContinuityState } from "@/lib/tradeContinuity";
+import { getBackendUrl } from "@/lib/api/sniperClient";
 import type { DashboardSettings, Symbol, SymbolDiagnostic, TradePlan } from "@/types/sniper";
 
 const DEFAULT_POLL_MS = 2_000;
 const WATCHLIST_LIMIT = 24;
+const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
+  backendUrl: getBackendUrl(),
+  apiKeyStatus: "missing",
+  refreshIntervalSec: 2,
+  staleThresholdSec: 10,
+  watchlist: [],
+  riskAllocation: { perTradePct: 0.5, dailyMaxPct: 2.0, ddCapPct: 6.0 },
+};
 
 export type PollingUiState = {
   backendReady: boolean;
@@ -322,11 +331,17 @@ export function normalizeSymbolForWatchlistComparison(symbol: string | null | un
   return normalized;
 }
 
-function normalizeDashboardSettings(settings: DashboardSettings): DashboardSettings {
+export function normalizeDashboardSettings(settings: Partial<DashboardSettings>): DashboardSettings {
+  const backendUrl = normalizeBackendUrlString(settings.backendUrl) || getBackendUrl();
   return {
+    ...DEFAULT_DASHBOARD_SETTINGS,
     ...settings,
-    backendUrl: normalizeBackendUrlString(settings.backendUrl),
+    backendUrl,
     watchlist: normalizeWatchlist(settings.watchlist),
+    riskAllocation: {
+      ...DEFAULT_DASHBOARD_SETTINGS.riskAllocation,
+      ...(settings.riskAllocation ?? {}),
+    },
   };
 }
 

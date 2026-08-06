@@ -24,10 +24,29 @@ export const riskSettingsSchema = z
 
 export const userSettingsSchema = z
   .object({
-    notifications: notificationSettingsSchema.optional(),
-    theme: z.enum(["light", "dark", "system"]).optional(),
-    watchlist: z.array(z.string()).optional(),
-    risk: riskSettingsSchema.optional(),
+    backendUrl: z.string(),
+    apiKeyStatus: z.enum([
+      "missing",
+      "ok",
+      "invalid",
+      "rate-limited",
+      "blocked",
+      "testing",
+    ]),
+    refreshIntervalSec: z.number().min(0),
+    staleThresholdSec: z.number().min(0),
+    signalBoardSize: z.enum([3, 5, 10]),
+    watchlist: z.array(z.string()),
+    theme: z.enum(["light", "dark", "system"]),
+    notifications: notificationSettingsSchema,
+    riskAllocation: z
+      .object({
+        perTradePct: z.number().min(0),
+        dailyMaxPct: z.number().min(0),
+        ddCapPct: z.number().min(0),
+      })
+      .partial(),
+    risk: riskSettingsSchema,
   })
   .partial();
 
