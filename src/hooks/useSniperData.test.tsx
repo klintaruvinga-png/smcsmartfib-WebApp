@@ -259,6 +259,11 @@ describe("normalizeDashboardSettings", () => {
     });
   });
 
+  it("preserves an explicit blank backend URL instead of falling back to the current backend", () => {
+    const actual = normalizeDashboardSettings({ backendUrl: "   " });
+    expect(actual.backendUrl).toBe("");
+  });
+
   it("returns defaults for missing optional settings", () => {
     const actual = normalizeDashboardSettings({});
     expect(actual.riskAllocation).toEqual({ perTradePct: 0.5, dailyMaxPct: 2.0, ddCapPct: 6.0 });

@@ -51,13 +51,7 @@ export type UserSettings = {
     ddCapPct?: number;
   };
   backendUrl?: string;
-  apiKeyStatus?:
-    | "missing"
-    | "ok"
-    | "invalid"
-    | "rate-limited"
-    | "blocked"
-    | "testing";
+  apiKeyStatus?: "missing" | "ok" | "invalid" | "rate-limited" | "blocked" | "testing";
   refreshIntervalSec?: number;
   staleThresholdSec?: number;
   signalBoardSize?: 3 | 5 | 10;
