@@ -13,7 +13,12 @@ export const getRouter = () => {
         refetchOnReconnect: true,
         retry: (failureCount, error) => {
           if (error instanceof AuthError) return false;
-          return failureCount < 3;
+          // 404 means the endpoint does not exist on the backend — retrying
+          // forever (the caller also polls on an interval) only floods the
+          // console. Surface it once and let the interval re-check.
+          const status = (error as { status?: number } | undefined)?.status;
+          if (status === 404) return false;
+          return failureCount < 1;
         },
       },
     },
