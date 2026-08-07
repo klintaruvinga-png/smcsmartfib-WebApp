@@ -128,6 +128,37 @@ describe("fetchSoakReport", () => {
     await expect(fetchSoakReport()).rejects.toThrow(
       /API \/admin\/soak-report failed: 500 - {"error":"table_init_failed","detail":"dbDelta unavailable"}/,
     );
+
+    // Verify the thrown error includes the numeric status property for retry logic
+    try {
+      await fetchSoakReport();
+      expect.fail("Expected fetchSoakReport to throw");
+    } catch (error) {
+      expect(error).toHaveProperty("status", 500);
+    }
+  });
+
+  it("attaches HTTP 404 status to errors for non-retryable endpoint-not-found responses", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response("Not Found", {
+            status: 404,
+            headers: { "Content-Type": "text/plain" },
+          }),
+      ),
+    );
+
+    await expect(fetchSoakReport()).rejects.toThrow(/API \/admin\/soak-report failed: 404/);
+
+    // Verify the error includes status 404 so retry logic can short-circuit
+    try {
+      await fetchSoakReport();
+      expect.fail("Expected fetchSoakReport to throw");
+    } catch (error) {
+      expect(error).toHaveProperty("status", 404);
+    }
   });
 });
 
