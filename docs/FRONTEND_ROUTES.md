@@ -49,3 +49,21 @@ That message is the app's "missing route" screen. It appears only for genuinely 
 
 - `/soak-report` — there is no root-level soak-report route; the real one is `/admin/soak-report` (which redirects to `/admin`).
 - Any path not listed above.
+
+## Frontend → backend endpoint gap (verified 2026-08-07)
+
+The dashboard client (`src/lib/api/sniperClient.ts`) calls several `/api/*` endpoints that the **current Railway backend does not implement yet**. These return `404` from the backend's TanStack Start router (not a frontend bug). Until BACKEND-2 ships these endpoints, the dashboard surfaces empty/error states for the affected panels.
+
+| Frontend call | Backend status |
+| --- | --- |
+| `GET /api/signals` (board_size, scope) | ❌ not implemented |
+| `GET /api/ladders` | ❌ not implemented |
+| `GET /api/account-telemetry` | ❌ not implemented |
+| `GET /api/user/risk-profile` | ❌ not implemented (only `/api/risk/*` exists) |
+| `GET/POST/DELETE /api/user/twelve-data-key` | ❌ not implemented |
+| `GET /api/orders`, `GET /api/positions` | ❌ not implemented |
+| `GET /api/user/settings`, `GET /api/health`, `POST /api/auth/*` | ✅ implemented |
+
+**Console 404 + favicon fixes (PR `fix/console-404-spam`):** the favicon 404 was resolved by adding `public/favicon.svg` + a `<link rel="icon">` in `src/routes/__root.tsx`. The flood of repeat 404s from polling queries was resolved by (a) attaching `status` to API errors in `sniperClient.ts` and (b) making the QueryClient `retry` short-circuit on `404` (endpoint-not-found is not transient) and cap other retries at 1 — the interval-based `refetchInterval` still re-checks on schedule without hammering.
+
+**Action:** implement the missing endpoints under BACKEND-2 (SignalService / MarketDataService / TelemetryService) and add a contract test per endpoint. Tracking: see `plans/backend-2-restoration-plan.md`.

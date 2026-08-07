@@ -240,7 +240,13 @@ async function call<T>(path: string, opts: RequestOpts = {}, isRetry = false): P
 
     if (!res.ok) {
       const errorBody = await res.text();
-      throw new Error(`API ${path} failed: ${res.status}${errorBody ? ` - ${errorBody}` : ""}`);
+      const apiError = new Error(
+        `API ${path} failed: ${res.status}${errorBody ? ` - ${errorBody}` : ""}`,
+      );
+      // Attach the HTTP status so query retry logic can short-circuit
+      // non-retryable responses (e.g. 404 endpoint-not-found).
+      (apiError as Error & { status?: number }).status = res.status;
+      throw apiError;
     }
 
     // Only allow empty successful bodies for known no-content endpoints.
